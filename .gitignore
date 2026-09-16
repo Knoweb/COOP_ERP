@@ -1,0 +1,42 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java / Gradle
+.gradle/
+**/build/
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# Android
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+test-results/
+playwright-report/
+
+# Local compose state
+infra/compose/data/
