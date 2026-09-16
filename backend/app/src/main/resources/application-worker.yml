@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: worker
+
+knoweb:
+  role: worker
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

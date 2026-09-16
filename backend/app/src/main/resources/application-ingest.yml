@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: ingest
+
+knoweb:
+  role: ingest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
