@@ -1,0 +1,495 @@
+Cooperative Retail and Distribution System
+
+29 – M9 Integration
+
+Module design for the outward surface: the public API as a versioned OpenAPI contract
+with scoped OAuth2 clients, journal export derived from the posting maps for the
+accounting system to come, notification rules and templates with provider adapters, the
+e-invoicing seam, and the webhook design held for phase 2. Adapters translate; they
+never hold a business rule.
+
+Field             Value
+Document          29 – M9 Integration (Stage 2 module design; template of doc 20 §5)
+Version           v0.1 – draft for design review; contract freeze targeted end of Stage 2 week 7 with doc 33
+Date              9 September 2026
+Owning developer  Module developer (full-stack); the API bundle (doc 33) is assembled here from all module slices
+Inputs            05 SRS (FR-BIL-110, FR-BIL-140); 16 answers (J-02, J-04, R-05 to R-09, M-10); 09 ADR-01, ADR-05; 17 v0.2.1
+                  §7.9, §10; 18 v0.2; 19 v0.2 §7 (notifications delivery), §8; 20 v0.3 M9; 21–28 contracts (events, posting maps,
+Depends on        notification rules handed over); 30 §5.9; 32
+                  All modules' queries and events; M1 (client scope, entities), M4 (posting maps, invoice snapshots), M5 and M7
+Depended on by    (postings), kernel (identity, notifications delivery, attachments, scheduling, audit)
+                  The accounting system (first consumer), the Inland Revenue adapter (phase 3), SMS and e-mail providers, doc 33
+
+Two principles. An adapter is a translator, never a place for business rules: the posting map is M4's data, the invoice
+snapshot is M4's document, the notification rule fires on another module's event – M9 only carries them outward in the
+shape the outside world needs (doc 17 §10.2). And the public API exposes module commands and queries under the
+same scope, permission and idempotency rules as the back office: a client is a principal, not a back door.
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+In scope (phase 1)                                                             Out of scope
+
+API clients: registration per entity, OAuth2 client credentials, scoped        Inbound write APIs beyond what the accounting consumer needs
+grants, rotation, suspension, rate limits, call audit (R-07)                   (acknowledgements); a public developer programme
+
+The public OpenAPI surface: read endpoints over documents, stock,              GraphQL; an API gateway product (doc 20 §4)
+exposure, statements, journal exports, scoped by the client's entity and
+the same RLS classes; versioning and deprecation policy; doc 33
+assembled here
+
+Journal export: per entity and period, lines derived from the posting maps Statutory accounting of any kind (ADR-05); a specific accounting
+
+of every mapped document type, generic JSON and CSV, immutable                 package's format until it is chosen (adapter slot)
+
+once generated, acknowledged by the consumer (J-02, FR-BIL-140)
+
+Notification rules, templates (three languages) and provider adapters for      The delivery mechanics (kernel, doc 19 §7)
+SMS and e-mail; in-app channel; quiet hours and kill switch configuration
+(R-08)
+
+E-invoicing seam: submission record, adapter interface, stub                   Live Inland Revenue integration (phase 3)
+implementation; readiness only (J-04, FR-BIL-110)
+
+Webhook subscriptions designed for phase 2 on the consumer                     Built in phase 1
+mechanism
+
+Regulator read-only access (M-10) as an M1 grant with M8 exports               Prescribed return formats (none exist)
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                             Design section
+FR-BIL-110          E-invoicing readiness: immutable invoice snapshot, reserved integration point                      3.5, 4.4
+FR-BIL-140          Postings derived from documents through the posting map                                            3.3
+J-02                Export format decided when the accounting system is chosen; mapping exists now                     3.3, 11 (DR-2)
+J-04                E-invoicing expected; readiness built in                                                           3.5
+R-05                No bank integration                                                                                1 (out of scope)
+R-06                No government portal now; readiness                                                                3.5
+R-07                OpenAPI, OAuth2/OIDC-secured; accounting system first consumer                                     3.1, 3.2, 4.1
+R-08                SMS and e-mail notifications: dispatch alerts, statements, member communications                   3.4
+R-09                No inherited devices                                                                               –
+M-10                Department of Co-operative Development read-only access                                            3.6
+ADR-01              Money recorded, never moved                                                                        3.3 (export only)
+Doc 19 §7           Kernel delivers; M9 owns rules, templates, providers                                               3.4
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System                                                             Page 2
+3. Domain model
+
+Schema integration.
+
+3.1 API clients
+
+Aspect                     Design
+Aggregate
+                           api_client(client_id, owner_entity_id, name, kind ACCOUNTING | THIRD_PARTY |
+Principal                  INTERNAL_TOOL, credential_kind SECRET | CERT, secret_hash, cert_subject, scopes[],
+                           rate_limit_per_minute, status, created_by) plus api_credential_history for rotation (old
+Scopes                     credential valid for an overlap window).
+Call audit
+                           A client authenticates with OAuth2 client credentials at the identity provider (doc 19 §2) and receives a token with
+                           cls = API_CLIENT, ent = its owner entity, and its scopes. The kernel scope filter maps it to OWN for its entity
+                           (or PARTY on documents where its entity is a party); it never gets FEDERATION_VIEW unless the Federation
+                           registers it so.
+
+                           Named API scopes (documents:read, stock:read, exposure:read, statements:read,
+                           journal:read, journal:ack, customers:read (MPCS only)); each maps to a permission set; granted
+                           by the entity's administrator within their own permissions (no escalation, doc 19 §3).
+
+                           api_call_log(client, at, operation, status, latency, rows) sampled at 100% for writes and
+                           10% for reads; rate limiting per client at the edge and in the interceptor; 429 with retry-after.
+
+3.2 The public API
+
+Aspect                     Design
+
+Shape                      REST under /v1 (doc 17 §10.1): OpenAPI 3.1, bearer tokens, idempotency keys on mutations, cursor
+                           pagination, problem details, ETags on documents. The bundle (doc 33) is assembled from the module slices; the
+                           public subset is marked x-public: true and is the only part clients see.
+
+Phase-1 public operations  Read: invoices, credit and debit notes, payment receipts (seller and buyer views through PARTY masking),
+                           GRNs (own), stock balances (own), exposure and statements (own relationship side), journal exports (own),
+                           customer accounts and postings (own MPCS, customers:read). Write: acknowledge a journal export; nothing
+                           else in phase 1.
+
+Versioning                 /v1 is stable for the phase; additive changes only; a breaking change opens /v2 with /v1 supported for at least
+                           12 months and a Sunset header; deprecations listed in the bundle.
+
+3.3 Journal export
+
+Aspect                     Design
+Derivation
+                           For an entity and period, JournalBuilder walks every document with a posting map (M4 posting_map: INV,
+Export                     CN, DN2, PRC seller side; GRN and INV buyer side; plus M5 WOF/ADJ/RPK and M7 CPR maps registered the
+                           same way) and produces journal_line(export, document, line_kind, side, debit_role,
+Balance                    credit_role, amount, business_date, reference) with account roles; the chart-of-accounts mapping
+Delivery                   is applied by the package adapter when one exists, else roles are exported as-is (J-02).
+
+                           journal_export(export_id, entity, period_from, period_to, format JSON | CSV |
+                           ADAPTER, status, object_key, line_count, total_debit, total_credit, content_hash,
+                           generated_at, acknowledged_by, acknowledged_at, supersedes). Immutable once GENERATED;
+                           a correction is a new export that supersedes the old (documents issued later for the period appear in a
+                           supplementary export, never by editing).
+
+                           Every export balances (Σ debit = Σ credit) by construction of the posting map; a failure is a defect in a map,
+                           reported as an ALERT, never silently exported.
+
+                           Object storage plus the API (journal:read); the consumer acknowledges (journal:ack); unacknowledged
+                           exports older than 30 days raise a REVIEW.
+
+3.4 Notifications: rules, templates, providers
+
+Aspect                     Design
+Rules
+                           notification_rule(rule_id, owner_entity_id (null = federation), event_type,
+                           predicate jsonb, template_id, audience_kind ROLE_AT_COUNTERPARTY | ROLE_AT_OWNER |
+                           CUSTOMER | EXPLICIT, audience_spec, channels[], priority, status). Modules hand over
+                           their rules as seed data (M4 dispatch and dispute events, M7 statements, M8 exception reports, M1 lockouts); an
+                           MPCS may add rules for its own events within its scope. The kernel dispatcher (doc 19 §7) evaluates them.
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System  Page 3
+Aspect                   Design
+Templates
+                         notification_template(template_id, channel, subject_en/si/ta, body_en/si/ta,
+Providers                placeholders_schema, status); ICU MessageFormat; rendered in the recipient's language with English
+                         fallback; SMS bodies limited to 160 GSM or 70 UCS-2 characters with a length check at authoring for Sinhala and
+Consent and suppression  Tamil.
+
+                         provider_config(channel, primary_provider, secondary_provider, credentials_ref
+                         (KMS), sender_id, daily_cap, status); adapters implement NotificationChannel (kernel
+                         interface): HttpSmsAdapter (provider-neutral HTTP with a small template per gateway), SmtpEmailAdapter,
+                         InAppAdapter.
+
+                         Customer channels require M7's STATEMENTS consent (checked at audience resolution); quiet hours,
+                         de-duplication and the kill switch are configuration items read by the kernel dispatcher.
+
+3.5 E-invoicing seam
+
+Aspect                   Design
+Readiness
+                         e_invoice_submission(invoice_document_id, status NOT_SUBMITTED | PENDING |
+                         SUBMITTED | ACCEPTED | REJECTED, provider_ref, submitted_at, response_key,
+                         attempts); EInvoiceAdapter interface with StubAdapter (records PENDING, never sends) in phase 1; the
+                         payload is M4's immutable invoice snapshot (content hash, both VAT numbers, tax point); nothing on the invoice
+                         changes on submission (J-04).
+
+3.6 Regulator and auditor access
+
+Aspect                   Design
+Path
+                         Not an API: a time-boxed EXTERNAL grant (M1) to the web back office with M8 exports; every export audited. If
+                         the Department later prescribes a return format, it becomes an M8 definition and, if needed, an M9 delivery
+                         adapter.
+
+3.7 Webhooks (phase 2 design)
+
+Aspect                   Design
+Design only
+                         webhook_subscription(client, event_types[], url, secret, status) and
+                         webhook_delivery log; a kernel consumer per subscription signs and posts the envelope with retries;
+                         entity-scoped events only. Built on the same consumer mechanism; not in phase 1.
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+   4. State machines
+
+   4.1 API client
+
+From         To           Trigger / command            Guard                                Permission          Audit
+–            ACTIVE
+                          RegisterApiClient(name,      entity admin; scopes within          int.client.manage   API_CLIENT_R
+                          kind, scopes, credential     grantor's permissions; MFA           (MFA)               EGISTERED
+                          kind)
+ACTIVE       ACTIVE                                    overlap window (default 7 days) int.client.manage        API_CREDENTI
+                          RotateCredential             during which both credentials work (MFA)                 AL_ROTATED
+
+ACTIVE       ACTIVE       AmendScopes /                within grantor's permissions;        int.client.manage   API_CLIENT_S
+                          SetRateLimit                 reason                               (MFA)               COPES_CHAN
+                                                                                                                GED
+ACTIVE       SUSPENDED SuspendClient(reason)           reason                               int.client.manage
+                                                                                                                API_CLIENT_S
+SUSPENDED ACTIVE          ReinstateClient              reason                               int.client.manage   USPENDED
+                                                                                            (MFA)
+ACTIVE /     REVOKED      RevokeClient                 terminal; tokens rejected                                API_CLIENT_R
+                                                       immediately                          int.client.manage   EINSTATED
+SUSPENDED                                                                                   (MFA)
+                                                                                                                API_CLIENT_R
+                                                                                                                EVOKED
+
+   4.2 Journal export
+
+From         To           Trigger / command            Guard                                Permission          Audit
+–            REQUESTED                                                                      int.journal.export  JOURNAL_REQ
+                          RequestJournalExport(entit   entity accounts; period closed (all                      UESTED
+                          y, period, format)           locations' day-close past period
+                                                       end) or explicit 'provisional' flag                      JOURNAL_GEN
+                                                                                                                ERATED
+REQUESTED GENERATED       JournalBuilder completes     balances; hash computed; object      system              JOURNAL_FAIL
+REQUESTED FAILED          map error                    stored                               system              ED
+                                                                                                                JOURNAL_ACK
+                                                       ALERT with the offending                                 NOWLEDGED
+                                                       document and map                                         JOURNAL_SUP
+                                                                                                                ERSEDED
+GENERATED    ACKNOWLEDG   AcknowledgeJournalExport     consumer client with journal:ack or int.journal.ack
+             ED           (API or web)                 entity accounts
+GENERATED /
+ACKNOWLED    SUPERSEDED   a later export for an        supersedes link                      system
+GED                       overlapping period
+
+   4.3 Notification rule and template
+
+From         To           Trigger / command            Guard                                Permission          Audit
+                                                                                            int.notify.manage
+–            DRAFT        DefineRule /                 owner scope; event type exists;                          NOTIFY_RULE_
+                                                       template placeholders match the                          DEFINED
+                          DefineTemplate               event's payload schema; SMS
+                                                       length check
+DRAFT        ACTIVE       ActivateRule                                                      int.notify.manage   NOTIFY_RULE_
+                                                       template ACTIVE in all three         (MFA for            ACTIVATED
+ACTIVE       RETIRED      RetireRule                   languages (or English with           customer
+                                                       fallback accepted by the owner)      channels)           NOTIFY_RULE_
+                                                                                                                RETIRED
+                                                       reason                               int.notify.manage
+
+   4.4 E-invoice submission (readiness)
+
+From         To           Trigger / command            Guard                                Permission          Audit
+             PENDING                                                                        system              EINVOICE_PEN
+NOT_SUBMIT                invoice.issued.v1 with       adapter configured (stub in phase                        DING
+TED                       e-invoicing enabled for the  1)
+                          entity                                                                                EINVOICE_*
+
+PENDING      SUBMITTED /  adapter response (phase 3) –                                      system
+             ACCEPTED /
+             REJECTED
+
+   29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System                                Page 5
+5. Contract
+
+5.1 Commands
+
+Command                                       Input (essentials)                            Permission                Events
+                                              name, kind, credential kind, scopes;          int.client.manage (MFA)   api_client.*.v1
+RegisterApiClient / RotateCredential /        reason
+AmendScopes / SetRateLimit / SuspendClient /                                                int.journal.export / ack  journal.requested/ge
+ReinstateClient / RevokeClient                entity, period, format, provisional?;                                   nerated/failed/ackno
+                                              export id                                                               wledged/superseded.
+RequestJournalExport /                                                                                                v1
+AcknowledgeJournalExport /                                                                                            posting_map.register
+RegenerateJournalExport                                                                                               ed.v1
+                                                                                                                      notification_template.
+RegisterPostingMap (internal, from M5/M7      doc type, line kinds, roles                   system                    *.v1
+seeds)                                                                                                                notification_rule.chan
+                                                                                                                      ged.v1
+DefineTemplate / ActivateTemplate /           channel, three languages, placeholders int.notify.manage                provider.configured.v
+RetireTemplate                                                                                                        1
+                                                                                                                      einvoice.*.v1
+DefineRule / ActivateRule / RetireRule        event type, predicate, template,              int.notify.manage (MFA    api_bundle.published
+                                              audience, channels                            for customer channels)    .v1
+
+ConfigureProvider / TestProvider              channel, providers, sender id, cap            int.provider.manage (F,
+                                                                                            MFA)
+
+EnableEInvoicing (entity) / SubmitEInvoice (stub) entity; invoice                           int.einvoice.manage (F)
+
+PublishApiBundle (doc 33)                     version, slices                               int.api.publish (F)
+
+5.2 Queries (admin) and the public operations
+
+Query / operation                                     Returns                                       Scope rule
+                                                      Clients, scopes, call statistics              OWN admin
+ListApiClients(entity) / GetClientUsage(client)       Exports and lines; download link              OWN accounts; API journal:read
+                                                                                                    OWN; F for federation rules
+ListJournalExports(entity) / GetJournalExport(id) /   Rules, templates, delivery log (recipient     Any authenticated
+GetJournalLines(id)                                   hashed)                                       Client's entity: OWN or PARTY per
+                                                      Roles by line kind                            the module's RLS
+ListNotificationRules / Templates /                   The module queries' public subsets through
+GetNotificationLog(scope)                             their own controllers                         journal:ack
+
+GetPostingMap(doc type)                               The one write
+
+Public: GET /v1/trading/invoices, credit-notes,
+debit-notes, payment-receipts, grns; GET
+/v1/inventory/.../balances; GET
+/v1/trading/relationships/{id}/exposure and
+/statement; GET /v1/integration/journal-exports; GET
+/v1/customers/... (customers:read)
+
+Public: POST
+/v1/integration/journal-exports/{id}/acknowledge
+
+5.3 Events published
+
+Event                                         Payload                                       Consumers
+                                                                                            Identity provider mapper (client scopes),
+api_client.registered/rotated/scopes_changed client id, entity, scopes                      audit, M8
+/suspended/reinstated/revoked.v1                                                            Notifications (accounts role), M8
+
+journal.requested/generated/failed/acknowled export id, entity, period, totals, object key  Kernel dispatcher cache, audit
+ged/superseded.v1
+                                                                                            M4 (e_invoice_status metadata), M8
+notification_rule.changed.v1 /                rule id, event type, status
+notification_template.*.v1 /                                                                Documentation site, audit
+provider.configured.v1
+
+einvoice.pending/submitted/accepted/rejecte invoice id, status, provider ref
+d.v1
+
+api_bundle.published.v1                       version, deprecations
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System                                         Page 6
+6. Key flows
+
+Flow                           Sequence                                                              Failure paths
+
+6.1 Onboarding the             MPCS administrator registers an API client (kind ACCOUNTING)          A scope beyond the administrator's
+accounting system                                                                                    own permissions is refused; a
+                               with scopes journal:read, journal:ack, documents:read (MFA) →         suspended client gets 403; rate limit
+                               credential issued once, shown once → the consumer authenticates       429
+                               with client credentials → token carries the entity and scopes →
+                               reads invoices and the month's journal export → acknowledges
+
+6.2 Month-end journal export   Accounts requests the export for September (all locations' day-close  A document without a map for its line
+                                                                                                     kind: FAILED with an ALERT naming it;
+                               past 30 September) → JournalBuilder walks INV, CN, DN2, PRC           a provisional export (period not closed)
+                               (seller), GRN and INV (buyer), WOF, ADJ, CPR with their maps →        is marked PROVISIONAL in the file
+                               lines by role; totals balance; hash; JSON and CSV stored →            and superseded later
+                               GENERATED → notification to accounts → consumer downloads
+                               and acknowledges
+
+6.3 A late document            An invoice for September issued on 3 October after the export → –
+                               not edited into the export; a supplementary export for the same
+                               period lists only documents issued since the last export's
+                               generated_at; the consumer posts the supplement
+
+6.4 Dispatch alert             M4 delivery_note.dispatched.v1 → kernel dispatcher matches the        Primary provider down: secondary after
+                               federation rule (audience: stores role at the buyer; channels SMS,    the third attempt; quiet hours: deferred
+                               IN_APP) → template rendered in the recipient's language →             to 07:00; no consent needed (staff
+                               HttpSmsAdapter sends via the primary provider → log                   channel)
+
+6.5 Customer statement SMS M7 customer_statement.issued.v1 → rule with audience                      No consent: SUPPRESSED in the log
+                                          CUSTOMER → consent STATEMENTS checked → 160-character
+                                          summary in the customer's language → sent
+
+6.6 E-invoicing enabled later Federation enables e-invoicing for an entity; invoice.issued.v1        –
+
+                               creates PENDING submissions; the stub records; when the IRD
+
+                               adapter lands (phase 3) it drains PENDING and posts
+
+                               ACCEPTED/REJECTED as metadata on M4's invoice
+
+6.7 Publishing the API bundle  At cross-module reconciliation: collect every module's OpenAPI        A slice that disagrees on a shared
+(doc 33)                       slice, validate consistency (shared schemas, error types, security    schema fails the build
+                               scheme), mark public operations, generate the documentation site
+                               and the typed clients → version 1.0.0 published
+
+   7. Configuration                                      Default                               Scope                   Who may change
+                                                         600                                   Federation; per client  int.client.manage
+Item                                                                                           override
+integration.client_rate_limit_per_minute                 7                                     Federation              –
+                                                         [JSON, CSV]                           Federation              int.journal.export
+integration.credential_overlap_days                      30                                    Federation              –
+integration.journal_formats                              22:00–07:00                           Entity                  int.notify.manage
+integration.journal_unacknowledged_review_days           provider-dependent                    Federation              int.provider.manage
+notify.quiet_hours (SMS)                                 off                                   Entity                  int.notify.manage
+notify.daily_cap_per_channel                             false                                 Entity (F sets)         int.einvoice.manage
+notify.kill_switch (channel)                             12                                    Federation              –
+einvoice.enabled
+api.deprecation_notice_months
+
+8. Screens as paper
+
+Screen                  Paper mirrored          Surface  Roles                      Notes
+API clients             Access register         W        Entity admin (MFA)
+                                                                                    Register, scopes, rotate (credential shown once),
+Journal exports         Journal                 W        Accounts                   suspend, usage
+
+Posting map viewer      Chart mapping           W        Accounts, auditor          Period, format, provisional flag, totals, download,
+Notification templates  Notice text                                                 acknowledgement state, supplements
+                                                W        Federation, MPCS
+                                                                                    Roles by document type and line kind (read-only)
+
+                                                                                    Three languages, placeholders, SMS length meter,
+                                                                                    preview
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System                                          Page 7
+Screen              Paper mirrored  Surface  Roles                             Notes
+Notification rules  Notice list     W        Federation, MPCS                  Event, audience, channels; activation
+Notification log    Dispatch book   W        Entity                            Status, attempts, suppression reasons; recipients
+                                                                               hashed
+Providers           –               W        Federation (MFA)                  Primary and secondary per channel; test send
+E-invoicing         –                                                          Enable per entity; submission states (stub)
+API documentation   –               W        Federation                        Generated from the bundle; versions and
+                                                                               deprecations
+                                    W (public) Clients
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System  Page 8
+9. Non-functional design
+
+Aspect             Design
+9.1 Security
+                   Clients are principals under the same scope filter and RLS; scopes never exceed the granting administrator's
+9.2 Isolation      permissions; credentials hashed (secrets) or certificate-bound; rotation with overlap; rate limits at the edge and
+9.3 Correctness    in-process; every write audited; the public subset is explicitly marked in the bundle.
+9.4 Privacy
+9.5 Compatibility  Adapters run in the worker profile with timeouts and circuit breakers; a provider outage never blocks a business
+                   transaction (notifications are asynchronous by design).
+
+                   Journal exports balance by construction; a map defect is an ALERT; exports are immutable and superseded,
+                   never edited; hashes let the consumer verify a download.
+
+                   Notification logs hash recipients and keep no bodies; customer channels require consent; the public API exposes
+                   customer data only under customers:read to the owning MPCS.
+
+                   Additive changes within /v1; 12-month deprecation; generated clients versioned with the bundle.
+
+10. Test strategy
+
+Layer              What is tested
+Unit               Scope containment on registration; rotation overlap; JournalBuilder line derivation for every mapped document type
+                   and side; balance assertion; supplement selection by generated_at; template rendering and SMS length; audience
+Contract           resolution incl. consent
+                   Every admin operation; every public operation under a client token (OWN and PARTY masking); rate limit 429;
+State machine      idempotent acknowledgement
+Property-based     Clients, exports, rules, submissions
+Adapters           Random document sets: every export balances; supplement plus original equals a fresh full export
+Scenario           SMS and e-mail adapters against local fakes (compose: mailpit; an HTTP SMS stub); failover; quiet hours
+Bundle             Flows 6.1–6.7 incl. the accounting consumer simulator and the bundle publication
+                   All module slices merge without conflicts; shared schemas identical; generated clients compile
+
+11. Decision requests
+
+#        Point                                         Proposed                                  Decider
+DR-1     Public write operations in phase 1
+DR-2     Journal export formats before the accounting  Only journal acknowledgement              Federation
+         package is chosen
+DR-3     Which document types carry posting maps in    Generic JSON and CSV with account roles;  Federation accounts
+         phase 1                                       package adapter later
+DR-4     SMS provider(s)
+                                                       INV, CN, DN2, PRC (seller); GRN, INV (buyer); Accountant review (doc 20 M9
+DR-5     MPCS-authored notification rules
+DR-6     Webhooks                                      WOF, ADJ, RPK (M5); CPR (M7)              risk)
+DR-7     Integration tables (CR-29-1 to doc 18)
+                                                       Procurement item; adapter is provider-neutral; Federation procurement
+                                                       two providers for failover
+
+                                                       Allowed within their scope for their own events Federation
+
+                                                       Phase 2                                   Federation
+
+                                                       Adopt                                     Architecture review
+
+12. Traceability
+
+Section            Identifiers
+3.1–3.2            R-07; doc 17 §10.1; doc 19 §2, §3; doc 33
+3.3                FR-BIL-140; J-02; ADR-01, ADR-05; doc 24 §3.9; doc 25, 27 posting maps
+3.4                R-08; doc 19 §7; M7 consent
+3.5                FR-BIL-110; J-04; R-06; doc 24 §3.6
+3.6–3.7            M-10; doc 17 §10.2 webhooks
+9                  NFR-SEC; ADR-27
+
+End of document. Draft for design review; the contract freezes with the doc 33 bundle at cross-module reconciliation, targeted
+Stage 2 week 7. Implementation guide: 29A.
+
+29 - M9 Integration | v0.1 draft | Cooperative Retail and Distribution System                                         Page 9
+

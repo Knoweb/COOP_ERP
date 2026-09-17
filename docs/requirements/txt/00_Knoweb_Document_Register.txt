@@ -1,0 +1,245 @@
+Cooperative Retail and Distribution System
+00  -  Knoweb Document Register
+v0.5  --  18 September 2026  --  replaces v0.4 (10 September, PDF) and v0.2 (14 August). Live document.
+Index of every document of the requirements baseline and the design phase: file, version, status and what it contains. Numbers are identifiers, not reading order. Versioning convention: files are never edited in place on Drive; a superseded version is replaced by a new versioned file and the old one is moved to trash. Design and implementation documents are issued as PDF; the live registers (00, 10) and the folder entry point (00_Start_Here) are Word documents so they can be edited in place. This register decides which version is current whenever two documents disagree.
+
+Requirements baseline folder: https://drive.google.com/drive/folders/1DKsOlf4k8vlOJCjp2oVaEQlg-XCs1fgh
+System design folder: https://drive.google.com/drive/folders/14pTgorZIGEZ9FrJGlmhaLy6Eh1o5FdFj
+Code repository (document sources under docs/ from 17 September 2026): https://github.com/Knoweb/COOP_ERP
+1. Requirements baseline (documents 00 - 13, 15, 16)
+File
+Version
+Status
+Contents
+00_Knoweb_Document_Register.docx
+v0.5
+Live
+This register
+01_Vision_and_Scope
+v0.2
+Baseline
+Objectives, boundaries, documents-not-payments scope, delivery approach, baseline authority. Change requests of 3 September 2026 pending as v0.3
+02_Domain_Model
+v0.2
+Baseline
+Entity and relationship tables, 13 document types, cardinalities, recurring patterns
+03_Document_State_Machines
+v0.2
+Baseline
+All document lifecycles: statuses, transitions, actors, numbering per state. Reconciled in docs 24, 25, 26
+04_Process_Flows
+v0.2
+Baseline
+Twelve numbered actor flows from inter-entity trade to shop onboarding
+05_SRS_Functional_Requirements
+v0.2
+Baseline
+129 EARS-phrased functional requirements across 16 domains with IDs, phases and source references. FR-PRC-040 split and FR-POS-050 wording per the September change requests
+06_NFR_Specification
+v0.2
+Baseline
+Non-functional requirements against ISO 25010. Change requests: hosting-neutral NFR-PRF-020; NFR-UPD-040 deferred; NFR-CMP-030 advisory (24B)
+07_Matrices
+v0.2
+Baseline
+RBAC skeleton, visibility matrix, audit event catalogue, configuration-at-setup register, report catalogue placeholder. The discount-cap configuration item and supervisor price override are rescinded by ADR-14 and must not be implemented
+08_Traceability_Matrix
+v0.2
+Baseline
+Every questionnaire reference (A - T) mapped to resolution, requirement IDs, phase, status. Doc 40 will extend it to design sections
+09_Decisions_Log
+v0.2
+Live
+ADR-01 to ADR-36. ADR-37 to ADR-50 to be entered from doc 18 v0.3.1 §11
+10_Open_Items_Register.docx
+v0.4
+Live
+Every open decision and action by decider with the assumption in force; the 13-item ratification batch; parked items; pending external input; closed items
+11_Business_Primer_for_Engineering
+v0.2
+Baseline
+The business in plain terms for the build team
+12_Domain_Glossary
+v0.2
+Live
+Terms. To add: assortment, control price, primary till, shop-management mode, CPR, sell-through, freshness stamp
+13_Worked_Scenarios
+v0.2
+Baseline
+Scenarios 1 - 4, allocated to modules in docs 24 - 26
+15_Clarification_Questionnaire
+v1.0
+Reference
+The questionnaire put to the federation
+16_Questionnaire_Answers
+v1.0
+Reference
+The federation's answers (references A - T cited throughout the design)
+Supporting documents (baseline folder)
+File
+Version
+Status
+Contents
+Document_Numbering_RFC
+v1.0
+Closed
+Multi-series gapless numbering proposal (ADR-11); adopted by 24B on 9 September 2026
+Numbering_Scheme_Tax_Advisor_Briefing
+v1.0
+Sent; advisory
+Five written questions for the tax advisor; answers now advisory (24B, doc 10 P-05)
+2. Design phase
+2.1 Entry point
+File
+Version
+Status
+Contents
+00_Start_Here.docx
+v1.1
+Live
+Folder entry point and developer start guide: what the system is, the three governing ideas, which document is which, the full file list, how to start on a module, the non-negotiable rules, reading paths for non-developers
+2.2 Stage 1  -  Foundations
+File
+Version
+Status
+Contents
+14_Technical_Foundations
+v0.2
+Drafted
+Stack, till platform, hosting decision matrix (provider-neutral), capacity model, stateless scale-out rules, the seven prototype spikes
+17_Solution_Architecture
+v0.2.1
+Drafted
+Module map (M1 - M9, M10 boundary), four layers, dependency rules R1 - R7, event backbone, edge architecture
+18_Core_Data_Model
+v0.3.1
+Design of record
+Parts A - E shared tables and invariants; Part F module schema register; ADR-37 - 50 list. v0.3.1 restores v0.2 material dropped in the v0.3 rewrite
+19_Kernel_Services
+v0.2
+Drafted
+Kernel index; identity, permissions, audit, i18n, events, notifications delivery, configuration register, scheduling
+20_Stage2_Module_Design_Plan
+v0.3
+Drafted
+Plan and schedule, the module design template, the implementation-guide outline, simplicity guardrails, Appendix A deferred-capability register, M10 boundary
+30_Frontend_Foundations_and_UI_Module_Designs
+v0.1
+Drafted
+Design system, the two shells (web, native Android till), screen inventories per module
+31_Application_Update_and_Distribution
+v0.1
+Drafted
+Zero-touch updates to terminals nationwide: device-owner agent, rings, health gates, version floor
+32_Sync_Contract
+v0.1
+Drafted
+Till-to-central protocol: batches, acknowledgements, snapshots, gaps, conformance suite
+2.3 Sprint 0  -  Implementation guides for the foundations
+File
+Version
+Status
+Implements
+17A_Build_Skeleton_Implementation_Guide
+v0.1
+Drafted
+17 (with the stack of 14 and the shells of 30): repository, build, boundary tests, migrations, hello module
+19A_Kernel_Services_Implementation_Guide
+v0.1
+Drafted
+19, 18 parts C - E, 32: the kernel services as tables, classes, algorithms and tickets
+2.4 Stage 2  -  Module designs and implementation guides
+File
+Version
+Status
+Guide
+21_M1_Party_Tenancy_Security
+v0.1
+Drafted
+21A_M1_Implementation_Guide v0.1
+22_M2_Catalogue_Batch
+v0.1
+Drafted
+22A_M2_Implementation_Guide v0.1
+23_M3_Pricing_Rules
+v0.1
+Drafted
+23A_M3_Implementation_Guide v0.1
+24_M4_Trading_Documents
+v0.1
+Drafted
+24A_M4_Implementation_Guide v0.1 (amended by CR-27-2); 24B_Numbering_Addendum v1.0
+25_M5_Inventory_Costing_Repack_Loss
+v0.1
+Drafted
+25A_M5_Implementation_Guide v0.1
+26_M6_POS_Offline
+v0.1
+Drafted
+26A_M6_Implementation_Guide v0.1 (till track)
+27_M7_Customers_Payment_Recording
+v0.1
+Drafted
+27A_M7_Implementation_Guide v0.1
+28_M8_Reporting_Pipeline
+v0.1
+Drafted
+28A_M8_Implementation_Guide v0.1
+29_M9_Integration
+v0.1
+Drafted
+29A_M9_Implementation_Guide v0.1; 29A §7 produces the API bundle
+33_API_Specification
+ - 
+Build artefact
+Produced by the bundle assembler (29A §7): public, internal and device OpenAPI bundles, changelog, documentation site. Never written by hand
+2.5 Stage 3  -  Prototype spikes
+No documents. Seven spikes (doc 14 §8) close as entries in doc 09 or as changes to the affected module pair; spike code lives in the repository.
+2.6 Stage 4  -  Operational design (to write)
+File
+Status
+Prerequisite
+34_Security_Architecture_and_Threat_Model
+To write
+18, 19, 21, 26, 29; pen-test sequencing (doc 10 P-13)
+35_Infrastructure_and_Deployment
+To write
+Hosting decision (doc 10 F-01); 14
+36_Observability_Backup_and_DR
+To write
+35; 14 §6; spike 5; RTO/RPO (F-14)
+37_Data_Migration_and_Onboarding_Tooling
+To write
+22, 25 (opening balances), 21 (bulk register), 31 (staging); cutover exercise (P-11)
+38_Operations_and_Support_Runbook
+To write
+31, 36; helpdesk boundaries (Q-09); support hours (F-02)
+2.7 Stage 5  -  Build readiness (to write)
+File
+Status
+Prerequisite
+39_Test_Strategy_and_Assurance
+To write
+Every module design §10; spikes
+40_Design_Traceability_and_Build_Readiness_Review
+To write
+All; doc 08
+3. Repository mirror
+From 17 September 2026 every document above is also committed to the code repository: PDFs and Word files under docs/requirements/ and docs/design/, read-only text extracts under the txt/ subfolders, and Markdown sources for any document revised or created thereafter under docs/sources/. The repository's docs/README.md holds the operating instructions; docs/DECISIONS_PENDING.md is the Markdown source of document 10; AGENTS.md at the root carries the standing instructions for the AI coding tools the team uses.
+4. Reading paths
+Reader
+Path
+Federation administrator or board member
+01 --> 11 --> 17 §4, §6, §9.2, §10.3 --> 20 §2 and Appendix A --> 10 (the sections for Federation deciders)
+New engineering lead
+00_Start_Here --> 14 --> 17 --> 18 --> 19 --> 20 --> 32 --> 30 --> 31, then the module pair for their area
+Platform pair (Sprint 0)
+17A --> 19A, with 18, 19 and 32 beside them
+Module developer
+00_Start_Here, then the module's nA guide (self-contained), then the design n for the reasoning, then 10 for the assumptions in force
+Till track
+26 --> 26A --> 32 --> 24A §7 - 8, 25A §7 - 8, 27A §7 --> 31 --> 30 §4
+Auditor or reviewer
+18 (invariants, Part F) --> 19 §4 --> 24B --> 34 when written --> 10
+5. Status notes and change control
+Documents 01 - 13 are stable baseline content pending federation sign-off of the 3 September 2026 change requests; they change only by change request with Federation sign-off. Design documents are drafts until the Stage 5 review; a module's published contract (design §5) freezes when a dependant designs against it and changes thereafter by change request. Document 10 is the live register, updated at every Stage 2 gate and the Stage 4 and 5 reviews; document 09 records every closed decision; this register records every version change. The Ratification Defaults RFC (doc 10 §2) is still to be tabled; the Numbering RFC closed with 24B.

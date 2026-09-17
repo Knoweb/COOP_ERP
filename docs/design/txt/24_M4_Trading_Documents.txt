@@ -1,0 +1,872 @@
+Cooperative Retail and Distribution System
+
+24 – M4 Trading Documents
+
+Module design for the inter-entity flow from order to settlement: order, delivery note with
+drops, goods received note as the ownership pivot, discrepancy and claim, invoice,
+credit and debit notes, payment receipt with settlement to specific invoices, statements,
+and the warn-only exposure picture. This is where the state machines the Stage 2 plan
+called for live; numbering detail waits for the tax advisor (24B).
+
+Field             Value
+Document
+Version           24 – M4 Trading Documents (Stage 2 module design; template of doc 20 §5)
+Date
+Owning developer  v0.1 – draft for design review; contract freeze targeted end of Stage 2 week 5
+
+Inputs            9 September 2026
+
+Depends on        Module developer (full-stack) for the back office and the driver app screens; the till track hosts the GRN screens in
+                  shop-management mode from this module's specification
+Depended on by
+                  05 SRS (FR-ORD, FR-DEL, FR-BIL); 03 state machines §2–8; 13 scenarios 1 and 2; 16 answers (A, C, D, I-05 to
+                  I-07, J sections); 09 ADR-01, 03, 04, 11, 12; 17 v0.2.1 §7.4, ADR-37; 18 v0.2 part C; 19 v0.2; 20 v0.3 M4
+                  blueprint; 21–23 contracts; 30 §5.4; 32
+
+                  M1 (relationships and terms, locations, scope), M2 (SKU, conversions, batch registration), M3 (trade price,
+                  adjustment types), M5 query (availability), kernel (document base, numbering, links, attachments, audit, events)
+
+                  M5 (stock effects of GRN, returns), M2 (batch registration), M7 (customer payments share the PRC base), M8, M9
+                  (journal export, e-invoice seam, notifications), M10 (purchase-order receipts, phase 2)
+
+One event carries the whole module. grn.confirmed.v1 is the moment ownership and risk transfer (firm sale,
+ADR-03). Before it, the goods are the seller's problem; after it, the buyer's. Batches get registered from it, lots get
+created from it, invoicing is permitted by it, and loss attribution depends on its timestamp. Everything in this module is
+either on the way to that event or a consequence of it.
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+M4 owns the documents that pass between two legal entities and the ledger picture they produce: what was
+ordered, what was dispatched, what was received, what is disputed, what is owed and what has been paid. It
+never moves money (ADR-01) and never blocks on credit (ADR-12); it records, links and computes.
+
+In scope (phase 1)                                                             Out of scope
+
+Order (buyer's document): manual lines and system suggestions (P2),            Vehicle routing, load planning, fleet management (D-01);
+submission, seller acceptance with allocation (FCFS default, manual            minimum order quantities (C-06); fixed ordering cycles (C-07)
+override), partial fulfilment with backorders, indicative ETA, amend/cancel
+until the lock window, manual adjustments on Federation orders (C-01 to
+C-09, A-06)
+
+Delivery note with drops (ship-to per drop, bill-to entity), vehicle, driver,  Returnable containers (D-10); cold-chain telemetry
+timestamps; proof of delivery by driver app or paper (D-02, D-03, D-09)
+
+GRN: actuals recorded by the receiver, never forced to match; offline          Stock lots and movements themselves (M5 applies them from the
+
+capture and confirmation at a shop; the ownership pivot; reversal within a event)
+
+window (D-04, D-05, ADR-03)
+
+Discrepancy raised automatically on any mismatch; resolution by the            –
+
+parties within the window; escalation to the Federation as arbiter (D-05,
+
+D-06)
+
+Claim with photographs: raise, inspect, approve or reject; credit note and Insurance or transporter recovery outside the system
+return on approval (F-03, D-07, D-08)
+
+Invoice following GRN; credit and debit notes at every tier; tax invoice with Statutory accounting (ADR-05); interest posting automation (A-12
+both VAT numbers; immutable snapshot for e-invoicing readiness (J-03, deferred); live e-invoicing (P3)
+J-04, J-07)
+
+Payment receipt recorded by the seller, settled to specific invoices;          Bank integration or payment processing (ADR-01); customer
+cheque sub-lifecycle; dispute and reversal (I-05, I-07)                        payments' screens (M7 reuses the base)
+
+Statements per relationship at a configured frequency; committed               Credit blocking of any kind
+exposure warn-only with freshness (I-06, A-10)
+
+Journal-posting map per document type as data (J-02); lateral transfer         The transfer document itself (M5 XFR)
+request mediated by the MPCS (C-10, C-11)
+
+Numbering: uses the kernel series (buyer's ENTITY series for orders,           Numbering rules pending the tax advisor: addendum 24B
+seller's for DN/INV/CN/DN2/PRC, receiver's LOCATION series for shop
+GRNs)
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                            Design section
+FR-ORD-010          Requisition by manual entry and system suggestion (C-01)                                          3.1, 6.1
+FR-ORD-020          Seller approves manually; multi-role approval; no auto-fulfilment (C-02)                          4.1
+FR-ORD-030          Allocation FCFS default, manual override, configurable per seller, audited (C-03, C-04)           3.1, 6.2
+FR-ORD-040          Partial fulfilment; remainder stays open as backorder unless cancelled (C-05)                     3.1, 4.1
+FR-ORD-050          Amend/cancel until a configurable lock window before ETA; per-order override (C-08)               4.1, 7
+FR-ORD-060          Indicative ETA at acceptance; delivery performance measured (C-13)                                3.1, 5.2
+FR-ORD-070          Buyer sees seller availability, live or indicative (C-12)                                         6.1
+FR-ORD-080          Lateral transfer request within an MPCS, mediated (C-10, C-11)                                    3.7, 4.7
+FR-DEL-010          Delivery note per dispatch; multi-drop from one vehicle (D-02)                                    3.2
+FR-DEL-020          Bill-to and ship-to distinguished on drops                                                        3.2
+FR-DEL-030          Receiver records actuals; never forced to match (D-04, D-05)                                      3.3
+FR-DEL-040          Discrepancy raised automatically on mismatch (D-05)                                               3.4, 4.4
+FR-DEL-050          Photographs attachable to discrepancies and claims (D-08)                                         3.4, 3.5
+FR-DEL-060          GRN capture and confirmation offline (H-02)                                                       3.3, 9.2
+FR-BIL-010          Invoice from received goods at the relationship's trade price                                     3.6
+FR-BIL-020          Journal-posting map per document type (J-02)                                                      3.9
+FR-BIL-030          Credit and debit notes at all tiers (J-07)                                                        3.6, 4.6
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                                   Page 2
+Identifier      Requirement (abridged)                                               Design section
+FR-BIL-040      Statements per relationship (I-06)                                   3.8
+FR-BIL-050/060  Series scopes and gapless numbering (ADR-11)                         3.10, 24B
+FR-BIL-070      Payment matched to specific invoices (I-07)                          3.7, 4.6
+FR-BIL-080      Exposure computed and warned, never blocked (ADR-12)                 3.8
+FR-BIL-090      Counter transfer on device replacement                               kernel (doc 32 §8)
+FR-BIL-100      Interest rule configurable, manual application (A-12)                7
+FR-BIL-110      E-invoicing readiness: immutable invoice snapshot (J-04)             3.6, 9.5
+FR-BIL-120/130  Tax invoice content; VAT numbers of both parties (J-03)              3.6
+FR-BIL-140      Postings derived from documents                                      3.9
+FR-BIL-150      Cheque sub-lifecycle                                                 4.6
+ADR-03          Ownership and risk at GRN confirmation                               3.3
+D-06            Discrepancy time limit; Federation arbiter                           4.4, 7
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System  Page 3
+3. Domain model
+
+All documents use the kernel base (doc 18 part C): header, lines, typed links, state history, attachments. M4
+adds extension tables in schema trading, keyed one-to-one on document_id and inheriting immutability.
+
+3.1 Order (ORD)
+
+Aspect             Design
+Extension
+                   doc_order(document_id, relationship_id, requested_eta, committed_eta, lock_at,
+Issuer and series  lock_override_by, allocation_run_id, backorder_of_order_id); line extension
+Allocation run     doc_order_line(line_id, requested_qty, allocated_qty, fulfilled_qty, backorder_qty,
+                   tier_price, adjustment_type?, adjustment_value?).
+Backorders
+Lock               The buyer issues; ENTITY series of the buyer (doc 18 §5.5 corrected).
+Adjustments
+                   allocation_run(seller, at, rule, orders considered, availability snapshot, manual
+                   overrides): FCFS by submission time by default; a seller may override allocations with a reason; the run is
+                   audited (C-04).
+
+                   Unallocated remainder stays open on the same order as backorder_qty until the seller allocates it in a later run
+                   or either party cancels it; a configurable age (default 30 days) raises a REVIEW, never an auto-cancel.
+
+                   lock_at = committed_eta − relationship.order_lock_hours_before_eta; a permitted seller role
+                   may override per order with a reason (C-08).
+
+                   Only on Federation→distributor orders, against M3 adjustment types and within their bounds, gated by the type's
+                   permission (A-06); recorded as a line of kind ADJUSTMENT that flows to the invoice.
+
+3.2 Delivery note (DN)
+
+Aspect             Design
+Extension
+                   doc_delivery(document_id, vehicle_ref, driver_user_id?, driver_name, dispatched_at,
+Direct drop        route_ref); doc_delivery_drop(drop_id, document_id, seq, ship_to_location_id,
+Risk               bill_to_entity_id, order_ids[], status, arrived_at, pod_kind PAPER | APP,
+                   pod_signature_key?, pod_photo_key?, delivered_by); lines carry drop_id, dispatched_qty,
+                   batch_id.
+
+                   One DN from one vehicle may serve several drops; a drop's ship-to may be a shop location of the bill-to entity
+                   (direct-to-shop, D-02). The GRN for that drop is captured at the shop, in the shop's LOCATION series,
+                   offline-capable.
+
+                   Remains with the seller until each drop's GRN is confirmed (A-03); in-transit loss is the seller's.
+
+3.3 Goods received note (GRN)
+
+Aspect             Design
+Extension
+                   doc_grn(document_id, drop_id?, delivery_document_id?, purchase_order_ref?,
+The pivot          received_at, counted_by, confirmed_by, confirmed_at, reversal_of?); lines carry
+Offline            expected_qty (from the DN drop, nullable for local supply), received_qty, batch_id (registered through
+                   M2 at confirmation), condition GOOD | DAMAGED, damaged_qty.
+Reversal
+Local supply       Confirmation is the transfer of ownership and risk (ADR-03). In the same transaction: batches registered (M2),
+                   grn.confirmed.v1 published; M5 creates the receiving entity's lots at the trade price and posts receipt
+                   movements; discrepancy raised if any line's received ≠ expected or any damaged_qty > 0.
+
+                   Captured and confirmed on the till in shop-management mode against the DN drop in the snapshot (or without
+                   expectation for local supply); numbered from the shop's LOCATION series held by the primary till; ingested
+                   through the document bundle path (doc 32 §3.1); the confirmation timestamp is the till's, corrected for clock
+                   offset.
+
+                   A confirmed GRN may be reversed within grn_reversal_hours (default 24) only if no sale has consumed its
+                   lots (M5 query) and no invoice references it; reversal is a REVERSES-linked GRN with negated lines; ownership
+                   reverts. Beyond the window, corrections go through discrepancy or claim.
+
+                   An MPCS receiving open-market goods (A-08) issues a GRN with no DN, a supplier from M2's minimal table, and
+                   its own cost per line; the same pivot applies (the entity now owns the goods).
+
+3.4 Discrepancy
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+Aspect         Design
+Document
+               doc_discrepancy(document_id, grn_document_id, delivery_document_id, raised_at,
+Automatic      window_ends_at, kind SHORT | OVER | DAMAGED | MIXED, resolution, resolved_by,
+Resolution     escalated_at, arbiter_user_id) with lines (sku, batch, expected, received, damaged, variance);
+               DISPUTES-linked to the GRN and the DN (doc 18 document_link).
+
+               Raised by the GRN confirmation handler; no user action; the seller is notified (R-08).
+
+               Within relationship.discrepancy_window_days: ACCEPT_SHORT (seller issues a credit note for the
+               shortfall), ACCEPT_OVER (seller invoices the extra or buyer returns), REJECT (seller disputes the count; buyer
+               may raise a claim), SPLIT (agreed quantities). After the window without resolution: escalation to the Federation
+               arbiter (D-06), whose decision is recorded and binding.
+
+    3.5 Claim  Design
+
+Aspect         doc_claim(document_id, grn_document_id, discrepancy_document_id?, kind DAMAGED |
+Document       EXPIRED_ON_ARRIVAL | WRONG_GOODS | QUALITY, raised_at, inspected_at, inspector,
+               decision, decided_at, return_required) with lines (sku, batch, qty, value at trade price) and
+Outcome        attachments (photographs mandatory, F-05 style).
+
+               APPROVED → seller issues a credit note (CREDITS link) and, if return_required, M5 posts a return
+               movement on claim.approved.v1; REJECTED → closed with reason; either may be escalated like a
+               discrepancy.
+
+3.6 Invoice, credit note, debit note
+
+Aspect         Design
+Invoice
+               doc_invoice(document_id, grn_document_ids[], delivery_document_id?, seller_vat_no,
+Timing         buyer_vat_no, tax_point_date, due_date, settled_amount, e_invoice_status); lines from
+Credit note    the GRN's received quantities at the trade price resolved through M3 (tier by the ordered quantity, DR-2) plus
+Debit note     adjustment lines; VAT per line from the SKU's category; immutable snapshot (content_hash, header and lines)
+               is the e-invoicing readiness (J-04).
+
+               Phase 1: invoice follows GRN (one invoice per GRN or a consolidated invoice per DN across its drops for one
+               bill-to, seller's choice). Invoice-on-dispatch is deferred (doc 20 DR-2).
+
+               Issued by the seller against an invoice (CREDITS link with amount) for discrepancy shortfalls, approved claims,
+               price corrections; reduces the invoice's open balance; an unapplied credit note (issued before the invoice) is
+               applied later with a link.
+
+               Issued by the seller for under-billing or agreed charges (interest applied manually, A-12), DEBITS-linked to the
+               original invoice.
+
+3.7 Payment receipt and cheque
+
+Aspect         Design
+Document
+               doc_payment_receipt(document_id, relationship_id, payer_entity_id, method CASH |
+Cheque         CHEQUE | TRANSFER | DEPOSIT, reference, received_on, amount, unapplied_amount);
+Recorded only  SETTLES links carry the amount applied per invoice (I-07); never oldest-first; unapplied amounts sit on the
+               receipt until applied.
+
+               cheque(receipt_document_id, bank, number, dated, status RECEIVED | CLEARED |
+               BOUNCED, outcome_at); a bounce reverses the settlements (REVERSES link on the receipt) and raises an
+               ALERT; the invoices reopen.
+
+               The seller records what was received; the system processes nothing (ADR-01). M7 reuses this base for customer
+               payments with the customer account as payer.
+
+3.8 Exposure and statements
+
+Aspect         Design
+Exposure
+               committed_exposure(relationship) = open invoice balances + accepted-not-invoiced
+               order value − unapplied credit notes − unapplied receipts; recomputed on every relevant
+               event into relationship_exposure(relationship_id, amount, as_of, freshness); compared with
+               relationship.credit_limit to raise exposure.warning.v1 (warn only, ADR-12) at configurable
+               thresholds (80%, 100%).
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System  Page 5
+Aspect     Design
+Statement
+           Generated per relationship for a period from documents and links: opening balance, invoices, credit and debit
+           notes, receipts with allocations, closing balance and ageing buckets; rendered A4 (kernel) and notified (R-08); a
+           report, not a document with a number.
+
+3.9 Journal-posting map
+
+Aspect     Design
+Data
+           posting_map(doc_type, line_kind, debit_account_role, credit_account_role,
+           amount_source) seeded per document type (INV: receivable/revenue/VAT output; CN: reverse; GRN at the
+           buyer: inventory/payable; PRC: bank/receivable) using account roles, mapped to a chart of accounts when the
+           accounting system is chosen (J-02). M9 exports journal.postings_ready.v1 payloads.
+
+3.10 Numbering (interim)
+
+Aspect     Design
+Series
+           ORD: buyer ENTITY; DN, INV, CN, DN2, PRC: seller ENTITY; GRN: receiving LOCATION when captured at a
+           shop, receiving ENTITY at a warehouse; discrepancy and claim: issuer ENTITY (doc 18 §5.5). Financial-year
+           reset and fiscal scope await the tax advisor (24B); until then no reset, GRN non-fiscal.
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System  Page 6
+4. State machines
+
+Reconciled with doc 03 sections 2–8. Every transition has a guard, a permission and an audit event;
+offline-issuable transitions are marked (H-02).
+
+4.1 Order
+
+From          To          Trigger / command            Guard                                 Permission          Audit / offline
+–             DRAFT       CreateOrder                                                                            –
+                                                       buyer scope; ACTIVE relationship ord.order.draft
+                          SubmitOrder                  (M1); lines with active SKUs                              ORDER_SUBMI
+                                                                                                                 TTED / online
+DRAFT         SUBMITTED                                ≥1 line; qty > 0; unit valid (M2      ord.order.submit    only
+                                                       conversion); issuance protocol                            ORDER_ACCE
+                                                       (buyer series)                                            PTED
+
+SUBMITTED ACCEPTED        AcceptOrder(allocations,     seller scope; allocation run          ord.order.accept    ORDER_REJEC
+                          eta)                         recorded; eta ≥ today; lock_at                            TED
+                                                       computed                                                  ORDER_AMEN
+                                                                                                                 DED
+SUBMITTED REJECTED        RejectOrder(reason)          seller; reason                        ord.order.accept
+                                                                                                                 ORDER_LOCK
+SUBMITTED / AMENDED (new AmendOrder                    buyer; before lock_at (or override);  ord.order.submit;   ED
+ACCEPTED version)                                      an amendment SUPERSEDES               ord.order.lock_ov   –
+                                                       the previous lines (draft-level       erride (seller)
+                                                       supersession, number retained)
+
+ACCEPTED LOCKED           Clock (lock_at)              –                                     system
+
+ACCEPTED / PARTIALLY_FU DN issued for part of the      –                                     system (from DN)
+
+LOCKED        LFILLED     allocation
+
+PARTIALLY_F FULFILLED     All allocated qty on issued  –                                     system              ORDER_FULFIL
+ULFILLED /                DNs; backorder_qty = 0 or
+LOCKED                    cancelled                                                                              LED
+
+ACCEPTED      ACCEPTED    AllocateBackorder (later     seller; availability                  ord.order.accept ORDER_ALLOC
+(with                     run)                                                                                          ATED
+backorder)
+
+any           CANCELLED   CancelOrder(reason)          buyer before lock; seller any time    ord.order.submit /  ORDER_CANC
+non-terminal                                           with reason; only                     ord.order.accept    ELLED
+                                                       unallocated/undispatched quantity
+                                                       cancels (partial cancel of the
+                                                       remainder)
+
+4.2 Delivery note
+
+From          To          Trigger / command            Guard                                 Permission          Audit / offline
+–             DRAFT                                                                          del.note.draft      –
+                          CreateDeliveryNote(orders,   seller; orders
+                          drops)                       ACCEPTED/LOCKED with
+                                                       allocations; batches available
+                                                       (M5); drops' ship-to belong to
+                                                       bill-to
+
+DRAFT         ISSUED      IssueDeliveryNote            issuance (seller series); M5          del.note.issue      DN_ISSUED
+ISSUED        IN_TRANSIT                               reserves/picks the batches (pick
+                                                       list)
+
+                          Dispatch(vehicle, driver, at) –                                    del.note.dispatch   DN_DISPATCH
+                                                                                                                 ED
+IN_TRANSIT    IN_TRANSIT  RecordProofOfDelivery(dro driver app or paper;                     del.pod.record
+                                                                                             (driver)            DROP_DELIVE
+              (drop delivered) p)                      signature/photo optional                                  RED / offline
+                                                                                             system /            (driver app)
+IN_TRANSIT CLOSED         All drops have a confirmed –                                       del.note.dispatch
+                          GRN, or a drop is marked                                                               DN_CLOSED
+                          UNDELIVERED with
+                          reason (goods returned to
+                          seller: M5 return-to-stock)
+
+4.3 Goods received note
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                   Page 7
+From         To           Trigger / command             Guard                                  Permission          Audit / offline
+–            DRAFT                                                                                                 – / offline
+                          CaptureGrn(drop | local       receiver scope; expected lines         shop.grn.confirm
+DRAFT                     supply)                       from the drop when present             (shop) /            GRN_CONFIRM
+                                                                                               whs.grn.confirm     ED / offline
+                                                                                               (warehouse)
+                                                                                                                   DISCREPANCY
+             CONFIRMED ConfirmGrn                       received_qty per line; batch data      as above            _RAISED
+                                                        per line (MRP when                                         GRN_CLOSED
+                                                        has_printed_mrp, expiry when                               GRN_CLOSED
+                                                        tracked); issuance (LOCATION or
+                                                        ENTITY series); the pivot (Section
+                                                        3.3)
+
+CONFIRMED DISCREPANCY system (on confirm) when          –                                      system
+
+             _RAISED      any variance or damage
+
+CONFIRMED CLOSED          system when no variance       –                                      system
+
+DISCREPANC CLOSED         Discrepancy resolved or       –                                      system
+Y_RAISED                  escalation decided
+
+CONFIRMED / REVERSED      ReverseGrn(reason)            within grn_reversal_hours; no lot      shop.grn.reverse    GRN_REVERS
+DISCREPANC                                              consumed (M5); no invoice              (supervisor,        ED / online only
+Y_RAISED                                                references it; REVERSES-linked         online)
+                                                        negated GRN issued
+
+4.4 Discrepancy
+
+From         To           Trigger / command             Guard                                  Permission          Audit / offline
+–            RAISED       system (GRN confirm)                                                 system
+                                                        variance or damage present;                                DISCREPANCY
+                                                        window_ends_at = confirm +                                 _RAISED
+                                                        discrepancy_window_days
+
+RAISED       UNDER_REVIE  AcknowledgeDiscrepancy seller scope                                  del.discrepancy.re –
+             W                                                                                 solve (seller)
+
+RAISED / UND RESOLVED     ResolveDiscrepancy(resolut    either party proposes, the other       del.discrepancy.re  DISCREPANCY
+ER_REVIEW                 ion, agreed lines)            accepts (two-step: PROPOSED            solve (both)        _RESOLVED
+                                                        then ACCEPTED);
+                                                        ACCEPT_SHORT triggers seller
+                                                        credit note; ACCEPT_OVER
+                                                        triggers extra invoice line or return
+
+RAISED / UND ESCALATED    Clock (window_ends_at) or     window passed or either party          system / del.discr  DISCREPANCY
+ER_REVIEW                 EscalateDiscrepancy           escalates with reason                  epancy.escalate     _ESCALATED
+
+ESCALATED RESOLVED        ArbitrateDiscrepancy(decisi   Federation arbiter role; decision      fed.arbitrate (F,   DISCREPANCY
+                          on, lines)                    binding; reason                        MFA)                _ARBITRATED
+
+RESOLVED CLOSED           Consequent documents          –                                      system              DISCREPANCY
+                                                                                                                   _CLOSED
+                          issued (credit note, return,
+
+                          extra invoice) or none
+
+                          required
+
+4.5 Claim
+
+From         To           Trigger / command             Guard                                  Permission          Audit / offline
+–            RAISED       RaiseClaim(grn, lines, kind,  buyer scope; within claim window       del.claim.raise
+                          photos)                       (config); photographs attached                             CLAIM_RAISED
+RAISED       INSPECTED                                  (pending upload allowed, must be       del.claim.inspect   / draft offline,
+                          InspectClaim(findings)        COMPLETE before decision)              (seller)            issue online
+INSPECTED APPROVED                                      seller scope; attachments              del.claim.decide
+                          ApproveClaim(lines,           COMPLETE                               (seller)            CLAIM_INSPEC
+INSPECTED REJECTED        return_required)              seller; credit note issued in the      del.claim.decide    TED
+                          RejectClaim(reason)           same transaction (CREDITS link)
+RAISED /     ESCALATED                                  seller; reason                         del.claim.escalate  CLAIM_APPRO
+INSPECTED /               EscalateClaim                                                                            VED
+REJECTED                                                either party; reason
+                                                                                                                   CLAIM_REJECT
+                                                                                                                   ED
+
+                                                                                                                   CLAIM_ESCAL
+                                                                                                                   ATED
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                  Page 8
+From        To          Trigger / command             Guard                              Permission           Audit / offline
+ESCALATED               ArbitrateClaim                Federation arbiter
+            APPROVED /                                                                   fed.arbitrate (F,    CLAIM_ARBITR
+APPROVED /  REJECTED    Return movement posted        –                                  MFA)                 ATED
+REJECTED                (M5) if required; else
+            CLOSED      immediate                                                        system               CLAIM_CLOSE
+                                                                                                              D
+
+   4.6 Invoice, credit note, payment receipt
+
+From        To          Trigger / command             Guard                              Permission           Audit / offline
+–           INV ISSUED  IssueInvoice(grns | dn)                                          bil.invoice.issue    INVOICE_ISSU
+                                                      seller; GRNs CONFIRMED or                               ED / online only
+INV ISSUED  PARTIALLY_SE SETTLES links from           CLOSED; not already invoiced;      system
+                                                      trade prices resolved (M3); VAT                         –
+                                                      numbers present; issuance (seller
+                                                      series); snapshot hashed
+
+                                                      sum of applied ≤ invoice total
+
+            TTLED /     receipts or CREDITS links
+
+            SETTLED     from credit notes
+
+INV ISSUED / DISPUTED   DisputeInvoice(reason)        buyer scope; reason                bil.invoice.dispute INVOICE_DISP
+PARTIALLY_S
+ETTLED                                                                                   (buyer)              UTED
+
+DISPUTED    ISSUED / PARTI ResolveInvoiceDispute      seller with buyer acceptance, or   bil.invoice.issue /  INVOICE_DISP
+–           ALLY_SETTLED                              arbiter                            fed.arbitrate        UTE_RESOLVE
+                                                                                                              D
+                                                      seller; MFA (credit note); amount
+            CN / DN2    IssueCreditNote /             ≤ open balance when linked;        bil.creditnote.issu  CREDIT_NOTE
+            ISSUED      IssueDebitNote(invoice?,      reason                             e (MFA) /            _ISSUED / DEBI
+                        lines, reason)                                                   bil.debitnote.issue  T_NOTE_ISSUE
+                                                                                                              D
+
+CN ISSUED APPLIED       ApplyCreditNote(invoice,      open balance                       bil.creditnote.issu  CREDIT_NOTE
+                        amount)                                                          e                    _APPLIED
+
+–           PRC         RecordPaymentReceipt(me       seller; each settlement ≤ invoice  bil.payment.recor    PAYMENT_REC
+                        thod, amount, settlements[])  open balance; cheque details       d                    ORDED
+            RECORDED                                  when CHEQUE; issuance (seller
+                                                      series)
+
+PRC         DISPUTED    DisputePayment(reason) either party                              bil.payment.recor PAYMENT_DIS
+RECORDED
+                        ReversePaymentReceipt(re seller; MFA; REVERSES link;             d/                   PUTED
+                        ason) or cheque BOUNCED settlements undone; invoices
+                                                                                         bil.invoice.dispute
+                                                                reopen
+PRC         REVERSED                                                                     bil.payment.revers PAYMENT_REV
+RECORDED /
+DISPUTED                                                                                 e (MFA)              ERSED
+
+Cheque      CLEARED /   RecordChequeOutcome           seller; bounce triggers reversal   bil.payment.recor    CHEQUE_CLEA
+RECEIVED    BOUNCED                                                                      d                    RED / CHEQUE
+                                                                                                              _BOUNCED
+
+   4.7 Lateral transfer request (within an MPCS)
+
+From        To          Trigger / command             Guard                              Permission           Audit / offline
+–           REQUESTED
+                        RequestLateralTransfer(fro    requesting shop scope; both        shop.transfer.requ TRANSFER_RE
+                        m shop, to shop, lines)       shops of one MPCS
+                                                                                         est                  QUESTED /
+
+                                                                                                              online
+
+REQUESTED APPROVED      ApproveLateralTransfer        MPCS scope; availability at        mpcs.transfer.app    TRANSFER_AP
+                                                      source (M5)                        rove                 PROVED (M5
+                                                                                                              issues XFR at
+                                                                                                              cost)
+
+REQUESTED REJECTED      RejectLateralTransfer(reaso MPCS                                 mpcs.transfer.app TRANSFER_RE
+                        n)
+                                                                                         rove                 JECTED
+
+   24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                Page 9
+5. Contract
+
+5.1 Commands
+
+Command                                  Input (essentials)                          Permission               Events
+
+CreateOrder / SubmitOrder /              relationship, lines (sku, uom, qty),        ord.order.draft / submit order.submitted/amended/
+AmendOrder / CancelOrder                 requested_eta; reason                                                           cancelled.v1
+
+AcceptOrder / RejectOrder /              order, allocations per line, committed_eta, ord.order.accept         order.accepted/rejected/al
+AllocateBackorder                        overrides with reasons                                               located.v1
+
+OverrideLockWindow                       order, new lock_at, reason                  ord.order.lock_override order.lock_overridden.v1
+
+RecordOrderAdjustment                    order, adjustment type, value               type's permission (M3) order.adjusted.v1
+
+CreateDeliveryNote / IssueDeliveryNote orders, drops (ship-to, bill-to), lines with  del.note.*               delivery_note.issued/disp
+                                                                                                              atched.v1
+/ Dispatch                               batches; vehicle, driver
+
+RecordProofOfDelivery                    drop, kind, signature/photo keys, at,       del.pod.record           drop.delivered.v1
+                                         location
+
+MarkDropUndelivered                      drop, reason                                del.note.dispatch        drop.undelivered.v1
+
+CaptureGrn / ConfirmGrn                  drop or local supply; lines (received, batch shop.grn.confirm /      grn.captured/confirmed.v1
+                                                                                                              (+ discrepancy.raised.v1)
+                                         data, condition)                            whs.grn.confirm
+
+ReverseGrn                               grn, reason                                 shop.grn.reverse         grn.reversed.v1
+
+AcknowledgeDiscrepancy /                 discrepancy, resolution kind, agreed lines, del.discrepancy.* /      discrepancy.*.v1
+ProposeResolution / AcceptResolution /
+EscalateDiscrepancy /                    reason                                      fed.arbitrate
+ArbitrateDiscrepancy
+
+RaiseClaim / InspectClaim /              grn, lines, kind, photos; findings; decision del.claim.* / fed.arbitrate claim.*.v1
+ApproveClaim / RejectClaim /
+EscalateClaim / ArbitrateClaim
+
+IssueInvoice / DisputeInvoice /          grns or dn, consolidation choice; reason bil.invoice.*               invoice.issued/disputed/re
+ResolveInvoiceDispute                                                                                         solved.v1
+
+IssueCreditNote / ApplyCreditNote /      invoice?, lines or amount, reason           bil.creditnote.issue     credit_note.issued/applied
+IssueDebitNote                                                                       (MFA) /                  .v1; debit_note.issued.v1
+                                                                                     bil.debitnote.issue
+
+RecordPaymentReceipt / ApplyReceipt /    method, amount, reference, settlements;     bil.payment.*            payment_receipt.recorded
+DisputePayment /                         cheque details; reason                                               /applied/disputed/reversed
+ReversePaymentReceipt /                                                                                       .v1; cheque.cleared/bounc
+RecordChequeOutcome                                                                                           ed.v1
+
+GenerateStatement                        relationship, period                        bil.statement.generate statement.generated.v1
+
+RequestLateralTransfer /                 shops, lines; reason                        shop.transfer.request /  transfer_request.*.v1
+ApproveLateralTransfer /                                                             mpcs.transfer.approve
+RejectLateralTransfer
+
+    5.2 Queries                          Returns                                                    Scope rule
+                                         Header, lines, allocations, status, ETA, lock              PARTY (buyer sees its orders; seller
+Query                                                                                               sees orders to it)
+GetOrder / ListOrders(filter)            Live or indicative on-hand (seller's choice in             Buyer with an ACTIVE relationship
+                                         configuration) via M5
+SellerAvailability(seller, skus)         For allocation runs and DN creation                        OWN
+
+ListOpenBackorders(seller) /             DN with drops for the driver app; expected lines for       OWN; driver scope; receiver scope for
+ListDueOrders(seller, date)              GRN capture (snapshot)                                     its drop
+GetDeliveryRun(vehicle, date) /          GRNs with lines and discrepancy status
+GetDrop(drop)                                                                                       OWN, PARTY (seller sees GRNs
+GetGrn / ListGrns(location, period)      Open items with windows and escalation state               against its DNs)
+
+ListDiscrepancies / ListClaims(scope,                                                               PARTY; FEDERATION_VIEW; arbiter
+status)
+GetInvoice / ListInvoices(relationship,  Header, lines, links, open balance                         PARTY (masked: no cost columns)
+status)
+ListUnsettledInvoices(relationship)      For payment matching                                       PARTY
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                            Page 10
+Query                                       Returns                                               Scope rule
+GetExposure(relationship) /                 Amount, components, limit, freshness                  OWN (seller), FEDERATION_VIEW;
+ListExposures(seller)                                                                             buyer sees its own
+GetStatement(relationship, period)          Rendered statement reference and data                 PARTY
+DeliveryPerformance(seller, period)         Committed vs actual per order (C-13)                  OWN, FEDERATION_VIEW
+PostingsFor(document)                       Journal lines by account role (M9)                    M9 internal
+
+5.3 Events published
+
+Event                                            Payload (beyond envelope)                        Consumers
+
+order.submitted/accepted/rejected/amended/allocate order id, relationship, parties, lines summary, M5 (allocation availability), M8,
+
+d/locked/cancelled/adjusted.v1                   eta, lock                                        notifications
+
+delivery_note.issued/dispatched/closed.v1;       dn id, drops, ship-to, bill-to, batches          M5 (pick and return), snapshot
+drop.delivered/undelivered.v1                                                                     (expected lines for GRN capture at
+                                                                                                  the shop), M8, notifications
+
+grn.captured/confirmed/closed/reversed.v1        grn id, receiver entity and location, seller,    M2 (batch registration), M5 (lots,
+                                                 drop, lines with batch data and condition,       receipts, reversal), M3 (via M2 batch
+                                                 confirmed_at                                     event), M8, M10
+
+discrepancy.raised/acknowledged/proposed/resolved/ ids, kind, lines, resolution                   Notifications, exception queues, M8,
+escalated/arbitrated/closed.v1                                                                    arbiter queue
+
+claim.raised/inspected/approved/rejected/escalated/a ids, kind, lines, decision, return_required  M5 (return movement), notifications,
+rbitrated/closed.v1                                                                               M8
+
+invoice.issued/disputed/resolved.v1              invoice id, parties, VAT numbers, totals, grns, M9 (e-invoice seam), M8,
+
+                                                 snapshot hash                                    notifications, exposure
+
+credit_note.issued/applied.v1; debit_note.issued.v1 ids, invoice, amount, reason                  Exposure, M8, M9
+
+payment_receipt.recorded/applied/disputed/reversed. receipt id, payer, amount, settlements        Exposure, M7 (customer payer), M8,
+v1; cheque.cleared/bounced.v1                                                                     M9
+
+exposure.updated/warning.v1                      relationship, amount, limit, threshold,          Order desk screen, notifications, M8
+                                                 freshness
+
+statement.generated.v1                           relationship, period, object key                 Notifications, M8
+
+journal.postings_ready.v1                        document id, type, postings by account role M9
+
+transfer_request.requested/approved/rejected.v1  shops, lines                                     M5 (XFR issuance on approval),
+                                                                                                  notifications
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                        Page 11
+6. Key flows
+
+Flow                           Sequence                                                               Failure paths
+6.1 Order to cash (doc 13
+scenario 1)                    MPCS stores role drafts an order from suggestions and manual           Order to a SUSPENDED relationship
+                                                                                                      refused; allocation over availability
+6.2 Direct drop and offline    lines → sees distributor availability (indicative) → submits (buyer    refused; invoice before GRN refused;
+GRN (doc 13 scenario 2)        series) → distributor runs allocation (FCFS) with a manual override    settlement over open balance refused;
+                               for a scarce SKU (reason) → accepts 80% with ETA; 20%                  bounce reverses settlement and
+6.3 Claim with photographs     backorder → exposure recomputed and warned at 100% → DN                reopens the invoice
+                               issued with one drop to the MPCS warehouse → dispatched →
+6.4 Escalation to the          GRN confirmed at the warehouse (ENTITY series) → invoice issued
+Federation                     from received quantities at tiered trade price → statement at month
+6.5 Federation order with      end → cheque received and matched to the invoice → cleared
+adjustment
+6.6 GRN reversal               Distributor DN with three drops to three shops of one MPCS (bill-to    GRN line without MRP for a
+                               MPCS) → driver app records POD at each drop offline → shop 2           has_printed_mrp SKU blocked on the
+6.7 Lateral transfer           captures the GRN on the till during an outage from the drop lines in   till with the reason; a drop without
+6.8 Statement and exposure     its snapshot: counts actuals, keys batch MRP and expiry for a new      snapshot data (DN issued after the last
+                               batch, marks two damaged → confirms (LOCATION series, primary          sync) is captured as local supply
+                               till) → on sync: bundle ingested, batches registered, lots created,    against the DN number keyed by hand
+                               discrepancy raised automatically for the damage → distributor          and reconciled at ingestion (REVIEW)
+                               acknowledges, proposes ACCEPT with credit for the damaged units
+                               → MPCS accepts → credit note CREDITS the invoice
+
+                               MPCS raises a claim for expired-on-arrival goods within the window     Decision refused while any attachment
+                               with photos (uploaded via presign; pending allowed) → distributor      is PENDING; claim after the window
+                               inspects once attachments are COMPLETE → approves with return          refused with the window shown
+                               required → credit note issued; M5 posts the return on
+                               claim.approved.v1
+
+                               Discrepancy unresolved after the window → system escalates;            –
+
+                               arbiter queue shows both parties' statements and evidence →
+
+                               arbiter decides (MFA) → consequent documents issued by the
+
+                               seller; refusal to issue is itself an exception item
+
+                               Distributor orders from the uniform list → Federation sales applies    Beyond bounds refused using M3's
+                               SPECIAL_DISC 3% within bounds (permission) → invoice carries           type query
+                               the adjustment line
+
+                               Warehouse confirmed a GRN against the wrong DN → supervisor            After a sale from the lot: refused;
+                               reverses within 24 h (no lots consumed, no invoice) →                  correct via discrepancy or claim
+                               REVERSES-linked GRN; ownership reverts; batches remain
+
+                               registered (identity is global)
+
+                               Shop A requests 20 units from shop B → MPCS approves against           Cross-MPCS request refused: that is a
+                               B's availability → M5 issues XFR at cost; no invoice (C-11)            sale
+
+                               Month end job generates statements per relationship; exposure          Stale freshness (a shop not synced) is
+                               warning at 80% notifies the seller's accounts role; nothing blocks     shown on the exposure, not hidden
+
+7. Configuration
+
+Item                                                Default                          Scope                           Who may change
+                                                                                                                     prt.relationship.amend
+relationship.discrepancy_window_days /              7 / 24 / FCFS                    Relationship (M1)
+order_lock_hours_before_eta / allocation_rule                                                                        ord.order.accept
+                                                                                                                     ord.order.accept
+trading.availability_mode                           INDICATIVE                       Entity (seller)                 shop.grn.reverse
+                                                                                                                     prt.relationship.amend
+trading.backorder_review_days                       30                               Entity (seller)                 fed.arbitrate
+
+trading.grn_reversal_hours                          24                               Entity                          bil.invoice.issue
+                                                                                                                     bil.payment.record
+trading.claim_window_days                           14                               Relationship                    prt.relationship.amend
+                                                                                                                     prt.relationship.amend
+trading.escalation_grace_days (after window before  3                                Federation                      –
+
+auto-escalate)
+
+trading.invoice_consolidation                       PER_GRN                          Entity (seller)
+
+trading.exposure_warn_thresholds                    [80, 100]                        Entity (seller)
+
+trading.statement_frequency                         MONTHLY                          Relationship
+
+trading.interest_rule (rate, grace days; manual application) none                    Relationship
+
+trading.tier_basis                                  ORDERED_QTY (DR-2) Federation
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                  Page 12
+8. Screens as paper
+
+Screen                Paper mirrored     Surface    Roles                            Notes
+Requisition book      Requisition book   W
+                                                    Buyer stores                     Suggested lines (P2) and manual; availability
+                                         W                                           column; submit; amend until lock; exposure banner
+
+Order desk            Order register     W          Seller sales                     Allocation run with overrides and reasons; ETA;
+                                                                                     backorders; lock override
+                                         D
+Delivery note         Delivery note                 Seller dispatch                  Drops per vehicle; batches from pick list; print;
+                                         T (shop                                     driver assignment
+                                         mode) / W
+Drop list and POD     Signed DO          W          Driver                           Stops in sequence; signature, photo, timestamp;
+                                                                                     offline
+                                         W
+Goods received        GRN book                      Receiver                         Expected lines; actuals; batch data entry (MRP,
+                                         W                                           expiry) with ItemCard; damaged qty; confirm; offline
+
+Discrepancy           Discrepancy sheet  W          Both parties, arbiter Timeline, evidence, propose/accept, escalation
+                                                                                  state
+                                         W
+Claim                 Claim form         W          Both parties, arbiter Photos (AttachmentCapture), inspection findings,
+                                         W                                        decision
+
+Tax invoice / credit note / Tax invoice             Seller accounts                  Read-only after issue; links; A4 print; e-invoice
+debit note                                                                           status
+
+Receipt book and      Receipt book                  Seller accounts                  Select invoices, amounts; cheque details; reversal
+matching                                                                             with reason (MFA)
+
+Statement of account  Statement                     Both                             Period, ageing, freshness
+
+Exposure view         Ledger summary                Seller accounts                  Components, limit, warning state, freshness
+
+Arbitration queue     –                             Federation arbiter Escalated items with both statements
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                             Page 13
+9. Non-functional design
+
+Aspect                      Design
+9.1 Capacity
+                            Orders and DNs in the thousands per day; GRNs in the tens of thousands (shop receipts dominate); invoices and
+9.2 Offline                 receipts in the thousands. All on the partitioned document base; extension tables partitioned alike. Exposure
+9.3 Visibility              recomputation is incremental per event, not a full sum.
+
+9.4 Immutability and links  GRN capture and confirmation, POD capture: fully local; ingested as bundles in sequence; the expected lines for
+                            a drop travel to the shop in the snapshot on DN issue (urgent flag when the ETA is within a day).
+9.5 E-invoicing readiness
+9.6 Auditability            PARTY reads through masked views: the buyer never sees the seller's cost or margin columns, the seller never
+                            sees the buyer's retail data; discrepancy and claim evidence is visible to both; the arbiter sees both
+                            (FEDERATION_VIEW plus the arbiter role's write on arbitration only).
+
+                            Every issued document is immutable; every correction is a link (REVERSES, CREDITS, DEBITS, SETTLES,
+                            DISPUTES); the open balance of an invoice is derived from links, never stored except as a cached column
+                            recomputed by the same events.
+
+                            The invoice snapshot (header, lines, both VAT numbers, tax point, hash) is what an IRD adapter will submit;
+                            e_invoice_status is metadata; nothing on the invoice changes when submission arrives (J-04).
+
+                            Every transition in Section 4 is an audit event; arbitration and reversals require MFA; the allocation run stores the
+                            availability snapshot it decided on, so a fairness dispute can be replayed (C-03).
+
+10. Test strategy
+
+Layer             What is tested
+Unit
+                  Every guard in Section 4; allocation FCFS and override arithmetic; lock_at computation; tier pricing by ordered
+Contract          quantity; open-balance derivation; exposure formula; cheque bounce reversal
+
+State machine     Every command and query; PARTY masking (a buyer's read of an invoice has no cost columns); driver API POD
+Property-based    offline replay
+
+Scenario          All seven machines transition by transition, including the two-step discrepancy resolution and the escalation clock
+Integration with
+M2/M5             Sum of SETTLES and CREDITS on an invoice never exceeds its total; exposure equals the sum of components under
+Performance       any event order; GRN received quantities are independent of DN quantities (no forced match)
+
+                  Doc 13 scenarios 1 and 2 end to end, including the offline GRN through the till simulator and ingestion; flows 6.3–6.8
+
+                  GRN confirmation registers batches and creates lots in one committed sequence; reversal reverts lots; claim approval
+                  posts a return
+
+                  Allocation run over 500 open orders under 10 s; exposure recomputation under 50 ms per event; statement generation
+                  for 800 relationships under 15 minutes
+
+11. Decision requests
+
+#     Point                                          Proposed                                   Decider
+DR-1  Invoice timing
+                                                     Follows GRN in phase 1 (per GRN or         Federation admins
+DR-2  Tier basis for volume pricing                  consolidated per DN); invoice-on-dispatch
+                                                     deferred (doc 20 DR-2)
+DR-3  GRN reversal window
+DR-4  Escalation grace after the discrepancy window  Ordered quantity (the buyer's commitment), not Federation with distributor input
+DR-5  Backorder review age                           received
+DR-6  Claim window
+DR-7  Direct drop GRN without snapshot data          24 hours; no consumed lots; no invoice     Federation admins
+
+DR-8  Extension tables (CR-24-1 to doc 18)           3 days then automatic                      Federation
+DR-9  Numbering rules (24B)
+                                                     30 days REVIEW; never auto-cancel          Federation with MPCS input
+
+                                                     14 days from GRN confirmation              Federation
+
+                                                     Capture as local supply keyed against the DN M4 and M6 designers
+                                                     number; reconcile at ingestion
+
+                                                     Adopt as listed in Section 3               Architecture review
+
+                                                     Assume no FY reset, GRN non-fiscal until the Tax advisor
+                                                     tax advisor answers
+
+12. Traceability
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                  Page 14
+Section  Identifiers
+3.1      FR-ORD-010 to 070; C-01 to C-09, C-12, C-13; A-06; ADR-04
+3.2–3.3  FR-DEL-010 to 060; D-01 to D-05, D-09; A-03, A-08; ADR-03; H-02; doc 18 §5.5
+3.4–3.5  D-05 to D-08; F-03; doc 18 document_link DISPUTES/CREDITS
+3.6–3.7  FR-BIL-010, 030, 070, 110 to 130, 150; J-03, J-04, J-07; I-05, I-07; ADR-01
+3.8–3.9  FR-BIL-020, 040, 080, 140; I-06; A-10, A-12; ADR-12; J-02
+3.10     FR-BIL-050, 060; ADR-11; 24B
+4        Doc 03 §2–8; C-10, C-11; D-06; H-02/H-03
+6        Doc 13 scenarios 1 and 2
+9        M-05 (PARTY masking); NFR-OFF, NFR-AUD
+
+End of document. Draft for design review; the contract freezes when M5 and M6 acknowledge it, targeted end of Stage 2 week
+5. Implementation guide: 24A; numbering addendum: 24B.
+
+24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System    Page 15
+
