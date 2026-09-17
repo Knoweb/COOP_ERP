@@ -1,0 +1,506 @@
+Cooperative Retail and Distribution System
+
+28 ­ M8 Reporting Pipeline
+
+Module design for the pipeline, not the reports: projections built from the event stream
+into a reporting schema on the replica, end-of-day aggregates keyed to each shop's
+day-close, a per-entity freshness stamp on every federation-level figure, a
+decision-driven report catalogue rendered through the A4 pipeline, spreadsheet export,
+the analyst SQL role, and the exception queues. Individual report definitions arrive from
+the pending workshop and slot into this pipeline without changing it.
+
+Field             Value
+Document
+Version           28 ­ M8 Reporting Pipeline (Stage 2 module design; template of doc 20 §5)
+Date
+Owning developer  v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 6
+Inputs
+                  9 September 2026
+Depends on
+                  Module developer (full-stack); the report-catalogue workshop supplies definitions as data
+Depended on by
+                  05 SRS (FR-REP-010­050); 07 §5 placeholder report set; 16 answers (O section, F-09, M-04, M-06, N-06); 17
+                  v0.2.1 §7.8, ADR-30; 18 v0.2 part E; 19 v0.2 §4.3, §6, §9, DR-3; 20 v0.3 M8 and Appendix A (analyst SQL role);
+                  21­27 event contracts; 30 §5.8
+
+                  Every module's events (through the outbox archive), M1 scope and RLS classes, kernel (event backbone, A4
+                  renderer, scheduling, audit exception queues)
+
+                  M9 (exports to notifications), doc 31 fleet console (health projections), M4 (delivery performance), M10 (phase-2
+                  forecasting inputs)
+
+Three commitments. Every projection is rebuildable from the outbox archive, so a wrong report is fixed by a rebuild,
+never by editing figures. Every federation-level number carries the freshness of its least-recent contributor, because
+some shops are always offline and a figure without that stamp misleads. And the catalogue is decision-driven: a report
+enters it with the decision it supports and the audience that makes it (O-01), or it does not enter at all.
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+In scope (phase 1)                                                        Out of scope
+
+Projections: fact and position tables in a reporting schema, maintained by Modules reading projections for transactional decisions (they
+
+idempotent event consumers, rebuildable from the archive (ADR-30)         never do)
+
+Freshness: per location and per entity, stamped on every figure and every An anonymised aggregate tier (M-06: not needed)
+rendered report (O-03, FR-REP-020)
+
+End-of-day aggregates keyed to each location's day-close; monthly         ­
+
+roll-ups; comparability across years (O-07)
+
+Report catalogue as data: definition, parameters, scope class, decision   Self-service report builder (backlog, O-05); mobile dashboard app
+supported, audience, output formats; the doc 07 §5 placeholder set until  (O-06)
+the workshop finalises (O-01)
+
+Rendering and export: A4 through the kernel pipeline in the reader's      ­
+
+language; spreadsheet export as a job with a download link (O-05)
+
+Dashboards: fixed tiles per scope with freshness; drill to catalogue reports Real-time streaming dashboards beyond near-real-time
+                                                                                                      projections
+
+Exception queues: the REVIEW/ALERT audit events by scope with             The audit store itself (kernel)
+acknowledgement, as the reporting face of doc 19 §4.3 (N-06)
+
+Analyst SQL role on the replica under the Federation view (doc 20         Write access of any kind; direct access to operational schemas
+Appendix A)
+
+Alias resolution (M2) so promoted SKUs keep unbroken trends (B-10)        ­
+
+Phase 2 designed as projections: stock ageing, reorder suggestions, ABC A columnar store in phase 1 (trigger-based, doc 19 DR-3)
+classes, demand inputs for M10
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                 Design section
+FR-REP-010          Near-real-time operational views from the event stream; heavy aggregates end-of-day    3.1, 3.3, 9.1
+                    (O-03)
+FR-REP-020          Per-entity data-freshness stamp on every federation-level figure                       3.2
+FR-REP-030          Offline shop reports on the till (Z-report, day sales, session)                        M6 (doc 26 §3.5);
+                                                                                                           referenced only
+FR-REP-040          Decision-driven catalogue; fixed set; finalised in the workshop (O-01)                 3.4, 6.1
+FR-REP-050          Spreadsheet export; printed A4 reports (O-04, O-05)                                    3.5
+O-07                Indefinite history; comparable trends across years                                     3.3, 9.2
+F-09                Shrinkage percentage per shop visible to the Federation                                3.1 (loss projections), 3.6
+M-04                Federation sees margins, profitability and shrinkage view-only                         3.6
+N-06                Exception reports with named reviewers                                                 3.7
+B-10                Alias resolution preserves history                                                     3.1
+ADR-30              Outbox archive as the replay source                                                    3.1, 4.2
+Doc 20 Appendix     Analyst SQL role                                                                       3.8
+A
+Doc 19 DR-3         Columnar store trigger                                                                 9.3
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                                               Page 2
+3. Domain model
+
+Schema reporting on the primary (written by consumers) and read on the replica. Nothing here is a source of
+truth; every table can be dropped and rebuilt.
+
+3.1 Projections
+
+Projection                 Grain                                           Built from                   Serves
+receipt_fact /
+receipt_line_fact          One row per receipt and per line: location,     receipt.issued/voided/refunde Sales reports, markdown cost, cap
+                           business date, operator, SKU
+sales_daily                (alias-resolved), batch, qty, prices, ceilings  d.v1                         analysis, VAT summary
+stock_position             applied, rule, tax, tender kinds
+stock_movement_fact
+loss_fact                  Location × business date × SKU (and roll-ups receipt facts at day-close      Daily sales, trends, ranking
+                           by tag, entity, district)
+trade_document_fact
+                           Location × SKU × batch × condition: on hand, stock.moved.v1 (M5)             Stock position, ageing (P2), expiry
+dispute_register           cost, expiry, days held
+exposure_snapshot
+customer_receivables       One row per movement with type and cost stock.moved.v1                       Stock cards, cost of goods sold,
+till_session_fact                                                                                       movement analysis
+pricing_review_fact
+fleet_health               Write-off lines by category, value, location,   writeoff.posted.v1, count    Loss by category, shrinkage %,
+location_freshness         approver                                        adjustments, negative-lot    tolerance analysis
+                                                                           clearances
+
+                           Orders, DNs, GRNs, invoices, credit notes,      M4 events                    Fill rate, delivery performance,
+                           receipts between entities with status and                                    receivables, statements
+                           amounts
+
+                           Discrepancies and claims with windows,          M4 events                    Dispute register, escalation ageing
+                           resolution, arbitration
+
+                           Relationship × day: exposure components         exposure.updated.v1          Exposure trends, limit utilisation
+
+                           Account × day: balance and ageing buckets M7 events                          Debtors, ageing
+
+                           Sessions with float, tenders, drops, variance M6 session events              Till variance, cash control
+
+                           Reviews raised by M3 with resolution            pricing.review_raised.v1     Pricing hygiene
+
+                           Device × heartbeat: version, snapshot age,      till.heartbeat.v1, device.*  Fleet console (doc 31), sync
+                           pending, peripherals                                                         health
+
+                           Location: last applied device seq time; entity sync.batch_received.v1        Every stamp
+
+                           roll-up                                         (kernel)
+
+Aspect                     Design
+Idempotency
+Alias resolution           Each projection consumer upserts by the event's aggregate id and event id (kernel inbox); a replayed event
+Position tables            produces the same rows.
+
+                           Facts store sku_id as issued and canonical_sku_id resolved through M2's alias at projection time; reports
+                           group by the canonical id so promotion and merge never break a trend (B-10).
+
+                           Recomputed incrementally from movements; a nightly comparison against M5's lots raises a REVIEW on drift
+                           (the same discipline as doc 25 §3.2).
+
+3.2 Freshness
+
+Aspect                     Design
+Per location
+Per entity and federation  location_freshness.applied_through = the received_at of the last event applied from that location's
+On every output            devices; updated by the kernel's sync.batch_received.v1.
+
+                           The minimum over the contributing locations; a figure covering N locations carries (freshness = min
+                           applied_through, locations_stale = count older than threshold).
+
+                           Dashboards, catalogue reports and exports embed the stamp in the rendered output and in the API response; the
+                           FreshnessStamp component (doc 30) renders it as 'includes shops synced up to hh:mm; 3 shops not yet synced'.
+
+3.3 End-of-day and roll-ups
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                                           Page 3
+Aspect                   Design
+Trigger
+                         location.day_closed.v1 (kernel day-close, doc 19 §9) per location; not a clock time for all shops.
+Aggregates               Late-arriving events for a closed day (a till that syncs two days later) update the day's aggregates and re-stamp
+Comparability            freshness; the day is never 'final' before its freshness covers all its locations.
+
+                         sales_daily, cash_daily, loss_daily; monthly roll-ups by a nightly job; financial-year roll-ups by entity
+                         settings (M1).
+
+                         Facts keep the issued-time attributes (price, tax rate, MRP, rule) so a 2028 report on 2026 data reproduces
+                         2026's figures; alias resolution keeps SKU continuity (O-07).
+
+3.4 Report catalogue
+
+Aspect                   Design
+Definition as data
+Phase-1 set              report_definition(report_id, name (three languages), decision_supported,
+                         audience_roles, scope_class (OWN | FEDERATION_VIEW | PARTY), parameters schema,
+Runs                     data_source (projection query or SQL template), a4_template, xlsx_layout,
+                         freshness_rule, status, version). Registered by the Federation; entities cannot author definitions in
+                         phase 1 (O-05).
+
+                         The doc 07 §5 placeholders, each with its decision and audience: daily sales by shop (shop manager: what sold,
+                         cash to bank); sales by SKU and tag (MPCS: what to reorder, what to drop); till sessions and variance
+                         (supervisor: cash control); stock position and expiry (shop and MPCS: what to count, mark down or move); loss
+                         by category and shrinkage % (MPCS and Federation: where losses arise); discrepancy and claim register (both
+                         parties: what is unresolved); discount and markdown cost by rule (MPCS: what promotions cost); VAT summary
+                         (accounts: what to file); exposure and statements (seller accounts: who to chase); receivables ageing (MPCS:
+                         khata risk); order fill rate and delivery performance (Federation and distributors: service levels); fleet and sync
+                         health (DevOps and Federation: which shops are dark). The workshop replaces or extends this list as data.
+
+                         report_run(run_id, report_id, requested_by, scope, parameters, freshness, status,
+                         object_key, rendered_at); every run is audited (a report is a read of scoped data).
+
+3.5 Rendering and export
+
+Aspect                   Design
+A4
+                         Definitions bind to templates rendered by the kernel A4 pipeline (doc 19 §5.3) in the reader's language with
+Spreadsheet              English fallback; output to object storage; report.rendered.v1.
+
+                         export_job(job_id, report_id or projection, scope, parameters, status, object_key,
+                         row_count) produced by a worker with the caller's scope applied at query time; export.ready.v1;
+                         downloads expire after 7 days; large exports paginate into multiple sheets.
+
+3.6 Visibility on projections
+
+Aspect                   Design
+Classes
+                         Projection tables carry owner_entity_id and location_id and are under the same four RLS classes (doc
+                         18 §3.7): a shop-scoped user sees only its location; an MPCS its locations; the Federation everything view-only
+                         including margins and shrinkage (M-04); PARTY sees trade documents it is party to through masked columns (no
+                         cost). Cost and margin columns are absent from any row a PARTY class can read.
+
+3.7 Exception queues
+
+Aspect                   Design
+Face of the audit store
+                         exception_item is a projection of REVIEW/ALERT audit events with reviewer_role_template,
+                         acknowledgement state (from AUDIT_REVIEWED events) and escalation age; queues per entity and per named
+                         reviewer; acknowledgement is a kernel command (doc 19 §4.3), not an M8 write.
+
+3.8 Analyst SQL role
+
+Aspect                   Design
+Access
+                         A database role app_analyst on the replica with SELECT on reporting.* only, connections through the
+                         pooler with the FEDERATION_VIEW session scope fixed by a login hook; issued to named Federation analysts
+                         holding rpt.analyst.query; every session start is audited; no operational schema is grantable.
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+4. State machines
+
+4.1 Report run
+
+From           To           Trigger / command         Guard                               Permission           Audit
+­              REQUESTED                                                                  rpt.report.run (per  REPORT_REQ
+                            RequestReport(report,     definition ACTIVE; caller's scope   definition           UESTED
+                            scope, parameters)        class permitted by the definition;  audience)
+                                                      parameters valid                    system               ­
+REQUESTED RENDERING         worker picks up                                               system               REPORT_REN
+RENDERING READY             render complete           ­                                                        DERED
+                                                                                          system               REPORT_FAILE
+RENDERING FAILED            error                     object stored; freshness                                 D (ALERT after
+                                                      embedded                                                 3)
+
+                                                      reason
+
+4.2 Export job
+
+From           To           Trigger / command         Guard                               Permission           Audit
+­              QUEUED       RequestExport(source,                                         rpt.export.run
+                            scope, parameters)        as report run; row estimate under                        EXPORT_REQ
+QUEUED         READY /      worker                    the cap or paginated                system               UESTED
+READY          FAILED
+                            Clock (7 days)            ­                                                        EXPORT_READ
+               EXPIRED                                                                                         Y / FAILED
+                                                      object deleted                      system
+                                                                                                               ­
+
+4.3 Projection
+
+From           To           Trigger / command         Guard                               Permission           Audit
+                                                                                          sys.projection.reb
+LIVE           REBUILDING   RebuildProjection(name,   DevOps; replays from the archive    uild (MFA)           PROJECTION_
+                            from_seq)                 into a shadow table                                      REBUILD_STA
+                                                                                          system               RTED
+REBUILDING LIVE             swap shadow into place; row counts reconciled
+                            consumer resumes from the                                     system               PROJECTION_
+                            live position                                                                      REBUILT
+
+LIVE           LAGGING      consumer lag over         ­                                                        PROJECTION_
+                                                                                                               LAGGING
+                            threshold                                                                          (ALERT)
+
+4.4 Report definition
+
+From           To           Trigger / command         Guard                               Permission           Audit
+­              DRAFT        RegisterReportDefinition
+                                                      caller Federation; decision and     rpt.definition.man   REPORT_DEFI
+                            ActivateReportDefinition  audience stated; data source        age (F)              NED
+                            RetireReportDefinition    validates against the schema
+DRAFT          ACTIVE                                                                     rpt.definition.man   REPORT_ACTI
+ACTIVE         RETIRED                                template renders on fixture data;   age (F, MFA)         VATED
+                                                      scope class set
+                                                                                          rpt.definition.man   REPORT_RETI
+                                                      reason                              age (F)              RED
+
+5. Contract
+
+5.1 Commands
+
+Command                                Input (essentials)                             Permission          Events
+
+RegisterReportDefinition /             definition (names, decision, audience,         rpt.definition.manage report_definition.*.v1
+                                                                                      (F)
+ActivateReportDefinition / RetireReportDefinition scope class, parameters, source,
+
+                                       templates)
+
+RequestReport                          report id, scope, parameters, language         per definition      report.requested/rend
+                                                                                      audience            ered/failed.v1
+RequestExport                          report or projection, scope, parameters
+                                                                                      rpt.export.run      export.ready.v1
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                              Page 5
+Command                                        Input (essentials)                           Permission    Events
+RunEndOfDay (internal)                         location, business date
+RebuildProjection                              projection, from_seq                         system (from  end_of_day.complete
+PinDashboardTile (per user)                    tile id, position                            day_closed)   d.v1
+
+                                                                                            sys.projection.rebuild projection.rebuilt.v1
+                                                                                            (MFA)
+
+                                                                                            any           ­
+
+5.2 Queries
+
+Query                                          Returns                                            Scope rule
+                                                                                                  Caller's scope class
+GetDashboard(scope)                            Tiles with figures and freshness                   Definition's scope class
+
+GetReportData(report, scope, parameters)       Tabular data with freshness (the same source the   Any
+                                               renderer uses)                                     Requester; OWN
+                                                                                                  Any authenticated
+ListReportDefinitions(audience)                Catalogue visible to the caller                    Named reviewer roles; OWN
+                                                                                                  DevOps; FEDERATION_VIEW
+GetReportRun / ListRuns(scope)                 Run status and download link                       OWN, FEDERATION_VIEW
+
+GetFreshness(entity | location)                applied_through, stale locations
+
+GetExceptionQueue(scope, severity, since) Items with acknowledgement state
+
+ProjectionStatus()                             Lag, last seq, rebuild state per projection
+
+DeliveryPerformance / FillRate(seller, period); Named projections used by other modules' screens
+ShrinkagePct(location, period);
+Receivables(mpcs)
+
+    5.3 Events published                       Payload                                      Consumers
+                                               run, report, scope, object key, freshness    Notifications (M9), audit
+Event                                          job, object key, rows                        Notifications
+report.requested/rendered/failed.v1            location, business date, totals, freshness   M7 (banking expected), M9, dashboards
+export.ready.v1                                projection, positions                        DevOps alerts
+end_of_day.completed.v1                        scope, counts by severity, reviewer          Notifications to named reviewers (N-06)
+projection.rebuilt.v1 / projection.lagging.v1
+exception_report.generated.v1
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                              Page 6
+6. Key flows
+
+Flow                           Sequence                                                                Failure paths
+
+6.1 Adding a report after the  Federation registers a definition as data: names, the decision it       A definition without a decision or
+workshop                       supports, audience roles, scope class, parameter schema, a              audience is refused; a query touching a
+                               projection query, an A4 template and a spreadsheet layout               non-reporting schema is refused
+                               validated against fixture data  activated (MFA)  appears in the
+                               catalogue for its audience
+
+6.2 A shop manager's           Dashboard tile 'yesterday' shows sales, cash to bank, variance with     A till still offline: the tile shows the stale
+morning                        freshness 'includes till 2 synced 06:10'  drill to daily sales by shop  count and the figures exclude it
+                                A4 print in Sinhala                                                    explicitly
+
+6.3 Federation shrinkage       Shrinkage % by shop for the month from loss_fact and negative-lot       ­ (view-only by construction)
+view                           clearances over sales; freshness per MPCS; drill to loss by
+                               category; export to spreadsheet
+
+6.4 Late sync after a two-day Receipt events for two closed business dates arrive  facts               ­
+
+outage                         inserted; sales_daily for those dates updated; freshness advances;
+
+                               dashboards that showed 'not yet synced' now include the shop;
+
+                               previously rendered reports keep their stamp (a re-run gets the new
+
+                               figures)
+
+6.5 A wrong projection         A bug in the loss consumer double-counted a category  fix               Rebuild longer than the window:
+                               deployed  RebuildProjection(loss_fact, from_seq = 0) replays the        projection marked REBUILDING;
+                               archive into a shadow table  swap  reports correct; no figure           reports show 'temporarily unavailable'
+                               was ever edited                                                         rather than wrong figures
+
+6.6 Analyst query              Named analyst connects to the replica with app_analyst; session ­
+                               start audited; reads reporting.* under FEDERATION_VIEW; a query
+                               on an operational schema fails on grant
+
+6.7 Exception review           MPCS accountant opens the exception queue: negative lots, offline ­
+                               limit breaches, variance beyond threshold, gap anomalies;
+                               acknowledges with dispositions (kernel command);
+                               unacknowledged ALERTs escalate after 3 days
+
+   7. Configuration                                 Default                                   Scope                   Who may change
+                                                    24                                        Federation              rpt.definition.manage
+Item                                                300                                       Federation              DevOps
+reporting.freshness_stale_threshold_hours           500,000 rows / 100,000 per                Federation              DevOps
+reporting.projection_lag_alert_seconds              sheet
+reporting.export_row_cap / pages                    7                                         Federation              DevOps
+                                                    120                                       Federation              DevOps (doc 19 DR-3
+reporting.export_retention_days                                                                                       trigger input)
+reporting.end_of_day_window_minutes (before ALERT)                                            Federation              rpt.definition.manage
+                                                                                              Federation              DevOps
+reporting.dashboard_tiles (per role template)       as seeded
+reporting.monthly_rollup_time                       02:30 Asia/Colombo
+
+8. Screens as paper
+
+Screen                    Paper mirrored       Surface Roles                          Notes
+Dashboard                                                                             Fixed tiles with FreshnessStamp; drill to reports
+Catalogue                 Day sheet            W    By scope                          Grouped by decision; parameters form; run history
+Report viewer                                                                         A4 render, data view, export; freshness banner
+Exception queue           Standard forms index W    By audience                       Shared component; acknowledgement dispositions
+Freshness and fleet                                                                   Which shops synced when; stuck devices; projection
+                          The printed form     W    By audience                       lag
+                                                                                      Decision, audience, scope, parameters, source,
+                          Exceptions book      W    Named reviewers                   templates; fixture preview
+                                                                                      Issue and revoke app_analyst credentials; session
+                          ­                    W    Federation, DevOps                audit
+
+Definition editor         ­                    W    Federation
+
+Analyst access            ­                    W    Federation admin
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                                                  Page 7
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System  Page 8
+9. Non-functional design
+
+Aspect                Design
+9.1 Latency
+9.2 Volume            Projection lag under 60 s in steady state at 1,000 events/s; during reconnection bursts projections lag and the
+                      stamp says so; dashboards read the replica (replica lag added to freshness).
+9.3 Columnar trigger
+                      Receipt facts: about 3 million rows a day at the horizon, lines 15 million; partitioned monthly; roll-ups keep
+9.4 Isolation         dashboards on small tables; indefinite retention with cold partitions detached to object storage and re-attachable
+9.5 Security          for historical runs.
+9.6 Privacy
+                      When end-of-day aggregation for the federation exceeds reporting.end_of_day_window_minutes on the
+                      replica, or dashboard queries exceed 2 s at p95, a columnar store is introduced (doc 19 DR-3); because facts are
+                      rebuildable from the archive, it is a rebuild, not a migration.
+
+                      Consumers run in the worker profile; rendering and exports in the rendering queue; the replica serves reads; the
+                      primary bears only projection writes.
+
+                      RLS on every projection; the analyst role cannot reach operational schemas; every report run and export is
+                      audited as a read; exports carry the scope and stamp in the file.
+
+                      Customer projections carry account ids and balances, never names or phones (names resolve at render time
+                      under M7's RLS for the OWN MPCS only).
+
+10. Test strategy
+
+Layer                 What is tested
+Unit                  Every projection consumer against event fixtures from docs 21A­27A; alias resolution; freshness arithmetic;
+                      end-of-day totals; ageing and shrinkage formulas
+Rebuild equivalence   For random event sequences: live projection equals a from-zero rebuild, row for row
+Idempotency           Replaying any event twice changes nothing
+Contract              Every command and query; report data equals rendered data; exports respect the caller's scope
+RLS matrix            Shop, MPCS, distributor (PARTY masked), Federation view, analyst role; cost columns invisible to PARTY
+Scenario              Flows 6.1­6.7; late sync updates closed days and stamps; a wrong consumer fixed by rebuild
+Performance           1,000 events/s projection throughput; end-of-day for 10,000 locations under the window; dashboard p95 under 2 s on
+                      the replica
+Rendering             Each phase-1 definition renders on fixture data in three languages; export layouts paginate correctly
+
+11. Decision requests
+
+#        Point                                         Proposed                                    Decider
+DR-1     Report catalogue workshop date                                                            Federation
+                                                       Stage 2 week 3­4; definitions land as data
+DR-2     Phase-1 placeholder set                       without pipeline change                     Federation admins
+
+DR-3     Analyst role issuance                         The doc 07 §5 list with decisions and       Federation, DevOps
+                                                       audiences as in §3.4
+DR-4     Freshness stale threshold                                                                 Federation
+DR-5     Export cap and retention                      Named Federation analysts only; audited     DevOps
+DR-6     Reporting tables (CR-28-1 to doc 18: schema   sessions; revocable                         Architecture review
+         reporting as rebuildable, excluded from part
+         A­E invariants)                               24 hours
+
+                                                       500,000 rows, 7 days
+
+                                                       Adopt with the 'no source of truth' note
+
+12. Traceability
+
+Section               Identifiers
+3.1­3.3               FR-REP-010, 020; O-03, O-07; ADR-30; B-10; doc 19 §6, §9
+3.4­3.5               FR-REP-040, 050; O-01, O-04, O-05; doc 07 §5; doc 19 §5.3
+3.6­3.8               M-04, M-05, M-06; N-06; doc 19 §4.3; doc 20 Appendix A
+9                     NFR-PRF; doc 19 DR-3; J-06
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                                    Page 9
+End of document. Draft for design review; the contract freezes when M9 acknowledges it, targeted end of Stage 2 week 6.
+Implementation guide: 28A.
+
+28 - M8 Reporting Pipeline | v0.1 draft | Cooperative Retail and Distribution System                                     Page 10
+

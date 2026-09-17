@@ -1,0 +1,1157 @@
+Islandwide Cooperative
+Retail and Distribution System
+
+Requirements Clarification Questionnaire
+
+A structured set of questions to be answered by the federation before solution design begins. Each
+question states plainly why it is being asked and what part of the system it determines. Abbreviations are
+expanded in the glossary at Section 4.
+
+Document      Requirements clarification questionnaire
+Status        Draft for discussion
+Prepared for  Central cooperative and member cooperative societies
+Scope         Central supply, shop requisition and fulfilment, multi-location inventory, point of sale,
+              inter-entity settlement, reporting
+Structure     20 question sections, approximately 150 questions
+Next step     Answer the eight gating questions in Section 3 first; the remainder depend on them
+
+How to read this document
+
+This document deliberately asks more than it answers. In a federation of independent societies, most of the
+difficult decisions are commercial and governance decisions rather than technical ones. Recording them
+explicitly now is far cheaper than discovering the disagreement during build or, worse, after go-live.
+Requirements Clarification Questionnaire                       Cooperative Retail and Distribution System
+
+1. Purpose and how to use this document
+
+The proposed system serves a federation, not a chain. The central cooperative and each member cooperative
+shop are separate legal entities. That single fact changes the nature of almost every transaction in the system:
+goods moving from central to a shop are not an internal stock transfer but a commercial transaction between
+two businesses, and data generated at a shop is that shop's own commercial record rather than central's.
+
+The questions below are grouped by domain. Within each domain, questions are numbered with a section
+letter and sequence number so they can be referenced unambiguously in discussion and in the answers you
+return.
+
+Conventions used
+
+Element               Meaning
+
+A-01                  Question reference. Section letter plus sequence number. Please answer against these
+                      references.
+
+Why we ask            Included where the reason for the question is not self-evident, or where the answer has
+                      consequences beyond the obvious.
+
+Shaded box            Context, a decision already taken, or a warning about a common failure mode.
+
+Who needs to answer
+
+These questions are not all for one person. Broadly: Sections A, C, G, K and S need the federation board or its
+equivalent decision-making authority. Sections I, J and L need the finance function at central and a
+representative shop treasurer. Sections B, D, E and F need operations and warehouse management. Sections
+H, M, N, P, Q and R need whoever will own the system after go-live. Where a question cannot be answered by
+any single party, that is itself a finding worth recording.
+
+2. Points already settled
+
+The following have been confirmed in discussion and are treated as fixed assumptions in the questions that
+follow. If any of these change, the dependent questions are flagged in the relevant section.
+
+Point                 Position                                 Consequence
+Existing
+systems               There is no ERP (Enterprise Resource     No ERP migration. The new system supplies POS, so
+                      Planning system) anywhere in the         any existing POS is replaced rather than integrated.
+Connectivity          federation. Some shops may run a point   Data extraction from those systems is still an open
+                      of sale (POS) system.                    question (Section R).
+Languages
+                      Internet access will be provided to all  Offline capability at the till is a hard requirement, not an
+Stock losses          shops, but outages and slow links are    option. How far offline capability must extend is the
+                      expected in remote areas.                subject of Section H.
+
+                      Sinhala, Tamil and English must all be   Affects interface, master data, printed output, search
+                      supported.                               and sorting, and receipt printer selection. Depth of the
+                                                               requirement is explored in Section P.
+                      Damages and discards must be handled
+                      by the system.                           Treated as a full domain in Section F, and tightly coupled
+                                                               to the goods ownership decision in Section A.
+
+Draft for discussion                                                                                           Page 2
+Requirements Clarification Questionnaire                                    Cooperative Retail and Distribution System
+
+3. The gating questions
+
+Eight questions determine the shape of everything else. Until they are answered, detailed design cannot begin,
+because the answers change the data model, the ledger and the governance rules rather than merely adding
+features. We recommend these are settled first, in writing, by whoever holds decision-making authority for the
+federation.
+
+Ref   Decision                                          What it determines
+A-01
+B-01  Do goods become the shop's property on            Whose balance sheet holds the stock, when central
+B-02  receipt (firm sale), or does central retain       recognises revenue, who carries the loss on damage and
+M-01  ownership until sale (consignment)?               expiry, and the entire credit exposure model.
+J-01
+H-01  At what level is a Stock Keeping Unit (SKU)       Every stock figure, sales report and reorder calculation
+K-01  defined?                                          aggregates at this level. If central and shops draw the line
+S-03                                                    differently, no report will reconcile.
+
+      Is a case or outer pack a separate SKU, or the The single most common source of stock error in distribution
+
+      same SKU with a pack conversion?                  systems. Central thinks in cases; the counter sells singles.
+
+      Who legally owns the transaction data             What central may see and do with shop data, what happens
+      generated at a shop?                              when a shop leaves the federation, and who answers to a
+                                                        regulator.
+
+      Full accounting per shop, or only the             One of the largest scope decisions in the programme. Full
+      receivable and payable between central and        multi-entity accounting roughly doubles the finance scope.
+      each shop?
+
+      What is the longest offline period the till must  An hour is a simple queue. Several days is a full local
+      survive and still trade?                          database with conflict resolution. The cost difference is
+                                                        substantial.
+
+      Do members need to be distinguished from          If no, most of the membership domain disappears. If yes,
+      ordinary customers at all?                        member identification enters the checkout flow and affects
+                                                        queue speed.
+
+      Is a phased first release acceptable, or must     Usually the difference between a programme that lands and
+      full scope go live at once?                       one that stalls.
+
+Draft for discussion                                                                                               Page 3
+Requirements Clarification Questionnaire                                 Cooperative Retail and Distribution System
+
+4. Glossary of abbreviations and terms
+
+Terms are expanded here and used in abbreviated form thereafter. Where a term has a specific meaning in
+this context, that meaning is given rather than the dictionary definition.
+
+Term                  Expansion                 Meaning in this context
+3PL
+AGM                   Third-Party Logistics     An external contractor performing warehousing or delivery on behalf of
+API                                             central.
+AP
+AR                    Annual General Meeting    The members' meeting at which a cooperative's governance decisions are
+                                                ratified.
+COGS
+DO                    Application Programming A defined way for another system to exchange data with this one
+EAN / GTIN
+                      Interface                 automatically.
+ERP
+FEFO                  Accounts Payable          Money an entity owes to others. From a shop's point of view, what it owes
+FIFO                                            central for goods supplied.
+FMCG
+GL                    Accounts Receivable       Money owed to an entity. From central's point of view, what the shops owe
+GRN                                             it. The same transaction is AR for central and AP for the shop, which is
+KPI                                             why the two ledgers must agree.
+MDM
+MFA                   Cost of Goods Sold        The cost of the stock that was sold, as opposed to the price it sold for. The
+MOQ                                             difference is gross margin.
+
+                      Delivery Order            The document accompanying goods from central to a shop, listing what
+                                                was dispatched.
+
+                      European Article Number   The standard barcode number printed on retail packaging.
+                      / Global Trade Item
+                      Number
+
+                      Enterprise Resource       An integrated business system covering finance, inventory and
+                      Planning                  operations. Confirmed as not present today.
+
+                      First Expired, First Out  A picking rule that issues the stock nearest its expiry date first. Used
+                                                where goods perish.
+
+                      First In, First Out       A picking or costing rule that treats the oldest stock as issued first.
+
+                      Fast-Moving Consumer      Everyday grocery and household items sold in high volume at low margin.
+                      Goods
+
+                      General Ledger            The complete set of accounting records for a legal entity.
+
+                      Goods Received Note       The record a shop raises when it receives and counts a delivery. The point
+                                                at which the shop's stock records are updated.
+
+                      Key Performance           An agreed measure used to judge performance, for example shrinkage
+                      Indicator                 percentage.
+
+                      Master Data               The discipline of governing shared reference data such as the product
+                      Management                catalogue.
+
+                      Multi-Factor              Requiring a second proof of identity beyond a password.
+                      Authentication
+
+                      Minimum Order Quantity The smallest quantity that may be ordered for a given item.
+
+Draft for discussion                                                                                                      Page 4
+Requirements Clarification Questionnaire                                Cooperative Retail and Distribution System
+
+Term                  Expansion                Meaning in this context
+
+PII                   Personally Identifiable  Data identifying an individual, such as a member's name, address or
+
+                      Information              identity card number. Subject to privacy obligations.
+
+PLU                   Price Look-Up code       A short numeric code keyed at the till for items without a barcode, typically
+
+                                               loose produce.
+
+PO                    Purchase Order           An order placed by central on an external supplier.
+
+POS                   Point of Sale            The till system at the shop counter where sales to customers are
+                                               recorded.
+
+RBAC                  Role-Based Access        Granting permissions by job role rather than to individuals one by one.
+                      Control
+
+RPO                   Recovery Point Objective The maximum amount of data, expressed as a period of time, that the
+                                                             business is willing to lose in a disaster. Drives backup frequency.
+
+RTO                   Recovery Time Objective The maximum time the business is willing to be without the system in a
+                                                             disaster. Drives failover design and cost.
+
+SKU                   Stock Keeping Unit       The smallest distinctly tracked and counted item in the catalogue. Its
+                                               definition is a business decision, addressed in Section B.
+
+SLA                   Service Level Agreement A commitment on availability and support response, with consequences
+
+                                               for breach.
+
+SSO                   Single Sign-On           One login granting access to several systems.
+
+STO                   Stock Transfer Order     An instruction to move stock between locations. Note that between
+                                               independent cooperatives this is a sale, not a transfer.
+
+SVAT                  Simplified Value Added   A credit voucher scheme operating alongside VAT in certain supply
+                      Tax                      chains.
+
+UOM                   Unit of Measure          The unit in which an item is counted, bought or sold, for example kilogram,
+                                               each, or case of twenty-four.
+
+VAT                   Value Added Tax          Consumption tax charged on sales and reclaimable on purchases by
+
+                                               registered entities.
+
+Consignment                                    An arrangement in which the supplier retains ownership of goods until the
+                                               retailer sells them, and is paid only on sale.
+
+Firm sale                                      An arrangement in which ownership and risk pass to the buyer on
+                                               delivery, regardless of whether the goods are subsequently sold.
+
+Shrinkage                                      The gap between stock the records say should be present and stock
+                                               actually counted, after known losses are accounted for.
+
+Draft for discussion                                                                                                   Page 5
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section A. Commercial and ownership model
+
+   Why this section comes first
+
+   This is the most consequential section in the document. Because central and each shop are separate legal
+   entities, goods moving between them is a real commercial transaction. Whether ownership passes on delivery
+   or is retained until sale determines the inventory model, the accounting entries, the credit risk, and who
+   absorbs losses. Nearly every later section inherits from A-01.
+
+A-01 When central supplies goods to a shop, does ownership pass to the shop at that moment (firm sale), or
+          does central retain ownership until the shop sells the item to an end customer (consignment)?
+           Why we ask: This determines whose balance sheet the stock sits on, when central recognises revenue, whether
+           central can recall unsold stock, and who carries the loss when goods expire or are damaged on the shelf. The
+           inventory model, the ledger postings and the credit exposure all follow from this one answer.
+
+A-02 Could the model differ by product category, for example firm sale for dry goods but consignment for
+          high-value or short-shelf-life items?
+           Why we ask: If the model is mixed, every stock lot must carry an ownership flag rather than the system applying
+           one global rule. That is considerably more complex and is far better known now than discovered during build.
+
+A-03 At what precise point does risk of loss transfer: when goods leave the central warehouse, when the
+          vehicle arrives at the shop, or when the shop signs the GRN?
+           Why we ask: Determines who absorbs in-transit damage and theft, and therefore which party the system charges
+           when a delivery arrives short or damaged.
+
+A-04 Is a shop obliged to accept and pay for stock that central allocates to it, or may it decline a delivery or
+          return unsold stock?
+           Why we ask: Governs whether a returns-to-central workflow and a credit note mechanism are needed, and
+           whether central can push stock or only respond to pull.
+
+A-05 If returns to central are permitted, under what conditions: time window, condition of goods, restocking
+          charge, prior authorisation?
+
+A-06 At what price do shops buy from central: a wholesale or transfer price, cost plus a fixed margin, or a
+          member-discounted rate?
+
+A-07 Is there a single price list for all shops, or do transfer prices vary by shop, region, or volume purchased?
+           Why we ask: Volume-tiered or regional pricing requires a price-list engine with effective-dated versions rather
+           than a single price field on the product record.
+
+A-08 May shops purchase the same goods from outside suppliers if the price is better, or must they source
+          exclusively from central where central stocks the item?
+           Why we ask: Determines whether the system must record a parallel non-central supply chain per shop, and
+           whether central can treat shop requisitions as a reliable proxy for true demand when planning procurement.
+
+A-09 What are the payment terms: does the shop pay before dispatch, on delivery, or on credit? If on credit,
+          over what period?
+
+A-10 Is there a credit limit per shop, and should the system block a requisition that would breach it, or merely
+          warn?
+           Why we ask: A hard block has real operational consequences, since a shop that cannot order cannot trade. The
+           rule and its escalation path must be agreed by the federation before it is built, not chosen by a developer.
+
+A-11 Who may override a credit block, and must that approval be recorded for audit?
+
+Draft for discussion                      Page 6
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+A-12 Are penalties or interest charged on overdue balances, and must the system calculate them?
+
+A-13 Is there any obligation on central to supply, or on a shop to buy a minimum volume, that the system
+          should monitor and report against?
+
+Draft for discussion                                                                                      Page 7
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section B. SKU definition and product master data
+
+   On the SKU question
+
+   You asked what the scope of an SKU should be. This is the right question, and it is a decision rather than a
+   lookup. An SKU (Stock Keeping Unit) is the smallest thing the business agrees to count as distinct. Every
+   stock balance, sales report, reorder point and reconciliation aggregates at this level, so if central and the
+   shops draw the boundary differently, no report between them will ever agree.
+
+B-01 At what level is a distinct SKU defined? Please confirm the exact attribute set that makes two items
+          different SKUs: brand, product, pack size, variant, flavour, colour, grade?
+           Why we ask: This is the foundation of the entire data model. It should be written down as a rule that a warehouse
+           clerk and a shop assistant would both apply the same way.
+
+B-02 Is a case, carton or outer pack a separate SKU from the single selling unit, or the same SKU with a
+          defined pack conversion factor?
+           Why we ask: The most common source of stock error in distribution systems. Central habitually thinks in cases
+           while the shop counter sells singles. Whichever answer is chosen, the conversion must be held in one place and
+           be unambiguous.
+
+B-03 If the same product is bought from two different suppliers or manufacturers, is that one SKU or two?
+           Why we ask: One SKU simplifies selling and shelf management but hides supplier-level cost and quality
+           differences. Two SKUs preserve traceability but fragment stock balances and sales reporting.
+
+B-04 Are batch number, manufacture date and expiry date attributes of the stock holding rather than of the
+          SKU itself? Which product categories genuinely require batch or expiry tracking?
+           Why we ask: Batch tracking multiplies the size of the inventory records and changes the picking rule from FIFO
+           to FEFO. It should be applied only where it is needed, because it adds counting effort at every shop.
+
+B-05 Are any items serialised, that is tracked by an individual unique number, for example appliances
+          carrying a warranty?
+
+B-06 Are loose or weighed goods sold, such as rice, dhal, sugar or vegetables broken down from bulk? If so,
+          how is the bulk purchase unit converted to a retail selling unit, and how is natural weight loss or gain
+          accounted for?
+           Why we ask: Bulk-to-loose conversion creates a permanent and expected variance that is neither damage nor
+           theft. Without a distinct transaction type for it, stock will never balance and shrinkage figures will be meaningless.
+
+B-07 Who has authority to create a new SKU in the central catalogue, and what approval does it require?
+
+B-08 May a shop create its own SKU for a locally sourced item that central does not supply?
+
+B-09 If shops may create local SKUs, should these sit in a separate numbering range from central SKUs, and
+          should central be able to see them?
+           Why we ask: A separate range keeps the shared catalogue clean and prevents two shops inventing conflicting
+           codes for the same product. Whether central can see them at all is a visibility decision that belongs with Section
+           M.
+
+B-10 If a locally sourced item is later adopted into the central range, is there a process to promote or merge
+          the local SKU into the central catalogue without losing that shop's sales history?
+           Why we ask: Merging product codes retrospectively is difficult if not designed for. Deciding now avoids a
+           permanent break in trend data later.
+
+Draft for discussion                      Page 8
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+B-11 Do products carry barcodes reliably? What is done for unbarcoded and loose items: printed shelf labels,
+          in-store printed barcodes, or PLU codes keyed at the till?
+           Why we ask: This determines the scanning workflow and the hardware specification at every shop, including
+           whether label printers are needed.
+
+B-12 Can one SKU carry multiple barcodes, for example when a supplier changes pack artwork or an item is
+          sourced from more than one market?
+
+B-13 What set of units of measure (UOM) is required, and who defines conversion factors: central only, or
+          may a shop define its own?
+
+B-14 Must product names, descriptions and categories be held in all three languages in the master catalogue,
+          and who is responsible for supplying and maintaining the translations?
+           Why we ask: Trilingual master data is a continuing content operation rather than a one-time technical feature.
+           For a catalogue of any size it needs a named owner and a budget, otherwise it degrades into partial coverage
+           within months.
+
+B-15 What product category hierarchy is required, and is it common across the federation, or may shops
+          re-categorise items for their own merchandising?
+           Why we ask: A shared hierarchy is what makes cross-shop comparison possible. Local re-categorisation makes
+           shops happier but breaks federation-level analysis unless a mapping is maintained.
+
+B-16 Are there items that are restricted or age-controlled, or that some shops are not permitted to sell?
+
+B-17 How are seasonal or discontinued items handled, and can an SKU be deactivated centrally while a shop
+          still holds stock of it?
+           Why we ask: Deactivation while stock remains on shelves is a routine cause of tills refusing to sell saleable
+           goods. The rule needs to be explicit.
+
+Draft for discussion                      Page 9
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section C. Requisition, allocation and fulfilment
+
+C-01 What triggers a requisition: manual entry by shop staff, a system suggestion based on reorder point and
+          sales history, or both?
+
+C-02 Does central approve every requisition, or is it fulfilled automatically when stock is available? Who
+          approves, and are there value thresholds requiring higher approval?
+
+C-03 When total requested quantity exceeds available central stock, how is the shortfall allocated across
+          shops: first come first served, pro rata to request, share of historical sales, or a fixed quota?
+           Why we ask: This is a fairness question between independent member societies, with real commercial
+           consequences for the shops that lose out. It should be decided by the federation and recorded in policy, not
+           settled by whichever rule is easiest to code.
+
+C-04 Should the allocation rule be configurable by central at any time, or fixed and changeable only by formal
+          decision?
+
+C-05 Is partial fulfilment permitted, and does the unfulfilled remainder stay open as a backorder or get
+          cancelled?
+
+C-06 Is there a minimum order quantity or minimum order value per requisition, per line, or per delivery run?
+
+C-07 Are requisitions raised on a fixed cycle, for example each shop ordering on an assigned weekday, or ad
+          hoc at any time?
+           Why we ask: A fixed cycle lets central batch picking and plan delivery routes efficiently. Ad hoc ordering
+           demands continuous fulfilment capacity. This shapes the warehouse operation as much as the software.
+
+C-08 May a shop amend or cancel a requisition after submission, and up to what point in the fulfilment
+          process?
+
+C-09 Are emergency or out-of-cycle requests permitted, and do they follow a different approval path or attract
+          a different delivery charge?
+
+C-10 May shops transfer stock directly to one another, or must all movement route through central?
+           Why we ask: A lateral transfer between two independent cooperatives is commercially a sale between two
+           entities, requiring its own invoice and settlement. It also requires each shop to see something of another shop's
+           stock position, which is a visibility decision.
+
+C-11 If lateral transfers are permitted, does central approve them, and at what price do they transact?
+
+C-12 Should a shop be able to see central stock availability before raising a requisition, and should that be a
+          live figure or an indicative one?
+           Why we ask: A live figure is more useful but invites shops to race each other for scarce stock, which interacts
+           with the allocation rule in C-03.
+
+C-13 What lead time does central commit to between requisition and delivery, and should the system
+          measure performance against it?
+
+Draft for discussion                      Page 10
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section D. Delivery, goods receipt and discrepancies
+
+D-01 Who performs delivery: a central fleet, a contracted third-party logistics provider, or does the shop
+          collect from a depot?
+
+D-02 Are deliveries planned as routes serving several shops from one vehicle?
+           Why we ask: If so, the system needs load planning and a per-drop delivery note rather than a simple per-shop
+           dispatch document.
+
+D-03 Should drivers use a mobile application for proof of delivery, or is a signed paper delivery order
+          sufficient?
+
+D-04 At goods receipt, does the shop count every line, or accept on trust and count later?
+
+D-05 When the received quantity differs from the dispatched quantity, what happens? Does the shop record
+          what it actually received and raise a discrepancy for central to investigate, or must the receipt match
+          the dispatch note?
+           Why we ask: This decides whether a shop's stock ledger may temporarily diverge from central's records. Forcing
+           an exact match makes reconciliation trivial but causes shops to carry stock on the system that they do not
+           physically have, which corrupts every subsequent count.
+
+D-06 Who investigates a disputed discrepancy, who adjudicates it, and within what time limit must it be
+          raised?
+
+D-07 When goods arrive damaged, is the shop credited automatically on receipt, or only after inspection and
+          approval by central?
+
+D-08 Should the receiving clerk be able to photograph damaged or short deliveries and attach the images to
+          the discrepancy record?
+           Why we ask: Photographic evidence captured at the moment of receipt substantially reduces disputes between
+           independent entities, and is inexpensive if designed in from the start rather than added later.
+
+D-09 Should vehicle, driver and delivery timestamp be recorded for accountability?
+
+D-10 Are returnable containers, crates or pallets in circulation that must be tracked and reconciled?
+           Why we ask: Unreturned containers are a genuine and often unmeasured cost. If they are in use, they need their
+           own balance per shop.
+
+Draft for discussion                      Page 11
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section E. Inventory management
+
+E-01 How many central warehouses or regional depots exist, and does stock move between them?
+
+E-02 Within a shop, must stock be distinguished by location, for example sales floor versus back store?
+           Why we ask: This is what lets a shop answer the question 'we have none on the shelf, is there any in the back'. It
+           also introduces replenishment tasks, so it should be adopted deliberately rather than by default.
+
+E-03 What costing method should apply: weighted average, FIFO, or standard cost?
+           Why we ask: This determines reported cost of goods sold and therefore each shop's declared profit. It has tax
+           consequences and should be confirmed with the accountants who sign off the societies' books.
+
+E-04 For batch-tracked goods, is the picking rule FIFO or FEFO?
+
+E-05 How often are physical stock counts performed? Is cycle counting, that is counting a rotating subset
+          continuously, acceptable, or are only full stocktakes recognised?
+
+E-06 Must trading stop during a stocktake, or should the system support counting while the shop continues to
+          trade?
+           Why we ask: Counting while trading is significantly more complex but avoids closing shops, which for a small
+           society may mean a day of lost revenue.
+
+E-07 Who may approve a stock adjustment arising from a count, and above what variance value must it be
+          escalated?
+
+E-08 Should reorder points and safety stock be calculated by the system for each shop and SKU, or entered
+          manually by the shop?
+
+E-09 Should the system permit negative stock, that is selling an item the records say is not present, or block
+          the sale?
+           Why we ask: Blocking enforces data discipline but will stop genuine sales at the counter whenever records are
+           wrong, which in early operation is often. Most retailers permit it and manage it through an exception report. This
+           interacts directly with offline selling in Section H.
+
+E-10 Are there items with special storage requirements, such as cold chain, that the system should track or
+          alert on?
+
+E-11 Should stock ageing be reported, showing how long stock has been held?
+           Why we ask: Ageing is the earliest warning of over-ordering, and under a consignment model it is central's
+           exposure rather than the shop's.
+
+Draft for discussion                      Page 12
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section F. Damages, discards, expiry and shrinkage
+
+   Coupled to the ownership decision
+
+   You raised this and it deserves treatment as a full domain. It is tightly coupled to Section A: under
+   consignment, central absorbs most of these losses; under firm sale, the shop does. Until A-01 is answered,
+   F-02 cannot be.
+
+F-01 Which loss categories must be recorded and reported separately? For example: damaged in transit,
+          damaged in store, expired, spoiled, pest or weather damage, theft, unexplained shrinkage, staff
+          consumption, samples and tasting, donation or charitable write-off, and returns to supplier.
+           Why we ask: Each has a different owner, a different accounting treatment and a different management response.
+           Recording them all as a single 'adjustment' makes the data worthless for deciding what to fix.
+
+F-02 Under the ownership model chosen in A-01, who bears the cost of each loss category: central, the shop,
+          an insurer, the transporter, or the supplier?
+
+F-03 May damaged or expired goods be returned to central or to the supplier for credit, and is there a claim
+          workflow to support that?
+
+F-04 What approval is required to write off stock, and does the requirement vary by value?
+
+F-05 Must written-off goods be physically verified and witnessed before disposal, and should the system
+          record who witnessed it?
+           Why we ask: Write-off is the most common vector for stock fraud in retail, because it makes missing goods
+           legitimate on paper. Dual approval and a witness record are standard controls and are far cheaper to include from
+           the outset.
+
+F-06 Should stock approaching expiry trigger alerts, and at what lead time by product category?
+
+F-07 Is markdown selling of near-expiry goods permitted, and should a markdown be recorded as a distinct
+          event separate from an ordinary discount?
+           Why we ask: Separating the two lets you measure the true cost of over-ordering, which is otherwise hidden
+           inside general discounting and never surfaces to management.
+
+F-08 Is a disposal or destruction certificate required for any category, such as food, pharmaceutical or
+          agrochemical goods?
+
+F-09 Should shrinkage be reported as a percentage measure per shop, and is that figure visible to central or
+          only to the shop itself?
+           Why we ask: This is a politically sensitive metric between independent societies. It belongs in the visibility matrix
+           in Section M rather than being decided by default.
+
+F-10 Are there acceptable tolerance levels for loss by category, below which no investigation is required?
+
+F-11 Should the system distinguish goods that are damaged but still saleable at a reduced price from goods
+          that are unsaleable?
+
+Draft for discussion                      Page 13
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section G. Pricing
+
+G-01 Does central set the retail selling price, recommend it, or leave it entirely to each shop?
+
+G-02 If central sets or recommends prices, may a shop deviate? Does deviation require approval, or merely a
+          recorded reason?
+
+G-03 Are any goods subject to government-controlled maximum retail prices? If so, must the system enforce
+          the ceiling and retain a history of controlled prices?
+           Why we ask: Selling above a gazetted maximum price is a legal offence, so this is a hard control rather than a
+           preference. It also requires effective-dated price records so that a past transaction can be shown to have been
+           compliant at the time.
+
+G-04 Are there member prices distinct from non-member prices? If so, are they funded by the shop or by
+          central?
+
+G-05 Are promotions required: time-limited price reductions, multi-buy offers, basket-level discounts,
+          bundles?
+
+G-06 Who funds a promotion, central or the shop, and must the system apportion the cost between them?
+           Why we ask: Between independent entities, promotional funding is a real settlement item rather than a display
+           detail. If central funds a promotion, the shop must be reimbursed, and that calculation has to come from
+           somewhere.
+
+G-07 May till operators apply manual discounts? Within what limits, and with what authorisation?
+
+G-08 Should price changes be effective-dated and scheduled in advance, so that a shop can load next
+          month's prices ahead of time?
+           Why we ask: Without scheduling, price changes must be applied manually on the day, which across many shops
+           with poor connectivity is a reliable source of error and of pricing disputes with customers.
+
+G-09 Are prices inclusive or exclusive of tax at the shelf edge, and is that consistent across all shops?
+
+G-10 Is rounding required at the till, and to what denomination?
+
+Draft for discussion                      Page 14
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section H. Point of sale and offline operation
+
+   Offline is a requirement, not an option
+
+   You have confirmed connectivity will be provided but that outages and slow links are expected in remote
+   areas. That makes offline capability a requirement rather than an option. These questions establish how far it
+   must extend, which is the main cost variable in this section.
+
+H-01 What is the longest offline period the till must survive while continuing to trade: an hour, a full trading
+          day, several days?
+           Why we ask: An hour can be handled with a simple queue held in memory. Several days requires a full local
+           database at each till, a locally held product and price catalogue, and a designed conflict-resolution strategy. The
+           difference in cost and complexity is large, so the answer should reflect the worst real site rather than the average
+           one.
+
+H-02 While offline, which operations must still work: sale, refund, member lookup, price lookup, card payment,
+          receipt printing, stock deduction?
+
+H-03 Which operations may legitimately be blocked while offline?
+
+H-04 If a shop and central both change the same record while disconnected, whose version prevails on
+          reconnection?
+           Why we ask: Without an explicit rule, a system silently discards one side's data. The usual answer is that a shop
+           is authoritative for its own sales and stock, and central for the catalogue and prices, but this must be confirmed
+           rather than assumed.
+
+H-05 Are card, mobile wallet or QR payments accepted? These generally require live connectivity, so what
+          should the till do when the payment network is down?
+
+H-06 How many till lanes are needed per shop, typically and at the largest site?
+
+H-07 Which peripherals must be supported: barcode scanner, receipt printer, cash drawer, weighing scale,
+          customer display, card terminal, label printer?
+
+H-08 Is the till to run on a standard computer, a tablet, or a dedicated POS terminal? Is there existing
+          hardware to be reused?
+
+H-09 Must the receipt print in the customer's chosen language, and may that be selected per transaction?
+           Why we ask: Trilingual printing on low-cost thermal printers has real constraints, particularly for Sinhala and
+           Tamil rendering, and may determine which printers can be purchased. Better decided before hardware is bought.
+
+H-10 Are refunds, exchanges and voided transactions permitted at the till, and what authorisation do they
+          require?
+
+H-11 Is a suspended or parked sale needed, so a cashier can set a transaction aside and serve another
+          customer?
+
+H-12 What are the peak transactions per hour at the busiest shop, and the total daily transaction volume
+          across the federation?
+           Why we ask: Needed to size the central infrastructure and to design the synchronisation approach. An
+           order-of-magnitude estimate is sufficient at this stage.
+
+H-13 Must a sale be attributable to the individual cashier who processed it?
+
+H-14 Is home delivery, telephone ordering or any form of online ordering in scope, now or in a later phase?
+
+Draft for discussion                      Page 15
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section I. Payments, cash and settlement
+
+I-01 Which tender types are accepted at the counter: cash, card, mobile wallet, member credit account,
+          voucher, coupon, government subsidy instrument?
+
+I-02 Do shops extend credit to individual members or customers? If so, must the system manage those
+          personal accounts, limits and repayments?
+           Why we ask: Member credit books are common in cooperative retail and are frequently the largest receivable a
+           shop carries. If in scope this is a substantial module, so it needs to be identified now rather than assumed to be a
+           small feature.
+
+I-03 Is till cash management required: opening float, cash drops during the day, blind close, till variance
+          reporting?
+           Why we ask: A blind close, where the cashier counts without seeing the expected figure, is the standard control
+           against till theft. It is a small design choice with a large effect on the usefulness of variance data.
+
+I-04 Must the system record banking of daily takings and reconcile it against till totals?
+
+I-05 How does a shop settle its account with central: bank transfer, cheque, deduction from a rebate,
+          offsetting against returns?
+
+I-06 Should the system produce statements of account between central and each shop, and at what
+          frequency?
+
+I-07 Should payments be matched to specific invoices, or applied against the oldest balance first?
+           Why we ask: This determines whether the receivables ledger can produce a meaningful ageing report and
+           support dispute handling on a specific invoice.
+
+I-08 Are foreign currency or remittance transactions ever involved?
+
+Draft for discussion                      Page 16
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section J. Inter-entity billing and accounting
+
+   On AR and AP
+
+   Every supply from central creates a matched pair of entries: an account receivable (AR) at central, being
+   money owed to it, and an account payable (AP) at the shop, being money it owes. Because these sit in the
+   books of two different legal entities, they must agree, and disagreement between them is the routine source of
+   disputes in federated structures. The scope question in J-01 decides how much of that ledger the system
+   owns.
+
+J-01 Should the system produce a full set of accounts for each shop, that is general ledger, trial balance,
+          profit and loss and balance sheet? Or only manage the receivable and payable between central and
+          each shop, exporting to whatever books each society already keeps?
+           Why we ask: One of the largest scope decisions in the programme. Full multi-entity accounting roughly doubles
+           the finance scope and brings each society's statutory reporting inside the system. Many federations prefer to
+           leave society bookkeeping where it is and integrate instead.
+
+J-02 If only AR and AP are in scope, what export format is required, and to which accounting packages do the
+          shops currently post?
+
+J-03 What is the applicable tax regime: VAT, SVAT, or another? Which items are exempt or zero-rated, and
+          does the treatment differ between central and shops?
+
+J-04 Is government electronic invoicing or fiscal reporting mandated now, or expected in the near term?
+           Why we ask: If it is coming, invoice numbering, immutability and archival must be designed for it from the start.
+           Retrofitting fiscal compliance into a live retail system is disproportionately expensive.
+
+J-05 What document numbering rules apply, and must numbering be sequential and gapless within each
+          entity?
+           Why we ask: Gapless sequential numbering is a common statutory requirement and it conflicts with offline
+           operation, since a disconnected till cannot know the next number. If it is required, the design must reserve
+           number ranges per site in advance.
+
+J-06 What is the retention period for transaction and tax records?
+
+J-07 Are credit notes and debit notes required, and who may issue them?
+
+J-08 Does the financial year end differ between central and any of the shops?
+
+J-09 Who audits each society, and are there audit requirements the system must support, such as read-only
+          auditor access or a defined transaction listing?
+
+Draft for discussion                      Page 17
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section K. Membership and patronage
+
+   Why members matter
+
+   You asked how members matter to the system. In a cooperative, members are owners rather than ordinary
+   customers, and the relationship often carries financial consequences: preferential prices, patronage rebates
+   on the year's purchases, share capital, credit facilities, and voting rights. If any of these exist, purchases must
+   be attributed to a member identity at the till, which changes the checkout flow and the year-end close. If none
+   do, this section falls away and the system is simply retail. Both are legitimate answers, but it must be
+   answered explicitly.
+
+K-01 Does the business need to distinguish members from ordinary customers at the point of sale at all?
+           Why we ask: If the answer is no, questions K-02 to K-08 do not apply and a significant amount of scope
+           disappears.
+
+K-02 Does each shop maintain its own member register, or is there an islandwide member identity shared
+          across the federation?
+           Why we ask: If a member of one society may shop at another, the system needs a federated identity and a rule
+           for which society the patronage accrues to. If not, the register stays local and much simpler.
+
+K-03 Do members receive preferential prices, and are those funded by the shop or by central?
+
+K-04 Are patronage rebates or dividends paid based on a member's purchases over the year, and must this
+          system calculate them?
+           Why we ask: This requires every relevant sale to be reliably attributed to a member, which puts an identification
+           step into the checkout flow and slows the queue. The operational cost is real and should be weighed against the
+           benefit.
+
+K-05 Is member share capital, subscription or savings tracked, and is that in scope here or held in a separate
+          system?
+
+K-06 Are there member loans or credit facilities to administer?
+
+K-07 Is any governance function expected in the system, such as membership records for AGM voting
+          eligibility, or is that entirely outside scope?
+
+K-08 What personal data is held about members, and what consent and privacy obligations apply to it?
+           Why we ask: Member records are personally identifiable information belonging to an independent society. Who
+           may see them across the federation is a Section M question with legal weight.
+
+Draft for discussion                      Page 18
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section L. Central procurement and supplier management
+
+L-01 Is central's own procurement in scope for this system, or handled elsewhere?
+
+L-02 Should shop requisitions and sales history feed a demand forecast that drives central purchase orders?
+           Why we ask: This is one of the strongest arguments for a central system at all, and worth confirming as an
+           explicit objective. It also constrains Section M, because forecasting requires central to see a meaningful amount
+           of shop-level sales data.
+
+L-03 Must supplier contracts, agreed prices and volume rebates be managed in the system?
+
+L-04 Is there a tender or quotation process central must follow, with an audit trail?
+
+L-05 Are goods imported, requiring landed cost calculation where duty, freight and clearing charges are
+          apportioned across a shipment?
+           Why we ask: Landed cost materially changes the true cost of goods and therefore the transfer price to shops. If
+           imports are significant, this cannot be approximated.
+
+L-06 Does central manufacture, pack, repack or brand any goods itself?
+           Why we ask: Repacking bulk into retail packs is a production process that consumes one SKU and produces
+           another, and needs its own transaction type rather than being recorded as an adjustment.
+
+L-07 Are there supplier performance measures to track, such as fill rate, lead time or quality rejections?
+
+Draft for discussion                      Page 19
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section M. Data ownership, visibility and governance
+
+   What this section is really asking
+
+   To clarify the earlier question: this is not about whether to use one central database or a separate database
+   per shop. That is an architecture choice made afterwards, and strict ownership rules can be honoured
+   perfectly well inside a single shared database. The question here is the legal and governance one. Because
+   each society is an independent entity, its transaction data is its own commercial record, and the federation
+   must decide who owns it, who may see it, and what happens to it if a society leaves. The technology can
+   implement whatever is decided, but it cannot make the decision.
+
+M-01 Who legally owns the transaction data generated at a shop: the shop as an independent entity, central,
+          or both jointly?
+           Why we ask: This governs what central may do with the data, what happens if a society leaves the federation,
+           and who is answerable to a regulator or data protection authority. It is a constitutional question for the federation
+           and should be settled in writing before the system encodes an answer by default.
+
+M-02 May central see a shop's sales of goods that central did not supply?
+
+M-03 May central see a shop's locally sourced inventory and the identity of its local suppliers?
+
+M-04 May central see a shop's margins, profitability and shrinkage?
+
+M-05 May one shop see any data belonging to another? If lateral transfers are permitted under C-10, stock
+          availability must be visible at minimum. How much beyond that is acceptable?
+
+M-06 Should there be an aggregate-only tier, where central sees anonymised or combined figures for
+          planning without seeing shop-identifiable detail?
+           Why we ask: This is frequently the compromise that makes federation-wide reporting politically acceptable. It is
+           straightforward to build if specified now and awkward to retrofit onto reports already written.
+
+M-07 If a society leaves the federation, what happens to its historical data: deleted, exported to it, or retained
+          by central?
+
+M-08 Who administers users at a shop: the shop itself, or central?
+           Why we ask: Shop-level administration respects autonomy but distributes the security risk across many small
+           organisations with limited IT capability. Central administration is safer but slower and may be resisted.
+
+M-09 Which data protection or privacy obligations apply to member and customer data, and is there a
+          designated responsible officer?
+
+M-10 Does any authority, such as the Department of Co-operative Development, have a right of access to the
+          data or require returns in a prescribed format?
+
+M-11 Is there an agreed data sharing agreement between central and the societies, or does one need to be
+          drafted alongside this project?
+           Why we ask: In most federations this document does not yet exist, and the system project is what forces it to be
+           written. Identifying that early avoids a legal blocker appearing late.
+
+Draft for discussion                      Page 20
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section N. Security, roles and internal controls
+
+N-01 What roles are required at a shop, for example cashier, supervisor, stock clerk, manager, accountant,
+          and what may each do?
+
+N-02 What roles are required at central?
+
+N-03 How do staff authenticate at the till: password, PIN, card, fingerprint?
+           Why we ask: Speed at the counter matters, and a control that is slow will be circumvented by sharing logins,
+           which destroys accountability entirely.
+
+N-04 Is multi-factor authentication required for administrative or financial functions?
+
+N-05 Which actions must be irreversible and recorded on an immutable audit trail? For example price
+          override, manual discount, void, refund, stock write-off, opening the cash drawer without a sale,
+          changing a member record.
+           Why we ask: These are the standard indicators of retail fraud. Deciding now which events are audited is far
+           cheaper than adding auditing later, and an audit trail that can be edited is worth nothing.
+
+N-06 Should the system produce exception reports for management review, and who is responsible for
+          reviewing them?
+           Why we ask: An exception report nobody owns is a control that does not exist. The reviewer should be named as
+           part of the requirement.
+
+N-07 Are segregation-of-duties rules required, for example that the person who requests a stock write-off may
+          not approve it?
+
+N-08 What happens to a user account when a member of staff leaves, and who is responsible for closing it?
+
+N-09 Are there physical security considerations at shops, such as unattended tills or shared devices, that the
+          design should account for?
+
+Draft for discussion                      Page 21
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section O. Reporting and analytics
+
+O-01 For each stakeholder group, what decisions do they need to make, and what information supports each
+          decision? Please answer for central management, a shop manager, and the federation board.
+           Why we ask: Asking for a list of reports usually produces a long list of screens nobody opens. Naming the
+           decision first produces a much smaller and far more useful set, and makes it obvious when a requested report
+           supports no decision at all.
+
+O-02 What reporting must remain available offline or on paper at a shop with no connectivity?
+
+O-03 Is real-time federation-wide reporting genuinely required, or is end-of-day sufficient?
+           Why we ask: Real-time reporting across many poorly connected sites raises the cost of the synchronisation
+           design considerably. If daily consolidation is adequate, the architecture becomes markedly simpler and cheaper.
+
+O-04 Are statutory or regulatory returns required in a prescribed format, and by when?
+
+O-05 Do users need to export to spreadsheets, and should they be able to build their own reports without
+          developer involvement?
+
+O-06 Is a mobile dashboard needed for managers, given the connectivity constraints?
+
+O-07 What history must be retained and reportable, and over how many years should trends be comparable?
+
+Draft for discussion                      Page 22
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section P. Language, localisation and accessibility
+
+   Confirmed: all three languages
+
+   You have confirmed that Sinhala, Tamil and English must all be supported. These questions determine how
+   deep that requirement runs, because there is a large difference in effort between a trilingual customer receipt
+   and a fully trilingual application with trilingual master data maintained indefinitely.
+
+P-01 Must all three languages be available throughout the user interface, or is the staff interface in one
+          language with only customer-facing output trilingual?
+           Why we ask: Full interface translation is a one-time cost that recurs at every release. Trilingual master data is a
+           permanent operational commitment. These are different decisions and can be answered differently.
+
+P-02 Is language a per-user setting, a per-shop setting, or switchable at any moment?
+
+P-03 Must reports and printed documents be produced in all three languages?
+
+P-04 Must the system search and sort correctly in Sinhala and Tamil, including for product names and
+          member names?
+           Why we ask: Correct collation and search behaviour in these scripts is a real engineering task, and it is
+           frequently discovered late when users find they cannot locate a record they know exists.
+
+P-05 What fonts and rendering are acceptable on receipt printers and low-cost shop hardware for Sinhala and
+          Tamil?
+
+P-06 Is data entry required in all three scripts, and will keyboards and input methods be provided at shops?
+
+P-07 Which language is authoritative where a translation is missing, disputed, or where a legal document is
+          concerned?
+
+P-08 Are there literacy or accessibility considerations among shop staff or members that should shape the
+          interface design, for example icon-led screens or larger text?
+
+P-09 Are dates, numbers and currency to be formatted consistently across all three languages?
+
+Draft for discussion                      Page 23
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section Q. Infrastructure, hosting and service levels
+
+Q-01 Is hosting to be cloud-based, on premises at central, or hybrid? Is there any legal or policy requirement
+          that data remain within the country?
+
+Q-02 Who will own and operate the infrastructure after go-live? Is there an in-house team, or is a managed
+          service expected?
+           Why we ask: The answer changes the design. A system to be run by a small in-house team must be far simpler
+           to operate than one supported by a vendor under contract.
+
+Q-03 What are the recovery time objective and recovery point objective? That is, how long may the system be
+          unavailable, and how much data may be lost, in a disaster?
+           Why we ask: These two numbers drive the backup and failover design and are a major cost driver. They should
+           be stated by the business rather than assumed by the technical team, because the business bears the
+           consequence.
+
+Q-04 What availability is expected during trading hours, and is there an agreed service level agreement with
+          defined support hours?
+
+Q-05 What growth is expected over five years in number of shops, users, SKUs and transactions?
+
+Q-06 What connectivity will each shop actually have: fixed broadband, mobile data, or both as failover? What
+          bandwidth is realistic at the weakest sites?
+
+Q-07 Is power reliability a problem at shops, and must the till survive a power interruption on battery-backed
+          hardware?
+           Why we ask: In practice power interruption is at least as disruptive as connectivity loss, and it affects hardware
+           specification and the safe-shutdown design of the local database.
+
+Q-08 Is there existing infrastructure, licensing or a technical standard the system must fit within?
+
+Q-09 What support model is expected: hours of cover, languages of support, first-line responsibility at shop
+          level, and the escalation path?
+
+Q-10 How will software updates be deployed to shops, and can a shop defer an update?
+           Why we ask: With many independent sites and poor links, update distribution is a genuine operational problem,
+           and allowing deferral means supporting multiple versions simultaneously.
+
+Draft for discussion                      Page 24
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section R. Existing systems, data migration and integration
+
+   Confirmed position
+
+   You have confirmed there is no ERP, and that where shops run a POS today it will be replaced by the one
+   provided with this system. That removes integration with those systems from scope, but not the question of
+   what data must be extracted from them before they are retired.
+
+R-01 Which shops have an existing POS system, which product is it, and can data be extracted from it?
+
+R-02 What historical data must be migrated: product master, member register, opening stock balances,
+          outstanding balances, sales history? How far back?
+           Why we ask: Opening balances are almost always essential. Deep sales history is usually expensive to migrate
+           and rarely used afterwards. It is worth deciding deliberately rather than migrating everything by default.
+
+R-03 Where does master data currently live: spreadsheets, paper ledgers, individual shop systems? Who
+          owns and maintains it today?
+
+R-04 How clean is the existing data, and who will do the cleansing work?
+           Why we ask: Data cleansing is very often the critical path of a programme like this and is almost always
+           underestimated. It needs a named owner and dedicated time in the plan, because it cannot be done by the
+           software team alone.
+
+R-05 Must the system integrate with banks for payment files or statement reconciliation?
+
+R-06 Must it integrate with any government portal for tax or cooperative reporting?
+
+R-07 Should an API be provided for future integrations, and are any third parties expected to connect?
+
+R-08 Is SMS or email notification required, for example dispatch alerts, account statements or member
+          communications?
+
+R-09 Are there weighing scales, label printers or other devices already in use at shops that must be
+          supported?
+
+Draft for discussion                      Page 25
+Requirements Clarification Questionnaire  Cooperative Retail and Distribution System
+
+Section S. Programme, rollout and change management
+
+S-01 How many cooperative shops are there in total, and how are they distributed geographically?
+
+S-02 How many staff will use the system, and what is their general level of computer familiarity?
+
+S-03 Is a phased first release acceptable, for example central plus a pilot group of shops with requisition and
+          POS only, or must the full scope go live at once?
+           Why we ask: Phasing is usually the difference between a programme that lands and one that stalls. Agreeing a
+           minimum viable first release early gives everyone something real to react to within months rather than years.
+
+S-04 Who holds decision-making authority for the federation, and how are decisions affecting all societies
+          ratified?
+           Why we ask: With independent entities, an unclear decision path is the most common cause of delay on projects
+           of this kind. We need to know who can settle the questions in this document and how long ratification takes.
+
+S-05 Are all shops obliged to adopt the system, or is adoption voluntary?
+           Why we ask: If voluntary, the system must work correctly with only partial coverage, and central reporting will be
+           incomplete by design. That is workable, but it must be a deliberate choice rather than a surprise.
+
+S-06 What is the target go-live date, and are there seasonal periods such as festivals or harvest that must be
+          avoided?
+
+S-07 Who will deliver training, in which languages, and will it be centralised or delivered regionally?
+
+S-08 How is the system funded: central budget, per-shop subscription, transaction fee? Does the funding
+          model affect what any shop is entitled to use?
+           Why we ask: A per-shop charge changes the adoption dynamic entirely and may require the system to meter
+           usage, which is a requirement in its own right.
+
+S-09 Who will own the system after go-live, in the sense of prioritising changes and arbitrating between
+          competing requests from societies?
+
+S-10 What does success look like twelve months after go-live, stated in measurable terms?
+           Why we ask: Writing this down before build begins anchors later scope arguments and gives an honest basis for
+           judging the programme.
+
+Draft for discussion                      Page 26
+Requirements Clarification Questionnaire                                       Cooperative Retail and Distribution System
+
+Section T. Risks and assumptions to confirm
+
+The following are our working assumptions. Each carries a risk if it proves wrong, and each should be either
+confirmed or corrected. They are listed separately from the questions because they need a yes or no rather
+than a considered answer.
+
+Ref   Assumption                                            Risk if incorrect
+T-01
+T-02  The federation can reach a single binding decision    Design cannot begin. This is the largest schedule risk
+T-03  on the questions in Section 3 within a defined        in the programme.
+T-04  timeframe.
+T-05
+T-06  Shops will accept some degree of central visibility   If not, central reporting and demand forecasting lose
+T-07  over their trading data in exchange for supply and    most of their value and the business case weakens.
+      system benefits.
+
+      Product master data can be assembled into a single Cataloguing becomes the critical path and delays
+
+      trusted catalogue before go-live.                     everything downstream.
+
+      Shop staff can be trained to operate a computerised Adoption fails at the counter regardless of how good
+
+      till, with support available in their language.       the system is.
+
+      Connectivity, while imperfect, will be present often  Some shops effectively operate permanently offline,
+      enough for daily synchronisation at every site.       which changes the design from
+                                                            occasionally-disconnected to genuinely distributed.
+
+      The societies' existing accounting arrangements       If full accounting must move into the system, finance
+      can continue unchanged, with this system feeding      scope roughly doubles.
+      them.
+
+      Hardware at shops will be standardised or at least    Supporting arbitrary hardware across many
+      specified centrally.                                  independent sites is a disproportionate ongoing
+                                                            support burden.
+
+Next steps
+
+We suggest the following sequence. First, circulate Section 3 to whoever holds decision-making authority and
+obtain written answers to those eight questions, since nothing meaningful can be designed until they are
+settled. Second, assign each remaining section to the party best placed to answer it, using the guidance in
+Section 1. Third, return the answers against the question references so that gaps are visible.
+
+Where a question cannot be answered because the federation has never had to decide it, that is a useful
+finding rather than a failure. Those items should be listed and taken to the board as decisions required,
+because the system will otherwise make the decision implicitly, and it will make it badly.
+
+Once Section A and Section B are answered, the domain model and the central-to-shop transaction flow can
+be drafted. That is the backbone to which everything else attaches, and it can be reviewed by the federation
+before any further commitment is made.
+
+End of document. Draft prepared for discussion and subject to revision as answers are received.
+
+Draft for discussion                                                                                         Page 27
+

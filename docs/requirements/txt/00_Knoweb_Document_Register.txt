@@ -1,0 +1,50 @@
+Cooperative Retail and Distribution System
+00  -  Knoweb Document Register
+v0.2  --  14 August 2026  --  replaces v0.1
+Index of the requirements baseline package for the Cooperative Retail and Distribution System. Versioning convention: files are never edited in place  --  superseded versions are replaced by a new versioned file and the old one is moved to trash.
+Baseline package (documents 1 - 10)
+File
+Contents
+Size
+01_Vision_and_Scope.docx
+Objectives, boundaries, documents-not-payments scope, delivery approach, baseline authority
+11 KB
+02_Domain_Model.docx
+Entity and relationship tables, 13 document types, cardinalities, recurring patterns
+13 KB
+03_Document_State_Machines.docx
+All 13 document lifecycles: statuses, transitions, actors, numbering per state
+15 KB
+04_Process_Flows.docx
+Twelve numbered actor flows from inter-entity trade to shop onboarding
+13 KB
+05_SRS_Functional_Requirements.docx
+118 EARS-phrased functional requirements across 16 domains, with IDs, phases, source refs
+23 KB
+06_NFR_Specification.docx
+Non-functional requirements against ISO 25010: performance, availability, offline, security, compliance, usability, localisation, updates, auditability
+14 KB
+07_Matrices.docx
+RBAC skeleton, visibility matrix, audit event catalogue, config-at-setup register, report catalogue placeholder
+13 KB
+08_Traceability_Matrix.docx
+Every questionnaire reference (A - T) mapped to resolution, requirement IDs, phase, status
+22 KB
+09_Decisions_Log.docx
+27 ADR-style decisions including the two items currently in RFC
+15 KB
+10_Open_Items_Register.docx
+LIVE document: open items, 13-item ratification batch, external pendings, parked items, programme actions
+13 KB
+Supporting documents
+File
+Contents
+Size
+Document_Numbering_RFC.docx
+Multi-series gapless numbering proposal  --  with stakeholders (optional upload)
+11 KB
+Numbering_Scheme_Tax_Advisor_Briefing.docx
+Five written questions for the tax advisor (optional upload)
+12 KB
+Status notes
+Documents 1 - 9 are stable baseline content pending federation sign-off. Document 10 is the one live document, updated at each programme gate. Two RFCs are with stakeholders: the numbering design (ADR-11) and the 13-item ratification batch listed in document 10.

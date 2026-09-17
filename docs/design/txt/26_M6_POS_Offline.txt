@@ -1,0 +1,737 @@
+Cooperative Retail and Distribution System
+
+26 ­ M6 POS & Offline
+
+Module design for the till: selling, tendering as record, printing trilingual receipts,
+deducting stock, running a session with blind close, hosting the shop-management
+screens, and doing all of it for two days without central ­ then synchronising without ever
+merging. Also the central side that ingests, re-validates and watches the fleet.
+
+Field           Value
+Document
+Version         26 ­ M6 POS & Offline (Stage 2 module design; template of doc 20 §5)
+Date
+Owning team     v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 6
+Inputs
+                9 September 2026
+Depends on
+                The till track (native Android, doc 30 DR-1); the central ingestion side is a thin M6 package in the monolith. M4 and
+Depended on by  M5 supply shop-mode screen specifications; M3 supplies the engine; the kernel supplies the sync gateway.
+
+                05 SRS (FR-POS-010­110, FR-PAY-010, 030­050, FR-REP-030); 03 §13; 13 scenarios 2 and 4; 16 answers (H,
+                I-01, I-03, N-03, N-09, O-02, P-05, Q-07); 09 ADR-10, 19, 24, 31, 34, 36; 14 §3, §8; 17 v0.2.1 §9; 18 v0.2; 19 v0.2;
+                20 v0.3 M6; 21­25 contracts and bundle specs; 30 §2, §4; 31; 32; the multi-MRP study
+
+                Snapshots from M1 (operators, permissions), M2 (catalogue, batches, images), M3 (prices, rules, ceilings,
+                policies), M5 (lots, count tasks, policies), M4 (expected drops, transfers), M7 (customers, balances); the shared
+                engine; the kernel sync gateway and management agent
+
+                M5 (sale deductions from receipt bundles), M7 (account tenders), M4 (GRN bundles), M8 (till sessions, variance,
+                sales), doc 31 (health and version telemetry)
+
+The till is a small, complete system. It has its own database, its own gapless counters, its own copy of the rules, its
+own audit log and its own outbox. Central never edits what it produces and it never edits what central sends. That
+symmetry (ADR-10) is why there is no conflict resolution anywhere; every other design choice in this module protects
+it. The second commitment is speed at the counter: three taps to sell, and nothing that requires reading more than a
+word.
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+In scope (phase 1)                                                               Out of scope
+
+Selling: scan, code lookup, search by name in any script, weighed goods          Card, wallet or QR processing; any payment gateway (ADR-19)
+(scale or keyed weight, 20­29 labels), thumbnails; price and rules through
+the shared engine; multi-MRP policy incl. the picker; control-price cap;
+negative-stock acknowledgement; sell-through of inactive items (H-02,
+FR-POS-010­040)
+
+Tender recording: cash with rupee rounding and change; card reference;           Self-checkout, home delivery, online ordering (H-14)
+customer account within the offline cap; mixed tenders; vouchers and
+subsidy instruments later (I-01, FR-PAY-010)
+
+Receipt as an immutable fiscal document from the till-position series;           Per-transaction language switch (P-02)
+trilingual raster printing; reprint audited; customer display (H-09, P-05,
+N-05)
+
+Void within session; same-till same-session refund; cross-session refund Discretionary discounts of any kind (ADR-14)
+online by supervisor (H-10, FR-POS-050 corrected)
+
+Park and resume; till session with float, drops, blind close and variance;       Till-to-till communication; shared parked sales; a shop server (doc
+Z-report, day sales and session report offline (H-11, I-03, O-02)                20 Appendix A)
+
+Operator PIN, idle lock, cashier attribution; drawer-open-without-sale           ­
+
+audited (N-03, N-09, H-13)
+
+Shop-management mode hosting M4 (GRN, expected drops), M5 (count,                Online-only shop functions (orders, cross-session refunds,
+write-off draft, repack, transfer receipt) and reports; role-gated; park-first;  approvals) ­ the web back office on the same terminal
+audited (ADR-36)
+
+Local database with till-owned tables and read-only caches; local                Update installation itself (management agent, doc 31)
+counters (till-position; location on the primary till); outbox; sync worker per
+doc 32; snapshot application with apply_from at day-open; heartbeat and
+telemetry
+
+Peripheral layer: scanner (2D), receipt printer (raster), drawer, scale,         UnifiedPOS-certified drivers (vocabulary only)
+customer display, label printer; vendor adapters; simulator (H-07)
+
+Training mode on a sandbox namespace (T-04)                                      ­
+
+Central side: bundle validation and re-validation with the shared engine, ­
+till session and cash records, sync health and fleet views, cross-session
+refund handler
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                               Design section
+                                                                                                                         3.2, 3.6, 6.2, 6.3
+FR-POS-010          Sale by scan, code, search; weighed goods                                                            3.2, 6.2, 6.4
+                                                                                                                         4.1, 6.7, 6.8
+FR-POS-020          Price resolution through the shared engine; MRP and control-price cap; picker; rules                 3.2, 6.5
+                                                                                                                         3.8, 9.2
+FR-POS-030          Refund rules: same-till same-session at cashier level; cross-session online with supervisor
+                                                                                                                         3.3, 4.1
+FR-POS-040          Negative stock permitted with explicit acknowledgement; exception event                              3.5, 4.3
+                                                                                                                         3.4
+FR-POS-050          Online-only actions are blocked offline, not queued                                                  3.8, 9.2
+(corrected)
+                                                                                                                         3.7, 4.4
+FR-POS-060          Park and resume                                                                                      3.9
+                                                                                                                         3.3
+FR-POS-070          Cashier attribution on every action; PIN; idle lock                                                  3.5, 4.2
+
+FR-POS-080          Receipt printing in the shop language with English fallback; raster                                  3.5
+                                                                                                                         3.1, 3.10
+FR-POS-090          Offline set: sale, receipt, deduction, lookup, park, same-session refund, GRN capture,
+                    counts
+
+FR-POS-100          Shop-management mode on the same device
+
+FR-POS-110          Training/sandbox mode
+
+FR-PAY-010          Tender types recorded, none processed
+
+FR-PAY-030/040/ Float, cash drops, blind close, variance reporting
+050
+
+FR-REP-030          Z-report, day sales, session report offline
+
+H-01, H-04          Two days offline; one writer, no merge
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                                                              Page 2
+Identifier  Requirement (abridged)                                                 Design section
+                                                                                   3.6, 3.11
+H-05, H-06, H-07, Cash only offline; ~1.5 tills; peripherals; dedicated terminals
+H-08                                                                               9.1, 9.3
+                                                                                   3.10, 6.12
+H-12, Q-07  Volume envelope; power resilience                                      3.2, 3.6
+
+ADR-24, doc 31 Version reporting; self-test; floor behaviour
+
+Multi-MRP study AUTO_LOWEST default; picker; 2D scan
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                    Page 3
+3. Domain model
+
+3.1 Two databases, one logical model
+
+Aspect                      Design
+Till-owned (written on the
+device, uploaded)           document (RCT and shop-mode types), document_line with pricing fields, doc_receipt_tender,
+                            document_state_history, stock_movement (sale deductions), audit_event, till_session, cash_movement,
+Central-owned (received     parked_sale, counters, outbox, sync_state. Same columns and types as doc 18 (doc 17 §9).
+read-only)
+                            snapshot tables: sku, conversion, barcode, image (thumb keys), tag, tax_rate, batch, lot, price_list_line,
+Central mirror              discount_rule, control_price, mrp_policy, customer, operator, permission, count_task, expected_drop,
+                            expected_transfer, inventory_policy, config, message_catalogue, plus snapshot_version.
+Encryption and durability
+                            Schema pos at central: doc_receipt, doc_receipt_tender, till_session, cash_movement, device_health;
+                            everything else lands in the kernel base and the owning modules' tables through ingestion.
+
+                            SQLite via Room with SQLCipher; key in the Android keystore; WAL; synchronous=FULL on issuance
+                            transactions; safe shutdown on battery threshold (Section 9.3).
+
+    3.2 Receipt             Design
+
+Aspect                      RCT from the till-position series; header per doc 18 with business_date from the session; lines carry
+Document                    batch_id, unit_price, mrp_applied, control_price_applied, cap_reason,
+                            discount_rule_id, discount_amount, tax_rate, tax_amount, line_total (doc 18
+Line creation               document_line); header carries bill_rule_id, bill_discount, rounding, engine_version,
+                            snapshot_version.
+Negative stock
+Sell-through                Scan  scan layer parses  local lookup (barcode, gtin+lot, INTERNAL code, or search)  LineInput 
+Immutability                PriceResolver.resolveLine against the PricingSnapshotIndex built for the current snapshot version
+                             policy: AUTO_LOWEST silently; BARCODE_RESOLVED uses the scanned batch; PICKER shows candidates
+                            in the ItemCard zone when the gap exceeds the threshold  line added; basket re-resolved for rules on every
+                            change (doc 23 §3.5).
+
+                            If the resolved lot's cached quantity would go below zero, the line needs pos.negative_stock.acknowledge
+                            (one tap, reason NONE); the receipt line is flagged; an audit REVIEW event is recorded locally and uploaded
+                            (E-09).
+
+                            An INACTIVE SKU with sell_through in the assortment sells with a badge; without it the lookup refuses with
+                            the reason (doc 22 DR-3).
+
+                            Issuance is the doc 18 §5.5 protocol on the device: counter increment and document insert in one local
+                            transaction; content_hash; nothing about an issued receipt changes; void and refund are new documents
+                            linked REVERSES / CREDITS.
+
+3.3 Tenders, rounding and parked sales
+
+Aspect                      Design
+Tenders
+                            doc_receipt_tender(receipt, seq, kind CASH | CARD_REF | ACCOUNT | VOUCHER (later) |
+Account tender              SUBSIDY (later), amount, reference, customer_account_id, change_given). Mixed tenders
+Parked sales                allowed; cash rounding applies to the cash portion of the total per the engine (G-10); change computed on cash.
+                            CARD_REF records the standalone terminal's approval reference keyed by the cashier; blocked offline (H-05).
+
+                            Against the cached customer balance and limit; offline permitted up to customers.offline_account_cap
+                            per receipt and the cached available balance; the till marks the tender offline = true; M7 reconciles on
+                            ingestion (doc 20 DR-3).
+
+                            parked_sale(id, lines json, parked_at, operator) local only, per till; resumed by the same or
+                            another operator on the same till; expire at session close (a parked sale is not a document and has no number).
+
+3.4 Receipt rendering and reprint
+
+Aspect                      Design
+Content
+                            Entity legal name and VAT number, shop name and address, receipt number (display form), business date and
+Rendering                   time, operator, lines (name in shop language with English fallback tag, qty × unit, MRP note when capped, rule
+                            name when reduced), subtotal, reductions, VAT summary by rate, rounding, total, tenders and change, gazette
+                            note when a control price bound a line, training watermark in sandbox; trilingual fixed strings from the message
+                            catalogue.
+
+                            Composed as a bitmap by the platform text stack with bundled Noto fonts and printed as raster through the
+                            printer adapter (P-05); the same renderer produces the Z-report, day sales and session report.
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+Aspect                Design
+Reprint
+                      Permitted for own-session receipts by the cashier and any receipt by the supervisor; every reprint is an audit
+                      event with the receipt number; the reprint carries a REPRINT banner.
+
+3.5 Session and cash
+
+Aspect                Design
+Session
+Cash movements        till_session(id, position, operator, business_date, opened_at, float, closed_at,
+Blind close           counted_cash, expected_cash, variance, closed_by); one open session per position; the session's
+Day-close             business date is the shop's current business date at open (doc 19 §9 day-close).
+
+                      cash_movement(session, kind FLOAT | DROP | PAYOUT? (no: not in scope) |
+                      CLOSE_COUNT, amount, at, operator, witness?); drops require a reason and print a slip; drawer open
+                      without a sale is an audited event (N-09).
+
+                      The cashier keys the counted cash without seeing the expected figure; the system computes expected = float +
+                      cash tenders - change - drops and the variance; the supervisor sees both; the session closes; the Z-report prints
+                      (I-03).
+
+                      When every open session at the location has closed (or the configured cut-off passes), the till advances the
+                      business date locally and activates pending apply_from rows; central's DayCloseTrigger does the same from
+                      the uploaded session events (doc 19 §9, doc 32 §5.2).
+
+3.6 Scan layer and peripherals
+
+Aspect                Design
+Scan layer
+Peripheral layer      Symbology detection; GS1 element-string and Digital Link parsing; AI 01 (GTIN), 10 (lot), 17 (expiry), 3103
+                      (weight); dual-marked packs de-duplicated (single beep); 20­29 in-store labels decoded to SKU code + weight or
+Weighed goods         + batch (doc 22 DR-6); output ScanResult(symbology, gtin|code, lot?, expiry?, weight?).
+
+                      One interface per device class, UnifiedPOS vocabulary: Scanner, PosPrinter, CashDrawer, Scale,
+                      LineDisplay, LabelPrinter; vendor adapters behind them (two or three vendors); a Simulator
+                      implementation for development, tests and training; health check per device at session open reported in telemetry
+                      (doc 14 §3).
+
+                      Scale read on demand (tare handled by the scale) or keyed weight with pos.weight.key; the line carries the
+                      weight in KG and the per-kg price; weigh-station labels where a label printer exists.
+
+3.7 Shop-management mode
+
+Aspect                Design
+Entry and exit
+Hosted screens        From the bottom bar; requires a role holding any shop-mode permission; the current sale must be parked first;
+                      entry and exit are audited (MODE_SWITCH_SHOP_MGMT); idle lock 3 minutes.
+Primary-till rule
+                      GRN capture and confirm (doc 24A §8), count (doc 25A §8), write-off draft, repack, transfer receipt, expiry list,
+Online-only from the  reprint, sync and device status, local reports. Each renders the owning module's specification on the shell
+terminal              components; the data comes from the snapshot rows those modules contribute.
+
+                      Documents in the LOCATION series (GRN confirm, count submit, write-off submit, repack, transfer receipt) issue
+                      only on the primary till; a non-primary till captures DRAFTs and hands them over (the draft appears on the
+                      primary till after sync, or the web completes it). The tile shows which this device is.
+
+                      Orders, statements, cross-session refunds, write-off submission and approvals open the web back office in the
+                      terminal's browser (kiosk allow-listed URL) with the operator's back-office credentials.
+
+3.8 Offline and online sets (H-02 / H-03 as behaviour)
+
+Works offline                                                           Blocked offline (refused with reason, never queued)
+
+Sale, receipt, stock deduction, lookup and search, rules and ceilings,  Card reference confirmation of card, wallet or QR tenders;
+park and resume, same-session void and refund, GRN capture and          cross-session or cross-till refunds; write-off submission and any
+confirm (primary), count, write-off draft, repack (primary), transfer   approval; new orders; master-data changes; anything MFA-gated;
+receipt (primary), account tender within cap, Z-report and session      payment-receipt posting
+reports, reprint, PIN login, mode switch, training
+
+3.9 Training mode
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System  Page 5
+Aspect        Design
+Namespace
+              A separate local database file and a separate numbering namespace (TRN- prefix, visibly non-live); the same
+              snapshot; simulated peripherals or the real printer with a watermark; uploads to the sandbox entity at central so
+              trainers can review (ADR-35).
+
+3.10 Sync, counters and device state
+
+Aspect        Design
+Outbox
+              Every issued document bundle, movement set, audit event and session fact is appended with a dense
+Snapshots     device_seq in the same local transaction; the upload worker sends batches per doc 32 §3; acknowledged rows
+Counters      are retained 7 days then purged (S8).
+
+Instructions  Delta or full per doc 32 §5; staged, verified, swapped in one local transaction between sales; apply_from rows
+              held pending until day-open; the PricingSnapshotIndex is rebuilt on swap.
+Clock
+              counter(series_id, next_number) persisted with fsync inside the issuance transaction; the till-position
+              series always; the location series only when this device is the primary till (flag from the snapshot); counter
+              transfer per doc 32 §8.
+
+              From acks and heartbeats: revoke (wipe caches, lock, preserve outbox), floor notice (banner; after grace sync
+              refused, selling continues), re-request-from-seq (resend retained rows), series holder change (adopt or release
+              the location counter).
+
+              Device clock plus monotonic uptime; offset from heartbeats; events carry occurred_local and the offset;
+              sequence orders, never time.
+
+3.11 Multi-till shops
+
+Aspect        Design
+Independence
+              Each till syncs alone and deducts against its own lot cache; oversell across tills is accepted (doc 25 §3.2); parked
+              sales are per till; a session is per position; the primary till holds the location series. A shop-hub role is the phase-2
+              path if this bites (doc 20 Appendix A).
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System  Page 6
+   4. State machines
+
+   4.1 Sale and receipt
+
+From        To           Trigger / command            Guard                                Permission          Audit / offline
+­
+            IN_PROGRESS StartSale / add first line    session OPEN; operator logged in pos.receipt.issue       ­ / offline
+
+IN_PROGRES  PARKED       ParkSale                     1 line                               pos.receipt.issue   SALE_PARKED
+S           IN_PROGRESS  ResumeSale                                                                            / offline
+                                                      same till; session OPEN              pos.receipt.issue
+PARKED                                                                                                         SALE_RESUME
+                                                                                                               D / offline
+IN_PROGRES TENDERING     Tender                       basket resolved; total > 0           pos.receipt.issue
+S                        CompleteSale                                                                          ­
+
+TENDERING ISSUED                                      tenders cover total (cash rounding   pos.receipt.issue   RECEIPT_ISSU
+                                                      applied); card ref only online;                          ED / offline
+                                                      account within cap; issuance
+                                                      protocol (till-position series);
+                                                      movements; audit; outbox
+
+TENDERING   IN_PROGRESS  CancelTender                 ­                                    pos.receipt.issue ­
+            ABANDONED
+IN_PROGRES               AbandonSale(reason) or       reason when lines exist              pos.receipt.issue   SALE_ABANDO
+S / PARKED               session close                                                                         NED (REVIEW
+                                                                                                               when lines > 0)
+
+ISSUED      VOIDED       VoidReceipt(reason)          same session; not yet refunded;      pos.receipt.void    RECEIPT_VOID
+                                                      reason                                                   ED (REVERSES
+                                                                                                               -linked void
+                                                                                                               document) /
+                                                                                                               offline
+
+ISSUED      PARTIALLY_RE RefundLines(receipt, lines,  same till and session at cashier     pos.refund.same_    REFUND_ISSU
+                                                      level; else supervisor online; qty   session / pos.refu  ED (CREDITS-li
+            FUNDED /     reason)                      unrefunded; reason                   nd.cross_session    nked refund
+                                                                                                               receipt) / offline
+            REFUNDED                                                                                           for same
+                                                                                                               session
+
+   4.2 Till session
+
+From        To           Trigger / command            Guard                                Permission          Audit / offline
+
+­           OPEN         OpenSession(float)           no open session on the position;     pos.session.mana SESSION_OPE
+                                                      operator PIN; float  0; business
+                                                      date from day state                  ge                  NED / offline
+
+OPEN        OPEN         CashDrop(amount, reason) amount  expected cash; slip              pos.session.mana CASH_DROPP
+OPEN        OPEN                                                 printed
+                                                                                           ge                  ED / offline
+
+                         OpenDrawerNoSale(reason reason                                    pos.drawer.open     DRAWER_OPE
+                         )                                                                                     N_NO_SALE
+                                                                                                               (REVIEW) /
+                                                                                                               offline
+
+OPEN        CLOSED       CloseSession(counted)        no sale in progress (parked sales    pos.session.mana    SESSION_CLO
+                                                      abandoned with REVIEW); blind        ge                  SED (variance
+                                                      count keyed; variance computed;                          beyond
+                                                      Z-report                                                 threshold 
+                                                                                                               REVIEW) /
+                                                                                                               offline
+
+   4.3 Operator
+
+From        To           Trigger / command            Guard                                Permission          Audit / offline
+                         PinLogin                                                          ­                   OPERATOR_LO
+­           LOGGED_IN                                 operator in cached snapshot; PIN                         GIN / offline
+                                                      matches Argon2id hash; not           ­
+LOGGED_IN   LOCKED       Idle timeout or Lock         locked out                           ­                   ­
+LOCKED      LOGGED_IN    PinLogin                                                                              OPERATOR_S
+                                                      2­3 min sales, 3 min shop mode                           WITCH when
+                                                                                                               different
+                                                      same operator; or another
+                                                      operator (switch is audited)
+
+   26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                              Page 7
+From      To             Trigger / command          Guard                            Permission          Audit / offline
+any       LOCKED_OUT     5 failed PINs              ­                                ­
+                                                                                                         AUTHENTICATI
+                                                                                                         ON_FAILED × 5
+                                                                                                          ACCOUNT_L
+                                                                                                         OCKED_OUT
+                                                                                                         (15 min)
+
+4.4 Mode
+
+From      To             Trigger / command          Guard                            Permission          Audit / offline
+                         SwitchToShopMode           sale parked or none; operator    any shop.* / inv.*
+SALES     SHOP_MGMT                                 holds a shop-mode permission     offline permission  MODE_SWITCH
+                                                                                                         _SHOP_MGMT
+SHOP_MGMT SALES          ReturnToSales              no unsaved shop document         ­                   / offline
+                                                    (saved as draft first)
+                                                                                                         MODE_SWITCH
+                                                                                                         _SALES / offline
+
+4.5 Device (local view)
+
+From      To             Trigger / command          Guard                            Permission          Audit / offline
+                                                    ­                                system              ­
+ENROLLED ACTIVE          First snapshot applied;
+                         position assigned                                                               SNAPSHOT_ST
+ACTIVE    STALE                                     warning banner; selling continues system             ALE (REVIEW)
+                         Snapshot older than                                                             VERSION_BEL
+                         staleness age                                                                   OW_FLOOR
+                                                                                                         DEVICE_REVO
+ACTIVE    BELOW_FLOO     Floor notice past grace    sync refused; selling continues  system              KED
+any       R              Signed revoke instruction
+                                                    caches wiped; screen locked;     system
+          REVOKED                                   outbox preserved
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                          Page 8
+5. Contract
+
+5.1 Till-local commands (no REST; the till's own application layer)
+
+Command                                      Guards                              Effect                            Uploaded as
+                                                                                 session and cash rows;
+OpenSession(float) / CashDrop /              Section 4.2                         Z-report                          till_session.opened/closed
+                                                                                                                   .v1; cash.dropped.v1; dra
+OpenDrawerNoSale / CloseSession(counted)                                         basket state (not a               wer.opened_no_sale.v1
+                                                                                 document)
+StartSale / AddLine(scan | code | weight) /  session OPEN; lookup success;                                         ­ (audit for acknowledge
+ChangeQty / RemoveLine / PickBatch /         engine result; policy                                                 and pick)
+AcknowledgeNegativeStock
+                                             Section 4.1                         parked_sale rows                  audit events
+ParkSale / ResumeSale / AbandonSale          coverage; online for
+                                             CARD_REF; cap for ACCOUNT           receipt document, tenders,        receipt.issued.v1 (bundle
+Tender(kind, amount, reference | account) /  Section 4.1                         movements, audit, outbox          with movements)
+CancelTender / CompleteSale
+                                                                                 linked documents                  receipt.voided.v1 /
+VoidReceipt / RefundLines(same session)                                                                            receipt.refunded.v1
+                                                                                                                   (bundles)
+
+ReprintDocument                              own session or supervisor           print; audit                      audit
+                                             Section 4.3
+PinLogin / Lock / SwitchOperator             Section 4.4                         operator session                  audit
+                                             Owning modules' rules (docs
+SwitchToShopMode / ReturnToSales             24A, 25A); primary-till rule        mode                              mode.switched.v1
+
+Shop-mode delegates: CaptureGrn /            doc 32                              documents in the LOCATION the owning modules'
+ConfirmGrn, StartCount / SubmitCount,
+RequestWriteOff (draft), ExecuteRepack,      operator holds pos.training         series                            bundles
+ReceiveTransfer
+                                                                                 outbox, caches, state             ­
+SyncNow / ApplySnapshot / Heartbeat                                              namespace switch                  sandbox uploads
+(worker)
+
+EnterTraining / ExitTraining
+
+5.2 Central commands and queries
+
+Item                                         Description                                                           Permission / scope
+RefundCrossSession(receipt, lines,
+reason)                                      Supervisor on the web (or the till online): issues a refund receipt   pos.refund.cross_session
+                                             CREDITS-linked to the original from the supervisor's till-position    (online)
+SetOfflineAccountCap / SetIdleLocks /        series if at a till, else the location's ENTITY-scoped refund series
+SetReceiptTemplate                           (DR-1)
+GetSyncHealth(device | location | entity) /
+ListStuckDevices                             Configuration register items                                          pos.config (entity)
+GetTillSessions(location, date) /
+GetVariances(scope, period)                  Pending counts, last ack, snapshot version, floor state,              OWN; FEDERATION_VIEW;
+GetReceipt(number) /                         anomalies                                                             helpdesk
+SearchReceipts(location, date, amount)       Sessions with blind-close variances
+DeviceHealth(device)                                                                                               OWN, FEDERATION_VIEW;
+                                             For cross-session refunds and disputes                                M8
+
+                                                                                                                   OWN
+
+                                             Peripheral self-test, battery, storage, version, clock offset         OWN; DevOps; doc 31
+
+5.3 Events (uploaded by the till or raised at central)
+
+Event                                        Payload                                           Consumers
+
+receipt.issued/voided/refunded.v1 (bundles)  Document, lines with pricing fields and batch, M5 (deductions), M7 (account tenders), M8,
+                                             tenders, movements, state row, engine and kernel re-validation
+                                             snapshot versions
+
+till_session.opened/closed.v1;               Session facts, variance                           M8 (variance), exception queues, day-close
+                                                                                               trigger
+cash.dropped.v1; drawer.opened_no_sale.v1
+
+mrp_cap.applied.v1 / mrp_picker.used.v1 /    Receipt line, reason, batch                       M3 reviews, exception queues, M8
+negative_stock.acknowledged.v1
+
+mode.switched.v1; operator.switched.v1       Device, operator, mode                            Audit
+
+till.heartbeat.v1; device.health.v1;         Versions, pending, battery, peripherals, offset Fleet console (doc 31), freshness (M8), sync
+snapshot.applied.v1                                                                                          health
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                                                         Page 9
+Event                  Payload                                                   Consumers
+sync.local_anomaly.v1                                                            DevOps alert
+                       What the till could not apply (a snapshot row
+                       it cannot parse)
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                Page 10
+6. Key flows
+
+Flow                         Sequence                                                                  Failure paths
+6.1 Open the day
+                             Cashier PIN  OpenSession with float  peripheral self-test                 A failed printer self-test warns and
+6.2 The three-tap sale       (printer test line, scanner beep, drawer)  pending apply_from rows        allows selling with receipts queued for
+                             activated if the business date advanced  sales screen                     reprint; a failed scanner falls back to
+6.3 Weighed item                                                                                       code entry
+6.4 Two batches, picker
+policy (doc 13 scenario 4    Scan (line appears with thumbnail, price, MRP note)  scan                 Unknown barcode  code or name
+variant)                     [Cash]  total rounded, tendered amount keypad or exact                    search; no list line  'not sellable' with
+6.5 Negative stock           change shown large  receipt prints  drawer kicks; under a                 reason
+6.6 Park and resume          second from last scan to print
+6.7 Same-session refund
+                             Scan the 20­29 weigh label (SKU + weight) or select the item and          Scale unreachable  keyed weight
+6.8 Cross-session refund     read the scale  line at per-kg price; ceiling checked per kg              with permission and an audit event
+6.9 Blind close
+6.10 Power cut mid-sale      Scan  engine returns needsPick with two candidates (MRP 980               Under AUTO_LOWEST the same scan
+                             and 1,080, gap above threshold)  ItemCard shows both with pack            produces the 980 line silently
+6.11 Two days offline, then  images  cashier taps the one matching the pack  line with
+reconnection                 cap_reason MRP_PICKED and mrp_picker.used.v1
+
+6.12 A gazette lands while   Scan an item whose cached lot is at 0  inline prompt 'records             Without the permission the line is
+trading                      show none in stock; sell anyway?'  one tap (permission)  line             refused and a supervisor PIN can
+                             flagged; REVIEW event                                                     approve
+6.13 Version floor
+6.14 Suspension              Customer forgot their wallet  Park  next customer served                  Parked sales left at session close are
+                             Resume from the parked list                                               abandoned with a REVIEW
+
+                             Customer returns an item bought an hour ago  cashier selects the          A receipt from a previous session 
+                             receipt from own session  lines and qty  reason  refund                   'supervisor online' path (6.8)
+                             receipt (CREDITS link), cash returned, SALE_REVERSAL
+
+                             movement
+
+                             Supervisor logs in online (till or web)  searches the receipt by          Offline  refused with reason; the
+                             number  refund lines with reason  refund document; audit with             customer is asked to return when
+                             both actors                                                               online or to the MPCS office
+
+                             End of shift  CloseSession  cashier keys counted cash without             Sale in progress must be completed or
+                             the expected figure  variance computed  Z-report prints                   abandoned first
+                             supervisor sees variance; beyond threshold  REVIEW
+
+                             Battery keeps the terminal up; at the low threshold the app               A hard cut below threshold: WAL
+                             completes or abandons the sale, flushes the database and shuts            recovery on start; the property is still
+                             down cleanly; on restart the last transaction is either fully present or  all-or-nothing per issuance transaction
+                             absent (spike 1)
+
+                             Trading continues; a lorry arrives and the GRN is confirmed on the        Ack lost  resend same batch id
+                                                                                                       (DUPLICATE outcomes); central
+                             primary till; a count is done; the snapshot ages (staleness banner at     restored from backup 
+                             3 days)  connectivity returns  upload worker sends batches in             re-request-from-seq served from
+                             sequence, acks arrive, retained rows marked  snapshot delta               retained rows
+                             downloaded, staged, swapped between sales  central ingests, M5
+                             deducts and records oversells, M4 processes the GRN
+
+                             Urgent change-log row  next heartbeat downloads the delta                 Till offline: the cap applies on
+                             swap between sales  the next scan of the affected item caps at            reconnection; central re-validation flags
+                             the new ceiling with a gazette note on the receipt                        any sale above the ceiling made in
+                                                                                                       between with the snapshot version
+                                                                                                       evidence (S4)
+
+                             Floor raised; grace banner for 14 days  the agent installs outside ­
+                             trading hours (doc 31)  if not installed after grace: sync refused,
+                             selling continues, helpdesk queue
+
+                             Device reported stolen  revoke instruction on next contact                ­
+
+                             caches wiped, screen locked, outbox preserved for administrator
+
+                             recovery
+
+   7. Configuration                         Default                                       Scope                       Who may change
+                                            2/3                                           Entity; location            gov.user.manage
+Item                                                                                      override
+pos.idle_lock_sales / shop_mode (minutes)   4­6; 5 / 15                                   Entity                      gov.user.manage
+                                            NEAREST_RUPEE (engine)                        Federation                  ­
+pos.pin_length, lockout attempts / minutes
+pos.cash_rounding
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                                       Page 11
+Item                                                   Default                            Scope       Who may change
+pos.card_reference_required                            true                               Entity      pos.config
+customers.offline_account_cap (per receipt)            Rs 5,000                           Entity      pos.config
+pos.session_variance_review_threshold                  Rs 500 or 1%                       Entity      pos.config
+pos.parked_sale_max_age (minutes)                      120                                Entity      pos.config
+pos.reprint_limit_per_receipt                          3                                  Entity      pos.config
+pos.receipt_template                                   default (fields fixed; header and  Entity      pos.config
+                                                       footer text per entity)
+pos.snapshot_staleness_days                            3                                  Federation  ­
+pos.battery_safe_shutdown_pct                          8                                  Federation  ­
+pos.quiet_hour (24-hour shops, for updates)            02:00­04:00                        Location    prt.location.*
+pos.training_allowed_roles                             cashier, supervisor,               Entity      gov.role.manage
+                                                       shop-in-charge
+
+8. Screens as paper
+
+Screen                  Paper mirrored       Roles           Offline             Notes
+PIN and session         Attendance book      Operator        Yes                 Float entry; self-test results; blind close; cash drop with
+                                                                                 slip
+Sales                   Till slip            Cashier         Yes                 Zones per doc 30 §4.3; ItemCard hosts picker,
+                                                                                 negative-stock prompt, sell-through badge, weight entry
+Park / resume           ­                    Cashier         Yes                 Parked list with age and first line
+Refund (same session)   Refund slip          Cashier         Yes                 Own-session receipts; line picker; reason codes
+Refund (cross session)  Refund slip          Supervisor      No                  Receipt search; both actors recorded
+Weigh and price         Scale ticket         Cashier         Yes                 Scale read or keyed weight
+Reports                 Z-report, day sheet  Supervisor      Yes                 Print via raster renderer; last 7 sessions
+Shop-management         Shop diary           Shop-in-charge  Yes                 Tiles: receive goods, count, write-off, repack, transfer,
+home                                                                             expiry, reprint, sync status; primary-till badge
+Sync and device status  ­                    Supervisor      Yes                 Pending uploads, last ack, snapshot version and age, floor
+                                                                                 state, peripherals, battery, version
+Training                ­                    All permitted   Yes                 Loud badge and watermark
+                                             Shop-in-charge  No                  Kiosk allow-listed back office for online-only functions
+Web on the terminal     ­
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                       Page 12
+9. Non-functional design
+
+Aspect                    Design
+9.1 Performance
+                          Scan to line under 300 ms on the reference terminal (lookup on indexed local tables, engine under 5 ms); receipt
+9.2 Offline               render and print start under 1 s; snapshot swap under 2 s for a 6,000-SKU assortment; the basket index rebuilt
+                          on swap, not per scan (doc 23 §9.1).
+9.3 Power and durability
+                          Two days: about 400 receipts per till per day at the planning basis, 2­4 KB each with movements; the local
+9.4 Security              database stays under 200 MB including caches and thumbnails; 7-day retention of acknowledged rows about 10
+                          MB (doc 32 §10).
+9.5 Privacy
+9.6 Usability             Internal battery (doc 14 §3.1); safe shutdown at the battery threshold after completing or abandoning the current
+9.7 Observability         sale; WAL with synchronous=FULL on issuance; the spike-1 harness injects power loss at every step of issuance
+                          and asserts all-or-nothing and dense counters.
+
+                          Kiosk lock-task; device-owner managed; keystore-held database key; Argon2id PIN hashes; operator snapshot
+                          signed; no card data anywhere; USB debugging and unknown sources disabled by policy; revoke wipes caches
+                          and locks (doc 31 §8).
+
+                          Customer cache holds name, phone, balance and limit only; receipts do not print the phone number; the audit log
+                          stores identifiers (ADR-27).
+
+                          Three taps to sell; 56 dp targets; keypad-first; no modal chains; reason codes instead of confirmations; loud
+                          training mode; two cashier rounds before freeze (doc 30 §2.3, spike 7).
+
+                          Telemetry on every heartbeat; crash reports; sync anomalies; a local diagnostics screen for the helpdesk within
+                          its boundaries (no connectivity troubleshooting).
+
+10. Test strategy
+
+Layer                What is tested
+Unit (JVM)
+                     Every guard in Section 4; tender coverage and rounding; blind-close arithmetic; scan-layer parsing (GS1 fixtures, dual
+Instrumentation      marking, 20­29 labels); engine parity with the golden baskets (doc 23A); outbox sequencing; snapshot staging and
+(emulator and        swap; apply_from activation
+reference terminal)
+Sync conformance     Issuance transaction with power-loss injection (spike 1); database encryption; kiosk behaviour; peripheral adapters
+Scenario             against the simulator and real devices (spike 3); raster receipts in three languages (spike 2)
+
+Soak                 The thirteen cases of doc 32 §11 against the central simulator; two-day backlog drain; central restore re-request
+
+Usability            Flows 6.1­6.14; doc 13 scenarios 2 and 4; two tills overselling; GRN, count, write-off draft, repack and transfer
+Central              bundles accepted by central
+
+                     48-hour disconnected trading on the reference terminal with periodic power cuts; storage growth and battery
+                     behaviour measured
+
+                     Two rounds with real cashiers (spike 7): task completion, tap counts, error rates in Sinhala, Tamil and English
+
+                     Bundle re-validation flags but never rejects; session and variance records; cross-session refund handler; sync health
+                     queries
+
+11. Decision requests
+
+#     Point                                      Proposed                                           Decider
+DR-1  Cross-session refund series                                                                   Federation accounts; kernel
+                                                 Issued from the supervisor's till-position series
+DR-2  Non-primary tills and LOCATION-series      when done at a till; from a location-scoped        Till track; Federation admins
+DR-3  documents                                  refund series when done on the web
+DR-4  Card reference mandatory for CARD_REF
+DR-5  tenders                                    Drafts only; primary till or web confirms
+DR-6  Offline account tender cap default
+                                                 Yes; online only                                   Federation accounts
+      Parked sale maximum age and session-close
+      behaviour                                  Rs 5,000 per receipt within cached available       Federation with MPCS
+      Receipt legal content                      balance                                            treasurers
+
+                                                 120 minutes; abandoned at close with REVIEW Federation
+
+                                                 As Section 3.4; confirm with the tax advisor       Programme
+                                                 when their review arrives (24B advisory)
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                                          Page 13
+#     Point                         Proposed                                       Decider
+DR-7  Customer display in phase 1                                                  Federation (doc 30 DR-4)
+                                    Where the terminal has a second screen; line,  Federation
+DR-8 Keyed weight without a scale   total, change                                  DevOps, helpdesk lead (doc 38)
+
+DR-9 Helpdesk kiosk-exit procedure  Permitted with pos.weight.key and an audit
+                                    event
+
+                                    Supervisor PIN plus a time-boxed code from
+                                    the helpdesk; audited
+
+12. Traceability
+
+Section          Identifiers
+3.1, 3.10, 3.11  ADR-10, ADR-34; H-01, H-04, H-06; NFR-OFF-010/030/040; doc 32; doc 18 §5.5
+3.2­3.4          FR-POS-010 to 040, 080; ADR-14, ADR-31; G-10; H-09; P-05; N-05; multi-MRP study; doc 23 §3.5
+3.3              FR-PAY-010; I-01, I-02; ADR-19; H-05; doc 20 DR-3
+3.5              FR-PAY-030 to 050; FR-REP-030; I-03, I-04; O-02; doc 19 §9
+3.6              FR-POS-010; H-07; B-11; doc 14 §3; doc 22 DR-6
+3.7­3.9          FR-POS-100, 110; ADR-36; H-02, H-03; T-04; ADR-35
+4                Doc 03 §13; N-03, N-09; FR-POS-030, 060, 070
+6                Doc 13 scenarios 2 and 4; doc 14 §8 spikes 1­7; doc 31
+9                NFR-PRF, NFR-OFF, NFR-SEC-020, NFR-USE; Q-07
+
+End of document. Draft for design review; the contract freezes when M7 and M8 acknowledge it and the till track signs the
+bundle specifications of docs 24A and 25A, targeted end of Stage 2 week 6. Implementation guide: 26A.
+
+26 - M6 POS & Offline | v0.1 draft | Cooperative Retail and Distribution System                                            Page 14
+

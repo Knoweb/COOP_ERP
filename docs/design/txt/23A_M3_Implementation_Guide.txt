@@ -1,0 +1,777 @@
+Cooperative Retail and Distribution System
+
+23A ­ M3 Pricing & Rules: Implementation Guide
+
+Everything the M3 developer and the till track need: the pricing schema as DDL, seed
+data, package layout, the API slice, handler specifications, the shared engine in Kotlin
+(price resolution, rule evaluation, tax and rounding), the authoring validator, the review
+consumers, the snapshot contributor, golden-basket fixtures, screens, tests and tickets.
+Self-contained; restated material is marked.
+
+Field             Value
+Document          23A ­ implementation guide for 23 M3 Pricing & Rules v0.1
+Version           v0.1 ­ for the M3 developer and the till track (Section 6 is shared)
+Date              9 September 2026
+Prerequisite      Sprint 0; M1 and M2 contracts frozen; the shared-engine module of 17A §9 with its interfaces. M5's in-stock batch
+                  query is stubbed until doc 25 (Section 11).
+Estimated effort  About 22 developer-days: 15 for the module, 7 for the engine (of which the till track co-owns the parity suite)
+Restated content  Marked restated from doc X §Y.
+
+Read this first. Build the engine before the module: it is a pure Kotlin library with no database, it is what the till runs,
+and every back-office screen just calls it. Get the golden baskets green on JVM and Android first (ticket M3-02), then
+wrap the tables and screens around it. The legal property ­ no output ever exceeds a control price ­ is a
+property-based test, not a code review item.
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
+1. What you are building
+
+Restated from doc 23 §1. Every price a buyer pays and every reduction a customer receives: trade lists per
+relationship, one retail list per MPCS, advisory prices, a five-kind rule engine as the only reduction mechanism,
+the printed-MRP and gazetted ceilings as hard blocks, the multi-MRP policy, and the resolution engine shared
+with the till.
+
+You build                                                                   You do not build
+                                                                            Batch MRP itself (M2), lots (M5), documents that carry prices
+Schema pricing: price_list, price_list_line, discount_rule, control_price,  (M4, M6)
+mrp_policy, adjustment_type, label_job                                      The till application (M6) ­ it links your library
+
+The shared engine's real implementation: PriceResolver, RuleEvaluator,      Weigh labels and batch stickers (M6, M5)
+Tax, Rounding, BasketResolver
+                                                                            The picker screen (M6)
+11 commands, 10 queries, 6 event families; the authoring validator; two
+review consumers; the snapshot contributor; the label job
+
+Seven web screens; the MRP picker's data contract for M6
+
+2. What you inherit
+
+From                  You use                                                          How
+17A §9
+shared-engine         Module skeleton: Money, Quantity, Tax, PriceResolver,            You replace the stubs (Section 6); keep the
+19A §4­5, §11­12      RuleEvaluator, Envelope interfaces with stubs                    package and versioning
+
+19A §6 i18n           AuditFacade, EventPublisher, ConfigRegistry, @ScheduledJob, As in every module
+19A §8 sync           @EventConsumer
+
+M1 api/query          A4Renderer for labels; IcuFormats for money                      Label job
+
+M2 api/query          SnapshotContributor; SnapshotChangeLog.record(...,               Section 7.3
+                      applyFrom, urgent)
+M5 query (stub until
+doc 25)               LookupRelationship (trade list binding), listLocations(entity),  Trade resolution; change-log fan-out per location
+17A §7 web shell      scope
+
+                      GetSku (flags, has_printed_mrp, tags), TaxQueries.rateInForce, Authoring checks; tax; policy scopes
+                      TagQueries.isGoverned, batch identity
+
+                      InStockBatches(locationIds, skuId)  [(batchId, printedMrp,       Authoring ceiling check (min in-stock MRP)
+                      expiry, onHand)]
+
+                      DocumentHeader, ApprovalBar, ReasonCapture, StepUpDialog, Section 8
+                      generated client
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                          Page 2
+3. Schema
+
+Restated from doc 18 v0.2 part B (M3 tables) and doc 23 §3; adds mrp_policy, adjustment_type, label_job
+(CR-23-1). Location db/migration/m3pricing/.
+
+-- V0001__pricing.sql
+
+CREATE TABLE pricing.price_list (
+
+price_list_id uuid PRIMARY KEY, owner_entity_id uuid NOT NULL,
+
+kind text NOT NULL CHECK (kind IN ('TRADE','RETAIL','ADVISORY')), name text NOT NULL,
+
+version int NOT NULL DEFAULT 1, source_version_id uuid,
+
+status text NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')),
+
+apply_from date, published_by uuid, published_at timestamptz);
+
+-- one PUBLISHED RETAIL list per MPCS
+
+CREATE UNIQUE INDEX one_published_retail ON pricing.price_list (owner_entity_id) WHERE kind = 'RETAIL' AND
+
+status = 'PUBLISHED';
+
+CREATE UNIQUE INDEX one_draft_retail   ON pricing.price_list (owner_entity_id) WHERE kind = 'RETAIL' AND
+
+status = 'DRAFT';
+
+CREATE TABLE pricing.price_list_line (
+   line_id uuid PRIMARY KEY, price_list_id uuid NOT NULL REFERENCES pricing.price_list,
+   sku_id uuid NOT NULL, uom_code varchar(10) NOT NULL, tier_from_qty numeric(14,3) NOT NULL DEFAULT 0,
+   price numeric(14,4) NOT NULL CHECK (price >= 0), effective_from date NOT NULL, effective_to date,
+   owner_entity_id uuid NOT NULL,
+   EXCLUDE USING gist (price_list_id WITH =, sku_id WITH =, uom_code WITH =, tier_from_qty WITH =,
+                                       daterange(effective_from, coalesce(effective_to,'infinity'::date), '[]') WITH &&));
+
+CREATE INDEX pll_lookup ON pricing.price_list_line (price_list_id, sku_id, uom_code, effective_from DESC);
+
+CREATE TABLE pricing.discount_rule (
+   rule_id uuid PRIMARY KEY, owner_entity_id uuid NOT NULL, name text NOT NULL,
+   kind text NOT NULL CHECK (kind IN
+          ('TIME_LIMITED_PRICE','QUANTITY_BREAK','BILL_THRESHOLD','FREE_ITEM','EXPIRY_MARKDOWN')),
+   predicate jsonb NOT NULL, benefit jsonb NOT NULL, priority smallint NOT NULL DEFAULT 100,
+   advisory boolean NOT NULL DEFAULT false, adopted_from_rule_id uuid,
+   valid_from date NOT NULL, valid_to date, status text NOT NULL DEFAULT 'DRAFT'
+       CHECK (status IN ('DRAFT','ACTIVE','EXPIRED','WITHDRAWN')), CHECK (valid_to IS NULL OR valid_to >=
+              valid_from));
+
+CREATE INDEX rule_active ON pricing.discount_rule (owner_entity_id, status, valid_from, valid_to);
+
+CREATE TABLE pricing.control_price (
+
+control_price_id uuid PRIMARY KEY, sku_id uuid, tag_code varchar(40), ceiling_price numeric(14,2) NOT NULL
+
+CHECK (ceiling_price > 0),
+
+ceiling_uom_code varchar(10) NOT NULL, effective_from date NOT NULL, effective_to date,
+
+gazette_reference varchar(80) NOT NULL, entered_by uuid NOT NULL, entered_at timestamptz NOT NULL DEFAULT
+
+now(),
+
+owner_entity_id uuid NOT NULL,                                                     -- always the Federation
+
+CHECK ((sku_id IS NULL) <> (tag_code IS NULL)),
+
+EXCLUDE USING gist (coalesce(sku_id,'00000000-0000-0000-0000-000000000000'::uuid) WITH =,
+
+coalesce(tag_code,'') WITH =,
+
+                       daterange(effective_from, coalesce(effective_to,'infinity'::date), '[]') WITH &&)); --
+
+                       B-I6
+
+GRANT INSERT ON pricing.control_price TO app_rw; GRANT UPDATE (effective_to) ON pricing.control_price TO
+
+app_rw; -- never edited otherwise
+
+CREATE TABLE pricing.mrp_policy (
+   policy_id uuid PRIMARY KEY, sku_id uuid, tag_code varchar(40),
+   policy text NOT NULL CHECK (policy IN ('AUTO_LOWEST','BARCODE_RESOLVED','PICKER')),
+   picker_gap_amount numeric(14,2), picker_gap_percent numeric(5,2), owner_entity_id uuid NOT NULL,
+   CHECK ((sku_id IS NULL) <> (tag_code IS NULL)), UNIQUE
+          (coalesce(sku_id,'00000000-0000-0000-0000-000000000000'::uuid), coalesce(tag_code,''),
+          owner_entity_id));
+
+CREATE TABLE pricing.adjustment_type (
+   code varchar(24) PRIMARY KEY, name_en text NOT NULL, kind text NOT NULL CHECK (kind IN
+          ('SPECIAL_DISCOUNT','DELIVERY_FEE')),
+   permission_code varchar(64) NOT NULL, max_percent numeric(5,2), max_amount numeric(14,2),
+   status text NOT NULL DEFAULT 'ACTIVE', owner_entity_id uuid NOT NULL);
+
+CREATE TABLE pricing.label_job (job_id uuid PRIMARY KEY, owner_entity_id uuid NOT NULL, location_id uuid NOT
+       NULL,
+
+   template text NOT NULL, sku_ids uuid[] NOT NULL, refused jsonb NOT NULL DEFAULT '[]', object_key text,
+   status text NOT NULL DEFAULT 'QUEUED' CHECK (status IN ('QUEUED','RENDERED','FAILED')), created_by uuid NOT
+
+          NULL, created_at timestamptz NOT NULL DEFAULT now());
+
+-- RLS: template of 17A 6.3; plus PARTY read on price_list/line for the relationship's buyer (join via M1's
+       relationship view);
+
+-- control_price, advisory lists and advisory rules readable by every authenticated scope.
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                            Page 3
+3.1 Seed data
+
+# seed/m3/config.yaml pricing.stacking_policy PRIORITY_THEN_BEST | pricing.default_mrp_policy AUTO_LOWEST |
+
+   pricing.picker_gap {amount: 20, percent: 5}
+
+#                     pricing.cash_rounding NEAREST_RUPEE | pricing.trade_above_mrp_review true |
+
+   pricing.control_price_staleness_days 3
+
+# seed/m3/adjustment-types.yaml
+
+- {code: SPECIAL_DISC, kind: SPECIAL_DISCOUNT, permission: prc.adjust.special, max_percent: 5}
+
+- {code: DELIVERY_FEE, kind: DELIVERY_FEE,  permission: prc.adjust.delivery, max_amount: 25000}
+
+# seed/m3/permissions.yaml (appended to the catalogue file)
+
+- prc.pricelist.author (ENTITY) - prc.pricelist.publish (ENTITY, mfa for TRADE via handler) - prc.rule.author
+
+   (ENTITY)
+
+- prc.rule.activate (ENTITY) - prc.controlprice.enter (F, mfa) - prc.mrp_policy.set (ENTITY; tags F) -
+
+   prc.adjustment.define (F)
+
+- prc.adjust.special (F) - prc.adjust.delivery (F) - prc.label.print (ENTITY)
+
+# seed/m3/rule-schemas/*.json one JSON schema per rule kind (predicate + benefit), used by the authoring
+
+   validator and by the engine's loader
+
+4. Package layout
+
+backend/shared-engine/src/main/kotlin/lk/coopfed/knoweb/engine/                    -- pure Kotlin JVM, no Spring, no
+
+   Android
+
+   Money.kt Quantity.kt Tax.kt Rounding.kt                                         -- 17A skeleton, completed here
+
+   model/     RetailLine, BatchCandidate, Ceiling, Policy, Rule, Basket, LineInput, LineResult, BasketResult
+
+   PriceResolver.kt   resolveLine(input): LineResult                               -- steps 1-4 of doc 23 3.5
+
+   RuleEvaluator.kt   applyLineRules / applyBillRule                               -- step 5
+
+   BasketResolver.kt  resolve(basket, snapshot, businessDate, tenderKind): BasketResult -- steps 1-7
+
+   orchestration
+
+   snapshot/ PricingSnapshotIndex (rules by sku/tag, ceilings by sku/tag, lines by sku/uom) built once per
+
+   snapshot version
+
+   EngineVersion.kt   const val ENGINE_VERSION = "1.0.0"
+
+backend/shared-engine/src/test/resources/golden/*.json                             -- shared with the till (Section 9)
+
+lk.coopfed.knoweb.m3pricing/     @ApplicationModule(allowedDependencies =
+
+   {"kernel","m1party::api","m1party::query","m2catalogue::api","m2catalogue::query","m5inventory::query"})
+
+   api/       commands (11), events (6 families), PricingApi facade, value types
+
+   query/     PricingQueries (resolveRetailPrice, resolveBasket, resolveTradePrice, skusOnRetailList,
+
+   ceilings, snapshot), MarkdownQueries
+
+   internal/
+
+   list/      PriceList, Line, handlers, VersionCarryForward
+
+   rule/      Rule, handlers, RuleSchemaValidator
+
+   ceiling/ ControlPrice, handlers, CeilingResolver (sku + tags -> lowest in force)
+
+   policy/    MrpPolicy, handlers, EffectivePolicy (sku beats tag; default)
+
+   adjust/    AdjustmentType, handler
+
+   label/     LabelJob, PrintShelfLabelsHandler, LabelRenderer (uses A4Renderer with the label template)
+
+   authoring/ AuthoringValidator (ceilings, tiers, schema), TradeAboveMrpReview
+
+   review/    BatchMrpReviewConsumer (batch.registered.v1), GazetteReviewConsumer (control_price.entered.v1)
+
+   snapshot/ PricingSnapshotContributor; PublishFanOut (worker consumer of price_list.published.v1)
+
+   queries/ PricingQueriesImpl (loads inputs, calls the engine)
+
+   web/       PriceListController, RuleController, ControlPriceController, PolicyController,
+
+   AdjustmentController, LabelController, ReviewController
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                              Page 4
+5. API slice: openapi/m3pricing.yaml
+
+paths:
+
+/v1/pricing/lists:                            post: createPriceList get: listPriceLists (kind, status)
+
+/v1/pricing/lists/{listId}/versions:          post: draftNewVersion
+
+/v1/pricing/lists/{listId}/lines:             put: setLines (bulk) -> per-line outcomes {skuId, uom, tier, ok
+
+   | ceiling: {kind, value, ref}}
+
+/v1/pricing/lists/{listId}/publish:           post: publishPriceList {applyFrom} (x-mfa when kind = TRADE)
+
+/v1/pricing/lists/{listId}/withdraw:          post
+
+/v1/pricing/rules:                            post: authorRule get: listRules (status, kind)
+
+/v1/pricing/rules/{ruleId}:                   patch: amendDraftRule post /activate | /withdraw | /adopt
+
+/v1/pricing/control-prices:                   post: enterControlPrice (prc.controlprice.enter, mfa) get:
+
+   controlPricesInForce (date)
+
+/v1/pricing/control-prices/{id}/rescind: post
+
+/v1/pricing/mrp-policies:                     put: setMrpPolicy get
+
+/v1/pricing/adjustment-types:                 post | get
+
+/v1/pricing/labels:                           post: printShelfLabels -> {jobId} get /{jobId}
+
+/v1/pricing/resolve/retail:                   post: resolveBasket {locationId, businessDate, tenderKind,
+
+   lines[{skuId, uom, qty, batchId?, pickedBatchId?}]}
+
+/v1/pricing/resolve/trade:                    post: resolveTradePrice {relationshipId, skuId, uom, qty, date}
+
+/v1/pricing/authoring/check:                  post: checkCeilingsForAuthoring {entityId, skuId, uom, price}
+
+/v1/pricing/reviews:                          get: listReviews (kind, status)
+
+components.schemas:
+
+LineResult: { skuId, uom, qty, batchId?, unitPrice, mrpApplied?, controlPriceApplied?, capReason, ruleId?,
+
+   discountAmount,
+
+          taxRatePercent, taxAmount, lineTotal, candidates?: [{batchId, batchNo, printedMrp, expiry,
+
+                     thumbKey}] } # candidates only for PICKER
+
+BasketResult: { lines: [LineResult], billRuleId?, billDiscount, subtotal, total, rounding, engineVersion,
+
+   snapshotVersion }
+
+# example - resolveBasket for doc 13 scenario 4 (two batches, AUTO_LOWEST, 5% rule)
+
+{ "lines": [ { "skuId": "...", "uom": "EA", "qty": 1, "batchId": "<batch 980>", "unitPrice": 931.00,
+
+"mrpApplied": 980.00,
+
+          "capReason": "MRP_LOWEST", "ruleId": "<5% rule>", "discountAmount": 49.00, "taxRatePercent":
+
+                   18.00,
+
+          "taxAmount": 142.02, "lineTotal": 931.00 } ], "billDiscount": 0, "subtotal": 931.00, "total":
+
+                   931.00, "rounding": 0.00,
+
+"engineVersion": "1.0.0", "snapshotVersion": 4182 }
+
+6. The shared engine (Kotlin)
+
+Restated and formalised from doc 23 §3.5. The code below is the reference implementation the till links; the
+repository file is authoritative, this is what reviewers check it against.
+
+// model
+
+data class RetailLine(val skuId: Id, val uom: String, val price: Money, val tierFromQty: Qty = Qty.ZERO)
+
+data class BatchCandidate(val batchId: Id, val batchNo: String, val printedMrp: Money?, val expiry:
+
+LocalDate?, val onHand: Qty)
+
+data class Ceiling(val price: Money, val uom: String, val ref: String)                       // control price,
+
+unit-converted by the index
+
+data class Policy(val kind: PolicyKind, val gapAmount: Money?, val gapPercent: BigDecimal?)
+
+data class LineInput(val skuId: Id, val uom: String, val qty: Qty, val scannedBatchId: Id?, val pickedBatchId:
+
+Id?)
+
+enum class CapReason { NONE, MRP_LOWEST, MRP_BARCODE, MRP_PICKED, CONTROL_PRICE }
+
+object PriceResolver {
+
+fun resolveLine(i: LineInput, ix: PricingSnapshotIndex, date: LocalDate): LineResult {
+
+val list = ix.retailLine(i.skuId, i.uom, date) ?: return LineResult.notSellable(i, "price.no_list_line")
+
+val cands = ix.inStockBatches(i.skuId).filter { it.onHand > Qty.ZERO }
+
+val policy = ix.policyFor(i.skuId)
+
+val (batchTerm, batch, reasonIfBound) = when {
+
+   !ix.sku(i.skuId).hasPrintedMrp -> Triple(null, i.scannedBatchId?.let(ix::batch), CapReason.NONE)
+
+   policy.kind == BARCODE_RESOLVED && i.scannedBatchId != null ->
+
+          ix.batch(i.scannedBatchId).let { Triple(it.printedMrp, it, CapReason.MRP_BARCODE) }
+
+   policy.kind == PICKER && i.pickedBatchId != null ->
+
+          ix.batch(i.pickedBatchId).let { Triple(it.printedMrp, it, CapReason.MRP_PICKED) }
+
+   policy.kind == PICKER && gapExceeds(cands, policy) && i.pickedBatchId == null ->
+
+          return LineResult.needsPick(i, cands)                                      // till shows the picker
+
+   else -> cands.minByOrNull { it.printedMrp ?: Money.MAX }.let { Triple(it?.printedMrp, it,
+
+          CapReason.MRP_LOWEST) }
+
+}
+
+val control = ix.ceilingFor(i.skuId, i.uom, date)                                    // lowest of sku- and
+
+        tag-scoped
+
+var unit = list.price; var reason = CapReason.NONE
+
+if (batchTerm != null && batchTerm < unit) { unit = batchTerm; reason = reasonIfBound }
+
+if (control != null && control.price < unit) { unit = control.price; reason = CapReason.CONTROL_PRICE }
+
+return LineResult.base(i, batch, unit, mrpApplied = batchTerm, controlApplied = control?.price, capReason
+
+        = reason)
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                             Page 5
+   }
+}
+
+object RuleEvaluator {
+
+   fun applyLineRules(r: LineResult, ix: PricingSnapshotIndex, date: LocalDate, policy: StackingPolicy):
+
+      LineResult {
+
+      val applicable = ix.lineRulesFor(r.skuId, date).filter { it.matches(r) }     // kind-specific
+
+             predicate
+
+      val chosen = when (policy) {
+
+      PRIORITY_THEN_BEST -> applicable.sortedWith(compareBy({ it.priority }, { -benefitOf(it, r)
+
+             })).firstOrNull()
+
+      BEST_ONLY             -> applicable.maxByOrNull { benefitOf(it, r) } }
+
+      return chosen?.let { r.withBenefit(it.id, benefitOf(it, r), it.kind == EXPIRY_MARKDOWN) } ?: r
+
+   }
+
+   fun applyBillRule(lines: List<LineResult>, ix: PricingSnapshotIndex, date: LocalDate): BillBenefit? = ...
+
+}
+
+object BasketResolver {
+
+   fun resolve(b: Basket, ix: PricingSnapshotIndex, date: LocalDate, tender: TenderKind): BasketResult {
+
+      val lines = b.lines.map { PriceResolver.resolveLine(it, ix, date) }
+
+      .map { if (it.sellable) RuleEvaluator.applyLineRules(it, ix, date, ix.stackingPolicy) else it }
+
+      .map { it.recheckCeiling(ix, date) }                                         // step 6: never
+
+             above control
+
+      val bill = RuleEvaluator.applyBillRule(lines, ix, date)
+
+      val taxed = Tax.decompose(lines, bill, ix)                                   // inclusive -> tax
+
+             amounts, apportion bill benefit
+
+      val total = taxed.sumOf { it.lineTotal } - (bill?.amount ?: Money.ZERO)
+
+      val rounding = if (tender == CASH) Rounding.toRupee(total) else Money.ZERO
+
+      return BasketResult(taxed, bill, total + rounding, rounding, ENGINE_VERSION, ix.snapshotVersion)
+
+   }
+
+}
+
+Aspect                  Design
+Index
+                        PricingSnapshotIndex is built once per snapshot version from the snapshot rows: maps sku  retail lines by
+Determinism             uom and tier, sku/tag  active rules, sku/tag  ceilings (unit-converted using M2 conversions), sku  policy, sku
+                         in-stock batches (from the lot rows). Building it is O(rows); resolving is O(lines × rules-for-sku).
+Central use
+                        No clocks, no randomness, no I/O; the business date is an input; money arithmetic uses the library's fixed
+                        rounding modes; the same inputs give the same bytes on JVM and Android (a golden fixture asserts the
+                        serialised BasketResult).
+
+                        PricingQueriesImpl.resolveBasket loads the same inputs from tables into the same index type and calls
+                        the same function; ingestion re-validation rebuilds the index for the snapshot version the till reported (kernel
+                        keeps snapshot versions for the change-log window).
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                       Page 6
+7. Handler specifications, consumers, snapshot
+
+Command            Guards (in order)                               Mutation                      Audit        Events
+
+CreatePriceList    owner; kind; RETAIL: no DRAFT exists (unique insert DRAFT                     PRICELIST_D ­
+                   index backstop);                                                              RAFTED
+                   ADVISORY/TRADE-federation: caller F
+
+DraftNewVersion    source PUBLISHED or SUPERSEDED; owner new DRAFT with lines carried PRICELIST_D ­
+                                                                                     forward (effective_from = null RAFTED
+                                                                                     until publish)
+
+SetLines           list DRAFT; owner; per line: sku active, uom upsert draft lines; return       ­            ­
+
+                   valid (M2), tiers ascending, price  0;          per-line outcomes
+
+                   AuthoringValidator.ceilings (RETAIL:
+
+                   min in-stock batch MRP at owner's locations
+
+                   via M5 query, control price; TRADE:
+
+                   review-only above lowest MRP)
+
+PublishPriceList   DRAFT; all lines valid at publish time (re-run  set effective_from =          PRICELIST_P  price_list.publish
+                   validator); apply_from  today; TRADE: MFA       apply_from on lines; close    UBLISHED     ed.v1 (changed
+                                                                   previous version lines at                  sku ids)
+                                                                   apply_from - 1; status
+                                                                   PUBLISHED, previous
+                                                                   SUPERSEDED
+
+AuthorRule /       owner; RuleSchemaValidator for the kind;        insert / update DRAFT         RULE_AUTHO ­
+AmendDraftRule     scope sku/tag exists; EXPIRY_MARKDOWN                                         RED
+                   requires expiry-tracked scope (M2 flag; for a
+                   tag, every SKU under it or the validator lists
+                   offenders); advisory only by F
+
+ActivateRule       DRAFT; valid_from  today; FIXED_PRICE           ACTIVE; change-log rows for RULE_ACTIV     discount_rule.ac
+                   benefit under ceilings for its scope today;                                                tivated.v1
+                   benefit within [0, 100%]                        the owner's locations         ATED
+
+                                                                   (apply_from = valid_from)
+
+WithdrawRule       ACTIVE; reason                                  WITHDRAWN; change-log         RULE_WITHD discount_rule.wit
+                                                                   urgent
+                                                                                                 RAWN         hdrawn.v1
+
+AdoptAdvisoryRule  source advisory ACTIVE; caller MPCS             copy as DRAFT with            RULE_AUTHO ­
+                                                                   adopted_from                  RED
+
+EnterControlPrice  caller F; MFA; scope exists (sku or governed    insert; close previous        CONTROL_P    control_price.ent
+                   tag); ceiling > 0; gazette ref; overlap check   same-scope row at             RICE_ENTER   ered.v1
+                   (exclusion backstop)                            effective_from - 1;           ED
+                                                                   change-log urgent to all
+                                                                   locations (worker fan-out)
+
+RescindControlPrice IN_FORCE; reason and reference                 set effective_to; change-log  CONTROL_P control_price.res
+                                                                   urgent                        RICE_RESCIN cinded.v1
+                                                                                                 DED
+
+SetMrpPolicy       owner (F for tag scope); gap fields only for    upsert; publish               MRP_POLICY   mrp_policy.chan
+                   PICKER                                                                        _SET         ged.v1 (M2
+                                                                                                              updates sku.mul
+                                                                                                              ti_mrp_policy)
+
+DefineAdjustmentType caller F; bounds present                      insert                        ADJUSTMENT adjustment_type
+                                                                                                 _TYPE_DEFIN .defined.v1
+                                                                                                 ED
+
+PrintShelfLabels   owner; location belongs to owner; SKUs on the   label_job QUEUED; job         LABEL_JOB_ label_job.render
+                   retail list                                     renders; per SKU: refuse
+                                                                   when list price > ceiling in  CREATED      ed.v1
+                                                                   force on the print date;
+                                                                   refused[] filled
+
+7.1 Consumers
+
+@EventConsumer(types={"batch.registered.v1"}, consumer="m3.batch-mrp-review")
+    // for each MPCS whose PUBLISHED retail line for the sku exceeds the batch's printed MRP (and that holds or
+           may receive the batch:
+    // in phase 1: every MPCS with a retail line for the sku) -> pricing.review_raised.v1 BATCH_MRP_BELOW_LIST +
+           exception-queue audit REVIEW
+
+@EventConsumer(types={"control_price.entered.v1"}, consumer="m3.gazette-review")
+    // for every PUBLISHED retail list line (and TRADE line) above the new ceiling ->
+           LIST_ABOVE_CEILING_AT_GAZETTE review per owner
+
+@EventConsumer(types={"price_list.published.v1"}, consumer="m3.publish-fanout") // worker
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                           Page 7
+   // RETAIL: for each location of the owner: SnapshotChangeLog.record(location, "price_list_line", lineId,
+
+       UPSERT, applyFrom, false)
+
+   //                    for changed skus; TOMBSTONE for removed lines
+
+@ScheduledJob(name="rule-expiry", cron="0 5 0 * * *") // ACTIVE rules past valid_to -> EXPIRED (no snapshot
+
+   row needed: tills evaluate validity)
+
+7.2 Snapshot contributor
+
+tables(): ["price_list_line","discount_rule","control_price","mrp_policy"]
+
+rowsFor(location, table, ids):
+
+   price_list_line -> lines of the owner MPCS's PUBLISHED (and SUPERSEDED-but-still-effective) retail list for
+
+       the assortment; applyFrom = effective_from
+
+   discount_rule -> ACTIVE (and DRAFT->ACTIVE scheduled) rules of the owner MPCS; applyFrom = valid_from
+
+   control_price -> all rows in force or future; applyFrom = effective_from; urgent on entry/rescind
+
+   mrp_policy            -> effective policies for the assortment's skus (sku rows plus tag rows for their tags)
+
+8. Screens
+
+Offer notice (rule editor)                                                 Shelf price list (retail)
+
++--------------------------------------------------+
+
+   +----------------------------------------------------+
+
+| Kind: [Time-limited price v]                     |                       | Version 12 DRAFT (from v11) apply from
+
+   [2026-10-05] |
+
+| Applies to: (o) item [Milk powder 400g]          |                       | search [____] tag [any v] show [all | issues]
+
+   |
+
+|                        ( ) tag [_____]           |                       | SKU         name   unit advisory price
+
+   ceiling |
+
+| Benefit: ( ) fixed price [Rs ____]               |                       | 7Q2K9 Milk powder EA 1,050  1,040
+
+   ok                 |
+
+|                     (o) percent off [ 5 ] %      |                       | 3F8A1 Red rice 1kg KG    -                     240 !
+
+   220 |
+
+| Valid: [2026-10-01] to [2026-10-31] Priority [100] |                     | ! = above control price (gazette 2492/29) -
+
+   fix to publish |
+
+| Preview on sample basket: [Try] -> 931.00 shown |                        | [Print labels...]        [Publish...]
+
+   (disabled: 1 issue) |
+
+| [Save draft] [Activate] -> StepUp if F           |
+
+   +----------------------------------------------------+
+
++--------------------------------------------------+
+
+Screen                   Components                                        Message ids (m3.)   Notes
+Wholesale price list                                                                           MFA on publish
+Shelf price list         DocumentHeader, versions, tier table, review flags list.*             Advisory column read-only
+
+Offer notice             as sketched; ceiling status per line from the     list.*              No free-text logic anywhere
+
+Gazette                  validator                                                             F only
+
+MRP policy               kind-driven form, preview (calls resolveBasket),  rule.*              ­
+Pricing reviews          ApprovalBar                                                           ­
+
+Markdown queue           form with gazette reference, ReasonCapture,       ceiling.*           Web and till (M6 renders)
+                         StepUpDialog, affected-lists count
+
+                         table by SKU/tag                                  policy.*
+
+                         ExceptionQueue filtered to pricing kinds with deep review.*
+                         link to the list line
+
+                         list from M5 expiry data joined with the applicable markdown.*
+                         rule
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                           Page 8
+9. Tests
+
+Layer                  Cases                                                                                 Target
+Engine unit
+                       Each step of doc 23 §3.5; every rule kind and benefit; stacking policies; tax         Every branch
+Engine property-based  decomposition incl. bill apportionment; rounding (.49/.50/.51); ceiling unit
+                       conversion (per kg ceiling vs 400 g pack)
+Golden baskets
+                       Random snapshots and baskets: total  sum of list prices; every line  control          10,000 cases; parity 100%
+Contract
+State machine          term; capReason consistent; idempotent re-resolution; serialised result identical on
+Consumers
+Scenario               JVM and Android (parity harness in till/app androidTest)
+Performance
+Web                    golden/*.json: doc 13 scenario 4 plus twenty fixtures (single batch, two              All green on both platforms
+                       batches, picker, gazette below list, expiry markdown, free item out of stock, bill
+                       threshold with tag restriction, cash vs card rounding, no list line, has_printed_mrp
+                       false)
+
+                       Every operation; setLines per-line outcomes carry the binding ceiling;                Every operation
+                       resolveBasket example above reproduces to the cent
+
+                       Lists, rules, control prices; urgent flags on withdraw/enter/rescind                  All transitions
+
+                       BATCH_MRP_BELOW_LIST raised only when below; gazette review fan-out;                  Three cases
+                       publish fan-out produces exactly the expected change-log rows per location
+
+                       Flows 6.1­6.7 of doc 23 end to end (M5 stub for in-stock batches; M4 stub for         Seven flows
+                       adjustments)
+
+                       30-line basket, 200 rules: under 5 ms on the reference terminal, under 2 ms on        Two targets
+                       JVM; publish fan-out for 6,000 SKUs × 12 locations under 30 s
+
+                       Playwright: draft list with an over-ceiling line  publish disabled  fix  publish;     Three flows
+                       author and activate an expiry rule; enter a control price with step-up
+
+10. Tickets in build order
+
+#      Ticket                                                                          Est. (days)    Done when
+M3-01                                                                                  1.5            Unit tests green
+       Engine model and index; Money/Quantity/Tax/Rounding completion in
+M3-02  shared-engine                                                                   4              Golden and parity green on JVM
+                                                                                                      and Android
+M3-03  PriceResolver, RuleEvaluator, BasketResolver; golden baskets; property          1              Applies; schemas validate fixtures
+M3-04  tests; parity harness with the till track                                       3              Flow 6.1; fan-out test
+
+M3-05  Migration V0001 with RLS; seeds; rule JSON schemas                              2              Flow 6.3
+M3-06                                                                                  2              Flow 6.4
+       Price lists: create, versions, set lines with AuthoringValidator, publish with
+M3-07  carry-forward and closure; PublishFanOut                                        1.5            Flow 6.7; M2 sku field updated
+
+M3-08  Rules: author, amend, activate, withdraw, adopt; schema validator; expiry job   1.5            Flow 6.5, 6.6
+
+M3-09  Control prices: enter, rescind, CeilingResolver with unit conversion; gazette   1.5            Snapshot tests; refused labels listed
+M3-10  review consumer; urgent change-log                                              3              Three flows green
+M3-11                                                                                  0.5            M4 and M6 acknowledge
+       MRP policy, EffectivePolicy, M2 denormalisation event; adjustment types;
+       ResolveTradePrice
+
+       Batch MRP review consumer; reviews query; queries incl.
+       resolveBasket/resolveRetailPrice at central
+
+       Snapshot contributor; label job with ceiling refusal
+
+       Web screens (seven) and Playwright flows
+
+       Contract freeze: m3pricing.yaml v1; engine 1.0.0 tagged; api/query review
+       with M4 and M6; doc 33 slice
+
+Total about 21.5 developer-days. The engine (M3-01, M3-02) is the first deliverable and is what the till track
+integrates; tag engine 1.0.0 before the module contract freeze so M6's spike work links a stable artefact.
+
+11. Open points: what to assume, whom to ask
+
+Point                          Assume              Decider                                            If different
+Stacking policy (doc 23 DR-1)  PRIORITY_THEN_BEST  Federation admins
+                                                                                                      Config value; engine already
+                                                                                                      supports BEST_ONLY
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                             Page 9
+Point                          Assume                                  Decider                 If different
+SKU vs tag ceiling (DR-2)      Lower applies                           Federation legal        CeilingResolver picks by specificity
+                                                                                               instead; one-line change, golden
+Trade above MRP (DR-3)         Review, not block                       Federation              fixture changes
+                               Rs 20 or 5%                                                     Turn the review into an authoring
+Picker gap (DR-4)              By copy                                 Federation + usability  refusal
+                               Adopted                                 round                   Config values
+Advisory adoption (DR-5)                                               Federation
+New tables (DR-6) and P3 slot                                          Architecture review     Remove AdoptAdvisoryRule
+(DR-7)                                                                                         ­
+M5 InStockBatches query
+                               Stub returning fixture batches until doc M5 developer           Swap the stub
+Ceiling unit conversion for    25                                                              ­
+weighed goods
+                               Per-kg ceilings convert through M2      M2 and M3 developers
+
+                               conversions; loose goods priced per kg
+
+                               compare directly
+
+End of document. 23A v0.1; the shared-engine README and golden fixtures, and m3pricing/README.md, become the living
+version once merged.
+
+23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                             Page 10
+

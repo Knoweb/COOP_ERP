@@ -1,0 +1,53 @@
+Cooperative Retail and Distribution System
+03  -  Document State Machines
+Baseline requirements package  --  document 3 of 10
+This is the highest-value artifact in the package. The system is, at its core, a set of document lifecycles  --  this document defines every one of them precisely enough to build against.1. Governing rules (apply to every state machine below)
+ Immutability: a document is final at issuance and is never renumbered, edited, or deleted. Correction is always a new, linked document.
+ Void != delete: a voided document keeps its number; void is a status, not a deletion.
+ Drafts consume no numbers: a document has no number until it is actually issued or printed. Parked or abandoned drafts consume no series position.
+ Every transition is audited: every state transition that is privileged (override, approval, reversal) is written to the immutable audit trail with the acting user and role.
+2. Order
+Raised by a buying entity (or by a shop, routed via its MPCS) against a selling entity it holds a trading relationship with.
+StateEntered whenWho may transitionExits toDraftBuyer begins composing the order.Buyer (any permitted role)Submitted, or discardedSubmittedBuyer submits the order.SellerAccepted, RejectedAcceptedSeller accepts, in full or in part; sets an indicative ETA.Seller; allocation rule applied automatically if stock is shortLocked, Amended, CancelledLockedA configurable window before ETA is reached (seller policy, overridable per order).System; override by permitted roleDispatchedDispatchedFirst delivery note is raised against the order.Seller (warehouse role)Partially fulfilled, ClosedPartially fulfilledSome but not all lines/quantity delivered; remainder stays open as backorder.SellerDispatched (further drops), Closed, Cancelled (remainder)ClosedAll lines fulfilled and GRNs raised, or buyer accepts partial as final.System on last GRN, or buyer manually --  terminalCancelled / RejectedBuyer cancels before lock, or seller rejects at submission.Buyer (before lock) / Seller --  terminalNumbering: Back-office series, per selling entity, online-only (orders are never created offline).
+
+3. Delivery note / dispatch
+One order may generate several delivery notes (partial fulfilment, or multiple drops from one vehicle for a direct-to-shop delivery).
+StateEntered whenWho may transitionExits toCreatedSeller's warehouse picks and packs against an accepted order.Seller (warehouse role)In transitIn transitVehicle departs. Risk of loss sits with the seller until GRN signature.Seller; driver via mobile app or paper PODDeliveredDeliveredReceiving party signs  --  triggers GRN creation.Receiving entity or shop staff (on behalf of its MPCS for direct drops) --  leads into GRNNumbering: Back-office series per selling entity. One delivery note may cover several GRNs (multi-drop).
+
+4. Goods received note (GRN)
+The pivot of the whole ownership model: ownership and risk transfer to the receiving party at GRN confirmation, never before.
+StateEntered whenWho may transitionExits toDraft (offline-capable)Receiving staff count what actually arrived. Works fully offline at a shop.Receiving entity or shop staffConfirmedConfirmedCounted quantity matches, or receiving party accepts the variance and records actuals.Receiving staffClosed, or Discrepancy raisedDiscrepancy raisedReceived quantity differs from dispatched quantity.Receiving staff; investigated by relevant parties plus federationResolved --> ClosedClosedOwnership confirmed transferred. Invoice may now be raised by the seller.System --  terminal, feeds InvoiceNumbering: Till/shop series if captured at a shop offline; syncs to central on reconnect with the sync-completeness check applying.
+
+5. Invoice
+Immutable. Never edited once issued  --  the only way to change an invoiced amount is a credit or debit note.
+StateEntered whenWho may transitionExits toIssuedSeller raises the invoice against a closed GRN (or a set of GRNs).Seller (back office, online only) --  terminal; open until settledSettledA tracking status, not a state transition: reached when linked payment receipts + credit notes reduce this invoice's contribution to exposure to zero. The invoice document itself does not change.System (derived)n/aNumbering: One gapless series per entity per document type, online-only.
+
+6. Credit note / debit note
+Corrects a prior invoice  --  for a claim outcome, a pricing error, or a return.
+StateEntered whenWho may transitionExits toIssuedRaised by the issuing entity, referencing the original invoice and a reason code.Permitted role at issuing entity --  terminalNumbering: Same series family as invoices, per entity per document type.
+
+7. Payment receipt
+Recorded by the seller only; buyer views and may dispute. Never processes an actual payment.
+StateEntered whenWho may transitionExits toPostedSeller records "Rs X received against invoice Y", with method (cash / bank deposit / cheque).Permission-gated role at sellerDisputed, or standsDisputedBuyer flags the receipt as incorrect via their statement view.BuyerResolved manually (outside system) --> stands, or seller reversesReversedSeller (or permitted role) reverses a wrong or bounced receipt via a compensating document.Permission-gated role --  terminal; exposure restoredNumbering: Back-office series per entity. Cheques carry the same lifecycle with one extra state (below).
+
+7a. Cheque (payment receipt sub-type)
+StateEntered whenWho may transitionExits toReceivedCheque recorded against an invoice. Headroom released provisionally.SellerCleared, or BouncedClearedBank confirms clearance (recorded manually until accounting integration).Seller / accounts role --  terminalBouncedCheque returned unpaid.Seller / accounts roleReversed (restores exposure) + relationship flagged
+8. Claim
+Covers damage, shortage, or dispute against a delivery or a batch.
+StateEntered whenWho may transitionExits toRaisedClaimant records the issue with photographic evidence.Receiving entity/shopUnder inspectionUnder inspectionCounterparty investigates.Responsible party + federation if unresolvedApproved, RejectedApprovedClaim accepted  --  triggers a credit note.Permitted role at responsible entity --  leads to Credit noteRejectedClaim disputed; resolved bilaterally outside the system.Responsible entity --  terminal
+9. Repack transaction
+Transforms bulk stock into a new retail SKU per a predefined recipe. Ad-hoc conversion without a recipe requires a higher permission and is flagged on the exception report.
+StateEntered whenWho may transitionExits toExecutedInput batch(es) consumed, output batch created, yield variance recorded against the recipe's expectation.Permitted warehouse/shop role --  terminal, or ReversedReversedPermission-gated, and only while the output batch is still unsold in full or in part.Higher-permission role --  terminal; restores input, removes outputNumbering: No document number of its own  --  a stock-ledger event referencing the recipe used.
+
+10. Stock adjustment (count variance)
+StateEntered whenWho may transitionExits toRaisedA physical count finds a variance against system stock.Counting staffPending approvalPending approvalEscalated by value threshold, configurable per SKU or SKU tag.System routes by thresholdApprovedApprovedAdjustment posted to the stock ledger.MPCS chairman / accountant, or configured approver --  terminal
+11. Write-off
+The highest-fraud-risk lifecycle in the system  --  dual control is mandatory.
+StateEntered whenWho may transitionExits toRequestedStaff request disposal of loss/damage/expiry stock.Requesting role (may capture offline as a draft)Awaiting witnessAwaiting witnessPhysical verification with, where practical, a photograph.A different person from the requesterApprovedApprovedA different, permitted role approves; requester != approver enforced (segregation of duties).Approving role, online --  terminal; stock removedNumbering: Offline write-offs are captured as drafts and require online approval before posting.
+
+12. Discount / markdown rule
+The sole mechanism for any price reduction anywhere in the system  --  no discretionary discount exists at the point of sale.
+StateEntered whenWho may transitionExits toDraftMPCS (or federation, for markdown bands) defines target, trigger, benefit, validity.Permitted pricing roleActiveActiveRule syncs to till caches and applies automatically within its validity window.System, effective-datedExpired, or WithdrawnExpiredValidity window ends.System --  terminalWithdrawnManually ended early by a permitted role.Permitted pricing role --  terminal
+13. Void (any till-issued document)
+StateEntered whenWho may transitionExits toActiveDocument issued in the normal course. -- VoidVoidCancelled after issue. The document keeps its number; a compensating record notes the void, reason, and approving role where required.Permitted role (same-till, same-session refunds may be cashier-level; cross-till or cross-day requires supervisor) --  terminalNumbering: The number is never freed or reused  --  this is what keeps the series gapless through cancellations.
+

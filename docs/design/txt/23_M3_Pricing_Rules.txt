@@ -1,0 +1,553 @@
+Cooperative Retail and Distribution System
+
+23 ­ M3 Pricing & Rules
+
+Module design for every price a buyer pays and every reduction a customer receives:
+trade price lists per relationship, one retail list per MPCS, Federation advisory prices, the
+closed-vocabulary rule engine that is the sole source of any discount or markdown, the
+two legal ceilings (printed MRP per batch and the gazetted control price by date), and
+the price-resolution engine that runs identically at central and on an offline till.
+
+Field             Value
+Document
+Version           23 ­ M3 Pricing & Rules (Stage 2 module design; template of doc 20 §5)
+Date
+Owning developer  v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 4
+
+Inputs            9 September 2026
+
+Depends on        Module developer (full-stack) for the back office; the shared engine library is co-owned with the till track (it runs on
+                  the terminal)
+Depended on by
+                  05 SRS (FR-PRC-010­130); 16 answers (G section, F-07, A-06, A-07); 09 ADR-14; 17 v0.2.1 §7.3 and ADR-31;
+                  18 v0.2 part B and §4.9; 19 v0.2; 20 v0.3 M3 blueprint; 21, 22 contracts; 30 §5.3; 32 §5; the September 2026
+                  multi-MRP study and the CAA control-price finding
+
+                  M1 (relationships, scope), M2 (SKU, batch MRP, tags, tax rates), M5 query (in-stock batches for authoring
+                  checks), kernel
+
+                  M4 (trade price at order and invoice), M6 (retail resolution on the till through the engine and snapshot), M2
+                  (assortment from retail lists), M8, M7 (P3 preferential price)
+
+Two facts shape this module. First, a gazetted maximum price is law from its publication date and binds all stock
+regardless of what is printed on older packs (Consumer Affairs Authority Act s.20(5)); selling above it is an offence with
+fines in the millions of rupees. So the control price is a hard block at every point a price is set, printed or charged.
+Second, the till must compute the same bill offline that central would compute online, so resolution is one pure library,
+versioned, with no server dependencies (ADR-31).
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+In scope (phase 1)                                                         Out of scope
+
+Trade price lists: one uniform Federation list; negotiated, volume-tiered  Cross-entity promotional funding and settlement (G-06)
+distributor lists; each bound to a relationship (A-06, A-07)
+
+One retail price list per MPCS for all its shops (G-01); Federation advisory Per-shop price deviation of any kind (G-02)
+prices (advisory only)
+
+The rule engine: five rule kinds in a closed vocabulary; the sole          Discretionary till discounts (rescinded); coupons, vouchers,
+mechanism for any reduction (ADR-14, G-05, G-07); markdowns as a           subsidy instruments (later phases, I-01); loyalty or member
+distinct kind (F-07)                                                       pricing (K-01)
+
+Control prices: date-effective gazetted ceilings by SKU or governed tag;   An automated gazette feed (none exists); scheduled future price
+hard block at authoring, label printing and sale (G-03)                    lists (G-08 dropped; apply_from covers the practical need)
+
+Multi-MRP resolution policy per SKU or tag (AUTO_LOWEST default,           Price optimisation, elasticity, forecasting (L-02 scenario tool,
+BARCODE_RESOLVED, PICKER); the price-resolution engine (doc 18             phase 2, and never automated)
+§4.9)
+
+Tax-inclusive retail prices computed from the rate in force; cash rounding Tax filing and invoicing (M4, M9)
+to the rupee (G-09, G-10)
+
+Manual adjustment types permitted on Federationdistributor orders          Their application on documents (M4 applies; M3 defines what
+(special discount, delivery fee), permission-gated (A-06)                  exists)
+
+Shelf price labels (print job; ceiling-checked at print)                   Batch stickers (M5) and weigh labels (M6 peripheral); the printers
+                                                                           themselves
+
+Batch-MRP-below-list review (three-point enforcement, point two)           Per-customer preferential price (phase 3, FR-PRC-110; the hook
+                                                                           is designed, not built)
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                     Design section
+FR-PRC-010          Federation uniform trade list with permitted manual adjustments per order (A-06)           3.1, 3.6
+FR-PRC-020          DistributorMPCS negotiated, volume-tiered lists per relationship (A-07)                    3.1, 6.2
+FR-PRC-030          One retail list per MPCS; shops have no deviation; Federation advisory (G-01, G-02)        3.1, 4.1
+FR-PRC-040          MRP and gazetted ceilings enforced: at authoring, at receipt (batch MRP review), at sale;  3.4, 3.5, 6.4, 6.5
+(split)             per batch; effective-dated control prices (G-03)
+FR-PRC-050          No member or loyalty pricing                                                               1 (out of scope)
+FR-PRC-060          Rules as the sole reduction mechanism; every reduction stamps its rule (ADR-14, G-07)      3.3, 3.5
+FR-PRC-070          Rule kinds: time-limited, quantity, bill-level, free item (G-05)                           3.3
+FR-PRC-080          Expiry markdown as a distinct rule kind, measurable separately (F-07, F-11)                3.3, 6.3
+FR-PRC-090          Tax-inclusive shelf and receipt prices from per-SKU tax categories (G-09)                  3.5
+FR-PRC-100          Cash rounding to the nearest rupee at receipt level; card and account exact (G-10)         3.5
+FR-PRC-110          Per-customer preferential price (P3)                                                       3.7
+FR-PRC-120          Price-list publication reaches tills as a snapshot with apply_from (ADR-34)                4.1, 6.1
+FR-PRC-130          Multi-MRP resolution policy configurable per SKU or tag (September decision)               3.4, 3.5
+ADR-31              One shared engine used by central and the till                                             3.5, 9
+NFR-PRF (till)      Basket resolution under a few milliseconds on an ARM terminal                              9.1
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System                                                  Page 2
+           3. Domain model
+
+           Schema pricing: price_list, price_list_line, discount_rule, control_price (doc 18 v0.2 part B), plus mrp_policy,
+           adjustment_type and label_job introduced here.
+
+           3.1 Price lists
+
+           Aspect            Design
+           Aggregate
+           Binding           price_list(kind TRADE | RETAIL | ADVISORY, owner_entity, name, version, status) with
+                             price_list_line(sku, uom, price, tier_from_qty, effective_from/to).
+           Invariants
+           Versions          A TRADE list is referenced by one or more entity_relationship rows (M1); the Federation's uniform list by
+                             every Federationdistributor relationship; a distributor's negotiated list by one relationship each. A RETAIL list
+                             belongs to an MPCS and is the single retail list for all its shops. ADVISORY lists are Federation-owned and never
+                             resolve a price.
+
+                             One PUBLISHED RETAIL list per MPCS at any time. Lines are effective-dated with an exclusion constraint per
+                             (list, sku, uom, tier). Prices are tax-inclusive for RETAIL and ADVISORY, tax-exclusive for TRADE (invoices add
+                             VAT). A line's price never exceeds the ceilings (Section 3.4) at publication.
+
+                             Publication creates a new version of the list with an apply_from business date; lines not changed are carried
+                             forward; the previous version's lines are closed at apply_from - 1. History is queryable; nothing is edited.
+
+           3.2 Volume tiers and adjustments
+
+           Aspect            Design
+           Tiers
+                             tier_from_qty on trade lines: the line whose tier is the highest not exceeding the order line quantity (in the
+           Adjustment types  line's unit) applies. Tier 0 is the base price.
+
+                             adjustment_type(code, name, kind SPECIAL_DISCOUNT | DELIVERY_FEE, permission_code,
+                             max_percent?, max_amount?, owner F). M4 records an adjustment line on a Federationdistributor order
+                             only against a registered type and within its bounds, gated by its permission (A-06). No other document accepts
+                             manual adjustments.
+
+           3.3 Rules: the closed vocabulary
+
+Rule kind              Predicate (all fields optional unless      Benefit                      Level  Notes
+                       stated)
+
+TIME_LIMITED_PRI sku or tag (required); uom; validity window FIXED_PRICE or                    Line   The everyday promotion
+
+CE                                                                PERCENT_OFF or
+
+                                                                  AMOUNT_OFF
+
+QUANTITY_BREAK sku or tag (required); min_qty (required)          PERCENT_OFF or               Line   Buy 3 pay less
+
+                                                                  FIXED_PRICE for qualifying
+
+                                                                  quantity
+
+BILL_THRESHOLD bill_total  amount (required); optional tag PERCENT_OFF or                      Bill   One bill-level rule per receipt
+
+                       restriction on what counts                 AMOUNT_OFF on the bill
+
+FREE_ITEM              sku or tag A with qty N (required); sku B  FREE_QTY of B                Line (adds a zero-priced line) Only if B is in stock at the till
+                       (required)
+
+EXPIRY_MARKDOW sku or tag; days_to_expiry  D (required);          PERCENT_OFF or               Line   F-07: reported separately as
+                                                                                                      markdown cost
+N                      requires expiry-tracked SKUs               FIXED_PRICE, applied to the
+
+                                                                  specific batch
+
+           Aspect            Design
+           Structure
+                             discount_rule(rule_id, owner_entity, kind, predicate jsonb, benefit jsonb,
+           Stacking          priority, valid_from, valid_to, status, name). The predicate and benefit are validated against a
+                             JSON schema per kind at authoring; there is no expression language (doc 20 §4 guardrail).
+           Ownership
+           Stamping          At most one line-level rule applies to a line (highest priority; ties resolved best-for-customer), then at most one
+                             bill-level rule; benefits never compound two line rules. Configurable only as pricing.stacking_policy with
+                             values PRIORITY_THEN_BEST (default) or BEST_ONLY.
+
+                             An MPCS authors rules for its shops and funds them (G-06). The Federation may author ADVISORY rules that
+                             an MPCS can adopt (copy) but that never apply by themselves.
+
+                             Every receipt line that benefits records discount_rule_id and discount_amount; a bill-level benefit records
+                             on the receipt header with apportionment to lines for tax (doc 18 document_line).
+
+           23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System                 Page 3
+3.4 Ceilings and policy
+
+Aspect                Design
+Printed MRP
+Control price         Batch attribute (M2, ADR-08); nullable only when the SKU's has_printed_mrp is false.
+
+Multi-MRP policy      control_price(scope sku | tag, ceiling_price, ceiling_uom, effective_from,
+                      effective_to, gazette_reference, entered_by), Federation-written only, hard block (doc 18 §4).
+Trade prices and MRP  Where both a SKU-scoped and a tag-scoped ceiling are in force, the lower applies (DR-2).
+
+                      mrp_policy(scope sku | tag, policy AUTO_LOWEST | BARCODE_RESOLVED | PICKER,
+                      picker_gap_threshold?). SKU scope wins over tag; the default is AUTO_LOWEST (multi-MRP study). M2's
+                      sku.multi_mrp_policy is the denormalised effective value maintained by M3 for the snapshot.
+
+                      A trade price is not bound by retail ceilings, but a trade line above the SKU's lowest known printed MRP raises a
+                      REVIEW at publication: the buyer could not legally resell at a margin.
+
+3.5 The price-resolution engine (the shared library)
+
+Restated and formalised from doc 18 §4.9. Pure functions in the shared engine (17A §9); inputs come from the
+snapshot on the till and from queries at central; the outputs are what the receipt line records.
+
+Step                  Rule
+1 List price
+2 Batch term          The RETAIL line for (sku, uom) in force on the business date; missing line  item not sellable (till shows the reason).
+
+3 Control term        Policy AUTO_LOWEST: lowest printed MRP among batches with positive on-hand at the location (from the lot
+4 Base unit price     snapshot). BARCODE_RESOLVED: the scan-resolved batch's MRP when present, else AUTO_LOWEST. PICKER:
+5 Rules               the operator's chosen batch's MRP (only when the gap between candidate MRPs exceeds the threshold; otherwise
+6 Re-check            AUTO_LOWEST silently). SKUs without printed MRP: no term.
+7 Tax and rounding
+Outputs               Control price in force on the business date for the SKU or any of its governed tags, converted to the line's unit; lower of
+                      several.
+
+                      min(list, batch term, control term); cap_reason records which bound (NONE, MRP_LOWEST, MRP_BARCODE,
+                      MRP_PICKED, CONTROL_PRICE).
+
+                      Line-level rule selection per stacking policy; benefits reduce the line; EXPIRY_MARKDOWN applies only to the
+                      specific batch; bill-level rule after all lines.
+
+                      After rules, no line may exceed the control term (a FIXED_PRICE rule set above a later gazette is clamped and
+                      flagged).
+
+                      Tax decomposed from the inclusive price by the rate in force; cash tender rounds the receipt total to the rupee; other
+                      tenders exact; rounding is a receipt-level field, lines untouched.
+
+                      unit_price, batch_id, mrp_applied, control_price_applied, cap_reason, rule_id,
+                      discount_amount, tax_rate, tax_amount, line_total per line; bill_rule_id, bill_discount,
+                      rounding per receipt; engine_version on the envelope.
+
+    3.6 Labels        Design
+
+Aspect                label_job(owner, location, sku list, template, status) renders price labels (code, three
+Shelf label job       names with fallback, price, MRP note, unit) through the kernel renderer for the shop's label printer where present;
+                      the job refuses any label whose price would exceed a ceiling in force on the print date (multi-MRP study option C
+                      guard).
+
+3.7 Preferential price hook (phase 3)
+
+Aspect                Design
+Design only
+                      A future customer_price(customer_account, sku, price, validity) enters the engine as a
+                      candidate list price in step 1 (min with the retail line); nothing else changes. Not built in phase 1; the engine's
+                      input record carries an empty optional slot so the till contract does not change later.
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+   4. State machines
+
+   4.1 Price list version
+
+From         To            Trigger / command                      Guard                           Permission             Audit
+­            DRAFT                                                                                prc.pricelist.author   PRICELIST_DR
+                           CreatePriceList /                      owner; kind; RETAIL: no other   prc.pricelist.author   AFTED
+                           DraftNewVersion                        DRAFT for the MPCS                                     ­ (draft edits
+                                                                                                  prc.pricelist.publish  unaudited until
+DRAFT        DRAFT         SetLines (bulk or single)              each line under ceilings        (MFA for TRADE)        publish)
+DRAFT        PUBLISHED     PublishPriceList(apply_from)           (authoring check); trade tiers                         PRICELIST_PU
+                                                                  ascending                       system                 BLISHED
+                                                                                                  prc.pricelist.author
+                                                                  all lines valid; apply_from                            ­
+                                                                  today; RETAIL: one
+                                                                  PUBLISHED per MPCS                                     PRICELIST_WI
+                                                                  (previous becomes                                      THDRAWN
+                                                                  SUPERSEDED at apply_from)
+
+PUBLISHED    SUPERSEDE     Next version's apply_from              ­
+DRAFT        D             WithdrawDraft                          reason
+
+             WITHDRAWN
+
+   4.2 Rule
+
+From         To            Trigger / command                      Guard                           Permission             Audit
+                           AuthorRule                                                                                    RULE_AUTHOR
+­            DRAFT                                                owner; kind schema valid;       prc.rule.author        ED
+                                                                  predicate scope exists; expiry
+                                                                  kind requires expiry-tracked                           RULE_ACTIVAT
+                                                                                                                         ED
+DRAFT        ACTIVE        ActivateRule                           valid_from  today; benefit never prc.rule.activate
+                                                                  negative; FIXED_PRICE under                            ­
+                                                                  ceilings                                               RULE_WITHDR
+                                                                                                                         AWN
+ACTIVE       EXPIRED       Clock (valid_to)                       ­                               system
+ACTIVE
+             WITHDRAWN WithdrawRule                               reason; urgent snapshot change prc.rule.activate
+
+   4.3 Control price
+
+From         To            Trigger / command                      Guard                           Permission             Audit
+
+­            IN_FORCE      EnterControlPrice                      caller F; MFA; gazette reference; prc.controlprice.enter CONTROL_PRI
+
+                                                                  scope exists; effective_from; no (F, MFA)              CE_ENTERED
+
+                                                                  overlapping row for the scope
+
+IN_FORCE     SUPERSEDE     EnterControlPrice (later               closes the previous at          as above               CONTROL_PRI
+IN_FORCE     D             effective_from)                        effective_from - 1                                     CE_ENTERED
+
+             RESCINDED     RescindControlPrice(effective reason; gazette reference of the as above                       CONTROL_PRI
+                                                                                                                         CE_RESCINDE
+                           _to)                                   rescission                                             D
+
+   Control-price entry and withdrawal of a rule are urgent snapshot changes: tills download on the next heartbeat
+   rather than the 15-minute cycle (doc 32 §5.2).
+
+   5. Contract
+
+    5.1 Commands           Input (essentials)                        Permission             Effect                       Events
+                                                                     prc.pricelist.author   DRAFT                        ­
+Command                    kind, owner, name; source
+CreatePriceList /          version                                   prc.pricelist.author   draft lines; ceiling check   ­
+DraftNewVersion                                                                             per line with reasons
+SetLines                   list, lines[] (sku, uom, price, tier)                                                         price_list.publishe
+                                                                                            PUBLISHED; previous          d.v1 (apply_from)
+PublishPriceList           list, apply_from                          prc.pricelist.publish  SUPERSEDED at
+                                                                     (MFA for TRADE)        apply_from; change-log
+                                                                                            rows (RETAIL)
+
+   23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System                                             Page 5
+Command                      Input (essentials)            Permission                            Effect                      Events
+WithdrawDraft                                                                                                                ­
+AuthorRule /                 list, reason                  prc.pricelist.author                  WITHDRAWN                   ­
+AmendDraftRule
+ActivateRule / WithdrawRule  kind, predicate, benefit, priority, prc.rule.author                 DRAFT                       discount_rule.acti
+                             validity, name                                                                                  vated/withdrawn.v
+AdoptAdvisoryRule                                                                                                            1
+                             rule; reason on withdraw      prc.rule.activate                     ACTIVE / WITHDRAWN;         ­
+EnterControlPrice /                                                                              change-log (urgent on
+RescindControlPrice                                                                              withdraw)                   control_price.ente
+                                                                                                                             red/rescinded.v1
+SetMrpPolicy                 advisory rule                 prc.rule.author                       copy into the MPCS as
+                                                                                                 DRAFT                       mrp_policy.chang
+DefineAdjustmentType                                                                                                         ed.v1
+                             scope, ceiling, uom,          prc.controlprice.enter (F, row; change-log to all
+PrintShelfLabels             effective_from, gazette ref;                                                                    adjustment_type.d
+                             reason                        MFA)                                  locations (urgent)          efined.v1
+                                                                                                                             label_job.rendere
+                             scope sku | tag, policy, threshold prc.mrp_policy.set               policy row; M2 sku          d.v1
+                                                                            (owner; F for tags)  denormalised value
+                                                                                                 updated via event
+
+                             code, kind, bounds, permission prc.adjustment.define row
+                                                                            (F)
+
+                             location, sku list, template  prc.label.print (owner)               label_job; render; refuses
+                                                                                                 over-ceiling labels
+
+5.2 Queries
+
+Query                                        Returns                                                      Scope rule
+ResolveRetailPrice(location, sku, uom, qty,  Engine result for one line (Section 3.5) ­ central use:      OWN, FEDERATION_VIEW
+batch?, picked_batch?, business_date)        M4 internal, ingestion re-validation, screens
+ResolveBasket(location, lines[],             Full receipt result incl. bill rule and rounding             As above; the till runs the same
+business_date, tender_kind)                                                                               function locally
+ResolveTradePrice(relationship, sku, uom,    Tiered trade price, tax-exclusive, adjustment types          PARTY, FEDERATION_VIEW
+qty, date)                                   allowed
+skusOnRetailList(entity)                     SKU ids on the PUBLISHED retail list                         M2 assortment; OWN
+GetPriceList(list, version) /                Header and lines                                             OWN; PARTY for the TRADE list
+ListPriceLists(owner, kind)                                                                               bound to their relationship
+ListRules(owner, status) / GetRule           Rules                                                        OWN; advisory readable by all
+ControlPricesInForce(date) /                 Ceilings (sku and tag scope)                                 Any
+ControlPriceFor(sku, date)
+CheckCeilingsForAuthoring(entity, sku, uom,  OK or the binding ceiling with reason                        OWN
+price)
+GetPricingSnapshot(location, since)          Delta of retail lines, rules, control prices, policies, tax  Snapshot builder
+                                             rates (via M2), adjustment types not included
+MarkdownCost(scope, period)                  Reductions by rule kind for M8                               OWN, FEDERATION_VIEW
+
+5.3 Events published
+
+Event                                 Payload                                                    Consumers
+price_list.published.v1               list id, kind, owner, version, apply_from, changed sku     M2 assortment, snapshot change log, M4
+discount_rule.activated/withdrawn.v1  ids                                                        (trade), M8
+control_price.entered/rescinded.v1    rule id, owner, kind, validity, scope skus/tags            Snapshot (urgent on withdraw), M8
+mrp_policy.changed.v1                 scope, ceiling, effective range, gazette ref               Snapshot (urgent, all locations), M2 (review of
+pricing.review_raised.v1                                                                         lists), M8
+                                      scope, policy, threshold                                   M2 (sku denormalised value), snapshot
+label_job.rendered.v1                 kind (BATCH_MRP_BELOW_LIST,                                Exception queues (M1), M8
+                                      LIST_ABOVE_CEILING_AT_GAZETTE,
+                                      TRADE_ABOVE_MRP), sku, entity, details                     M6 (print), M8
+                                      job id, location, count
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System                                            Page 6
+6. Key flows
+
+Flow                           Sequence                                                                Failure paths
+
+6.1 Publishing an MPCS         Pricing officer drafts a new version (carries forward lines)  edits     A line above a ceiling is refused with
+retail list                    lines; each edit checked against lowest in-stock batch MRP at the       the binding ceiling shown; a list with
+                                                                                                       any invalid line cannot publish;
+                               MPCS's locations (M5 query) and control prices                          apply_from in the past refused
+                               PublishPriceList(apply_from = next Monday)  change-log rows per
+                               location for changed SKUs with apply_from  tills download within
+                               15 minutes and activate at day-open on that date  M2 assortment
+                               updated
+
+6.2 Negotiating a distributor  Distributor sales drafts a TRADE list with tiers for one MPCS  M1       Descending tiers refused; publish
+list                           relationship references it  publish (MFA)  M4 resolves order            without a bound relationship allowed
+                               lines by tier; adjustment types apply only on Federation orders         (bound later at relationship activation)
+
+6.3 Authoring an expiry        MPCS authors EXPIRY_MARKDOWN for tag dairy: days_to_expiry              Rule on a non-expiry-tracked scope
+markdown                        5  30% off  activate  till applies to the specific batch entering      refused at authoring
+                               the window; M5's expiry warning tasks and this rule work together;
+                               M8 reports the reduction as markdown cost separately (F-07)
+
+6.4 A gazette lands            Federation catalogue steward enters a control price for tag rice, Rs    A second entry overlapping the same
+                               220/kg, effective today, gazette 2492/29  MFA  urgent                   scope refused; rescission requires its
+                               change-log to every location  tills apply on next heartbeat and cap     own reference
+                               immediately (control term); M3 raises
+                               LIST_ABOVE_CEILING_AT_GAZETTE reviews for every MPCS
+                               whose retail line exceeds it so lists get corrected; label jobs refuse
+                               old labels
+
+6.5 A batch arrives with a     M4 confirms a GRN; M2 registers batch with MRP 980 while the            ­
+lower MRP than the list
+                               retail line is 1,040  M3 consumer raises
+
+                               BATCH_MRP_BELOW_LIST review to the MPCS pricing role 
+
+                               until corrected, the engine's batch term already caps the sale
+
+                               (AUTO_LOWEST), so the customer is never over-charged; the
+
+                               review is about margin and list hygiene
+
+6.6 Till resolution with two   Scan; AUTO_LOWEST picks min(1,040 list, 980 lowest MRP, no              With PICKER policy and gap above
+batches (doc 13 scenario 4)    control) = 980, cap_reason MRP_LOWEST; a TIME_LIMITED rule              threshold the ItemCard shows both
+                               of 5% applies  931; tax decomposed; cash rounding at receipt;           batches with images; the operator's
+                               line records batch, mrp_applied 980, rule id                            pick records MRP_PICKED
+
+6.7 Federation adjustment on Federation sales adds SPECIAL_DISCOUNT 3% (type bounds 5%) Beyond bounds or without the type's
+
+a distributor order            on an order  M4 records the adjustment line with the type and the permission refused by M4 using M3's
+
+                               actor's permission  invoice carries it                                  query
+
+7. Configuration
+
+Item                                                 Default                        Scope                             Who may change
+pricing.stacking_policy                              PRIORITY_THEN_BEST             Entity                            prc.rule.activate
+pricing.default_mrp_policy                           AUTO_LOWEST                    Federation                        prc.mrp_policy.set (F)
+pricing.picker_gap_threshold                         Rs 20 or 5%, whichever larger  Entity                            prc.mrp_policy.set
+pricing.cash_rounding                                NEAREST_RUPEE                  Federation                        ­ (G-10)
+pricing.trade_above_mrp_review                       true                           Federation                        prc.pricelist.publish (F)
+pricing.control_price_staleness_days (till warning)  3                              Federation                        prc.controlprice.enter
+pricing.label_template                               default                        Entity                            prc.label.print
+
+8. Screens as paper
+
+Screen                      Paper mirrored           Surface Roles                  Notes
+                            Wholesale price list
+Wholesale price list                                 W  Seller pricing              Versions and tiers; ceiling review flags; bound
+(TRADE)                     Shelf price list                                        relationships
+                                                     W  MPCS pricing
+Shelf price list (RETAIL)                                                           Draft/publish with apply_from; per-line ceiling status;
+                                                                                    advisory column beside; label print
+Offer notice (rule editor) Offer notice              W  MPCS pricing
+                                                                                    Form per kind (no free text logic); preview against a
+                                                                                    sample basket; priority; validity
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System                                     Page 7
+Screen                    Paper mirrored   Surface Roles                           Notes
+Gazette (control prices)  Gazette                                                  Effective-dated ceilings by SKU or tag; gazette
+                                           W    Federation steward                 reference; affected lists count; staleness
+                                                                                   Per SKU or tag; threshold
+MRP policy                ­                W    MPCS pricing, F for
+                                                                                   BATCH_MRP_BELOW_LIST,
+                                                tags                               LIST_ABOVE_CEILING, TRADE_ABOVE_MRP
+                                                                                   items with one-click 'open list line'
+Pricing reviews           Exceptions book  W    MPCS pricing                       Batches in the window with the rule that applies (M5
+                                                                                   data + M3 rule)
+Markdown queue            Expiry list      W/T  Supervisor                         Rendered by M6 in the ItemCard zone from the
+MRP picker                Pack label                                               engine's candidate list
+                                           T    Cashier
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System  Page 8
+9. Non-functional design
+
+Aspect                    Design
+9.1 Engine performance
+                          Pure functions over in-memory inputs; a 30-line basket with 200 active rules resolves in under 5 ms on the
+9.2 Determinism and       reference ARM terminal; rule indexing by sku and tag at snapshot load, not per scan.
+parity
+                          The engine is deterministic given (snapshot version, engine version, business date, inputs); central re-validates
+9.3 Versioning            every ingested receipt with the version the till reported (doc 32 §5.2); a parity suite of golden baskets runs on JVM
+                          and Android in CI (17A).
+9.4 Snapshot volume
+                          Engine changes bump engine_version; the snapshot schema carries the minimum engine version; a till below
+9.5 Legal safety          it warns and keeps selling with its own version (central re-validates with that version).
+
+9.6 Privacy and security  Retail lines for the assortment (a few thousand rows), rules (tens to hundreds), control prices (tens), policies;
+                          deltas are small except on a list publication day.
+
+                          Property-based tests assert that no engine output ever exceeds the control term; the label job and the authoring
+                          check share the same function; control-price entry is MFA-gated and audited with the gazette reference.
+
+                          No personal data; trade lists are PARTY-visible only for the bound relationship; advisory rules public within the
+                          federation.
+
+10. Test strategy
+
+Layer           What is tested
+Unit (engine)
+                Each step of Section 3.5 in isolation; every rule kind; stacking policies; tax decomposition and rounding edge cases
+Property-based  (0.50 rupee, negative after rounding never); unit conversion of ceilings
+                For random lists, batches, ceilings and rules: output  control term always; output  list always; cap_reason consistent
+Golden baskets  with the binding term; parity JVM vs Android on the same random inputs
+Contract
+State machine   Doc 13 scenario 4 and twenty more fixtures as JSON shared with the till track; expected receipts to the cent
+Scenario
+Performance     Every command and query; authoring refusals carry the binding ceiling; snapshot contributor output
+
+                List versions, rules, control prices; urgent flags on the right transitions
+
+                Flows 6.1­6.7 end to end incl. the gazette landing and the review fan-out
+
+                Engine under 5 ms per basket on ARM; list publication for a 6,000-SKU list produces change-log rows for all locations
+                of the MPCS under 30 s
+
+11. Decision requests
+
+#        Point                                            Proposed                                Decider
+DR-1     Stacking policy default                          PRIORITY_THEN_BEST; one line rule plus  Federation admins with MPCS
+                                                          one bill rule; no compounding           pricing input
+DR-2     SKU-scoped vs tag-scoped control price both      The lower applies                       Federation legal
+         in force
+DR-3     Trade price above lowest MRP                     Allowed with a REVIEW, not blocked      Federation
+DR-4     Picker gap threshold default                     Rs 20 or 5%                             Federation with cashier usability
+                                                                                                  round
+DR-5     Advisory rules adoptable by copy                 Yes                                     Federation
+DR-6                                                      Adopt                                   Architecture review
+         mrp_policy, adjustment_type, label_job tables
+DR-7     (CR-23-1 to doc 18)                              Adopt (empty optional)                  Architecture review, till track
+
+         Preferential-price slot in the engine input now
+         (P3 hook)
+
+12. Traceability
+
+Section         Identifiers
+3.1­3.2         FR-PRC-010, 020, 030; A-06, A-07; G-01, G-02; ADR-04
+3.3             FR-PRC-060, 070, 080; G-05, G-06, G-07; F-07, F-11; ADR-14; doc 20 §4 guardrail
+3.4­3.5         FR-PRC-040, 090, 100, 130; G-03, G-09, G-10; ADR-08, ADR-31; doc 18 §4.9, B-I6, B-I7; multi-MRP study; CAA Act
+                s.20(5)
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System                 Page 9
+Section  Identifiers
+3.6­3.7  B-11 (labels); FR-PRC-110 (P3)
+4        FR-PRC-120; ADR-34; doc 32 §5.2 urgent changes
+6        Doc 13 scenario 4; the September review item 11
+9        NFR-PRF (till); NFR-CMP (legal safety); doc 14 §8 spikes 1 and 7
+
+End of document. Draft for design review; the contract freezes when M4 and M6 acknowledge it, targeted end of Stage 2 week
+4. Implementation guide: 23A.
+
+23 - M3 Pricing & Rules | v0.1 draft | Cooperative Retail and Distribution System  Page 10
+

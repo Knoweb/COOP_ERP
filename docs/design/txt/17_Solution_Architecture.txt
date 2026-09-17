@@ -1,0 +1,1107 @@
+Cooperative Retail and Distribution System
+
+17 ­ Solution Architecture
+
+Stage 1 foundation artefact: module boundaries, event stream and queue, edge
+architecture, integration surface. Version 0.2 realigns the module map to nine phase-1
+modules with Trading Documents as its own module (M4), and reconciles the
+architecture with documents 14, 18, 19, 20, 30 and 31.
+
+Field                        Value
+Document
+Version / status             17 ­ Solution Architecture
+Date
+Baseline it designs against  v0.2.1 ­ Draft for design review (supersedes v0.1 of 3 September 2026; v0.2.1 restores detail items dropped in
+                             the v0.2 merge)
+Audience
+What changed                 7 September 2026
+
+                             Requirements package v0.2 plus the v0.3 change requests of 3 September 2026, and the Stage 1 companions
+                             as drafted: 14 Technical Foundations v0.2, 18 Core Data Model v0.1, 19 Cross-Cutting Services v0.1, 20 Stage
+                             2 Module Design Plan v0.2, 30 Frontend Foundations v0.1, 31 Application Update and Distribution v0.1
+
+                             Design leads, technical leads, the DevOps engineer, and Federation admins for the business-visible decisions
+                             (sections 4, 6, 9.2, 10.3)
+
+                             Section 0 lists every alignment change from v0.1 with its reason; ADR-28 is revised, ADR-37 to ADR-40 are
+                             new
+
+How to read this document. Plain language for a mixed audience; abbreviations expanded on first use and collected
+in Appendix A. Each numbered decision is marked Decided (follows from an accepted requirement or decision record)
+or Proposed (needs review). Nothing here changes a requirement; where the architecture depends on an open item,
+the dependency is stated.
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System  Page 1
+0. Alignment changes from v0.1
+
+v0.1 was written before the core data model, cross-cutting services and Stage 2 plan existed. Those documents
+made choices v0.1 had left open or made differently. This version adopts them; each change is listed so the
+review can accept or reverse it deliberately.
+
+# Change                 v0.1 position                           v0.2 position                               Reason
+
+C1 Module count and      Fourteen business modules               Nine phase-1 modules (M1­M9),               Doc 20 blueprints and handover to
+        grouping         plus kernel                             Procurement as M10 (phase 2), plus          full-stack developers by module;
+                                                                 kernel                                      fewer, thicker modules with clear
+                                                                                                             contracts. Internal boundaries survive
+                                                                                                             as packages.
+
+C2 Trading documents Split across Orders, Delivery               One module, M4 Trading Documents:           Order-to-settlement and the
+                                      & Receiving, Documents &   order, delivery note, GRN, discrepancy,     ownership pivot (ADR-03) belong
+                                      Payments                   claim, invoice, credit/debit note, payment  together; the state machines are
+                                                                 receipt, statement, exposure                designed in one place (doc 20 DR-1).
+
+C3 Party and security    Party & Tenancy and                     M1 Party, Tenancy & Security                Everything scopes on both; one
+C4 Batch ownership       Governance & Security as                                                            contract to freeze first.
+                         two modules
+                                                                 Batch identity (SKU, batch number,          Doc 18: one physical batch is owned
+                         Batch owned by Inventory                expiry, printed MRP, supplier) in M2;       successively by several entities at
+                                                                 stock lot (holding, cost) and movements     different costs; identity and holding
+                                                                 in M5                                       are different things.
+
+C5 Repack recipe         Owned by Catalogue                      Owned by M5                                 Execution, yield variance and
+C6 Loss & Claims         Own module                                                                          reversal are inventory operations.
+
+                                                                 Write-off and loss categories in M5;        A claim is a trading-document
+                                                                 claims in M4                                lifecycle ending in a credit note; a
+                                                                                                             write-off is a stock lifecycle.
+
+C7 Localisation module Business module owning                    Dissolved: interface catalogue and          No table or lifecycle was left for a
+                                      translation content        rendering are kernel (doc 19 section 5);    module to own.
+                                                                 catalogue names are M2; shop language
+                                                                 is M1 location
+
+C8 Documents and         Numbering a kernel service;             Kernel owns the document base type          Doc 18 part C; till receipts, GRNs and
+        numbering        document base implicit                  (header, lines, links, state history,       back-office documents share one
+                                                                 attachments) and numbering series;          base.
+                                                                 modules own document types
+
+C9 Event naming          PascalCase (SaleRecorded)               Dotted, versioned (receipt.issued.v1)       Doc 19 envelope; the version travels
+                                                                                                             in the type.
+
+C10 Update distribution  POS application's own                   Device-owner management agent (doc          Google developer-verification
+                         update agent; LAN sharing               31); no till-to-till sharing in phase 1     exemptions require the device-owner
+                         between tills                                                                       path; single-till shops make LAN
+                                                                                                             sharing marginal. NFR-UPD-040
+                                                                                                             needs a change request (section 15).
+
+C11 Scope enforcement Kernel scoping service first,              Row-level security policy classes are the   One mechanism keyed on one
+                                      row-level security second  data-layer enforcement (doc 18 section      column; the service layer checks
+                                                                 3.7); the kernel sets the session scope     permissions, the database checks
+                                                                                                             scope.
+
+C12 Reporting store      Replica plus OpenSearch in              Replica in phase 1; columnar store on       Doc 20 Appendix A.
+C13 Deployment           P2                                      trigger (doc 19 DR-3); analyst SQL role
+C14 Product images                                               on the replica
+                         Web/API and worker profiles
+                                                                 Same, plus stateless scale-out rules and Doc 14 section 1.3.
+                         Not mentioned                           an ingest-only worker role for bursts
+
+                                                                 M2 owns images; tills cache thumbnails September 2026 decision.
+
+1. Purpose, scope and what this document decides
+
+This is the first design artefact of Stage 1. It fixes the shape of the system at the level everything else depends
+on: which parts exist, what each owns, how they may depend on one another, how business events flow, and
+where the outside world connects. It stops short of table-level detail (doc 18), the internals of the cross-cutting
+services (doc 19), provider-specific infrastructure (doc 14, doc 35) and screens (doc 30).
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                            Page 2
+This document decides                                                  This document defers
+
+The architectural style: modular monolith with a message queue, plus Provider choice, sizing, hosting (doc 14, doc 35)
+an offline-first edge application
+
+The module map: nine phase-1 modules, Procurement as phase 2, a Table-level schema, indexes, partitions (doc 18)
+platform kernel; layers, dependency rules and their enforcement in the
+build
+
+Ownership of every document lifecycle, ledger and reference set        Internals of identity, permissions, audit, i18n (doc 19)
+
+The event and queue design; edge ingestion; reference distribution to Sync message formats and timing (doc 32)
+tills
+
+The integration surface and the edge application's internal structure  Module designs (docs 21­29), report catalogue (workshop), screens
+                                                                       (doc 30 and module designs), numbering's final form pending the tax
+                                                                       advisor (NFR-CMP-030)
+
+2. Architecture drivers
+
+Driver                                       Source                    Architectural response
+A federation of independent legal entities;  ADR-02, FR-PTY-010        One platform with entity-scoped tenancy: every record carries its
+a shop is a location, not an entity                                    owning entity (and location where relevant); visibility enforced at the
+                                             ADR-10, NFR-AVL-020,      data layer by row-level security, never in screens
+Tills trade one to two days offline; no      NFR-OFF-010               Edge application with its own database and gapless counters; strict
+merge logic; one writer per record type                                split into till-owned (uploaded as events) and central-owned
+                                             NFR-AUD-010, doc 03       (distributed read-only)
+Documents are immutable, corrected by                                  One document base type in the kernel; append-only; typed correction
+linked compensating documents                ADR-11,                   links; no update path for issued documents anywhere
+Gapless multi-series numbering with no       FR-BIL-050/060,           Numbering as a kernel service: entity, location and till-position series;
+central coordination offline                 NFR-OFF-030               locally persisted counters at the edge; gap detection on ingestion
+                                             NFR-PRF-010/030,
+10,000 shops, 15,000 tills, 3 million        ADR-22                    Queue-based idempotent ingestion with backpressure; small write set
+receipts a day; reconnection bursts          NFR-UPD-050, ADR-20       at central; partitioned ledgers; read models on a replica
+One DevOps engineer                                                    One deployable in two profiles; one database; standard components;
+                                             Q-01 change request       no microservices, no orchestration platform in phase 1
+Hosting not bound to a provider; local                                 Containers on commodity open-source components; nothing
+hosting possible                             NFR-LOC, FR-LOC           proprietary in the critical path (doc 14)
+Sinhala, Tamil, English with correct                                   ICU kernel; translations as data; raster receipts
+collation and thermal rendering              ADR-01, ADR-19
+Money recorded, never moved; no card                                   No payment, bank or card-terminal integration
+data                                         ADR-05, FR-BIL-020
+No statutory accounting; journal mapping                               Integration surface as adapters; postings derived from documents
+per document type                            ADR-23
+Phased delivery with a pilot gate            v0.3 change request       Phase 2 and 3 modules placed on the map now
+Single-device, single-person shops                                     Shop-management mode in the POS application; web back office on
+                                             FR-PRC-040, ADR-08,       the same terminal for online-only functions
+Gazetted ceilings are law; MRP is a batch    control-price table       Pricing owns the control-price record; one shared price-resolution
+attribute; ceilings are date-effective       September 2026            engine used identically at central and at the till
+Full-stack developers take a module each     decision                  Modules are vertical slices with contracts and screen inventories (doc
+                                                                       20, doc 30); two shells owned by a platform pair
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                           Page 3
+   3. Architecture principles
+
+#  Principle                               In practice
+
+P1 One system, many modules, explicit One backend application; module boundaries enforced by the build (section 6), not by
+
+   boundaries                              convention.
+
+P2 One database, one schema per            A module owns its tables in its own PostgreSQL schema; it reaches another module only
+          module, no cross-schema queries  through its published interface or its events.
+
+P3 State changes cross module              Synchronous calls only downward to master-data modules and for read-only queries;
+          boundaries only as events        changing another module's state is a published event handled asynchronously.
+
+P4 Documents are facts; facts are never Issued documents are immutable; corrections are new linked documents, at the till and in the
+
+   edited                                  back office alike.
+
+P5 Exactly one writer per record type      The till writes its own sale, session, receiving and count records; central writes everything
+                                           else; nothing is written in both places.
+
+P6 Scope is enforced at the data layer, Row-level security keyed on the owning entity and location; the kernel sets the session scope
+
+   not in screens                          from the token; a screen cannot leak what the database will not return.
+
+P7 The same business rule runs the         Price resolution, rule evaluation, tax, rounding, envelope and counters are one shared library
+          same way everywhere              used by central and the Android application.
+
+P8 Provider-neutral by construction        Only components that run on any cloud or on premises are hard dependencies.
+
+P9 Everything privileged is audited,       Audit is a kernel service with a write-only path; no module can bypass it; no role can alter it.
+          append-only
+
+P10 Configuration over code, within limits What the baseline marks configurable is data with a default; what is law (gazetted ceilings,
+                                                                segregation of duties) is code.
+
+P11 Extractable later, monolithic now      Any module could be lifted into a service if load and team justify it; the option is preserved, not
+                                           exercised.
+
+P12 Stateless application tier             Any request to any instance; no sticky sessions; idempotent commands; singleton jobs under
+                                           cluster locks (doc 14 section 1.3).
+
+   4. System context
+
+   The system sits between the four tiers of the federation and a small set of external systems. Two boundaries are
+   easy to assume the other way: card terminals are not connected (the cashier keys a reference), and the
+   societies' accounting systems are not connected in phase 1 (an export is produced later).
+
+Actor or external system                   Relationship to the system
+Federation (COOPFED) staff                 Steward the shared catalogue and images, run procurement (phase 2), sell to distributors, record
+                                           payment receipts, keep the gazetted control-price register, view every entity's data read-only,
+Distributor staff (about 75)               administer their own users only
+MPCS staff (about 800)                     Buy from the Federation, sell to their MPCS on negotiated price lists, may run shops
+                                           Buy from a distributor, set one retail price list for all their shops, author discount rules, approve
+Shop staff (about 4,000 shops, growing to  adjustments and write-offs, administer shop users and roles
+10,000)                                    Sell, receive, count, request write-offs, offline-capable; a single-staff shop does all of it from the
+Drivers                                    terminal
+Auditors; Department of Co-operative       Proof of delivery on a mobile app or paper; vehicle operations out of scope
+Development                                Read-only: entity-scoped for society auditors, federation-wide for Federation auditors, time-bound
+Helpdesk and operations bridge             for the regulator
+                                           Sync health, fleet and queue monitoring, diagnostics; no transactional access; cannot reset
+Accounting systems (phase 3)               MPCS passwords
+Inland Revenue e-invoicing (when           Receive journal-posting exports; the first API consumer
+mandated)                                  Reserved adapter at invoice issuance
+SMS / e-mail gateway
+Consumer Affairs Authority gazettes        Notifications through a swappable adapter
+                                           Loaded manually by a named Federation role as date-effective control prices; no automated feed
+Device management (doc 31)                 exists
+                                           Provisioning, silent updates, lock and wipe of terminals through a device-owner agent
+
+   17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                               Page 4
+   5. Container view
+
+   The running parts. The two carrying business logic (central application, POS edge application) are what the
+   module map describes; the rest is infrastructure.
+
+Container             Technology                                   Responsibility
+Central application
+                      Java 21 / Spring Boot 3 modular monolith;    All modules and the kernel in one artefact. Web/API profile serves
+PostgreSQL            Spring Modulith boundary enforcement         the back-office web, edge sync API, driver API and third-party API;
+                      (ADR-32)                                     worker profile runs ingestion (with an ingest-only role for bursts),
+Message broker                                                     event consumers, rendering, notifications and scheduled jobs.
+                                                                   Stateless; scales by adding instances (P12).
+Object storage
+Back-office web       16 or later; managed or self-hosted per doc  Single system of record: one cluster, one schema per module plus
+POS edge application  14; connection pooler in front               kernel schemas (documents, numbering, events, audit). Primary
+                                                                   with streaming replica for reporting and the analyst role.
+Driver application
+Identity provider     RabbitMQ quorum queues (proposed             Work-queue delivery and fan-out. Not the system of record for
+Device management     default); NATS JetStream alternative; not    events: the outbox archive in PostgreSQL is.
+agent and update      Kafka
+service
+Edge, proxy,          Any S3-compatible store; MinIO on premises Photographs, product images, rendered A4 output, signed
+observability                                                                         packages, exports, audit hash anchors (write-once bucket).
+
+                      React + TypeScript single-page application   All back-office functions, role-scoped; responsive so a terminal's
+                      (doc 30)                                     browser can open it for online-only shop functions.
+
+                      Native Android (Kotlin, Compose) on ARM      Selling, receiving, counting, write-off drafts, cash management,
+                      terminals; SQLite via Room; device-owner     reports, shop-management mode, sync worker, peripheral layer,
+                      kiosk (doc 30, doc 31)                       receipt renderer. Offline-capable one to two days.
+
+                      Same Android stack, minimal                  Drop list and proof of delivery.
+
+                      Self-hosted OIDC provider, single realm (doc Login, tokens, TOTP, device credentials.
+                      19)
+
+                      Device-owner MDM class plus a small update Provisioning, silent install, rings, health gates, version floor, lock
+
+                      service (doc 31)                             and wipe.
+
+                      CDN/WAF edge; reverse proxy;                 TLS, routing, rate limiting of the sync API; metrics, logs, alerts.
+                      Prometheus/Grafana/Loki class
+
+   6. Module map, layers and dependency rules
+
+   Four layers. A module may call downward and query sideways read-only; it never calls upward and never
+   changes another module's state except by an event the other module chooses to handle. The graph is acyclic.
+
+Layer                 Modules                                             Role and rule
+0 ­ Platform kernel   Scope and session; Documents & Numbering base;
+                      Audit; Event backbone (outbox, relay, inbox); Edge  Technical services with no business rules; every module
+1 ­ Master data and   sync gateway; Internationalisation; Attachments;    may use them; they depend on nothing above (doc 18 parts
+policy                Notifications delivery; Configuration register;     C and D, doc 19).
+2 ­ Transactions      Scheduling
+3 ­ Read side         M1 Party, Tenancy & Security; M2 Catalogue &        Slowly changing reference data and the policies governing
+                      Batch; M3 Pricing & Rules                           transactions. Their published interfaces are what transaction
+                                                                          modules call synchronously; their changes reach tills as
+                      M4 Trading Documents; M5 Inventory, Costing,        reference-data snapshots (8.5).
+                      Repack & Loss; M6 POS & Offline; M7 Customers &
+                      Payment Recording; M10 Procurement (phase 2)        Documents and ledgers. Each owns document lifecycles
+                      M8 Reporting Pipeline; M9 Integration               from doc 03. They interact only by events and read-only
+                                                                          queries.
+
+                                                                          Consume the event stream to build read models, reports,
+                                                                          exports and outbound adapters; write nothing to layers 1
+                                                                          and 2.
+
+   6.1 Dependency rules (enforced in the build)
+
+#  Rule                                                                                    Enforcement
+
+R1 A module exposes exactly one published package: commands, queries, event Spring Modulith verification tests (or ArchUnit); the
+
+   types, value types. Everything else is internal.                                        build fails on violation.
+
+   17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                             Page 5
+#  Rule                                                                                    Enforcement
+
+R2 Layer 2 modules may call layer 1 published APIs synchronously; layer 2                  Query interfaces are a distinct annotated type.
+
+   modules call each other only through read-only query interfaces marked as
+
+   such.
+
+R3 Any change to another module's state is a domain event handled                          Command interfaces are not exported across layer 2.
+          asynchronously; no cross-module command in one transaction.
+
+R4 A module owns its PostgreSQL schema; no SQL crosses a schema; no                        Database roles per schema; migrations scoped per
+          cross-schema foreign keys; references by identifier.                             module; schema-ownership test.
+
+R5 Kernel services never import business modules.                                          Package rules as R1.
+
+R6 Reporting reads events and its own read models; it may query layer 1 for                Package rules as R1.
+          labels at render time.
+
+R7 Every mutating command carries an idempotency key; every singleton job                  Framework interceptor; scheduler configuration test
+          runs under a cluster lock.                                                       (P12).
+
+   Decision (Proposed ­ ADR-28, revised). Nine phase-1 modules, Procurement as a phase-2 module with its
+   boundary present from day one, and a platform kernel, in four layers, with rules R1­R7 enforced by automated
+   build checks from the first sprint.
+
+   17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                        Page 6
+7. Module catalogue
+
+One entry per module: what it owns (the only module that writes those records), the SRS area it implements, its
+lifecycles, the events it publishes and consumes, and its phase. Event names use the doc 19 form; the working
+set is refined in the module designs, the ownership is the decision here. Doc 20 carries each module's
+commands, queries, deliberate omissions and risks; they are not repeated.
+
+7.1 M1 ­ Party, Tenancy & Security
+
+Field        Content
+SRS area     FR-PTY; FR-SEC; FR-GOV
+
+Owns         Entity with tier and VAT registration; location with owner, language, trading hours, size band, primary till; till position;
+             device; trading relationship (price-list reference, credit limit, terms, dispute window, lock window, allocation rule;
+Documents /  effective-dated); user, permission catalogue, role builder and templates (including shop-in-charge), scoped role
+lifecycles   assignment, external time-boxed grants, segregation-of-duties pairs and modes; session and idle-lock policy;
+             sandbox/training flag per user; financial-year settings; visibility policy as data for the row-level security classes
+
+             None (master data); relationship activation and credit-limit change are permission-gated, audited acts
+
+Publishes    entity.*, location.*, till_position.*, device.*, relationship.opened/amended.v1, user.*, role.changed.v1, external_grant.*,
+Consumes     authentication.failed.v1, account.locked_out.v1
+
+             None
+
+Notes        The relationship is the anchor for price lists and credit (ADR-04) and is not a hard-coded tier, so Federation-to-MPCS
+Phase        direct trading later is configuration. Authentication is the kernel's identity provider (doc 19); authorisation policy lives
+             here and is evaluated by the kernel on every request.
+
+             P1
+
+7.2 M2 ­ Catalogue & Batch
+
+Field        Content
+
+SRS area     FR-SKU; FR-LOC-020 (trilingual master data)
+Owns
+             SKU (global namespace, owner, status draft/local/shared, mandatory English name, trilingual names, bounded
+             attributes); units and conversions; barcodes (many-to-one, optional batch link, symbology); tags; tax categories and
+             rates; images (per SKU, optional per barcode); alias mapping on promotion; batch as physical identity (SKU, batch
+             number, supplier, manufacture and expiry, printed MRP); synthetic batches for non-batch-tracked SKUs; a minimal
+             supplier table until M10
+
+Documents /  SKU status lifecycle; promotion with alias; batch correction (new batch, audited)
+lifecycles
+             sku.*, barcode.registered/retired.v1, conversion.defined.v1, tag.defined.v1, tax_rate.published.v1,
+Publishes    image.attached/retired.v1, batch.registered/corrected.v1
+
+Consumes     M4 grn.confirmed.v1 and M5 repack.executed.v1 command batch registration
+Notes
+             Change C4: batch identity is here, holding and cost are M5. The catalogue is the largest reference set distributed to
+             tills; thumbnails ride in the snapshot for each shop's assortment. The steward's tooling (bulk import, duplicate
+             detection across scripts, translation completeness) is first-class (T-03).
+
+Phase        P1
+
+7.3 M3 ­ Pricing & Rules
+
+Field        Content
+SRS area     FR-PRC; G section; F-07
+
+Owns         Trade price lists per relationship (uniform Federation list; negotiated, volume-tiered distributor lists); one retail list per
+             MPCS; Federation advisory prices; discount and markdown rules (closed vocabulary; the sole source of any reduction,
+Documents /  ADR-14); gazetted control price (date-effective, SKU or tag, gazette reference; hard block); multi-MRP resolution
+lifecycles   policy per SKU or tag; cash rounding; per-customer preferential price (phase 3)
+
+             Rule lifecycle (draft, active, expired, withdrawn); price-list publication with apply_from
+
+Publishes    price_list.published.v1, discount_rule.activated/retired.v1, control_price.entered/rescinded.v1, mrp_policy.changed.v1
+Consumes     batch.registered.v1 (raise a pricing review when an incoming batch MRP is below the standing list)
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                            Page 7
+Field        Content
+Notes
+             Owns the price-resolution engine: a pure library with no database access, packaged once, used by M4 (inter-entity),
+Phase        by ingestion re-validation and by the till offline (P7, ADR-31). Resolution is min(list, lowest in-stock batch MRP, control
+             price in force), then rules, then the control price re-checked; the receipt line records what bound it (doc 18 section 4.9).
+
+             P1 (preferential pricing P3)
+
+7.4 M4 ­ Trading Documents
+
+Field        Content
+SRS area     FR-ORD; FR-DEL; FR-BIL (except numbering internals); A, C, D, I-05 to I-07, J sections
+
+Owns         Order (buyer's series) with lines, allocation runs, backorders, lock window, indicative ETA; delivery note with drops
+             (per ship-to location, with a bill-to entity for direct-to-shop deliveries), vehicle, driver, timestamps; proof of delivery;
+Documents /  GRN (location series when captured at a shop; offline-capable; the ownership pivot); discrepancy (automatic on
+lifecycles   mismatch) and claim (raise, inspect, approve, reject); invoice, credit and debit notes; payment receipt with settlement
+             to specific invoices and cheque sub-lifecycle; statements; committed exposure per relationship (warn-only);
+             journal-posting mapping per document type; immutable invoice snapshot for e-invoicing readiness; intra-MPCS lateral
+             transfer request (mediated)
+
+             Order, delivery note, GRN, discrepancy, claim, invoice, credit/debit note, payment receipt (doc 03 sections 2­8); the
+             six state machines designed in doc 24; numbering addendum 24A after the tax advisor
+
+Publishes    order.*, delivery_note.*, grn.captured/confirmed/closed.v1, discrepancy.*, claim.*, invoice.issued.v1,
+Consumes     credit_note.issued.v1, debit_note.issued.v1, payment_receipt.recorded/disputed/reversed.v1,
+             cheque.cleared/bounced.v1, exposure.updated.v1, statement.generated.v1, journal.postings_ready.v1
+
+             M7 customer payments where the payer is a customer; M10 purchase orders for expected receipts (P2)
+
+Notes        grn.confirmed.v1 is the most important event in the system: M2 registers batches from it, M5 creates the receiving
+Phase        entity's lots and posts receipts, invoicing is permitted by it, and loss attribution depends on its timestamp. Till-captured
+             GRNs are ingested through the same path as receipts. Money is never moved (ADR-01); exposure warns, never
+             blocks (ADR-12).
+
+             P1 (e-invoicing live P3; reorder suggestions feeding orders P2)
+
+7.5 M5 ­ Inventory, Costing, Repack & Loss
+
+Field        Content
+
+SRS area     FR-INV; FR-LOSS; E, F sections; B-06; R-02
+Owns
+             Stock lot (entity holding of a batch at a location, acquisition cost); stock movement ledger (append-only, every
+             movement cites a document); derived balances; weighted-average cost per entity; FEFO suggestion; intra-entity
+             transfer at cost; count tasks and results; adjustment with value-threshold approval; repack recipe and execution with
+             expected yield and reversal; write-off with loss categories, requester  approver, witness (remote for single-staff
+             shops), photographs, value-banded approval; loss tolerances; expiry warning tasks; negative-stock and oversell
+             exception records; opening balances; ageing and reorder points (phase 2)
+
+Documents /  Transfer, adjustment, repack, write-off, count, opening balance (doc 03 sections 9­11)
+lifecycles
+             stock.moved.v1, lot.negative.v1, count.*, adjustment.approved.v1, writeoff.requested/witnessed/approved/posted.v1,
+Publishes    repack.executed/reversed.v1, batch.expiring.v1, opening_balance.recorded.v1
+
+Consumes     grn.confirmed.v1 (lots and receipts), receipt.issued/refunded/voided.v1 via ingestion (deductions and returns per
+Notes        batch), claim.approved.v1 (return movements), landed_cost.finalised.v1 (P2 restates lot cost)
+
+             Provides the availability query for M4 and the lot list distributed to tills (batch, MRP, expiry, FEFO order). Concurrent
+             offline oversells are accepted and flagged (oversell exception), never rejected. Changes C4­C6 apply.
+
+Phase        P1 (ageing, reorder points, ABC cycle counting P2)
+
+7.6 M6 ­ POS & Offline
+
+Field        Content
+SRS area     FR-POS; FR-PAY (till subset); FR-REP-030; H, I-03, O-02, P-05, Q-07 sections
+
+Owns         On the edge: till session (float, drops, blind close, variance); receipt with lines, batch attribution, applied rules, tax,
+             tenders, operator; void and same-session refund; parked sales; receipt rendering; local reference cache and version;
+Documents /  local counters for the till-position series and, on the primary till, the location series; local outbox and upload cursor;
+lifecycles   shop-management mode hosting M4 and M5 screens (GRN, count, write-off draft, shop repack); training namespace.
+             At central: ingestion ­ validation, idempotent acceptance, gap detection, re-validation of price and ceiling compliance
+             with the shared engine, re-publication into the backbone; sync-health view per till
+
+             Receipt, refund, void, till session (doc 03 section 13)
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                               Page 8
+Field        Content
+Publishes
+Consumes     receipt.issued/voided/refunded.v1, till_session.opened/closed.v1, cash.dropped.v1, drawer.opened_no_sale.v1,
+Notes        mrp_cap.applied.v1, mode.switched.v1, sync.batch_received/anomaly.v1, till.heartbeat.v1
+
+Phase        Reference-data snapshots from layer 1 and M5 through the distribution channel (8.5), and the permission snapshot
+             from M1; not domain events
+
+             Section 9. Ingestion never rejects a well-formed event for business reasons: a bad price is flagged, not refused; the
+             sale already happened. Card, wallet and QR tenders are references only (ADR-19). Updates arrive through the
+             management agent (doc 31), not through this module.
+
+             P1 (LAN peer stock visibility P2, NFR-OFF-040)
+
+7.7 M7 ­ Customers & Payment Recording
+
+Field        Content
+SRS area     FR-CUS; FR-PAY (customer subset); I-01, I-02, I-04; K section
+
+Owns         Registered customer (internal id, name, optional NIC where credit is granted, bounded attributes); phone numbers
+             with audited change and reuse detection; account per MPCS (limit, balance, ageing, offline cap); account postings
+Documents /  (credit sales, repayments, adjustments); customer payment receipts settling specific charges; banking record of
+lifecycles   takings
+
+             Account posting (append-only), customer payment receipt, opening balance from migration
+
+Publishes    customer.registered/phone_changed.v1, account.opened/limit_amended/closed.v1, account.charged/credited.v1,
+Consumes     banking.recorded.v1
+
+             receipt.issued/refunded.v1 where a tender is a customer account; payment_receipt.recorded.v1 where the payer is a
+             customer
+
+Notes        Unrelated to cooperative membership (ADR-16). Tagged and credit customers with balances are part of a shop's
+Phase        snapshot so account sales work offline against the last known balance up to a configurable cap; minimal PII (ADR-27).
+
+             P1 (preferential pricing P3)
+
+7.8 M8 ­ Reporting Pipeline
+
+Field        Content
+
+SRS area     FR-REP; O section; M-04, M-06; N-06
+Owns
+             Read models in a reporting schema (sales by period, entity, shop, SKU, rule; stock position and ageing; discrepancy
+             and claim register; loss by category; discount cost by rule; VAT summary; exposure and statements; till variance;
+             exception queues); per-entity and per-location freshness stamp; report catalogue definitions; end-of-day aggregates;
+             the A4 rendering pipeline; spreadsheet export; the analyst SQL role on the replica
+
+Documents /  None; read-only
+lifecycles   report.rendered.v1, export.ready.v1, end_of_day.completed.v1, projection.rebuilt.v1, exception_report.generated.v1
+
+Publishes
+
+Consumes     Every domain event
+Notes
+             Every federation-level figure carries the freshness of its least-recent contributor (FR-REP-020). Read models are
+             rebuildable from the outbox archive, which is what makes a fixed catalogue safe to extend after the workshop. Heavy
+             reads run on the replica; a columnar store follows on trigger (doc 19 DR-3).
+
+Phase        P1 catalogue; self-service builder backlog
+
+7.9 M9 ­ Integration
+
+Field        Content
+SRS area     FR-BIL-110, FR-BIL-140; R-05 to R-09; J-02, J-04
+
+Owns         API clients and scoped grants; the OpenAPI surface as the versioned public contract; journal export using M4's
+             posting maps; e-invoice submission adapter stub; notification templates and the provider adapter; webhooks (phase
+Documents /  2/3)
+lifecycles
+             None
+
+Publishes    notification.sent/failed.v1, journal.exported.v1, api_client.registered.v1
+Consumes     journal.postings_ready.v1, invoice.issued.v1 (e-invoice seam), delivery and statement events for notifications
+
+Notes        REST only; an adapter is a translator, never a place for business rules (anti-corruption layer). The first API consumer
+             is the accounting system.
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System  Page 9
+Field                   Content
+Phase                   P1 (accounting integration and e-invoicing P3)
+
+7.10 M10 ­ Procurement (phase 2)
+
+Field                   Content
+
+SRS area                FR-PRO; L section
+Owns
+                        Supplier master (takes over M2's minimal table); supplier contracts; quotation register with audited award; purchase
+                        order; market price observations; shipment and landed cost; supplier performance; demand-forecast inputs
+
+Documents /             Purchase order, quotation register, shipment
+lifecycles              purchase_order.issued.v1, quotation.awarded.v1, landed_cost.finalised.v1, supplier_performance.computed.v1
+
+Publishes
+
+Consumes                grn.confirmed.v1 at Federation warehouses; sales aggregates via M8 for forecasting
+Notes
+                        Placed on the map now so Federation warehouse receiving in phase 1 can carry a purchase-order reference field.
+                        Federation repacking (P3) reuses M5's recipe mechanism by permission.
+
+Phase                   P2 (repacking P3)
+
+7.11 Platform kernel services
+
+Service                 Responsibility                                                                    Designed in
+Scope and session
+Documents &             Sets the caller's entity and location scope and policy class on every database Doc 18 section 3.7, doc 19 section
+Numbering base
+Audit                   session from the token; row-level security policies enforce it                    1
+Event backbone
+Edge sync gateway       Document header, lines, typed links, state history, attachments;                  Doc 18 part C; addendum 24A
+Internationalisation    document-type registry; numbering series with entity, location and till-position  after the tax advisor
+                        scopes; issuance protocol; gap detection
+Attachments
+Notifications delivery  Append-only audit store written through one facade in the business                Doc 18 part D, doc 19 section 4
+Configuration register  transaction; event-type catalogue; exception queues; hash chain in phase 2
+
+Scheduling              Transactional outbox and archive, relay, broker publication, per-consumer         Doc 19 section 6
+                        inbox, replay
+
+                        Upload, distribution, heartbeat, series registration and counter transfer; rate   Doc 32
+                        limiting and backpressure
+
+                        ICU collation and formatting, message catalogue with English fallback, NFC        Doc 19 section 5
+                        normalisation, rendering pipelines; the input-method provisioning register per
+                        shop (configuration item)
+
+                        Object-storage keys and metadata, scoped like any record                          Doc 18 (document_attachment)
+
+                        Event-triggered sends through M9's adapter and templates, with retry              Doc 20 M9
+
+                        Onboarding-time values (thresholds, lock windows, rounding, idle locks,           Doc 07 section 4; module designs
+                        resolution policies, offline account cap, quiet hours) with defaults, scoped per  section 7
+                        entity or location, audited
+
+                        End-of-day, expiry scans, statements, reconciliation, gap checks, ring            Doc 14 section 1.3
+                        progression; singleton under cluster locks
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                        Page 10
+8. Event stream and queue
+
+The event stream is the durable, replayable record of business facts; the work queue is a delivery mechanism
+for jobs. The design keeps them apart (doc 19 section 6 names the four kinds of event and their persistence).
+
+8.1 Where events live
+
+Decision (Proposed ­ ADR-30). The system of record for domain events is an append-only outbox archive in
+PostgreSQL written in the same transaction as the business change; a relay publishes rows to the broker; the
+broker holds nothing that cannot be re-derived from the archive. Central write volume is on the order of a
+thousand events a second at peak and a few thousand during reconnection bursts (doc 14 section 6), which
+PostgreSQL handles; replay and audit come free; there is one fewer stateful system; the broker is replaceable.
+The archive is partitioned by month and retained indefinitely.
+
+8.2 Envelope
+
+One envelope for every event, wherever it is created (doc 19 section 6.1): event id (UUIDv7), versioned dotted
+type, occurred and received times, source (central or device), dense per-source sequence, owning entity and
+location, aggregate type and id, correlation and causation ids, actor, and a small payload. The pair (source,
+source sequence) is the idempotency key for ingestion and the basis of gap detection.
+
+8.3 Delivery guarantees and consumer rules
+
+· At-least-once delivery. Every consumer is idempotent by event id; the kernel supplies a per-consumer inbox
+   table.
+
+· Ordering per source, not globally. Events from one till, or from central, apply in sequence; cross-source
+   order is by received time with freshness stamps.
+
+· Consumers are registered in code, reviewed, and listed in the module catalogue; the dependency graph
+   stays visible.
+
+· Replay is first-class for read models; layer 2 modules never replay: their state is corrected by compensating
+   documents, never by re-processing history.
+
+· Poison events go to a dead-letter queue with an alert after three attempts and never block a source's
+   subsequent events.
+
+8.4 Event catalogue by producer
+
+Producer    Events                                                                      Main consumers (besides M8 and audit)
+M1                                                                                      Numbering (series creation), edge sync (snapshot
+            entity.*, location.*, till_position.*, device.*, relationship.*, user.*,    scope and permission snapshot), M4 (exposure
+M2          role.changed, external_grant.*, authentication.failed,                      configuration)
+M3          account.locked_out                                                          Edge sync (catalogue snapshot), M3 (batch MRP
+M4                                                                                      review), M5 (alias mapping)
+            sku.*, barcode.*, conversion.defined, tag.defined,                          Edge sync (pricing snapshot with apply_from), M4
+M5          tax_rate.published, image.*, batch.registered/corrected                     (relationship price at acceptance)
+M6 (via                                                                                 M2 (batch registration), M5 (lots, receipts, returns),
+ingestion)  price_list.published, discount_rule.activated/retired,                      M7 (customer payments), M9 (journal export,
+M7          control_price.entered/rescinded, mrp_policy.changed                         e-invoice seam, notifications), M10 (purchase-order
+M8                                                                                      receipts)
+M9          order.*, delivery_note.*, grn.captured/confirmed/closed,
+            discrepancy.*, claim.*, invoice.issued, credit_note.issued,                 M3 (in-stock MRPs for authoring checks), edge sync
+            debit_note.issued, payment_receipt.recorded/disputed/reversed,              (lot snapshot), exception queues
+            cheque.cleared/bounced, exposure.updated, statement.generated,              M5 (stock deduction per batch), M7 (account
+            journal.postings_ready                                                      tenders), exception queues, fleet and sync health
+
+            stock.moved, lot.negative, count.*, adjustment.approved, writeoff.*,        Edge sync (credit customer snapshot)
+            repack.*, batch.expiring, opening_balance.recorded                          Notifications, named reviewers
+
+            receipt.issued/voided/refunded, till_session.*, cash.dropped,               Audit
+            drawer.opened_no_sale, mrp_cap.applied, mode.switched,
+            sync.batch_received/anomaly, till.heartbeat
+
+            customer.*, account.*, banking.recorded
+
+            report.rendered, export.ready, end_of_day.completed,
+            projection.rebuilt, exception_report.generated
+
+            notification.sent/failed, journal.exported, api_client.registered
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System  Page 11
+Producer        Events                                                                  Main consumers (besides M8 and audit)
+M10 (P2)                                                                                M5 (lot cost restatement), M4 (expected receipts)
+                purchase_order.issued, quotation.awarded, landed_cost.finalised,
+                supplier_performance.computed
+
+8.5 Reference-data distribution to tills is not the event stream
+
+Decision (Proposed ­ ADR-34). Tills do not subscribe to domain events. They receive versioned snapshots
+and deltas assembled per shop by the edge sync gateway: catalogue with thumbnails for the shop's assortment,
+prices, rules, control prices, tax, lot lists, credit customers and balances, permissions, message catalogue. Each
+snapshot carries a version and an apply_from business date; the till applies it atomically so a bill is never
+computed against a half-applied price list. Read-only at the till (P5).
+
+8.6 Work queues
+
+Queue           Behaviour
+Edge ingestion
+                One job per uploaded batch; partitioned by device so one device's events apply in order, concurrent across devices;
+Event relay     rate-limited per device at the gateway; duplicates acknowledged as already processed; documents and movements
+Rendering       before audit rows within a device's window
+Notifications
+Scheduled jobs  One queue per consumer so a slow consumer never delays another; dead-letter after three attempts
+
+                A4 reports and statements to object storage; report.rendered on completion
+
+                SMS and e-mail with retry and provider failover
+
+                End-of-day aggregates, expiry scans, statement runs, reconciliation and gap checks, ring promotion, freshness
+                recomputation; each singleton under a cluster lock
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System  Page 12
+      9. Edge architecture: the POS application
+
+      The Android application is the second place business logic runs. Doc 30 section 4 gives its shell and screens;
+      doc 31 its update path; doc 32 its sync protocol. This section fixes its structure.
+
+Component                 Responsibility
+
+Selling                   Scan or key, weigh, resolve price through the shared engine (multi-MRP policy and control-price cap), rules,
+                          tenders as references, park and resume, receipt, same-session refund and void
+
+Shop-management mode      Role-gated second mode on the same device hosting M4 and M5 screens: GRN capture and confirmation,
+                          count entry, write-off draft, shop repack, local reports. Entered park-first; entry and exit audited. Online-only
+                          functions open the web back office in the terminal's browser.
+
+Shared engine library     The same library as central (ADR-31): price resolution, rule evaluation, tax, rounding, envelope, numbering
+                          counter. No server dependencies; versioned with the snapshot schema.
+
+Local database            SQLite via Room, encrypted with a keystore-held key. Till-owned tables (documents, lines, state history,
+                          movements, audit, counters, outbox) and read-only cache tables replaced atomically per snapshot version.
+                          Synchronous commit on every issued document.
+
+Local numbering           Persisted counters: the till-position series for receipts, voids, refunds; the location series for GRN, count,
+                          write-off draft and transfer when this device is the shop's primary till. Number and document commit in one
+                          local transaction; counter transfer is an audited procedure.
+
+Sync worker               Uploads the outbox in sequence with acknowledgement cursors; downloads snapshot deltas; reports
+                          heartbeat, version and clock offset; never blocks the interface; passive status indicator
+
+Peripheral layer          One interface per device class (scanner with GS1 parsing, printer, drawer, scale, customer display, label
+                          printer) with vendor adapters behind it and a simulator for development and training; UnifiedPOS categories
+                          as vocabulary
+
+Receipt renderer          Raster output through the platform text stack with Noto fonts; also Z-report, day sales and session reports
+                          offline
+
+Local authentication      Operator PIN against cached hashes; cached permission snapshot; idle lock; operator switch audited
+
+Training mode             Separate local namespace with visibly non-live numbering and a watermark; uploads to the sandbox entity at
+                          central
+
+Management agent (separate Device-owner agent for provisioning, silent update, lock and wipe (doc 31); the POS application cooperates by
+
+app)                      reporting version and running self-tests
+
+      9.2 Offline-capable and online-only (H-02/H-03 as architecture)
+
+Offline: fully local, uploaded later                                   Online-only: refused while disconnected, never queued
+
+Cash sale, receipt, stock deduction, price and rule lookup,            New orders and lateral transfer requests, card, wallet and QR tender
+control-price check, park and resume, same-till same-session refund    confirmation, cross-till or cross-day refunds, master-data changes,
+and void, GRN capture and confirmation, count entry, write-off draft,  payment-receipt posting, write-off approval, any MFA-gated action.
+shop repack, account tender within the offline cap, Z-report and       This resolves the FR-POS-050 wording conflict: blocked, not queued.
+session report, operator authentication, training mode
+
+      9.3 The channels between till and central
+
+Channel                   Direction            Carries                                             Owner
+1 Event upload            Till to central      Issued documents with lines and state rows,         Edge sync gateway; doc 32
+                                               movements, audit events, heartbeat
+2 Reference distribution  Central to till      Versioned snapshots and deltas (8.5)                Edge sync gateway; doc 32
+3 Software update                              Signed packages, ring instructions, health reports  Doc 31
+                          Update service to
+4 Online-only requests    management agent     Orders, statements, cross-session refunds, approvals Back-office API; web shell
+
+                          Terminal browser to
+                          back-office API
+
+      Channels 1 and 2 carry data in opposite directions and never overlap in what they carry (P5).
+
+      10. Integration surface
+
+      10.1 Inbound
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System               Page 13
+API                       Consumers                        Design
+Back-office API (public)  Back-office web; the accounting
+                          system; third parties            REST, OpenAPI 3.1, versioned under /v1; OIDC bearer tokens; scope and
+Edge sync API (private)                                    permissions enforced by the kernel and row-level security; idempotency keys
+                          POS application                  on all mutating requests; cursor pagination; problem-detail errors. Every
+Driver API (private)                                       operation maps to a module command or query; no business logic in the API
+Regulator and auditor     Driver application               layer.
+access                    Department of Co-operative
+                          Development; auditors            Device-credential authenticated plus operator context per batch; upload,
+                                                           acknowledge, fetch delta by version, heartbeat, series registration and counter
+                                                           transfer; rate-limited and backpressured; small, resumable responses.
+
+                                                           Delivery run, drop confirmation with signature, photo, timestamp, location;
+                                                           same envelope and idempotency.
+
+                                                           The back-office web with time-bound read-only roles and export; every grant
+                                                           and export audited.
+
+10.2 Outbound adapters
+
+Adapter                   Phase  Design
+Accounting export
+                          P3 (mapping P1) Consumes journal.postings_ready; produces postings in the target format once the package is
+Inland Revenue                                       chosen; mapping lives in M4, the adapter only translates.
+e-invoicing
+SMS / e-mail              P3 (readiness P1) Adapter point on invoice.issued with the immutable snapshot; submission status is metadata;
+Webhooks                                             the invoice never changes.
+
+Spreadsheet export        P1     Provider adapter behind kernel delivery; templates per language in M9; retry and failover.
+
+                          P2/P3  Subscriptions to selected event types, entity-scoped, signed, retried; built on the same
+                                 consumer mechanism.
+
+                          P1     M8; scoped and audited like any read.
+
+10.3 Explicit non-integrations
+
+Card, wallet and QR terminals (standalone; reference only; no PCI scope, ADR-19). Banks for payments or
+statements (ADR-01). Existing POS systems (none exist, R-01). Gazetted control prices (manual entry by a
+named Federation role; no feed exists). Google Play as an update channel is optional, not assumed (doc 31).
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System  Page 14
+11. Data architecture summary
+
+Choice                            Statement
+One database, schema per module
+(Proposed ­ ADR-29)               One PostgreSQL cluster; each module and kernel service owns a schema; no cross-schema foreign
+Scope on every row                keys; references by identifier; a connection pooler in front.
+
+Documents are append-only         owner_entity_id (and location_id where bound) on every operational table; row-level security policy
+                                  classes OWN, PARTY, FEDERATION_VIEW, EXTERNAL_TIMEBOXED (doc 18 section 3.7).
+Ledgers, not balances
+                                  One base type in the kernel; no update statements for issued documents; state changes as history
+Outbox archive and audit trail    rows; corrections as typed links; application roles lack UPDATE and DELETE on document tables.
+
+Partitioned volume tables         Stock, customer accounts and exposure are movement ledgers; balances are materialised and
+Text and collation                recomputable.
+
+Binary content                    Two append-only kernel schemas, partitioned by month, retained indefinitely; audit written through one
+                                  facade in the business transaction.
+Read models
+Identifiers                       Documents, lines, movements, state history, outbox and audit range-partitioned by month from day one.
+
+                                  UTF-8, NFC-normalised at write; ICU collations on Sinhala, Tamil and English columns; trigram search;
+                                  OpenSearch phase 2.
+
+                                  Object storage for photographs, images, rendered documents, packages; keys and metadata in the
+                                  database.
+
+                                  Rebuildable projections in M8's schema on the replica; never a source for transactional decisions.
+
+                                  UUIDv7 primary keys generated where the record is born; business numbers are separate unique
+                                  attributes.
+
+12. Deployment shape (provider-neutral)
+
+Element                    Minimum production shape on any provider
+
+Application                At least two web/API and two worker instances of one container image behind a load balancer; stateless
+                           (P12); rolling deployment; an ingest-only worker role can be scaled during reconnection bursts.
+
+Database                   PostgreSQL primary with streaming replica; continuous write-ahead-log archiving to object storage for
+                           point-in-time recovery inside the 15-minute RPO; connection pooler; managed where available.
+
+Broker and object storage  Persistent queues; S3-compatible store with versioning and a write-once bucket for audit anchors; MinIO on
+                           premises.
+
+Identity, device management, Self-hosted provider; device-owner MDM; update service with package store.
+update service
+
+Environments               Development, test, staging (mirrors production; update ring 0), production. Training is a flagged sandbox entity
+                           inside production (ADR-35), not an environment.
+
+Observability              Ingestion lag per till, series gaps, queue depth, replica lag, disk, ring status, fleet version distribution; the
+                           single DevOps engineer's eyes, part of the minimum shape.
+
+Network                    Inbound only through the edge and proxy over TLS; devices authenticated by credential; no inbound
+                           connections to shops.
+
+Local hosting note         The shape runs on premises unchanged; what changes is who is on call at 02:00, the second site or cloud
+                           standby needed for the RTO, and the operating-model cost. Doc 14 section 5 carries the matrix.
+
+13. Quality attributes
+
+Requirement                       Mechanism                                                       Verified by
+NFR-PRF-010/020 scale             Small write set at central; queued ingestion; read models on    Spike 5 at the 15,000-till envelope
+                                  replica; partitioning; stateless scale-out
+NFR-PRF-030 reconnection burst    Gateway rate limiting and backpressure; per-device ordered      Burst simulation of two days of events
+                                  queues; idempotent acceptance                                   from thousands of tills
+NFR-PRF-040 15-minute poll        Versioned snapshot/delta channel                                Delta size and apply time on the target
+                                                                                                  terminal
+NFR-AVL-010 RTO 4­8 h, RPO        Replica plus point-in-time recovery; restore runbook            Restore drill before pilot; quarterly
+15 min
+NFR-AVL-020/050 offline trading,  Full local database, local counters, shared engine, one-writer  Spike 1: 48-hour disconnected soak with
+GRN, refunds                      split                                                           power-loss injection
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                   Page 15
+Requirement                       Mechanism                                                  Verified by
+NFR-AVL-040 no scheduled
+downtime                          Stateless instances; rolling deployment; expand-then-contract Deployment rehearsal under synthetic
+NFR-OFF-010/030 one writer;
+gapless offline numbering         migrations                                                 load
+NFR-OFF-040 future LAN peer
+visibility                        P5 data split; persisted counters committed with the       Ownership review of every edge table;
+NFR-SEC-010/030 ASVS L2,          document                                                   counter tests under crash
+credentials, TOTP
+NFR-SEC-020 no card data          Envelope carries source and sequence; a peer channel can   Design review only (P2)
+                                  reuse it (shop-hub option, doc 20 Appendix A)
+NFR-CMP-010 PDPA
+                                  OIDC provider; kernel authorisation; MFA step-up; till PIN with ASVS checklist; penetration test before
+NFR-CMP-030 tax advisor review
+NFR-USE-010..060 usability        lockout                                                    certification
+directive
+NFR-LOC-010/020 trilingual, ICU,  No terminal integration; reference only                    Data-model review: no card-number field
+thermal                                                                                      exists
+NFR-UPD-010..050 updates;
+modular monolith                  Minimal PII in M7; scope enforcement; audited access;      PDPA review of doc 18
+NFR-AUD-010/030 immutable         time-bound regulator role
+documents; audit catalogue
+                                  Numbering isolated in one kernel service                   Detailed design after the written review
+
+                                  Screens as paper; role-scoped screens; passive sync        Spike 7 cashier rounds
+                                  indicator; compensating documents; sandbox
+
+                                  Internationalisation kernel; translations as data; raster  Spike 2 on target printers
+                                  receipts
+
+                                  Device-owner agent, signed packages, rings, floor (doc 31); Ring rehearsal staging to pilot; build fails
+
+                                  Modulith enforcement                                       on boundary violation
+
+                                  Append-only schemas; privileges; single audit facade       Privilege test; coverage test against doc
+                                                                                             07 section 3
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                   Page 16
+14. Decisions proposed in this document (candidate ADRs)
+
+ID            Decision                                                   Rationale and consequence
+ADR-28
+(revised)     Nine phase-1 modules plus Procurement (P2) plus a          Modular by mechanism; extraction possible; full-stack
+ADR-29
+ADR-30        kernel, four layers, rules R1­R7 enforced by build checks handover by module; phase-2 boundary exists from day one
+ADR-31
+              One PostgreSQL cluster, one schema per module, no          Single operational unit; module independence; scope at the
+ADR-32
+ADR-33        cross-schema foreign keys, row-level scope on every table data layer
+
+ADR-34        Transactional outbox archive in PostgreSQL as the system Replay and audit from the archive; one fewer stateful system;
+ADR-35
+ADR-36        of record for events; broker is delivery only              provider-neutral; consumers must be idempotent
+
+ADR-37 (new)  One shared engine library (price resolution, rules, tax,   Removes offline-bill-differs-from-online-bill defects; library
+ADR-38 (new)  rounding, envelope, counters) used by central and the      must stay free of server dependencies
+ADR-39 (new)  Android application
+
+ADR-40 (new)  Spring Modulith (or ArchUnit) to declare and verify        Enforcement must be automated
+              boundaries in the build
+
+              Provider-neutral infrastructure: containers, PostgreSQL,   Hosting neutrality including a local option; some cloud
+              S3-compatible storage, mainstream broker, open-source      conveniences deliberately unused
+              proxy and observability
+
+              Reference-data distribution to tills as a versioned        Small stable till contract; atomic price-list application
+              snapshot/delta channel, not domain-event subscription
+
+              Training is a flagged sandbox entity in production plus a till Real pipeline, no extra environment, no contamination
+              namespace with visibly non-live numbering
+
+              The POS application carries a role-gated                   Single-device shops; one package per shop
+              shop-management mode; online-only shop functions use
+              the web back office on the same terminal
+
+              Trading documents (order to settlement) are one module, Ownership pivot and state machines in one place; one base
+
+              M4; the document base type and numbering are kernel        for till and back-office documents
+
+              Batch identity in M2; stock lot and cost in M5; synthetic  One physical batch, many successive owners at different
+              batches for non-batch-tracked SKUs                         costs; one price-resolution path
+
+              Stateless application tier: no sticky sessions, idempotency Add and remove instances at will; the database is the scaling
+
+              keys on mutations, cluster-locked singleton jobs,          ceiling by intent
+
+              connection pooler
+
+              Software updates through a device-owner management         Developer-verification exemption; single-till shops;
+              agent; no till-to-till package sharing in phase 1          NFR-UPD-040 change request
+
+15. Risks, dependencies and open points
+
+Item                                   Type                      Effect and mitigation
+
+Tax advisor review of numbering (ADR-11, External dependency Only the numbering kernel service changes; detailed design after the
+
+NFR-CMP-030)                                                     review; GRN fiscal-scope question added
+
+Hosting decision (doc 14 DR-1)         External dependency Affects operating model and achievable recovery objectives, not the
+                                                                       module map; section 12 fixes the shape
+
+NFR-UPD-040 LAN-shared updates         Change request            Deferred: the management agent downloads per device; package size
+                                       needed                    discipline (under 30 MB) keeps this acceptable; revisit with the shop-hub
+                                                                 option (doc 20 Appendix A)
+
+Shared engine on Android (ADR-31)      Technical risk            Library kept lean; spike 1 runs identical bills at central and on the
+                                                                 terminal against the same snapshot
+
+Reconnection burst sizing              Technical risk            Backpressure and per-device queues; spike 5 measures and sets limits
+
+Local database durability under power  Technical risk            Synchronous commit per issued document; battery-backed hardware;
+loss                                                             spike 1 injects power loss
+
+Terminal selection (doc 14 DR-3)       Procurement               Scale integration is the gating test; spikes 2, 3, 6 on candidates; M6
+                                       dependency                design starts against the minimum specification
+
+Report catalogue workshop              Programme                 Pipeline designed now; definitions later; rebuildable read models make
+                                       dependency                late additions safe
+
+Control-price content ownership        Operational               Named Federation owner required before pilot (doc 18 DR-8)
+                                       dependency
+
+Catalogue data steward unnamed (T-03) Programme risk             Blocks go-live, not design; M2 steward tooling designed early
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                          Page 17
+Item                                     Type             Effect and mitigation
+Identity provider product (doc 19 DR-1)  Design decision
+                                                          Either candidate satisfies the architecture; the trade-off is operating
+Doc 20 omission of Procurement           Documentation    footprint against feature completeness; decide with the broker in Stage 2
+                                                          week 2
+
+                                                          Add M10 (P2) to doc 20 section 2 and the traceability summary (change
+                                                          request)
+
+16. Next steps
+
+· Design review of this version with the technical leads and the DevOps engineer; accept or amend ADR-28 to
+   ADR-40; record outcomes in doc 09; raise the NFR-UPD-040 and doc 20 M10 change requests.
+
+· Present sections 4, 6, 9.2 and 10.3 to Federation admins: the business-visible boundaries.
+· Stand up the build skeleton: one repository, module descriptors for M1­M10 and the kernel, boundary
+
+   verification tests, the document base, outbox and envelope in the kernel, the shared engine as a separate
+   library module, two application instances in every environment from day one.
+· Proceed with Stage 2 per doc 20: doc 21 (M1) and doc 32 (sync contract) this week; spikes 1 and 5 as soon
+   as the envelope and outbox exist.
+
+Appendix A. Glossary of abbreviations
+
+Term                        Meaning in this document
+ADR                         Architecture Decision Record (doc 09)
+API / REST / OpenAPI        Application Programming Interface; the HTTP style used; its machine-readable description
+ASVS                        OWASP Application Security Verification Standard, Level 2
+CAA                         Consumer Affairs Authority of Sri Lanka; gazettes maximum retail prices
+COOPFED                     The national cooperative federation; the apex entity
+EARS                        Easy Approach to Requirements Syntax: the form used in the SRS
+FEFO                        First expired, first out
+FR / NFR                    Functional / non-functional requirement (docs 05, 06)
+GRN                         Goods received note; the moment ownership and risk transfer
+GS1 Application Identifier  A prefix in a barcode identifying a data field (product number, batch, expiry)
+ICU                         International Components for Unicode
+IRD                         Inland Revenue Department
+MDM / DPC                   Mobile device management / device policy controller: the device-owner agent
+MFA / TOTP                  Multi-factor authentication / time-based one-time password
+MPCS                        Multi-purpose cooperative society
+MRP                         Maximum retail price printed on a pack; a batch attribute here
+OIDC / OAuth2               OpenID Connect / OAuth 2.0
+PCI                         Payment card industry standards; avoided by never handling card data
+PDPA / PII                  Personal Data Protection Act No. 9 of 2022 / personally identifiable information
+POS                         Point of sale
+RBAC                        Role-based access control
+RFC                         Request for comments: a proposal circulated for stakeholder review
+RLS                         Row-level security: database policies filtering rows by the caller's scope
+RTO / RPO                   Recovery time / recovery point objective
+SKU                         Stock keeping unit
+SRS                         Software Requirements Specification (doc 05)
+UUIDv7                      Time-ordered universally unique identifier
+VAT                         Value added tax
+Z-report                    End-of-session till summary
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                Page 18
+End of document. v0.2 draft for design review; subject to revision after review and after the Stage 3 spikes report.
+
+17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                                Page 19
+

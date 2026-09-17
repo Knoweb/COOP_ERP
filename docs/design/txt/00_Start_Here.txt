@@ -1,0 +1,284 @@
+Cooperative Retail and Distribution System (Knoweb)
+Developer Start Guide  -  Working on a Module
+For developers joining the project and taking their first module. It tells you what to read (and what not to read yet), how the code is organised, what your first two weeks look like, the rules that are not negotiable, and how to get unstuck. Version 1.0, 10 September 2026.
+If you read nothing else: your module's implementation guide (the document numbered nA  -  21A, 22A, ...) is written so that you can start from it alone. Read it first, end to end, before you open the design document or the architecture. Everything below explains why it is shaped that way and what to do in what order.
+1. What you are building, in five sentences
+The system runs the supply chain and shops of Sri Lanka's cooperative federation: the Federation sells to about 75 distributors, who sell to about 800 societies (MPCS), who run about 4,000 shops growing to 10,000. Goods are ordered, delivered, received, sold at the till, and paid for; stock is counted, written off and repacked; customers buy on credit; everything is reported to the federation. Shops must keep selling for two days with no connectivity, in Sinhala, Tamil or English. The backend is one Java application divided into nine modules with strict boundaries; the till is a native Android application; the two talk through a sync contract that never merges data. You will own one module, from its database tables to its screens.
+2. Three ideas you must understand before writing code
+Almost every design choice in this system comes from one of these. When something looks odd, check which one explains it.
+Idea
+What it means for your code
+A shop is a location, not a legal entity
+Every row carries owner_entity_id (the MPCS, distributor or Federation that owns it). A shop never owns anything. Row-level security in the database filters rows by the caller's entity and location; your code never filters by tenant itself.
+Ownership of goods transfers when the receiver confirms the goods received note (GRN)
+Before confirmation the goods are the seller's; after it, the buyer's. Batches are registered, stock lots are created, invoicing becomes possible  -  all from that one event. Nothing about a GRN is ever edited afterwards.
+No record is ever written by two parties
+The till writes its own receipts, sessions, counts and receiving; central writes everything else and pushes it to tills read-only. Because nothing has two writers, there is no merge logic anywhere. Never write code that 'reconciles' two versions of a record.
+Two more rules follow from these and are enforced by the build: documents are immutable once issued (corrections are new, linked documents), and ledgers  -  stock movements, account postings, the audit log  -  are insert-only (balances are sums, never edited).
+3. The documents in the folder: which is which
+Every file in the system design folder follows one naming rule, and you only need three kinds of them. The number is an identifier, not a reading order.
+Looks like
+What it is
+What it is for you
+21_M1_Party_Tenancy_Security.pdf  (a plain number)
+Module design document. One per module. Explains what the module owns, the rules (invariants), the state machines, the published contract (commands, queries, events), the key flows, configuration, screens, tests, and the open decisions.
+The reasoning. Read it after your guide, when you need to know why a rule exists or what should happen in a case the guide does not spell out. Sections 4 (state machines) and 6 (flows) are the ones you will return to.
+21A_M1_Implementation_Guide.pdf  (number + A)
+Module implementation guide. One per module, written for the developer. Self-contained: DDL, seed data, package layout, the OpenAPI slice, every command as a handler specification, the algorithms that matter as pseudocode, screens, tests, tickets in build order, and the assumptions to build on.
+Your working document. Section 10 is your ticket list; section 3 is the SQL you paste; section 6 is what each handler must do; section 11 is what to assume where a decision is still open.
+24B_Numbering_Addendum.pdf  (number + B)
+Addendum. Closes a specific open point without changing the design.
+Read only if it concerns your module (24B concerns everyone who issues documents).
+14, 17, 18, 19, 20, 30, 31, 32  (foundations)
+The architecture and the shared things: stack (14), module map and rules (17), data model (18), kernel services (19), the design plan (20), the two user-interface shells (30), updates to terminals (31), the till-to-central sync contract (32).
+Reference. You are pointed into specific sections by your guide; you do not need to read them end to end before starting.
+17A, 19A  (foundation guides)
+Implementation guides for the build skeleton and the kernel services  -  what the platform pair built in Sprint 0 and what you inherit.
+Read 17A sections 4, 5 and 12 (conventions, boundary tests, the hello module) and 19A section 0 (the map of kernel services) before your first ticket.
+00_...  (register, README, this guide)
+The document register (which version is current), the folder README, and this start guide.
+00 Document Register wins whenever two documents disagree about a version.
+10_Open_Items_Register.docx
+The live list of decisions not yet taken, grouped by who decides, each with the assumption in force.
+When your guide says 'assume X', this is where X lives and where you will see it change.
+Every file in the folder, in number order:
+File
+What it is
+00_README_System_Design.docx
+Folder read-me: how the documentation is organised, where to start by role
+00_Developer_Start_Guide.docx
+This guide
+00_Knoweb_Document_Register.pdf
+Document register: the authoritative list of documents and current versions
+10_Open_Items_Register.docx
+Live register of open decisions by decider, each with the assumption in force
+14_Technical_Foundations.pdf
+Stack, till platform, hosting matrix, capacity model, the seven prototype spikes
+17_Solution_Architecture.pdf
+Module map, four layers, dependency rules, event backbone, edge architecture
+17A_Build_Skeleton_Implementation_Guide.pdf
+Sprint 0 part one: repository, build, boundary tests, migrations, shells, hello module
+18_Core_Data_Model.pdf
+Data model of record: shared tables, invariants, Part F module schema register
+19_Kernel_Services.pdf
+The kernel: scope, identity, permissions, audit, events, i18n, notifications, configuration, scheduling
+19A_Kernel_Services_Implementation_Guide.pdf
+Sprint 0 part two: the kernel services as tables, classes and algorithms
+20_Stage2_Module_Design_Plan.pdf
+The design plan, the document template, simplicity guardrails, deferred-capability register
+21_M1_Party_Tenancy_Security.pdf / 21A_M1_Implementation_Guide.pdf
+M1 design and guide
+22_M2_Catalogue_Batch.pdf / 22A_M2_Implementation_Guide.pdf
+M2 design and guide
+23_M3_Pricing_Rules.pdf / 23A_M3_Implementation_Guide.pdf
+M3 design and guide
+24_M4_Trading_Documents.pdf / 24A_M4_Implementation_Guide.pdf / 24B_Numbering_Addendum.pdf
+M4 design, guide and the numbering addendum
+25_M5_Inventory_Costing_Repack_Loss.pdf / 25A_M5_Implementation_Guide.pdf
+M5 design and guide
+26_M6_POS_Offline.pdf / 26A_M6_Implementation_Guide.pdf
+M6 design and guide (till track)
+27_M7_Customers_Payment_Recording.pdf / 27A_M7_Implementation_Guide.pdf
+M7 design and guide
+28_M8_Reporting_Pipeline.pdf / 28A_M8_Implementation_Guide.pdf
+M8 design and guide
+29_M9_Integration.pdf / 29A_M9_Implementation_Guide.pdf
+M9 design and guide; 29A section 7 also produces the API bundle (document 33)
+30_Frontend_Foundations_and_UI_Module_Designs.pdf
+Design system, the two shells, screen inventories per module
+31_Application_Update_and_Distribution.pdf
+Zero-touch software updates to terminals nationwide
+32_Sync_Contract.pdf
+Till-to-central sync: batches, acknowledgements, snapshots, gaps
+Not in the folder: 33 (the API specification) is produced by the build; 34 - 40 (operational design and build readiness) are not yet written. The requirements baseline (01 - 13, 15, 16) is in its own folder, linked from the README.
+The pairs you will work with:
+Module
+Design
+Guide
+Owns
+M1 Party, Tenancy & Security
+21
+21A
+Entities, relationships, locations, tills, devices, users, roles, permissions
+M2 Catalogue & Batch
+22
+22A
+SKUs, units, barcodes, images, tags, tax, batches, assortment
+M3 Pricing & Rules
+23
+23A
+Price lists, discount rules, control prices, the price-resolution engine
+M4 Trading Documents
+24
+24A (+24B)
+Orders, deliveries, GRNs, discrepancies, claims, invoices, payments, exposure
+M5 Inventory, Costing, Repack & Loss
+25
+25A
+Lots, movements, costing, counts, adjustments, write-offs, repacks, transfers
+M6 POS & Offline
+26
+26A
+The till application and its central ingestion
+M7 Customers & Payment Recording
+27
+27A
+Customers, credit accounts, repayments, statements, banking record, privacy
+M8 Reporting Pipeline
+28
+28A
+Projections, freshness, catalogue of reports, exports, analyst access
+M9 Integration
+29
+29A
+API clients, journal export, notifications, e-invoicing seam
+How to hold them together: the guide (nA) tells you what to do; the design (n) tells you why; the foundations tell you what everyone shares; 10 tells you what is still undecided; 00 tells you which version is current. If you are ever reading the design document to find out what to build, you are in the wrong document  -  go back to the guide.
+4. What to read, in what order
+Read in this order. Each step is a prerequisite for the next; how long each takes depends on you and your module.
+ 1. --------------------------------------------------------------------------------
+  This guide, then the folder README (00_README)  -  orientation.
+ 2. --------------------------------------------------------------------------------
+  Your module's implementation guide (nA), sections 1 - 4 and 10  -  what you build, what you inherit, the schema, the package layout, the tickets.
+ 3. --------------------------------------------------------------------------------
+  17A Build Skeleton sections 4, 5 and 12, then 19A Kernel Services section 0 and the sections for the services your module uses  -  the conventions and the kernel classes you call; the hello module is the template you copy.
+ 4. --------------------------------------------------------------------------------
+  Your module's design document (n), sections 3 - 6  -  the reasoning behind the tables and state machines, and the flows you must make work.
+ 5. --------------------------------------------------------------------------------
+  Your nA guide again, sections 5 - 9, slowly, then 30 Frontend Foundations sections 2 - 3  -  the API slice, the handler specifications, the screens, the tests.
+ 6. --------------------------------------------------------------------------------
+  When you need depth: 18 Core Data Model (your part and Part F), 19 Kernel Services for any service you use heavily, 20 section 4 (what we deliberately left out).
+Do not start with 17 Solution Architecture or 14 Technical Foundations. They explain the whole system and are useful after your first module; before it they will slow you down.
+5. How the code is organised
+One repository. The backend is a Spring Boot application with one package per module; the build fails if a module reaches into another module's internals.
+ backend/app/src/main/java/lk/coopfed/knoweb/
+   kernel/          layer 0: scope, identity, permissions, audit, events, documents, sync
+                    (you call it; you never change it)
+   m1party/ m2catalogue/ m3pricing/ m4trading/ m5inventory/
+   m6pos/ m7customers/ m8reporting/ m9integration/
+   hello/           the template module  -  copy it, do not invent your own shape
+  
+ lk/coopfed/knoweb/m2catalogue/            (example)
+   api/        what other modules may call: commands, queries, events   <- your contract
+   query/      read-only query interfaces other modules may call
+   internal/   everything else: entities, repositories, handlers, services  <- private
+   web/        REST controllers implementing the generated OpenAPI interfaces
+  
+ backend/app/src/main/resources/
+   db/migration/m2catalogue/V0001__catalogue.sql   your schema (nA guide section 3)
+   openapi/m2catalogue.yaml                        your API slice (nA guide section 5)
+   seed/m2/*.yaml                                  your seed data
+   i18n/en.json si.json ta.json                    message ids; a missing translation fails the build
+ web/src/modules/m2catalogue/                      your screens, on the shell's components
+
+The database has one schema per module (party, security, catalogue, pricing, trading, inventory, pos, customers, reporting, integration). You write only to your own schema. To use another module's data you call its query interface; to change another module's state you publish an event it handles.
+6. The shape of every command handler
+Every write in the system looks the same. The kernel interceptor has already checked the permission, the multi-factor step-up and the idempotency key before your code runs. Your handler does four things in one transaction, in this order:
+ @CommandHandler(permission = "cat.sku.create_local")
+ class CreateSkuHandler implements Handles<CreateSku, SkuId> {
+   @Transactional
+   public SkuId handle(CreateSku cmd, ScopeContext ctx) {
+     // 1. guards   business rules in the order the nA guide lists them;
+     //              throw ProblemException("sku.name_required")
+     // 2. mutation create or change your entities; save through your repository
+     // 3. audit    audit.record(SKU_CREATED, Subject.of(sku), null, sku.snapshot(), ctx)
+     // 4. events   events.publish(new SkuCreated(sku.id(), ctx.entityId()))
+     //              (written to the outbox in the same transaction)
+     return sku.id();
+   }
+ }
+
+If a handler needs a fifth thing, stop and ask. Handlers that skip the audit call, publish events outside the transaction, or call another module's command directly are the three most common mistakes in review.
+7. Your first steps on a module, in order
+Step
+Do
+You are done when
+1 Run the stack
+Clone; run `make up`; log in; register a greeting in the hello module; run `make test`
+Everything is green on your machine. If not, that is a Sprint 0 defect  -  report it, do not work around it
+2 Scaffold your module
+Run `make new-module NAME=<yours> SCHEMA=<yours>`; paste the DDL from your nA guide section 3 into the migration; add the seed files
+`make migrate` applies your schema; the schema-ownership check passes
+3 First aggregate end to end
+Ticket 1 of your nA guide section 10: entity, repository, one command handler, one query, one controller, tests
+The contract test for that operation passes; the RLS test for your table passes
+4 The next tickets
+Tickets 2 onward in order; for each handler write the guards as failing tests first, from section 6 of the guide
+Your published api package compiles and has been reviewed; your first screen renders on the shell
+5 Contract review
+Walk your api and query packages and your OpenAPI slice through with the developer of the module that depends on yours
+They acknowledge; from then on your api package changes only by change request
+8. Rules that are not negotiable
+Rule
+Because
+Never UPDATE or DELETE a document, a line, a stock movement, a posting or an audit row. The database role does not allow it; do not ask for the grant.
+The audit trail and the gapless numbering depend on it
+Never store a balance you do not recompute from the same events that change it.
+Balances are sums; a cached balance is a convenience, not a truth
+Never write to another module's schema; never import another module's internal package.
+The build enforces it; the modules must stay independently deployable later
+Never put a phone number, NIC, password, PIN or token in an event payload, a log line or an audit row.
+Personal data and credentials have exactly one home each
+Never reject a till's uploaded fact for a business reason. Flag it.
+The sale already happened in the real world
+Never hard-code a price, threshold, window or limit. It is a configuration item or a data table.
+876 societies need different values; law-like values (control prices) are data with their own tables
+Every user-visible string is a message id with three translations.
+Sinhala, Tamil and English are all first-class; a missing one fails the build
+Every mutating API operation carries an idempotency key and a permission annotation that matches the OpenAPI slice.
+Stateless instances; the build compares them
+9. Testing: what 'done' means
+Your nA guide section 9 lists the layers. The minimum before a ticket is closed:
+ oo --------------------------------------------------------------------------------
+  Every guard in the handler specification has a failing-case unit test with its message id.
+ oo --------------------------------------------------------------------------------
+  Every operation in your slice has a contract test through the generated client, including the idempotent resend.
+ oo --------------------------------------------------------------------------------
+  Your tables have rows in the row-level security matrix: a user from another entity sees nothing; a shop-scoped user sees only its shop; the Federation reads but cannot write.
+ oo --------------------------------------------------------------------------------
+  If your module has a ledger or a balance, the property-based test 'balance equals the sum of movements under random interleavings' is green.
+ oo --------------------------------------------------------------------------------
+  The scenario in your guide's section 9 that your ticket completes runs end to end against the composed stack with two backend instances (`make up-2`).
+10. When you are stuck
+Situation
+Do this
+The guide does not say what should happen in a case you hit
+Check the design document's section 4 (state machines) and section 6 (flows). If it is still not there, ask the module designer and record the answer in your module README. Do not decide silently.
+The answer depends on a decision nobody has taken
+It is probably in 10 Open Items Register with an assumption already written. Build to the assumption; note the item number in your code comment.
+You need something from another module that does not exist yet
+Your guide's section 11 names the stub to use. Code against the interface in the other module's api package; the stub returns fixture data.
+You think the design is wrong
+You may well be right. Write it as a change request (what, why, what changes) and send it to the design lead. Do not fix it locally  -  the same problem exists in the documents and in other modules.
+A kernel service does not do what 19A says
+That is a Sprint 0 defect. Report it with a failing test; the platform pair fixes the kernel, you do not.
+The build fails on a boundary or ownership rule
+The rule is right and your code is wrong. Move the code to the correct package or schema; do not loosen the rule.
+11. Words you will see everywhere
+Term
+Meaning
+Entity
+A legal party: the Federation, a distributor or an MPCS. Owns everything.
+Location
+A warehouse, shop or office belonging to an entity. A shop is a location.
+SKU
+Stock keeping unit: the smallest thing counted and sold. Global namespace.
+Batch
+A physical supply identity with expiry and the printed maximum retail price (MRP). Global, not owned.
+Lot
+An entity's holding of a batch at a location, in a condition, at that entity's cost.
+GRN
+Goods received note. Confirming it transfers ownership.
+Control price
+A government-gazetted maximum price; a hard ceiling by date, whatever is printed on the pack.
+Snapshot
+The read-only reference data a till receives (catalogue, prices, lots, operators). Applied whole or not at all.
+Bundle
+A complete document a till uploads (header, lines, movements, state) as one event.
+Kernel
+Layer 0: scope, identity, permissions, audit, events, documents, sync. You use it; you never change it.
+Contract
+Your module's api and query packages plus its OpenAPI slice. Frozen once another module depends on it.
+nA guide
+The implementation guide for design document n. Self-contained; start there.
+
+Keep this guide honest: if a step here did not work for you, fix the guide, not the next developer.

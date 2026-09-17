@@ -1,0 +1,146 @@
+Cooperative Retail and Distribution System
+09  -  Decisions Log
+Baseline requirements package  --  document 9 of 10
+Architecture Decision Record (ADR) style. Captures the significant, structural decisions behind the requirements  --  not every answer, but every choice that would be expensive to reverse. Two items remain formally in RFC / discussion with stakeholders and are marked accordingly.Scope and business model
+ADR-01  --  System boundary: documents, not payments
+Status: Accepted
+Decision: The system is the source of truth for stock ownership, movement, and trading documents. It never moves money.
+Rationale: Keeps the build tractable, avoids PCI/financial-licensing exposure, and matches what the federation actually needs first. Settlement is recorded, not processed.
+
+ADR-02  --  Entity vs location model
+Status: Accepted
+Decision: Federation, each Distributor, and each MPCS are legal entities. A Shop is a location belonging to one entity, not a legal entity itself.
+Rationale: Determines when a stock movement is a commercial transaction (inter-entity) versus a simple transfer (intra-entity). The single most consequential structural decision in the domain model.
+
+ADR-03  --  Ownership and risk transfer at GRN
+Status: Accepted
+Decision: Ownership and risk of goods pass to the receiving party at the moment its GRN is confirmed  --  not at dispatch, not at invoice.
+Rationale: A single, unambiguous, auditable event rather than a negotiated moment in time.
+
+ADR-04  --  Trading relationship as a first-class, configurable record
+Status: Accepted
+Decision: A relationship between two entities carries its own price list and credit configuration, and is not hardcoded to a fixed three-tier structure.
+Rationale: Anticipates Federation - MPCS direct trading (confirmed as a future phase) without requiring a schema change when it happens.
+
+ADR-05  --  No full statutory accounting in this system
+Status: Accepted
+Decision: The system will never produce general ledgers, trial balances, or statutory financial statements. An external accounting system will integrate after this system is stable.
+Rationale: Removes the single largest scope-inflation risk in the programme (would roughly double finance-domain scope). Every document type is designed with its eventual journal mapping in mind, so integration is additive.
+
+Catalogue and inventory
+ADR-06  --  SKU: global namespace, owned and status-tracked
+Status: Accepted
+Decision: One SKU namespace across the federation; each SKU has an owning entity and a status of draft, local, or shared.
+Rationale: Prevents duplicate/conflicting local codes while preserving entity autonomy to create local items; gives federation a clean promotion path to shared status without losing sales history.
+
+ADR-07  --  Three-way SKU conversion model
+Status: Accepted
+Decision: Case<-->single uses a UOM conversion factor on one SKU. Bulk-->new retail item uses a repack recipe producing a second SKU. Loose sale by weight uses the same SKU priced per kilogram.
+Rationale: Each of the three physical realities was tested against "is there really a second product"; only the repack case genuinely is one, so only that case gets a second SKU.
+
+ADR-08  --  Batch carries cost and MRP; price lives at SKU x MPCS
+Status: Accepted
+Decision: Cost and MRP are batch attributes. Selling price is set once per SKU per MPCS, not per batch  --  except where two live MRPs coexist, in which case the till presents a batch/price picker.
+Rationale: Keeps the common case simple for the cashier (batch invisible) while remaining legally correct when MRP genuinely differs across concurrent stock.
+
+ADR-09  --  Repack correction by reversal only, recipe-first
+Status: Accepted
+Decision: A repack transaction can only be corrected by a permission-gated reversal while the output batch remains unsold. Ad-hoc conversion without a predefined recipe requires higher permission and is exception-flagged.
+Rationale: Consistent with the system-wide no-edit, compensating-document principle; recipes prevent typo-class errors (e.g., sugar becoming soap).
+
+Offline and numbering
+ADR-10  --  Offline: one writer per record type, no merge logic
+Status: Accepted
+Decision: Each record type has exactly one authoritative writer  --  the till for its own sale events, central for catalogue and price (pushed read-only). No conflict-merge algorithm exists or is needed.
+Rationale: The alternative (arbitrary conflict resolution across shop and central edits) is a well-known source of silent data loss and was designed out rather than solved for.
+
+ADR-11  --  Numbering: multi-series gapless, not a single central sequence
+Status: Proposed / RFC
+Decision: Till-issued documents number from a per-till-position gapless series. Back-office documents number from a per-entity, per-document-type gapless series, online-only. A number is final at issue and never reused; central adds an internal posting reference as metadata only, never printed.
+Rationale: An offline till cannot request the next number from a single central sequence. This mirrors long-standing multi-branch bill-book practice. Formally sent to stakeholders as an RFC; awaiting approval.
+Alternatives considered: Pre-allocated central number ranges per till  --  rejected: unconsumed ranges fragment into apparent gaps, and exhausted ranges stop a till mid-outage.
+
+ADR-12  --  Credit headroom: warn, never block
+Status: Accepted
+Decision: When an entity's recorded credit exposure approaches or exceeds its limit, the system shows a warning banner on orders and deliveries. It never blocks the transaction.
+Rationale: Exposure is derived from manually posted payment-receipt documents and is therefore not guaranteed accurate; blocking trade on an unverified figure is a worse failure mode than an occasional over-limit warning.
+
+ADR-13  --  Committed exposure = open invoices + accepted undelivered orders
+Status: Accepted
+Decision: Credit exposure for headroom purposes includes goods on order as well as goods already invoiced.
+Rationale: The conservative, standard definition; goods already committed but not yet delivered are a real, near-term liability for the buyer.
+
+Pricing and customers
+ADR-14  --  Discount engine: rules only, no discretionary POS discount
+Status: Accepted
+Decision: Every price reduction at the till is produced by a pre-authorised rule (target + trigger + benefit + validity). No cashier or supervisor discretionary discount function exists.
+Rationale: Converts discount misuse from a monitoring problem into a structural impossibility. Supersedes and rescinds the earlier permission-gated manual-discount design (G-07).
+
+ADR-15  --  Customer identity: global ID, entity-scoped account, phone as lookup only
+Status: Accepted
+Decision: A customer's true key is an internal ID. Phone numbers are a many-to-one lookup attribute, with an audited change flow and a staff-confirmed prompt on suspected number reuse.
+Rationale: Sri Lankan mobile numbers churn (multi-SIM use, prepaid switching, carrier reuse after deactivation); keying identity on phone would misattribute credit history to strangers.
+
+ADR-16  --  No cooperative membership tracking
+Status: Accepted
+Decision: The system does not track cooperative members, shares, patronage rebates, or AGM voting eligibility. The "customer" concept is unrelated to cooperative membership.
+Rationale: These are governance and accounting functions with no operational role in a retail/distribution system, and were explicitly scoped out by stakeholders.
+
+Governance and security
+ADR-17  --  Visibility: Federation sees everything, view-only; no anonymised tier
+Status: Accepted
+Decision: Federation has full, view-only visibility into every entity's data including margins and shrinkage. Distributors and MPCS cannot see each other's or their sub-entities' internals. Shops cannot see siblings.
+Rationale: Resolves the assumption that societies would accept central visibility (T-02) in the affirmative and removes the need for a compromise anonymised-aggregate reporting tier.
+
+ADR-18  --  Each entity self-administers; no downward admin below MPCS-over-shops
+Status: Accepted
+Decision: Every entity administers its own users. An MPCS additionally administers its own shops' users. Federation holds no administrative rights over any entity below it.
+Rationale: Respects legal entity autonomy; accepted operational cost is that the helpdesk cannot reset an MPCS user's password directly and must route through the MPCS admin.
+
+ADR-19  --  PCI avoidance by design
+Status: Accepted
+Decision: Card, wallet and QR payments are accepted only via standalone bank terminals; the system never sees, stores, or transmits card data.
+Rationale: Removes the entire PCI-DSS compliance regime from scope permanently, for negligible functional loss.
+
+Infrastructure and delivery
+ADR-20  --  Modular monolith plus queue, not microservices
+Status: Accepted
+Decision: The backend architecture is a modular monolith with a message queue for offline event ingestion, hosted on AWS Mumbai, not a distributed microservices topology.
+Rationale: Matches the realistic team shape (one DevOps engineer) and the actual transaction volume (tens of writes per second at peak); verified to carry 2x load as provisioned and 3x with a single database upgrade.
+
+ADR-21  --  RTO 4 - 8h / RPO 15min for central; multi-day tolerance at the edge
+Status: Accepted
+Decision: Central services target an aggressive recovery objective, while shops are proven to trade through multi-day central outages by construction.
+Rationale: "The business survives 1 - 2 days" should not become "the target is 1 - 2 days"  --  central downtime still stops all inter-entity trade even while retail continues.
+
+ADR-22  --  Growth envelope revised to 10,000 shops within 3 years
+Status: Accepted
+Decision: Planning basis raised from an assumed 4,000-shop worst case to a stakeholder-confirmed 10,000 shops within three years, 12,000 at five years.
+Rationale: Verified the infrastructure spec already covers this (falls inside the previously-tested 3x scenario); converts shop onboarding from a rollout-phase activity into a permanent, ratio-staffed operational function.
+
+ADR-23  --  Three delivery phases against three rollout waves
+Status: Accepted
+Decision: Phase 1 (core trading spine), Phase 2 (control and reporting), Phase 3 (extensions) delivered against three geographic rollout waves, with a go/no-go gate at end of pilot.
+Rationale: Buys a real stop-point at roughly 40% of programme spend instead of discovering problems at 90% spent. Costs roughly 8% on build and 3% on hardware, and about two months of schedule.
+
+ADR-24  --  POS update mechanism: signed, ring-deployed, resumable, LAN-distributed
+Status: Accepted
+Decision: Updates are signed and integrity-verified, rolled out in rings (pilot --> waves --> fleet), packaged by component with binary diffs, and distributed once per shop via local-network peer distribution to multi-till shops. Installation happens automatically outside each shop's trading hours.
+Rationale: Protects a cash-handling fleet's update channel, and directly reduces the metered-internet cost the federation will bear once societies pay for their own connectivity.
+
+ADR-25  --  Connectivity cost borne by each society, not the central budget
+Status: Accepted
+Decision: Each MPCS pays for its own shop and back-office internet connections; a minimum connectivity specification is a go-live gate condition per site.
+Rationale: Removes a large, ongoing telco cost from the central programme budget. Accepted consequence: connection quality will vary by society, reinforcing the case for robust offline operation, and the helpdesk boundary must exclude connectivity troubleshooting.
+
+Data governance
+ADR-26  --  Joint-controller data governance agreement required
+Status: Accepted (action pending)
+Decision: Federation and each society are, in substance, joint controllers of shared transaction data under the PDPA. A written data-governance agreement is required alongside the system build, not optional documentation.
+Rationale: No such agreement currently exists between Federation and the societies. The system implements whatever allocation of responsibility the agreement specifies; the agreement itself is a legal, not technical, deliverable, and is flagged as near-mandatory rather than merely good practice.
+
+ADR-27  --  Build PDPA-compliant ahead of enforcement
+Status: Accepted
+Decision: The system is built compliant with the Personal Data Protection Act's substantive provisions before those provisions formally commence.
+Rationale: The Act's enforcement date was not yet gazetted as of mid-2026, but penalties of up to LKR 10 million per non-compliance apply once it does; compliance is cheap at this system's minimal-PII scope.
+

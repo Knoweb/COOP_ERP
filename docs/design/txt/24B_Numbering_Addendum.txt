@@ -1,0 +1,111 @@
+     Cooperative Retail and Distribution System
+
+     24B ­ Numbering Addendum
+
+     Closes the six open numbering questions as decisions. No design changes result; the
+     document-type seed flags and the decision log are updated, and NFR-CMP-030 moves
+     from gating to advisory.
+
+Field                Value
+Document             24B ­ Numbering Addendum to 24 M4 Trading Documents (and to doc 18 part C, doc 32 §8, 19A §7)
+Version              v1.0 ­ decisions recorded
+Date                 9 September 2026
+Decided by           Chamin (programme), 9 September 2026: the working assumptions are adopted as decisions
+Effect on the build  None beyond seed values; the kernel numbering service, the till counters and M4's series usage are implemented
+                     as already specified
+
+     Status of the tax advisor review. NFR-CMP-030 asked for a written tax-advisor review of the numbering design. The
+     programme has decided not to wait for it. The review remains advisable and, if it arrives with a different view, is
+     handled as an ordinary change request against this addendum. Until then these decisions stand and the risk is owned
+     by the programme, recorded in doc 10.
+
+     1. Decisions
+
+#    Question                        Decision                                                Where it lands
+
+N-1  Financial-year reset of series  No reset. Every series counts monotonically for its numbering_series.fy_reset =
+
+     counters                        lifetime; the display format carries no year segment false for all series; no reset job; doc 18
+
+                                                                                             §5 DR-1 closed
+
+N-2  Is a GRN outside the fiscal     Yes. GRN is an internal material document;              document_type.fiscal = false
+                                     gaplessness is kept as an operational control (sync     for GRN; LOCATION series at shops
+     gapless obligation?             gap check), not a fiscal requirement                    stands; doc 18 §5 DR-2 closed
+
+N-3  Multiple series per entity (per till Accepted. The RFC design is adopted: ENTITY        ADR-11 confirmed; no change
+
+     position, per location, per     series per document type; LOCATION series for
+
+     document type) instead of one shop-issued stock documents; TILL_POSITION
+
+     sequence                        series for receipts
+
+N-4  Voids keep their numbers        Yes. A voided or reversed document retains its          Doc 18 C-I2 (density) and document_link
+                                     number; the reversal is a new numbered document         rules stand
+                                     linked by REVERSES
+
+N-5  Fiscal numbering for            No. They number from the issuer's ENTITY series for document_type.fiscal = false
+
+     discrepancy and claim           traceability but are not fiscal                         for DISC and CLM
+
+     documents
+
+N-6  Retention period for numbered Indefinite, pending a formal retention policy (J-06); Doc 14 DR-6 tiering policy proceeds on
+
+     documents                       partitions are detached to cold storage, never          that basis
+
+                                     dropped
+
+     2. Fiscal document set (as decided)
+
+Document type                                       Series scope                     Fiscal  Issuer
+RCT till receipt (incl. void, same-session refund)  TILL_POSITION                    Yes     Shop (till)
+INV tax invoice                                     ENTITY                           Yes     Seller
+CN credit note / DN2 debit note                     ENTITY                           Yes     Seller
+PRC payment receipt                                 ENTITY                           Yes     Seller (or MPCS for customer
+                                                                                             receipts)
+
+   24B - Numbering Addendum | v1.0 | Cooperative Retail and Distribution System                                           Page 1
+Document type                              Series scope                       Fiscal   Issuer
+ORD order                                  ENTITY (buyer)                     No       Buyer
+DN delivery note                           ENTITY                             No       Seller
+GRN goods received note                    LOCATION (shop) / ENTITY           No       Receiver
+                                           (warehouse)
+DISC discrepancy / CLM claim               ENTITY                             No       Issuer
+CNT count / WOF write-off / XFR transfer   LOCATION (shop) / ENTITY           No       Holder
+ADJ adjustment / RPK repack / OPB opening  ENTITY                             No       Holder
+balance
+
+Fiscal documents are the ones whose gaplessness and immutability the e-invoicing seam and any tax
+inspection rely on; the same mechanism protects the others, but their gaps are operational findings rather than
+compliance findings.
+
+3. Changes applied
+
+seed/kernel/document-types.yaml            fiscal: RCT, INV, CN, DN2, PRC = true; all others = false; fy_reset
+
+absent (false everywhere)
+
+seed/kernel/numbering-format.yaml          display =
+
+{entity_code}[-{location_code}[-T{position}]]-{type}-{number:07d} (no year segment)
+
+doc 09 Decisions Log                       ADR-11 note: N-1..N-6 confirmed 9 Sep 2026; NFR-CMP-030 reclassified
+
+advisory
+
+doc 10 Open Items                          'Tax advisor numbering review' -> carried as advisory risk, owner:
+
+programme
+
+doc 18 part C                              DR-1, DR-2 closed; document_type table note updated
+
+doc 24 section 3.10                        'interim' removed; refers to this addendum
+
+19A section 7 / 21A section 11             assumptions marked as decided
+
+End of addendum.
+
+24B - Numbering Addendum | v1.0 | Cooperative Retail and Distribution System                     Page 2
+

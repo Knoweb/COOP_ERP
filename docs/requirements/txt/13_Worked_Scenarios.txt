@@ -1,0 +1,54 @@
+Cooperative Retail and Distribution System
+13  -  Worked Scenarios
+Baseline requirements package  --  document 13  --  seed material for acceptance tests
+Six end-to-end narratives with concrete numbers. Each maps onto the state machines (doc 03) and flows (doc 04), and each QA note points at the FR IDs it exercises  --  these convert almost directly into acceptance test cases. Figures are illustrative, not price guidance.Scenario 1: Order to settlement, with credit headroom
+Matale MPCS buys from its distributor. Credit limit Rs 10,000,000. Open invoices Rs 6,500,000; accepted undelivered orders Rs 1,200,000 --> committed exposure Rs 7,700,000; headroom Rs 2,300,000.
+ 1. MPCS raises an order worth Rs 2,600,000. On acceptance, exposure would reach Rs 10,300,000  --  over limit. The distributor sees a warning banner; the order is NOT blocked (warn-not-block).
+ 2. Distributor accepts 80% of lines (stock short on two items, first-come-first-served allocation): accepted value Rs 2,080,000. Exposure now Rs 9,780,000. ETA set for Thursday.
+ 3. Wednesday 18:00, the order locks (24h-before-ETA policy). A Thursday-morning cancellation attempt by the MPCS is refused with the lock reason shown.
+ 4. Thursday: one delivery note, two drops  --  60% to the MPCS central store, 40% direct-dropped at Shop M042. Shop staff sign the shop GRN on behalf of the MPCS; ownership of each drop transfers at its own GRN.
+ 5. Store GRN finds one damaged case: received quantity recorded as actual, discrepancy raised, photo attached. Resolved as a Rs 36,000 credit note after inspection.
+ 6. Distributor invoices against the closed GRNs: Rs 2,044,000 net of shorted lines; the credit note follows.
+ 7. MPCS pays by cheque. Seller posts a cheque payment receipt  --  headroom released provisionally. Ten days later the bank returns it: bounce reversal restores exposure and flags the relationship.
+QA notes  --  exercises FR-ORD-030/040/060, FR-DEL-010/020/030/040, FR-PAY-050/060/070, FR-BIL-130. Test both the over-limit warning path and the bounce reversal restoring exact prior exposure.
+Scenario 2: A full offline trading day at one till
+Shop M042, till position S03-T1, last issued number 2028/M042-S03-T1-0004511. Power cut at 09:10; connectivity returns 16:40.
+ 1. 09:12 first offline sale: price lookup, stock deduction, receipt 0004512 printed  --  all from local cache. Cashier sees only a passive offline indicator, no error.
+ 2. 10:30 a customer steps away mid-basket: sale parked; resumed and completed at 10:45 as 0004519.
+ 3. 11:20 same-till refund of 0004516 (wrong item): processed offline, compensating record queued.
+ 4. 12:05 customer attempts card payment  --  refused offline; pays cash. 13:00 supervisor tries to post a new stock order  --  refused offline, queued as not-permitted-offline per doc 05 §8.
+ 5. 14:15 a lorry arrives: GRN captured offline against the expected delivery, stock available to sell immediately.
+ 6. 16:40 reconnect: 74 queued events upload; central deduplicates by event ID and runs the gap check on the series 0004512 - 0004585. Number 0004561 is missing  --  flagged for follow-up (till kept the event; a corrupt upload is retried).
+ 7. 18:00 close: blind close  --  cashier declares counted cash Rs 214,350 before seeing the system figure Rs 214,600; Rs 250 variance recorded. Z-report prints on the local thermal printer.
+QA notes  --  exercises FR-POS-010 - 050, FR-BIL-050/100, FR-PAY-030, NFR-AVL-020. The gap-check case (missing 0004561) and the offline-refusal list are the highest-value tests here.
+Scenario 3: Repack: bulk sugar to retail packs
+MPCS store holds batch B-2841: one 50 kg sugar bag, batch cost Rs 9,500 (Rs 190/kg). Recipe R-012: 50 kg bulk --> 50 x 1 kg packs (output SKU differs from input SKU), expected yield 99%.
+ 1. Storekeeper executes recipe R-012 against batch B-2841. Input batch consumed.
+ 2. Actual output: 49 sealed packs + 0.4 kg spillage --> yield 98%, within tolerance of the 99% expectation; variance recorded, no flag.
+ 3. Output batch B-2907 created: 49 units, unit cost Rs 193.88 (9,500 / 49), traceable to B-2841. Expiry inherited; MRP for the 1 kg pack SKU applies at batch level.
+ 4. Next morning the storekeeper realises the wrong recipe was used (should have been 5 kg packs). 12 packs already sold  --  full reversal is impossible. A permission-gated partial correction path is refused; the remaining 37 revert only via a fresh reversal-eligible check: reversal is allowed only while output is unsold, so the supervisor instead executes a second repack of the 37 remaining packs under the correct recipe, everything audit-logged.
+ 5. An ad-hoc conversion attempt without any recipe (loose sugar into unlabelled bags) requires elevated permission and lands on the exception report.
+QA notes  --  exercises FR-INV-080/090/100, FR-SKU-050, cost math FR-INV-010/030. Test the reversal-blocked-after-sale rule precisely: 0 sold = reversible, 1 sold = not.
+Scenario 4: Two MRPs on the shelf at once
+Shop M042 sells 400 g milk powder. Batch B-1120 (older): MRP Rs 980, 14 units left. Batch B-1163 (new delivery after a gazetted price revision): MRP Rs 1,050, 96 units. MPCS retail price list says Rs 1,040.
+ 1. Cashier scans the factory barcode  --  identical on both batches, so the batch is NOT inferable from the scan. The till shows a two-option batch/price picker.
+ 2. Customer holds an old-stock tin: cashier picks B-1120. Till validates price <= that batch's MRP: Rs 1,040 > Rs 980 --> the line prices at Rs 980 (capped), and the cap is recorded.
+ 3. Next customer, new tin: B-1163 selected, Rs 1,040 charged (<= 1,050, passes).
+ 4. When B-1120 depletes to zero, the picker disappears and normal single-batch flow resumes.
+ 5. FEFO drives the count task and shelf guidance toward selling B-1120 first; the picker exists because physical reality can disagree with FEFO.
+QA notes  --  exercises FR-INV-020/040/070, FR-PRC-040. Edge cases: offline picker behaviour (batch data is in the cache), and a batch depleting mid-day between two tills.
+Scenario 5: Write-off under dual control
+Shop M042 finds 18 expired yogurt cups during the expiry-window count task the system generated.
+ 1. Counter (cashier role) raises a write-off request offline: category 'expired', 18 units, photo of the dated lids attached. It is saved as a DRAFT  --  offline write-offs never post directly.
+ 2. The shop supervisor physically witnesses disposal and countersigns as witness  --  a different person from the requester.
+ 3. On reconnection the draft syncs; the MPCS accountant reviews and approves. The system enforces requester != approver  --  the supervisor who witnessed also cannot approve their own request in the reverse case.
+ 4. Stock reduces; the loss posts under 'expired' against the MPCS (owner at moment of loss); the full chain (request --> witness --> approval) is in the audit trail.
+ 5. A second attempt where the same person tries to both request and approve is rejected with a segregation message.
+QA notes  --  exercises FR-LOSS-010 - 040, FR-INV-050, FR-SEC-050. Test the offline-draft path and the SoD rejection explicitly.
+Scenario 6: Customer credit sale and a recycled phone number
+R. Perera holds credit accounts at two MPCS: Matale (limit Rs 30,000, balance Rs 22,500) and Dambulla (limit Rs 15,000, balance Rs 4,000)  --  one identity, two independent accounts.
+ 1. At a Matale shop, the cashier looks Perera up by phone, tags the Rs 9,000 sale to his Matale account. New balance Rs 31,500 exceeds the Rs 30,000 limit --> warning banner; sale completes (warn-not-block).
+ 2. His Dambulla account is untouched and invisible to Matale staff  --  accounts are entity-scoped.
+ 3. A week later he repays Rs 15,000; the MPCS accountant posts it against the Matale account; the statement and ageing update.
+ 4. Months later a new customer registers with a number that matches Perera's old, inactive second phone (reassigned by the operator). The system prompts staff to confirm whether this is the same person  --  it neither auto-merges nor silently duplicates. Staff select 'new customer'; the number moves with an audited change record.
+QA notes  --  exercises FR-CUS-010 - 040, FR-PAY-020/060. The recycled-number prompt (FR-CUS-030) is the test that protects credit histories from misattribution  --  verify both the 'same person' and 'new customer' branches.

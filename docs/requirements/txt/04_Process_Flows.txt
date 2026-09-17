@@ -1,0 +1,99 @@
+Cooperative Retail and Distribution System
+04  -  Process Flows
+Baseline requirements package  --  document 4 of 10
+Twelve flows, given as numbered actor steps rather than drawn BPMN diagrams, so this stays exact and reviewable in text. Each maps directly onto the document state machines in Document 3 and can be converted to formal BPMN swimlane diagrams at design time without changing the logic.Flow 1: Inter-entity trade cycle
+Actors: Buying entity, selling entity
+ 1. Buyer raises an Order against a seller it holds a trading relationship with.
+ 2. Seller accepts (in full or part, per the allocation rule if stock is short) and sets an indicative ETA.
+ 3. Order locks for edit/cancel at the configured window before ETA.
+ 4. Seller dispatches; a Delivery note is created (one or more drops).
+ 5. Receiving party signs on delivery; a GRN is raised, ownership transfers.
+ 6. If received quantity differs from dispatched, a Discrepancy is raised and investigated.
+ 7. Seller issues an Invoice against the closed GRN(s).
+ 8. Buyer's credit headroom decreases by the invoiced (or, if configured, committed) exposure.
+ 9. Seller posts a Payment receipt when payment is received; headroom is released.
+
+Flow 2: Direct-drop delivery to shops
+Actors: MPCS (bill-to), Shop (ship-to), Distributor/Fed (seller)
+ 1. MPCS raises the order; seller accepts against the MPCS's credit relationship.
+ 2. Seller's vehicle plans a multi-shop route; one Delivery note references several drop points.
+ 3. At each shop, shop staff sign the GRN on behalf of the owning MPCS.
+ 4. Ownership transfers to the MPCS at each shop's GRN signature, stock lands directly at that shop location.
+ 5. MPCS's aggregate inventory (store + all shops) updates accordingly; invoice is raised once against the MPCS.
+
+Flow 3: Repack (bulk to retail)
+Actors: Warehouse/shop staff with repack permission
+ 1. Staff select a predefined repack recipe (input SKU + quantity --> output SKU + quantity, expected yield).
+ 2. Input batch(es) are consumed from stock.
+ 3. Output batch is created, inheriting traceability to the input batch(es).
+ 4. Actual yield is compared to the recipe's expected yield; material variance is flagged for review.
+ 5. If a mistake is found and output stock is still unsold, a permission-gated Reversal restores the input and removes the output.
+
+Flow 4: Write-off (loss, damage, expiry disposal)
+Actors: Requesting staff, witness, approving role
+ 1. Staff identify stock to be written off and select a loss category (damaged / expired / theft / shrinkage / other, per the F-01 category list).
+ 2. A write-off request is raised, capturing photographic evidence where practical.
+ 3. A different person witnesses physical disposal (segregation of duties: requester != approver).
+ 4. A permitted role approves; if raised offline, this step is deferred until the site is online.
+ 5. Stock is removed from the ledger; the event is written to the immutable audit trail.
+
+Flow 5: GRN discrepancy handling
+Actors: Receiving staff, dispatching entity, federation (if unresolved)
+ 1. Receiving staff record what was actually received, not what was on the dispatch note.
+ 2. A Discrepancy record is raised automatically where actual != dispatched.
+ 3. The dispatching entity is notified and investigates within an agreed time limit.
+ 4. Resolution (correction, replacement, credit note) is agreed bilaterally; the system records the outcome.
+ 5. If unresolved between the two parties, federation may be drawn in as a fall-back arbiter.
+
+Flow 6: Lateral transfer between shops
+Actors: Shop (short), MPCS, Shop (source)
+ 1. A shop identifies a stock shortage and raises a request to its MPCS (shops cannot see sibling shop stock directly).
+ 2. MPCS reviews stock availability across all its shops and its central store.
+ 3. If another shop or the store can cover it, MPCS approves a lateral Stock transfer (intra-entity, at cost, no invoice).
+ 4. If not, MPCS raises an Order upward to its distributor (or federation, once that channel is open).
+
+Flow 7: Customer credit sale and repayment
+Actors: Cashier, tagged/credit customer, MPCS accounts role
+ 1. At billing, cashier tags the sale to a registered customer (looked up by phone; internal ID is the true key).
+ 2. Sale posts against the customer's entity-scoped account; balance increases.
+ 3. System checks the account's credit limit; a warning banner shows if headroom is marginal or exceeded  --  the sale is never blocked on this basis.
+ 4. Customer later makes a repayment; MPCS accounts role posts it against the account.
+ 5. Ageing and statement reports are available to the MPCS for that customer.
+
+Flow 8: Stocktake / cycle count
+Actors: Counting staff, approving role
+ 1. A count task is generated  --  either scheduled cycle counting or a full stocktake, or system-generated when a batch enters its expiry warning window.
+ 2. Staff count physical stock; the system compares to the ledger position.
+ 3. Variance is escalated for approval if it exceeds the configured threshold for that SKU or SKU group.
+ 4. Approved adjustment posts to the stock ledger, fully audit-logged.
+
+Flow 9: Offline sale and synchronisation
+Actors: Cashier, till (local cache), central system
+ 1. Till operates from its local cache (catalogue, prices, promotions, tax categories, roles/permissions) with no live connection.
+ 2. Sale completes locally: price lookup, stock deduction, receipt printed with a till-position series number.
+ 3. Sale event is queued locally, append-only, immutable.
+ 4. On reconnection, queued events upload to central; central deduplicates by event ID.
+ 5. Central checks each till-position series for gaps  --  a missing number signals an event that has not yet arrived, and is flagged for follow-up.
+
+Flow 10: Price / catalogue propagation
+Actors: MPCS (pricing role), federation (SKU steward), shop tills
+ 1. MPCS sets or updates its retail price list, or federation updates the shared SKU catalogue.
+ 2. Change is validated against the MRP ceiling for any regulated item.
+ 3. Change propagates to all of that MPCS's (or federation's) affected shop till caches on next sync.
+ 4. A shop offline at the time of change continues selling at its last-cached price until it reconnects.
+
+Flow 11: Shop onboarding
+Actors: MPCS, field deployment team, new shop staff
+ 1. Shop location is created under its owning MPCS or distributor; till positions are provisioned and register their numbering series.
+ 2. Hardware is installed; local cache is seeded with the current catalogue, prices and permissions.
+ 3. Opening stock count is performed and entered as an opening-balance stock position.
+ 4. Any pre-existing customer/khata balances for that shop are entered as signed, two-party opening-balance documents.
+ 5. Staff training is delivered against the standard playbook; the shop goes live.
+
+Flow 12: Claim and return to source
+Actors: Receiving entity/shop, responsible entity
+ 1. Damage, shortage or quality issue is identified after GRN  --  a Claim is raised with photographic evidence.
+ 2. Responsible entity inspects (per the claim's terms, bilaterally agreed  --  the system tracks status only).
+ 3. If approved, a Credit note is issued against the original invoice.
+ 4. If goods are physically returned, a return movement records the reverse stock and ownership transfer.
+

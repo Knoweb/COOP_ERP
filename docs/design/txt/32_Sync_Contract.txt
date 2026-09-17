@@ -1,0 +1,435 @@
+Cooperative Retail and Distribution System
+
+32 ­ Sync Contract
+
+The contract between a till and central: what moves in each direction, in what unit, in
+what order, how it is acknowledged, how versions and gaps are handled, and what
+happens on every failure that matters. This is the one interface that is expensive to
+change once terminals are in the field, so it is specified before the till is designed.
+
+Field     Value
+Document
+Version   32 ­ Sync Contract (design artefact; Stage 1/2 boundary; owned by the till track with the kernel's edge sync
+Date      gateway)
+Status
+Inputs    v0.1 ­ draft for design review
+
+Audience  7 September 2026
+
+          Draft. Batch sizes, retention windows and the push mechanism are decision requests (Section 12); the
+          conformance suite (Section 11) is the acceptance criterion.
+
+          ADR-10 (one writer), ADR-11 (numbering), ADR-24, ADR-31 (shared engine), ADR-34 (snapshot distribution);
+          NFR-PRF-030/040, NFR-OFF-010/030, NFR-AVL-020/050; H-01 to H-04, Q-06; doc 17 v0.2.1 sections 8 and 9;
+          doc 18 parts C and D; doc 19 section 6; doc 14 section 6; doc 20 M6; doc 31.
+
+          Till track, kernel developers, DevOps, test engineers. Section 1 for reviewers.
+
+The contract in one paragraph. A till writes its own facts into a local outbox with a dense sequence number. It
+uploads them in order, one batch in flight at a time, and central acknowledges the highest sequence it has durably
+applied. Central never edits, re-numbers or merges what a till sends; a fact it cannot accept is quarantined and
+flagged, never lost and never allowed to block what follows. In the other direction, central publishes versioned
+snapshots of reference data per shop; a till downloads the delta since its version and applies it atomically. No record
+has two writers, so there is nothing to reconcile.
+
+32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System             Page 1
+   1. Principles the contract enforces
+
+#  Principle                          Consequence in the protocol
+
+S1 One writer per record type (ADR-10) Channel 1 carries only till-owned records; channel 2 carries only central-owned records.
+                                                                  Nothing appears in both.
+
+S2 Sequence orders events, never clocks Every uploaded event carries a dense per-device sequence; central applies in that order;
+                                                                  clocks are recorded for reporting and corrected for drift, never used to order.
+
+S3 Exactly-once effect over at-least-once The till may send a batch twice; central applies each event id once; the acknowledgement is
+
+   delivery                           derived from database state, so any instance can answer.
+
+S4 Never reject a fact, quarantine a  A sale that happened is applied even if it breaks a business rule (flagged); a payload that
+          malformed one               cannot be parsed is stored raw, the sequence advances, an alert is raised.
+
+S5 Atomic reference data              A snapshot version is applied whole or not at all; a bill is never computed against a
+                                      half-applied price list.
+
+S6 Resumable, small, compressible     Batches are bounded; downloads are resumable byte ranges; everything is
+                                      gzip-compressed; the weakest link (about 2 Mbps down, 0.5 up) is the design case.
+
+S7 Stateless central                  No instance memory participates; the device cursor row in the database is the only state
+                                      (doc 14 section 1.3).
+
+S8 Nothing is deleted at the edge until it is Acknowledged outbox rows are retained for a retention window so central can ask for them
+
+   safe                               again after a point-in-time restore.
+
+   2. Identities and state
+
+Item                  Where held                                                 Meaning
+Device credential     Terminal keystore; central device table                    Client certificate (or secret) bound to the hardware serial;
+Till position                                                                    authenticates every call (doc 19 section 2.1)
+Primary till flag     Central; cached on device                                  The logical lane; the till-position numbering series follows it
+Device sequence       Central location.primary_till_position_id;                 Whether this device holds the location-scoped series (GRN,
+(device_seq)          cached                                                     count, write-off draft, transfer)
+Sync cursor           Device outbox; central cursor                              Dense, monotonic, per device, across all record kinds; starts at 1
+                                                                                 at enrolment; never reset except by the audited recovery
+Snapshot version      Central table device_sync_cursor: device_id,               procedure (Section 8)
+Operator context      last_applied_seq, last_batch_id, last_ack_at,              The only server-side sync state; row-locked during ingestion
+                      snapshot_version_reported
+                      Central per-location version counter; device               Monotonic integer per location; the device reports the version it
+                      local                                                      trades on with every upload
+                      Per event                                                  The authenticated operator (user id) and role snapshot version at
+                                                                                 the time
+
+   32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System                                              Page 2
+   3. Channel 1: event upload (till to central)
+
+   3.1 What is uploaded
+
+   Every till-owned fact is an event in the doc 19 envelope. The till emits four families; each is applied by a kernel
+   or module handler at central.
+
+Family                  Event types                                   Payload                                  Applied by
+Document bundle         receipt.issued/voided/refunded,
+                        grn.captured/confirmed, count.recorded,       The complete document: header, lines,    Kernel document base
+Stock movement          writeoff.requested (draft), repack.executed,  extension table rows, links, attachment  inserts; owning module's
+Audit                   transfer.issued (intra-entity at shop)        references with hashes, and the          handler (M6, M4, M5)
+                                                                      DRAFTISSUED state row;                   validates and publishes to the
+Till lifecycle          stock.moved                                   content_hash                             backbone
+
+                        audit.* (every audited action on the till,    Movement rows for one document,          M5 ledger; balances
+                        including mode switches, negative-stock       cited by document id                     recomputed
+                        acknowledgements, MRP picker use,
+                        drawer-open-no-sale)                          Audit row fields (doc 18 part D)         Kernel audit store (insert
+                        till_session.opened/closed, cash.dropped,                                              only)
+                        till.heartbeat, sync.local_anomaly
+                                                                      Session and health facts                 M6 central side; fleet and
+                                                                                                               freshness views
+
+   A document bundle is one event so that its application is atomic: header, lines, movements and the state row
+   commit together or not at all. Stock movements for a receipt travel inside the receipt bundle; the separate
+   stock.moved family exists for movements that have no bundle of their own (a correction applied by a later
+   procedure).
+
+   3.2 The batch
+
+Aspect                  Design
+Unit
+In flight               A batch is a contiguous run of events in device_seq order. Up to 500 events or 2 MB compressed, whichever first
+Request                 (DR-1). A batch never splits a document bundle.
+Response
+Timeouts and retry      Exactly one batch in flight per device. The till does not send the next batch until it has an acknowledgement or a
+Priority under backlog  timeout; central rejects a second concurrent batch for the same device with 409 and the in-flight batch id.
+
+                        POST /sync/v1/devices/{device_id}/batches with device authentication; gzip body: batch_id (UUIDv7), first_seq,
+                        last_seq, app_version, snapshot_version_in_use, device_clock, device_uptime, events[].
+
+                        200 with ack (Section 3.4); 409 for sequence mismatch or concurrent batch, carrying expected_seq; 429 with
+                        retry_after under backpressure; 401/403 for credential or suspension; 5xx retried with backoff.
+
+                        Client timeout 60 s on the weakest link; exponential backoff with jitter from 5 s to 10 min; a lost response is not an
+                        error: the retry carries the same batch_id and central answers idempotently.
+
+                        Batches are sent in sequence; there is no reordering by kind. To keep receipts flowing first after an outage the till
+                        emits audit rows for a document immediately after its bundle, so sequence order already interleaves them tightly.
+
+   3.3 Central ingestion
+
+Step  Action                                                          Rule
+1     Authenticate the device; check status ACTIVE; check
+      app_version against the floor (doc 31)                          Suspended device: 403 and a signed revoke instruction; below floor
+2     SELECT device_sync_cursor FOR UPDATE                            after grace: 426 with reason
+3     Compare first_seq with last_applied_seq
+                                                                      One ingestion per device at a time on any instance (S7)
+4     Apply events in order in chunks of 50 per transaction
+                                                                      first_seq = last+1: proceed. first_seq  last: the batch (or its prefix) is a
+5     Business validation with the shared engine (ADR-31)             replay; answer from state without re-applying. first_seq > last+1: gap;
+                                                                      409 with expected_seq (Section 7)
+6     Malformed event
+                                                                      Each event: skip if event_id already in the inbox; else validate envelope
+                                                                      and schema; verify content_hash for bundles; insert; publish to the
+                                                                      outbox; record in the inbox
+
+                                                                      Re-resolve price and ceilings against the snapshot version the till
+                                                                      reported; any difference or ceiling breach is recorded as a flag on the
+                                                                      line and an ALERT audit event; the event is still applied (S4)
+
+                                                                      Store raw in sync_quarantine with the reason; advance the cursor;
+                                                                      raise SYNC_ANOMALY ALERT; continue (S4)
+
+   32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System                                            Page 3
+Step  Action                                                 Rule
+7
+      Update the cursor to the highest applied seq; commit;  Cursor advances only on commit; a crash leaves the cursor at the last
+8     release the lock                                       committed chunk
+
+      Return the ack                                         Section 3.4
+
+3.4 Acknowledgement
+
+Aspect           Design
+Content
+                 batch_id; last_applied_seq (authoritative); per-event outcomes: APPLIED, DUPLICATE, FLAGGED (with codes),
+Meaning          QUARANTINED (with reason); server_time; clock_offset_ms; current snapshot_version for the location; pending
+Partial success  instructions (revoke, floor notice, re-request from seq, series holder change).
+Lost ack
+                 Everything at or below last_applied_seq is durably at central. The till marks those outbox rows acknowledged and
+                 retains them for the retention window (S8, DR-3: 7 days), then purges.
+
+                 If ingestion failed part-way, last_applied_seq is the last committed chunk; the till resends from last_applied_seq +
+                 1 with a new batch_id. Already-applied events in the overlap are answered DUPLICATE.
+
+                 The till resends the same batch_id; central finds first_seq  cursor and answers from state; no double application
+                 (S3).
+
+4. Attachments
+
+Aspect           Design
+Path
+                 Photographs never travel inside a batch. The till requests a pre-signed PUT for each attachment (object key
+Ordering         derived from document id and attachment id), uploads directly to object storage, resumable in byte ranges, then
+                 includes the key and content hash in the document bundle or in a later attachment.completed event.
+Limits
+                 A document may be applied before its attachments finish uploading; the document carries the expected keys and
+                 hashes; central marks attachments PENDING until the object exists and the hash matches, then COMPLETE. A
+                 write-off approval requires all its attachments COMPLETE.
+
+                 Images are downscaled on the device to at most 1600 px on the long edge and about 300 KB; a bundle
+                 references at most 10 attachments.
+
+32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+5. Channel 2: reference-data distribution (central to till)
+
+5.1 Scope of a shop's snapshot
+
+Table set                 Content for the location                                                           Source module
+Catalogue
+                          SKUs in the shop's assortment: on the MPCS retail list, or with a lot at the       M2
+Pricing
+                          location, or local to the owning entity; with units, conversions, barcodes, tags,
+Lots
+                          tax categories, thumbnail keys
+Customers
+Operators and             The MPCS retail price list lines; active and scheduled discount rules; control M3
+permissions               prices in force or scheduled; multi-MRP policies; rounding rule; tax rates
+Message catalogue and
+configuration             Batches with positive on-hand at the location: batch id, SKU, expiry, printed      M5 (batch identity from M2)
+                          MRP, FEFO rank, quantity as last known
+
+                          Tagged and credit customers of the MPCS with balance, limit, offline cap           M7
+
+                          Operators assigned to the location: user id, display name, PIN hash, resolved M1 via doc 19 section 3.3
+                          offline permissions with catalogue version; signed
+
+                          Translations for the interface; configuration items for the location (idle locks,  Kernel
+                          quiet hours, offline account cap, thresholds); series assignments and
+                          primary-till flag
+
+5.2 Versions and deltas
+
+Aspect                    Design
+Version
+Delta request             Central keeps one monotonic snapshot version per location. Any publication that changes the shop's snapshot
+Full snapshot             (price list published, rule activated, control price entered, SKU shared, lot changed by a GRN elsewhere in the
+Atomic apply              entity, operator added) records a change-log row and bumps the version.
+apply_from
+Cadence                   GET /sync/v1/locations/{location_id}/snapshot?since=N returns a delta from N+1 to current: per table, upserted
+                          rows and tombstones, with the new version. If N is older than the change-log retention (DR-4: 30 days) or the
+Consistency with uploads  device has no version, the response points to a full snapshot.
+Staleness warning
+                          A pre-built compressed file in object storage per location, rebuilt when the delta would exceed a threshold or
+                          nightly, with a manifest (tables, row counts, hashes, version) and a pre-signed resumable download. Target
+                          under 20 MB with thumbnails.
+
+                          The device loads a delta or full snapshot into staging tables, verifies hashes, then swaps into the live cache and
+                          records the version in one local transaction. Selling continues on the old version until the swap; the swap waits for
+                          the current sale to complete.
+
+                          Rows with an apply_from business date later than the shop's current business date are held in pending and
+                          activated at the shop's day-open, so every till in the federation switches prices on the same trading day
+                          regardless of when it downloaded.
+
+                          Version check on every heartbeat (5 min) when online; download at most every 15 minutes (NFR-PRF-040)
+                          unless central marks the change urgent (control price entered, permission revoked), in which case the next
+                          heartbeat downloads immediately. An optional push wake-up (DR-2) shortens this; the design does not depend
+                          on it.
+
+                          Every upload reports snapshot_version_in_use; central re-validates prices against that version, so a legitimate
+                          sale made on a slightly stale list is recognised as such rather than flagged as an error.
+
+                          A till whose snapshot is older than a configured age (default 3 days) warns the supervisor that ceilings and prices
+                          may be stale; it keeps selling.
+
+6. Heartbeat and health
+
+Aspect                    Design
+Cadence
+Content                   Every 5 minutes when online; on app start; after any batch.
+
+Central use               app_version, snapshot_version, pending_event_count, oldest_pending_seq_age, last_applied_seq as known,
+                          battery, storage free, peripheral self-test summary, device clock and uptime, open session flag.
+Clock
+                          device.last_seen_at and app_version; per-location freshness stamp = time of the last applied event from the
+                          location's devices; fleet console; rollout health (doc 31); staleness detection.
+
+                          Central returns the offset; the till stores it and stamps occurred_local plus the offset on later events; large drift
+                          (over 10 minutes) raises a REVIEW audit event but never blocks.
+
+7. Gap and anomaly handling
+
+32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System                                                Page 5
+Situation                         Detection                         Handling
+Batch starts above the cursor     first_seq > last_applied_seq + 1
+                                                                    409 with expected_seq. The till must resend from expected_seq; it can,
+Batch starts at or below the      first_seq  last_applied_seq       because unacknowledged rows are never purged. Repeated 409 for
+cursor                                                              the same device raises SYNC_ANOMALY.
+Duplicate event id with a         Inbox has event_id at another
+different sequence                seq                               Replay: answered from state; events above the cursor within the batch
+Hash mismatch on a bundle         Recomputed content_hash           are applied normally.
+                                  differs
+Document number gap within a      Kernel gap check over (series,    Quarantine the later copy; ALERT; advance cursor.
+series                            doc_number) after ingestion
+Till outbox lost (local database  Device reports device_seq         Quarantine; ALERT; advance cursor. The document is not applied until
+corruption or replacement         below the cursor, or cannot       the till resends a correct copy through the recovery procedure.
+without transfer)                 produce expected_seq
+Central restored from backup      Central cursor below the till's   SYNC_ANOMALY REVIEW; a gap can be legitimate only if the
+                                  acknowledged seq                  device's quarantine holds the missing number; otherwise investigate.
+Clock drift
+Malformed payload                 Offset over threshold             Never silent. The recovery procedure (Section 8) creates an audited
+                                  Schema validation fails           sequence-reset record; missing events remain a documented gap;
+                                                                    ALERT to the MPCS administrator.
+
+                                                                    Central asks for re-send from its cursor via the ack's pending
+                                                                    instructions; the till still holds acknowledged rows within the retention
+                                                                    window (S8), so the data is recovered. This is why retention is not zero.
+
+                                                                    REVIEW event; reporting uses corrected times.
+
+                                                                    Quarantine, advance, ALERT (S4).
+
+32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System  Page 6
+8. Registration, series and counter transfer
+
+Procedure             Steps                                                                                     Audit
+
+Device enrolment      Provisioned as a managed kiosk (doc 31); first start calls POST                           device.enrolled,
+                      /sync/v1/devices/{id}/enrol with the credential; central assigns the till position (from  series.registered
+                      staging) and returns the device_seq starting value (1), series assignments
+                      (till-position series; location series if primary), and the initial snapshot pointer
+
+Series assignment     Central creates numbering_series rows for the position; the device persists counters series.registered
+                      from the last synchronised next_number (1 for new series)
+
+Counter transfer      Precondition: the old device's outbox is fully acknowledged (or its loss is recorded).    device.position_changed,
+(replacement device)  The administrator reassigns the position to the new device; central returns               series.holder_changed
+                      next_number per series computed from the highest applied doc_number; the new
+                      device starts there. If the old device had unacknowledged issued documents, the
+                      transfer records the numbers reserved but not received as a documented gap
+
+Primary till change   Location-scoped series move with the primary flag using the same transfer rule            series.holder_changed
+
+Sequence reset (recovery) Only by an MPCS administrator with a reason code, on a device that cannot produce sync.sequence_reset
+                                      expected_seq; central records the gap range, sets the cursor to the device's new
+                                      start, raises ALERT
+
+9. Security
+
+Aspect                Design
+Transport
+                      TLS 1.2 or later to the edge; device client certificate or bearer token from the device credential; no anonymous
+Integrity             endpoint.
+
+Replay                content_hash on every bundle; signed permission snapshot; snapshot manifest hashes; the ack is over the same
+Suspension            TLS channel, so it needs no separate signature.
+
+Data minimisation     batch_id plus sequence semantics make replays harmless; event ids are UUIDv7 and unique.
+Rate limiting
+                      A suspended device receives 403 and a signed revoke; the application wipes caches and locks; unacknowledged
+                      outbox rows are preserved for recovery by an administrator.
+
+                      Customer snapshot carries name, phone, balance, limit only; PIN hashes are Argon2id; no card data exists.
+
+                      Per device: batches per minute and bytes per hour; global: ingest capacity; 429 with retry_after; prioritised
+                      fairness so one device cannot starve others.
+
+10. Volumes and limits (planning basis, doc 14 section 6)
+
+Quantity                       Value                                                    Note
+Events per receipt             About 3 (bundle, one or two audit rows)                  Movements travel inside the bundle
+Bundle size                    About 2­4 KB compressed                                  Five lines, tenders, state row
+Steady upload per till         A few KB per minute                                      Negligible on a 0.5 Mbps uplink
+Two-day backlog per till       About 400 receipts at 200 a day; about 1­2 MB; two to    Drains in under a minute on the weakest link
+                               four batches
+Fleet reconnection burst       Thousands of tills, two days each; central target 3,500  Rate limiting spreads it; projections lag with
+                               events/s                                                 freshness stamps
+Full snapshot                  Under 20 MB with thumbnails; under 5 MB without          Resumable download; nightly rebuild
+Delta                          Typically under 100 KB                                   Price list day: up to a few MB for a large
+                                                                                        assortment
+Acknowledged outbox retention  7 days (DR-3)                                            Bounded by storage: about 10 MB per till
+
+11. Conformance suite (acceptance criterion for both sides)
+
+A simulator on each side is part of the deliverable: a central simulator the till is tested against, and a till simulator
+central is load-tested with (spike 5). The suite is the definition of done for this contract.
+
+Test                           Asserts
+Lost acknowledgement           Same batch resent; every event applied once; cursor correct
+
+32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System                                                       Page 7
+Test                           Asserts
+
+Crash mid-batch at central     Cursor at last committed chunk; resend from cursor+1; no duplicates, no loss
+
+Power loss on the till during issuance Either the document and its number both exist or neither; outbox sequence dense (spike 1)
+
+Gap                            Batch above cursor rejected with expected_seq; till recovers from retained rows
+
+Malformed event                Quarantined, cursor advanced, later events applied, ALERT raised
+
+Business-rule breach           Event applied, line flagged, ALERT raised; nothing rejected
+
+Concurrent batches for one device Second rejected with 409; first completes
+
+Two instances                  Batches from one device alternate between instances; ordering and idempotency hold
+
+Snapshot atomicity             Kill the till mid-apply; it trades on the old version; re-apply completes
+
+apply_from                     Prices dated tomorrow do not sell today; activate at day-open
+
+Central point-in-time restore  Central re-requests from a lower cursor; till resends retained rows; state converges
+
+Counter transfer               New device continues the series without gap or duplicate; documented gap when the old device lost
+                               data
+
+Burst                          Simulated fleet backlog absorbed within the target; fairness across devices
+
+     12. Decision requests
+
+#        Point                                 Proposed                                                      Decider
+DR-1     Batch limits                          500 events or 2 MB compressed                                 Till track and DevOps after
+DR-2                                                                                                         spike 5
+DR-3     Push wake-up mechanism                None required; optional MQTT-class push added if heartbeat    Engineering lead
+DR-4                                           latency proves insufficient for urgent control-price changes
+DR-5     Acknowledged outbox retention on      7 days                                                        DevOps (restore drill
+DR-6     the till                                                                                            informs)
+         Change-log retention for deltas       30 days; older devices take a full snapshot                   DevOps
+         Chunk size per ingestion transaction  50 events                                                     Kernel developers after
+                                                                                                             load test
+         Staleness warning age                 3 days                                                        Federation
+
+     13. Traceability
+
+Section             Requirements and decisions
+1­3                 ADR-10, ADR-31; NFR-OFF-010/030; NFR-PRF-030; H-01, H-04; doc 19 6.1­6.3; doc 18 5.5
+4                   D-08, F-05 (photographic evidence); doc 18 document_attachment
+5                   ADR-34; NFR-PRF-040; G-08 (apply on propagation); doc 19 3.3 (signed permission snapshot); doc 20 M2 thumbnails
+6                   O-03 (freshness stamps); doc 31 health gates
+7­8                 ADR-11; FR-BIL-090 (counter transfer); J-05; N-05 (sync anomalies audited)
+9                   NFR-SEC set; ADR-27; doc 19 2.1
+10­11               ADR-22; doc 14 sections 6 and 8 (spikes 1, 5)
+
+     End of document. Draft for design review; message schemas are published as an OpenAPI slice and JSON schemas alongside
+     this document once DR-1 to DR-5 are settled.
+
+32 - Sync Contract | v0.1 draft | Cooperative Retail and Distribution System                                                      Page 8
+

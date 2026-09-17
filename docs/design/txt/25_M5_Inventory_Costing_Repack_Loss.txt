@@ -1,0 +1,716 @@
+Cooperative Retail and Distribution System
+
+25 ­ M5 Inventory, Costing, Repack & Loss
+
+Module design for where stock is and what it cost: lots by location and batch, the
+append-only movement ledger, weighted-average costing per entity, availability for
+sellers, intra-entity transfers, counts and adjustments with value-threshold approval,
+repack recipes with expected yield, the write-off lifecycle with its loss categories and
+controls, expiry tasks, oversell exceptions, and opening balances.
+
+Field             Value
+Document
+Version           25 ­ M5 Inventory, Costing, Repack & Loss (Stage 2 module design; template of doc 20 §5)
+Date
+Owning developer  v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 6
+
+Inputs            9 September 2026
+
+Depends on        Module developer (full-stack); the till track hosts count, write-off draft, repack and transfer-receipt screens in
+                  shop-management mode from this module's specification
+Depended on by
+                  05 SRS (FR-INV-010­100, FR-LOSS-010­060); 03 state machines §9­11; 13 scenarios 3 and 4; 16 answers (E,
+                  F sections, B-06, R-02); 09 ADR-03, ADR-07, ADR-08; 17 v0.2.1 §7.5, ADR-38; 18 v0.2 part B (stock_lot,
+                  stock_movement, repack_recipe); 20 v0.3 M5; 21­24 contracts; 24B; 30 §5.5; 32
+
+                  M1 (locations, thresholds as role parameters), M2 (SKU flags, batch identity, conversions, alias), M4 (GRN, claim,
+                  DN, transfer request events), kernel (document base, links, attachments, audit, events, snapshot)
+
+                  M3 (in-stock batch MRPs), M4 (availability, pick batches, lots consumed), M6 (lot snapshot, sale deductions arrive
+                  from it), M2 (assortment by lots), M8
+
+Two invariants and one temptation. Movements are the only way stock changes, and every movement cites a
+document; balances are sums, materialised for speed and reconciled nightly. The temptation is to reject a sale that the
+records say is impossible ­ two offline tills selling the same last unit ­ and the answer is never: the sale happened, the
+lot goes negative, an exception is raised, and the next count fixes the record (E-09).
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+In scope (phase 1)                                                           Out of scope
+
+Stock lots: an entity's holding of a batch at a location, with acquisition cost Shelf versus back-store sub-locations (E-02); bins and put-away
+and condition (GOOD, DAMAGED); balances derived from movements in warehouses (doc 20 Appendix A)
+(E-01, E-02: one location per shop)
+
+Movement ledger: every quantity change cites a document; types               Serialised items (B-05); cold-chain telemetry (E-10)
+RECEIPT, SALE, SALE_REVERSAL, TRANSFER_OUT/IN,
+REPACK_CONSUME/PRODUCE, COUNT_ADJUST, WRITE_OFF,
+RETURN_TO_SELLER, OPENING_BALANCE
+
+Weighted-average cost per entity per SKU; lot keeps acquisition cost; cost Per-transaction cost overrides; standard or FIFO costing
+of goods sold at issue (E-03)
+
+FEFO suggestion for expiry-tracked goods with manual override (E-04);        FEFO as the pricing rule (M3 separates them)
+pick lists for delivery notes
+
+Availability for sellers (on hand minus quantities on issued, undispatched Reservation on order acceptance (allocation is a plan, not a hold)
+delivery notes) (C-12)
+
+Counts: scheduled by the entity, cycle counting, count while trading,        ABC prioritisation (P2)
+variance with value-threshold approval (E-05 to E-07)
+
+Adjustments as documents with approval bands; negative-stock and             ­
+
+oversell exceptions (E-09)
+
+Repack recipes and execution with expected yield; variance against           Federation repacking (P3, permission flip on the same
+expectation; reversal while eligible (B-06, ADR-07)                          mechanism)
+
+Write-off lifecycle: nine loss categories, requester  approver, witness      Disposal certificates (F-08); insurance recovery
+requester (remote for single-staff shops), photographs, value-banded
+approval, loss attributed to the owner at the time (F-01 to F-05)
+
+Expiry warning tasks by window per category; markdown hand-off to M3 ­
+(F-06, F-07); loss tolerances (F-10); shrinkage reporting basis (F-09)
+
+Intra-entity transfers at cost with receipt at the destination (C-10, C-11,  Cross-entity transfers (those are sales, M4)
+E-01)
+
+Opening balances as two-party signed documents at onboarding (R-02) Historical sales migration (none)
+
+Returns to seller on approved claims; lot re-pointing on batch correction ­
+and SKU merge (M2 events)
+
+Phase 2 designed as projections: stock ageing, reorder points and            ­
+
+suggestions, ABC cycle counting (E-08, E-11)
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                   Design section
+FR-INV-010          Balances by location and batch; movements as the only change; document citation          3.1, 3.2
+FR-INV-020          Weighted-average costing per entity (E-03)                                               3.3
+FR-INV-030          FEFO picking suggestion with override (E-04)                                             3.4
+FR-INV-040          Counts scheduled per entity; cycle counting; trade during counts (E-05, E-06)            3.5, 4.1
+FR-INV-050          Adjustment approval by value thresholds per SKU or tag (E-07)                            3.5, 4.2
+FR-INV-060          Negative stock permitted with acknowledgement; every occurrence on the exception report  3.2, 6.2
+                    (E-09)
+FR-INV-070          Intra-entity transfers at cost, MPCS-mediated (C-10, C-11)                               3.7, 4.5
+FR-INV-080          Repack recipe with expected yield; variance separate from shrinkage (B-06)               3.6, 4.4
+FR-INV-090          Reorder points system-calculated and overridable (P2)                                    3.9
+FR-INV-100          Stock ageing with warnings (P2)                                                          3.9
+FR-LOSS-010         Loss categories recorded separately, never one adjustment (F-01)                         3.8
+FR-LOSS-020         Loss borne by the owner at the moment of loss (F-02, ADR-03)                             3.8
+FR-LOSS-030         Write-off: requester  approver; witness distinct; photographs (F-04, F-05, N-07)         3.8, 4.3
+FR-LOSS-040         Returns to seller for credit via claims (F-03)                                           6.7
+FR-LOSS-050         Expiry alerts by window per category generating count tasks (F-06)                       3.8, 4.6
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                                 Page 2
+Identifier   Requirement (abridged)                                                                  Design section
+FR-LOSS-060  Markdown separate from loss; damaged-but-saleable as markdown (F-07, F-11)              3.8 (hand-off to M3)
+R-02         Opening balances only; two-party signed documents                                       3.7, 4.7
+ADR-38       Batch identity in M2; lot and cost here                                                 3.1
+H-02         Count entry and write-off draft offline                                                 9.2
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 3
+3. Domain model
+
+Schema inventory: stock_lot, stock_movement, repack_recipe (doc 18 v0.2 part B) plus the tables introduced
+here.
+
+    3.1 Lot                  Design
+
+Aspect                       stock_lot(location, batch, condition GOOD | DAMAGED, qty_on_hand, unit_cost,
+Aggregate                    received_at, last_movement_seq). A lot is one entity's holding of one batch at one location in one
+                             condition; damaged units received on a GRN form a DAMAGED lot (doc 24 §6.1), sellable only through an M3
+Cost                         markdown rule or written off.
+Re-pointing
+                             unit_cost is the acquisition cost of that lot: trade price for goods bought from another entity, keyed cost for
+                             local supply, recipe-derived cost for repack outputs, restated by landed cost in phase 2 (M10).
+
+                             On batch.corrected.v1 lots move to the replacement batch (same qty and cost); on sku.merged.v1 lots of
+                             the alias SKU's batches remain (batch identity carries the SKU) and queries resolve through the alias.
+
+3.2 Movement ledger and balances
+
+Aspect                       Design
+Ledger
+                             stock_movement(movement_seq per location, location, batch, condition, qty_delta,
+Balances                     movement_type, unit_cost_at_movement, document, line, occurred_at, operator,
+Negative lots                device) (doc 18 part B). Insert-only. movement_seq is dense per location: assigned by the till for its own
+Batch attribution of a sale  movements (inside the receipt bundle) and by central otherwise; the two sequences are kept apart by a source
+                             column so both stay dense.
+
+                             stock_lot.qty_on_hand =  qty_delta for the lot (B-I4); updated in the same transaction as the movement;
+                             the nightly StockReconcileJob recomputes and raises a REVIEW on drift, never silently fixes.
+
+                             A SALE movement may take a lot below zero (offline oversell). The lot is flagged negative_since;
+                             lot.negative.v1 goes to the exception queue; the next count or receipt clears it. Availability never counts
+                             negative lots.
+
+                             The receipt line carries the batch the till resolved (M3 engine: scanned, picked or lowest-MRP); the deduction hits
+                             that lot. If that lot is exhausted, the deduction still hits it (negative) rather than silently moving to another batch, so
+                             the record shows what the till believed.
+
+    3.3 Costing              Design
+
+Aspect                       Moving weighted average per entity per SKU (E-03, IAS 2): entity_sku_cost(entity, sku,
+Method                       qty_on_hand, avg_cost) updated on every receipt-type movement (RECEIPT, TRANSFER_IN at the
+                             receiving entity is at cost so unchanged, REPACK_PRODUCE, OPENING_BALANCE) as (qty × avg +
+Lot cost versus entity       qty_in × cost_in) / (qty + qty_in); issues (SALE, WRITE_OFF, TRANSFER_OUT within the entity
+average                      unchanged, REPACK_CONSUME) carry unit_cost_at_movement = avg_cost at that moment.
+Damaged units
+                             The lot keeps its acquisition cost for traceability and for claims; the entity average is the costing figure for cost of
+                             goods sold, valuation and write-off value. Both are stored; neither is recomputed retroactively.
+
+                             A DAMAGED lot carries the same unit cost as its GOOD sibling; the loss is recognised when written off or when
+                             marked down (M3).
+
+3.4 FEFO and picking
+
+Aspect                       Design
+Suggestion
+                             FefoOrder(location, sku) ranks GOOD lots by expiry then received_at; the till's lot snapshot carries the
+Availability                 rank; warehouses get a pick_list per delivery note (M4 delivery_note.issued.v1) with suggested lots
+                             that the picker may override with a reason.
+
+                             available(location, sku) =  GOOD lots on hand (non-negative) - quantities on ISSUED
+                             but not DISPATCHED delivery notes; Availability(entity locations, skus) is what M4 shows
+                             buyers and uses in allocation runs (DR-1).
+
+3.5 Counts and adjustments
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+Aspect                   Design
+Count task
+                         count_task(location, scope: full | skus | tags | expiry-window, scheduled_for,
+Variance and adjustment  status) created by the entity's schedule or by the expiry job; results as document CNT with lines (sku, batch,
+                         condition, expected_qty at count start, counted_qty); counting while trading is supported by snapshotting
+                         expected quantities at task start and applying movements that occur during the count to the expectation (E-06).
+
+                         Submitting a count creates an ADJ document with the variances; approval is banded by value (variance qty ×
+                         entity avg cost) against variance_threshold(sku | tag, band, approver permission with
+                         limits) (E-07); tolerances (F-10) below which a variance posts without escalation; approved adjustments post
+                         COUNT_ADJUST movements; the exception queue receives every count that cleared a negative lot.
+
+    3.6 Repack           Design
+
+Aspect                   repack_recipe(owner, input sku, input qty, output sku, output qty,
+Recipe                   expected_loss_pct, status) (ADR-07, B-06); the output SKU is a distinct M2 SKU (origin
+                         REPACK_OUTPUT).
+Execution
+                         Document RPK: input lot(s), actual output qty; movements REPACK_CONSUME (input) and
+Reversal                 REPACK_PRODUCE (output at cost = consumed cost / produced qty); yield variance recorded on the document
+                         against the recipe's expectation and reported separately from shrinkage; the output batch is registered through
+                         M2 with the input batch's expiry and a local MRP if labelled.
+
+                         Permitted while the output lot is untouched (no sale, transfer or write-off against it; qty equals produced): a
+                         REVERSES-linked RPK restores the input lot; used for wrong-recipe corrections (doc 13 scenario 3).
+
+3.7 Transfers and opening balances
+
+Aspect                   Design
+Transfer (XFR)
+                         Within one entity only. Issued at the source location on M4's transfer_request.approved.v1 or directly by
+Opening balance (OPB)    the entity for warehouse-to-warehouse: TRANSFER_OUT at source at cost; in-transit until the destination
+                         confirms receipt (offline-capable on the till, LOCATION series) posting TRANSFER_IN; unconfirmed after
+                         transfer_receipt_days raises a REVIEW.
+
+                         At onboarding: counted quantities with batch data and cost, signed by the entity and the Federation onboarding
+                         officer (two signatures as state transitions); posts OPENING_BALANCE movements; the only way stock enters
+                         without a GRN or repack (R-02).
+
+3.8 Loss
+
+Aspect                   Design
+
+Categories               loss_category: DAMAGED_IN_TRANSIT, DAMAGED_IN_STORE, EXPIRED, THEFT,
+                         SHRINKAGE_UNEXPLAINED, STAFF_CONSUMPTION, SAMPLES, DONATION, OTHER (F-01). Each
+                         write-off line carries one; reporting never aggregates across them without showing the split.
+
+Write-off (WOF)          Requester drafts (offline on the till allowed) with lines, category, batch, qty, photographs; a witness distinct from
+                         the requester confirms; an approver distinct from the requester approves within their value band (entity avg cost
+                         basis); posting creates WRITE_OFF movements. For a single-staff shop the MPCS approver acts as remote
+                         witness with photographs mandatory (doc 18 DR-7 adopted).
+
+Attribution              The loss belongs to the entity owning the lot when the write-off is posted (ADR-03); DAMAGED_IN_TRANSIT on
+                         the seller's side is the seller's write-off of returned goods; on the buyer's side it is a claim (M4), not a write-off.
+
+Expiry tasks             expiry_task created when a batch enters its window (SKU or tag expiry_warning_days): a count task for
+                         the holding location and a hand-off to M3's markdown rules; on expiry date, remaining quantity becomes a
+                         suggested write-off (category EXPIRED) that still needs the full lifecycle.
+
+Tolerances and shrinkage loss_tolerance(sku | tag, pct or qty) below which count variances post without escalation (F-10);
+                                      shrinkage percentage per shop is a projection of SHRINKAGE_UNEXPLAINED and negative-lot clearances over
+                                      sales (F-09), visible to the Federation view-only.
+
+3.9 Phase 2 as projections
+
+Aspect                   Design
+Ageing and reorder
+                         Ageing by lot received_at and reorder points from sales history are M8 projections over the movement ledger
+                         and M6 receipts; the ledger design needs nothing more; suggestions feed M4's requisition book (FR-ORD-010).
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 5
+   4. State machines
+
+   4.1 Count
+
+From          To           Trigger / command          Guard                                             Permission         Audit / offline
+­             SCHEDULED    ScheduleCount(scope,
+                           date)                      entity scope; scope valid                         inv.count.schedul COUNT_SCHE
+                           StartCount
+                                                                                                        e                  DULED
+                           SubmitCount(lines)
+SCHEDULED COUNTING                                    location scope; expectation                       shop.count.record COUNT_START
+                           system: variances above    snapshot taken                                                               ED / offline
+                           tolerance exist
+COUNTING SUBMITTED         system: no variance above  all scope lines counted or explicitly shop.count.record COUNT_SUBMI
+                           tolerance
+                           ADJ approved or rejected   skipped; issuance (LOCATION                                          TTED / offline
+
+                                                      series)
+
+SUBMITTED     VARIANCE_RE                             ­                                                 system             ADJ created
+SUBMITTED     VIEW
+                                                                                                                           DRAFT
+              CLOSED
+                                                      in-tolerance variances post                       system             COUNT_CLOSE
+                                                      automatically                                                        D
+
+VARIANCE_R CLOSED                                     ­                                                 system             COUNT_CLOSE
+EVIEW
+                                                                                                                           D
+
+   4.2 Adjustment
+
+From          To           Trigger / command          Guard                                             Permission         Audit / offline
+­             DRAFT                                   entity scope; lines with batches
+                           system (from count) or                                                       inv.adjust.request ­
+                           CreateAdjustment(reason)
+
+DRAFT         PENDING_APP  SubmitAdjustment           issuance (ENTITY series); value                   inv.adjust.request ADJ_SUBMITTE
+              ROVAL        ApproveAdjustment          band computed                                                                D
+PENDING_AP
+PROVAL        APPROVED                                approver  requester (SoD                          inv.adjust.approve ADJ_APPROVE
+                                                      INSTANCE); approver's limit 
+                                                      value; MFA                                        (MFA)              D
+
+PENDING_AP    REJECTED     RejectAdjustment(reason) reason                                              inv.adjust.approve ADJ_REJECTE
+PROVAL        POSTED       system: movements posted same transaction as approval                                                   D
+
+APPROVED                                                                                                system             ADJ_POSTED
+
+   4.3 Write-off
+
+From          To           Trigger / command          Guard                                             Permission         Audit / offline
+
+­             DRAFT        RequestWriteOff(lines,     location scope; lot exists; qty  on inv.writeoff.reques ­ / offline (draft)
+                           category, photos)
+                                                      hand (or negative-clearing)                       t
+                           SubmitWriteOff
+DRAFT         REQUESTED                               issuance (LOCATION series at a                    inv.writeoff.reques WRITEOFF_RE
+                                                      shop, ENTITY at warehouse);
+                                                      photographs referenced                            t                  QUESTED /
+                                                      (mandatory when the location is
+                                                      single-staff or category is                                          online
+                                                      THEFT/SHRINKAGE)
+
+REQUESTED WITNESSED WitnessWriteOff                   witness  requester (SoD);                         inv.writeoff.witnes WRITEOFF_WI
+                                                      attachments COMPLETE;
+                                                      single-staff shop: the approver's                 s                  TNESSED
+                                                      witnessing counts (remote)
+
+WITNESSED APPROVED         ApproveWriteOff            approver  requester; value within inv.writeoff.approv WRITEOFF_AP
+
+                                                      approver's band (entity avg cost); e (MFA)                           PROVED
+
+                                                      MFA
+
+REQUESTED / REJECTED       RejectWriteOff(reason)     reason                                            inv.writeoff.approv WRITEOFF_RE
+WITNESSED
+                           system: WRITE_OFF                                                            e                  JECTED
+APPROVED POSTED            movements
+                                                      same transaction                                  system             WRITEOFF_PO
+                                                                                                                           STED
+
+   4.4 Repack
+
+From          To           Trigger / command          Guard                                             Permission         Audit / offline
+                                                                                                                           ­
+­             DRAFT        PlanRepack(recipe, input   recipe ACTIVE; input lots GOOD                    inv.repack.execut
+                           lots)                      with qty                                          e
+
+   25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                             Page 6
+From        To            Trigger / command         Guard                                               Permission          Audit / offline
+DRAFT       EXECUTED      ExecuteRepack(actual
+                          output qty)               issuance (LOCATION or ENTITY                        inv.repack.execut   REPACK_EXEC
+                                                    series); movements consume and                      e                   UTED / offline at
+                          ReverseRepack(reason)     produce; output batch registered                                        shop
+                                                    (M2); variance recorded
+                          system: any movement
+EXECUTED REVERSED         against the output lot    output lot untouched (qty =                         inv.repack.reverse REPACK_REVE
+EXECUTED CLOSED                                     produced; no movements against                                                 RSED / online
+                                                    it); REVERSES-linked RPK
+
+                                                    ­                                                   system              ­
+
+   4.5 Transfer
+
+From        To            Trigger / command         Guard                                               Permission          Audit / offline
+                          IssueTransfer (from M4
+­           ISSUED        approval or direct)       same entity; source availability;                   inv.transfer.issue  TRANSFER_IS
+                                                    issuance (LOCATION or ENTITY                                            SUED
+                          Dispatch                  series); TRANSFER_OUT posted
+                          ReceiveTransfer(actuals)
+ISSUED      IN_TRANSIT                              ­                                                   inv.transfer.issue ­
+IN_TRANSIT  RECEIVED      CancelTransfer(reason)
+                                                    destination scope; TRANSFER_IN shop.transfer.rece TRANSFER_RE
+
+                                                    posted; variance  ADJ draft at ive                                      CEIVED / offline
+
+                                                    destination
+
+ISSUED /    CANCELLED                               before receipt; TRANSFER_OUT inv.transfer.issue TRANSFER_CA
+IN_TRANSIT
+                                                    reversed                                                                NCELLED
+
+   4.6 Expiry task
+
+From        To            Trigger / command         Guard                                               Permission          Audit / offline
+                          system (ExpiryScanJob)
+­           OPEN                                    batch enters window at a location system                                EXPIRY_TASK_
+                                                                                                                            OPENED
+OPEN        COUNTED       linked count submitted    ­                                                   system
+            CLOSED                                                                                      system              ­
+OPEN /                    lot exhausted, written off, or ­
+COUNTED                   expiry passed with a                                                                              EXPIRY_TASK_
+                          suggested write-off created                                                                       CLOSED
+
+   4.7 Opening balance
+
+From        To            Trigger / command         Guard                                               Permission          Audit / offline
+­           DRAFT
+                          PrepareOpeningBalance(lin location ONBOARDING; no prior                       inv.opening.prepa ­
+                          es with batch data and cost) movements at the location                        re
+
+DRAFT       SIGNED_ENTIT  SignOpeningBalance        entity officer; MFA                                 inv.opening.sign    OPB_SIGNED_
+            Y                                                                                           (entity, MFA)       ENTITY
+                          CountersignOpeningBalanc
+SIGNED_ENTI POSTED        e                         Federation onboarding officer;                      inv.opening.count   OPB_POSTED
+TY
+                                                    MFA; issuance (ENTITY series); ersign (F, MFA)
+
+                                                    OPENING_BALANCE movements
+
+   25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                         Page 7
+5. Contract
+
+5.1 Commands
+
+Command                                   Input (essentials)                       Permission               Events
+
+ApplyReceipt (internal, from grn.confirmed) grn lines with batch, qty, damaged, cost system                 stock.moved.v1
+
+ApplySale / ApplySaleReversal (internal,  receipt lines with batch, qty            system                   stock.moved.v1;
+from receipt bundles)                                                                                       lot.negative.v1
+
+ApplyReturn (internal, from claim.approved / lines                                 system                   stock.moved.v1
+drop.undelivered)
+
+ScheduleCount / StartCount / SubmitCount scope, date; lines (batch, condition,     inv.count.schedule /     count.*.v1
+                                                                                   shop.count.record
+/ SkipCountLine                           counted)
+
+CreateAdjustment / SubmitAdjustment /     lines, reason                            inv.adjust.request /     adjustment.*.v1;
+ApproveAdjustment / RejectAdjustment                                               approve (MFA)            stock.moved.v1
+
+RequestWriteOff / SubmitWriteOff /        lines, category, photos; reason          inv.writeoff.request /   writeoff.*.v1;
+WitnessWriteOff / ApproveWriteOff /
+RejectWriteOff                                                                     witness / approve (MFA) stock.moved.v1
+
+DefineRecipe / RetireRecipe               input/output skus and qty, expected loss inv.recipe.manage        recipe.defined/retired.v1
+
+PlanRepack / ExecuteRepack /              recipe, input lots, actual output; reason inv.repack.execute /    repack.executed/reverse
+ReverseRepack                                                                                      reverse  d.v1; stock.moved.v1
+
+IssueTransfer / DispatchTransfer /        source, destination, lines; actuals      inv.transfer.issue /     transfer.*.v1;
+ReceiveTransfer / CancelTransfer                                                   shop.transfer.receive    stock.moved.v1
+
+PrepareOpeningBalance /                   lines with batch data and cost           inv.opening.* (MFA)      opening_balance.*.v1;
+SignOpeningBalance /                                                                                        stock.moved.v1
+CountersignOpeningBalance
+
+SetVarianceThreshold / SetLossTolerance / scope sku | tag, values                  inv.policy.set           inventory_policy.change
+SetExpiryWindow                                                                                             d.v1
+
+OverridePick                              pick list line, lot, reason              whs.pick                 pick.overridden.v1
+
+AcknowledgeNegativeLot                    lot, note                                inv.count.schedule       lot.acknowledged.v1
+
+    5.2 Queries                           Returns                                                    Scope rule
+                                          Lots by batch and condition with expiry, qty, FEFO         OWN (cost hidden at till),
+Query                                     rank; cost only for OWN                                    FEDERATION_VIEW
+GetBalance(location, sku) /               Sellable quantities (Section 3.4)                          OWN; PARTY (buyer of an ACTIVE
+ListBalances(location, filter)                                                                       relationship, indicative or live per
+Availability(locations, skus)             (batch, printed MRP, expiry, on hand) for M3               seller config)
+                                          authoring checks                                           OWN (M3)
+InStockBatches(locations, sku)            Guards and assortment for M4 and M2
+                                                                                                     Internal
+LotsConsumed(grn) / HasAnyLot(sku) /
+SkusWithLots(location)                    FEFO-suggested lots per line                               OWN (seller)
+PickBatches(dn lines) / GetPickList(dn)   avg_cost, qty                                              OWN, FEDERATION_VIEW
+EntityAverageCost(entity, sku)            Batches and tasks                                          OWN
+ListExpiring(location, window) /
+ListExpiryTasks                           Documents with lines and approval state                    OWN; approver queues
+ListCounts / ListAdjustments /
+ListWriteOffs(scope, status)              For M8 and the Federation view                             OWN, FEDERATION_VIEW
+LossSummary(scope, period, category) /
+ShrinkagePct(location, period)            Lots for the till (batch, MRP via M2, expiry, FEFO         Snapshot builder
+GetLotSnapshot(location, since)           rank, qty)
+
+5.3 Events published
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                         Page 8
+Event                          Payload                                               Consumers
+                                                                                     M2 assortment (lots), snapshot (lot rows), M3
+stock.moved.v1                 location, batch, condition, qty delta, type, cost at  (in-stock MRPs), M8 projections, M10 (P2)
+                               movement, document                                    Exception queues (M1), M8
+                                                                                     Snapshot (count tasks to tills), notifications
+lot.negative.v1 / lot.acknowledged.v1 lot, qty, since, document that caused it
+                                                                                     Exception queues, M8
+count.scheduled/started/submitted/cl task, location, scope, variances
+osed.v1                                                                              Exception queues, M8 (loss by category),
+                                                                                     notifications
+adjustment.submitted/approved/reject document, value band, approver                  M2 (output batch registration), M8
+ed/posted.v1                                                                         M4 (write-back of xfr id), snapshot (expected
+                                                                                     transfer lines at destination), M8
+writeoff.requested/witnessed/approve document, category, value, witness, approver    M8; M1 (location activation gate may require
+d/rejected/posted.v1                                                                 it: DR-6)
+                                                                                     M3 markdown rules, snapshot, notifications
+repack.executed/reversed.v1    document, recipe, input lots, output batch, variance
+                                                                                     Snapshot (tolerances for the till count screen)
+transfer.issued/dispatched/received/c document, locations, lines
+ancelled.v1
+
+opening_balance.posted.v1      location, lines
+
+batch.expiring.v1 (relayed as  batch, location, days to expiry, qty
+expiry_task.opened.v1)         scope, thresholds
+
+inventory_policy.changed.v1
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 9
+6. Key flows
+
+Flow                             Sequence                                                               Failure paths
+
+6.1 Receipt into stock           M4 grn.confirmed.v1  per line: GOOD lot (received - damaged)           A GRN reversal (grn.reversed.v1)
+                                 and DAMAGED lot (damaged) at the line's unit cost; RECEIPT             posts negating movements only if lots
+                                 movements; entity average recomputed; M2 assortment adds the           are unconsumed (M4 already guarded
+                                 SKU for the location; lot snapshot delta                               via LotsConsumed)
+
+6.2 Sale deduction and           Receipt bundle ingested (M6)  per line SALE movement against           A sale against a batch with no lot at the
+oversell                         the resolved batch's lot  lot goes to -3 because two tills sold the    location (till cache stale) creates the lot
+                                 same units offline  lot.negative.v1  exception queue; availability     at zero minus qty with cost = entity
+                                 excludes it  next count corrects; the cleared negative is reported     average and a REVIEW
+                                 as SHRINKAGE_UNEXPLAINED or as an over-count depending on
+
+                                 the direction
+
+6.3 Scheduled count with         MPCS schedules a monthly count of tag dairy for shop 7  the task       Variance above the accountant's band
+variance                         reaches the till in the snapshot  shop-in-charge counts offline;       escalates to the chairman's band; a
+                                 expectation snapshot taken at start; sales during the count adjust     count on a location with an in-transit
+                                                                                                        transfer warns
+                                 the expectation  submit (LOCATION series)  variances above
+                                 tolerance form an ADJ draft  MPCS accountant approves within
+                                 band (MFA)  COUNT_ADJUST movements
+
+6.4 Write-off at a single-staff  Shop-in-charge finds six expired packs  drafts WOF offline with        Category THEFT without photos
+shop                             photos and category EXPIRED  submits when online (LOCATION             refused; approver band exceeded 
+                                 series)  MPCS accountant, as remote witness, reviews photos            routed to the next band; requester =
+                                 and witnesses (attachments COMPLETE)  the same accountant              approver refused by SoD
+                                 cannot approve if they are also the requester (never the case here)
+
+                                  approves within band (MFA)  WRITE_OFF movements; loss
+                                 attributed to the MPCS
+
+6.5 Repack and wrong-recipe      Warehouse repacks 50 kg bulk into 1 kg packs by recipe R-012           Reversal after 12 packs were sold
+correction (doc 13 scenario 3)   (expected 49 after loss)  actual 49  REPACK_CONSUME 50                 refused; correction then requires a
+                                 kg, REPACK_PRODUCE 49 EA at cost 9,500/49; output batch                write-off or a second recipe consuming
+                                 registered (M2)  discovers it should have been 5 kg packs              the 1 kg packs as input
+                                 ReverseRepack (output untouched) restores the input lot 
+                                 executes recipe R-013
+
+6.6 Transfer between two         M4 transfer_request.approved.v1  IssueTransfer at shop B               Unreceived after transfer_receipt_days
+shops                            (TRANSFER_OUT at cost)  dispatched  shop A receives                     REVIEW
+                                 actuals on its till (TRANSFER_IN)  a short receipt raises an ADJ
+                                 draft at A; the MPCS decides
+
+6.7 Return to seller on an       M4 claim.approved.v1 with return_required                              ­
+approved claim
+                                 RETURN_TO_SELLER movement from the buyer's lot (DAMAGED
+
+                                 or GOOD as the claim states)  the seller's receipt of the return is a
+
+                                 GRN on the seller's side citing the claim
+
+6.8 Expiry window                ExpiryScanJob finds batch B2411A entering its 30-day window at ­
+                                 shop 7  expiry task, count task, and expiry_task.opened.v1 
+                                 M3's markdown rule applies at the till from that day  on the expiry
+                                 date the remainder becomes a suggested WOF (EXPIRED)
+                                 awaiting the full lifecycle
+
+6.9 Opening balance at           Federation onboarding officer and the MPCS count shop 7 with           A second OPB for a location with
+onboarding                       batch data and costs  PrepareOpeningBalance  MPCS officer              movements refused
+                                 signs (MFA)  Federation countersigns (MFA) 
+                                 OPENING_BALANCE movements; lots and entity averages seeded;
+                                 the location may activate (M1 gate, DR-6)
+
+7. Configuration
+
+Item                                                        Default                                  Scope               Who may change
+inventory.variance_threshold bands (sku | tag): tolerance,                                           Entity              inv.policy.set
+band1 limit, band2 limit                                    tolerance 1% or 2 units; band1 Rs
+                                                            25,000; band2 Rs 250,000; above:         Entity              inv.policy.set
+inventory.loss_tolerance (sku | tag)                        chairman                                 Entity; Federation  inv.policy.set
+inventory.expiry_warning_days (sku | tag)                                                            defaults by
+                                                            1% or 2 units                            governed tag        gov.role.manage
+                                                                                                     Entity
+                                                            30 (dairy 7, fresh 3)
+
+inventory.writeoff_bands (value limits per approver role) as role limits (M1)
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                      Page 10
+Item                                                  Default                                        Scope       Who may change
+inventory.writeoff_photos_required                    always for THEFT, SHRINKAGE,                   Entity      inv.policy.set
+                                                      single-staff locations; otherwise
+inventory.remote_witness_allowed                      recommended                                    Federation  inv.policy.set (F)
+inventory.count_frequency (scope)                     true (single-staff shops)                      Entity      inv.count.schedule
+inventory.transfer_receipt_days                       monthly full; weekly cycle by tag              Entity      inv.policy.set
+inventory.repack_reversal_requires_untouched_output   3                                              ­           ­
+inventory.availability_excludes_negative              true (not configurable)                        ­           ­
+                                                      true (not configurable)
+
+8. Screens as paper
+
+Screen                   Paper mirrored      Surface    Roles                Notes
+Stock book (position)    Stock book          W/T        Stores, shop
+                                                                             By SKU and batch; expiry badges; negative lots
+Stock card (movement     Stock card          W          Stores, auditor      flagged; cost hidden at the till
+ledger)                  Stocktake sheet
+                                             T (shop                         Per SKU with document links
+Stocktake sheet (count)                      mode) / W
+                                                        Shop, stores         Lines to count with thumbnails; enter counted;
+Adjustment voucher       Adjustment voucher  W                               variance shown after entry; skip with reason;
+                         Damage register     T (shop    Approver             submit offline
+Damage/expiry register                       mode) / W  Requester, witness,  Value band, approver limit, MFA
+(write-off)              Production sheet    W/T        approver             Category, batch, qty, photos; witness and approval
+                                                        Stores               steps visible; SoD enforced visibly
+Production sheet         Transfer note       W/T                             Recipe, input lot, actual yield, variance; reversal
+(repack)                 Pick list           W          MPCS, shops          while eligible
+                                                        Warehouse            Issue at source; receive at destination offline
+Transfer note                                                                FEFO suggestions per DN line; override with
+                                                        Supervisor           reason
+Pick list                                                                    Batches in window with markdown rule (M3) and
+                                                        Onboarding officer,  suggested write-offs
+Expiry list              Expiry list         W/T        entity officer       Two signatures with step-up
+                                                        Entity, Federation
+Opening stock sheet      Opening stock sheet W          view                 By category and shop; tolerances
+
+Loss and shrinkage       ­                   W
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System              Page 11
+9. Non-functional design
+
+Aspect                 Design
+9.1 Capacity
+                       Movements are the highest-volume table after receipt lines: about 15 million a day at the horizon (five lines per
+9.2 Offline            receipt). Partitioned monthly by received_at; the lot table is small (locations × live batches). Balance updates
+9.3 Consistency        are single-row increments in the ingestion transaction; the entity average update is one row per (entity, sku) per
+9.4 Controls           receipt-type movement.
+9.5 Visibility
+9.6 Phase 2 readiness  Count entry, write-off draft, repack at a shop and transfer receipt are till-local documents in the LOCATION series
+                       (primary till) and arrive as bundles; the till deducts sales against its lot cache immediately and the ledger at
+                       central is authoritative after ingestion.
+
+                       Lot balance = sum of movements (B-I4) enforced by the transaction pattern and verified nightly; negative lots are
+                       visible, never hidden; the reconciliation job raises, never fixes.
+
+                       Write-off is the highest-fraud-risk lifecycle: SoD at INSTANCE level, witness rule, photographs, value bands, MFA
+                       on approval, every step audited; adjustments the same minus the witness; every negative lot and every
+                       tolerance-cleared variance lands on the exception report.
+
+                       Costs and margins are OWN and Federation view-only (M-04); the buyer of a relationship never sees the seller's
+                       lots except through availability; shops see only their own location (M-05).
+
+                       Ageing, reorder points and ABC cycle counting are projections over this ledger; nothing in the phase-1 schema
+                       changes for them.
+
+10. Test strategy
+
+Layer                  What is tested
+Unit
+                       Every guard of Section 4; weighted-average arithmetic to the cent through the doc 13 scenarios; FEFO ranking;
+Contract               availability formula; variance bands; tolerance evaluation; repack cost derivation and yield variance; SoD and witness
+State machine          rules
+Property-based
+                       Every command and query; cost hidden in till-scoped balance reads; Availability for PARTY indicative vs live
+Scenario
+Reconciliation         All seven machines including offline transitions ingested as bundles
+Performance
+                       Lot balance equals movement sum under random interleavings including reversals and negatives; entity average
+                       never negative and equals the recomputed-from-scratch value; a reversal restores the input lot exactly; availability
+                       never counts negative lots
+
+                       Doc 13 scenarios 3 and 4 (M5 parts); flows 6.1­6.9; oversell from two till simulators selling the same last units
+
+                       Injected drift is found and reported; nothing auto-fixed
+
+                       Ingestion of 1,000 receipt bundles per second sustains balance updates; nightly reconcile of 10,000 locations under
+                       30 minutes; expiry scan under 10 minutes
+
+11. Decision requests
+
+#     Point                                           Proposed                                       Decider
+DR-1  Availability definition
+                                                      On hand (non-negative GOOD lots) minus         Federation with distributor input
+DR-2  Damaged units as a separate lot condition       issued-undispatched DN quantities; allocation
+DR-3  Write-off value basis for bands                 does not reserve
+DR-4  Remote witness for single-staff shops
+DR-5  Oversell against a batch with no lot at the     Adopt; sellable only via markdown or written off Architecture review
+DR-6  location
+DR-7  Opening balance as a prerequisite for location  Entity average cost (not retail)               Federation accounts
+      activation
+DR-8  New tables (CR-25-1 to doc 18):                 Adopt (doc 18 DR-7); photos mandatory          Federation admins
+      entity_sku_cost, count_task, expiry_task,
+      pick_list, loss_category, variance_threshold,   Create the lot negative with a REVIEW rather Architecture review
+      loss_tolerance, document extensions             than reject
+      Count-while-trading expectation adjustment
+                                                      Yes for SHOP and WAREHOUSE (M1 gate) Federation admins
+
+                                                      Adopt                                          Architecture review
+
+                                                      Apply movements during the count to the        Architecture review, till track
+                                                      expectation (E-06)
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                         Page 12
+12. Traceability
+
+Section  Identifiers
+3.1­3.3  FR-INV-010, 020, 060; E-01 to E-03, E-09; ADR-03, ADR-38; doc 18 B-I3 to B-I5
+3.4      FR-INV-030; E-04; C-12; doc 24 allocation
+3.5      FR-INV-040, 050; E-05 to E-07; F-10
+3.6      FR-INV-080; B-06; ADR-07; doc 13 scenario 3
+3.7      FR-INV-070; C-10, C-11; R-02
+3.8      FR-LOSS-010 to 060; F-01 to F-11; N-07; doc 18 DR-7
+3.9      FR-INV-090, 100; E-08, E-11
+4        Doc 03 §9­11; H-02/H-03
+9        M-04, M-05; NFR-PRF; NFR-AUD
+
+End of document. Draft for design review; the contract freezes when M6 acknowledges it, targeted end of Stage 2 week 6.
+Implementation guide: 25A.
+
+25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                      Page 13
+
