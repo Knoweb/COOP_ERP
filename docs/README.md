@@ -6,7 +6,6 @@ Operating instructions for everything under `docs/`, for people and for every AI
 
 ```
 docs/
-  HANDOVER.md              one-time briefing from the design conversation (17 Sep 2026); read once
   DECISIONS_PENDING.md     doc 10 Open Items Register in Markdown: the assumption in force for every open decision
   PROGRESS.md              done / next / deviations, updated after every ticket; the resume point for any person or tool
   README.md                this file
@@ -54,7 +53,7 @@ Versions live inside the document (cover block and page footer) and in the regis
 
 ## 5. Sources (`docs/sources/`) and rendering
 
-The PDFs of documents 14–32 and the guides were rendered from generator scripts that were lost before the handover; those PDFs are content-only. From now on:
+The PDFs of documents 14–32 and the guides were rendered with reportlab, and the Word files 10 and 00_Start_Here with docx-js, by generator scripts that were lost before the handover; those files are content-only. From now on:
 
 - Any document that is revised or created has a Markdown source `docs/sources/<same base name>.md`. The source is the maintained text; the PDF is rendered from it and is never edited by hand.
 - One script in `docs/tools/` renders a source to `docs/design/<same base name>.pdf` (or `docs/requirements/` for baseline documents). The render script does not exist yet; it is added with the first document revised from this repository, and the choice of renderer is recorded in `docs/adr/`. Until it exists, no document is re-issued from here.

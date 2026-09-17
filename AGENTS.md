@@ -1,6 +1,6 @@
 # AGENTS.md — Cooperative Retail and Distribution System (Knoweb / COOPFED)
 
-Standing instructions for working in this repository. They apply to every person and to every AI coding tool; the tool-specific files at the root (`CLAUDE.md`, `GEMINI.md`) only point here. Read fully before any task. `docs/HANDOVER.md` is the one-time briefing; `docs/DECISIONS_PENDING.md` lists the assumptions you build to; `docs/README.md` explains how the documentation is organised, read and maintained.
+Standing instructions for working in this repository. They apply to every person and to every AI coding tool; the tool-specific files at the root (`CLAUDE.md`, `GEMINI.md`) only point here. Read fully before any task. `docs/DECISIONS_PENDING.md` lists the assumptions you build to; `docs/README.md` explains how the documentation is organised, read and maintained; `docs/PROGRESS.md` says where the work stands.
 
 ## What this system is (five sentences)
 

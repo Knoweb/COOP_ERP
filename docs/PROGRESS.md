@@ -7,8 +7,9 @@ Last updated: 18 September 2026, branch `docs/step0-instruction-files`.
 ## Done
 
 - **Step 0 (17 Sep).** `AGENTS.md` is the tool-neutral instruction file; `CLAUDE.md` and `GEMINI.md` point to it. `docs/README.md` is the documentation operating guide. `docs/tools/extract-text.sh` regenerates the read-only extracts; all extracts regenerated as UTF-8 with LF endings. ADR and change-request templates added; LF enforced for `.md`, `.txt`, `.sh`. Commit `cf0d836`.
-- **Step 1 (17 Sep).** Orientation reading done: `AGENTS.md`, `docs/HANDOVER.md`, `docs/DECISIONS_PENDING.md`, then 17A and 19A end to end, then 19, 18 and 32. Checkpoint 1 reported to the architect; its open decisions are under Next.
+- **Step 1 (17 Sep).** Orientation reading done: `AGENTS.md`, `docs/HANDOVER.md` (since retired), `docs/DECISIONS_PENDING.md`, then 17A and 19A end to end, then 19, 18 and 32. Checkpoint 1 reported to the architect; its open decisions are under Next.
 - **Document update (18 Sep).** Register v0.5 (Word, live, `docs/requirements/`), 18 v0.3.1, 14 and 22A added, 00_Start_Here v1.1, doc 10 v0.4 with `docs/DECISIONS_PENDING.md` as its Markdown source; extracts regenerated; CR-00_Start_Here-1 raised. Commits `ee32343` to `500102a`. Both Drive folders match the repository file for file.
+- **HANDOVER.md retired (18 Sep).** Everything actionable in the briefing now lives in the register, doc 10, `docs/README.md` and this file; its one unresolved point became CR-28A-1 (cost of goods sold from `stock.moved.v1`, not from the receipt bundle). The original stays in git history, commit `ed20626`.
 - **Sprint 0 work done before the handover** by the platform pair (16 Sep, PRs #1 to #6): parts of S0-02 (app, three profiles, health endpoint), S0-03 (kernel `api` interfaces and in-memory stubs), S0-04 (per-module Flyway runner, baseline migration) and S0-05 (architecture tests, pipeline scripts). Each is partial; see Deviations.
 
 ## Next
