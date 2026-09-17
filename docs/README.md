@@ -7,11 +7,11 @@ Operating instructions for everything under `docs/`, for people and for every AI
 ```
 docs/
   HANDOVER.md              one-time briefing from the design conversation (17 Sep 2026); read once
-  DECISIONS_PENDING.md     mirror of doc 10 Open Items Register: the assumption in force for every open decision
+  DECISIONS_PENDING.md     doc 10 Open Items Register in Markdown: the assumption in force for every open decision
   PROGRESS.md              done / next / deviations, updated after every ticket; the resume point for any person or tool
   README.md                this file
-  requirements/            the requirements baseline: documents 00–13 (Word) and 15–16 (PDF), plus txt/ extracts
-  design/                  the system design: 17–32, the nA guides, 24B, 00_Start_Here, plus txt/ extracts
+  requirements/            the requirements baseline: the register 00 (Word, live), 01–13 (Word), 15–16 (PDF), plus txt/ extracts
+  design/                  the system design: 14, 17–32, the nA guides, 24B, 00_Start_Here (Word), plus txt/ extracts
   sources/                 Markdown sources of documents revised or created from this repository onward
   tools/                   extract-text.sh (extracts) and the render script (Markdown → PDF)
   adr/                     architecture decision records, one file each, mirroring doc 09 (TEMPLATE.md)
@@ -24,7 +24,7 @@ Every document has a number. The number is an identity, never a reading order.
 
 | File name pattern | What it is |
 |---|---|
-| `00_Knoweb_Document_Register` | The register: which version of every document is current. It wins every version dispute. |
+| `00_Knoweb_Document_Register.docx` | The register, a live Word document kept in `docs/requirements/`: which version of every document is current. It wins every version dispute. |
 | `00_Start_Here.docx` | The entry point to the design folder: reading paths by role and the developer start guide. |
 | `01`–`13` | Requirements baseline (Word): vision, domain model, state machines, process flows, SRS, NFR, matrices, traceability, decisions log (09), open items (10, live), business primer, glossary (12, live), worked scenarios. |
 | `15`, `16` | Clarification questionnaire and its answers (PDF). |
@@ -59,6 +59,7 @@ The PDFs of documents 14–32 and the guides were rendered from generator script
 - Any document that is revised or created has a Markdown source `docs/sources/<same base name>.md`. The source is the maintained text; the PDF is rendered from it and is never edited by hand.
 - One script in `docs/tools/` renders a source to `docs/design/<same base name>.pdf` (or `docs/requirements/` for baseline documents). The render script does not exist yet; it is added with the first document revised from this repository, and the choice of renderer is recorded in `docs/adr/`. Until it exists, no document is re-issued from here.
 - Sources keep the document's cover block (number, title, version, date, status, inputs) and its section numbering, so that references such as "24A §3.2" stay valid.
+- One source lives outside `docs/sources/`: doc 10's is `docs/DECISIONS_PENDING.md`, kept at the docs root so that code comments can cite its item ids by a short path. It must carry the doc 10 version the register names; the Word file is its published form.
 
 ## 6. Procedure: revising or creating a document
 
@@ -76,11 +77,11 @@ A change request is how a problem in a document is raised. Write one when a docu
 
 - One file per request, named `CR-<doc>-<n>.md` (for example `CR-24-3.md` for the third request against document 24), from `TEMPLATE.md`.
 - Status moves `raised → accepted | rejected → applied`. Only the architect accepts. When applied, the affected documents are re-issued by the procedure in section 6 and the request records their new versions.
-- Requests accepted before this repository existed (CR-21-1 to CR-29-x) are already applied in doc 18 v0.3; they are not repeated here.
+- Requests accepted before this repository existed (CR-21-1 to CR-29-x) are already applied in doc 18 v0.3.1; they are not repeated here.
 
 ## 8. Architecture decision records (`docs/adr/`)
 
-Decisions already taken are numbered ADR-01 onward in doc 09 (requirements baseline) and are cited by number in the design documents; ADR-37 to ADR-50 are listed in doc 18 v0.3 §11 and not yet entered in doc 09.
+Decisions already taken are numbered ADR-01 onward in doc 09 (requirements baseline) and are cited by number in the design documents; ADR-37 to ADR-50 are listed in doc 18 v0.3.1 §11 and not yet entered in doc 09.
 
 - One file per decision, `ADR-<nnn>-<short-title>.md` (three digits), from `TEMPLATE.md`.
 - Mirror an existing doc 09 decision here the first time code touches its area, so the reason is beside the code. Record a **new** decision here first, with the next free number, and enter it in doc 09 at its next revision.

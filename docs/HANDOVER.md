@@ -2,6 +2,8 @@
 
 Date: 17 September 2026. Read once at the start; `AGENTS.md` holds the standing rules; `docs/DECISIONS_PENDING.md` the assumptions.
 
+> **Update, 18 September 2026.** Sections 1 and 2 below are now historical. The six document corrections were applied: the register is v0.5 (`docs/requirements/00_Knoweb_Document_Register.docx`, Word, live) and lists the current versions; doc 18 is v0.3.1; 14, 22A and 00_Start_Here v1.1 are in `docs/design/`. Doc 10 v0.4 (Word) is named by the register but not yet in the repository, so `docs/DECISIONS_PENDING.md` still carries the v0.3 content. The repository is not empty: a partial Sprint 0 skeleton was merged on 16 September (see `docs/PROGRESS.md`). Standing rules: `AGENTS.md`; documentation operating guide: `docs/README.md`.
+
 ## 1. Where things stand
 
 - Requirements baseline: 16 documents (00–13, 15, 16) at v0.2, plus change requests of 3 September 2026 not yet folded in. Drive folder `1DKsOlf4k8vlOJCjp2oVaEQlg-XCs1fgh`.

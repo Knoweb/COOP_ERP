@@ -20,12 +20,12 @@ Consequences enforced by the build: documents are immutable once issued (correct
 |---|---|
 | What does module n do and why | `docs/design/<n>_*.pdf` (design document) — sections 3–6 |
 | What exactly do I build for module n | `docs/design/<n>A_*.pdf` (implementation guide) — self-contained; section 3 DDL, 5 API slice, 6 handler specs, 10 tickets, 11 assumptions |
-| Shared tables, invariants, which schema owns what | `docs/design/18_Core_Data_Model.pdf` v0.3 (Part F is the schema register) |
+| Shared tables, invariants, which schema owns what | `docs/design/18_Core_Data_Model.pdf` v0.3.1 (Part F is the schema register) |
 | Kernel services (scope, identity, permissions, audit, events, documents, sync) | `docs/design/19_Kernel_Services.pdf` v0.2 and `19A_*.pdf` |
 | Repository layout, build, conventions, hello module | `docs/design/17A_Build_Skeleton_Implementation_Guide.pdf` |
 | Till ↔ central protocol | `docs/design/32_Sync_Contract.pdf` |
-| Which document version is current | `docs/design/00_Knoweb_Document_Register.pdf` — the register wins |
-| Decisions not yet taken, and the assumption in force | `docs/DECISIONS_PENDING.md` (mirror of doc 10 Open Items Register) |
+| Which document version is current | `docs/requirements/00_Knoweb_Document_Register.docx` (Word, live) — the register wins |
+| Decisions not yet taken, and the assumption in force | `docs/DECISIONS_PENDING.md` (doc 10 Open Items Register in Markdown; the register names the version it must match) |
 | Decisions already taken | doc 09 Decisions Log in the requirements baseline; ADR numbers are cited in the design documents |
 | How the documentation is organised, extracted, revised and published | `docs/README.md` |
 
