@@ -83,8 +83,6 @@ Presented to stakeholders as defaults that stand unless objected to. Each has de
 | F-16 | Minimum connectivity go-live gate values: accept as stated | Accepted; enforced at location activation | Before pilot | Baseline v0.2 §1; doc 21 §4.3 |
 | F-17 | Ratify the 13 standing defaults (Section 2) in one sitting | Defaults stand unless objected to | Before pilot | Baseline v0.2 §2 |
 
-(F-15 is not assigned in v0.4.)
-
 ### 3.3 Federation legal
 
 | Ref | Item | Assumed / proposed | Needed by | Source |
