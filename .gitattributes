@@ -1,0 +1,19 @@
+# Binary documents and assets: Git must never apply line-ending conversion to these.
+# (Git misdetects the reportlab-generated PDFs as text; with core.autocrlf=true that would corrupt them.)
+*.pdf      binary
+*.docx     binary
+*.xlsx     binary
+*.pptx     binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.ico      binary
+*.ttf      binary
+*.otf      binary
+*.woff     binary
+*.woff2    binary
+*.jar      binary
+*.apk      binary
+*.aab      binary
+*.keystore binary
