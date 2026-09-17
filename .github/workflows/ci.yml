@@ -69,9 +69,18 @@ jobs:
         shell: pwsh
         run: ./tools/check-generated.ps1
 
-      - name: Set up Android SDK
+      - name: Install Android SDK packages
         if: ${{ hashFiles('till/gradlew') != '' }}
-        uses: android-actions/setup-android@v3
+        shell: bash
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
 
       - name: Make till wrapper executable
         if: ${{ hashFiles('till/gradlew') != '' }}
