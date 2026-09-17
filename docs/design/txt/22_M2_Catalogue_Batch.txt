@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-22 ­ M2 Catalogue & Batch
+22 â€“ M2 Catalogue & Batch
 
 Module design for the shared product truth: stock keeping units in one global namespace
 with local and shared status, units and pack conversions, barcodes many-to-one with
@@ -10,9 +10,9 @@ operates, and the largest reference set distributed to tills.
 
 Field             Value
 Document
-Version           22 ­ M2 Catalogue & Batch (Stage 2 module design; template of doc 20 §5)
+Version           22 â€“ M2 Catalogue & Batch (Stage 2 module design; template of doc 20 Â§5)
 Date
-Owning developer  v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 3
+Owning developer  v0.1 â€“ draft for design review; contract freeze targeted end of Stage 2 week 3
 
 Inputs            8 September 2026
 
@@ -20,8 +20,8 @@ Depends on        Module developer (full-stack): backend and web screens end to 
                   snapshot; M4 and M5 command batch registration
 Depended on by
                   05 SRS (FR-SKU, FR-LOC-020); 16 answers (B section, P-07, R-02 to R-04, T-03); 09 ADR-07, ADR-08; 17
-                  v0.2.1 §7.2; 18 v0.2 part B; 19 v0.2 §5, §8; 20 v0.3 M2 blueprint and Appendix A (images, attributes); 21 (owner
-                  entities, scopes); 30 §5.2; 32 §5.1; the September 2026 multi-MRP study (barcode-to-batch, 2D readiness)
+                  v0.2.1 Â§7.2; 18 v0.2 part B; 19 v0.2 Â§5, Â§8; 20 v0.3 M2 blueprint and Appendix A (images, attributes); 21 (owner
+                  entities, scopes); 30 Â§5.2; 32 Â§5.1; the September 2026 multi-MRP study (barcode-to-batch, 2D readiness)
 
                   M1 (owner entity, scope, locations for assortment), kernel (audit, events, i18n, snapshot change log, attachments
                   for images)
@@ -52,7 +52,7 @@ Units of measure and per-SKU pack conversions (case of 24 is the same Serialised
 SKU); weighed goods by kilogram
 
 Barcode registry: many-to-one, symbology-aware, factory and in-store     Barcode printing hardware (M6 peripheral layer); label templates
-(20­29) codes, optional batch link; GS1 application-identifier data      (M3 for price labels, M5 for batch stickers)
+(20â€“29) codes, optional batch link; GS1 application-identifier data      (M3 for price labels, M5 for batch stickers)
 captured from 2D scans
 
 Tags as the governed grouping vocabulary; local tags per entity          A mandatory category hierarchy (B-15)
@@ -87,7 +87,7 @@ FR-SKU-080          Supplier attribution at batch level; one or two SKUs per pro
 FR-SKU-090
 FR-SKU-100          Weighed goods by kilogram; bulk-to-pack via repack recipe (B-06)                            3.2, 6.7
 FR-SKU-110
-FR-LOC-020          Barcodes: not guaranteed; many-to-one; in-store 20­29 labels; code lookup (B-11, B-12)      3.3, 6.5
+FR-LOC-020          Barcodes: not guaranteed; many-to-one; in-store 20â€“29 labels; code lookup (B-11, B-12)      3.3, 6.5
 B-17 (parked)
 Doc 20 Appendix     Units and conversions defined per SKU by the owner (B-13)                                   3.2
 A
@@ -138,7 +138,7 @@ Vocabulary
                         uom is Federation-governed: EA, KG, G, L, ML, CASE, PKT, BAG, BOX, DOZ. An entity cannot add units; it can
 Conversion              define conversions for its own SKUs.
 
-                        sku_uom_conversion(sku, uom, factor_to_base, effective_from/to): CASE = 24 × EA. A
+                        sku_uom_conversion(sku, uom, factor_to_base, effective_from/to): CASE = 24 Ã— EA. A
                         supplier's case-size change is a new effective-dated row, not an edit (P5). Weighed goods: base KG; retail packs
                         of a bulk SKU are a different SKU produced by an M5 recipe, never a conversion (ADR-07).
 
@@ -148,16 +148,16 @@ Aspect                  sku_barcode(barcode, symbology, sku, uom, batch_id?, own
 Registry                (barcode, symbology) across the federation for factory symbologies; INTERNAL codes unique within the owner
                         entity (B-I2).
 In-store codes
-                        GS1 prefixes 20­29 for weigh labels and stickers. The label encodes SKU code and weight (or SKU code and
+                        GS1 prefixes 20â€“29 for weigh labels and stickers. The label encodes SKU code and weight (or SKU code and
 Batch link              batch), never a price, so the till resolves the price through the shared engine and the control-price ceiling still
-                        applies (multi-MRP study; doc 18 §4.9).
+                        applies (multi-MRP study; doc 18 Â§4.9).
 2D readiness
                         batch_id set when the code identifies one batch: an MPCS batch sticker (option C of the study), a manufacturer
                         code that changed with the MRP (option B), or a 2D code carrying application identifier 10. The till's scan layer
                         passes the parsed GTIN, lot and expiry; M2's lookup returns the SKU and, when it can, the batch.
 
                         LookupByBarcode accepts (gtin, lot?, expiry?, symbology); when lot is present and a batch with
-                        that number exists for the SKU, the batch is returned even without a registered batch barcode ­ this is what
+                        that number exists for the SKU, the batch is returned even without a registered batch barcode â€“ this is what
                         makes GS1 2027 marking pay off without any catalogue work.
 
     3.4 Images          Design
@@ -166,7 +166,7 @@ Aspect                  sku_image(sku, barcode?, owner, object_key_full, object_
 Model                   (doc 18 v0.2). One ACTIVE image per (sku, barcode-or-null).
 
 Thumbnails              An M2 job (ImageThumbnailJob) produces the 128 px WebP thumbnail on attach; the snapshot carries only
-                        thumbnail keys; the till fetches lazily and caches (doc 20 M2; doc 32 §5.1).
+                        thumbnail keys; the till fetches lazily and caches (doc 20 M2; doc 32 Â§5.1).
 Ownership
                         Federation attaches for SHARED SKUs; an entity may attach for its LOCAL SKUs; an entity may also attach a
                         local override for a SHARED SKU (different pack in that region), scoped to its own locations.
@@ -187,7 +187,7 @@ Rule
 
 Aspect               tax_category(code, names) and tax_rate(category, rate_percent, effective_from/to).
 Model                Standard VAT only (J-03); exempt and zero-rated as categories with a 0% rate row. Publication of a new rate is a
-                     Federation command with an apply_from that reaches tills through the snapshot (doc 32 §5.2).
+                     Federation command with an apply_from that reaches tills through the snapshot (doc 32 Â§5.2).
 
     3.7 Batch        Design
 
@@ -198,7 +198,7 @@ Uniqueness           ADR-38).
 Synthetic batches
 MRP                  (sku_id, supplier_id, batch_no) unique. A receiver who keys a batch that already exists gets the
 Who creates batches  existing row (the GRN cites it); a receiver who keys a new number for the same physical batch creates a
-                     duplicate identity ­ accepted, flagged as a duplicate suspect for the steward (Section 6.2).
+                     duplicate identity â€“ accepted, flagged as a duplicate suspect for the steward (Section 6.2).
 
                      For SKUs with batch_tracked = false each receipt line creates a synthetic batch (is_synthetic =
                      true, batch_no = 'S-' + document number + line) so that MRP and cost always have a home and
@@ -216,19 +216,19 @@ Who creates batches  existing row (the GRN cites it); a receiver who keys a new 
 
 Aspect               Design
 Definition
-                     The set of SKUs a location's till must know: SKUs on the owning MPCS's retail price list (M3 query)  SKUs with
-Materialisation      a lot at the location (M5 query)  LOCAL SKUs of the owning entity  SKUs tagged core-range (a governed
+                     The set of SKUs a location's till must know: SKUs on the owning MPCS's retail price list (M3 query) âˆª SKUs with
+Materialisation      a lot at the location (M5 query) âˆª LOCAL SKUs of the owning entity âˆª SKUs tagged core-range (a governed
                      tag the Federation uses for goods every shop should be able to sell).
 
                      location_assortment(location_id, sku_id, reason, since) maintained by an M2 consumer of
                      price-list, lot and SKU events; the snapshot contributor reads it; a change to it writes the change-log row for that
-                     location (doc 32 §5.1). Change request CR-22-2 adds the table to doc 18 part B.
+                     location (doc 32 Â§5.1). Change request CR-22-2 adds the table to doc 18 part B.
 
 3.9 Minimal supplier table (until M10)
 
 Aspect               Design
 Model
-                     supplier(supplier_id, owner_entity, name, status) ­ enough for batch attribution (B-03) and
+                     supplier(supplier_id, owner_entity, name, status) â€“ enough for batch attribution (B-03) and
                      Federation receipts. Change request CR-22-1 adds it to doc 18 with the note that M10 absorbs it in phase 2 (doc
                      20 M10 seams).
 
@@ -238,7 +238,7 @@ Model
    4.1 SKU
 
 From        To          Trigger / command           Guard                               Permission            Audit
-­           DRAFT       CreateSku                                                                             SKU_CREATED
+â€“           DRAFT       CreateSku                                                                             SKU_CREATED
                                                     English name; base unit; tax        cat.sku.create_local
                         ActivateLocalSku            category; owner = caller scope      (entity) or           SKU_ACTIVATE
                                                                                         cat.sku.create (F)    D
@@ -273,7 +273,7 @@ INACTIVE    SHARED                                  Reason                      
    4.2 Barcode
 
 From        To          Trigger / command           Guard                               Permission            Audit
-­           ACTIVE      RegisterBarcode             Unique per symbology                cat.barcode.manage    BARCODE_RE
+â€“           ACTIVE      RegisterBarcode             Unique per symbology                cat.barcode.manage    BARCODE_RE
                                                     (federation) or per owner           (owner of SKU; any    GISTERED
 ACTIVE      RETIRED     RetireBarcode               (INTERNAL); SKU not                 entity for INTERNAL
 ACTIVE                  LinkBarcodeToBatch          INACTIVE                            on its own SKUs)      BARCODE_RET
@@ -285,7 +285,7 @@ ACTIVE                  LinkBarcodeToBatch          INACTIVE                    
 
 From        To          Trigger / command           Guard                               Permission            Audit
 
-­           REGISTERED  RegisterBatch (from M4 GRN  SKU active; unique (sku,            internal (caller      BATCH_REGIS
+â€“           REGISTERED  RegisterBatch (from M4 GRN  SKU active; unique (sku,            internal (caller      BATCH_REGIS
                         or M5 repack)               supplier, batch_no); MRP
 REGISTERE   SUPERSEDE                               present when required; expiry       module's permission) TERED
 D           D                                       when expiry-tracked
@@ -298,9 +298,9 @@ D           D                                       when expiry-tracked
 
 From        To          Trigger / command           Guard                               Permission            Audit
                         PublishTaxRate                                                                        TAX_RATE_PU
-­           SCHEDULED                               Caller F; category exists;          cat.tax.publish (F,   BLISHED
-                                                    apply_from  today; no overlap       MFA)                  ­
-SCHEDULE    IN_FORCE    Clock (apply_from)          ­
+â€“           SCHEDULED                               Caller F; category exists;          cat.tax.publish (F,   BLISHED
+                                                    apply_from â‰¥ today; no overlap      MFA)                  â€“
+SCHEDULE    IN_FORCE    Clock (apply_from)          â€“
 D                       PublishTaxRate (next)                                           system                TAX_RATE_PU
             SUPERSEDE                                                                                         BLISHED
 IN_FORCE    D                                       Sets effective_to on the current cat.tax.publish
@@ -317,7 +317,7 @@ ActivateLocalSku /         sku                                as above          
 ActivateSharedSku                                                                                        changing base uom or
 UpdateSku                  names, descriptions, flags,        owner; F for SHARED                        tracking flags requires no  sku.promoted.v1
                            attributes, tags                                                              lots anywhere (M5 query)
-PromoteToShared                                                                                          Owner  Federation;          sku.merged.v1
+PromoteToShared                                                                                          Owner â†’ Federation;         sku.merged.v1
                            local sku, completed names,        cat.sku.promote (F)                        alias row for the origin
 MergeIntoShared            governed tags                                                                 entity                      sku.deactivated/re
                                                                                                          Alias; barcodes moved;      activated.v1
@@ -416,15 +416,15 @@ duplicate.suspected/dismissed.v1            supplier id, owner                  
 
 Flow                             Sequence                                                             Failure paths
 6.1 Assembling the initial
-catalogue (the T-03 critical     Steward uploads the consolidated sheet in validate mode  report:     Nothing partial: each row commits or is
+catalogue (the T-03 critical     Steward uploads the consolidated sheet in validate mode â†’ report:    Nothing partial: each row commits or is
 path)                            rows accepted, rows with errors (missing English name, unknown       reported; a re-upload of the same
                                                                                                       sheet is idempotent by a row key
 6.2 Duplicate detection          unit, bad tax category), duplicate suspects across scripts (Section  (sheet row hash); suspects are never
-across scripts                   6.2)  steward fixes the sheet or resolves suspects  commit           auto-merged
-                                 creates DRAFT SKUs  steward completes translations
-6.3 Promoting a local SKU        (dashboard shows completeness by tag)  ActivateSharedSku in
-                                 bulk for rows with three names  barcodes registered from the
-6.4 Batch registration at        sheet  images attached in bulk by SKU code
+across scripts                   6.2) â†’ steward fixes the sheet or resolves suspects â†’ commit         auto-merged
+                                 creates DRAFT SKUs â†’ steward completes translations
+6.3 Promoting a local SKU        (dashboard shows completeness by tag) â†’ ActivateSharedSku in
+                                 bulk for rows with three names â†’ barcodes registered from the
+6.4 Batch registration at        sheet â†’ images attached in bulk by SKU code
 receipt
                                  On import and on CreateSku: normalise names (NFC, case,              A dismissed pair is remembered;
 6.5 Scan resolution at the till  punctuation), transliterate Sinhala and Tamil names to a Latin key   thresholds are configuration; false
@@ -433,26 +433,26 @@ receipt
 6.7 Bulk to pack                 duplicate_suspect rows for the steward
 
 6.8 MRP correction               An MPCS's local item sells well; Federation adds it to the shared    Merge with lots in a different base unit
-                                 range  PromoteToShared (as new) or MergeIntoShared (existing         is refused; barcodes that collide with
-                                 shared SKU)  alias row (origin sku  canonical)                       the target's are retired with a report
-                                 sku.promoted/merged.v1  M5 re-points the origin entity's lots; M8
+                                 range â†’ PromoteToShared (as new) or MergeIntoShared (existing        is refused; barcodes that collide with
+                                 shared SKU) â†’ alias row (origin sku â†’ canonical) â†’                   the target's are retired with a report
+                                 sku.promoted/merged.v1 â†’ M5 re-points the origin entity's lots; M8
                                  resolves aliases at query time so trends are unbroken
 
                                  (FR-SKU-100)
 
-                                 M4 confirms a GRN  per line: RegisterBatch(sku, supplier,            MRP missing for a has_printed_mrp
-                                 batch_no, dates, MRP)  existing batch returned or created            SKU blocks GRN confirmation for that
-                                 (synthetic when not batch-tracked)  batch.registered.v1  M3          line with a clear message; a new
+                                 M4 confirms a GRN â†’ per line: RegisterBatch(sku, supplier,           MRP missing for a has_printed_mrp
+                                 batch_no, dates, MRP) â†’ existing batch returned or created           SKU blocks GRN confirmation for that
+                                 (synthetic when not batch-tracked) â†’ batch.registered.v1 â†’ M3        line with a clear message; a new
                                  compares MRP with the standing list and raises a pricing review      batch_no for an existing physical batch
                                                                                                       creates a suspect, not an error
                                  when lower
 
-                                 Scan layer parses (symbology, gtin, lot?, expiry?)  snapshot         Unknown code  code-lookup or
-                                 lookup: barcode  sku, uom, batch link; or gtin + lot  batch by       search by name; a code mapped to an
-                                 number  returns item card data; price resolution is M3's engine      INACTIVE SKU without sell-through 
+                                 Scan layer parses (symbology, gtin, lot?, expiry?) â†’ snapshot        Unknown code â†’ code-lookup or
+                                 lookup: barcode â†’ sku, uom, batch link; or gtin + lot â†’ batch by     search by name; a code mapped to an
+                                 number â†’ returns item card data; price resolution is M3's engine     INACTIVE SKU without sell-through â†’
                                                                                                       refuse with reason
 
-                                 Supplier delivers cases; GRN line in CASE; conversion 24  base A missing conversion blocks the GRN
+                                 Supplier delivers cases; GRN line in CASE; conversion 24 â†’ base A missing conversion blocks the GRN
 
                                  EA; the till sells EA; a case barcode maps to (sku, CASE)            line in that unit
 
@@ -461,20 +461,20 @@ receipt
                                  REPACK_OUTPUT); the output batch is registered by M5 with the
                                  input batch's expiry and a local MRP if labelled
 
-                                 Warehouse keyed 980 instead of 1,080  CorrectBatchMrp with           A correction after sales were capped
-                                 reason and MFA  new batch (corrects old)  batch.corrected.v1         by the wrong MRP is reported to the
-                                  M5 re-points lots; M3 re-evaluates ceilings; receipts already       entity's exception queue (money was
+                                 Warehouse keyed 980 instead of 1,080 â†’ CorrectBatchMrp with          A correction after sales were capped
+                                 reason and MFA â†’ new batch (corrects old) â†’ batch.corrected.v1       by the wrong MRP is reported to the
+                                 â†’ M5 re-points lots; M3 re-evaluates ceilings; receipts already      entity's exception queue (money was
                                  issued keep their recorded mrp_applied                               left on the table, or, if the MRP was too
                                                                                                       high, an over-charge review)
 
    7. Configuration                        Default                                   Scope                           Who may change
                                            0.85                                      Federation                      cat.sku.promote
-Item                                       v1                                        Federation                      ­
-catalogue.duplicate_threshold              128 / 10                                  Federation                      ­
+Item                                       v1                                        Federation                      â€“
+catalogue.duplicate_threshold              128 / 10                                  Federation                      â€“
 catalogue.transliteration_table_version    false                                     Entity                          cat.sku.create_local
 catalogue.thumbnail_px / max_thumb_kb      true (DR-3)                               Federation                      cat.sku.deactivate
 catalogue.local_sku_requires_barcode       core-range                                Federation                      cat.tag.manage
-catalogue.inactive_sell_through            4                                         Federation                      ­
+catalogue.inactive_sell_through            4                                         Federation                      â€“
 catalogue.assortment_core_tag
 catalogue.attributes_max_kb
 
@@ -491,9 +491,9 @@ Product card             Product card    W  Steward, MPCS                       
 Stock list upload (bulk  Stock list      W  Steward, MPCS                            Three names with
 import)                                                                              completeness marks;
                                                                                      units and conversions;
-Duplicate suspects       ­               W  Steward                                  barcodes with batch
+Duplicate suspects       â€“               W  Steward                                  barcodes with batch
                                                                                      links; images; tags;
-Translation              ­               W  Steward                                  attributes; batch list tab
+Translation              â€“               W  Steward                                  attributes; batch list tab
 
 completeness                                                                         Validate then commit;
                                                                                      report with row
@@ -533,14 +533,14 @@ Aspect                    Design
 9.2 Snapshot size         thousands federation-wide); barcodes two to three per SKU; batches: millions per year (synthetic ones dominate).
                           Batch is partitioned by created_at month; lookups are by (sku, supplier, batch_no) and by id.
 9.3 Search latency
-9.4 Collation and         A shop's assortment: typically 2,000­6,000 SKUs; catalogue rows about 1 KB each with barcodes and
+9.4 Collation and         A shop's assortment: typically 2,000â€“6,000 SKUs; catalogue rows about 1 KB each with barcodes and
 normalisation             conversions; thumbnails about 8 KB each; a full snapshot under 20 MB including thumbnails, under 5 MB without
-9.5 Security and privacy  (doc 32 §10). Deltas are per changed row.
+9.5 Security and privacy  (doc 32 Â§10). Deltas are per changed row.
 9.6 Availability
                           Trigram indexes on the three names plus sku_code; target under 100 ms for a partial name on the back office;
                           the till searches its local copy.
 
-                          NFC at write (kernel converter); ICU collations on the name columns; sort by the display language (doc 19 §5.4);
+                          NFC at write (kernel converter); ICU collations on the name columns; sort by the display language (doc 19 Â§5.4);
                           the transliteration table for duplicate scoring is a versioned repository asset.
 
                           No personal data in the catalogue; supplier names are business names; images are public-safe product
@@ -564,10 +564,10 @@ Performance
                 Random import sheets: every row either creates exactly one DRAFT or one report line; re-import is idempotent;
                 duplicate scoring is symmetric and stable under NFC variants of the same name
 
-                The Sinhala/Tamil name test set of doc 19 §5.4 extended with known duplicates and known distinct pairs; threshold
+                The Sinhala/Tamil name test set of doc 19 Â§5.4 extended with known duplicates and known distinct pairs; threshold
                 tuned on it
 
-                Flows 6.1­6.8; doc 13 scenario 3 (repack) and 4 (batch MRPs) for M2's part; a GRN line for a has_printed_mrp SKU
+                Flows 6.1â€“6.8; doc 13 scenario 3 (repack) and 4 (batch MRPs) for M2's part; a GRN line for a has_printed_mrp SKU
                 without MRP is blocked
 
                 Import of 20,000 rows with validation under 5 minutes; search under 100 ms; snapshot build for a 6,000-SKU
@@ -602,12 +602,12 @@ DR-7
 
 22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                                    Page 10
 Section  Identifiers
-3.1­3.2  FR-SKU-010, 020, 050, 070, 080; B-01, B-02, B-06, B-08, B-09, B-13, B-14; ADR-07; doc 18 B-I1; doc 20 Appendix A
+3.1â€“3.2  FR-SKU-010, 020, 050, 070, 080; B-01, B-02, B-06, B-08, B-09, B-13, B-14; ADR-07; doc 18 B-I1; doc 20 Appendix A
 3.3      FR-SKU-060; B-11, B-12; doc 18 B-I2; multi-MRP study options B, C, E
 3.4      Doc 20 M2 and Appendix A (images)
-3.5­3.6  FR-SKU-090, 110; B-15; G-09; J-03
+3.5â€“3.6  FR-SKU-090, 110; B-15; G-09; J-03
 3.7      FR-SKU-030, 040; B-03, B-04; ADR-08, ADR-38; doc 18 B-I8, DR-4, DR-5
-3.8­3.9  Doc 32 §5.1; doc 20 M10 seams
+3.8â€“3.9  Doc 32 Â§5.1; doc 20 M10 seams
 4        FR-SKU-100; B-10, B-17
 6        T-03; R-02 to R-04; doc 13 scenarios 3 and 4
 9        NFR-LOC-010/020; NFR-PRF-040; M-03

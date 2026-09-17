@@ -1,6 +1,6 @@
 # HANDOVER.md — from the design conversation to this repository
 
-Date: 17 September 2026. Read once at the start; `CLAUDE.md` holds the standing rules; `docs/DECISIONS_PENDING.md` the assumptions.
+Date: 17 September 2026. Read once at the start; `AGENTS.md` holds the standing rules; `docs/DECISIONS_PENDING.md` the assumptions.
 
 ## 1. Where things stand
 

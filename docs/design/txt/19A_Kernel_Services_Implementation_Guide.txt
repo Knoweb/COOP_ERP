@@ -1,20 +1,20 @@
 Cooperative Retail and Distribution System
 
-19A ญ Kernel Services Implementation Guide
+19A โ€“ Kernel Services Implementation Guide
 
 Sprint 0, part two. The ten layer-0 services behind the interfaces 17A scaffolded: scope
 and session, identity, permissions, audit, event backbone, internationalisation,
 documents and numbering, edge sync gateway, attachments, notifications delivery,
-configuration register and scheduling ญ as tables, classes, algorithms, tests and tickets.
+configuration register and scheduling โ€“ as tables, classes, algorithms, tests and tickets.
 
 Field             Value
-Document          19A ญ Kernel Services Implementation Guide (implements 19 Kernel Services v0.2, doc 18 parts CญE, doc 32)
-Version           v0.1 ญ for the platform pair; Sprint 0 weeks 1ญ3 overlapping 17A from day 4
+Document          19A โ€“ Kernel Services Implementation Guide (implements 19 Kernel Services v0.2, doc 18 parts Cโ€“E, doc 32)
+Version           v0.1 โ€“ for the platform pair; Sprint 0 weeks 1โ€“3 overlapping 17A from day 4
 Date              8 September 2026
 Prerequisite      17A: repository, kernel package with interfaces and stubs, baseline migration, hello module. Every section below
                   replaces a 17A stub and must keep the hello module green.
 Audience          Platform pair, DevOps, till track lead (sections 9 and 10 define what the till talks to).
-Restated content  Marked restated from doc X งY. Tables are given as DDL fragments; the full files live in
+Restated content  Marked restated from doc X ยงY. Tables are given as DDL fragments; the full files live in
                   backend/app/src/main/resources/db/migration/kernel/.
 
 What done looks like. The hello module's integration tests pass against real services: a scoped user cannot read
@@ -29,11 +29,11 @@ instances.
 
 Service                 kernel.api interface (17A)  Tables (schema kernel)          Main classes (kernel.internal)    Ticket
 
-1 Scope and session ScopeContext                    ญ (GUC helpers from 17A)        ScopeFilter,                      K-01
+1 Scope and session ScopeContext                    โ€“ (GUC helpers from 17A)        ScopeFilter,                      K-01
                                                                                     ScopeConnectionCustomizer,
                                                                                     GrantedEntities
 
-2 Identity              IdentityProviderClient,     ญ (provider holds credentials)  JwtClaimsMapper,                  K-02
+2 Identity              IdentityProviderClient,     โ€“ (provider holds credentials)  JwtClaimsMapper,                  K-02
                         DeviceCredentials                                           StepUpInterceptor, PinHasher,
                                                                                     DeviceAuth
 
@@ -72,12 +72,12 @@ register                                                                        
 12 Scheduling                                       scheduled_job, job_run          JobRunner, LockProvider,          K-12
                                                                                     DayCloseTrigger
 
-13 Business date and Clock, BusinessDate            ญ                               BusinessDateService, ClockOffset K-13
+13 Business date and Clock, BusinessDate            โ€“                               BusinessDateService, ClockOffset K-13
 clock
 
 1. Scope and session
 
-Restated from doc 19 ง1 and doc 18 ง3.7. Every request carries a resolved principal and scope; the database
+Restated from doc 19 ยง1 and doc 18 ยง3.7. Every request carries a resolved principal and scope; the database
 session carries the same facts as custom settings that the row-level security policies read.
 
 // kernel.api.ScopeContext
@@ -122,19 +122,19 @@ Tests
                  view trading.v_document_party omits cost, margin and internal notes and is what PARTY reads go through
                  (implemented by M4 against the template here).
 
-                 The RLS matrix of 17A ง12 extended: OWN, PARTY, FEDERATION_VIEW, EXTERNAL grants, NONE; a
+                 The RLS matrix of 17A ยง12 extended: OWN, PARTY, FEDERATION_VIEW, EXTERNAL grants, NONE; a
                  transaction that forgets the customizer sees zero rows.
 
 19A - Kernel Services Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 3
 2. Identity
 
-Restated from doc 19 ง2. Four principals, four authentication paths; the provider issues tokens, the kernel maps
+Restated from doc 19 ยง2. Four principals, four authentication paths; the provider issues tokens, the kernel maps
 claims and enforces step-up and device auth.
 
 Piece                  Implementation
 Resource server
                        Spring Security OAuth2 resource server with the provider's JWKS; JwtClaimsMapper turns claims sub, dev,
-Provider wrapper       ent, scopes[], roles[], rv, cls, mfa_at, lang into ScopeContext (doc 19 ง1 claim table). Claims
+Provider wrapper       ent, scopes[], roles[], rv, cls, mfa_at, lang into ScopeContext (doc 19 ยง1 claim table). Claims
                        scopes and roles are put into the token by a provider mapper that reads M1's user_role through a small kernel
 Step-up MFA            endpoint at token issue time, so the provider stays generic.
 
@@ -146,12 +146,12 @@ Tests
                        @CommandHandler(permission=..., requiresMfa=true) or permission.requires_mfa in the
                        catalogue; StepUpInterceptor checks mfaAt against the freshness window from the configuration register
                        (security.mfa_freshness_hours, per-action list) and returns 401 with problem type step_up_required and
-                       the provider's step-up URL; the web shell handles it (17A ง7).
+                       the provider's step-up URL; the web shell handles it (17A ยง7).
 
                        Client certificate at the edge (mTLS terminated at the proxy, subject forwarded in a header the app trusts only from the
                        proxy) or OAuth2 client credentials per device; either yields a device token with dev and cls = DEVICE.
                        DeviceAuth validates status ACTIVE against M1 through the permission cache and rejects SUSPENDED with 403
-                       plus the signed revoke instruction (doc 32 ง9).
+                       plus the signed revoke instruction (doc 32 ยง9).
 
                        PinHasher: Argon2id, memory 64 MB, iterations 3, parallelism 2, 16-byte salt, output 32 bytes; the hash is what the
                        operator snapshot carries. Verification happens on the device; the kernel never sees PINs at login.
@@ -164,7 +164,7 @@ Tests
 
 3. Permissions
 
-Restated from doc 19 ง3. The catalogue and roles are M1's data (schema security, doc 21); the kernel
+Restated from doc 19 ยง3. The catalogue and roles are M1's data (schema security, doc 21); the kernel
 resolves and enforces.
 
 // kernel.api.PermissionResolver
@@ -201,7 +201,7 @@ authoring              Enforced in M1's handlers with kernel helpers: Sod.roleMo
 Scope of a permission  Grant.withinGrantor(ctx, permissions), Grant.lastAdminGuard(entity).
 
 Tests                  The catalogue row's scope (LOCATION, ENTITY, FEDERATION) decides the finest grantable level; the resolver
-                       expands an ENTITY grant to all the entity's locations at check time (doc 19 ง3.1).
+                       expands an ENTITY grant to all the entity's locations at check time (doc 19 ยง3.1).
 
                        Resolver property test: union over roles never yields a permission absent from every role; cache invalidation on
                        each event; interceptor order; SoD INSTANCE and ROLE modes.
@@ -209,7 +209,7 @@ Tests                  The catalogue row's scope (LOCATION, ENTITY, FEDERATION) 
 19A - Kernel Services Implementation Guide | v0.1 | Cooperative Retail and Distribution System        Page 4
 4. Audit
 
-Restated from doc 18 part D and doc 19 ง4.
+Restated from doc 18 part D and doc 19 ยง4.
 
 -- V0002__audit.sql (kernel)
 CREATE TABLE kernel.audit_event_type (
@@ -255,10 +255,10 @@ Privilege test   CorrelationFilter creates or propagates X-Correlation-Id; the i
 
                  ExceptionQueueQuery.list(scope, severityIn, since) reads REVIEW/ALERT rows not yet
                  acknowledged; acknowledgement is a further audit event AUDIT_REVIEWED with subject_id = the reviewed
-                 row (doc 19 ง4.3); the self-review guard uses Sod.
+                 row (doc 19 ยง4.3); the self-review guard uses Sod.
 
                  PartitionJob (Section 12) creates monthly partitions three months ahead for audit_event, event_outbox and
-                 the document tables; detaches partitions older than the tiering policy to cold storage (doc 14 DR-6) ญ detach,
+                 the document tables; detaches partitions older than the tiering policy to cold storage (doc 14 DR-6) โ€“ detach,
                  never drop.
 
                  Columns reserved; AnchorJob skeleton present but disabled; when enabled, computes per-partition chain and
@@ -268,7 +268,7 @@ Privilege test   CorrelationFilter creates or propagates X-Correlation-Id; the i
 
 5. Event backbone
 
-Restated from doc 19 ง6, doc 18 part E, doc 17 ADR-30.
+Restated from doc 19 ยง6, doc 18 part E, doc 17 ADR-30.
 
 -- V0003__events.sql (kernel)
 
@@ -343,7 +343,7 @@ Ordering            BrokerAdapter interface with RabbitBrokerAdapter (quorum que
 Payload discipline  NatsBrokerAdapter stub, so doc 19 DR-2 is a swap.
 Tests
                     Per source only: one relay lock per source partition; consumer queues are single-active-consumer so a consumer
-                    processes one source in order (doc 19 ง6.2).
+                    processes one source in order (doc 19 ยง6.2).
 
                     A test rejects payloads over 8 KB and payloads containing fields named like personal data (name, phone, nic)
                     outside a whitelist.
@@ -354,7 +354,7 @@ Tests
 19A - Kernel Services Implementation Guide | v0.1 | Cooperative Retail and Distribution System     Page 6
 6. Internationalisation
 
-Restated from doc 19 ง5.
+Restated from doc 19 ยง5.
 
 Aspect                 Design
 Messages
@@ -374,19 +374,19 @@ Tests                  migration conventions); trigram indexes USING gin (name_s
                        NumberingSystem.LATN for si-LK and ta-LK (doc 19 DR-6).
 
                        A4Renderer: HTML templates (Thymeleaf) rendered to PDF by a headless Chromium worker (Playwright) with
-                       bundled Noto fonts ญ chosen over pure-Java renderers because Sinhala and Tamil shaping needs
+                       bundled Noto fonts โ€“ chosen over pure-Java renderers because Sinhala and Tamil shaping needs
                        HarfBuzz-class shaping; DR-3 confirms the operational footprint. Output to object storage;
                        report.rendered.v1.
 
                        A configuration item location.input_methods (Section 11) recorded at onboarding; no runtime behaviour.
 
-                       The curated Sinhala/Tamil name list of doc 19 ง5.4 with expected sort orders and equivalent spellings; golden
+                       The curated Sinhala/Tamil name list of doc 19 ยง5.4 with expected sort orders and equivalent spellings; golden
                        PDF rendering of a trilingual invoice compared by text extraction; fallback marker propagation through a message
                        with plurals.
 
 7. Documents and numbering base
 
-Restated from doc 18 part C. Tables as in doc 18 ง5 (document_type, numbering_series, document,
+Restated from doc 18 part C. Tables as in doc 18 ยง5 (document_type, numbering_series, document,
 document_line, document_link, document_state_history, document_attachment), partitioned by month on
 received_at for the volume tables; the DDL is in V0004__documents.sql. The behaviour that matters is
 the issuance protocol and immutability.
@@ -452,7 +452,7 @@ Type registry          per original and only while reversible per the type's sta
                        SETTLES requires an amount not exceeding the open balance.
 
                        document_type seed rows for ORD, DN, GRN, INV, CN, DN2, PRC, RCT, WOF, CNT, ADJ, RPK, XFR, OPB
-                       with series scope, issuer role, bilateral, fiscal and offline flags (doc 18 ง5); the fiscal flags are revisited by 24B.
+                       with series scope, issuer role, bilateral, fiscal and offline flags (doc 18 ยง5); the fiscal flags are revisited by 24B.
 
 19A - Kernel Services Implementation Guide | v0.1 | Cooperative Retail and Distribution System        Page 7
 Aspect                Design
@@ -463,7 +463,7 @@ Tests
 
 8. Edge sync gateway
 
-Restated from doc 32 ง3, 5, 6, 8. The REST surface is openapi/sync.yaml; the gateway runs in the web
+Restated from doc 32 ยง3, 5, 6, 8. The REST surface is openapi/sync.yaml; the gateway runs in the web
 profile, ingestion in worker or ingest.
 
 Endpoint                                  Handler           Notes
@@ -546,7 +546,7 @@ Tests
                       Token buckets per device (batches per minute, bytes per hour) in memory per instance plus a global concurrency
                       limit; fairness by round-robin across devices in the ingest queue.
 
-                      The thirteen-case conformance suite of doc 32 ง11 against a till simulator in
+                      The thirteen-case conformance suite of doc 32 ยง11 against a till simulator in
                       backend/app/src/test/.../sync/TillSimulator.java; two-instance ingestion of one device
                       alternating instances.
 
@@ -560,14 +560,14 @@ Verification           minutes) for key attachments/{entity}/{documentId}/{attac
 Reads                  provider-neutral (path-style addressing on MinIO).
 
                        AttachmentVerifier (job, every 5 minutes): for PENDING rows, HEAD the object, compare hash, set
-                       COMPLETE or FAILED; attachment.completed.v1; M5's write-off approval reads the status (doc 32 ง4).
+                       COMPLETE or FAILED; attachment.completed.v1; M5's write-off approval reads the status (doc 32 ยง4).
 
                        Pre-signed GET with scope check through the document's RLS: a user who cannot read the document cannot
                        obtain the URL.
 
 10. Notifications delivery
 
-Restated from doc 19 ง7. Rules and templates are M9's data; the kernel is the consumer that evaluates and
+Restated from doc 19 ยง7. Rules and templates are M9's data; the kernel is the consumer that evaluates and
 sends.
 
 CREATE TABLE kernel.notification_log (
@@ -593,7 +593,7 @@ Tests                  queries; renders with IcuMessages in the recipient's lang
 19A - Kernel Services Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 9
 11. Configuration register
 
-Restated from doc 19 ง8.
+Restated from doc 19 ยง8.
 
 CREATE TABLE kernel.config_item (key text PRIMARY KEY, value_type text NOT NULL, schema jsonb NOT NULL,
     description_en text NOT NULL, description_si text, description_ta text, default_value jsonb NOT NULL,
@@ -617,14 +617,14 @@ Tests              ConfigRegistry.set(key, scope, value, ctx, reason) checks the
                    (MFA if sensitive), validates against schema, inserts a new row (append-only), audits with before/after,
                    publishes the event and, for till_visible keys, a change-log row for the affected locations.
 
-                   seed/config-items.yaml with the doc 07 ง4 register plus doc 19 ง8 and doc 21 ง7 items; SeedLoader
+                   seed/config-items.yaml with the doc 07 ยง4 register plus doc 19 ยง8 and doc 21 ยง7 items; SeedLoader
                    upserts items on start (never values).
 
                    Resolution precedence; schema rejection; till_visible fan-out to the change log; MFA on sensitive keys.
 
 12. Scheduling
 
-Restated from doc 19 ง9, doc 14 ง1.3.
+Restated from doc 19 ยง9, doc 14 ยง1.3.
 
 CREATE TABLE kernel.scheduled_job (name text PRIMARY KEY, module text NOT NULL, cron text, continuous boolean
         NOT NULL DEFAULT false,
@@ -651,7 +651,7 @@ Phase-1 job seed   a job over maxRuntime is interrupted and its run marked TIMEO
 Tests
                    DayCloseTrigger consumes till_session.closed.v1; when every open session at a location has closed
                    (or at the location's configured cut-off), it advances the location's business date and publishes
-                   location.day_closed.v1, which end-of-day aggregation and apply_from activation consume (doc 32 ง5.2).
+                   location.day_closed.v1, which end-of-day aggregation and apply_from activation consume (doc 32 ยง5.2).
 
                    outbox-relay (continuous), partition-maintenance (daily), gap-check (nightly), attachment-verify (5 min),
                    notification-retry (2 min), snapshot-rebuild (nightly + on demand), changelog-prune (nightly), idempotency-expiry
@@ -706,7 +706,7 @@ K-13  privilege test
 
       contributors, change-log fan-out, heartbeat, rate limiter, till simulator
 
-      Attachment presign and verifier                                            0.5             PENDINGCOMPLETE on upload
+      Attachment presign and verifier                                            0.5             PENDINGโ’COMPLETE on upload
 
       Notification dispatcher, log, retry sweep, channel interface               1.5             Once per event; suppression
 
@@ -719,7 +719,7 @@ K-13  privilege test
       Clock, offset correction, business date service                            0.5             Business date from day-close
 
 Total about 27 developer-days. With 17A's 18.5 that is about 45 for the platform pair: Sprint 0 runs three weeks,
-not two (8ญ25 September), or a third developer joins for K-05, K-07 and K-08. Doc 20's schedule already carries
+not two (8โ€“25 September), or a third developer joins for K-05, K-07 and K-08. Doc 20's schedule already carries
 a reserve; this is the first measured correction and should be recorded there.
 
 15. Open points taken as assumptions
@@ -734,7 +734,7 @@ Snapshot fan-out
                                  Headless Chromium worker with bundled Noto fonts; revisit if the       Platform pair, DevOps
 FY reset and GRN fiscal scope    operational footprint is judged too heavy for the single-DevOps model
 PARTY masking views
-                                 Worker-side fan-out of central changes to per-location change-log rows; Doc 32 ง5.2
+                                 Worker-side fan-out of central changes to per-location change-log rows; Doc 32 ยง5.2
                                  hot paths never write per-location rows synchronously
 
                                  No reset; GRN non-fiscal; document_type seed flags accordingly         Tax advisor (24B)

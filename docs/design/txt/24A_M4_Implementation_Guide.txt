@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-24A � M4 Trading Documents: Implementation
+24A – M4 Trading Documents: Implementation
 Guide
 
 Everything the M4 developer needs: the trading schema as DDL on top of the kernel
@@ -11,14 +11,14 @@ consumers, the snapshot contribution and the till-side GRN bundle contract for M
 screens, tests and tickets. Self-contained.
 
 Field             Value
-Document          24A � implementation guide for 24 M4 Trading Documents v0.1
-Version           v0.1 � for the M4 developer; sections 7.4 and 8.1 are the contract with the till track
+Document          24A – implementation guide for 24 M4 Trading Documents v0.1
+Version           v0.1 – for the M4 developer; sections 7.4 and 8.1 are the contract with the till track
 Date              9 September 2026
-Prerequisite      Sprint 0; M1, M2, M3 contracts frozen; kernel document base and links (19A �7); M5's availability and lot queries
+Prerequisite      Sprint 0; M1, M2, M3 contracts frozen; kernel document base and links (19A §7); M5's availability and lot queries
                   stubbed until doc 25 (Section 11).
 Estimated effort  About 32 developer-days for one full-stack developer, or 5 weeks with the driver app screens handed to the till
                   track
-Restated content  Marked restated from doc X �Y.
+Restated content  Marked restated from doc X §Y.
 
 Read this first. M4 is nine document types on one base. Build them in the order they occur in the world (order,
 delivery, GRN, discrepancy, claim, invoice, payment) and make ConfirmGrnHandler the first thing that works end
@@ -28,7 +28,7 @@ yourself storing a balance that isn't recomputed by the same event that changes 
 24A - M4 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
 1. What you are building
 
-Restated from doc 24 �1. The inter-entity flow from order to settlement, recording and linking, never moving
+Restated from doc 24 §1. The inter-entity flow from order to settlement, recording and linking, never moving
 money and never blocking on credit.
 
 You build                                                            You do not build
@@ -48,13 +48,13 @@ Eleven web screens and the driver app's drop list and POD screens    Statement r
 2. What you inherit
 
 From                  You use                                                          How
-19A �7 document                                                                        Every document type registers a validator and a
+19A §7 document                                                                        Every document type registers a validator and a
 base                  DocumentService.issue(draft, ctx) (validator chain,              post-issue hook; every correction is a link
                       numbering, hash, state row, audit, events),
-19A �8 sync           DocumentLinks.link(from, to, type, amount),                      Sections 7.3, 7.4
+19A §8 sync           DocumentLinks.link(from, to, type, amount),                      Sections 7.3, 7.4
                       document_state_history, Attachments
-19A �9 attachments                                                                     Claims and discrepancy evidence
-19A �10�12            Document bundle ingestion calls your GrnPostIngestHook;          Windows, escalation clock, statements
+19A §9 attachments                                                                     Claims and discrepancy evidence
+19A §10–12            Document bundle ingestion calls your GrnPostIngestHook;          Windows, escalation clock, statements
                       SnapshotContributor;                                             Guards; direct-drop validation
 M1 api/query          SnapshotChangeLog.record(..., urgent)                            GRN confirmation
                                                                                        Invoice lines, order adjustments
@@ -65,7 +65,7 @@ M3 query              Notifications (by event rules M9 seeds), ConfigRegistry,  
 M5 query (stub until
 doc 25)               LookupRelationship (terms: window, lock hours, allocation
 Shared engine         rule, credit limit), listLocations, scope classes, arbiter role
-17A �7 web shell
+17A §7 web shell
                       RegisterBatch (internal command), GetSku flags,
                       conversions, supplier table
 
@@ -84,7 +84,7 @@ Shared engine         rule, credit limit), listLocations, scope classes, arbiter
 24A - M4 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                             Page 2
 3. Schema
 
-Restated from doc 24 �3 (CR-24-1). All extension tables key on document_id of the kernel base and are
+Restated from doc 24 §3 (CR-24-1). All extension tables key on document_id of the kernel base and are
 partitioned alike by received_at (carried as a column for the partition key). Location
 db/migration/m4trading/.
 
@@ -454,118 +454,118 @@ receivedOn, cheque?, settlements[{invoiceId, amount}]}
 
 # example - captureGrn at a shop (the same shape M6 puts in the offline bundle, Section 7.4)
 
-{ "dropId": "...", "locationId": "...", "receivedOn": "2026-10-14",
+{ "dropId": "…", "locationId": "…", "receivedOn": "2026-10-14",
 
-"lines": [ { "skuId": "...", "uom": "CASE", "expectedQty": 10, "receivedQty": 10, "damagedQty": 0, "batchNo":
+"lines": [ { "skuId": "…", "uom": "CASE", "expectedQty": 10, "receivedQty": 10, "damagedQty": 0, "batchNo":
 
 "B2411A", "expiryDate": "2027-03-31", "printedMrp": 1080.00 },
 
-           { "skuId": "...", "uom": "EA", "expectedQty": 48, "receivedQty": 46, "damagedQty": 2, "batchNo":
+           { "skuId": "…", "uom": "EA", "expectedQty": 48, "receivedQty": 46, "damagedQty": 2, "batchNo":
 
                   "R77", "expiryDate": null,         "printedMrp": null } ] }
 
 24A - M4 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                      Page 6
 6. Handler specifications
 
-Command                Guards (in order)                                         Mutation and effects                   Events
+Command                Guards (in order)                                         Mutation and effects                    Events
 
-CreateOrder            buyer scope; relationship ACTIVE (M1); lines: sku kernel draft document + doc_order �
+CreateOrder            buyer scope; relationship ACTIVE (M1); lines: sku kernel draft document + doc_order –
                        active, uom valid, qty > 0
 
-SubmitOrder            DRAFT; 1 line; DocumentService.issue                      SUBMITTED                              order.submitted.v1
+SubmitOrder            DRAFT; ≥1 line; DocumentService.issue                     SUBMITTED                               order.submitted.v1
                        (buyer ENTITY series)
 
-AcceptOrder            seller scope; SUBMITTED; allocations                      ACCEPTED; allocation_run; lock_at;     order.accepted.v1;
-                                                                                                                        order.allocated.v1
-                       requested and  availability snapshot; eta  today; tier_price per line (M3, ordered qty);
+AcceptOrder            seller scope; SUBMITTED; allocations ≤                    ACCEPTED; allocation_run; lock_at;      order.accepted.v1;
+                                                                                                                         order.allocated.v1
+                       requested and ≤ availability snapshot; eta ≥ today; tier_price per line (M3, ordered qty);
 
                        overrides carry reasons                                   exposure event
 
-RejectOrder /          status; reason; cancel only the undispatched              status; cancelled_qty                  order.rejected/cancell
-CancelOrder            remainder                                                                                        ed.v1
+RejectOrder /          status; reason; cancel only the undispatched              status; cancelled_qty                   order.rejected/cancell
+CancelOrder            remainder                                                                                         ed.v1
 
-AmendOrder             buyer; before lock_at or override; not FULFILLED          version+1; lines superseded            order.amended.v1
+AmendOrder             buyer; before lock_at or override; not FULFILLED          version+1; lines superseded             order.amended.v1
                                                                                  (SUPERSEDES link on line set);
                                                                                  re-accept required
 
-OverrideLockWindow seller; reason                                                lock_at; lock_override_by              order.lock_overridde
-                                                                                                                        n.v1
+OverrideLockWindow seller; reason                                                lock_at; lock_override_by               order.lock_overridde
+                                                                                                                         n.v1
 
-RecordOrderAdjustment Federationdistributor order; type ACTIVE (M3); ADJUSTMENT line                                    order.adjusted.v1
+RecordOrderAdjustment Federation→distributor order; type ACTIVE (M3); ADJUSTMENT line                                    order.adjusted.v1
                                     within bounds; caller holds the type's permission
 
-CreateDeliveryNote     seller; orders ACCEPTED/LOCKED; lines                     draft DN + drops + lines               �
+CreateDeliveryNote     seller; orders ACCEPTED/LOCKED; lines ≤                   draft DN + drops + lines                –
 
-                       allocated - fulfilled; drops' ship-to belongs to bill-to
+                       allocated − fulfilled; drops' ship-to belongs to bill-to
 
                        (M1); batches from PickBatches (M5) or keyed
 
-IssueDeliveryNote      valid; issuance (seller series)                           ISSUED; order lines fulfilled_qty +=   delivery_note.issued.
-                                                                                 dispatched; order status               v1 (M5 picks)
+IssueDeliveryNote      valid; issuance (seller series)                           ISSUED; order lines fulfilled_qty +=    delivery_note.issued.
+                                                                                 dispatched; order status                v1 (M5 picks)
                                                                                  PARTIALLY/FULFILLED; change-log
                                                                                  to each drop's shop (expected lines;
                                                                                  urgent if ETA within 1 day)
 
-Dispatch               ISSUED; vehicle/driver                                    IN_TRANSIT                             delivery_note.dispatc
-                                                                                                                        hed.v1
+Dispatch               ISSUED; vehicle/driver                                    IN_TRANSIT                              delivery_note.dispatc
+                                                                                                                         hed.v1
 
-RecordProofOfDelivery drop PLANNED; driver scope or paper by                     DELIVERED; keys                        drop.delivered.v1
+RecordProofOfDelivery drop PLANNED; driver scope or paper by                     DELIVERED; keys                         drop.delivered.v1
                                     dispatcher; idempotent by drop
 
 MarkDropUndelivered reason                                                       UNDELIVERED; DN closes when all drop.undelivered.v1
 
-                                                                                 drops terminal                         (M5 return to stock)
+                                                                                 drops terminal                          (M5 return to stock)
 
-CaptureGrn             receiver scope; drop belongs to a location in             draft GRN + lines                      grn.captured.v1
+CaptureGrn             receiver scope; drop belongs to a location in             draft GRN + lines                       grn.captured.v1
                        scope (or local supply with supplier); expected
                        lines from the drop
 
-ConfirmGrn             Section 6.1                                               the pivot                              grn.confirmed.v1; dis
-                                                                                                                        crepancy.raised.v1?
+ConfirmGrn             Section 6.1                                               the pivot                               grn.confirmed.v1; dis
+                                                                                                                         crepancy.raised.v1?
 
-ReverseGrn             supervisor; within grn_reversal_hours;                    negated GRN issued; REVERSES           grn.reversed.v1 (M5
-                       !inventory.lotsConsumed(grn); no invoice                  link; original REVERSED                reverts lots)
+ReverseGrn             supervisor; within grn_reversal_hours;                    negated GRN issued; REVERSES            grn.reversed.v1 (M5
+                       !inventory.lotsConsumed(grn); no invoice                  link; original REVERSED                 reverts lots)
                        references; reason; MFA
 
-Acknowledge / Propose / party scope; status; proposal by one party,              UNDER_REVIEW / proposal stored /       discrepancy.*.v1
+Acknowledge / Propose / party scope; status; proposal by one party,              UNDER_REVIEW / proposal stored /        discrepancy.*.v1
                                                                                  RESOLVED with consequences:
-Accept resolution      acceptance by the other; agreed lines  variance           ACCEPT_SHORT 
+Accept resolution      acceptance by the other; agreed lines ≤ variance          ACCEPT_SHORT →
                                                                                  IssueCreditNote (seller, in the same
                                                                                  transaction, MFA waived because the
                                                                                  proposal was accepted by the buyer:
                                                                                  DR-1 of this guide); ACCEPT_OVER
-                                                                                  extra invoice line or return request
+                                                                                 → extra invoice line or return request
 
-EscalateDiscrepancy /  either party with reason; arbiter F with MFA;             ESCALATED / RESOLVED with              discrepancy.escalate
-ArbitrateDiscrepancy   binding decision lines                                    arbitration                            d/arbitrated.v1
+EscalateDiscrepancy /  either party with reason; arbiter F with MFA;             ESCALATED / RESOLVED with               discrepancy.escalate
+ArbitrateDiscrepancy   binding decision lines                                    arbitration                             d/arbitrated.v1
 
-RaiseClaim             buyer; GRN CONFIRMED within claim window;                 issued claim (buyer series)            claim.raised.v1
-                       lines  received; attachments referenced                   DISPUTES-linked to GRN
+RaiseClaim             buyer; GRN CONFIRMED within claim window;                 issued claim (buyer series)             claim.raised.v1
+                       lines ≤ received; attachments referenced                  DISPUTES-linked to GRN
 
-InspectClaim /         seller; all attachments COMPLETE; approve                 status; credit note                    claim.*.v1 (M5 return
-ApproveClaim /         issues credit note (CREDITS) and sets                                                            on approved with
-RejectClaim            return_required                                                                                  return_required)
+InspectClaim /         seller; all attachments COMPLETE; approve                 status; credit note                     claim.*.v1 (M5 return
+ApproveClaim /         issues credit note (CREDITS) and sets                                                             on approved with
+RejectClaim            return_required                                                                                   return_required)
 
-IssueInvoice           seller; GRNs CONFIRMED/CLOSED, not                        INV ISSUED; doc_invoice;               invoice.issued.v1; jou
-                       invoiced, same buyer; VAT numbers present (M1);           postings_ready                         rnal.postings_ready.v
-                       InvoiceBuilder: lines from received_qty at M3                                                    1; exposure
+IssueInvoice           seller; GRNs CONFIRMED/CLOSED, not                        INV ISSUED; doc_invoice;                invoice.issued.v1; jou
+                       invoiced, same buyer; VAT numbers present (M1);           postings_ready                          rnal.postings_ready.v
+                       InvoiceBuilder: lines from received_qty at M3                                                     1; exposure
                        trade price (tier by ordered qty) + adjustments; tax
                        per line; issuance (seller series); snapshot hash
 
-24A - M4 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                               Page 7
+24A - M4 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                                Page 7
 Command                 Guards (in order)                                Mutation and effects              Events
 DisputeInvoice /        buyer with reason / seller+buyer or arbiter      DISPUTED / back                   invoice.disputed/resol
 ResolveInvoiceDispute                                                                                      ved.v1
 IssueCreditNote         seller; MFA (except discrepancy-accepted path);  CN issued; CREDITS link; invoice  credit_note.issued.v1
-                        invoice open balance  amount when linked;        credited_amount cache; postings
+                        invoice open balance ≥ amount when linked;       credited_amount cache; postings
 ApplyCreditNote /       reason                                                                             credit_note.applied.v
 IssueDebitNote          open balance; reason                             links; caches                     1/
                                                                                                            debit_note.issued.v1
-RecordPaymentReceipt Section 6.3                                         �                                 payment_receipt.reco
+RecordPaymentReceipt Section 6.3                                         –                                 payment_receipt.reco
                                                                                                            rded.v1
-ApplyReceipt /          Section 6.3                                      �                                 payment_receipt.*.v1
+ApplyReceipt /          Section 6.3                                      –                                 payment_receipt.*.v1
 DisputePayment / Rever                                                                                     ; cheque.*.v1
-sePaymentReceipt /                                                       StatementBuilder  A4Renderer 
+sePaymentReceipt /                                                       StatementBuilder → A4Renderer →
 RecordChequeOutcome                                                      object key                        statement.generated.
                                                                          transfer_request; on approve M5   v1
 GenerateStatement       party; period                                    issues XFR and writes back        transfer_request.*.v1
@@ -770,19 +770,19 @@ events.publish(ExposureUpdated(rel, x))
 7. Queries, jobs, consumers, snapshot and the till bundle
 
 Item                  Implementation
-Queries               As doc 24 �5.2; PARTY reads through the masking views; ListUnsettledInvoices uses the cached
+Queries               As doc 24 §5.2; PARTY reads through the masking views; ListUnsettledInvoices uses the cached
                       settled/credited columns; DeliveryPerformance compares committed_eta with the drop's arrived_at.
-LockClockJob (5 min)  ACCEPTED orders with lock_at  now  LOCKED; audit ORDER_LOCKED.
-EscalationClockJob    RAISED/UNDER_REVIEW discrepancies past window_ends_at + grace  ESCALATED; claims likewise; notify
+LockClockJob (5 min)  ACCEPTED orders with lock_at ≤ now → LOCKED; audit ORDER_LOCKED.
+EscalationClockJob    RAISED/UNDER_REVIEW discrepancies past window_ends_at + grace → ESCALATED; claims likewise; notify
 (hourly)              the arbiter queue.
-BackorderReviewJob    Orders with backorder older than trading.backorder_review_days  REVIEW audit event to the seller.
+BackorderReviewJob    Orders with backorder older than trading.backorder_review_days → REVIEW audit event to the seller.
 (nightly)
-StatementJob (per     For each relationship due: StatementBuilder  A4Renderer  statement.generated.v1.
+StatementJob (per     For each relationship due: StatementBuilder → A4Renderer → statement.generated.v1.
 frequency)
-Consumers             m4.exposure (6.3); m4.claim-return: on claim.approved with return_required  nothing here (M5
+Consumers             m4.exposure (6.3); m4.claim-return: on claim.approved with return_required → nothing here (M5
                       consumes the same event); m4.transfer-xfr: on M5's xfr.issued.v1 write back xfr_document_id;
                       m4.batch-correction: on batch.corrected.v1 nothing changes on issued documents (they keep mrp as
-                      recorded) � REVIEW only.
+                      recorded) – REVIEW only.
 
 7.3 Snapshot contributor: expected lines for a shop
 
@@ -900,7 +900,7 @@ Goods received (web)  from pick list, print                                     
 
 Discrepancy / Claim   Timeline, evidence gallery, propose/accept forms,      dispute.*            Unapplied amount shown
                       ReasonCapture
-                                                                             invoice.*            �
+                                                                             invoice.*            –
 Tax invoice / credit note / DocumentHeader/Lines read-only, links panel, A4
                                                                              payment.*            F only
 debit note            print
@@ -925,23 +925,23 @@ Contract
 State machine     Every operation; captureGrn example reproduces; PARTY invoice read has no              Every operation
 Property-based    cost columns; driver POD idempotent replay
 
-Bundle ingestion  All seven machines of doc 24 �4 incl. two-step resolution and the clocks               All transitions
+Bundle ingestion  All seven machines of doc 24 §4 incl. two-step resolution and the clocks               All transitions
 Scenario
 Performance       Settled + credited never exceed invoice total under random link sequences;             1000 cases each
 Web               exposure equals recomputed-from-scratch after any event order; GRN received
                   qty independent of DN qty; a reversed GRN leaves lots as before (via M5 stub)
 
-                  GRN bundle from the till simulator: applied; MRP missing  flagged not rejected; Four cases
-                  duplicate resend  DUPLICATE; drop TOMBSTONE in the change log
+                  GRN bundle from the till simulator: applied; MRP missing → flagged not rejected; Four cases
+                  duplicate resend → DUPLICATE; drop TOMBSTONE in the change log
 
-                  Doc 13 scenarios 1 and 2 end to end with M2 real and M5 stubbed; flows 6.3�6.8 Eight flows
+                  Doc 13 scenarios 1 and 2 end to end with M2 real and M5 stubbed; flows 6.3–6.8 Eight flows
                   of doc 24
 
                   Allocation over 500 open orders under 10 s; exposure recompute under 50 ms;            Four targets
                   800 statements under 15 min; invoice issue under 300 ms
 
-                  Playwright: order  accept with override  DN  GRN (web) with discrepancy  Two flows
-                  propose/accept  credit note; record cheque  bounce  invoice reopens
+                  Playwright: order → accept with override → DN → GRN (web) with discrepancy → Two flows
+                  propose/accept → credit note; record cheque → bounce → invoice reopens
 
 10. Tickets in build order
 
@@ -994,9 +994,9 @@ discrepancy proposal without MFA  agreed in the two-step flow                   
 24A - M4 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                          Page 12
 Point                              Assume                              Decider                 If different
                                                                                                Config values; no code change
-Invoice timing, tier basis, reversal and Defaults of doc 24 �7         Federation admins       except invoice-on-dispatch
+Invoice timing, tier basis, reversal and Defaults of doc 24 §7         Federation admins       except invoice-on-dispatch
 claim windows, escalation grace (doc
-24 DR-1 to DR-6)                                                                               �
+24 DR-1 to DR-6)                                                                               –
 
 Direct drop without snapshot data  Capture as local supply keyed against M4, M6                Location series holder becomes
 (DR-7)                             the DN number; reconcile at ingestion                       any till (doc 32 counter transfer

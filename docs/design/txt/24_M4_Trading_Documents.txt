@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-24 ­ M4 Trading Documents
+24 â€“ M4 Trading Documents
 
 Module design for the inter-entity flow from order to settlement: order, delivery note with
 drops, goods received note as the ownership pivot, discrepancy and claim, invoice,
@@ -10,18 +10,18 @@ called for live; numbering detail waits for the tax advisor (24B).
 
 Field             Value
 Document
-Version           24 ­ M4 Trading Documents (Stage 2 module design; template of doc 20 §5)
+Version           24 â€“ M4 Trading Documents (Stage 2 module design; template of doc 20 Â§5)
 Date
-Owning developer  v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 5
+Owning developer  v0.1 â€“ draft for design review; contract freeze targeted end of Stage 2 week 5
 
 Inputs            9 September 2026
 
 Depends on        Module developer (full-stack) for the back office and the driver app screens; the till track hosts the GRN screens in
                   shop-management mode from this module's specification
 Depended on by
-                  05 SRS (FR-ORD, FR-DEL, FR-BIL); 03 state machines §2­8; 13 scenarios 1 and 2; 16 answers (A, C, D, I-05 to
-                  I-07, J sections); 09 ADR-01, 03, 04, 11, 12; 17 v0.2.1 §7.4, ADR-37; 18 v0.2 part C; 19 v0.2; 20 v0.3 M4
-                  blueprint; 21­23 contracts; 30 §5.4; 32
+                  05 SRS (FR-ORD, FR-DEL, FR-BIL); 03 state machines Â§2â€“8; 13 scenarios 1 and 2; 16 answers (A, C, D, I-05 to
+                  I-07, J sections); 09 ADR-01, 03, 04, 11, 12; 17 v0.2.1 Â§7.4, ADR-37; 18 v0.2 part C; 19 v0.2; 20 v0.3 M4
+                  blueprint; 21â€“23 contracts; 30 Â§5.4; 32
 
                   M1 (relationships and terms, locations, scope), M2 (SKU, conversions, batch registration), M3 (trade price,
                   adjustment types), M5 query (availability), kernel (document base, numbering, links, attachments, audit, events)
@@ -58,7 +58,7 @@ capture and confirmation at a shop; the ownership pivot; reversal within a event
 
 window (D-04, D-05, ADR-03)
 
-Discrepancy raised automatically on any mismatch; resolution by the            ­
+Discrepancy raised automatically on any mismatch; resolution by the            â€“
 
 parties within the window; escalation to the Federation as arbiter (D-05,
 
@@ -111,7 +111,7 @@ FR-BIL-040      Statements per relationship (I-06)                              
 FR-BIL-050/060  Series scopes and gapless numbering (ADR-11)                         3.10, 24B
 FR-BIL-070      Payment matched to specific invoices (I-07)                          3.7, 4.6
 FR-BIL-080      Exposure computed and warned, never blocked (ADR-12)                 3.8
-FR-BIL-090      Counter transfer on device replacement                               kernel (doc 32 §8)
+FR-BIL-090      Counter transfer on device replacement                               kernel (doc 32 Â§8)
 FR-BIL-100      Interest rule configurable, manual application (A-12)                7
 FR-BIL-110      E-invoicing readiness: immutable invoice snapshot (J-04)             3.6, 9.5
 FR-BIL-120/130  Tax invoice content; VAT numbers of both parties (J-03)              3.6
@@ -135,7 +135,7 @@ Issuer and series  lock_override_by, allocation_run_id, backorder_of_order_id); 
 Allocation run     doc_order_line(line_id, requested_qty, allocated_qty, fulfilled_qty, backorder_qty,
                    tier_price, adjustment_type?, adjustment_value?).
 Backorders
-Lock               The buyer issues; ENTITY series of the buyer (doc 18 §5.5 corrected).
+Lock               The buyer issues; ENTITY series of the buyer (doc 18 Â§5.5 corrected).
 Adjustments
                    allocation_run(seller, at, rule, orders considered, availability snapshot, manual
                    overrides): FCFS by submission time by default; a seller may override allocations with a reason; the run is
@@ -144,10 +144,10 @@ Adjustments
                    Unallocated remainder stays open on the same order as backorder_qty until the seller allocates it in a later run
                    or either party cancels it; a configurable age (default 30 days) raises a REVIEW, never an auto-cancel.
 
-                   lock_at = committed_eta - relationship.order_lock_hours_before_eta; a permitted seller role
+                   lock_at = committed_eta âˆ’ relationship.order_lock_hours_before_eta; a permitted seller role
                    may override per order with a reason (C-08).
 
-                   Only on Federationdistributor orders, against M3 adjustment types and within their bounds, gated by the type's
+                   Only on Federationâ†’distributor orders, against M3 adjustment types and within their bounds, gated by the type's
                    permission (A-06); recorded as a line of kind ADJUSTMENT that flows to the invoice.
 
 3.2 Delivery note (DN)
@@ -177,11 +177,11 @@ Offline            expected_qty (from the DN drop, nullable for local supply), r
 Reversal
 Local supply       Confirmation is the transfer of ownership and risk (ADR-03). In the same transaction: batches registered (M2),
                    grn.confirmed.v1 published; M5 creates the receiving entity's lots at the trade price and posts receipt
-                   movements; discrepancy raised if any line's received  expected or any damaged_qty > 0.
+                   movements; discrepancy raised if any line's received â‰  expected or any damaged_qty > 0.
 
                    Captured and confirmed on the till in shop-management mode against the DN drop in the snapshot (or without
                    expectation for local supply); numbered from the shop's LOCATION series held by the primary till; ingested
-                   through the document bundle path (doc 32 §3.1); the confirmation timestamp is the till's, corrected for clock
+                   through the document bundle path (doc 32 Â§3.1); the confirmation timestamp is the till's, corrected for clock
                    offset.
 
                    A confirmed GRN may be reversed within grn_reversal_hours (default 24) only if no sale has consumed its
@@ -215,8 +215,8 @@ Document       EXPIRED_ON_ARRIVAL | WRONG_GOODS | QUALITY, raised_at, inspected_
                decision, decided_at, return_required) with lines (sku, batch, qty, value at trade price) and
 Outcome        attachments (photographs mandatory, F-05 style).
 
-               APPROVED  seller issues a credit note (CREDITS link) and, if return_required, M5 posts a return
-               movement on claim.approved.v1; REJECTED  closed with reason; either may be escalated like a
+               APPROVED â†’ seller issues a credit note (CREDITS link) and, if return_required, M5 posts a return
+               movement on claim.approved.v1; REJECTED â†’ closed with reason; either may be escalated like a
                discrepancy.
 
 3.6 Invoice, credit note, debit note
@@ -260,7 +260,7 @@ Recorded only  SETTLES links carry the amount applied per invoice (I-07); never 
 Aspect         Design
 Exposure
                committed_exposure(relationship) = open invoice balances + accepted-not-invoiced
-               order value - unapplied credit notes - unapplied receipts; recomputed on every relevant
+               order value âˆ’ unapplied credit notes âˆ’ unapplied receipts; recomputed on every relevant
                event into relationship_exposure(relationship_id, amount, as_of, freshness); compared with
                relationship.credit_limit to raise exposure.warning.v1 (warn only, ADR-12) at configurable
                thresholds (80%, 100%).
@@ -286,44 +286,44 @@ Data
 Aspect     Design
 Series
            ORD: buyer ENTITY; DN, INV, CN, DN2, PRC: seller ENTITY; GRN: receiving LOCATION when captured at a
-           shop, receiving ENTITY at a warehouse; discrepancy and claim: issuer ENTITY (doc 18 §5.5). Financial-year
+           shop, receiving ENTITY at a warehouse; discrepancy and claim: issuer ENTITY (doc 18 Â§5.5). Financial-year
            reset and fiscal scope await the tax advisor (24B); until then no reset, GRN non-fiscal.
 
 24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System  Page 6
 4. State machines
 
-Reconciled with doc 03 sections 2­8. Every transition has a guard, a permission and an audit event;
+Reconciled with doc 03 sections 2â€“8. Every transition has a guard, a permission and an audit event;
 offline-issuable transitions are marked (H-02).
 
 4.1 Order
 
 From          To          Trigger / command            Guard                                 Permission          Audit / offline
-­             DRAFT       CreateOrder                                                                            ­
+â€“             DRAFT       CreateOrder                                                                            â€“
                                                        buyer scope; ACTIVE relationship ord.order.draft
                           SubmitOrder                  (M1); lines with active SKUs                              ORDER_SUBMI
                                                                                                                  TTED / online
-DRAFT         SUBMITTED                                1 line; qty > 0; unit valid (M2       ord.order.submit    only
+DRAFT         SUBMITTED                                â‰¥1 line; qty > 0; unit valid (M2      ord.order.submit    only
                                                        conversion); issuance protocol                            ORDER_ACCE
                                                        (buyer series)                                            PTED
 
 SUBMITTED ACCEPTED        AcceptOrder(allocations,     seller scope; allocation run          ord.order.accept    ORDER_REJEC
-                          eta)                         recorded; eta  today; lock_at                             TED
+                          eta)                         recorded; eta â‰¥ today; lock_at                            TED
                                                        computed                                                  ORDER_AMEN
                                                                                                                  DED
 SUBMITTED REJECTED        RejectOrder(reason)          seller; reason                        ord.order.accept
                                                                                                                  ORDER_LOCK
 SUBMITTED / AMENDED (new AmendOrder                    buyer; before lock_at (or override);  ord.order.submit;   ED
-ACCEPTED version)                                      an amendment SUPERSEDES               ord.order.lock_ov   ­
+ACCEPTED version)                                      an amendment SUPERSEDES               ord.order.lock_ov   â€“
                                                        the previous lines (draft-level       erride (seller)
                                                        supersession, number retained)
 
-ACCEPTED LOCKED           Clock (lock_at)              ­                                     system
+ACCEPTED LOCKED           Clock (lock_at)              â€“                                     system
 
-ACCEPTED / PARTIALLY_FU DN issued for part of the      ­                                     system (from DN)
+ACCEPTED / PARTIALLY_FU DN issued for part of the      â€“                                     system (from DN)
 
 LOCKED        LFILLED     allocation
 
-PARTIALLY_F FULFILLED     All allocated qty on issued  ­                                     system              ORDER_FULFIL
+PARTIALLY_F FULFILLED     All allocated qty on issued  â€“                                     system              ORDER_FULFIL
 ULFILLED /                DNs; backorder_qty = 0 or
 LOCKED                    cancelled                                                                              LED
 
@@ -340,7 +340,7 @@ non-terminal                                           with reason; only        
 4.2 Delivery note
 
 From          To          Trigger / command            Guard                                 Permission          Audit / offline
-­             DRAFT                                                                          del.note.draft      ­
+â€“             DRAFT                                                                          del.note.draft      â€“
                           CreateDeliveryNote(orders,   seller; orders
                           drops)                       ACCEPTED/LOCKED with
                                                        allocations; batches available
@@ -351,13 +351,13 @@ DRAFT         ISSUED      IssueDeliveryNote            issuance (seller series);
 ISSUED        IN_TRANSIT                               reserves/picks the batches (pick
                                                        list)
 
-                          Dispatch(vehicle, driver, at) ­                                    del.note.dispatch   DN_DISPATCH
+                          Dispatch(vehicle, driver, at) â€“                                    del.note.dispatch   DN_DISPATCH
                                                                                                                  ED
 IN_TRANSIT    IN_TRANSIT  RecordProofOfDelivery(dro driver app or paper;                     del.pod.record
                                                                                              (driver)            DROP_DELIVE
               (drop delivered) p)                      signature/photo optional                                  RED / offline
                                                                                              system /            (driver app)
-IN_TRANSIT CLOSED         All drops have a confirmed ­                                       del.note.dispatch
+IN_TRANSIT CLOSED         All drops have a confirmed â€“                                       del.note.dispatch
                           GRN, or a drop is marked                                                               DN_CLOSED
                           UNDELIVERED with
                           reason (goods returned to
@@ -367,7 +367,7 @@ IN_TRANSIT CLOSED         All drops have a confirmed ­                          
 
 24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                   Page 7
 From         To           Trigger / command             Guard                                  Permission          Audit / offline
-­            DRAFT                                                                                                 ­ / offline
+â€“            DRAFT                                                                                                 â€“ / offline
                           CaptureGrn(drop | local       receiver scope; expected lines         shop.grn.confirm
 DRAFT                     supply)                       from the drop when present             (shop) /            GRN_CONFIRM
                                                                                                whs.grn.confirm     ED / offline
@@ -380,13 +380,13 @@ DRAFT                     supply)                       from the drop when prese
                                                         ENTITY series); the pivot (Section
                                                         3.3)
 
-CONFIRMED DISCREPANCY system (on confirm) when          ­                                      system
+CONFIRMED DISCREPANCY system (on confirm) when          â€“                                      system
 
              _RAISED      any variance or damage
 
-CONFIRMED CLOSED          system when no variance       ­                                      system
+CONFIRMED CLOSED          system when no variance       â€“                                      system
 
-DISCREPANC CLOSED         Discrepancy resolved or       ­                                      system
+DISCREPANC CLOSED         Discrepancy resolved or       â€“                                      system
 Y_RAISED                  escalation decided
 
 CONFIRMED / REVERSED      ReverseGrn(reason)            within grn_reversal_hours; no lot      shop.grn.reverse    GRN_REVERS
@@ -397,12 +397,12 @@ Y_RAISED                                                references it; REVERSES-
 4.4 Discrepancy
 
 From         To           Trigger / command             Guard                                  Permission          Audit / offline
-­            RAISED       system (GRN confirm)                                                 system
+â€“            RAISED       system (GRN confirm)                                                 system
                                                         variance or damage present;                                DISCREPANCY
                                                         window_ends_at = confirm +                                 _RAISED
                                                         discrepancy_window_days
 
-RAISED       UNDER_REVIE  AcknowledgeDiscrepancy seller scope                                  del.discrepancy.re ­
+RAISED       UNDER_REVIE  AcknowledgeDiscrepancy seller scope                                  del.discrepancy.re â€“
              W                                                                                 solve (seller)
 
 RAISED / UND RESOLVED     ResolveDiscrepancy(resolut    either party proposes, the other       del.discrepancy.re  DISCREPANCY
@@ -418,7 +418,7 @@ ER_REVIEW                 EscalateDiscrepancy           escalates with reason   
 ESCALATED RESOLVED        ArbitrateDiscrepancy(decisi   Federation arbiter role; decision      fed.arbitrate (F,   DISCREPANCY
                           on, lines)                    binding; reason                        MFA)                _ARBITRATED
 
-RESOLVED CLOSED           Consequent documents          ­                                      system              DISCREPANCY
+RESOLVED CLOSED           Consequent documents          â€“                                      system              DISCREPANCY
                                                                                                                    _CLOSED
                           issued (credit note, return,
 
@@ -429,7 +429,7 @@ RESOLVED CLOSED           Consequent documents          ­                       
 4.5 Claim
 
 From         To           Trigger / command             Guard                                  Permission          Audit / offline
-­            RAISED       RaiseClaim(grn, lines, kind,  buyer scope; within claim window       del.claim.raise
+â€“            RAISED       RaiseClaim(grn, lines, kind,  buyer scope; within claim window       del.claim.raise
                           photos)                       (config); photographs attached                             CLAIM_RAISED
 RAISED       INSPECTED                                  (pending upload allowed, must be       del.claim.inspect   / draft offline,
                           InspectClaim(findings)        COMPLETE before decision)              (seller)            issue online
@@ -450,7 +450,7 @@ REJECTED                                                either party; reason
 From        To          Trigger / command             Guard                              Permission           Audit / offline
 ESCALATED               ArbitrateClaim                Federation arbiter
             APPROVED /                                                                   fed.arbitrate (F,    CLAIM_ARBITR
-APPROVED /  REJECTED    Return movement posted        ­                                  MFA)                 ATED
+APPROVED /  REJECTED    Return movement posted        â€“                                  MFA)                 ATED
 REJECTED                (M5) if required; else
             CLOSED      immediate                                                        system               CLAIM_CLOSE
                                                                                                               D
@@ -458,14 +458,14 @@ REJECTED                (M5) if required; else
    4.6 Invoice, credit note, payment receipt
 
 From        To          Trigger / command             Guard                              Permission           Audit / offline
-­           INV ISSUED  IssueInvoice(grns | dn)                                          bil.invoice.issue    INVOICE_ISSU
+â€“           INV ISSUED  IssueInvoice(grns | dn)                                          bil.invoice.issue    INVOICE_ISSU
                                                       seller; GRNs CONFIRMED or                               ED / online only
 INV ISSUED  PARTIALLY_SE SETTLES links from           CLOSED; not already invoiced;      system
-                                                      trade prices resolved (M3); VAT                         ­
+                                                      trade prices resolved (M3); VAT                         â€“
                                                       numbers present; issuance (seller
                                                       series); snapshot hashed
 
-                                                      sum of applied  invoice total
+                                                      sum of applied â‰¤ invoice total
 
             TTLED /     receipts or CREDITS links
 
@@ -476,10 +476,10 @@ PARTIALLY_S
 ETTLED                                                                                   (buyer)              UTED
 
 DISPUTED    ISSUED / PARTI ResolveInvoiceDispute      seller with buyer acceptance, or   bil.invoice.issue /  INVOICE_DISP
-­           ALLY_SETTLED                              arbiter                            fed.arbitrate        UTE_RESOLVE
+â€“           ALLY_SETTLED                              arbiter                            fed.arbitrate        UTE_RESOLVE
                                                                                                               D
                                                       seller; MFA (credit note); amount
-            CN / DN2    IssueCreditNote /              open balance when linked;         bil.creditnote.issu  CREDIT_NOTE
+            CN / DN2    IssueCreditNote /             â‰¤ open balance when linked;        bil.creditnote.issu  CREDIT_NOTE
             ISSUED      IssueDebitNote(invoice?,      reason                             e (MFA) /            _ISSUED / DEBI
                         lines, reason)                                                   bil.debitnote.issue  T_NOTE_ISSUE
                                                                                                               D
@@ -487,7 +487,7 @@ DISPUTED    ISSUED / PARTI ResolveInvoiceDispute      seller with buyer acceptan
 CN ISSUED APPLIED       ApplyCreditNote(invoice,      open balance                       bil.creditnote.issu  CREDIT_NOTE
                         amount)                                                          e                    _APPLIED
 
-­           PRC         RecordPaymentReceipt(me       seller; each settlement  invoice   bil.payment.recor    PAYMENT_REC
+â€“           PRC         RecordPaymentReceipt(me       seller; each settlement â‰¤ invoice  bil.payment.recor    PAYMENT_REC
                         thod, amount, settlements[])  open balance; cheque details       d                    ORDED
             RECORDED                                  when CHEQUE; issuance (seller
                                                       series)
@@ -509,7 +509,7 @@ RECEIVED    BOUNCED                                                             
    4.7 Lateral transfer request (within an MPCS)
 
 From        To          Trigger / command             Guard                              Permission           Audit / offline
-­           REQUESTED
+â€“           REQUESTED
                         RequestLateralTransfer(fro    requesting shop scope; both        shop.transfer.requ TRANSFER_RE
                         m shop, to shop, lines)       shops of one MPCS
                                                                                          est                  QUESTED /
@@ -659,51 +659,51 @@ Flow                           Sequence                                         
 6.1 Order to cash (doc 13
 scenario 1)                    MPCS stores role drafts an order from suggestions and manual           Order to a SUSPENDED relationship
                                                                                                       refused; allocation over availability
-6.2 Direct drop and offline    lines  sees distributor availability (indicative)  submits (buyer      refused; invoice before GRN refused;
-GRN (doc 13 scenario 2)        series)  distributor runs allocation (FCFS) with a manual override     settlement over open balance refused;
-                               for a scarce SKU (reason)  accepts 80% with ETA; 20%                   bounce reverses settlement and
-6.3 Claim with photographs     backorder  exposure recomputed and warned at 100%  DN                  reopens the invoice
-                               issued with one drop to the MPCS warehouse  dispatched 
-6.4 Escalation to the          GRN confirmed at the warehouse (ENTITY series)  invoice issued
-Federation                     from received quantities at tiered trade price  statement at month
-6.5 Federation order with      end  cheque received and matched to the invoice  cleared
+6.2 Direct drop and offline    lines â†’ sees distributor availability (indicative) â†’ submits (buyer    refused; invoice before GRN refused;
+GRN (doc 13 scenario 2)        series) â†’ distributor runs allocation (FCFS) with a manual override    settlement over open balance refused;
+                               for a scarce SKU (reason) â†’ accepts 80% with ETA; 20%                  bounce reverses settlement and
+6.3 Claim with photographs     backorder â†’ exposure recomputed and warned at 100% â†’ DN                reopens the invoice
+                               issued with one drop to the MPCS warehouse â†’ dispatched â†’
+6.4 Escalation to the          GRN confirmed at the warehouse (ENTITY series) â†’ invoice issued
+Federation                     from received quantities at tiered trade price â†’ statement at month
+6.5 Federation order with      end â†’ cheque received and matched to the invoice â†’ cleared
 adjustment
 6.6 GRN reversal               Distributor DN with three drops to three shops of one MPCS (bill-to    GRN line without MRP for a
-                               MPCS)  driver app records POD at each drop offline  shop 2             has_printed_mrp SKU blocked on the
+                               MPCS) â†’ driver app records POD at each drop offline â†’ shop 2           has_printed_mrp SKU blocked on the
 6.7 Lateral transfer           captures the GRN on the till during an outage from the drop lines in   till with the reason; a drop without
 6.8 Statement and exposure     its snapshot: counts actuals, keys batch MRP and expiry for a new      snapshot data (DN issued after the last
-                               batch, marks two damaged  confirms (LOCATION series, primary           sync) is captured as local supply
-                               till)  on sync: bundle ingested, batches registered, lots created,     against the DN number keyed by hand
-                               discrepancy raised automatically for the damage  distributor           and reconciled at ingestion (REVIEW)
+                               batch, marks two damaged â†’ confirms (LOCATION series, primary          sync) is captured as local supply
+                               till) â†’ on sync: bundle ingested, batches registered, lots created,    against the DN number keyed by hand
+                               discrepancy raised automatically for the damage â†’ distributor          and reconciled at ingestion (REVIEW)
                                acknowledges, proposes ACCEPT with credit for the damaged units
-                                MPCS accepts  credit note CREDITS the invoice
+                               â†’ MPCS accepts â†’ credit note CREDITS the invoice
 
                                MPCS raises a claim for expired-on-arrival goods within the window     Decision refused while any attachment
-                               with photos (uploaded via presign; pending allowed)  distributor       is PENDING; claim after the window
-                               inspects once attachments are COMPLETE  approves with return           refused with the window shown
-                               required  credit note issued; M5 posts the return on
+                               with photos (uploaded via presign; pending allowed) â†’ distributor      is PENDING; claim after the window
+                               inspects once attachments are COMPLETE â†’ approves with return          refused with the window shown
+                               required â†’ credit note issued; M5 posts the return on
                                claim.approved.v1
 
-                               Discrepancy unresolved after the window  system escalates;             ­
+                               Discrepancy unresolved after the window â†’ system escalates;            â€“
 
-                               arbiter queue shows both parties' statements and evidence 
+                               arbiter queue shows both parties' statements and evidence â†’
 
-                               arbiter decides (MFA)  consequent documents issued by the
+                               arbiter decides (MFA) â†’ consequent documents issued by the
 
                                seller; refusal to issue is itself an exception item
 
-                               Distributor orders from the uniform list  Federation sales applies     Beyond bounds refused using M3's
-                               SPECIAL_DISC 3% within bounds (permission)  invoice carries            type query
+                               Distributor orders from the uniform list â†’ Federation sales applies    Beyond bounds refused using M3's
+                               SPECIAL_DISC 3% within bounds (permission) â†’ invoice carries           type query
                                the adjustment line
 
-                               Warehouse confirmed a GRN against the wrong DN  supervisor             After a sale from the lot: refused;
-                               reverses within 24 h (no lots consumed, no invoice)                    correct via discrepancy or claim
+                               Warehouse confirmed a GRN against the wrong DN â†’ supervisor            After a sale from the lot: refused;
+                               reverses within 24 h (no lots consumed, no invoice) â†’                  correct via discrepancy or claim
                                REVERSES-linked GRN; ownership reverts; batches remain
 
                                registered (identity is global)
 
-                               Shop A requests 20 units from shop B  MPCS approves against            Cross-MPCS request refused: that is a
-                               B's availability  M5 issues XFR at cost; no invoice (C-11)             sale
+                               Shop A requests 20 units from shop B â†’ MPCS approves against           Cross-MPCS request refused: that is a
+                               B's availability â†’ M5 issues XFR at cost; no invoice (C-11)            sale
 
                                Month end job generates statements per relationship; exposure          Stale freshness (a shop not synced) is
                                warning at 80% notifies the seller's accounts role; nothing blocks     shown on the exposure, not hidden
@@ -723,7 +723,7 @@ trading.grn_reversal_hours                          24                          
                                                                                                                      bil.payment.record
 trading.claim_window_days                           14                               Relationship                    prt.relationship.amend
                                                                                                                      prt.relationship.amend
-trading.escalation_grace_days (after window before  3                                Federation                      ­
+trading.escalation_grace_days (after window before  3                                Federation                      â€“
 
 auto-escalate)
 
@@ -773,7 +773,7 @@ Statement of account  Statement                     Both                        
 
 Exposure view         Ledger summary                Seller accounts                  Components, limit, warning state, freshness
 
-Arbitration queue     ­                             Federation arbiter Escalated items with both statements
+Arbitration queue     â€“                             Federation arbiter Escalated items with both statements
 
 24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                             Page 13
 9. Non-functional design
@@ -816,7 +816,7 @@ Integration with
 M2/M5             Sum of SETTLES and CREDITS on an invoice never exceeds its total; exposure equals the sum of components under
 Performance       any event order; GRN received quantities are independent of DN quantities (no forced match)
 
-                  Doc 13 scenarios 1 and 2 end to end, including the offline GRN through the till simulator and ingestion; flows 6.3­6.8
+                  Doc 13 scenarios 1 and 2 end to end, including the offline GRN through the till simulator and ingestion; flows 6.3â€“6.8
 
                   GRN confirmation registers batches and creates lots in one committed sequence; reversal reverts lots; claim approval
                   posts a return
@@ -856,12 +856,12 @@ DR-9  Numbering rules (24B)
 24 - M4 Trading Documents | v0.1 draft | Cooperative Retail and Distribution System                                  Page 14
 Section  Identifiers
 3.1      FR-ORD-010 to 070; C-01 to C-09, C-12, C-13; A-06; ADR-04
-3.2­3.3  FR-DEL-010 to 060; D-01 to D-05, D-09; A-03, A-08; ADR-03; H-02; doc 18 §5.5
-3.4­3.5  D-05 to D-08; F-03; doc 18 document_link DISPUTES/CREDITS
-3.6­3.7  FR-BIL-010, 030, 070, 110 to 130, 150; J-03, J-04, J-07; I-05, I-07; ADR-01
-3.8­3.9  FR-BIL-020, 040, 080, 140; I-06; A-10, A-12; ADR-12; J-02
+3.2â€“3.3  FR-DEL-010 to 060; D-01 to D-05, D-09; A-03, A-08; ADR-03; H-02; doc 18 Â§5.5
+3.4â€“3.5  D-05 to D-08; F-03; doc 18 document_link DISPUTES/CREDITS
+3.6â€“3.7  FR-BIL-010, 030, 070, 110 to 130, 150; J-03, J-04, J-07; I-05, I-07; ADR-01
+3.8â€“3.9  FR-BIL-020, 040, 080, 140; I-06; A-10, A-12; ADR-12; J-02
 3.10     FR-BIL-050, 060; ADR-11; 24B
-4        Doc 03 §2­8; C-10, C-11; D-06; H-02/H-03
+4        Doc 03 Â§2â€“8; C-10, C-11; D-06; H-02/H-03
 6        Doc 13 scenarios 1 and 2
 9        M-05 (PARTY masking); NFR-OFF, NFR-AUD
 

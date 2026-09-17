@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-21A ­ M1 Party, Tenancy & Security:
+21A â€“ M1 Party, Tenancy & Security:
 Implementation Guide
 
 Everything the M1 developer needs to build the module: what it is, what you inherit, the
@@ -9,14 +9,14 @@ a handler specification, queries and caches, screens, tests and the tickets in b
 Self-contained: what it needs from other documents is restated here and marked.
 
 Field             Value
-Document          21A ­ implementation guide for 21 M1 Party, Tenancy & Security v0.1
-Version           v0.1 ­ for the M1 developer; Sprint 1 (from 21 September 2026, after Sprint 0)
+Document          21A â€“ implementation guide for 21 M1 Party, Tenancy & Security v0.1
+Version           v0.1 â€“ for the M1 developer; Sprint 1 (from 21 September 2026, after Sprint 0)
 Date              8 September 2026
 Prerequisite      Sprint 0 complete: 17A repository and hello module, 19A kernel services (scope, identity, permissions, audit,
                   events, config, scheduling). M1 replaces nothing in the kernel; it fills the party and security schemas the
 Estimated effort  kernel already reads.
 Restated content  About 17 developer-days for one full-stack developer (Section 10)
-                  Marked restated from doc X §Y; the design decisions remain in 21, 18, 19, 30; this guide is the build.
+                  Marked restated from doc X Â§Y; the design decisions remain in 21, 18, 19, 30; this guide is the build.
 
 Read this first. M1 is small in code and large in consequence: every other module resolves scope, permissions and
 relationships through what you build. Build it in the order of Section 10, keep the contract in Section 5 unchanged once
@@ -26,7 +26,7 @@ M2 starts designing against it (week 2 gate), and raise anything you would have 
 21A - M1 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
 1. What you are building
 
-Restated from doc 21 §1. M1 answers four questions for the system: who exists (entities, locations, till positions,
+Restated from doc 21 Â§1. M1 answers four questions for the system: who exists (entities, locations, till positions,
 devices), who trades with whom on what terms (relationships), who may do what (users, roles, permissions,
 external grants), and what each caller may see (scope and policy class). It owns reference data and policy; the
 kernel enforces the policy on every request and database session.
@@ -41,25 +41,25 @@ Nine web screens (Section 8)                                     Any till screen
                                                                  builds from your ListOperators)
 BulkRegister with a validation report                            Catalogue cleansing (M2), device provisioning (doc 31)
 
-Where M1 sits: layer 1, depending on the kernel only; M2­M9 call its api and query packages.
+Where M1 sits: layer 1, depending on the kernel only; M2â€“M9 call its api and query packages.
 
 2. What you inherit from Sprint 0
 
 From                You use                                                        How
 17A kernel.api      ScopeContext, @CommandHandler, Handles,                        Every handler implements Handles; throw
-19A §1 scope        ProblemException, Ids.next(), DomainEvent                      ProblemException with a message id for guard failures
-19A §2 identity     Session variables set per transaction;                         Your policies use the 17A §6.3 template unchanged
+19A Â§1 scope        ProblemException, Ids.next(), DomainEvent                      ProblemException with a message id for guard failures
+19A Â§2 identity     Session variables set per transaction;                         Your policies use the 17A Â§6.3 template unchanged
                     kernel.scope_entity() etc. in RLS
-19A §3 permissions  IdentityProviderClient: createUser, disableUser,               Call inside your handlers; the wrapper enforces the scope
-19A §4 audit        setTemporaryPassword, resetTotp, revokeSessions;               rule, you enforce yours first
-19A §5 events       PinHasher
-19A §11             PermissionResolver, Sod, Grant helpers,                        Your role handlers call the guardrail helpers; the resolver
+19A Â§3 permissions  IdentityProviderClient: createUser, disableUser,               Call inside your handlers; the wrapper enforces the scope
+19A Â§4 audit        setTemporaryPassword, resetTotp, revokeSessions;               rule, you enforce yours first
+19A Â§5 events       PinHasher
+19A Â§11             PermissionResolver, Sod, Grant helpers,                        Your role handlers call the guardrail helpers; the resolver
 configuration       TillSnapshotSigner                                             reads your tables
-19A §7 numbering                                                                   One call per command, inside the transaction
-19A §8 sync         AuditFacade.record(type, subject, before,
-17A §7 web shell    after, scope, reason, witness)                                 One or more per command, inside the transaction; types in
+19A Â§7 numbering                                                                   One call per command, inside the transaction
+19A Â§8 sync         AuditFacade.record(type, subject, before,
+17A Â§7 web shell    after, scope, reason, witness)                                 One or more per command, inside the transaction; types in
                                                                                    Section 5.3
-17A §12 hello       EventPublisher.publish(event)                                  PIN policy, idle locks, MFA windows, tier flag (Section 7)
+17A Â§12 hello       EventPublisher.publish(event)                                  PIN policy, idle locks, MFA windows, tier flag (Section 7)
 module
                     ConfigRegistry typed getters
 
@@ -78,7 +78,7 @@ module
 21A - M1 Implementation Guide | v0.1 | Cooperative Retail and Distribution System             Page 2
 3. Schema
 
-Restated from doc 18 part A v0.2 and doc 21 §3. Two migration locations: db/migration/m1party/ for
+Restated from doc 18 part A v0.2 and doc 21 Â§3. Two migration locations: db/migration/m1party/ for
 schema party and db/migration/m1security/ for security. The full files are in the repository; the
 fragments below show every table with the constraints that carry design rules. Common columns created_at,
 updated_at, created_by are omitted for brevity.
@@ -413,7 +413,7 @@ ownership convenience for RLS grants, not a module boundary.
 
 5. API slice: openapi/m1party.yaml
 
-Restated from doc 21 §5. Paths under /v1/party and /v1/security; every mutating operation requires the
+Restated from doc 21 Â§5. Paths under /v1/party and /v1/security; every mutating operation requires the
 Idempotency-Key header; errors are problem details whose type is a message id. Full file in the repository;
 the excerpt shows the conventions.
 
@@ -499,7 +499,7 @@ the @CommandHandler annotations, so the API document and the code cannot disagre
 21A - M1 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                        Page 6
 6. Handler specifications
 
-Every handler follows the hello shape (17A §12): the kernel interceptor has already checked permission, MFA
+Every handler follows the hello shape (17A Â§12): the kernel interceptor has already checked permission, MFA
 and idempotency; the handler runs guards in the listed order, mutates, records audit, publishes events, in one
 transaction. Guard failures throw ProblemException(messageId, params).
 
@@ -509,7 +509,7 @@ RegisterEntity       caller FEDERATION; code unique; type            insert ONBO
                      valid; exactly-one-federation
                                                                                                      ERED            1
 
-ActivateEntity       status ONBOARDING; officer set; 1 user          status ACTIVE                   ENTITY_ACTIVA entity.activated.v1
+ActivateEntity       status ONBOARDING; officer set; â‰¥1 user         status ACTIVE                   ENTITY_ACTIVA entity.activated.v1
                      with gov.user.manage; VAT no present                                            TED
 
 SuspendEntity /      status transition valid; reason present         status                          ENTITY_SUSPE    entity.suspended/r
@@ -520,7 +520,7 @@ AppointResponsible user belongs to entity; caller FEDERATION officer fields     
                                                                                                      D
 Officer              or entity admin
 
-OpenTradingRelation  seller = caller scope; seller  buyer; both      insert DRAFT                    RELATIONSHIP_ relationship.opene
+OpenTradingRelation  seller = caller scope; seller â‰  buyer; both     insert DRAFT                    RELATIONSHIP_ relationship.opene
 ship                 ACTIVE or ONBOARDING; tier rule or
                      config flag; no overlapping ACTIVE                                              OPENED          d.v1
                      (pre-check; DB exclusion is the backstop)
@@ -531,7 +531,7 @@ ActivateRelationship status DRAFT; M3 query: price list belongs status ACTIVE   
 
 AmendRelationshipT   status ACTIVE; effective_from > current         close current row               RELATIONSHIP_   relationship.amen
 erms                 row's effective_from; if credit_limit changes:  (effective_to = effective_from  AMENDED; CRE    ded.v1; credit_limi
-                     caller holds bil.creditlimit.change and MFA     - 1 day); insert new ACTIVE     DIT_LIMIT_CHAN  t.changed.v1
+                     caller holds bil.creditlimit.change and MFA     âˆ’ 1 day); insert new ACTIVE     DIT_LIMIT_CHAN  t.changed.v1
                      fresh (interceptor checks the extra             row                             GED when
                      permission via requiresAlso); reason                                            applicable
                      present
@@ -548,7 +548,7 @@ StartOnboarding /    transition valid; ACTIVE requires               status     
 ActivateLocation /
 MarkDormant /        connectivity_spec_met and (SHOP) primary
 Reactivate
-                     till and 1 operator
+                     till and â‰¥1 operator
 
 SetPrimaryTill       position belongs to location; position          update flag; NumberingSer       LOCATION_PRIM   location.primary_c
                      ACTIVE; reason                                  vice.holderChange(loc           ARY_CHANGED     hanged.v1 (kernel
@@ -567,7 +567,7 @@ EnrolDevice          serial unique; staging record attested (doc insert ENROLLED
                      31)                                                                             LED
 
 AssignDeviceToPosit  device ENROLLED or ACTIVE; position             set position; status ACTIVE;    DEVICE_ASSIGN device.assigned/p
-ion                  free; app_version  floor; on re-assign: old     kernel counter transfer
+ion                  free; app_version â‰¥ floor; on re-assign: old    kernel counter transfer
                      device outbox drained (kernel                                                   ED / POSITION_ osition_changed.v
                      SyncStatus.drained(oldDevice)) or
                      loss recorded                                                                   CHANGED         1
@@ -616,7 +616,7 @@ BulkRegister         owner = caller scope (or FEDERATION for     insert / replac
                                                                                                   NGED          .v1
 
                      caller FEDERATION; grantee kind             insert / status                  EXTERNAL_GRA external_grant.iss
-                     EXTERNAL; valid_until  12 months;
+                     EXTERNAL; valid_until â‰¤ 12 months;
                      reason                                                                       NT_ISSUED /   ued/revoked.v1
 
                                                                                                   REVOKED
@@ -725,7 +725,7 @@ events.publish(new RoleChanged(r.id(), r.ownerEntityId(), r.version(), diff(befo
 Query                            Implementation                                            Scope and cache
 ResolveScope(user)               app_user + user_role joined to role.role_class; external  Kernel-only; the kernel caches by user for the
 ResolvePermissions(user, rv)     grants for EXTERNAL users                                 token lifetime
-                                 user_role  role_permission  permission, union per         Kernel PermissionCache keyed (user, rv);
+                                 user_role â†’ role_permission â†’ permission, union per       Kernel PermissionCache keyed (user, rv);
 LookupRelationship(seller,       scope with limits                                         you invalidate by publishing the
 buyer, date)                                                                               role/assignment events
 ListRelationships(entity, role)  index on (seller, buyer, effective_from)                  PARTY or FEDERATION_VIEW; cached 60 s
@@ -743,7 +743,7 @@ ListExternalGrants               scoped to the location or its entity, with pin_
                                  set
                                  active and expired                                        FEDERATION
 
-7.3 Snapshot contributors (doc 32 §5.1)
+7.3 Snapshot contributors (doc 32 Â§5.1)
 
 // OperatorSnapshotContributor implements SnapshotContributor
 
@@ -773,7 +773,7 @@ is removed)
 
 8. Screens
 
-Restated from doc 21 §8 and doc 30 §5.1. Nine web screens on the shell components; no till screens.
+Restated from doc 21 Â§8 and doc 30 Â§5.1. Nine web screens on the shell components; no till screens.
 Wireframes are given as zone sketches; the design-tool prototypes (doc 30 DR-3) refine them but must keep the
 zones.
 
@@ -857,7 +857,7 @@ Exception queue                                                                 
                          upload, ValidationReport table with per-row      bulk.*
                          reasons, commit
 
-                         shared ExceptionQueue                            ­
+                         shared ExceptionQueue                            â€“
 
 21A - M1 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                    Page 11
    9. Tests               Cases (fixtures in src/test/resources/m1/)                                            Target
@@ -869,7 +869,7 @@ Contract                  Generated client against a running app: every operatio
                           returns identical body; MFA-gated operations return step_up_required when
 State machine             stale; x-permission/x-mfa match annotations (build check)                             Full matrix
 Property-based (jqwik)
-                          All transitions of doc 21 §4 (six machines); illegal transitions rejected             Six flows
+                          All transitions of doc 21 Â§4 (six machines); illegal transitions rejected             Six flows
 RLS matrix (integration)
                           Random role edits never produce a ROLE-mode conflict; random                          Two targets
 Scenario (integration)    assignments never exceed grantor scope; random effective ranges never                 Two flows
@@ -879,7 +879,7 @@ Web                       Rows for party.* and security.*: distributor user vs M
                           user vs sibling shop operators; Federation view reads all, writes nothing;
                           expired grant reads nothing; NONE scope reads nothing
 
-                          Flows 6.1­6.6 of doc 21: onboarding an MPCS with three shops via
+                          Flows 6.1â€“6.6 of doc 21: onboarding an MPCS with three shops via
                           BulkRegister; opening and amending a relationship; building and assigning a
                           role; regulator grant lifecycle; device replacement with counter transfer
                           (asserts the kernel series.holder_changed event)
@@ -888,7 +888,7 @@ Web                       Rows for party.* and security.*: distributor user vs M
                           users, 60 devices under 60 s with report
 
                           Vitest for the duties list diff and conflict rendering; Playwright: register society
-                           activate blocked  appoint officer  activate; amend credit limit with
+                          â†’ activate blocked â†’ appoint officer â†’ activate; amend credit limit with
                           step-up
 
 10. Tickets in build order
@@ -903,7 +903,7 @@ M1-04  SeedLoader wiring                                                        
 
 M1-05  Entities: aggregate, repository, 4 handlers, queries, controller, tests             ResolvePermissions
 M1-06
-       Relationships: aggregate, 4 handlers incl. AmendTerms, M3 query stub,          1.5  Register  activate flow
+       Relationships: aggregate, 4 handlers incl. AmendTerms, M3 query stub,          1.5  Register â†’ activate flow
 M1-07  exclusion tests
                                                                                       2    Scenario 6.2 and 6.4
 M1-08  Locations, positions: handlers, NumberingService hooks, primary till
@@ -929,7 +929,7 @@ M1-13                                                                           
        Contract freeze: publish m1party.yaml v1, api package review with the M2
        developer, doc 33 slice registered
 
-Total about 19.5 developer-days ­ about four weeks for one developer; the contract freeze (M1-13) is targeted
+Total about 19.5 developer-days â€“ about four weeks for one developer; the contract freeze (M1-13) is targeted
 for the end of the second week so M2 can start against api while screens finish.
 
 11. Open points: what to assume, whom to ask
@@ -941,9 +941,9 @@ Entity activation prerequisites (doc Officer named, admin user, VAT         Fede
                                                                             Federation, DCD liaison  Flip the config item; no code change
 21 DR-6)                           registration                             Federation admins
                                                                             Closed                   Change the CHECK constraint and
-Direct FederationMPCS trading Flag present, default off                     Platform pair            validator
+Direct Federationâ†’MPCS trading Flag present, default off                    Platform pair            validator
 (DR-3)                                                                                               Add a Reactivate transition
-                                                                            M3 developer             ­
+                                                                            M3 developer             â€“
 External grant maximum (DR-4) 12 months
                                                                                                      Policy text in your migration
 Returning staff (DR-5)             New user with succeeds_user_id                                    changes; handlers unchanged
@@ -951,7 +951,7 @@ Responsible officer fields (DR-1)  Adopted per doc 18 v0.2
 and sod_pair (DR-2)                                                                                  Replace the stub; tests already
 MPCS admin reading shop users'     RLS policy variant allowing                                       assert the call
 rows                               home-entity-or-parent for shop-scoped
-                                   users (19A §1)
+                                   users (19A Â§1)
 Price-list validation at           M3 query interface stubbed until doc
 ActivateRelationship               23; stub returns true for the seed list
 

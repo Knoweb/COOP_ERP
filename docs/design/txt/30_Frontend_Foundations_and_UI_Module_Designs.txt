@@ -1,19 +1,19 @@
 Cooperative Retail and Distribution System
 
-30 ≠ Frontend Foundations and UI Module
+30 ‚Äì Frontend Foundations and UI Module
 Designs
 
 The two user-interface shells (web back office and Android till), the shared design
-system built around "screens as paper", the usability rules for low-literacy trilingual users,
+system built around ‚Äúscreens as paper‚Äù, the usability rules for low-literacy trilingual users,
 and a screen inventory for each of the nine modules so that a full-stack developer can
 take a module end to end.
 
 Field     Value
 Document
-Version   30 ≠ Frontend Foundations and UI Module Designs (design artefact; companion to 20 and to each module design
-Date      21≠29)
+Version   30 ‚Äì Frontend Foundations and UI Module Designs (design artefact; companion to 20 and to each module design
+Date      21‚Äì29)
 Status
-Inputs    v0.1 ≠ draft for design review
+Inputs    v0.1 ‚Äì draft for design review
 
 Audience  6 September 2026
 
@@ -41,18 +41,18 @@ Web back office                                                                 
 Till application    MPCS office staff, auditors, regulator  application; responsive down to
                                                             phone width (O-06)                                          M6 (shell and
 Driver application  Cashiers, supervisors,                                                                              sales); M4/M5
-Customer display    shop-in-charge; shop-management         Android native, kiosk-locked, local     Offline-first, 1≠2  (shop-mode
+Customer display    shop-in-charge; shop-management         Android native, kiosk-locked, local     Offline-first, 1‚Äì2  (shop-mode
 Printed output      mode for receiving, counts, write-off                                                               screens)
                     drafts                                  database, peripheral layer (Section 4) days                 M4
 
                     Delivery drivers: drop list, proof of   Same Android stack, minimal             Offline-capable,    M6
                     delivery, photos                                                                syncs like a till
                                                                                                                         M6, M8
-                    Shoppers at the counter: line, total,   Secondary screen of the till where      ≠
+                    Shoppers at the counter: line, total,   Secondary screen of the till where      ‚Äì
                     change
                                                             present
                     Receipts, Z-reports, A4 documents
-                    and reports                             Till raster renderer; server A4 pipeline ≠
+                    and reports                             Till raster renderer; server A4 pipeline ‚Äì
 
 There is deliberately no separate mobile application for managers: the responsive web back office covers
 phones (O-06), and the till's shop-management mode covers shop tasks on the one device a small shop has.
@@ -68,21 +68,21 @@ Touch and click targets  where 40 px is for money totals at the till. Line heigh
 Colour
                          8 px base. Till: three fixed zones (Section 4.3). Web: document-shaped pages, single column on phones.
 Iconography
-Language                 Minimum 48 ◊ 48 dp on the web (Material and WCAG 2.2 guidance); 56 ◊ 56 dp for primary till actions and every
+Language                 Minimum 48 √ó 48 dp on the web (Material and WCAG 2.2 guidance); 56 √ó 56 dp for primary till actions and every
 Numbers and money        keypad key; 12 dp minimum spacing between adjacent targets.
 Feedback
                          Neutral surfaces; one accent; semantic colours for state (draft, issued, disputed, void, alert) always paired with an
-                         icon and a label ≠ colour is never the only signal (P-08). Contrast ratio at least 4.5:1 for text, 3:1 for large text and
+                         icon and a label ‚Äì colour is never the only signal (P-08). Contrast ratio at least 4.5:1 for text, 3:1 for large text and
                          icons.
 
                          One icon set; every icon carries a visible label on shop screens; icons follow the paper metaphor (book, lorry,
                          scale, stamp), not software metaphors (gear, cloud).
 
                          All strings via the message catalogue (doc 19 section 5.2); three-column names with field-level English fallback
-                         marked by a small "EN" tag so staff know the translation is missing rather than the item being foreign.
+                         marked by a small ‚ÄúEN‚Äù tag so staff know the translation is missing rather than the item being foreign.
 
                          Western Arabic digits everywhere (doc 19 DR-6); money as Rs 1,234.00 with tabular figures; quantities with unit
-                         suffix (12 kg, 3 ◊ 24).
+                         suffix (12 kg, 3 √ó 24).
 
                          Every completed action gives three signals at the till: a sound, a colour flash on the affected line, and a text
                          confirmation; on the web, a toast plus the document's state chip changing.
@@ -114,7 +114,7 @@ ReasonCapture            name (three-column aware), batch, quantity, unit, price
 30 - Frontend Foundations and UI Module Designs | v0.1 draft | Cooperative Retail and Distribution System                        Page 2
 Component          What it is                                                                              Used by
 AttachmentCapture
-ScanField          Camera capture with thumbnail strip; queued upload; shows "pending upload" GRN discrepancy, claim, write-off
+ScanField          Camera capture with thumbnail strip; queued upload; shows ‚Äúpending upload‚Äù GRN discrepancy, claim, write-off
 NumericKeypad      honestly.
 ItemCard
 MoneyDisplay       Single focused input that accepts scanner, keyboard code, or weight; parses Till sale, GRN, count
@@ -130,7 +130,7 @@ TrainingBadge      Large on-screen keypad with quantity/price/PIN modes; hardwar
                    Totals block: subtotal, reductions with rule name, total, tendered, change; 40 Till, customer display
                    px total.
 
-                   "Figures include shops synced up to hh:mm; 3 shops not yet synced" on every M8, exposure and dashboards
+                   ‚ÄúFigures include shops synced up to hh:mm; 3 shops not yet synced‚Äù on every M8, exposure and dashboards
                    federation-level figure.
 
                    List of REVIEW/ALERT events in scope with acknowledge action and                        M1 (governance), M5, M6
@@ -141,33 +141,33 @@ TrainingBadge      Large on-screen keypad with quantity/price/PIN modes; hardwar
 
 2.3 Usability rules for shop screens
 
-∑ Three taps to sell. Scan, scan, tender. Nothing on the sales screen requires reading more than one word to
+‚Ä¢ Three taps to sell. Scan, scan, tender. Nothing on the sales screen requires reading more than one word to
    act.
 
-∑ No modal chains. A screen never opens a dialog that opens another; confirmations are inline in the
+‚Ä¢ No modal chains. A screen never opens a dialog that opens another; confirmations are inline in the
    ApprovalBar.
 
-∑ Destructive actions need a reason, never a second click. A void asks why (coded), not "are you sure?".
-∑ The keypad is the primary input. Quantity, weight, PIN and price look-ups all work without a keyboard;
+‚Ä¢ Destructive actions need a reason, never a second click. A void asks why (coded), not ‚Äúare you sure?‚Äù.
+‚Ä¢ The keypad is the primary input. Quantity, weight, PIN and price look-ups all work without a keyboard;
 
    search by name is the fallback.
-∑ Same place every time. Basket left, item card right, totals bottom-right, actions bottom bar; the layout never
+‚Ä¢ Same place every time. Basket left, item card right, totals bottom-right, actions bottom bar; the layout never
 
    reflows by mode.
-∑ Show what the system knows, honestly. Offline state, pending uploads, stale ceilings and missing
+‚Ä¢ Show what the system knows, honestly. Offline state, pending uploads, stale ceilings and missing
 
    translations are visible, never hidden.
-∑ Training mode is loud. Sandbox transactions look different enough that a real receipt can never be
+‚Ä¢ Training mode is loud. Sandbox transactions look different enough that a real receipt can never be
 
    mistaken for practice (T-04).
-∑ Validate with real cashiers twice (Stage 3 usability rounds) before any screen is frozen.
+‚Ä¢ Validate with real cashiers twice (Stage 3 usability rounds) before any screen is frozen.
 
 30 - Frontend Foundations and UI Module Designs | v0.1 draft | Cooperative Retail and Distribution System                 Page 3
 3. Web back-office shell
 
 Aspect                 Design
 
-Stack                  React 18+ with TypeScript; a single application with one route namespace per module (M1≠M9); Vite build;
+Stack                  React 18+ with TypeScript; a single application with one route namespace per module (M1‚ÄìM9); Vite build;
                        component library implementing Section 2 on top of a headless primitives library (decision request DR-2 for the
                        base library).
 
@@ -234,7 +234,7 @@ Long-term risk                          Lowest
 
 Recommendation (DR-1): native Android for the till and driver app, built by a dedicated till track of two to three
 developers; module developers hand shop-mode screens to that track as specifications and reviewed Compose
-components, not as web code. This is the one place the "full-stack owns the module end to end" rule bends, and
+components, not as web code. This is the one place the ‚Äúfull-stack owns the module end to end‚Äù rule bends, and
 it bends deliberately.
 
 30 - Frontend Foundations and UI Module Designs | v0.1 draft | Cooperative Retail and Distribution System                       Page 4
@@ -262,7 +262,7 @@ Telemetry         ScopeBanner (last synced, pending count).
                   renderer produces Z-report, day-sales and till-session reports offline (O-02).
 
                   Symbology detection, GS1 element-string and Digital Link parsing, AI 01/10/17 extraction, dual-mark
-                  de-duplication (single beep), 20≠29 prefix weigh-label decoding.
+                  de-duplication (single beep), 20‚Äì29 prefix weigh-label decoding.
 
                   Sales mode and shop-management mode, role-gated, park-first, audited (doc 20 M6).
 
@@ -278,7 +278,7 @@ Top strip         ScopeBanner: shop name, till number, operator, language,
                   online/offline and pending-upload indicator, training badge             Scan focus always returns here; scrolling keeps the
                                                                                           last line visible
 Left (60%)        Basket: line list newest at the bottom, each line with thumbnail,
-                  name, qty ◊ unit price, reductions with rule name, line total; a        Picker and negative-stock acknowledgement render
+                  name, qty √ó unit price, reductions with rule name, line total; a        Picker and negative-stock acknowledgement render
                   selected line exposes qty change and void-line                          here, not as dialogs
 
 Right (40%) upper ScanField and ItemCard for the last scanned or searched item:           Tender buttons: cash, card reference, account,
@@ -295,10 +295,10 @@ Bottom bar        Park, Resume, Void, Refund (same session), Reprint,
 5. Screen inventories by module
 
 The handover baseline. Surface: W = web, T = till (sales or shop mode), D = driver. Offline: whether the screen
-is usable without central. Each module design (docs 21≠29) refines these into flows and wireframes; the
+is usable without central. Each module design (docs 21‚Äì29) refines these into flows and wireframes; the
 inventory itself is frozen with the module's contract.
 
-5.1 M1 ≠ Party, Tenancy & Security
+5.1 M1 ‚Äì Party, Tenancy & Security
 
 Screen                  Surface  Roles           Paper mirrored        Offline  Notes
 Entity register         W                                              No
@@ -325,14 +325,14 @@ Device enrolment        W        Named reviewers Exceptions book
                                                                                 QR provisioning token, assignment,
                                                                                 suspend
 
-5.2 M2 ≠ Catalogue & Batch
+5.2 M2 ‚Äì Catalogue & Batch
 
 Screen                  Surface  Roles           Paper mirrored        Offline  Notes
 Catalogue browser       W        Steward, MPCS   Price book            No
                                                                        No       Search in three scripts; status filter;
 SKU editor              W        Steward, MPCS Product card                     thumbnails; tags
                                                                        No
-Promote local SKU       W        Steward         ≠                     No       Three names (EN mandatory), units and
+Promote local SKU       W        Steward         ‚Äì                     No       Three names (EN mandatory), units and
                                  Steward         Stock list                     conversions, barcodes, images, tax, flags,
 Bulk import and validation W                                           No       attributes
                                                                        No
@@ -351,14 +351,14 @@ Item lookup             T        steward                                        
 
                                                                                 Shared ScanField + ItemCard; read-only
 
-5.3 M3 ≠ Pricing & Rules
+5.3 M3 ‚Äì Pricing & Rules
 
 Screen                  Surface  Roles           Paper mirrored        Offline  Notes
 Trade price list        W        Seller pricing  Wholesale price list  No
                                                  Shelf price list      No       Per relationship; volume tiers; effective
 Retail price list       W        MPCS pricing    Offer notice          No       dates; ceiling validation errors inline
 
-Rule editor             W        MPCS pricing    ≠                     No       One list per MPCS; label print job; advisory
+Rule editor             W        MPCS pricing    ‚Äì                     No       One list per MPCS; label print job; advisory
                                                  Expiry list           T: yes   prices shown beside
 Multi-MRP policy        W        MPCS pricing
 Markdown queue                                                                  Closed vocabulary as a form (kind, applies
@@ -377,7 +377,7 @@ MRP picker                T        Cashier          Pack label           Yes
                                                                                   Rendered in the ItemCard zone; shows
                                                                                   batch, MRP, expiry and image side by side
 
-5.4 M4 ≠ Trading Documents
+5.4 M4 ‚Äì Trading Documents
 
 Screen                    Surface  Roles            Paper mirrored       Offline  Notes
 Requisition (order) book  W                         Requisition book     No
@@ -412,7 +412,7 @@ Statement                 W                         Statement of account No
                                                                                   Warn-only; ageing buckets; freshness
 Exposure view             W                         Ledger summary       No
 
-5.5 M5 ≠ Inventory, Costing, Repack & Loss
+5.5 M5 ‚Äì Inventory, Costing, Repack & Loss
 
 Screen                    Surface  Roles            Paper mirrored       Offline  Notes
 Stock position            W/T      Stores, shop     Stock book           T: yes
@@ -430,7 +430,7 @@ Repack                    mode) / W                 register             T: yes 
                           W        Witness, approver Same                         Category, batch, qty, photos, witness
                                                                                   selection
                           W/T      Stores           Production sheet
-                                                                                  Requester  approver enforced visibly
+                                                                                  Requester ‚â† approver enforced visibly
 Intra-entity transfer     W        MPCS             Transfer note        No       Recipe, input lot, actual yield; reversal while
                                    Two parties                                    eligible
 Opening balance           W                         Opening stock sheet No
@@ -438,12 +438,12 @@ Opening balance           W                         Opening stock sheet No
 
                                                                                   Signed two-party document at onboarding
 
-5.6 M6 ≠ POS & Offline
+5.6 M6 ‚Äì POS & Offline
 
 Screen                    Surface  Roles            Paper mirrored       Offline  Notes
 PIN and session           T        Operator         Attendance book      Yes      Open with float; blind close; cash drop
 Sales                     T        Cashier          Till slip            Yes      Section 4.3
-Park / resume             T        Cashier          ≠                    Yes      Parked list with age
+Park / resume             T        Cashier          ‚Äì                    Yes      Parked list with age
 Refund (same session)     T        Cashier          Refund slip          Yes      Select from own session receipts; reason
 Refund (cross session)    T        Supervisor       Refund slip          No       Online lookup by receipt number
 Weigh and price           T        Cashier          Scale ticket         Yes      Scale read or manual weight; per-kg price
@@ -453,14 +453,14 @@ Reports                   T        Supervisor       Z-report, day sheet  Yes    
 Screen                  Surface  Roles           Paper mirrored  Offline   Notes
                         T        Shop-in-charge  Shop diary      Yes
 Shop-management mode                                             Yes       Tiles: receive goods, count, write-off,
-home                    T        Supervisor      ≠               Yes       reprint, sync status
+home                    T        Supervisor      ‚Äì               Yes       reprint, sync status
 
 Sync and device status                                                     Pending uploads, last snapshot version,
                                                                            peripheral health, app version
-Training mode           T        All             ≠
+Training mode           T        All             ‚Äì
                                                                            Full sales flow on a sandbox database
 
-5.7 M7 ≠ Customers & Payment Recording
+5.7 M7 ‚Äì Customers & Payment Recording
 
 Screen                  Surface  Roles           Paper mirrored  Offline Notes
 Customer lookup         T/W
@@ -483,25 +483,25 @@ Banking record                                   Bank slip
 
                         W        Accounts                        No        Deposit reference against takings
 
-5.8 M8 ≠ Reporting Pipeline
+5.8 M8 ‚Äì Reporting Pipeline
 
 Screen                  Surface  Roles           Paper mirrored  Offline   Notes
 Dashboard               W        By scope        Day sheet       No
                                                                            Fixed tiles with FreshnessStamp; drill to
 Catalogue report viewer W        By scope        Standard forms  No        catalogue reports
                                                                  No
-Freshness and fleet     W        Federation      ≠               No        Parameters, A4 render, spreadsheet export
+Freshness and fleet     W        Federation      ‚Äì               No        Parameters, A4 render, spreadsheet export
 
-Analyst query           W        Federation analyst ≠                      Which shops synced when; stuck devices
+Analyst query           W        Federation analyst ‚Äì                      Which shops synced when; stuck devices
 
                                                                            Read-only SQL on the replica under RLS
                                                                            (doc 20 Appendix A)
 
-5.9 M9 ≠ Integration
+5.9 M9 ‚Äì Integration
 
 Screen                  Surface  Roles           Paper mirrored  Offline   Notes
 API clients             W                                        No        Register client, scope, rotate credential
-                                 Federation admin ≠
+                                 Federation admin ‚Äì
                                  (MFA)
 
 Notification templates  W        Federation, MPCS Notice text    No        Per event, three languages, preview
@@ -517,7 +517,7 @@ What a full-stack developer receives when a module is handed over, so that nothi
 knowledge.
 
 Item                                                    Source                                                    Status at handover
-Module design document (docs 21≠29)                     Stage 2                                                   At definition of done
+Module design document (docs 21‚Äì29)                     Stage 2                                                   At definition of done
 Contract file: commands, queries, events, with the      Module design section 5                                   Frozen
 OpenAPI slice and generated client
 Screen inventory with flows and wireframes              This document section 5, refined in the module Frozen with the contract
@@ -532,7 +532,7 @@ Definition of done
 
                                                         Module design section 7                                   Listed with defaults
 
-                                                        Doc 20 section 1, plus usability review for any ≠
+                                                        Doc 20 section 1, plus usability review for any ‚Äì
                                                         shop screen
 
 Boundaries at handover. A module developer owns the module's backend and its web screens end to end,

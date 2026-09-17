@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-27 � M7 Customers & Payment Recording
+27 – M7 Customers & Payment Recording
 
 Module design for the registered customer and the digitised khata: one global identity, a
 credit account per MPCS with limit, balance and ageing, account postings from till
@@ -9,18 +9,18 @@ takings, and the privacy obligations that come with holding people's data.
 
 Field             Value
 Document
-Version           27 � M7 Customers & Payment Recording (Stage 2 module design; template of doc 20 �5)
+Version           27 – M7 Customers & Payment Recording (Stage 2 module design; template of doc 20 §5)
 Date
-Owning developer  v0.1 � draft for design review; contract freeze targeted end of Stage 2 week 5
+Owning developer  v0.1 – draft for design review; contract freeze targeted end of Stage 2 week 5
 Inputs
                   9 September 2026
 Depends on
 Depended on by    Module developer (full-stack); the till track renders the customer lookup, account tender and repayment screens
                   from this module's specification
 
-                  05 SRS (FR-CUS-010�060, FR-PAY-010, 020, 060�090); 16 answers (I-01, I-02, I-04, I-05, K section, M-09); 09
-                  ADR-15, ADR-16, ADR-27; 17 v0.2.1 �7.7; 18 v0.2; 19 v0.2; 20 v0.3 M7 and Appendix A (attributes); 21
-                  (responsible officer), 24/24A (payment receipt base), 26/26A (tenders); 30 �5.7; 32; Personal Data Protection Act
+                  05 SRS (FR-CUS-010–060, FR-PAY-010, 020, 060–090); 16 answers (I-01, I-02, I-04, I-05, K section, M-09); 09
+                  ADR-15, ADR-16, ADR-27; 17 v0.2.1 §7.7; 18 v0.2; 19 v0.2; 20 v0.3 M7 and Appendix A (attributes); 21
+                  (responsible officer), 24/24A (payment receipt base), 26/26A (tenders); 30 §5.7; 32; Personal Data Protection Act
                   No. 9 of 2022
 
                   M1 (MPCS scope, responsible officer, locations), M6 (receipt bundles with ACCOUNT tenders), kernel (document
@@ -29,8 +29,8 @@ Depended on by    Module developer (full-stack); the till track renders the cust
                   M6 (customer snapshot, tender rules), M8 (receivables, ageing), M9 (statement notifications, journal export), M3
                   (phase 3 preferential price hook)
 
-What this is and is not. A registered customer is a retail-credit concept � a person a society has agreed to trust for a
-khata � and has nothing to do with cooperative membership, shares or votes (ADR-16, K-01). The khata is frequently
+What this is and is not. A registered customer is a retail-credit concept – a person a society has agreed to trust for a
+khata – and has nothing to do with cooperative membership, shares or votes (ADR-16, K-01). The khata is frequently
 the largest receivable a society carries (I-02), so it gets the same discipline as the inter-entity ledger: postings are
 append-only, balances are sums, and nothing is edited. Because these are people's records, the module holds the
 minimum and knows how to give it back or take it away (ADR-27, PDPA).
@@ -51,7 +51,7 @@ retention (M-09, PDPA)
 Credit account per MPCS: limit, balance, ageing buckets, status, offline   Loans, interest on customer balances (K-06); credit scoring
 cap; limit warn by default with an entity-configurable hard block
 
-Account postings (append-only): CHARGE from receipt ACCOUNT                �
+Account postings (append-only): CHARGE from receipt ACCOUNT                –
 
 tenders, CREDIT from refunds, PAYMENT from repayments,
 
@@ -130,7 +130,7 @@ Access request       records the first; opening an account requires the first; S
 
                      data_subject_request(customer_id, kind ACCESS | ERASURE, received_at, received_by,
                      status, fulfilled_at, export_object_key?); ACCESS produces a rendered export of the customer's
-                     data and postings; ERASURE anonymises (name  'Customer', phones removed, NIC hash removed, attributes
+                     data and postings; ERASURE anonymises (name → 'Customer', phones removed, NIC hash removed, attributes
                      cleared) while account postings and documents remain for the retention period, since they are also the society's
                      accounting records (a documented limitation of erasure under the Act's exemptions; DR-4 asks Federation legal
                      to confirm the wording).
@@ -142,7 +142,7 @@ Aggregate            offline_cap, status OPEN | SUSPENDED | CLOSED, opened_at, o
                      hard_block boolean); unique per (customer, MPCS). A customer of two societies has two independent
 Balance and ageing   accounts (ADR-15).
 
-Limit policy         balance =  account_posting.amount (charges positive, credits and payments negative), cached on the
+Limit policy         balance = Σ account_posting.amount (charges positive, credits and payments negative), cached on the
                      account and recomputed by the same handlers; ageing buckets (current, 30, 60, 90+) computed from unpaid
                      charge dates using the allocation records.
 
@@ -162,7 +162,7 @@ Ledger
 27 - M7 Customers & Payment Recording | v0.1 draft | Cooperative Retail and Distribution System  Page 3
 Aspect             Design
 From the till
-                   A receipt with an ACCOUNT tender (doc 26 �3.3) becomes a CHARGE on ingestion; a refund to account
+                   A receipt with an ACCOUNT tender (doc 26 §3.3) becomes a CHARGE on ingestion; a refund to account
 Reconciliation on  becomes a CREDIT. Offline tenders carry offline = true and were allowed by the till only within
 ingestion          offline_cap per receipt and the cached available balance.
 
@@ -216,7 +216,7 @@ Reconciliation     HANDOVER_TO_OFFICE | BANK_DEPOSIT, deposited_by, received_by?
 Aspect             Design
 Design only
                    customer_price(account_id, sku_id, price, valid_from, valid_to) feeds M3's engine input
-                   slot (doc 23 �3.7); the till's customer snapshot row would carry the customer's prices. Not built in phase 1.
+                   slot (doc 23 §3.7); the till's customer snapshot row would carry the customer's prices. Not built in phase 1.
 
 27 - M7 Customers & Payment Recording | v0.1 draft | Cooperative Retail and Distribution System  Page 4
    4. State machines
@@ -224,7 +224,7 @@ Design only
    4.1 Customer
 
 From       To                Trigger / command           Guard                                      Permission          Audit / offline
-�          ACTIVE            RegisterCustomer(name,
+–          ACTIVE            RegisterCustomer(name,
                              phone, language, consent)   online; phone valid; reuse                 cus.customer.regi   CUSTOMER_R
                                                          detection passed or confirmed;             ster                EGISTERED /
                              ChangePhone(new,            consent CREDIT_ACCOUNT                                         online only
@@ -246,7 +246,7 @@ INACTIVE
    4.2 Account
 
 From       To                Trigger / command           Guard                                      Permission          Audit / offline
-�          OPEN
+–          OPEN
                              OpenAccount(customer,       MPCS scope; customer ACTIVE;               cus.account.mana ACCOUNT_OP
                              limit, terms, offline cap)  consent; NIC captured when limit
                                                          > 0; no existing account for the           ge (MFA)            ENED
@@ -274,7 +274,7 @@ SUSPENDED                                                                       
 
 From       To                Trigger / command           Guard                                      Permission          Audit / offline
 
-�          RECORDED          RecordCustomerPayment(a     account OPEN or SUSPENDED;                 cus.payment.reco    CUSTOMER_P
+–          RECORDED          RecordCustomerPayment(a     account OPEN or SUSPENDED;                 cus.payment.reco    CUSTOMER_P
                              ccount, method, amount,     amount > 0; issuance (till-position        rd                  AYMENT_REC
                              reference, allocation)      or ENTITY series); PAYMENT                                     ORDED / offline
                                                          posting; allocations                       cus.payment.reve    at till (posted on
@@ -288,7 +288,7 @@ RECORDED REVERSED            ReverseCustomerPayment( MFA; REVERSES-linked CPR;
 
 From       To                Trigger / command           Guard                                      Permission          Audit / offline
 
-�          RECEIVED          RecordDataSubjectRequest customer identified; received by a            cus.privacy.record DSAR_RECEIV
+–          RECEIVED          RecordDataSubjectRequest customer identified; received by a            cus.privacy.record DSAR_RECEIV
 RECEIVED   FULFILLED                                                                                                           ED
                              (kind)                      named officer
 
@@ -302,11 +302,11 @@ RECEIVED   REFUSED           RefuseRequest(reason)       legal ground recorded  
 
    27 - M7 Customers & Payment Recording | v0.1 draft | Cooperative Retail and Distribution System                            Page 5
 From      To                     Trigger / command               Guard                               Permission                Audit / offline
-�         RECORDED               RecordBanking(kind,
+–         RECORDED               RecordBanking(kind,
                                  sessions, amount,               sessions CLOSED and not yet         cus.banking.recor         BANKING_REC
-RECORDED  RECONCILED             reference)                      banked; amount  expected cash       d                         ORDED
+RECORDED  RECONCILED             reference)                      banked; amount ≤ expected cash      d                         ORDED
                                                                  of the sessions (shortfall allowed
-                                 MarkReconciled(statement        with reason  REVIEW)                cus.banking.recon BANKING_REC
+                                 MarkReconciled(statement        with reason → REVIEW)               cus.banking.recon BANKING_REC
                                  reference)
                                                                  MPCS accounts
 
@@ -389,27 +389,27 @@ banking.recorded/reconciled.v1         record, sessions, amount
 
 Flow                           Sequence                                                             Failure paths
 
-6.1 Registering a customer at  Online till or web  name, phone, language  reuse detection           Offline: refused with 'register when
-the shop                       (phone free)  consent for CREDIT_ACCOUNT and optionally              online'; phone held by another ACTIVE
-                               STATEMENTS  customer ACTIVE  MPCS office opens an                    customer in the last 12 months:
-                               account with a limit (NIC last four and hash captured, MFA)          confirmation step with name and NIC
+6.1 Registering a customer at  Online till or web → name, phone, language → reuse detection         Offline: refused with 'register when
+the shop                       (phone free) → consent for CREDIT_ACCOUNT and optionally             online'; phone held by another ACTIVE
+                               STATEMENTS → customer ACTIVE → MPCS office opens an                  customer in the last 12 months:
+                               account with a limit (NIC last four and hash captured, MFA) →        confirmation step with name and NIC
                                snapshot change-log to the MPCS's shops                              last four
 
 6.2 Phone number recycled      A new customer registers a phone last used by a customer             Same person changing phones:
-                               deactivated 8 months ago  reuse flag  operator confirms it is a      ChangePhone with reason; the old
-                               different person  history row on the old customer (valid_to), new    number is released
+                               deactivated 8 months ago → reuse flag → operator confirms it is a    ChangePhone with reason; the old
+                               different person → history row on the old customer (valid_to), new   number is released
                                primary phone on the new; audit on both
 
-6.3 Buying on the khata        Cashier looks up the customer by phone in the cached snapshot        Hard-block accounts: the till refuses
+6.3 Buying on the khata        Cashier looks up the customer by phone in the cached snapshot →      Hard-block accounts: the till refuses
 offline                        ACCOUNT tender within the offline cap and cached available           beyond the cached limit; suspended
-                               balance  receipt issued with the tender flagged offline  on          accounts: refused with reason
+                               balance → receipt issued with the tender flagged offline → on        accounts: refused with reason
                                ingestion: CHARGE posting; if the cached balance was stale and
                                the limit is now breached: posting stands, REVIEW to accounts,
                                account may be suspended
 
-6.4 Repayment at the shop      Customer pays Rs 2,000 cash against the khata  CPR from the          Wrong customer: reversal online with
-                               till-position series (offline allowed)  on ingestion: PAYMENT        MFA; allocations undone
-                               posting allocated oldest-first  balance and ageing updated 
+6.4 Repayment at the shop      Customer pays Rs 2,000 cash against the khata → CPR from the         Wrong customer: reversal online with
+                               till-position series (offline allowed) → on ingestion: PAYMENT       MFA; allocations undone
+                               posting allocated oldest-first → balance and ageing updated →
                                provisional balance shown on the till immediately
 
 6.5 Month-end statements       StatementJob: for each account with movement: render A4 in the       No consent: no SMS; statement still
@@ -417,16 +417,16 @@ offline                        ACCOUNT tender within the offline cap and cached 
                                consent exists (balance, due amount, oldest charge date); printable
                                at the shop on request
 
-6.6 Banking the takings        Sessions close with counted cash  shop hands cash to the MPCS        Sessions banked twice refused; a
-                               office (HANDOVER record: sessions, amount, received by)  office      handover exceeding expected cash
-                               deposits at the bank (BANK_DEPOSIT with slip reference)              refused
+6.6 Banking the takings        Sessions close with counted cash → shop hands cash to the MPCS       Sessions banked twice refused; a
+                               office (HANDOVER record: sessions, amount, received by) → office     handover exceeding expected cash
+                               deposits at the bank (BANK_DEPOSIT with slip reference) →            refused
                                expected versus recorded per session; shortfall raises a REVIEW
 
                                with the reason keyed
 
-6.7 Access and erasure         Customer asks the shop for their data  officer records ACCESS        Open balance: erasure refused with
-requests                       export rendered and handed over (audited)  later asks for erasure    the legal ground until settled; refusal
-                                guard: no open balance  anonymised; postings and documents          recorded
+6.7 Access and erasure         Customer asks the shop for their data → officer records ACCESS →     Open balance: erasure refused with
+requests                       export rendered and handed over (audited) → later asks for erasure   the legal ground until settled; refusal
+                               → guard: no open balance → anonymised; postings and documents        recorded
                                retained for the retention period with the customer reference
 
                                replaced by an opaque id
@@ -437,8 +437,8 @@ Item                                                Rs 5,000                    
 customers.offline_account_cap (per receipt)                                           override                     cus.account.manage
                                                                                                                    cus.account.manage
 customers.limit_policy                              WARN (hard_block off)             Entity; per account          cus.payment.record
-customers.default_terms_days                                                                                       �
-customers.allocation_mode                           30                                Entity                       �
+customers.default_terms_days                                                                                       –
+customers.allocation_mode                           30                                Entity                       –
 customers.phone_reuse_window_months
 customers.nic_required_above_limit                  OLDEST_FIRST                      Entity                       cus.statement.issue
 
@@ -456,10 +456,10 @@ customers.banking_shortfall_review                  granted)
 
 8. Screens as paper
 
-Screen                     Paper mirrored           Surface        Roles                     Notes
+Screen                     Paper mirrored           Surface        Roles                      Notes
                            Khata index              T/W            Cashier, accounts
-Khata index (customer                                                                        By phone or name; account balance, limit,
-lookup)                                                                                      status; offline from cache
+Khata index (customer                                                                         By phone or name; account balance, limit,
+lookup)                                                                                       status; offline from cache
 
 27 - M7 Customers & Payment Recording | v0.1 draft | Cooperative Retail and Distribution System                    Page 8
 Screen               Paper mirrored    Surface          Roles                 Notes
@@ -503,7 +503,7 @@ Aspect             Design
                    snapshot encrypted at rest on tills; access and erasure workflows; responsible officer per entity; every read of a
                    customer record outside the sales path is audited (accounts screens).
 
-                   Postings insert-only; limit increases MFA; adjustments SoD (request  approve) and MFA; reversals MFA;
+                   Postings insert-only; limit increases MFA; adjustments SoD (request ≠ approve) and MFA; reversals MFA;
                    banking shortfalls REVIEW; offline limit breaches REVIEW.
 
                    A customer's data is visible to the registering MPCS and, for the account, to that MPCS only; another MPCS
@@ -528,7 +528,7 @@ Performance        consistent with allocations
                    Receipt bundles with ACCOUNT tenders post charges; refunds post credits; offline breach raises REVIEW; CPR
                    bundles from the till allocate
 
-                   Flows 6.1�6.7 end to end incl. the till simulator for offline tender and repayment
+                   Flows 6.1–6.7 end to end incl. the till simulator for offline tender and repayment
 
                    Access export completeness; erasure leaves no personal data outside retained documents; audit on reads
 
@@ -564,10 +564,10 @@ DR-7  Limit policy default                     Warn; hard block configurable per
 
 27 - M7 Customers & Payment Recording | v0.1 draft | Cooperative Retail and Distribution System                       Page 10
 Section  Identifiers
-3.1�3.2  FR-CUS-010, 040, 060; K-02, K-08; M-09; ADR-15, ADR-27; PDPA No. 9 of 2022
-3.3�3.5  FR-CUS-020, 030; FR-PAY-010, 020, 060, 070; I-01, I-02, I-05; H-02/H-03; doc 20 DR-3
-3.6�3.7  FR-PAY-080, 090; I-04; R-08
-3.8      FR-CUS-050; FR-PRC-110; doc 23 �3.7
+3.1–3.2  FR-CUS-010, 040, 060; K-02, K-08; M-09; ADR-15, ADR-27; PDPA No. 9 of 2022
+3.3–3.5  FR-CUS-020, 030; FR-PAY-010, 020, 060, 070; I-01, I-02, I-05; H-02/H-03; doc 20 DR-3
+3.6–3.7  FR-PAY-080, 090; I-04; R-08
+3.8      FR-CUS-050; FR-PRC-110; doc 23 §3.7
 4        Doc 03 conventions; N-05; N-07
 9        NFR-CMP-010; NFR-SEC; M-05
 

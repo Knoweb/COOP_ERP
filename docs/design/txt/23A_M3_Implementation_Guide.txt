@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-23A ­ M3 Pricing & Rules: Implementation Guide
+23A â€“ M3 Pricing & Rules: Implementation Guide
 
 Everything the M3 developer and the till track need: the pricing schema as DDL, seed
 data, package layout, the API slice, handler specifications, the shared engine in Kotlin
@@ -9,23 +9,23 @@ consumers, the snapshot contributor, golden-basket fixtures, screens, tests and 
 Self-contained; restated material is marked.
 
 Field             Value
-Document          23A ­ implementation guide for 23 M3 Pricing & Rules v0.1
-Version           v0.1 ­ for the M3 developer and the till track (Section 6 is shared)
+Document          23A â€“ implementation guide for 23 M3 Pricing & Rules v0.1
+Version           v0.1 â€“ for the M3 developer and the till track (Section 6 is shared)
 Date              9 September 2026
-Prerequisite      Sprint 0; M1 and M2 contracts frozen; the shared-engine module of 17A §9 with its interfaces. M5's in-stock batch
+Prerequisite      Sprint 0; M1 and M2 contracts frozen; the shared-engine module of 17A Â§9 with its interfaces. M5's in-stock batch
                   query is stubbed until doc 25 (Section 11).
 Estimated effort  About 22 developer-days: 15 for the module, 7 for the engine (of which the till track co-owns the parity suite)
-Restated content  Marked restated from doc X §Y.
+Restated content  Marked restated from doc X Â§Y.
 
 Read this first. Build the engine before the module: it is a pure Kotlin library with no database, it is what the till runs,
 and every back-office screen just calls it. Get the golden baskets green on JVM and Android first (ticket M3-02), then
-wrap the tables and screens around it. The legal property ­ no output ever exceeds a control price ­ is a
+wrap the tables and screens around it. The legal property â€“ no output ever exceeds a control price â€“ is a
 property-based test, not a code review item.
 
 23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
 1. What you are building
 
-Restated from doc 23 §1. Every price a buyer pays and every reduction a customer receives: trade lists per
+Restated from doc 23 Â§1. Every price a buyer pays and every reduction a customer receives: trade lists per
 relationship, one retail list per MPCS, advisory prices, a five-kind rule engine as the only reduction mechanism,
 the printed-MRP and gazetted ceilings as hard blocks, the multi-MRP policy, and the resolution engine shared
 with the till.
@@ -33,7 +33,7 @@ with the till.
 You build                                                                   You do not build
                                                                             Batch MRP itself (M2), lots (M5), documents that carry prices
 Schema pricing: price_list, price_list_line, discount_rule, control_price,  (M4, M6)
-mrp_policy, adjustment_type, label_job                                      The till application (M6) ­ it links your library
+mrp_policy, adjustment_type, label_job                                      The till application (M6) â€“ it links your library
 
 The shared engine's real implementation: PriceResolver, RuleEvaluator,      Weigh labels and batch stickers (M6, M5)
 Tax, Rounding, BasketResolver
@@ -46,12 +46,12 @@ Seven web screens; the MRP picker's data contract for M6
 2. What you inherit
 
 From                  You use                                                          How
-17A §9
+17A Â§9
 shared-engine         Module skeleton: Money, Quantity, Tax, PriceResolver,            You replace the stubs (Section 6); keep the
-19A §4­5, §11­12      RuleEvaluator, Envelope interfaces with stubs                    package and versioning
+19A Â§4â€“5, Â§11â€“12      RuleEvaluator, Envelope interfaces with stubs                    package and versioning
 
-19A §6 i18n           AuditFacade, EventPublisher, ConfigRegistry, @ScheduledJob, As in every module
-19A §8 sync           @EventConsumer
+19A Â§6 i18n           AuditFacade, EventPublisher, ConfigRegistry, @ScheduledJob, As in every module
+19A Â§8 sync           @EventConsumer
 
 M1 api/query          A4Renderer for labels; IcuFormats for money                      Label job
 
@@ -59,12 +59,12 @@ M2 api/query          SnapshotContributor; SnapshotChangeLog.record(...,        
                       applyFrom, urgent)
 M5 query (stub until
 doc 25)               LookupRelationship (trade list binding), listLocations(entity),  Trade resolution; change-log fan-out per location
-17A §7 web shell      scope
+17A Â§7 web shell      scope
 
                       GetSku (flags, has_printed_mrp, tags), TaxQueries.rateInForce, Authoring checks; tax; policy scopes
                       TagQueries.isGoverned, batch identity
 
-                      InStockBatches(locationIds, skuId)  [(batchId, printedMrp,       Authoring ceiling check (min in-stock MRP)
+                      InStockBatches(locationIds, skuId) â†’ [(batchId, printedMrp,      Authoring ceiling check (min in-stock MRP)
                       expiry, onHand)]
 
                       DocumentHeader, ApprovalBar, ReasonCapture, StepUpDialog, Section 8
@@ -73,7 +73,7 @@ doc 25)               LookupRelationship (trade list binding), listLocations(ent
 23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                          Page 2
 3. Schema
 
-Restated from doc 18 v0.2 part B (M3 tables) and doc 23 §3; adds mrp_policy, adjustment_type, label_job
+Restated from doc 18 v0.2 part B (M3 tables) and doc 23 Â§3; adds mrp_policy, adjustment_type, label_job
 (CR-23-1). Location db/migration/m3pricing/.
 
 -- V0001__pricing.sql
@@ -347,7 +347,7 @@ BasketResult: { lines: [LineResult], billRuleId?, billDiscount, subtotal, total,
 
 6. The shared engine (Kotlin)
 
-Restated and formalised from doc 23 §3.5. The code below is the reference implementation the till links; the
+Restated and formalised from doc 23 Â§3.5. The code below is the reference implementation the till links; the
 repository file is authoritative, this is what reviewers check it against.
 
 // model
@@ -476,9 +476,9 @@ object BasketResolver {
 
 Aspect                  Design
 Index
-                        PricingSnapshotIndex is built once per snapshot version from the snapshot rows: maps sku  retail lines by
-Determinism             uom and tier, sku/tag  active rules, sku/tag  ceilings (unit-converted using M2 conversions), sku  policy, sku
-                         in-stock batches (from the lot rows). Building it is O(rows); resolving is O(lines × rules-for-sku).
+                        PricingSnapshotIndex is built once per snapshot version from the snapshot rows: maps sku â†’ retail lines by
+Determinism             uom and tier, sku/tag â†’ active rules, sku/tag â†’ ceilings (unit-converted using M2 conversions), sku â†’ policy, sku
+                        â†’ in-stock batches (from the lot rows). Building it is O(rows); resolving is O(lines Ã— rules-for-sku).
 Central use
                         No clocks, no randomness, no I/O; the business date is an input; money arithmetic uses the library's fixed
                         rounding modes; the same inputs give the same bytes on JVM and Android (a golden fixture asserts the
@@ -493,17 +493,17 @@ Central use
 
 Command            Guards (in order)                               Mutation                      Audit        Events
 
-CreatePriceList    owner; kind; RETAIL: no DRAFT exists (unique insert DRAFT                     PRICELIST_D ­
+CreatePriceList    owner; kind; RETAIL: no DRAFT exists (unique insert DRAFT                     PRICELIST_D â€“
                    index backstop);                                                              RAFTED
                    ADVISORY/TRADE-federation: caller F
 
-DraftNewVersion    source PUBLISHED or SUPERSEDED; owner new DRAFT with lines carried PRICELIST_D ­
+DraftNewVersion    source PUBLISHED or SUPERSEDED; owner new DRAFT with lines carried PRICELIST_D â€“
                                                                                      forward (effective_from = null RAFTED
                                                                                      until publish)
 
-SetLines           list DRAFT; owner; per line: sku active, uom upsert draft lines; return       ­            ­
+SetLines           list DRAFT; owner; per line: sku active, uom upsert draft lines; return       â€“            â€“
 
-                   valid (M2), tiers ascending, price  0;          per-line outcomes
+                   valid (M2), tiers ascending, price â‰¥ 0;         per-line outcomes
 
                    AuthoringValidator.ceilings (RETAIL:
 
@@ -514,19 +514,19 @@ SetLines           list DRAFT; owner; per line: sku active, uom upsert draft lin
                    review-only above lowest MRP)
 
 PublishPriceList   DRAFT; all lines valid at publish time (re-run  set effective_from =          PRICELIST_P  price_list.publish
-                   validator); apply_from  today; TRADE: MFA       apply_from on lines; close    UBLISHED     ed.v1 (changed
+                   validator); apply_from â‰¥ today; TRADE: MFA      apply_from on lines; close    UBLISHED     ed.v1 (changed
                                                                    previous version lines at                  sku ids)
-                                                                   apply_from - 1; status
+                                                                   apply_from âˆ’ 1; status
                                                                    PUBLISHED, previous
                                                                    SUPERSEDED
 
-AuthorRule /       owner; RuleSchemaValidator for the kind;        insert / update DRAFT         RULE_AUTHO ­
+AuthorRule /       owner; RuleSchemaValidator for the kind;        insert / update DRAFT         RULE_AUTHO â€“
 AmendDraftRule     scope sku/tag exists; EXPIRY_MARKDOWN                                         RED
                    requires expiry-tracked scope (M2 flag; for a
                    tag, every SKU under it or the validator lists
                    offenders); advisory only by F
 
-ActivateRule       DRAFT; valid_from  today; FIXED_PRICE           ACTIVE; change-log rows for RULE_ACTIV     discount_rule.ac
+ActivateRule       DRAFT; valid_from â‰¥ today; FIXED_PRICE          ACTIVE; change-log rows for RULE_ACTIV     discount_rule.ac
                    benefit under ceilings for its scope today;                                                tivated.v1
                    benefit within [0, 100%]                        the owner's locations         ATED
 
@@ -536,12 +536,12 @@ WithdrawRule       ACTIVE; reason                                  WITHDRAWN; ch
                                                                    urgent
                                                                                                  RAWN         hdrawn.v1
 
-AdoptAdvisoryRule  source advisory ACTIVE; caller MPCS             copy as DRAFT with            RULE_AUTHO ­
+AdoptAdvisoryRule  source advisory ACTIVE; caller MPCS             copy as DRAFT with            RULE_AUTHO â€“
                                                                    adopted_from                  RED
 
 EnterControlPrice  caller F; MFA; scope exists (sku or governed    insert; close previous        CONTROL_P    control_price.ent
                    tag); ceiling > 0; gazette ref; overlap check   same-scope row at             RICE_ENTER   ered.v1
-                   (exclusion backstop)                            effective_from - 1;           ED
+                   (exclusion backstop)                            effective_from âˆ’ 1;           ED
                                                                    change-log urgent to all
                                                                    locations (worker fan-out)
 
@@ -655,8 +655,8 @@ Offer notice             as sketched; ceiling status per line from the     list.
 
 Gazette                  validator                                                             F only
 
-MRP policy               kind-driven form, preview (calls resolveBasket),  rule.*              ­
-Pricing reviews          ApprovalBar                                                           ­
+MRP policy               kind-driven form, preview (calls resolveBasket),  rule.*              â€“
+Pricing reviews          ApprovalBar                                                           â€“
 
 Markdown queue           form with gazette reference, ReasonCapture,       ceiling.*           Web and till (M6 renders)
                          StepUpDialog, affected-lists count
@@ -674,11 +674,11 @@ Markdown queue           form with gazette reference, ReasonCapture,       ceili
 
 Layer                  Cases                                                                                 Target
 Engine unit
-                       Each step of doc 23 §3.5; every rule kind and benefit; stacking policies; tax         Every branch
+                       Each step of doc 23 Â§3.5; every rule kind and benefit; stacking policies; tax         Every branch
 Engine property-based  decomposition incl. bill apportionment; rounding (.49/.50/.51); ceiling unit
                        conversion (per kg ceiling vs 400 g pack)
 Golden baskets
-                       Random snapshots and baskets: total  sum of list prices; every line  control          10,000 cases; parity 100%
+                       Random snapshots and baskets: total â‰¤ sum of list prices; every line â‰¤ control        10,000 cases; parity 100%
 Contract
 State machine          term; capReason consistent; idempotent re-resolution; serialised result identical on
 Consumers
@@ -697,35 +697,35 @@ Web                    golden/*.json: doc 13 scenario 4 plus twenty fixtures (si
                        BATCH_MRP_BELOW_LIST raised only when below; gazette review fan-out;                  Three cases
                        publish fan-out produces exactly the expected change-log rows per location
 
-                       Flows 6.1­6.7 of doc 23 end to end (M5 stub for in-stock batches; M4 stub for         Seven flows
+                       Flows 6.1â€“6.7 of doc 23 end to end (M5 stub for in-stock batches; M4 stub for         Seven flows
                        adjustments)
 
                        30-line basket, 200 rules: under 5 ms on the reference terminal, under 2 ms on        Two targets
-                       JVM; publish fan-out for 6,000 SKUs × 12 locations under 30 s
+                       JVM; publish fan-out for 6,000 SKUs Ã— 12 locations under 30 s
 
-                       Playwright: draft list with an over-ceiling line  publish disabled  fix  publish;     Three flows
+                       Playwright: draft list with an over-ceiling line â†’ publish disabled â†’ fix â†’ publish;  Three flows
                        author and activate an expiry rule; enter a control price with step-up
 
 10. Tickets in build order
 
-#      Ticket                                                                          Est. (days)    Done when
-M3-01                                                                                  1.5            Unit tests green
+#      Ticket                                                                          Est. (days)     Done when
+M3-01                                                                                  1.5             Unit tests green
        Engine model and index; Money/Quantity/Tax/Rounding completion in
-M3-02  shared-engine                                                                   4              Golden and parity green on JVM
-                                                                                                      and Android
-M3-03  PriceResolver, RuleEvaluator, BasketResolver; golden baskets; property          1              Applies; schemas validate fixtures
-M3-04  tests; parity harness with the till track                                       3              Flow 6.1; fan-out test
+M3-02  shared-engine                                                                   4               Golden and parity green on JVM
+                                                                                                       and Android
+M3-03  PriceResolver, RuleEvaluator, BasketResolver; golden baskets; property          1               Applies; schemas validate fixtures
+M3-04  tests; parity harness with the till track                                       3               Flow 6.1; fan-out test
 
-M3-05  Migration V0001 with RLS; seeds; rule JSON schemas                              2              Flow 6.3
-M3-06                                                                                  2              Flow 6.4
+M3-05  Migration V0001 with RLS; seeds; rule JSON schemas                              2               Flow 6.3
+M3-06                                                                                  2               Flow 6.4
        Price lists: create, versions, set lines with AuthoringValidator, publish with
-M3-07  carry-forward and closure; PublishFanOut                                        1.5            Flow 6.7; M2 sku field updated
+M3-07  carry-forward and closure; PublishFanOut                                        1.5             Flow 6.7; M2 sku field updated
 
-M3-08  Rules: author, amend, activate, withdraw, adopt; schema validator; expiry job   1.5            Flow 6.5, 6.6
+M3-08  Rules: author, amend, activate, withdraw, adopt; schema validator; expiry job   1.5             Flow 6.5, 6.6
 
-M3-09  Control prices: enter, rescind, CeilingResolver with unit conversion; gazette   1.5            Snapshot tests; refused labels listed
-M3-10  review consumer; urgent change-log                                              3              Three flows green
-M3-11                                                                                  0.5            M4 and M6 acknowledge
+M3-09  Control prices: enter, rescind, CeilingResolver with unit conversion; gazette   1.5             Snapshot tests; refused labels listed
+M3-10  review consumer; urgent change-log                                              3               Three flows green
+M3-11                                                                                  0.5             M4 and M6 acknowledge
        MRP policy, EffectivePolicy, M2 denormalisation event; adjustment types;
        ResolveTradePrice
 
@@ -744,10 +744,10 @@ integrates; tag engine 1.0.0 before the module contract freeze so M6's spike wor
 
 11. Open points: what to assume, whom to ask
 
-Point                          Assume              Decider                                            If different
+Point                          Assume              Decider                                             If different
 Stacking policy (doc 23 DR-1)  PRIORITY_THEN_BEST  Federation admins
-                                                                                                      Config value; engine already
-                                                                                                      supports BEST_ONLY
+                                                                                                       Config value; engine already
+                                                                                                       supports BEST_ONLY
 
 23A - M3 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                             Page 9
 Point                          Assume                                  Decider                 If different
@@ -759,10 +759,10 @@ Picker gap (DR-4)              By copy                                 Federatio
                                Adopted                                 round                   Config values
 Advisory adoption (DR-5)                                               Federation
 New tables (DR-6) and P3 slot                                          Architecture review     Remove AdoptAdvisoryRule
-(DR-7)                                                                                         ­
+(DR-7)                                                                                         â€“
 M5 InStockBatches query
                                Stub returning fixture batches until doc M5 developer           Swap the stub
-Ceiling unit conversion for    25                                                              ­
+Ceiling unit conversion for    25                                                              â€“
 weighed goods
                                Per-kg ceilings convert through M2      M2 and M3 developers
 

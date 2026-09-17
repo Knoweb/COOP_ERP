@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-29A ­ M9 Integration: Implementation Guide
+29A â€“ M9 Integration: Implementation Guide
 
 Everything the M9 developer needs: the integration schema as DDL, seed data
 (templates, rules handed over by the modules, providers, API scopes), package layout,
@@ -9,13 +9,13 @@ registration, the journal builder and the notification adapters, the bundle asse
 doc 33, screens, tests and tickets. Self-contained.
 
 Field             Value
-Document          29A ­ implementation guide for 29 M9 Integration v0.1
-Version           v0.1 ­ for the M9 developer; section 7 doubles as the doc 33 assembly procedure
+Document          29A â€“ implementation guide for 29 M9 Integration v0.1
+Version           v0.1 â€“ for the M9 developer; section 7 doubles as the doc 33 assembly procedure
 Date              9 September 2026
 Prerequisite      Sprint 0 (identity, notifications delivery, attachments, scheduler); the module slices and posting maps of docs
-                  21A­28A; M7 consent query
+                  21Aâ€“28A; M7 consent query
 Estimated effort  About 15 developer-days plus 3 for the doc 33 bundle assembly
-Restated content  Marked restated from doc X §Y.
+Restated content  Marked restated from doc X Â§Y.
 
 Read this first. Nothing in this module decides anything about money, prices or documents. If you find yourself writing
 a rule about when an invoice is due or which account a write-off hits, stop: that belongs in M4, M5 or M7's posting
@@ -30,7 +30,7 @@ You build                                                               You do n
 Schema integration: api_client, api_credential_history, api_scope,
 api_call_log, journal_export, journal_line, notification_rule,          Any business rule; posting maps (owned by M4, M5, M7 as seeds
 notification_template, provider_config, e_invoice_submission,           you read)
-webhook_subscription (table only)                                       ­
+webhook_subscription (table only)                                       â€“
 
 17 commands, 6 admin queries, the public read subset wired through the
 module controllers, 5 event families; JournalBuilder; three channel
@@ -41,18 +41,18 @@ Nine web screens and the generated API documentation site
 2. What you inherit
 
 From                   You use                                                     How
-19A §2 identity
+19A Â§2 identity
                        Client-credentials flow at the provider;                    Section 6.1
-19A §1 scope           IdentityProviderClient.createClient /
-19A §10 notifications  rotateSecret / disableClient (added here); token
+19A Â§1 scope           IdentityProviderClient.createClient /
+19A Â§10 notifications  rotateSecret / disableClient (added here); token
 delivery               claims cls = API_CLIENT
-19A §9 attachments
-19A §12 scheduler      The scope filter maps a client token to OWN/PARTY for its entity Public API
+19A Â§9 attachments
+19A Â§12 scheduler      The scope filter maps a client token to OWN/PARTY for its entity Public API
 M4 api/query
 M5, M7 seeds           NotificationChannel interface; dispatcher reads your rules Section 6.3
 All modules            and templates through NotificationRuleQueries
 
-17A §6 toolchain       Object storage for exports and documentation                Journal export
+17A Â§6 toolchain       Object storage for exports and documentation                Journal export
 
                        Unacknowledged-export review; provider health probe         Jobs
 
@@ -73,7 +73,7 @@ All modules            and templates through NotificationRuleQueries
 29A - M9 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                     Page 2
 3. Schema
 
-Restated from doc 29 §3 (CR-29-1). Location db/migration/m9integration/.
+Restated from doc 29 Â§3 (CR-29-1). Location db/migration/m9integration/.
 
 -- V0001__integration.sql (RLS per 17A 6.3; federation-owned rows readable by all where noted)
 CREATE TABLE integration.api_scope (scope_code varchar(40) PRIMARY KEY, description_en text NOT NULL,
@@ -335,62 +335,62 @@ ProviderController, EInvoiceController, BundleController
 
               # example - journal line (JSON export)
 
-              { "seq": 41, "documentId": "...", "docType": "INV", "docNumber": "M042-INV-0007712", "lineKind": "GOODS",
+              { "seq": 41, "documentId": "â€¦", "docType": "INV", "docNumber": "M042-INV-0007712", "lineKind": "GOODS",
 
                    "side": "SELLER",
 
               "debitRole": "RECEIVABLE", "creditRole": "REVENUE", "amount": 24850.00, "businessDate": "2026-09-14",
 
-                    "counterpartyEntityId": "...", "reference": "GRN M042-S07-GRN-000217" }
+                    "counterpartyEntityId": "â€¦", "reference": "GRN M042-S07-GRN-000217" }
 
      6. Handler specifications
 
-Command                     Guards (in order)                                    Effect                                  Events
+Command                     Guards (in order)                                     Effect                                  Events
 RegisterApiClient           entity admin; MFA; ScopeContainment: every
-                            scope's permissions  caller's permissions (doc       provider client created (client         api_client.registered.v1
-RotateCredential            19 §3 guardrail); customers:read only for an         credentials, claims: cls=API_CLIENT,
-                            MPCS; name unique                                    ent, scopes); api_client row;
-                                                                                 credential returned once, never
-                            ACTIVE; MFA                                          stored in clear
+                            scope's permissions âŠ† caller's permissions (doc       provider client created (client         api_client.registered.v1
+RotateCredential            19 Â§3 guardrail); customers:read only for an          credentials, claims: cls=API_CLIENT,
+                            MPCS; name unique                                     ent, scopes); api_client row;
+                                                                                  credential returned once, never
+                            ACTIVE; MFA                                           stored in clear
 
-                                                                                 new secret at the provider; history     api_client.rotated.v1
-                                                                                 row; previous valid until now +
-                                                                                 overlap days
+                                                                                  new secret at the provider; history     api_client.rotated.v1
+                                                                                  row; previous valid until now +
+                                                                                  overlap days
 
-AmendScopes /               containment; reason                                  row; provider claims updated            api_client.scopes_changed.v1
+AmendScopes /               containment; reason                                   row; provider claims updated            api_client.scopes_changed.v1
 SetRateLimit
 
-SuspendClient /             reason; MFA for reinstate and revoke                 status; provider client                 api_client.*.v1
+SuspendClient /             reason; MFA for reinstate and revoke                  status; provider client                 api_client.*.v1
 ReinstateClient /
-RevokeClient                                                                     disabled/enabled/deleted; tokens
+RevokeClient                                                                      disabled/enabled/deleted; tokens
 
-                                                                                 rejected by the kernel on status check
+                                                                                  rejected by the kernel on status check
 
-RequestJournalExport        entity accounts; period valid; not provisional  all  REQUESTED; JournalBuilder               journal.requested.v1 then
-                            locations' day-close past period_to (M1/M8           runs in the worker (6.2)                generated/failed
+RequestJournalExport        entity accounts; period valid; not provisional â‡’ all  REQUESTED; JournalBuilder               journal.requested.v1 then
+                            locations' day-close past period_to (M1/M8            runs in the worker (6.2)                generated/failed
                             freshness query); no GENERATED export
                             overlapping unless supplement
 
-AcknowledgeJournalExp GENERATED; client with journal:ack or entity               ACKNOWLEDGED                            journal.acknowledged.v1
+AcknowledgeJournalExp GENERATED; client with journal:ack or entity                ACKNOWLEDGED                            journal.acknowledged.v1
 
 ort                         accounts
 
-RegenerateJournalExpo reason; MFA                                                new export superseding; old             journal.superseded.v1
-rt                                                                               SUPERSEDED                              posting_map.registered.v1
+RegenerateJournalExpo reason; MFA                                                 new export superseding; old             journal.superseded.v1
+rt                                                                                SUPERSEDED                              posting_map.registered.v1
 
-RegisterPostingMap          from M4/M5/M7 seeds at start; conflicts fail         registry rows
+RegisterPostingMap          from M4/M5/M7 seeds at start; conflicts fail          registry rows
 (internal)                  start-up
 
-DefineTemplate /            owner; TemplateValidator: placeholders               rows; ACTIVE requires body_en; si/ta notification_template.*.v1
-ActivateTemplate            declared, ICU syntax valid, SMS body  160            optional with fallback accepted
+DefineTemplate /            owner; TemplateValidator: placeholders                rows; ACTIVE requires body_en; si/ta notification_template.*.v1
+ActivateTemplate            declared, ICU syntax valid, SMS body â‰¤ 160            optional with fallback accepted
                             GSM-7 or 70 UCS-2 in every language present
 
-DefineRule /                owner (F for federation-wide); event type exists in  rows; dispatcher cache invalidated notification_rule.changed.v1
+DefineRule /                owner (F for federation-wide); event type exists in   rows; dispatcher cache invalidated notification_rule.changed.v1
 ActivateRule                the catalogue; predicate schema; template
                             ACTIVE; audience resolvable; MFA when
                             channels include SMS to CUSTOMER
 
-     29A - M9 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                                    Page 5
+     29A - M9 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                                     Page 5
 Command              Guards (in order)                                  Effect                             Events
 ConfigureProvider /  caller F; MFA; credentials stored by reference in                                     provider.configured.v1
 TestProvider         the key store                                      row; test send to a Federation     einvoice.enabled.v1
@@ -520,18 +520,18 @@ integration/api-bundles/<version>/ and records api_bundle.published.v1
 
 29A - M9 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                    Page 6
 Screen              Components                                                     Message ids  Notes
-API clients                                                                        (m9.)        ­
+API clients                                                                        (m9.)        â€“
                     list, register form with scope picker limited to the admin's   client.*
-Journal exports     permissions, credential shown once modal, usage chart,                      ­
+Journal exports     permissions, credential shown once modal, usage chart,                      â€“
                     StepUpDialog                                                   journal.*
 Posting map viewer                                                                              Read-only
-Templates           period form, provisional flag, list with totals and            posting.*    ­
-Rules               acknowledgement state, download, supplements chain,            template.*   ­
-Notification log    regenerate with ReasonCapture                                  rule.*       ­
+Templates           period form, provisional flag, list with totals and            posting.*    â€“
+Rules               acknowledgement state, download, supplements chain,            template.*   â€“
+Notification log    regenerate with ReasonCapture                                  rule.*       â€“
 Providers                                                                          log.*        F only; StepUp
 E-invoicing         table by document type and side                                provider.*   F only
 API documentation                                                                  einvoice.*   Public
-                    three-language editor with placeholder chips, SMS length       ­
+                    three-language editor with placeholder chips, SMS length       â€“
                     meter per language, preview with sample payload
 
                     event picker, predicate form, template picker, audience
@@ -568,10 +568,10 @@ Web
                   Assembler on all slices: conflicts detected (planted duplicate operationId, altered      Gate green
                   shared schema, missing Sunset); clients compile; docs site builds
 
-                  Flows 6.1­6.7 of doc 29 incl. an accounting-consumer simulator end to end                Seven flows
+                  Flows 6.1â€“6.7 of doc 29 incl. an accounting-consumer simulator end to end                Seven flows
 
-                  Playwright: register client  credential once  usage; request export  download Two flows
-                   acknowledge; author template with SMS length warning
+                  Playwright: register client â†’ credential once â†’ usage; request export â†’ download Two flows
+                  â†’ acknowledge; author template with SMS length warning
 
 10. Tickets in build order
 
@@ -608,16 +608,16 @@ Total about 18 developer-days including the doc 33 assembly.
 11. Open points: what to assume, whom to ask
 
 Point                                     Assume                                   Decider                 If different
-Public writes, export formats, mapped     As proposed in doc 29 §11
+Public writes, export formats, mapped     As proposed in doc 29 Â§11
 document types, MPCS rules, webhooks                                               Federation; accountant  Seed and controller
 (doc 29 DR-1 to DR-3, DR-5, DR-6)                                                  review                  changes
 SMS providers (DR-4)
                                           Placeholders; adapter template per       Federation procurement  One template file per
 Integration tables (DR-7)                 gateway                                  Architecture review     provider
-Provider client creation in the identity                                           Platform pair           ­
-provider                                  Adopted; CR-29-1                         DevOps (doc 35)         ­
+Provider client creation in the identity                                           Platform pair           â€“
+provider                                  Adopted; CR-29-1                         DevOps (doc 35)         â€“
 Public API rate limit at the edge
-                                          Wrapper methods added to                                         ­
+                                          Wrapper methods added to                                         â€“
                                           IdentityProviderClient (19A)
 
                                           600/min per client mirrored at the edge

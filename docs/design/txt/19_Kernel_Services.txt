@@ -1,19 +1,19 @@
 Cooperative Retail and Distribution System
 
-19 ≠ Kernel Services
+19 ‚Äì Kernel Services
 
-Design of the platform kernel (layer 0 of doc 17): the five services designed in full here ≠
+Design of the platform kernel (layer 0 of doc 17): the five services designed in full here ‚Äì
 identity and authentication (OpenID Connect), the permission catalogue and role builder,
-the audit service, internationalisation on ICU, and the event model ≠ plus the index to the
+the audit service, internationalisation on ICU, and the event model ‚Äì plus the index to the
 kernel services designed in docs 18 and 32, and the three short specifications that had
 no home: notifications delivery, the configuration register, and scheduling.
 
 Field           Value
 Document
-Version         19 ≠ Kernel Services (design artefact; Stage 1; renamed from Cross-Cutting Services in v0.2 to match doc 17's
+Version         19 ‚Äì Kernel Services (design artefact; Stage 1; renamed from Cross-Cutting Services in v0.2 to match doc 17's
 Date            layer-0 vocabulary)
 Status
-Inputs          v0.2 ≠ draft for design review (rename; Section 0 kernel index; Sections 7≠9 notifications delivery, configuration
+Inputs          v0.2 ‚Äì draft for design review (rename; Section 0 kernel index; Sections 7‚Äì9 notifications delivery, configuration
                 register, scheduling; invariants and traceability extended)
 Audience
 Scope boundary  8 September 2026
@@ -33,8 +33,8 @@ Scope boundary  8 September 2026
 
 Why these five are designed together. A permission is meaningless without an identity to hold it; an audit event is
 meaningless without both; every audit event and every screen string must render in three languages; and all of it
-moves through one event model. Designing them apart produces five inconsistent notions of "who", "where" and
-"when". Designing them together lets one set of claims (user, device, entity scope, location scope, correlation) flow
+moves through one event model. Designing them apart produces five inconsistent notions of ‚Äúwho‚Äù, ‚Äúwhere‚Äù and
+‚Äúwhen‚Äù. Designing them together lets one set of claims (user, device, entity scope, location scope, correlation) flow
 unchanged from login to audit row to report.
 
 19 - Kernel Services | v0.2 draft | Cooperative Retail and Distribution System  Page 1
@@ -43,34 +43,34 @@ unchanged from login to audit row to report.
 Doc 17 (section 6) places ten technical services in layer 0, the platform kernel: services with no business rules
 that every module may use and that depend on nothing above them. This document is the complete index. Five
 are designed in full here; three are designed in the documents that own their tables or protocol; three had only a
-sketch in doc 17 and receive their specification in Sections 7≠9 of this version.
+sketch in doc 17 and receive their specification in Sections 7‚Äì9 of this version.
 
-Kernel service          Responsibility (doc 17 ß7.11)                           Designed in                     Implemented by
+Kernel service          Responsibility (doc 17 ¬ß7.11)                           Designed in                     Implemented by
 Scope and session                                                                                               19A
-                        Set the caller's entity/location scope and policy       This doc ß1, ß3.4; doc 18 ß3.7
+                        Set the caller's entity/location scope and policy       This doc ¬ß1, ¬ß3.4; doc 18 ¬ß3.7
 Identity and            class on every request and database session;                                            19A
 authentication          RLS policy classes
 Permission catalogue                                                                                            19A (service), 21/21A
-and role builder        OIDC provider, tokens, TOTP step-up, till PIN,          This doc ß2                     (data and screens)
+and role builder        OIDC provider, tokens, TOTP step-up, till PIN,          This doc ¬ß2                     (data and screens)
 Audit                   device credentials                                                                      19A
 
-Event backbone          Permissions as data, templates, segregation of          This doc ß3; doc 18 sod_pair    19A
+Event backbone          Permissions as data, templates, segregation of          This doc ¬ß3; doc 18 sod_pair    19A
 Internationalisation    duties, till snapshot
                                                                                                                 19A (plumbing), 17A
-Documents &             Append-only store through one facade in the             This doc ß4; doc 18 part D      (shell fonts and
+Documents &             Append-only store through one facade in the             This doc ¬ß4; doc 18 part D      (shell fonts and
 Numbering base          business transaction; exception queues; hash                                            catalogue loading)
 Edge sync gateway       chain P2                                                                                19A
 Attachments
-Notifications delivery  Outbox archive, relay, broker, inbox, replay;           This doc ß6; doc 18 part E      19A (gateway), 26A (till
+Notifications delivery  Outbox archive, relay, broker, inbox, replay;           This doc ¬ß6; doc 18 part E      19A (gateway), 26A (till
 Configuration register  envelope                                                                                side)
 Scheduling                                                                                                      19A
-                        ICU collation, NFC, message catalogue with              This doc ß5
+                        ICU collation, NFC, message catalogue with              This doc ¬ß5
                                                                                                                 19A (delivery), 29A
                         English fallback, rendering pipelines, input-method                                     (templates, adapter)
                                                                                                                 19A
                         register
                                                                                                                 19A
-                        Document header, lines, links, state history,           Doc 18 part C (ß5); numbering
+                        Document header, lines, links, state history,           Doc 18 part C (¬ß5); numbering
                         attachments; document-type registry; series and         addendum 24B after the tax
                         issuance protocol; gap detection                        advisor
 
@@ -78,16 +78,16 @@ Scheduling                                                                      
                         counter transfer, rate limiting
 
                         Object-storage keys and metadata, pre-signed            Doc 18 document_attachment;
-                        upload, hash verification                               doc 32 ß4
+                        upload, hash verification                               doc 32 ¬ß4
 
-                        Event-triggered sends through M9's adapter and This doc ß7
+                        Event-triggered sends through M9's adapter and This doc ¬ß7
                         templates, with retry
 
-                        Onboarding-time values with defaults, scoped per This doc ß8; doc 07 ß4 (the
+                        Onboarding-time values with defaults, scoped per This doc ¬ß8; doc 07 ¬ß4 (the
 
                         entity or location, audited                             register content)
 
-                        Singleton jobs under cluster locks; job catalogue; This doc ß9; doc 14 ß1.3
+                        Singleton jobs under cluster locks; job catalogue; This doc ¬ß9; doc 14 ¬ß1.3
                         run history
 
 The rule that keeps the kernel small: a service belongs here only if it carries no business rule. Price resolution is
@@ -143,15 +143,15 @@ Back-office user
 Till operator       OpenID Connect (OIDC) provider; TOTP       min) + rotating refresh token  minimum 12 characters,
                     second factor for functions marked         (8 h, single-use)              breached-password screening, no forced
 Device              requires_mfa (N-04)                                                       periodic rotation, rate-limited attempts. Idle
-                                                                                              lock 10≠15 min; admin screens 5 min
+                                                                                              lock 10‚Äì15 min; admin screens 5 min
 External system or                                                                            (N-09).
 person
                     Short numeric PIN, verified on the device  Local operator session on the  PIN is a low-entropy credential and is
                     against a cached Argon2id hash (N-03)      device; no central token       acceptable only because it is bound to
                                                                                               device possession, rate-limited (5 attempts
                                                                                               then 15-minute lockout), and scoped to till
-                                                                                              permissions. 4≠6 digits, entity policy. Idle
-                                                                                              lock 2≠3 min.
+                                                                                              permissions. 4‚Äì6 digits, entity policy. Idle
+                                                                                              lock 2‚Äì3 min.
 
                     Enrolment credential: an X.509 client      OAuth2 client-credentials      The device token authenticates sync
                     certificate (or client secret where        device token (24 h, refreshed  uploads and downloads. Suspension is
@@ -195,7 +195,7 @@ Provider product          Permissions with requires_mfa trigger a TOTP challenge
 
                           Device holds: device credential, cached PIN hashes for operators assigned to the shop, cached
                           role-to-permission snapshot with version, and cached `offline_allowed` flags. A user deactivated at central
-                          keeps working on an offline till until the next sync ≠ an accepted consequence of H-01, mitigated by the shop
+                          keeps working on an offline till until the next sync ‚Äì an accepted consequence of H-01, mitigated by the shop
                           administrator's ability to remove the operator locally (audited).
 
                           Decision request DR-1: a standards-compliant self-hosted provider (Keycloak-class) versus Spring
@@ -205,12 +205,12 @@ Provider product          Permissions with requires_mfa trigger a TOTP challenge
 
 Surface                   Idle lock                  Absolute session           Re-authentication
 Till (sales mode)                                    Till day-close             PIN
-                          2≠3 min (configurable per
+                          2‚Äì3 min (configurable per
 Till (shop-management     entity)                    Mode ends on return to sales PIN of a user holding shop-management
 mode)                                                                                          permissions; mode switch audited
                           3 min                                                                (MODE_SWITCH_SHOP_MGMT)
 
-Back office               10≠15 min                  8 h refresh lifetime       Password; TOTP on step-up
+Back office               10‚Äì15 min                  8 h refresh lifetime       Password; TOTP on step-up
 Administration screens    5 min
 External time-boxed       5 min                      8h                         Password + TOTP always
 
@@ -225,63 +225,63 @@ External time-boxed       5 min                      8h                         
     module.resource.action; the catalogue is versioned as a whole, and the version travels in the token as rv.
     A representative extract:
 
-Permission code                     offline       mfa  scope                        Meaning
-                                                       LOCATION                     Issue a till receipt
-pos.receipt.issue                   yes           no   LOCATION                     Void within same session
-                                                       LOCATION                     Refund on same till, same session
-pos.receipt.void                    yes           no   LOCATION                     Refund across tills or days (supervisor, online)
-                                                       LOCATION                     Proceed with a sale the records say is impossible (E-09)
-pos.refund.same_session             yes           no
+Permission code                      offline       mfa  scope                       Meaning
+                                                        LOCATION                    Issue a till receipt
+pos.receipt.issue                    yes           no   LOCATION                    Void within same session
+                                                        LOCATION                    Refund on same till, same session
+pos.receipt.void                     yes           no   LOCATION                    Refund across tills or days (supervisor, online)
+                                                        LOCATION                    Proceed with a sale the records say is impossible (E-09)
+pos.refund.same_session              yes           no
 
-pos.refund.cross_session            no            no
+pos.refund.cross_session             no            no
 
-pos.negative_stock.acknowled yes                  no
+pos.negative_stock.acknowled yes                   no
 
 ge
 
-pos.mrp.pick                        yes           no   LOCATION                     Use the batch picker where policy is PICKER
-                                                       LOCATION                     Confirm a goods received note; ownership transfers
-shop.grn.confirm                    yes           no   LOCATION                     Record a stock count
-                                                       LOCATION                     Raise a write-off draft
-shop.count.record                   yes           no   ENTITY                       Witness a write-off (distinct person)
-                                                       ENTITY                       Approve; carries value limit parameter
-inv.writeoff.request                yes (draft) no     ENTITY                       Approve count adjustment; value thresholds by SKU or tag
+pos.mrp.pick                         yes           no   LOCATION                    Use the batch picker where policy is PICKER
+                                                        LOCATION                    Confirm a goods received note; ownership transfers
+shop.grn.confirm                     yes           no   LOCATION                    Record a stock count
+                                                        LOCATION                    Raise a write-off draft
+shop.count.record                    yes           no   ENTITY                      Witness a write-off (distinct person)
+                                                        ENTITY                      Approve; carries value limit parameter
+inv.writeoff.request                 yes (draft) no     ENTITY                      Approve count adjustment; value thresholds by SKU or tag
                                                                                     (E-07)
-inv.writeoff.witness                no            no   ENTITY                       Raise an order to a seller
-                                                       ENTITY                       Accept, allocate, set ETA (seller side)
-inv.writeoff.approve                no            yes  ENTITY                       Issue a tax invoice
-                                                       ENTITY                       Issue a credit note
-inv.adjust.approve                  no            yes  ENTITY                       Change a relationship credit limit (A-11)
-                                                       ENTITY                       Author retail or trade price lists
-ord.order.submit                    no            no   ENTITY                       Author discount and markdown rules
-ord.order.accept                                       FEDERATION                   Enter a gazetted control price
-bil.invoice.issue                   no            no   ENTITY                       Create a local SKU
-bil.creditnote.issue                                   FEDERATION                   Promote local to shared
-bil.creditlimit.change              no            no   ENTITY                       Create, deactivate, reset users in scope
-prc.pricelist.author                                   ENTITY                       Build and assign roles in scope
-prc.rule.author                     no            yes  FEDERATION                   Grant a time-boxed external view
-prc.controlprice.enter                                 ENTITY                       Acknowledge exception-report items
-cat.sku.create_local                no            yes  ENTITY                       Enrol a device; assign to a position
+inv.writeoff.witness                 no            no   ENTITY                      Raise an order to a seller
+                                                        ENTITY                      Accept, allocate, set ETA (seller side)
+inv.writeoff.approve                 no            yes  ENTITY                      Issue a tax invoice
+                                                        ENTITY                      Issue a credit note
+inv.adjust.approve                   no            yes  ENTITY                      Change a relationship credit limit (A-11)
+                                                        ENTITY                      Author retail or trade price lists
+ord.order.submit                     no            no   ENTITY                      Author discount and markdown rules
+ord.order.accept                                        FEDERATION                  Enter a gazetted control price
+bil.invoice.issue                    no            no   ENTITY                      Create a local SKU
+bil.creditnote.issue                                    FEDERATION                  Promote local to shared
+bil.creditlimit.change               no            no   ENTITY                      Create, deactivate, reset users in scope
+prc.pricelist.author                                    ENTITY                      Build and assign roles in scope
+prc.rule.author                      no            yes  FEDERATION                  Grant a time-boxed external view
+prc.controlprice.enter                                  ENTITY                      Acknowledge exception-report items
+cat.sku.create_local                 no            yes  ENTITY                      Enrol a device; assign to a position
 cat.sku.promote
-gov.user.manage                     no            no
+gov.user.manage                      no            no
 gov.role.manage
-gov.external.grant                  no            no
+gov.external.grant                   no            no
 gov.audit.review
-sys.device.enrol                    no            yes
+sys.device.enrol                     no            yes
 
-                                    no            no
+                                     no            no
 
-                                    no            no
+                                     no            no
 
-                                    no            yes
+                                     no            yes
 
-                                    no            yes
+                                     no            yes
 
-                                    no            yes
+                                     no            yes
 
-                                    no            no
+                                     no            no
 
-                                    no            yes
+                                     no            yes
 
     Three attributes do most of the work. offline_allowed is exactly what the till caches (H-02/H-03).
     requires_mfa marks the online-only financial and administrative set (N-04). scope states the finest scope at
@@ -294,24 +294,24 @@ sys.device.enrol                    no            yes
     not approve it, N-07) is about the instance, not about holding both permissions. A one-person MPCS accounts
     office may legitimately hold both.
 
-Conflict pair                       Default mode      Effect
-writeoff.request  writeoff.approve  INSTANCE
-                                                      Same user may hold both; may not approve a write-off they requested. Enforced by
-                                                      comparing actor to the document's requester at approval.
+Conflict pair                        Default mode      Effect
+writeoff.request ‚Üî writeoff.approve  INSTANCE
+                                                       Same user may hold both; may not approve a write-off they requested. Enforced by
+                                                       comparing actor to the document's requester at approval.
 
     19 - Kernel Services | v0.2 draft | Cooperative Retail and Distribution System  Page 5
-Conflict pair                       Default mode  Effect
-writeoff.request  writeoff.witness  INSTANCE
-                                                  Witness must differ from requester (F-05). At a single-staff shop the MPCS approver
-adjust.request  adjust.approve      INSTANCE      fulfils the witness role remotely with mandatory photographs (September 2026
-user.manage  audit.review (own      INSTANCE      decision, DR-7 of doc 18).
+Conflict pair                        Default mode  Effect
+writeoff.request ‚Üî writeoff.witness  INSTANCE
+                                                   Witness must differ from requester (F-05). At a single-staff shop the MPCS approver
+adjust.request ‚Üî adjust.approve      INSTANCE      fulfils the witness role remotely with mandatory photographs (September 2026
+user.manage ‚Üî audit.review (own      INSTANCE      decision, DR-7 of doc 18).
 actions)
-role.manage  (any)                                As write-off.
+role.manage ‚Üî (any)                                As write-off.
 
-                                                  A reviewer may not acknowledge exception items where they are the actor.
+                                                   A reviewer may not acknowledge exception items where they are the actor.
 
-                                    GUARDRAIL Nobody can grant a permission they do not themselves hold; nobody can remove the
-                                                           last user holding gov.user.manage in an entity.
+                                     GUARDRAIL Nobody can grant a permission they do not themselves hold; nobody can remove the
+                                                            last user holding gov.user.manage in an entity.
 
 Entities may raise a pair from INSTANCE to ROLE mode (the two permissions can no longer coexist in one role
 for that entity). The change is a configuration-register item and is audited.
@@ -325,12 +325,12 @@ Parameters             count + write-off request, for single-staff shops), drive
 Guardrails             (regulator view, auditor view).
 Versioning
 Till snapshot          An entity clones a template; the clone is its own role from that moment. Template changes do not propagate
-                       automatically (entity autonomy); the entity administrator sees a "template updated" marker and may re-sync with a diff
+                       automatically (entity autonomy); the entity administrator sees a ‚Äútemplate updated‚Äù marker and may re-sync with a diff
                        shown. Decision request DR-4 confirms this against the alternative of forced propagation for security-critical changes.
 
                        Some permissions carry limits: approval value ceilings, variance thresholds. These live as `limits jsonb` on
-                       role_permission, validated against a per-permission parameter schema, so a role can say "approve write-offs up to Rs
-                       25,000" without a new permission code.
+                       role_permission, validated against a per-permission parameter schema, so a role can say ‚Äúapprove write-offs up to Rs
+                       25,000‚Äù without a new permission code.
 
                        No privilege escalation (grantor must hold the permission); FEDERATION-scope permissions never appear in entity
                        role builders; a role cannot be deleted while assigned; every change is a ROLE_CHANGE audit event with
@@ -456,7 +456,7 @@ Fallback                  Field-level, never document-level: a receipt in Tamil 
 Authoritative text        English, for legal documents and disputes (P-07). Printed tax invoices carry the English name alongside the
                           shop-language name.
 
-Numerals and dates        Western Arabic digits (0≠9) in every language, including Sinhala and Tamil interfaces; dates `dd/mm/yyyy`;
+Numerals and dates        Western Arabic digits (0‚Äì9) in every language, including Sinhala and Tamil interfaces; dates `dd/mm/yyyy`;
                           currency rendered `Rs 1,234.00`. ICU locale data for `si-LK` and `ta-LK` would default to native numerals for
                           some formats; the platform overrides this once, centrally (decision request DR-6).
 
@@ -517,7 +517,7 @@ Test set
 19 - Kernel Services | v0.2 draft | Cooperative Retail and Distribution System  Page 9
 6. Event model
 
-Four things are called "events" in this system and they are not the same thing. Naming them precisely is half the
+Four things are called ‚Äúevents‚Äù in this system and they are not the same thing. Naming them precisely is half the
 design.
 
 Kind             Purpose                         Producer                       Consumers                     Persistence
@@ -594,15 +594,15 @@ The sync protocol is its own document; here is only its place in the event model
 per record type).
 
 Direction        Content                                                        Rule
-Till  central
-Central  till    Issued documents with lines and state rows; stock              Central verifies content hashes and sequence density,
-                 movements; audit events ≠ all as envelope events in            applies idempotently, acknowledges the last applied
+Till ‚Üí central
+Central ‚Üí till   Issued documents with lines and state rows; stock              Central verifies content hashes and sequence density,
+                 movements; audit events ‚Äì all as envelope events in            applies idempotently, acknowledges the last applied
 Conflict         `source_seq` order                                             `source_seq`. Central never re-numbers, never edits, never
                                                                                 merges.
 
                  Catalogue, barcodes, batches and lots for the                  Tills apply read-only replacements. A till applies a snapshot
                  location, price lists, discount rules, control prices,         version atomically; it never runs on a half-applied catalogue.
-                 permission snapshot, message catalogue ≠ as                    Control-price and rule changes carry an `apply_from` so all
+                 permission snapshot, message catalogue ‚Äì as                    Control-price and rule changes carry an `apply_from` so all
                  versioned snapshots plus incremental change events             tills switch on the same business date.
                  routed by location
 
@@ -644,7 +644,7 @@ because the outbox is the replay source, that migration is a rebuild, not a migr
 7. Notifications delivery
 
 The kernel delivers; M9 owns what is said and through which provider (doc 20 M9). Keeping delivery in the
-kernel means every module raises a notification the same way ≠ by publishing a domain event ≠ and none calls
+kernel means every module raises a notification the same way ‚Äì by publishing a domain event ‚Äì and none calls
 a gateway directly.
 
 Aspect              Design
@@ -656,7 +656,7 @@ Delivery record     Resolved at send time from M1: named roles at the counterpar
 Retry and failover  customer's phone (statement), or an explicit recipient on the event.
 Suppression
 Privacy             Template in the recipient's language with English fallback, through the i18n service; placeholders from the event
-Guarantee           payload plus a bounded lookup (document number, amounts, dates) ≠ never a query into another module's tables.
+Guarantee           payload plus a bounded lookup (document number, amounts, dates) ‚Äì never a query into another module's tables.
 
                     SMS and e-mail in phase 1 through M9's provider adapter interface; in-app (the exception queue and a notification
                     bell) is a third channel with no external provider.
@@ -667,7 +667,7 @@ Guarantee           payload plus a bounded lookup (document number, amounts, dat
                     Three attempts with backoff; then the secondary provider if configured; then FAILED with an ALERT audit event.
                     Never retried past 24 hours (a dispatch alert two days late is noise).
 
-                    Per recipient quiet hours (22:00≠07:00 default for SMS), de-duplication of identical notifications within an hour, and an
+                    Per recipient quiet hours (22:00‚Äì07:00 default for SMS), de-duplication of identical notifications within an hour, and an
                     entity-level kill switch for a channel.
 
                     Message bodies are not stored beyond the rendered length; phone numbers are hashed in the log; the audit log
@@ -687,13 +687,13 @@ Resolution          ENTITY | LOCATION, who may change: permission code) and conf
 Validation          nullable, value jsonb, effective_from, changed_by, changed_at). Values are append-only; the current value is the
 Distribution        latest effective row.
 Audit
-Onboarding          Most specific scope wins: location  entity  federation default. A location value exists only for keys whose scope
+Onboarding          Most specific scope wins: location ‚Üí entity ‚Üí federation default. A location value exists only for keys whose scope
 Phase-1 catalogue   kind allows it. Resolution is a kernel query cached per instance and invalidated by config.changed.v1.
 seed
                     Every value is validated against the item's schema at write; a key nobody registered cannot be set. Law-like items
-                    (control prices, segregation pairs) are not configuration items ≠ they are data with their own tables (P10 of doc 17).
+                    (control prices, segregation pairs) are not configuration items ‚Äì they are data with their own tables (P10 of doc 17).
 
-                    Items flagged till_visible are part of the shop snapshot (doc 32 ß5.1): idle locks, quiet hours, offline account cap,
+                    Items flagged till_visible are part of the shop snapshot (doc 32 ¬ß5.1): idle locks, quiet hours, offline account cap,
                     multi-MRP thresholds, staleness age.
 
                     Every change raises config.changed.v1 with before/after; changes to items flagged sensitive (credit-related, security)
@@ -702,7 +702,7 @@ seed
                     The onboarding playbook (doc 37) sets location-scoped values from the checklist; BulkRegister (doc 21) accepts a
                     configuration sheet for the same keys.
 
-                    The doc 07 register plus the items named in docs 19 ß8, 21 ß7 and the later module designs; the seed file lives in the
+                    The doc 07 register plus the items named in docs 19 ¬ß8, 21 ¬ß7 and the later module designs; the seed file lives in the
                     repository and is the single source (19A).
 
 9. Scheduling
@@ -741,35 +741,35 @@ Manual runs
 
 The contract that code, configuration and tests must all honour.
 
-∑ X-I1. No request executes without a resolved principal and scope; anonymous access exists only for the login
+‚Ä¢ X-I1. No request executes without a resolved principal and scope; anonymous access exists only for the login
    endpoints.
 
-∑ X-I2. Permissions are checked at the service layer by code, never inferred from the user interface; every
+‚Ä¢ X-I2. Permissions are checked at the service layer by code, never inferred from the user interface; every
    service method carries a permission annotation (build-time test).
 
-∑ X-I3. No user can grant a permission they do not hold; no entity can lose its last user-management holder.
-∑ X-I4. A requires_mfa permission is exercised only with `mfa_at` inside the freshness window.
-∑ X-I5. A till exercises only permissions present in its signed snapshot; offline, only those flagged
+‚Ä¢ X-I3. No user can grant a permission they do not hold; no entity can lose its last user-management holder.
+‚Ä¢ X-I4. A requires_mfa permission is exercised only with `mfa_at` inside the freshness window.
+‚Ä¢ X-I5. A till exercises only permissions present in its signed snapshot; offline, only those flagged
 
    offline_allowed.
-∑ X-I6. Every business change commits with its audit row and its domain event in the same transaction, or not
+‚Ä¢ X-I6. Every business change commits with its audit row and its domain event in the same transaction, or not
 
    at all.
-∑ X-I7. Every event and audit row carries the correlation id of the user action that caused it.
-∑ X-I8. Events from one source are applied in `source_seq` order, exactly once in effect (idempotent by
+‚Ä¢ X-I7. Every event and audit row carries the correlation id of the user action that caused it.
+‚Ä¢ X-I8. Events from one source are applied in `source_seq` order, exactly once in effect (idempotent by
 
    `event_id`).
-∑ X-I9. Every string shown to a user resolves through the message catalogue or a three-column name with
+‚Ä¢ X-I9. Every string shown to a user resolves through the message catalogue or a three-column name with
 
    English fallback; a raw message id or a blank is a defect.
-∑ X-I10. All stored text is NFC-normalised; all list ordering uses the display language's ICU collation.
-∑ X-I11. No module calls a notification, SMS or e-mail gateway directly; every notification originates from a
+‚Ä¢ X-I10. All stored text is NFC-normalised; all list ordering uses the display language's ICU collation.
+‚Ä¢ X-I11. No module calls a notification, SMS or e-mail gateway directly; every notification originates from a
 
    domain event through a registered rule.
-∑ X-I12. No module holds private settings; every configurable value resolves through the configuration register
+‚Ä¢ X-I12. No module holds private settings; every configurable value resolves through the configuration register
 
    with a registered key and schema.
-∑ X-I13. Every scheduled job runs under the kernel lock; two instances never execute one job concurrently.
+‚Ä¢ X-I13. Every scheduled job runs under the kernel lock; two instances never execute one job concurrently.
 
 11. Decision requests
 
@@ -796,7 +796,7 @@ DR-4  Role template drift policy
 DR-5  PIN policy                  Notify and offer diff; no forced              Alternative: forced propagation for a marked security-critical
                                   propagation                                   subset. Affects entity autonomy expectations (M-08).
 DR-6  Numerals in Sinhala and
-      Tamil interfaces            4≠6 digits, entity-configurable; 5            Trade-off between counter speed and shared-login risk (N-03).
+      Tamil interfaces            4‚Äì6 digits, entity-configurable; 5            Trade-off between counter speed and shared-login risk (N-03).
 DR-7  MFA freshness window
                                   attempts then 15-minute lockout; no
 DR-8  Hash-chain anchor
@@ -825,7 +825,7 @@ Audit
                         FR-SEC-010 (dynamic RBAC, templates); N-01, N-02, N-07 (segregation of duties); E-07, F-04 (value
 Internationalisation    thresholds); A-11; M-05 (shop isolation); September 2026 single-staff shop decisions
 Event model
-                        FR-SEC-050; N-05 (immutable, event catalogue of doc 07 ß3), N-06 (named reviewers), N-09 (drawer-open
+                        FR-SEC-050; N-05 (immutable, event catalogue of doc 07 ¬ß3), N-06 (named reviewers), N-09 (drawer-open
 Notifications delivery  event); J-06, J-09; M-10; ADR-27; P2 hash chain and SIEM (doc 14 roadmap)
 Configuration register
 Scheduling              FR-LOC-010 to 030; P-01 to P-09; H-09; B-14 (trilingual master data); usability directive (S-02, P-08)
@@ -835,9 +835,9 @@ Scheduling              FR-LOC-010 to 030; P-01 to P-09; H-09; B-14 (trilingual 
 
                         R-08; FR-BIL statements; ADR-27; doc 20 M9
 
-                        Doc 07 ß4; P10 of doc 17; C-04, E-07, F-10, N-09; doc 32 ß5.1
+                        Doc 07 ¬ß4; P10 of doc 17; C-04, E-07, F-10, N-09; doc 32 ¬ß5.1
 
-                        Doc 14 ß1.3; ADR-39; B-I4, C-I2, E-I2; doc 31 ring promotion
+                        Doc 14 ¬ß1.3; ADR-39; B-I4, C-I2, E-I2; doc 31 ring promotion
 
 End of document. Draft for design review; subject to revision after the decision requests in Section 8 are answered.
 

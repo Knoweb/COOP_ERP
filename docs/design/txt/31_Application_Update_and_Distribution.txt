@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-31 � Application Update and Distribution
+31 – Application Update and Distribution
 
 How software reaches and stays current on up to 15,000 kiosk-locked till terminals
 across all 25 districts with no on-site IT, on poor links, without stopping trade: device
@@ -9,9 +9,9 @@ version floor, and the back-office deployment that has to stay compatible with a
 
 Field     Value
 Document
-Version   31 � Application Update and Distribution (design artefact; implements ADR-24; Stage 4 topic brought forward)
+Version   31 – Application Update and Distribution (design artefact; implements ADR-24; Stage 4 topic brought forward)
 Date
-Status    v0.1 � draft for design review
+Status    v0.1 – draft for design review
 Inputs
           6 September 2026
 Audience
@@ -27,7 +27,7 @@ Audience
 
 Why this is a design problem and not an operations chore. A terminal in a shop with one cashier and no IT will
 never have an update installed by hand. Every update must arrive by itself, install itself when the shop is closed, prove
-it is healthy, and undo itself if it is not � and the central system must keep serving the versions that have not yet
+it is healthy, and undo itself if it is not – and the central system must keep serving the versions that have not yet
 arrived. Get this wrong and the fleet fragments into versions nobody can support (Q-10).
 
 31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System  Page 1
@@ -65,7 +65,7 @@ low computer familiarity                                     Resumable downloads
 Poor and intermittent links (about 2 Mbps down Q-06, Q-07    Install outside each shop's own trading hours; never force a restart
 at the weakest sites), power cuts                            during a session
                                                              Central enforces a floor; the device cannot opt out
-24�7 trading capability, no scheduled          Q-04
+24×7 trading capability, no scheduled          Q-04
 downtime window                                              One managed platform; the agent can be a device owner from first boot
 
 No indefinite deferral; minimum version floor  ADR-24, Q-10  Distribution must go through a device-owner management agent or
@@ -74,7 +74,7 @@ with grace                                                   Managed Google Play
 Hardware new and centrally specified;          T-07, H-08
 ARM/Android terminals
 
-Google developer verification (2026�2027)      Section 3
+Google developer verification (2026–2027)      Section 3
 
 Single DevOps operating model                  ADR-20
 
@@ -174,12 +174,12 @@ Federation-controlled path either way.
 Aspect                 Design
 Versioning
 Package size           Semantic version for people; monotonically increasing Android versionCode for the platform. Android does not
-Compatibility          downgrade: a "rollback" is always a new, higher versionCode built from the previous good source.
+Compatibility          downgrade: a “rollback” is always a new, higher versionCode built from the previous good source.
 Local schema
                        Target under 30 MB; fonts and the message catalogue ship in the package (no first-run download); images are
                        never in the package (they are catalogue data).
 
-                       Every release supports the sync contract and snapshot formats of the two previous releases (N-2); central
+                       Every release supports the sync contract and snapshot formats of the two previous releases (N−2); central
                        supports app versions from the floor to current; the API is backward compatible within that window.
 
                        Migrations are forward-only, idempotent, run at start before the UI; the agent triggers a local database backup to
@@ -209,15 +209,15 @@ Ring              Membership                                             Purpose
 
     5.3 Health gates                 Source                          Threshold (initial)                    Action on breach
                                      Till telemetry on sync                                                 Halt rollout; alert DevOps
-Metric                               Update service and ingest        99.5% on the new version              Halt
+Metric                               Update service and ingest       ≥ 99.5% on the new version             Halt
 Crash-free session rate                                              No worse than the previous version by
 Sync success rate                                                    more than 0.5 points                   Halt; investigate
 
 Receipt issuance rate per till-hour Ingest projections               No drop beyond normal variance         Halt
                                                                      versus the same shops last week        Automatic re-install of previous
 Peripheral self-test failures        Till telemetry                                                         version on those devices;
-                                     Agent reports                    0.5% of updated devices               helpdesk ticket
-Devices stuck in install or                                           0.2%
+                                     Agent reports                   ≤ 0.5% of updated devices              helpdesk ticket
+Devices stuck in install or                                          ≤ 0.2%
 migration
 
 5.4 On-device sequence
@@ -253,7 +253,7 @@ ADR-24 forbids indefinite deferral. The floor is what makes that true without st
 
 Aspect                     Design
 
-Definition                 The lowest app version central will accept for sync. Set per release by DevOps; normally N-2.
+Definition                 The lowest app version central will accept for sync. Set per release by DevOps; normally N−2.
 
 Grace                      When a release raises the floor, devices below it get a configurable grace period (default 14 days) during which
                            sync continues and the till shows a persistent, non-blocking notice to the supervisor.
@@ -282,7 +282,7 @@ Local hosting variant      Served with content hashes; the shell compares its bu
                            reload on mismatch; API responses stay compatible with the previous client for at least one deployment.
 
                            Central accepts the envelope and snapshot formats of every app version above the floor; format changes are
-                           additive within the N-2 window.
+                           additive within the N−2 window.
 
                            New behaviour that changes what a shop sees is switched on per ring through configuration, not by deploying
                            different code to different shops.
@@ -330,7 +330,7 @@ DR-4  AOSP                                   Yes, now; low cost hedge           
 DR-5
       Register the Federation as a verified  1% canary, wave by district, 14-day grace,             Federation admin
       Android developer                      thresholds of 5.3
-                                             Configured per location; default 02:00�04:00           DevOps with             Before pilot
+                                             Configured per location; default 02:00–04:00           DevOps with             Before pilot
       Ring sizes, gate thresholds, grace                                                            Federation
       period
                                                                                                     MPCS via                Onboarding

@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-26A ญ M6 POS & Offline: Implementation Guide
+26A โ€“ M6 POS & Offline: Implementation Guide
 
 Everything the till track needs: the Android project structure, the local database as Room
 schema, the issuance transaction, the sync worker, snapshot application, the scan layer,
@@ -9,13 +9,13 @@ and training, telemetry, the central-side package, tests including the power-los
 and the tickets. Self-contained; restated material is marked.
 
 Field             Value
-Document          26A ญ implementation guide for 26 M6 POS & Offline v0.1
-Version           v0.1 ญ for the till track (two to three developers) and the M6 central developer
+Document          26A โ€“ implementation guide for 26 M6 POS & Offline v0.1
+Version           v0.1 โ€“ for the till track (two to three developers) and the M6 central developer
 Date              9 September 2026
 Prerequisite      17A till scaffold and shared engine; 19A sync gateway; 23A engine 1.0.0; the bundle and snapshot contracts of
-                  24A ง7 and 25A ง7; the terminal model shortlist (doc 14 DR-3) for spikes 2, 3, 6.
+                  24A ยง7 and 25A ยง7; the terminal model shortlist (doc 14 DR-3) for spikes 2, 3, 6.
 Estimated effort  About 60 developer-days for the till (three developers, about four weeks), plus 8 for the central package
-Restated content  Marked restated from doc X งY.
+Restated content  Marked restated from doc X ยงY.
 
 Read this first. Build in this order and do not skip ahead: (1) the local database and the issuance transaction with the
 power-loss harness, (2) the sync worker against the central simulator until the thirteen conformance cases pass, (3)
@@ -26,7 +26,7 @@ worked around with a paper book.
 26A - M6 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
 1. What you are building
 
-Restated from doc 26 ง1. A native Android application that sells, records tenders, prints trilingual receipts,
+Restated from doc 26 ยง1. A native Android application that sells, records tenders, prints trilingual receipts,
 deducts stock, runs sessions with blind close, hosts shop-management screens, works two days offline, and
 synchronises without merging; plus a thin central package that ingests, re-validates and watches the fleet.
 
@@ -45,37 +45,37 @@ cross-session refund, sync health and fleet queries                   consume yo
 
 From                  You use                                                            How
                                                                                          Extend; do not restart
-17A ง8 till scaffold  Project layout, Compose skeleton, Room mirror tables, fonts,       Link; never fork
+17A ยง8 till scaffold  Project layout, Compose skeleton, Room mirror tables, fonts,       Link; never fork
                       simulator peripherals, HelloScreen
                                                                                          Section 6
-17A ง9 / 23A ง6       PriceResolver, RuleEvaluator, BasketResolver,                      Sections 6 and 10
+17A ยง9 / 23A ยง6       PriceResolver, RuleEvaluator, BasketResolver,                      Sections 6 and 10
 shared engine         PricingSnapshotIndex, Tax, Rounding, Envelope,                     Section 8
                       Counter as a Maven artefact 1.0.0                                  Section 3
                                                                                          Sections 3 and 9
-19A ง8 sync gateway Endpoints enrol, batches, snapshot, heartbeat, presign; ack and      Sections 4 and 5
+19A ยง8 sync gateway Endpoints enrol, batches, snapshot, heartbeat, presign; ack and      Sections 4 and 5
                                 instruction semantics                                    Section 9
 
 Doc 32                Batch limits, retention, gap handling, conformance suite, central
                       simulator
 
-19A ง2, ง3            Device credential auth; signed operator snapshot with Argon2id
+19A ยง2, ยง3            Device credential auth; signed operator snapshot with Argon2id
                       PIN hashes and offline permissions
 
 Doc 18                Table shapes for document, line, tender, state history,
                       movement, audit, counters
 
-Doc 24A ง7.3ญ7.4,     Expected drop and transfer rows, count tasks, policies; GRN,
-doc 25A ง7.3ญ7.4      count, write-off draft, repack, transfer receipt bundle shapes
+Doc 24A ยง7.3โ€“7.4,     Expected drop and transfer rows, count tasks, policies; GRN,
+doc 25A ยง7.3โ€“7.4      count, write-off draft, repack, transfer receipt bundle shapes
 
-Doc 22A ง5, doc 23A LookupResult shape; pricing snapshot rows
-ง7.2
+Doc 22A ยง5, doc 23A LookupResult shape; pricing snapshot rows
+ยง7.2
 
-Doc 30 ง2, ง4         Design system, zones, usability rules, component vocabulary
+Doc 30 ยง2, ยง4         Design system, zones, usability rules, component vocabulary
 
 26A - M6 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                Page 2
 3. Local database (Room)
 
-Restated from doc 18 and doc 26 ง3.1. Two groups of tables: till-owned (written here, uploaded) and cache
+Restated from doc 18 and doc 26 ยง3.1. Two groups of tables: till-owned (written here, uploaded) and cache
 (received, replaced atomically). Entities are Kotlin data classes with Room annotations; the DDL below is the
 generated schema's meaning, not its exact text.
 
@@ -180,11 +180,11 @@ Migrations     database file with its own key.
                transaction (Section 4); the app calls checkpoint at session close and before safe shutdown.
 
                Room migrations forward-only; run at start before the UI; a failed migration reports to the agent's self-test (doc 31
-               ง5.4).
+               ยง5.4).
 
 4. The issuance transaction
 
-Restated from doc 18 ง5.5 and doc 32 ง3.1. The one function every document on the till goes through.
+Restated from doc 18 ยง5.5 and doc 32 ยง3.1. The one function every document on the till goes through.
 
 // data/IssuanceService.issue(draft: DocumentDraft, bundleBuilder: (Issued) -> Envelope, ctx:
 
@@ -290,7 +290,7 @@ complete(): final = BasketResolver.resolve(..., tenderKind = dominantTender); re
 26A - M6 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                            Page 4
 6. Sync worker and snapshot application
 
-Restated from doc 32 ง3, 5, 6, 7 and 19A ง8. A WorkManager periodic job (15 min) plus an immediate run after
+Restated from doc 32 ยง3, 5, 6, 7 and 19A ยง8. A WorkManager periodic job (15 min) plus an immediate run after
 any issuance when online and on connectivity change; never blocks the UI.
 
 // sync/UploadWorker
@@ -502,20 +502,20 @@ Shop-management home: tiles with icons and labels: Receive goods (2 expected) . 
    Repack . Transfer (1 in transit) . Expiry (4) . Reprint . Sync status
 
 Screen                                 Source of spec                              Notes
-PIN / session / blind close            Doc 26 ง3.5, ง4.2                           Float keypad; self-test results; Z-report
-Sales, picker, negative-stock prompt,  Doc 26 ง3.2, ง3.6; doc 30 ง4.3              As sketched; ItemCard from M2
+PIN / session / blind close            Doc 26 ยง3.5, ยง4.2                           Float keypad; self-test results; Z-report
+Sales, picker, negative-stock prompt,  Doc 26 ยง3.2, ยง3.6; doc 30 ยง4.3              As sketched; ItemCard from M2
 weigh                                                                              LookupResult; candidates from the engine
-Park / resume, refund (same session),  Doc 26 ง3.3, ง3.4, ง4.1                     Reason codes from the message catalogue
+Park / resume, refund (same session),  Doc 26 ยง3.3, ยง3.4, ยง4.1                     Reason codes from the message catalogue
 reprint
-Shop-management home and hosted        Doc 24A ง8 (GRN), doc 25A ง8 (count, write-off, Primary-till badge; draft hand-over
-screens                                repack, transfer), doc 26 ง3.7
+Shop-management home and hosted        Doc 24A ยง8 (GRN), doc 25A ยง8 (count, write-off, Primary-till badge; draft hand-over
+screens                                repack, transfer), doc 26 ยง3.7
 Sync and device status
-                                       Doc 26 ง3.10, ง9.7                          Pending, last ack, snapshot age, floor,
+                                       Doc 26 ยง3.10, ยง9.7                          Pending, last ack, snapshot age, floor,
 Training                                                                           peripherals, battery, version
 Web on the terminal
-                                       Doc 26 ง3.9                                 Loud badge, watermark
+                                       Doc 26 ยง3.9                                 Loud badge, watermark
 
-                                       Doc 26 ง3.7                                 Kiosk allow-listed URL; opens the back office
+                                       Doc 26 ยง3.7                                 Kiosk allow-listed URL; opens the back office
                                                                                    for online-only functions
 
 10. Central package m6pos
@@ -558,7 +558,7 @@ lk.coopfed.knoweb.m6pos/ @ApplicationModule(allowedDependencies =
 
 Layer       Cases                                                                                       Target
 Unit (JVM)
-            Scan layer (GS1 fixtures incl. Digital Link, 20ญ29 labels, dual marking); tender            All branches
+            Scan layer (GS1 fixtures incl. Digital Link, 20โ€“29 labels, dual marking); tender            All branches
             coverage and rounding; blind-close arithmetic; outbox batching rules (never split
             a bundle); snapshot staging and swap; apply_from activation; PIN lockout; mode
             guards; engine parity on the golden baskets (doc 23A)
@@ -570,7 +570,7 @@ Power-loss harness
 Sync conformance            step of Section 4; assert: no document without its number, no number without its
 Peripherals (spike 3)       document, outbox dense, lot cache consistent; database opens clean every time
 Rendering (spike 2)
-Scenario                    Doc 32 ง11 thirteen cases against the central simulator; two-day backlog (about All green
+Scenario                    Doc 32 ยง11 thirteen cases against the central simulator; two-day backlog (about All green
 Soak                        800 receipts) drains; lost ack; central re-request; series holder change; revoke
 Usability (spike 7)
 Central                     Each adapter against real devices on the candidate terminals; scale protocol      Gating for the terminal choice
@@ -579,7 +579,7 @@ Central                     Each adapter against real devices on the candidate t
                             Golden receipts in three languages and mixed fallback on each candidate printer; Pixel-stable
                             Z-report
 
-                            Flows 6.1ญ6.14 of doc 26; doc 13 scenarios 2 and 4; shop-mode bundles             All flows
+                            Flows 6.1โ€“6.14 of doc 26; doc 13 scenarios 2 and 4; shop-mode bundles             All flows
                             accepted by central (24A, 25A hooks)
 
                             48 hours disconnected on the reference terminal with power cuts every 4 hours; Under 200 MB; clean
@@ -601,14 +601,14 @@ T-01                                                                            
        Room schema (till-owned and cache), encryption, migrations, DAOs;
 T-02   sequence and counter services                                                   4                  Spike 1 green
 
-T-03   IssuanceService and the power-loss harness; bundle builders for RCT and         7                  Doc 32 ง11 green
+T-03   IssuanceService and the power-loss harness; bundle builders for RCT and         7                  Doc 32 ยง11 green
        shop-mode documents
 T-04                                                                                   3                  Parity and lookup tests
        Sync: UploadWorker, SnapshotWorker with staging swap, HeartbeatWorker,
 T-05   instructions; central simulator; conformance suite                              3                  GS1 fixtures; simulator flows
 
 T-06   Engine adapter, PricingSnapshotIndex build on swap, catalogue local lookup      8                  Three-tap sale on simulator; flows
-       and search (trigram over three names)                                                              6.2ญ6.7
+       and search (trigram over three names)                                                              6.2โ€“6.7
 T-07                                                                                   3                  Spike 2 goldens
 T-08   Scan layer and peripheral interfaces with Simulator; adapter scaffolds for two  3                  Flow 6.1, 6.9
 T-09   vendors                                                                         2                  Lockout and switch tests
@@ -653,19 +653,19 @@ Terminal model and vendor SDKs           Generic 8-inch profile; two adapter
 (doc 14 DR-3)                            scaffolds                                Federation accounts;    Series definition in the kernel
                                                                                   kernel                  seed
 Cross-session refund series (doc 26 Supervisor's till-position series at a till;  Till track; Federation  Counter transfer semantics
-                                                                                                          change (doc 32 ง8)
+                                                                                                          change (doc 32 ยง8)
 DR-1)                                    location refund series on the web        Federation              Config values
 
 Non-primary tills (DR-2)                 Drafts only for LOCATION-series          Programme; tax advisor  Template fields
                                          documents                                when available
                                                                                   Federation              Adapter presence
-Card reference mandatory, offline        Defaults of doc 26 ง7                    DevOps, helpdesk lead   Doc 38
+Card reference mandatory, offline        Defaults of doc 26 ยง7                    DevOps, helpdesk lead   Doc 38
 
 account cap, parked age, reprint limit,                                           DevOps after spike 5    Config
 
 keyed weight (DR-3, 4, 5, 8)
 
-Receipt legal content (DR-6)             Doc 26 ง3.4
+Receipt legal content (DR-6)             Doc 26 ยง3.4
 
 Customer display (DR-7)                  Where a second screen exists
 Kiosk-exit procedure (DR-9)
@@ -678,7 +678,7 @@ Thumbnail fetch policy                   helpdesk code
 
 26A - M6 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                         Page 9
 Point                 Assume                                 Decider               If different
-Snapshot swap timing                                         Till track            ญ
+Snapshot swap timing                                         Till track            โ€“
                       Between sales; if a sale stays open
                       over 10 minutes, the swap proceeds
                       and the open sale re-resolves on next

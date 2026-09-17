@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-16 � Questionnaire Answers
+16 – Questionnaire Answers
 
 Readable companion to the Requirements Clarification Questionnaire (doc 15)
 
@@ -14,18 +14,18 @@ Before reading: how the model evolved after the questionnaire
 The questionnaire was drafted early, and four of its framings were superseded by what stakeholders subsequently
 clarified. Reading the answers requires knowing these shifts:
 
-   � One structure, not two parties: the questionnaire speaks of "central and shops" as a two-party structure.
+   • One structure, not two parties: the questionnaire speaks of “central and shops” as a two-party structure.
        The real structure is four tiers: COOPFED at the apex, ~75 distributors (themselves large MPCS), ~800
-       MPCS, and shops -- and a shop is a location of its MPCS or distributor, not a legal entity. Questions asked
-       about "a shop" are answered at the legally correct level, usually the MPCS.
+       MPCS, and shops — and a shop is a location of its MPCS or distributor, not a legal entity. Questions asked
+       about “a shop” are answered at the legally correct level, usually the MPCS.
 
-   � Firm sale won: A-01 resolved as firm sale, with ownership and risk transferring at GRN confirmation.
+   • Firm sale won: A-01 resolved as firm sale, with ownership and risk transferring at GRN confirmation.
        Consignment appears in the questionnaire as a live option; it is not.
 
-   � No members: K-01 resolved as no -- cooperative membership is entirely out of scope. The system knows
-       "registered customers" (a retail-credit concept) instead of members.
+   • No members: K-01 resolved as no — cooperative membership is entirely out of scope. The system knows
+       “registered customers” (a retail-credit concept) instead of members.
 
-   � SVAT is gone: SVAT, listed in the tax questions, was abolished with effect from 1 October 2025. Only
+   • SVAT is gone: SVAT, listed in the tax questions, was abolished with effect from 1 October 2025. Only
        standard VAT exists in the design.
 
 The eight gating questions
@@ -36,16 +36,16 @@ B-01  SKU definition level          Smallest tracked item; global namespace, own
                                     One SKU + UOM conversion; a repack recipe only where a genuinely new item
 B-02  Case vs single                results
                                     Joint, in substance; legal opinion and data-governance agreement in progress
-M-01  Data ownership                AR/AP documents only -- no statutory accounting, ever, in this system
-J-01  Full accounting or AR/AP      1�2 days trading fully offline; paper + retrospective entry beyond
-H-01  Longest offline period        No -- membership out of scope; registered customers only
-K-01  Members distinguished at POS  Yes -- three phases, three waves, pilot go/no-go gate
+M-01  Data ownership                AR/AP documents only — no statutory accounting, ever, in this system
+J-01  Full accounting or AR/AP      1–2 days trading fully offline; paper + retrospective entry beyond
+H-01  Longest offline period        No — membership out of scope; registered customers only
+K-01  Members distinguished at POS  Yes — three phases, three waves, pilot go/no-go gate
 S-03  Phased release
-Section A -- Commercial and ownership model
+Section A — Commercial and ownership model
 
 Ref   Question (abridged)                   Answer as resolved
 A-01  Firm sale or consignment?
-A-02  Does the model differ by category?    Firm sale. Ownership passes to the receiving entity at the moment its GRN is confirmed --
+A-02  Does the model differ by category?    Firm sale. Ownership passes to the receiving entity at the moment its GRN is confirmed —
 A-03  When does risk of loss transfer?      not at dispatch, not at sale to the end customer. Consignment was considered and
 A-04  May a buyer decline or return stock?  rejected. (ADR-03)
 A-05  Return conditions?
@@ -64,11 +64,11 @@ A-13  Minimum volume obligations?           bilateral between the trading entiti
                                             Federation sells to distributors at one uniform price list plus permitted, permission-gated
                                             manual adjustments (special discounts, delivery fees) per order.
 
-                                            Varies by tier: Federationdistributor is uniform; distributorMPCS prices are individually
+                                            Varies by tier: Federation→distributor is uniform; distributor→MPCS prices are individually
                                             negotiated and volume-tiered. Every trading relationship carries its own effective-dated
                                             price list.
 
-                                            Yes -- open-market sourcing is permitted at every tier. The system records those goods
+                                            Yes — open-market sourcing is permitted at every tier. The system records those goods
                                             as local/outside supply.
 
                                             Credit trading is normal. The system records payment-receipt documents only; it never
@@ -84,23 +84,23 @@ A-13  Minimum volume obligations?           bilateral between the trading entiti
                                             Automated calculation is deferred until accounting integration.
 
                                             None. Out of scope.
-Section B -- SKU definition and product master data
+Section B — SKU definition and product master data
 
 Ref   Question (abridged)                       Answer as resolved
 B-01  At what level is a SKU defined?
                                                 The smallest distinctly tracked and counted item, in one global namespace. Each SKU
-B-02  Is a case a separate SKU?                 carries an owning entity and a status (draft  local  shared). Codes are system-
+B-02  Is a case a separate SKU?                 carries an owning entity and a status (draft → local → shared). Codes are system-
 B-03  Two suppliers, one SKU or two?            generated and meaningless; an English short name is mandatory. The precise attribute
 B-04  Batch attributes?                         rule stays flexible by design.
 B-05  Serialised items?
-B-06  Loose and weighed goods?                  Depends on the physical reality. Factory case  single of the same item = one SKU with a
+B-06  Loose and weighed goods?                  Depends on the physical reality. Factory case ↔ single of the same item = one SKU with a
 B-07  Who creates SKUs?                         UOM conversion factor. Bulk transformed into a genuinely different retail item = a second
 B-08  May a shop create local SKUs?             SKU created through a repack recipe. (ADR-07)
 B-09  Separate numbering range for local SKUs?
 B-10  Promoting a local SKU?                    Left open per product; the owning entity decides. Batch-level supplier attribution preserves
 B-11  Barcode reliability?                      traceability either way.
 B-12  Multiple barcodes per SKU?
-B-13  UOM conversions, who defines?             Yes -- batch (not SKU) carries cost, supplier, MRP and expiry. Batch/expiry tracking
+B-13  UOM conversions, who defines?             Yes — batch (not SKU) carries cost, supplier, MRP and expiry. Batch/expiry tracking
 B-14  Trilingual master data?                   applies only to categories that need it. MRP being a batch attribute is a key decision: two
 B-15  Category hierarchy?                       concurrent batches may legally carry different MRPs. (ADR-08)
 B-16  Restricted / age-controlled items?
@@ -112,26 +112,26 @@ B-17  Deactivation while stock remains?         No serialisation anywhere.
 
                                                 Federation stewards the shared catalogue; creation is RBAC-controlled.
 
-                                                The MPCS (or distributor) may -- shops are locations, not entities. Local SKUs live in the
+                                                The MPCS (or distributor) may — shops are locations, not entities. Local SKUs live in the
                                                 same global namespace with local status.
 
-                                                No separate ranges -- one namespace; the owner and status fields do the work. Visibility
+                                                No separate ranges — one namespace; the owner and status fields do the work. Visibility
                                                 follows the Section M matrix.
 
                                                 A promote-to-shared flow with an alias mapping preserves the originating entity's sales
                                                 history unbroken. (FR-SKU-100)
 
-                                                Not guaranteed. Where a label printer exists, weigh stations print GS1 20�29-prefix
+                                                Not guaranteed. Where a label printer exists, weigh stations print GS1 20–29-prefix
                                                 stickers; otherwise the cashier keys weight against the per-kg price. Code lookup at the till
                                                 covers unbarcoded items.
 
-                                                Yes -- many-to-one is native.
+                                                Yes — many-to-one is native.
 
                                                 Per SKU; entities are independent and free to sell in any unit they choose.
 
                                                 Federation SKUs carry all three languages; local SKUs may carry one or two. English
                                                 short name is always mandatory (it is the universal fallback). The federation must name a
-                                                catalogue data steward -- still open, and the top schedule risk (T-03).
+                                                catalogue data steward — still open, and the top schedule risk (T-03).
 
                                                 No mandatory hierarchy. A governed tag vocabulary provides grouping without forcing one
                                                 tree on independent entities.
@@ -139,7 +139,7 @@ B-17  Deactivation while stock remains?         No serialisation anywhere.
                                                 Not relevant for now; out of scope.
 
                                                 Not needed now; parked.
-Section C -- Requisition, allocation and fulfilment
+Section C — Requisition, allocation and fulfilment
 
 Ref   Question (abridged)                Answer as resolved
 C-01  What triggers a requisition?
@@ -156,24 +156,24 @@ C-10  Lateral transfers between shops?
 C-11  Lateral transfer price/approval?
 C-12  Stock visibility before ordering?  None required.
 C-13  Committed lead time?
-                                         No -- ad hoc ordering at any time.
+                                         No — ad hoc ordering at any time.
 
                                          Orders lock at a configurable window before the committed ETA (seller policy, per-order
                                          override by permitted role).
 
                                          Handled manually; no separate system path.
 
-                                         Within one MPCS only, mediated and approved by the MPCS -- shops never see sibling
-                                         stock directly. Between entities, a "transfer" is simply a normal sale.
+                                         Within one MPCS only, mediated and approved by the MPCS — shops never see sibling
+                                         stock directly. Between entities, a “transfer” is simply a normal sale.
 
                                          MPCS approves its internal transfers; they move at cost with no invoice. Federation is not
                                          involved.
 
-                                         Yes -- a buyer sees the seller's availability (live or indicative, seller's choice).
+                                         Yes — a buyer sees the seller's availability (live or indicative, seller's choice).
 
                                          An indicative ETA is set at acceptance and delivery performance is measured against it.
 
-Section D -- Delivery, goods receipt and discrepancies
+Section D — Delivery, goods receipt and discrepancies
 
 Ref   Question (abridged)                Answer as resolved
 D-01  Who delivers?
@@ -185,7 +185,7 @@ D-04  Count on receipt?                  Yes. One delivery note can cover multip
 D-05  Quantity differs from dispatched?
                                          Both a driver mobile app and signed paper are supported.
 D-06  Who investigates discrepancies?
-D-07  Damage credit timing?              The receiver counts and records actuals -- receipts are never forced to match the
+D-07  Damage credit timing?              The receiver counts and records actuals — receipts are never forced to match the
 D-08  Photograph evidence?               dispatch note.
 D-09  Vehicle/driver/timestamp?
 D-10  Returnable containers?             The system records what actually arrived and automatically raises a discrepancy for
@@ -194,14 +194,14 @@ D-10  Returnable containers?             The system records what actually arrive
                                          The two trading parties, within an agreed time limit; the federation is the fall-back arbiter if
                                          unresolved.
 
-                                         After inspection and approval -- never automatic on receipt.
+                                         After inspection and approval — never automatic on receipt.
 
                                          Yes, attachable to discrepancy and claim records. (FR-DEL-050)
 
                                          Recorded.
 
                                          Not tracked; out of scope.
-Section E -- Inventory management
+Section E — Inventory management
 
 Ref   Question (abridged)               Answer as resolved
 
@@ -231,14 +231,14 @@ E-11  Stock ageing?                     System-calculated per shop and SKU, revi
 
                                         Reported with warnings. (P2)
 
-Section F -- Damages, discards, expiry and shrinkage
+Section F — Damages, discards, expiry and shrinkage
 
 Ref   Question (abridged)               Answer as resolved
 F-01  Loss categories?
                                         Recorded separately: damaged in transit, damaged in store, expired, theft, shrinkage, staff
 F-02  Who bears each loss?              consumption, samples, donation, other. Never one generic adjustment. (FR-LOSS-010)
 F-03  Returns for credit?
-F-04  Write-off approval?               Whichever entity owned the goods at the moment of loss -- a direct consequence of the
+F-04  Write-off approval?               Whichever entity owned the goods at the moment of loss — a direct consequence of the
                                         firm-sale/GRN answer to A-01.
 F-05  Witness and verification?
                                         Yes, via the claim workflow: raise with photos, inspect, approve, credit note.
@@ -246,7 +246,7 @@ F-06  Expiry alerts?
                                         Role/permission-based, varying by value.
 F-07  Markdown selling?
 F-08  Disposal certificates?            Required: a witness distinct from the requester, photographic evidence where practical,
-F-09  Shrinkage percentage visibility?  and requester  approver enforced. Write-off is the highest-fraud-risk lifecycle in the
+F-09  Shrinkage percentage visibility?  and requester ≠ approver enforced. Write-off is the highest-fraud-risk lifecycle in the
 F-10  Loss tolerances?                  system.
 F-11  Damaged-but-saleable?
                                         Batch-level warning windows by category; entering the window generates a count task for
@@ -262,12 +262,12 @@ F-11  Damaged-but-saleable?
                                         Configurable threshold per SKU or SKU group below which no escalation occurs.
 
                                         Handled as a markdown rule rather than a separate stock state.
-Section G -- Pricing
+Section G — Pricing
 
 Ref   Question (abridged)               Answer as resolved
 
 G-01  Who sets retail price?            Each MPCS sets one retail list for all its shops. Federation may publish recommended
-                                        prices -- advisory only.
+                                        prices — advisory only.
 G-02  May a shop deviate?
                                         Never. Shops have no standing price deviation; any per-bill reduction comes only from an
 G-03  Government MRP ceilings?          authored rule.
@@ -277,24 +277,24 @@ G-05  Promotions?                       Enforced as a hard control, validated ag
 G-06  Who funds promotions?
                                         None. No member or loyalty pricing exists (see Section K).
 G-07  Manual till discounts?
-                                        Yes -- time-limited reductions, quantity offers, bill-level and free-item benefits, all
+                                        Yes — time-limited reductions, quantity offers, bill-level and free-item benefits, all
 G-08  Scheduled price changes?          expressed as rules.
 
 G-09  Tax-inclusive pricing?            The MPCS decides and funds its own promotions. No cross-entity promotional settlement
 G-10  Rounding?                         in phase 1.
 
-                                        No -- this earlier allowance was formally rescinded. There is no discretionary discount
+                                        No — this earlier allowance was formally rescinded. There is no discretionary discount
                                         function at any till; the rule engine is the sole mechanism for any price reduction. (ADR-14)
 
                                         Dropped for now. Price list changes apply on propagation; discount/markdown rules do
                                         carry validity windows.
 
-                                        Yes, uniformly -- shelf and receipt prices include tax, computed from per-SKU tax
+                                        Yes, uniformly — shelf and receipt prices include tax, computed from per-SKU tax
                                         categories.
 
                                         Cash tenders round to the nearest rupee; card and account tenders settle exact.
 
-Section H -- Point of sale and offline operation
+Section H — Point of sale and offline operation
 
 Ref   Question (abridged)               Answer as resolved
 H-01  Longest offline period?
@@ -318,17 +318,17 @@ H-14  Home delivery / online ordering?  tender type and reference only and never
                                         open data item for rollout planning.
 
                                         Scanner, receipt printer, cash drawer, weighing scale, customer display, card terminal
-                                        (standalone), label printer where present -- all behind a hardware abstraction layer.
+                                        (standalone), label printer where present — all behind a hardware abstraction layer.
 
                                         Dedicated POS terminals, all new hardware, centrally specified. (Direction as of this
-                                        document: ARM/Android terminals -- being finalised in technical design.)
+                                        document: ARM/Android terminals — being finalised in technical design.)
 
                                         Per shop, with English fallback for missing translations.
 
                                         Role-based: same-till same-session at cashier level; anything wider needs supervisor and
                                         connectivity.
 
-                                        Supported -- park and resume.
+                                        Supported — park and resume.
 
                                         No hard historical stats exist (paper operation). The adopted planning envelope: ~3 million
                                         transactions/day federation-wide at the 10,000-shop horizon.
@@ -336,35 +336,35 @@ H-14  Home delivery / online ordering?  tender type and reference only and never
                                         Every sale is attributed to the authenticated operator.
 
                                         Not now; parked for a later phase.
-Section I -- Payments, cash and settlement
+Section I — Payments, cash and settlement
 
 Ref   Question (abridged)          Answer as resolved
 
 I-01  Tender types?                All recorded, none processed: cash, card, wallet, customer credit account, voucher,
                                    subsidy instrument (later phases for the last two).
 I-02  Customer credit accounts?
-                                   Yes -- the khata book digitised: per-MPCS accounts with limit, balance, repayments and
+                                   Yes — the khata book digitised: per-MPCS accounts with limit, balance, repayments and
 I-03  Till cash management?        ageing. Frequently the largest receivable a society carries.
 
 I-04  Banking reconciliation?      Full: opening float, cash drops, blind close, variance reporting.
 
 I-05  How do entities settle?      Banking of takings is recorded; reconciliation automation follows accounting integration.
 
-I-06  Statements of account?       Cash/bank deposit at shopMPCS level (internal); cheque and deposit between entities.
+I-06  Statements of account?       Cash/bank deposit at shop→MPCS level (internal); cheque and deposit between entities.
                                    All recorded as payment-receipt documents by the seller.
 I-07  Payment matching?
                                    Yes, per relationship, at configured frequency.
 I-08  Foreign currency?
-                                   Matched to specific invoices, never oldest-first -- this is what makes ageing and dispute
+                                   Matched to specific invoices, never oldest-first — this is what makes ageing and dispute
                                    handling meaningful.
 
                                    Federation only, for import procurement (landed cost, P2).
 
-Section J -- Inter-entity billing and accounting
+Section J — Inter-entity billing and accounting
 
 Ref   Question (abridged)          Answer as resolved
 
-J-01  Full accounting per entity?  No -- the largest scope decision in the programme. The system manages trading
+J-01  Full accounting per entity?  No — the largest scope decision in the programme. The system manages trading
                                    documents and the receivable/payable picture between entities; statutory books stay in
 J-02  Export format?               each society's own arrangements, with an accounting system integrating later. (ADR-05)
 
@@ -373,7 +373,7 @@ J-03  Tax regime?                  Every document type carries a designed journa
 J-04  E-invoicing mandated?
                                    Standard VAT only. All chain entities are VAT-registered; registration is a per-entity
 J-05  Numbering rules?             attribute; tax invoices carry both parties' numbers. SVAT was abolished effective 1 Oct
-                                   2025 -- no SVAT flow exists.
+                                   2025 — no SVAT flow exists.
 J-06  Retention period?
                                    Expected near-term but not yet specified by IRD. Readiness is built in (immutable invoices,
 J-07  Credit/debit notes?          disciplined numbering, reserved integration point); live integration is deferred to P3.
@@ -388,16 +388,16 @@ J-09  Auditor access?              document-type series. Numbers are final at is
 
                                    Required and supported at all tiers.
 
-                                   None -- one common financial year across all entities.
+                                   None — one common financial year across all entities.
 
                                    Entity-scoped read-only for each society's auditors; Federation auditors see all entities
                                    view-only; defined transaction listings supported.
-Section K -- Membership and patronage
+Section K — Membership and patronage
 
 Ref   Question (abridged)            Answer as resolved
 
-K-01  Distinguish members at POS?    No -- and this dissolves most of Section K. Cooperative membership, shares, patronage
-                                     and governance are entirely out of scope. What exists instead is the "registered customer":
+K-01  Distinguish members at POS?    No — and this dissolves most of Section K. Cooperative membership, shares, patronage
+                                     and governance are entirely out of scope. What exists instead is the “registered customer”:
 K-02  Member register scope?         a retail-credit concept unrelated to co-op membership. (ADR-16)
 
 K-03  Preferential prices?           For registered customers: one global identity (internal ID; phone is a lookup attribute with
@@ -406,7 +406,7 @@ K-05  Share capital?                 trades with. (ADR-15)
 K-06  Member loans?
 K-07  AGM/governance functions?      Per-customer preferential pricing arrives in phase 3, configured by each MPCS.
 K-08  Personal data held?
-                                     Out of scope -- accounting/governance territory.
+                                     Out of scope — accounting/governance territory.
 
                                      Out of scope.
 
@@ -417,14 +417,14 @@ K-08  Personal data held?
                                      Minimal PII: name and phone; NIC optional and only where credit is granted. PDPA-
                                      compliant by design ahead of enforcement. (ADR-27)
 
-Section L -- Central procurement and supplier management
+Section L — Central procurement and supplier management
 
 Ref   Question (abridged)            Answer as resolved
 L-01  Central procurement in scope?
 L-02  Demand forecasting?            Yes, phase 2: market price intelligence per SKU by source (importer, supplier, Pettah
 L-03  Supplier contracts?            survey).
 L-04  Tender/quotation process?
-L-05  Landed cost?                   Yes, phase 2, by region/season/product -- one of the core arguments for the system.
+L-05  Landed cost?                   Yes, phase 2, by region/season/product — one of the core arguments for the system.
 L-06  Central repacking?             Price forecasting remains a scenario tool only, never an automated decision-maker.
 L-07  Supplier performance?
                                      Managed in-system: contracts, agreed prices, volume commitments. (P2)
@@ -433,21 +433,21 @@ L-07  Supplier performance?
                                      comparison, permission-gated award. No public portal. (P2)
 
                                      Calculated (duty, freight, clearing apportioned across shipment lines) and carried as the
-                                     batch cost of imported goods -- flowing straight into the costing model. (P2)
+                                     batch cost of imported goods — flowing straight into the costing model. (P2)
 
                                      Federation repacking is expected later; it reuses the same recipe mechanism as MPCS
                                      repacking and is enabled by a permission flip. (P3)
 
                                      Fill rate, lead time and rejection rate derived from PO-versus-GRN data. (P2)
-Section M -- Data ownership, visibility and governance
+Section M — Data ownership, visibility and governance
 
 Ref   Question (abridged)              Answer as resolved
 
-M-01  Who owns shop data?              Jointly, in substance -- Federation and societies act as joint controllers. A Co-operative
+M-01  Who owns shop data?              Jointly, in substance — Federation and societies act as joint controllers. A Co-operative
 M-02  Central sees non-central goods?  Act legal opinion is pending, and a written data-governance agreement (none exists today)
 M-03  Central sees local suppliers?    is flagged as near-mandatory to draft alongside the build. (ADR-26)
 M-04  Central sees margins/shrinkage?
-M-05  Shop-to-shop visibility?         Yes. Federation sees everything, view-only -- including sales of goods it did not supply.
+M-05  Shop-to-shop visibility?         Yes. Federation sees everything, view-only — including sales of goods it did not supply.
 M-06  Anonymised aggregate tier?
 M-07  If a society leaves?             Yes, view-only.
 M-08  Who administers users?
@@ -456,12 +456,12 @@ M-09  Privacy obligations?
 M-10  Regulator access?                None. A shop sees nothing of its siblings; the MPCS mediates lateral needs. (This
 M-11  Data sharing agreement?          supersedes the earlier C-10 framing.)
 
-                                       Not needed -- full visibility made the compromise tier redundant.
+                                       Not needed — full visibility made the compromise tier redundant.
 
-                                       It cannot -- societies cannot leave the federation. Historical data is retained indefinitely.
+                                       It cannot — societies cannot leave the federation. Historical data is retained indefinitely.
 
                                        Each entity self-administers. An MPCS additionally administers its shops' users.
-                                       Federation holds no downward admin -- accepted consequence: the helpdesk cannot
+                                       Federation holds no downward admin — accepted consequence: the helpdesk cannot
                                        reset an MPCS user's password. (ADR-18)
 
                                        PDPA (No. 9 of 2022, as amended) applies; a responsible officer is named per entity; the
@@ -470,50 +470,50 @@ M-11  Data sharing agreement?          supersedes the earlier C-10 framing.)
                                        The Department of Co-operative Development receives an external, time-bound, read-only
                                        role; every grant is audit-logged. No prescribed return formats exist.
 
-                                       Does not exist -- drafting it is a named legal deliverable running parallel to the build.
+                                       Does not exist — drafting it is a named legal deliverable running parallel to the build.
 
-Section N -- Security, roles and internal controls
+Section N — Security, roles and internal controls
 
 Ref   Question (abridged)              Answer as resolved
 N-01  Shop roles?
-                                       A default template set (cashier, supervisor, accountant, GM/chairman and others -- doc
+                                       A default template set (cashier, supervisor, accountant, GM/chairman and others — doc
 N-02  Central roles?                   07 lists fourteen) on top of a dynamic permission catalogue and role builder, so entities
 N-03  Till authentication?             can shape their own roles. (FR-SEC-010)
 N-04  MFA?
                                        Federation procurement, marketing, accounts, admin, auditors, NOC/support bridge,
-N-05  Immutable audit trail?           helpdesk -- same dynamic RBAC.
+N-05  Immutable audit trail?           helpdesk — same dynamic RBAC.
 
-N-06  Exception reports?               Short numeric PIN per operator -- fast enough that logins are not shared. Back office uses
+N-06  Exception reports?               Short numeric PIN per operator — fast enough that logins are not shared. Back office uses
 N-07  Segregation of duties?           passwords.
 N-08  Departing staff?
 N-09  Physical security at shops?      Required (TOTP) for financial and administrative back-office functions; those functions are
                                        online-only.
 
-                                       Yes, append-only, covering the full event catalogue in doc 07 �3: overrides, voids, refunds,
+                                       Yes, append-only, covering the full event catalogue in doc 07 §3: overrides, voids, refunds,
                                        write-offs, adjustments, role changes, series registrations, sync anomalies, regulator
                                        grants. Hash-chaining is a P2 hardening.
 
                                        Required with named reviewers; the concrete list is finalised in the pending report-
                                        catalogue workshop.
 
-                                       Enforced where specified -- the canonical case: a write-off requester may not approve it.
+                                       Enforced where specified — the canonical case: a write-off requester may not approve it.
 
                                        Accounts are deactivated, never deleted; history is retained.
 
-                                       Idle locks (till 2�3 min, back office 10�15, admin 5), operator attribution on every action,
+                                       Idle locks (till 2–3 min, back office 10–15, admin 5), operator attribution on every action,
                                        and drawer-open-without-sale as an audited event.
-Section O -- Reporting and analytics
+Section O — Reporting and analytics
 
 Ref   Question (abridged)                Answer as resolved
 
 O-01  What decisions drive reports?      The catalogue is decision-driven rather than a screen list; a finalisation workshop with
-                                         stakeholders is pending. Doc 07 �5 holds the current placeholder set.
+                                         stakeholders is pending. Doc 07 §5 holds the current placeholder set.
 O-02  Offline reporting?
                                          Z-report, day-sales summary and till-session report print on the local thermal printer with
 O-03  Real-time or end-of-day?           no connectivity.
 
 O-04  Statutory return formats?          Near-real-time operational dashboards from the event stream, heavy aggregates end-of-
-O-05  Exports and self-service?          day -- and every federation-level report carries a per-entity data-freshness stamp,
+O-05  Exports and self-service?          day — and every federation-level report carries a per-entity data-freshness stamp,
 O-06  Mobile dashboards?                 because some shops are always offline.
 O-07  History retention?
                                          None prescribed by the Co-operative Department.
@@ -522,20 +522,20 @@ O-07  History retention?
 
                                          Backlog; the responsive web back office covers browser access on phones.
 
-                                         Indefinite -- trends remain comparable across years by design.
+                                         Indefinite — trends remain comparable across years by design.
 
-Section P -- Language, localisation and accessibility
+Section P — Language, localisation and accessibility
 
 Ref   Question (abridged)                Answer as resolved
 P-01  Full trilingual interface?
-P-02  Language per user or shop?         Yes -- interface, printed documents, and search all trilingual, phase 1.
+P-02  Language per user or shop?         Yes — interface, printed documents, and search all trilingual, phase 1.
 P-03  Trilingual reports?
                                          Per shop, with English fallback wherever a translation is missing.
 P-04  Search and sort in Sinhala/Tamil?
                                          Printed customer-facing output follows the shop language; the shared A4 pipeline renders
 P-05  Fonts on thermal printers?         all catalogue reports.
 P-06  Input methods?
-P-07  Authoritative language?            Yes -- correct collation via Unicode/ICU is a phase-1 requirement; OpenSearch-backed
+P-07  Authoritative language?            Yes — correct collation via Unicode/ICU is a phase-1 requirement; OpenSearch-backed
 P-08  Literacy/accessibility?            search analysis arrives P2.
 P-09  Date/number formats?
                                          Noto (or equivalent) fonts; receipts render through the platform text stack and print as
@@ -543,37 +543,37 @@ P-09  Date/number formats?
 
                                          Sinhala/Tamil input provisioned per shop at onboarding (config register item).
 
-                                         English -- it is the mandatory universal field and the fallback everywhere.
+                                         English — it is the mandatory universal field and the fallback everywhere.
 
                                          Addressed by the usability directive: screens mirror familiar paper documents, role-scoped
                                          and icon-led, with a training/sandbox mode.
 
                                          Consistent formatting across all three languages via ICU.
-Section Q -- Infrastructure, hosting and service levels
+Section Q — Infrastructure, hosting and service levels
 
 Ref   Question (abridged)             Answer as resolved
 Q-01  Cloud or on-premises?
 Q-02  Who operates it?                Cloud. No legal data-residency constraint was identified (government IT policy check still
-Q-03  RTO / RPO?                      pending as a legal action). Provider and sizing specifics live in doc 14 -- Technical
+Q-03  RTO / RPO?                      pending as a legal action). Provider and sizing specifics live in doc 14 — Technical
 Q-04  Availability / SLA?             Foundations.
 Q-05  Five-year growth?
 Q-06  Connectivity per shop?          An in-house team; the architecture is deliberately shaped for a single-DevOps-engineer
 Q-07  Power reliability?              operating model (modular monolith, managed services). (ADR-20)
 Q-08  Existing standards to fit?
-Q-09  Support model?                  Central: recovery within 4�8 hours, data loss  15 minutes. The edge is stronger by
-Q-10  Update deferral?                construction -- shops trade through multi-day central outages. (ADR-21)
+Q-09  Support model?                  Central: recovery within 4–8 hours, data loss ≤ 15 minutes. The edge is stronger by
+Q-10  Update deferral?                construction — shops trade through multi-day central outages. (ADR-21)
 
-                                      24�7 trading capability with no scheduled downtime window; rolling updates. Support:
+                                      24×7 trading capability with no scheduled downtime window; rolling updates. Support:
                                       extended trading hours plus on-call (a Federation cost decision, still open between this
-                                      and full 24�7).
+                                      and full 24×7).
 
-                                      The stakeholder-confirmed envelope: 10,000 shops within three years (15,000 tills),
-                                      12,000 shops at five years, 3M transactions/day. (ADR-22)
+                                      The stakeholder-confirmed envelope: 10,000 shops within three years (≈15,000 tills),
+                                      12,000 shops at five years, ≈3M transactions/day. (ADR-22)
 
                                       Each society pays for its own connections (ADR-25); a minimum spec (~2 Mbps down /
                                       0.5 up, router-based) is a go-live gate per site.
 
-                                      A known problem -- hence battery-backed till hardware, safe-shutdown local database
+                                      A known problem — hence battery-backed till hardware, safe-shutdown local database
                                       design, and offline-first operation.
 
                                       None found; the government IT policy check remains an open legal item.
@@ -585,11 +585,11 @@ Q-10  Update deferral?                construction -- shops trade through multi-
                                       shop's trading hours, a server-enforced minimum version floor with a grace period. (ADR-
                                       24)
 
-Section R -- Existing systems, data migration and integration
+Section R — Existing systems, data migration and integration
 
 Ref   Question (abridged)             Answer as resolved
 R-01  Existing POS to extract from?
-R-02  What data migrates?             None -- the federation runs entirely on paper. Nothing to extract or integrate.
+R-02  What data migrates?             None — the federation runs entirely on paper. Nothing to extract or integrate.
 
 R-03  Where does master data live?    Opening balances only: stock counts at onboarding, plus any customer/khata balances
                                       entered as signed two-party opening-balance documents. No historical sales migration.
@@ -597,38 +597,38 @@ R-04  Data cleanliness?
 R-05  Bank integration?               Paper and scattered spreadsheets. Assembling the trusted catalogue is the T-03 critical
 R-06  Government portal integration?  path; the Federation must name its data steward.
 R-07  API for future integrations?
-R-08  SMS/email notifications?        Cleansing is budgeted as a named workstream with its own owner (to be appointed) -- it
+R-08  SMS/email notifications?        Cleansing is budgeted as a named workstream with its own owner (to be appointed) — it
 R-09  Existing devices to support?    cannot be absorbed by the software team.
 
-                                      None -- documents, not payments. (ADR-01)
+                                      None — documents, not payments. (ADR-01)
 
                                       None now; IRD e-invoicing readiness is designed in for when the mandate arrives.
 
-                                      Yes -- OpenAPI-specified, OAuth2/OIDC-secured; the accounting system is the first
+                                      Yes — OpenAPI-specified, OAuth2/OIDC-secured; the accounting system is the first
                                       expected consumer.
 
                                       Configurable notifications (dispatch alerts, statements) are in scope.
 
-                                      None to inherit -- hardware is new and centrally specified. (T-07 confirmed)
-Section S -- Programme, rollout and change management
+                                      None to inherit — hardware is new and centrally specified. (T-07 confirmed)
+Section S — Programme, rollout and change management
 
 Ref   Question (abridged)                      Answer as resolved
 S-01  How many shops, where?
-                                               4,000 today across all 25 districts, growing to 10,000 within three years of go-live.
+                                               ≈4,000 today across all 25 districts, growing to ≈10,000 within three years of go-live.
 S-02  Staff and computer familiarity?          Where the growth comes from (MPCS expansion vs new societies) is an open Federation
 S-03  Phased release acceptable?               question.
 
-S-04  Decision authority?                      Generally low familiarity -- addressed by the usability directive, trilingual regional training
+S-04  Decision authority?                      Generally low familiarity — addressed by the usability directive, trilingual regional training
                                                against a standard playbook, and the sandbox mode.
 S-05  Adoption voluntary?
-S-06  Target go-live date?                     Yes -- three functional phases against three geographic waves, with a go/no-go gate at
-S-07  Training delivery?                       end of pilot (40% of spend). (ADR-23)
+S-06  Target go-live date?                     Yes — three functional phases against three geographic waves, with a go/no-go gate at
+S-07  Training delivery?                       end of pilot (≈40% of spend). (ADR-23)
 S-08  Funding model?
 S-09  Post-go-live ownership?                  Federation admins hold sign-off; the requirements baseline freezes on their written
 S-10  Twelve-month success measures?           approval, then change control applies. Decision speed (T-01) remains the top programme
                                                risk.
 
-                                               Compulsory per rollout wave -- the system does not need to handle partial voluntary
+                                               Compulsory per rollout wave — the system does not need to handle partial voluntary
                                                coverage.
 
                                                Deliberately not stated in any document; wave planning avoids festival and harvest peaks.
@@ -642,28 +642,28 @@ S-10  Twelve-month success measures?           approval, then change control app
                                                Federation owns prioritisation and arbitration between societies, under the same change-
                                                control discipline as the baseline.
 
-                                               Not yet defined -- an open programme item to be agreed before build sign-off.
+                                               Not yet defined — an open programme item to be agreed before build sign-off.
 
-Section T -- Risks and assumptions
+Section T — Risks and assumptions
 
 Ref   Question (abridged)                      Answer as resolved
 
-T-01  Single binding decisions in time?        Confirmed as the arrangement, and confirmed as the top schedule risk -- tracked live in
+T-01  Single binding decisions in time?        Confirmed as the arrangement, and confirmed as the top schedule risk — tracked live in
                                                doc 10.
 T-02  Societies accept central visibility?
                                                Confirmed yes, fully: Federation sees everything view-only, including margins and
 T-03  Catalogue assembled before go-live?      shrinkage.
 
-T-04  Staff trainable at the till?             Confirmed as the critical path. The data steward and cleansing owner are still unnamed --
+T-04  Staff trainable at the till?             Confirmed as the critical path. The data steward and cleansing owner are still unnamed —
                                                the single largest open action.
 T-05  Connectivity sufficient for daily sync?
 T-06  Existing accounting continues?           Confirmed, with the mitigations designed in: paper-mirroring screens, PIN auth, sandbox
 T-07  Hardware standardised?                   mode, and prototype validation with real cashiers before build sign-off.
 
-                                               Confirmed -- the design tolerates 1�2 day gaps, and beyond that paper catch-up
+                                               Confirmed — the design tolerates 1–2 day gaps, and beyond that paper catch-up
                                                procedures apply.
 
-                                               Confirmed -- the system feeds future accounting; society bookkeeping is untouched.
+                                               Confirmed — the system feeds future accounting; society bookkeeping is untouched.
 
-                                               Confirmed -- centrally specified, all new.
+                                               Confirmed — centrally specified, all new.
 

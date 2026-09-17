@@ -1,14 +1,14 @@
      Cooperative Retail and Distribution System
 
-     24B ญ Numbering Addendum
+     24B โ€“ Numbering Addendum
 
      Closes the six open numbering questions as decisions. No design changes result; the
      document-type seed flags and the decision log are updated, and NFR-CMP-030 moves
      from gating to advisory.
 
 Field                Value
-Document             24B ญ Numbering Addendum to 24 M4 Trading Documents (and to doc 18 part C, doc 32 ง8, 19A ง7)
-Version              v1.0 ญ decisions recorded
+Document             24B โ€“ Numbering Addendum to 24 M4 Trading Documents (and to doc 18 part C, doc 32 ยง8, 19A ยง7)
+Version              v1.0 โ€“ decisions recorded
 Date                 9 September 2026
 Decided by           Chamin (programme), 9 September 2026: the working assumptions are adopted as decisions
 Effect on the build  None beyond seed values; the kernel numbering service, the till counters and M4's series usage are implemented
@@ -27,11 +27,11 @@ N-1  Financial-year reset of series  No reset. Every series counts monotonically
 
      counters                        lifetime; the display format carries no year segment false for all series; no reset job; doc 18
 
-                                                                                             ง5 DR-1 closed
+                                                                                             ยง5 DR-1 closed
 
 N-2  Is a GRN outside the fiscal     Yes. GRN is an internal material document;              document_type.fiscal = false
                                      gaplessness is kept as an operational control (sync     for GRN; LOCATION series at shops
-     gapless obligation?             gap check), not a fiscal requirement                    stands; doc 18 ง5 DR-2 closed
+     gapless obligation?             gap check), not a fiscal requirement                    stands; doc 18 ยง5 DR-2 closed
 
 N-3  Multiple series per entity (per till Accepted. The RFC design is adopted: ENTITY        ADR-11 confirmed; no change
 

@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-25A � M5 Inventory, Costing, Repack & Loss:
+25A – M5 Inventory, Costing, Repack & Loss:
 Implementation Guide
 
 Everything the M5 developer needs: the inventory schema as DDL, seed data, package
@@ -11,24 +11,24 @@ bundle contracts for count, write-off draft, repack and transfer receipt, screen
 tickets.
 
 Field             Value
-Document          25A � implementation guide for 25 M5 Inventory, Costing, Repack & Loss v0.1
-Version           v0.1 � for the M5 developer; sections 7.3 and 7.4 are the contract with the till track
+Document          25A – implementation guide for 25 M5 Inventory, Costing, Repack & Loss v0.1
+Version           v0.1 – for the M5 developer; sections 7.3 and 7.4 are the contract with the till track
 Date              9 September 2026
-Prerequisite      Sprint 0; M1�M4 contracts frozen (M4's grn.confirmed.v1, claim.approved.v1, transfer_request.approved.v1,
-                  delivery_note.issued.v1 payloads). M6's receipt bundle shape is taken from doc 32 �3.1 and doc 18
+Prerequisite      Sprint 0; M1–M4 contracts frozen (M4's grn.confirmed.v1, claim.approved.v1, transfer_request.approved.v1,
+                  delivery_note.issued.v1 payloads). M6's receipt bundle shape is taken from doc 32 §3.1 and doc 18
 Estimated effort  document_line.
 Restated content  About 27 developer-days for one full-stack developer
-                  Marked restated from doc X �Y.
+                  Marked restated from doc X §Y.
 
 Read this first. Build the ledger core first: LedgerService.post(movements) is the one place stock changes, and
-everything else � receipts, sales, counts, write-offs, repacks, transfers, opening balances � is a caller that assembles
+everything else – receipts, sales, counts, write-offs, repacks, transfers, opening balances – is a caller that assembles
 movements and cites a document. Get the property test 'lot balance equals movement sum under any interleaving'
 green on day two, then never touch qty_on_hand from anywhere else.
 
 25A - M5 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
 1. What you are building
 
-Restated from doc 25 �1. Where stock is and what it cost, by location, batch and condition; the append-only
+Restated from doc 25 §1. Where stock is and what it cost, by location, batch and condition; the append-only
 ledger; weighted-average costing per entity; availability; counts, adjustments, write-offs, repacks, transfers and
 opening balances as documents; expiry tasks; oversell exceptions.
 
@@ -39,7 +39,7 @@ repack_recipe, count_task, expiry_task, pick_list, loss_category,
 variance_threshold, loss_tolerance, and the document extensions for  The till screens (M6 renders count, write-off, repack, transfer
 CNT, ADJ, WOF, RPK, XFR, OPB                                         receipt from your specification)
 
-The ledger service; 5 internal apply commands; 22 user commands; 12  �
+The ledger service; 5 internal apply commands; 22 user commands; 12  –
 queries; 9 event families; 4 consumers; 4 jobs; the lot snapshot
 contributor
 
@@ -48,12 +48,12 @@ Eleven web screens
 2. What you inherit
 
 From                You use                                                              How
-19A �7 document
+19A §7 document
 base                DocumentService.issue, DocumentLinks (REVERSES for All M5 documents
-19A �8 sync         repack reversal and transfer cancel), attachments
+19A §8 sync         repack reversal and transfer cancel), attachments
 
-19A �3 permissions  Bundle ingestion hooks for CNT, WOF (draft), RPK, XFR receipt; Sections 7.3, 7.4
-19A �4�5, 11, 12    SnapshotContributor; change log
+19A §3 permissions  Bundle ingestion hooks for CNT, WOF (draft), RPK, XFR receipt; Sections 7.3, 7.4
+19A §4–5, 11, 12    SnapshotContributor; change log
 Shared engine
 M1 query            Sod.assertDistinct, role limits for value bands                      Adjustment and write-off approval
 
@@ -67,7 +67,7 @@ M6 bundles
                     RegisterBatch (repack outputs), GetSku flags and                     Repack, counts, re-pointing
                     conversions, batch identity, alias
 
-                    ResolveTradePrice is not needed here (M4 gives unit cost on �
+                    ResolveTradePrice is not needed here (M4 gives unit cost on –
                     the GRN event)
 
                     grn.confirmed/reversed, claim.approved, drop.undelivered,            Section 7.1
@@ -78,7 +78,7 @@ M6 bundles
 25A - M5 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                           Page 2
 3. Schema
 
-Restated from doc 18 v0.2 part B (M5 tables) and doc 25 �3 (CR-25-1). Location
+Restated from doc 18 v0.2 part B (M5 tables) and doc 25 §3 (CR-25-1). Location
 db/migration/m5inventory/.
 
 -- V0001__inventory.sql (RLS per 17A 6.3 on every table; grants: ledger INSERT only)
@@ -340,11 +340,11 @@ lk.coopfed.knoweb.m5inventory/ @ApplicationModule(allowedDependencies =
 
 # example - balances for a shop (till-scoped: no unitCost)
 
-[ { "skuId": "...", "batchId": "...", "batchNo": "B2411A", "expiry": "2027-03-31", "condition": "GOOD",
+[ { "skuId": "…", "batchId": "…", "batchNo": "B2411A", "expiry": "2027-03-31", "condition": "GOOD",
 
       "qtyOnHand": 37.000, "fefoRank": 1 },
 
-   { "skuId": "...", "batchId": "...", "batchNo": "B2503C", "expiry": "2027-06-30", "condition": "GOOD",
+   { "skuId": "…", "batchId": "…", "batchNo": "B2503C", "expiry": "2027-06-30", "condition": "GOOD",
 
       "qtyOnHand": 48.000, "fefoRank": 2 } ]
 
@@ -467,45 +467,45 @@ SubmitAdjustment          with reason; DocumentService.issue                    
 ApproveAdjustment         (LOCATION series); expectation adjusted by             SUBMITTED; VarianceEvaluator:          .v1
                           movements since start (E-06)                           in-tolerance variances post            adjustment.approved/
 RejectAdjustment                                                                 COUNT_ADJUST now; others form          posted.v1
-RequestWriteOff           entity scope; lines with lots; reason                  ADJ DRAFT                              adjustment.rejected.v
+RequestWriteOff           entity scope; lines with lots; reason                  ADJ DRAFT →                            adjustment.rejected.v
 SubmitWriteOff                                                                   VARIANCE_REVIEW; else CLOSED           1
-                          PENDING; Sod.assertDistinct(request,                                                          �
-WitnessWriteOff           approve, requester); approver limit  value;            ADJ issued (ENTITY series); value =    writeoff.requested.v1
-                          MFA                                                     |qty| � avg cost; band from
+                          PENDING; Sod.assertDistinct(request,                                                          –
+WitnessWriteOff           approve, requester); approver limit ≥ value;           ADJ issued (ENTITY series); value =    writeoff.requested.v1
+                          MFA                                                    Σ |qty| × avg cost; band from
 ApproveWriteOff           reason                                                 thresholds                             writeoff.witnessed.v1
 RejectWriteOff
-DefineRecipe /                                                                   APPROVED  COUNT_ADJUST                 writeoff.approved/pos
-RetireRecipe                                                                     movements  POSTED; count task          ted.v1
+DefineRecipe /                                                                   APPROVED → COUNT_ADJUST                writeoff.approved/pos
+RetireRecipe                                                                     movements → POSTED; count task         ted.v1
 PlanRepack /                                                                     CLOSED                                 writeoff.rejected.v1
 ExecuteRepack                                                                                                           recipe.*.v1
                                                                                  REJECTED; count CLOSED                 repack.executed.v1;
 ReverseRepack                                                                                                           stock.moved.v1
-IssueTransfer / Dispatch  location scope; lot exists; qty  on hand or lot        DRAFT (offline allowed)
+IssueTransfer / Dispatch  location scope; lot exists; qty ≤ on hand or lot       DRAFT (offline allowed)
 / ReceiveTransfer /       negative-clearing; category                                                                   repack.reversed.v1
 CancelTransfer                                                                                                          transfer.*.v1
                           DRAFT; photos referenced when category                 REQUESTED
                           requires or location single-staff; issuance
                           (LOCATION or ENTITY series)
 
-                          REQUESTED; witness  requester; attachments             WITNESSED (remote_witness flag)
+                          REQUESTED; witness ≠ requester; attachments            WITNESSED (remote_witness flag)
                           COMPLETE; remote witness allowed only when
                           the location is single-staff (config) and the witness
                           holds approve
 
-                          WITNESSED; approver  requester; value ( qty � APPROVED  WRITE_OFF
+                          WITNESSED; approver ≠ requester; value (Σ qty × APPROVED → WRITE_OFF
 
-                          avg cost)  approver band; MFA                          movements  POSTED
+                          avg cost) ≤ approver band; MFA                         movements → POSTED
 
                           reason                                                 REJECTED
 
-                          input  output; both SKUs active; output origin         row
+                          input ≠ output; both SKUs active; output origin        row
 
                           REPACK_OUTPUT (M2)
 
-                          recipe ACTIVE; input lots GOOD with qty  recipe        EXECUTED
+                          recipe ACTIVE; input lots GOOD with qty ≥ recipe       EXECUTED
                           input; issuance; consume/produce movements;
                           output cost = consumed cost / actual output;
-                          variance = expected - actual; output batch via M2
+                          variance = expected − actual; output batch via M2
                           RegisterBatch (expiry from input batch)
 
                           EXECUTED; output lot qty = produced and no             REVERSES-linked RPK: negating
@@ -513,7 +513,7 @@ CancelTransfer                                                                  
 
                           same entity; availability at source; issuance;         per state
                           TRANSFER_OUT at cost; destination receive
-                          posts TRANSFER_IN with actuals (shortfall 
+                          posts TRANSFER_IN with actuals (shortfall →
                           ADJ draft at destination); cancel before receipt
                           negates
 
@@ -538,7 +538,7 @@ t
 7. Queries, jobs, snapshot and till bundles
 
 Item                     Implementation
-Availability              GOOD lots with qty_on_hand > 0 at the locations -  pick_list reserved (dn ISSUED
+Availability             Σ GOOD lots with qty_on_hand > 0 at the locations − Σ pick_list reserved (dn ISSUED
                          not DISPATCHED); per (location, sku); cached per instance 30 s; PARTY callers get the seller's configured
 InStockBatches           mode (live or the last end-of-day figure).
 LotsConsumed(grn)        GOOD lots with qty > 0 joined to M2 batch (printed MRP, expiry) for M3's authoring checks.
@@ -547,11 +547,11 @@ ExpiryScanJob (nightly)  Rank GOOD lots by expiry nulls-last, then received_at; 
                          For each (location, batch) with qty > 0 and expiry within the window for the SKU or tag (most specific wins): open
 StockReconcileJob        expiry_task, create an EXPIRY-scope count task, publish expiry_task.opened.v1; on expiry date passed: create a
 (nightly)                suggested WOF DRAFT (category EXPIRED) for the remaining qty.
-TransferOverdueJob       Per location: recompute  movements per lot and compare with qty_on_hand; drift  audit REVIEW
+TransferOverdueJob       Per location: recompute Σ movements per lot and compare with qty_on_hand; drift → audit REVIEW
 (daily)                  STOCK_DRIFT with both figures; never corrects (doc 25 3.2).
-NegativeLotReviewJob     IN_TRANSIT longer than transfer_receipt_days  REVIEW.
+NegativeLotReviewJob     IN_TRANSIT longer than transfer_receipt_days → REVIEW.
 (daily)
-                         Lots negative longer than 7 days without acknowledgement  ALERT to the entity.
+                         Lots negative longer than 7 days without acknowledgement → ALERT to the entity.
 
 7.3 Snapshot contributors
 
@@ -641,18 +641,18 @@ Production sheet         as sketched (M6 renders from the count_task         cou
 Transfer note            snapshot row)                                                          approver
 Pick list                                                                                       Remote-witness badge for
 Expiry list              DocumentLines, band panel, ApprovalBar,             adjust.*           single-staff shops
-Opening stock sheet      StepUpDialog                                                           �
+Opening stock sheet      StepUpDialog                                                           –
 Loss and shrinkage
-Policies                 category grid, lot picker, AttachmentCapture,       writeoff.*         �
+Policies                 category grid, lot picker, AttachmentCapture,       writeoff.*         –
                          ApprovalBar with the next required actor
                                                                                                 Warehouse only
                          recipe picker, input lots, actual yield, variance,  repack.*           Web and till
                          [Reverse] while eligible
-                                                                                                �
+                                                                                                –
                          issue and receive forms; expected lines at          transfer.*
-                         destination from snapshot                                              �
+                         destination from snapshot                                              –
 
-                         per DN line: suggested lots; override with reason pick.*               �
+                         per DN line: suggested lots; override with reason pick.*               –
 
                          tasks with days-to-expiry, qty, markdown rule from expiry.*
                          M3, suggested write-offs
@@ -675,7 +675,7 @@ Property-based (jqwik)  193.88) and mixed receipts; FEFO ranking with null expir
                         reservations; VarianceEvaluator tolerances and bands; yield variance; witness
 Contract                rules incl. remote                                                                  Every operation
 State machine                                                                                               All transitions
-Consumers               Lot balance =  movements under random interleavings incl. reversals and             Seven cases
+Consumers               Lot balance = Σ movements under random interleavings incl. reversals and            Seven cases
                         negatives; avg cost equals recomputed-from-scratch and never negative;
 Scenario                ReverseRepack restores the input lot exactly; availability never includes negative  Ten flows
 Reconciliation          lots; adjustments from a count never double-post in-tolerance lines                 Two cases
@@ -689,7 +689,7 @@ Web                     Every operation; till-scoped balances carry no cost; PAR
                         lines deduct the resolved batch; oversell goes negative with lot.negative; claim
                         return; undelivered drop returns to stock; transfer request issues XFR
 
-                        Doc 13 scenarios 3 and 4 (M5 parts); flows 6.1�6.9 of doc 25; two till simulators
+                        Doc 13 scenarios 3 and 4 (M5 parts); flows 6.1–6.9 of doc 25; two till simulators
                         overselling the same last units
 
                         Injected drift found and reported, not fixed; NegativeLotReviewJob escalates after
@@ -698,8 +698,8 @@ Web                     Every operation; till-scoped balances carry no cost; PAR
                         1,000 receipt bundles/s sustain balance updates on the two-instance stack;
                         reconcile 10,000 locations under 30 min; expiry scan under 10 min
 
-                        Playwright: schedule count  (simulated till submit)  adjustment approve with
-                        step-up; write-off request  witness  approve; repack execute  reverse
+                        Playwright: schedule count → (simulated till submit) → adjustment approve with
+                        step-up; write-off request → witness → approve; repack execute → reverse
 
 10. Tickets in build order
 
@@ -752,15 +752,15 @@ building against; run their suites as part of M5-04's definition of done.
 
 25A - M5 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                             Page 10
 Point                                   Assume                                     Decider               If different
-Availability definition, damaged lots,  As proposed in doc 25 �11
+Availability definition, damaged lots,  As proposed in doc 25 §11
 write-off value basis, remote witness,                                             Federation admins;    Config or one-line guard
 sale-without-lot, opening balance gate                                             architecture review   changes
 (doc 25 DR-1 to DR-6)
-New tables (DR-7)                       Adopted; CR-25-1 raised                    Architecture review   �
+New tables (DR-7)                       Adopted; CR-25-1 raised                    Architecture review   –
 Count-while-trading expectation (DR-8)                                                                   Freeze expectation at start
                                         Movements during the count adjust the Architecture review, till  and report all sales as
 Movement sequence source column         expectation; the till applies the same track                     variance (worse)
-                                        rule locally                                                     �
+                                        rule locally                                                     –
 Snapshot churn from sales
                                         Dense per (location, source) with          Kernel                Tune the window
 Single-staff detection                  source = device id or 'central'

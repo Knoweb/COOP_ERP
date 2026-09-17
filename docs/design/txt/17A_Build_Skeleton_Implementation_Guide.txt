@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-17A ≠ Build Skeleton Implementation Guide
+17A ‚Äì Build Skeleton Implementation Guide
 
 Sprint 0, part one. The repository, build, module structure, migration framework,
 boundary enforcement, the three application shells, the shared engine library, local
@@ -9,10 +9,10 @@ Everything a module developer later inherits and never has to invent.
 
 Field             Value
 Document
-                  17A ≠ Build Skeleton Implementation Guide (implements 17 Solution Architecture v0.2.1 with the stack of 14 and
+                  17A ‚Äì Build Skeleton Implementation Guide (implements 17 Solution Architecture v0.2.1 with the stack of 14 and
 Version           the shells of 30)
 Date
-Companion         v0.1 ≠ for the platform pair; Sprint 0 weeks 1≠2 (8≠18 September 2026)
+Companion         v0.1 ‚Äì for the platform pair; Sprint 0 weeks 1‚Äì2 (8‚Äì18 September 2026)
 
 Audience          8 September 2026
 
@@ -22,7 +22,7 @@ Restated content  19A Kernel Services Implementation Guide fills the kernel pack
                   The platform pair (two developers), the DevOps engineer, the till track lead. Written for the keyboard: file names,
                   commands and code are literal.
 
-                  Marked restated from doc X ßY; the source documents remain authoritative for the decision, this guide for the
+                  Marked restated from doc X ¬ßY; the source documents remain authoritative for the decision, this guide for the
                   build.
 
 The one test that matters at the end of Sprint 0. A developer clones the repository, runs one command, and within
@@ -36,7 +36,7 @@ explain it, Sprint 0 is not done.
 
 Doc 17 fixed the shape: one Spring Boot deployable organised as Modulith modules in four layers, one
 PostgreSQL cluster with a schema per module, a transactional outbox, a React back office, a native Android till,
-and a shared engine library used by both (restated from doc 17 ß5≠6, doc 14 ß2). Sprint 0 turns that into a
+and a shared engine library used by both (restated from doc 17 ¬ß5‚Äì6, doc 14 ¬ß2). Sprint 0 turns that into a
 repository in which the first module can be written on day one of Sprint 1.
 
 Deliverable                                                       Done when
@@ -154,7 +154,7 @@ Schema naming   lk.coopfed.knoweb. where module is kernel, hello, m1party ... m1
 Branches
                 One PostgreSQL schema per module with the same name without the m-prefix number where unambiguous:
                 kernel, hello, party, security (both M1), catalogue, pricing, trading, inventory, pos,
-                customers, reporting, integration (restated from doc 21 ß3: M1 owns two schemas).
+                customers, reporting, integration (restated from doc 21 ¬ß3: M1 owns two schemas).
 
                 main protected; short-lived feature branches; squash merge; conventional commit messages (feat(m1):
                 ...).
@@ -175,10 +175,10 @@ PostgreSQL                 16                                   validateOnMigrat
 Flyway                     10.x                                 tests
                                                                 Layer and package rules beyond Modulith
 Testcontainers             1.20+                                Shared engine and till
-                                                                Doc 14 ß3.1 minimum platform
+                                                                Doc 14 ¬ß3.1 minimum platform
 ArchUnit                   1.3+
 Kotlin                                                          Web shell
-Android                    2.0.x                                Doc 30 ß3
+Android                    2.0.x                                Doc 30 ¬ß3
                                                                 OpenAPI-first: the slice is the source; controllers implement
 Node / package manager     Gradle plugin 8.5+, compileSdk 34,   generated interfaces
 React / TypeScript / Vite  minSdk 30 (Android 11)
@@ -198,7 +198,7 @@ Containers
 
 4.1 Application and profiles
 
-One artefact, three profiles (restated from doc 17 ß5, doc 14 ß1.3). Profiles change which components start,
+One artefact, three profiles (restated from doc 17 ¬ß5, doc 14 ¬ß1.3). Profiles change which components start,
 never the code.
 
 Profile             Starts                                                                     Does not start
@@ -285,7 +285,7 @@ Sub-package            Visibility                        Contains
 the hello module runs; 19A replaces each stub with the real service. Modules never see the difference.
 
 Interface (kernel.api)                      Stub in 17A                                        Real in 19A
-ScopeContext ≠ current user,                Fixed dev scope from a header                      From the OIDC token; sets session variables
+ScopeContext ‚Äì current user,                Fixed dev scope from a header                      From the OIDC token; sets session variables
 entity/location scopes, policy class
 AuditFacade.record(...)                     Inserts into kernel.audit_event without type       Catalogue-validated, correlation-aware
                                             validation
@@ -303,15 +303,15 @@ Clock / BusinessDate                        System clock; business date = calend
 Aspect                 Design
 Commands and handlers
                        A command is an immutable record in api; its handler is a class in internal annotated @CommandHandler
-Queries                (kernel annotation) whose handle method runs in one transaction: guards  mutation  audit.record 
+Queries                (kernel annotation) whose handle method runs in one transaction: guards ‚Üí mutation ‚Üí audit.record ‚Üí
 Events                 events.publish. The kernel's interceptor supplies idempotency and permission checks from the annotation's
-Errors                 permission attribute (restated from doc 19 ß3.4).
+Errors                 permission attribute (restated from doc 19 ¬ß3.4).
 Logging
 Time and money         Interfaces in query or api; implementations read through repositories; never return entities across the boundary,
 Identifiers            only records.
 
                        Records implementing DomainEvent with a static TYPE constant in the dotted versioned form; payload fields are
-                       identifiers and changed facts only (restated from doc 19 ß6.1).
+                       identifiers and changed facts only (restated from doc 19 ¬ß6.1).
 
                        RFC 9457 problem details; error codes are stable strings (relationship.overlap) and are
                        message-catalogue ids so the web renders them in the user's language.
@@ -333,7 +333,7 @@ Mapping
 17A - Build Skeleton Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 6
 5. Boundary enforcement in the build
 
-Rules R1≠R7 of doc 17 ß6.1 become tests that run on every commit. They are the only reason a modular
+Rules R1‚ÄìR7 of doc 17 ¬ß6.1 become tests that run on every commit. They are the only reason a modular
 monolith stays modular.
 
 // backend/app/src/test/java/lk/coopfed/knoweb/ArchitectureTests.java
@@ -410,7 +410,7 @@ class ArchitectureTests {
 
 Two further checks live in the pipeline rather than in Java: a schema-ownership script that parses each module's
 migrations and fails if a migration touches another module's schema, and an i18n check that fails the build when
-a message id lacks any of the three languages (restated from doc 19 ß5.2).
+a message id lacks any of the three languages (restated from doc 19 ¬ß5.2).
 
 6. Migration framework and database roles
 
@@ -484,7 +484,7 @@ Expand then contract  keys (R4). The pipeline script enforces it.
                       ahead (19A).
 
                       A migration never drops or renames a column in use; add, backfill, switch code, drop in a later release (doc 14
-                      ß1.3 rolling deployment).
+                      ¬ß1.3 rolling deployment).
 
 6.3 Row-level security policy template
 
@@ -554,13 +554,13 @@ Build                  stale.
                        handle the step-up challenge (HTTP 401 with step_up_required) by opening StepUpDialog and retrying.
 
                        Message ids, three JSON catalogues, ICU plurals; useT returns the string and a fallback flag so components
-                       can render the EN tag (restated from doc 30 ß2.1).
+                       can render the EN tag (restated from doc 30 ¬ß2.1).
 
                        Vitest for components and hooks; Playwright smoke test that logs in, sees the scope banner, opens the hello
                        screen in each language.
 
                        Vite; content-hashed assets; VITE_API_BASE; the shell reads the API's advertised version and prompts reload
-                       on mismatch (doc 31 ß7).
+                       on mismatch (doc 31 ¬ß7).
 
 8. Till shell scaffold
 
@@ -591,12 +591,12 @@ agent-test/            # tiny device-owner app used to validate provisioning and
 Aspect                 Design
 Stack
 Kiosk                  Kotlin 2, Jetpack Compose, Room with SQLCipher, WorkManager, Hilt; minSdk 30; the shared engine as a
-Database               Gradle dependency on :shared-engine (restated from doc 30 ß4.1, doc 14 ß2).
+Database               Gradle dependency on :shared-engine (restated from doc 30 ¬ß4.1, doc 14 ¬ß2).
 Fonts
 Hello screen           MainActivity requests lock-task mode; a debug flag disables it on developer devices; the device-owner
 Testing                configuration itself is the management agent's job (doc 31).
 
-                       Room entities generated from the same logical model as doc 18 parts C≠E; PRAGMA journal_mode=WAL;
+                       Room entities generated from the same logical model as doc 18 parts C‚ÄìE; PRAGMA journal_mode=WAL;
                        synchronous=FULL on issuance transactions; encryption key in the Android keystore.
 
                        Noto Sans, Noto Sans Sinhala, Noto Sans Tamil bundled; a ReceiptRenderer stub that draws a receipt to a
@@ -612,7 +612,7 @@ Testing                configuration itself is the management agent's job (doc 3
 
 17A - Build Skeleton Implementation Guide | v0.1 | Cooperative Retail and Distribution System              Page 9
 ADR-31: one library, no server dependencies, used by the backend and the till so a bill computes identically
-offline and online (restated from doc 17 ß3 P7). 17A creates the module with its public interfaces and stub
+offline and online (restated from doc 17 ¬ß3 P7). 17A creates the module with its public interfaces and stub
 implementations; M3 (23/23A) supplies the real price resolution and rule evaluation, the kernel (19A) the
 envelope and counter.
 
@@ -640,7 +640,7 @@ Versioning       No Spring, no Android, no I/O; persistence is injected as callb
 Consumption      source of truth for numeric behaviour.
 
                  The library version is stamped into every snapshot and every upload (engine_version in the envelope) so
-                 central can re-validate with the same version the till used (restated from doc 32 ß5.2).
+                 central can re-validate with the same version the till used (restated from doc 32 ¬ß5.2).
 
                  The backend depends on it as a project module; the till as a Maven artefact published by CI (same coordinates,
                  same version).
@@ -682,7 +682,7 @@ Two instances        Dev realm with three users in the three languages; the hell
                      templates arrive with 19A/21A seeds.
 Reset
                      make up-2 starts two backend containers behind a tiny nginx to catch instance-affinity bugs from day one
-                     (restated from doc 14 ß1.3).
+                     (restated from doc 14 ¬ß1.3).
 
                      make reset drops volumes; the fifteen-minute test of the cover is run against a fresh clone in CI nightly.
 
@@ -697,9 +697,9 @@ package              ArchitectureTests; schema-ownership script; i18n completene
 publish (main only)  format                                                                    floor (set per module in nA)
                                                                                                Login, scope, hello flow failures
                      Unit tests; integration tests with Testcontainers (PostgreSQL with RLS,
-                     RabbitMQ, MinIO, Keycloak); web Vitest; till JVM tests                    ≠
+                     RabbitMQ, MinIO, Keycloak); web Vitest; till JVM tests                    ‚Äì
 
-                     Playwright smoke against the composed stack with two backend              ≠
+                     Playwright smoke against the composed stack with two backend              ‚Äì
                      instances; Android emulator smoke
 
                      Jib image (backend), static bundle (web), APK signed with the dev key,
@@ -714,7 +714,7 @@ Release signing with the Federation key, ring deployment and the update service 
 12. The hello module: the template every module copies
 
 A deliberately trivial module that exercises every kernel interface and every convention, so that copying it gives
-a module developer a working skeleton and the reviewers a reference for what "done like the others" means.
+a module developer a working skeleton and the reviewers a reference for what ‚Äúdone like the others‚Äù means.
 
 lk.coopfed.knoweb.hello/
 
@@ -818,7 +818,7 @@ S0-05                                                                           
          Flyway per-module configuration, baseline migration, roles, collations, RLS 1
 S0-06    helpers                                                                                Client generated; stale check works
 
-S0-07    ArchitectureTests and pipeline scripts (schema ownership, i18n           1             Login  banner  hello page in three
+S0-07    ArchitectureTests and pipeline scripts (schema ownership, i18n           1             Login ‚Üí banner ‚Üí hello page in three
                                                                                                 languages
 S0-08    completeness)                                                                          APK builds; hello screen on emulator;
                                                                                                 JVM tests
@@ -846,7 +846,7 @@ S0-13                                                                           
 
          make new-module scaffolder                                               0.5
 
-Total about 18.5 developer-days: nine working days for the platform pair, matching Sprint 0 weeks 1≠2. 19A's
+Total about 18.5 developer-days: nine working days for the platform pair, matching Sprint 0 weeks 1‚Äì2. 19A's
 tickets run in the same sprint from day 4, replacing stubs as they land.
 
 15. Open points taken as assumptions
@@ -866,10 +866,10 @@ vs one per module                     enforcement; extraction later is a package
 
 Web component base                    Headless primitives (Radix-class) styled by tokens
 
-Terminal model for the till emulator  Generic 8-inch 1280◊800 profile until doc 14 DR-3 closes
+Terminal model for the till emulator  Generic 8-inch 1280√ó800 profile until doc 14 DR-3 closes
 profile
 
-End of document. 17A v0.1; superseded in detail by the repository itself once Sprint 0 completes ≠ the README and the hello
+End of document. 17A v0.1; superseded in detail by the repository itself once Sprint 0 completes ‚Äì the README and the hello
 module are then the living version of this guide.
 
 17A - Build Skeleton Implementation Guide | v0.1 | Cooperative Retail and Distribution System            Page 13

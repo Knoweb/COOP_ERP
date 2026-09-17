@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-27A � M7 Customers & Payment Recording:
+27A – M7 Customers & Payment Recording:
 Implementation Guide
 
 Everything the M7 developer needs: the customers schema as DDL, seed data, package
@@ -10,13 +10,13 @@ the customer snapshot, the till contracts for account tender and repayment, scre
 tests and tickets. Self-contained; restated material is marked.
 
 Field             Value
-Document          27A � implementation guide for 27 M7 Customers & Payment Recording v0.1
-Version           v0.1 � for the M7 developer; section 7.3 is the contract with the till track
+Document          27A – implementation guide for 27 M7 Customers & Payment Recording v0.1
+Version           v0.1 – for the M7 developer; section 7.3 is the contract with the till track
 Date              9 September 2026
-Prerequisite      Sprint 0; M1 contract (responsible officer, locations); M6 receipt bundle shape (26A �3, tenders); kernel document
+Prerequisite      Sprint 0; M1 contract (responsible officer, locations); M6 receipt bundle shape (26A §3, tenders); kernel document
                   base, A4 renderer, notifications
 Estimated effort  About 17 developer-days for one full-stack developer
-Restated content  Marked restated from doc X �Y.
+Restated content  Marked restated from doc X §Y.
 
 Read this first. Two things must be right from the first commit: personal data never leaks into events, logs or
 snapshots beyond what the till needs to serve the customer (name, phone, balance, limit), and the posting ledger is
@@ -26,7 +26,7 @@ phone number or a NIC fails the build.
 27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
 1. What you are building
 
-Restated from doc 27 �1. The registered customer, the credit account per MPCS, append-only postings from till
+Restated from doc 27 §1. The registered customer, the credit account per MPCS, append-only postings from till
 tenders and repayments, customer payment receipts with oldest-first allocation, statements, the banking record,
 and the privacy workflows.
 
@@ -36,7 +36,7 @@ Schema customers: customer, customer_phone, customer_consent,              scree
 customer_account, account_posting, allocation, doc_customer_payment
 (extension), data_subject_request, banking_record                          Inter-entity payment receipts (M4)
 
-18 commands, 8 queries, 8 event families; 2 consumers; 2 jobs; the         �
+18 commands, 8 queries, 8 event families; 2 consumers; 2 jobs; the         –
 customer snapshot contributor; the CPR bundle hook
 
 Nine web screens; the till-side specifications for lookup, account tender
@@ -45,27 +45,27 @@ and repayment
 2. What you inherit
 
 From                   You use                                                      How
-19A �7 document        DocumentService.issue for CPR and adjustment                 Payments and reversals
+19A §7 document        DocumentService.issue for CPR and adjustment                 Payments and reversals
 base                   documents; DocumentLinks (REVERSES)
-19A �8 sync            Bundle ingestion hook for CPR; SnapshotContributor;          Section 7
+19A §8 sync            Bundle ingestion hook for CPR; SnapshotContributor;          Section 7
                        change log (urgent on suspend)
-19A �6 i18n,           Statement rendering in the customer's language               Statements
+19A §6 i18n,           Statement rendering in the customer's language               Statements
 A4Renderer
-19A �10 notifications  SMS summary via M9's rules on customer_statement.issued.v1   Statements
-19A �3 permissions     Sod.assertDistinct for adjustments; MFA flags                Adjustments, limits
+19A §10 notifications  SMS summary via M9's rules on customer_statement.issued.v1   Statements
+19A §3 permissions     Sod.assertDistinct for adjustments; MFA flags                Adjustments, limits
 M1 query               Responsible officer per entity; MPCS scope; locations of an  Privacy requests; snapshot
                        MPCS (snapshot fan-out)
 M6 bundle              receipt.issued/refunded.v1 with doc_receipt_tender rows      Consumer (Section 6.2)
                        (kind ACCOUNT, customer_account_id, offline flag)
 Shared engine                                                                       Never re-implement rounding
-17A �7 web shell       Money                                                        Section 8
+17A §7 web shell       Money                                                        Section 8
                        DocumentHeader, ApprovalBar, ReasonCapture, StepUpDialog,
                        Timeline
 
 27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                Page 2
 3. Schema
 
-Restated from doc 27 �3 (CR-27-1). Location db/migration/m7customers/.
+Restated from doc 27 §3 (CR-27-1). Location db/migration/m7customers/.
 
 -- V0001__customers.sql (RLS per 17A 6.3; note the identity-vs-account visibility split in 3.1)
 
@@ -313,9 +313,9 @@ depositDate, shortfallReason?} /{id}/reconcile post
 
 # example - lookup response (till-safe shape; no NIC)
 
-{ "customerId": "...", "displayName": "K. Perera", "language": "si", "phone": "07xxxxxxxx",
+{ "customerId": "…", "displayName": "K. Perera", "language": "si", "phone": "07xxxxxxxx",
 
-"account": { "accountId": "...", "mpcsId": "...", "creditLimit": 15000.00, "balance": 6200.00, "available":
+"account": { "accountId": "…", "mpcsId": "…", "creditLimit": 15000.00, "balance": 6200.00, "available":
 
          8800.00, "offlineCap": 5000.00,
 
@@ -334,7 +334,7 @@ ChangePhone            customer ACTIVE; new phone valid; reuse                 c
                        detection; reason
                                                                                new primary                          nged.v1
 
-DeactivateCustomer     no OPEN account with balance  0                         INACTIVE                             customer.deactivated
+DeactivateCustomer     no OPEN account with balance ≠ 0                        INACTIVE                             customer.deactivated
                                                                                                                     .v1
 
 UpdateAttributes /     owner MPCS; attributes size                             rows                                 customer.updated.v1
@@ -356,7 +356,7 @@ PostCharge / PostCredit from receipt tender lines (6.2)                        p
 (internal)                                                                     flag                                 ited.v1
 
 RecordCustomerPayme    account OPEN or SUSPENDED; amount > 0;                  CPR document; PAYMENT posting;       customer_payment.r
-nt                     specific allocations  open charges; issuance            Allocator (6.3); balance recache     ecorded.v1
+nt                     specific allocations ≤ open charges; issuance           Allocator (6.3); balance recache     ecorded.v1
                        (till-position series at a till via the bundle, ENTITY
                        series in the office)
 
@@ -364,7 +364,7 @@ ReverseCustomerPaym RECORDED; MFA; reason                                      R
 ent
                                                                                posting; allocations reversed        eversed.v1
 
-PostAdjustment /       reason; SoD request  approve; MFA                       adjustment document;                 account.adjusted.v1
+PostAdjustment /       reason; SoD request ≠ approve; MFA                      adjustment document;                 account.adjusted.v1
 ApproveAdjustment                                                              ADJUSTMENT posting on approval
 
 IssueCustomerStatemen period; channel per consent                              render; store key; notification via  customer_statement.i
@@ -465,14 +465,14 @@ LookupCustomer
                              By E.164 phone (current primary) or by name trigram within the MPCS's customers; returns the till-safe shape of
 AgeingCalculator             Section 5; audited when called from accounts screens (not from the sales path).
 
-StatementJob (per            For each open charge: bucket by today - business_date (0�30, 31�60, 61�90, 90+) on the unallocated
+StatementJob (per            For each open charge: bucket by today − business_date (0–30, 31–60, 61–90, 90+) on the unallocated
 frequency)                   amount.
 SessionConsumer
-BankingShortfallJob          Accounts with movement in the period  StatementBuilder  A4Renderer in the customer's language 
+BankingShortfallJob          Accounts with movement in the period → StatementBuilder → A4Renderer in the customer's language →
 (daily)                      customer_statement.issued.v1 (M9 sends the SMS summary where consented).
 
-                             till_session.closed.v1  expected banking per session cached for UnbankedSessions.
-                             Sessions closed more than 3 days ago and unbanked  REVIEW to the MPCS accounts role.
+                             till_session.closed.v1 → expected banking per session cached for UnbankedSessions.
+                             Sessions closed more than 3 days ago and unbanked → REVIEW to the MPCS accounts role.
 
 7.3 Snapshot contributor and till contract
 
@@ -540,13 +540,13 @@ Khata index (lookup)                                                            
 Customer card             search by phone/name, ItemCard-style customer customer.*
 Khata page                rows; till version from the snapshot                                Registration online only; the till opens
 Charge to account (till)                                                                      this in web mode
-Repayment                 form (minimal fields), consents, phone history with customer.*      �
+Repayment                 form (minimal fields), consents, phone history with customer.*      –
 Statement                 reuse confirmation step, tags, attributes
 Bank slip / cash book                                                                         M6 renders
                           as sketched; ApprovalBar; StepUpDialog on limit account.*
                           increase; Timeline of postings                                      Reversal on the web with StepUp
 
-                          tender path in M6's sales screen: cap and limit  tender.*           �
+                          tender path in M6's sales screen: cap and limit  tender.*           –
                           messages from the rules in 7.3                                      Handover then deposit
 
                           amount, method, reference; provisional balance; payment.*
@@ -576,8 +576,8 @@ Privacy (CI gate)
 Property-based          snapshot rows contain no nic_* or attributes; logs contain no phone values; access
                         export contains every field the customer's rows hold
 Contract
-State machine           Balance =  postings under random sequences incl. reversals;  allocations per           1000 cases each
-Consumers               charge  charge; unallocated payment amount consistent; ageing sums to open
+State machine           Balance = Σ postings under random sequences incl. reversals; Σ allocations per         1000 cases each
+Consumers               charge ≤ charge; unallocated payment amount consistent; ageing sums to open
                         balance
 Scenario
 Performance             Every operation; lookup shape is till-safe; RLS: identity readable by an               Every operation
@@ -585,19 +585,19 @@ Web                     account-holding MPCS, balances OWN only
 
                         Customer, account, payment, DSAR, banking                                              All transitions
 
-                        ACCOUNT tender  CHARGE; refund  CREDIT; offline breach  REVIEW;                        Six cases
+                        ACCOUNT tender → CHARGE; refund → CREDIT; offline breach → REVIEW;                     Six cases
 
-                        hard-block bypassed offline  ALERT; CPR bundle  PAYMENT with allocations;
+                        hard-block bypassed offline → ALERT; CPR bundle → PAYMENT with allocations;
 
-                        CLOSED account  REVIEW
+                        CLOSED account → REVIEW
 
-                        Flows 6.1�6.7 of doc 27 incl. the till simulator for offline tender and repayment      Seven flows
+                        Flows 6.1–6.7 of doc 27 incl. the till simulator for offline tender and repayment      Seven flows
 
                         Lookup under 50 ms on 500,000 customers; statements for 100,000 accounts               Two targets
                         under 30 min
 
-                        Playwright: register with reuse confirmation  open account with step-up  record Two flows
-                        payment  statement; access request export
+                        Playwright: register with reuse confirmation → open account with step-up → record Two flows
+                        payment → statement; access request export
 
 10. Tickets in build order
 
@@ -641,10 +641,10 @@ Total about 20 developer-days.
 11. Open points: what to assume, whom to ask
 
 Point                                        Assume                                      Decider               If different
-                                             As proposed in doc 27 �11                   Federation accounts;  Config values; Allocator
+                                             As proposed in doc 27 §11                   Federation accounts;  Config values; Allocator
 Allocation mode, offline repayment                                                       Federation legal      default; H-02 set
 capture, limit policy, erasure wording, NIC  Adopted; CR-27-1, CR-27-2 raised
-capture, banking handover (doc 27 DR-1                                                   Architecture review   �
+capture, banking handover (doc 27 DR-1                                                   Architecture review   –
 to DR-5, DR-7)
 
 CPR as an M7 document; payer_kind

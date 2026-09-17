@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-20 ­ Stage 2 Module Design Plan and Blueprints
+20 â€“ Stage 2 Module Design Plan and Blueprints
 
 How the nine application modules will be designed, in what order, to what template and
 against which review gates; with a blueprint for each module stating what it owns, what it
@@ -8,23 +8,23 @@ exposes, the decisions already taken for it, and what it deliberately does not d
 
 Field     Value
 Document
-Version   20 ­ Stage 2 Module Design Plan and Blueprints (design plan plus module-level blueprints; the detailed
-Date      per-module designs are docs 21­29)
+Version   20 â€“ Stage 2 Module Design Plan and Blueprints (design plan plus module-level blueprints; the detailed
+Date      per-module designs are docs 21â€“29)
 Status
-Inputs    v0.3 ­ draft for design review (adds M10 Procurement boundary; adds the implementation-guide layer
-          17A/19A/21A­29A and Sprint 0; re-plans the schedule; closes DR-1)
+Inputs    v0.3 â€“ draft for design review (adds M10 Procurement boundary; adds the implementation-guide layer
+          17A/19A/21Aâ€“29A and Sprint 0; re-plans the schedule; closes DR-1)
 Audience
           8 September 2026
 
           Draft. Assumes doc 17 (Solution Architecture) module ownership as summarised in Section 2; doc 14 (Technical
           Foundations) and the sync contract are Stage 1 leftovers scheduled in the first two weeks of Stage 2.
 
-          01­13 baseline v0.2 with the September change requests; 16 Questionnaire Answers; 18 Core Data Model; 19
+          01â€“13 baseline v0.2 with the September change requests; 16 Questionnaire Answers; 18 Core Data Model; 19
           Cross-Cutting Services; the September 2026 review decisions and the multi-MRP study; external reference: ARTS
           Operational Data Model and UnifiedPOS (NRF/OMG), GS1 general specifications, IAS 2, PDPA No. 9 of 2022,
           industry offline-first practice (Section 3).
 
-          Engineering leads, module designers, the federation technical reviewer. Sections 1­4 and 14 for programme
+          Engineering leads, module designers, the federation technical reviewer. Sections 1â€“4 and 14 for programme
           readers.
 
 Design stance: enterprise-grade, not enterprise-complicated. The system must carry 10,000 shops, 3 million
@@ -38,8 +38,8 @@ considered and deliberately left out. A module design that adds one of them back
 
 Aspect                   Design
 Output
-                         For each module, a pair: the design document (docs 21­29, template in Section 5) and its implementation guide
-Definition of done (per  (21A­29A, outline in Section 5.1), handed to the module developer together. Sprint 0 delivers the two kernel guides
+                         For each module, a pair: the design document (docs 21â€“29, template in Section 5) and its implementation guide
+Definition of done (per  (21Aâ€“29A, outline in Section 5.1), handed to the module developer together. Sprint 0 delivers the two kernel guides
 module)                  (17A Build Skeleton, 19A Kernel Services) that every module guide inherits. Plus change requests against docs 18
                          and 19 where module work reveals a data-model or service gap.
 Cadence
@@ -86,7 +86,7 @@ M4 Trading Documents             Order-to-settlement between entities; ownership
 M5 Inventory, Costing, Repack &  Where stock is, what it cost, how it moved, how it was lost                 M1, M2, M4
           Loss
 
-M6 POS & Offline                 The till: sell, receive, count, print, survive two days offline, sync       M1­M5
+M6 POS & Offline                 The till: sell, receive, count, print, survive two days offline, sync       M1â€“M5
                                  Registered customers, khata credit, tenders and payment receipts            M1, M4, M6
 M7 Customers & Payment
           Recording
@@ -101,24 +101,24 @@ M10 Procurement (phase 2)
 
    2.1 Boundary rules (the modular monolith contract)
 
-   · A module owns its tables (doc 18 assigns them) in its own schema namespace; no other module reads or
+   â€¢ A module owns its tables (doc 18 assigns them) in its own schema namespace; no other module reads or
       writes those tables directly. Cross-module access is by in-process query interface (synchronous, read-only)
       or command interface (synchronous, transactional, permission-checked), or by reacting to domain events
       (asynchronous, via the outbox of doc 19).
 
-   · One database, one transaction: a command that spans modules runs in one transaction because it is one
+   â€¢ One database, one transaction: a command that spans modules runs in one transaction because it is one
       process against one database. No sagas, no compensation logic across modules in phase 1; compensation
 
    20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System                      Page 2
    exists only for documents, as the typed links of doc 18.
-· Events are notifications of committed facts, not the source of truth. Module state lives in tables; the outbox
+â€¢ Events are notifications of committed facts, not the source of truth. Module state lives in tables; the outbox
 
    lets other modules and tills react. No module is event-sourced.
-· Each module publishes a contract file (commands, queries, events with versions). A dependent module
+â€¢ Each module publishes a contract file (commands, queries, events with versions). A dependent module
 
    designs against the contract, never against the tables. Contracts are the artefact that lets modules be
    designed in parallel.
-· Module boundaries are also team boundaries for design ownership, but not deployment boundaries: one
+â€¢ Module boundaries are also team boundaries for design ownership, but not deployment boundaries: one
    deployable, per doc 17, until measured load says otherwise.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 3
@@ -129,7 +129,7 @@ deliberately not where they would import complexity the federation does not need
 
 Reference                 What it is                                              How it is used here
 
-ARTS Operational Data     The retail industry's reference relational model for    Vocabulary cross-check for M2­M7 (item, price
+ARTS Operational Data     The retail industry's reference relational model for    Vocabulary cross-check for M2â€“M7 (item, price
 Model (NRF, now OMG)      transaction data, normalised for day-to-day retail      derivation rule, retail transaction, tender, business
                           operations, maintained since 1994 (source: OMG retail   unit). Not adopted as a schema: doc 18 is smaller and
                           standards pages).                                       carries the federation's legal-entity split, which ARTS
@@ -142,7 +142,7 @@ UnifiedPOS (ARTS)         The platform-neutral specification for connecting POS 
 
 Offline-first practice    Current industry guidance (offline-first architecture   Confirms doc 19's outbox and sequencing design and
                           guides and commercial offline POS products,             doc 18's draft-then-issue protocol. The federation
-                          2025­2026) converges on: business record and outbox     removes the hard problem entirely by the one-writer
+                          2025â€“2026) converges on: business record and outbox     removes the hard problem entirely by the one-writer
                           entry committed in one local transaction; an            rule (ADR-10): histories never diverge because no
                           idempotency key on every mutation; a server-issued      record has two writers.
                           monotonic cursor for pulls rather than timestamps; and
@@ -153,7 +153,7 @@ Offline-first practice    Current industry guidance (offline-first architecture 
 
 GS1 General Specifications Barcode syntaxes, application identifiers, in-store    M2 barcode model and M6 scan layer (parse element
                                                                                   strings and Digital Link; AI 01/10/17; dual marking).
-and the 2D migration      20­29 prefixes, 2D readiness by 2027.
+and the 2D migration      20â€“29 prefixes, 2D readiness by 2027.
 
 IAS 2 Inventories         Weighted-average cost as an accepted cost formula;      M5 costing: per-entity moving weighted average
                           net realisable value.                                   across lots, NRV markdowns recorded as markdown
@@ -210,14 +210,14 @@ GraphQL, API gateway product       a product to operate                         
 Plugin or extension framework for      Autonomy is served by configuration (roles, rules, price Configuration register (doc 07) as data
 entities                               lists), not by code hooks
 
-Shelf/back-store sub-locations,        Out of scope by answer (E-02, B-05, D-10, E-10)  ­
+Shelf/back-store sub-locations,        Out of scope by answer (E-02, B-05, D-10, E-10)  â€“
 serialisation, returnable containers,
 cold-chain telemetry
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System      Page 5
 5. Module design document template
 
-Every module design (docs 21­29) follows this outline so that reviewers compare like with like and dependent
+Every module design (docs 21â€“29) follows this outline so that reviewers compare like with like and dependent
 designers find the contract in the same place.
 
 Section                   Content                                                             Reviewer checks
@@ -256,8 +256,8 @@ design                    including the failure paths
 
 5.1 Implementation guide outline (docs nA)
 
-The guide is self-contained: everything the developer needs from docs 14, 17­19, 30 and 32 is restated inline
-and marked restated from doc X §Y, so one document is read and provenance survives when a source
+The guide is self-contained: everything the developer needs from docs 14, 17â€“19, 30 and 32 is restated inline
+and marked restated from doc X Â§Y, so one document is read and provenance survives when a source
 changes. DDL, seed data and the OpenAPI slice are committed to the repository; the guide is their reviewed
 specification, never a second copy maintained by hand.
 
@@ -281,30 +281,30 @@ Dependency order fixes the start order, not a single file: once a module's contr
 can begin. Three tracks run in parallel with the two Stage 1 leftovers front-loaded.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System                            Page 6
-Week (2026)    Track A ­ back office core       Track B ­ edge and kernel         Track C ­ commercial and  Gates and inputs
-1 8­11 Sep                                                                        outward
-2 14­18 Sep    21 M1 design (done); 21A         Sprint 0: 17A Build Skeleton,     ­                         Hosting comparison
+Week (2026)    Track A â€“ back office core       Track B â€“ edge and kernel         Track C â€“ commercial and  Gates and inputs
+1 8â€“11 Sep                                                                        outward
+2 14â€“18 Sep    21 M1 design (done); 21A         Sprint 0: 17A Build Skeleton,     â€“                         Hosting comparison
                begins once 19A conventions      19A Kernel Services; doc 19                                 due; tax advisor
-               exist                            v0.2 and doc 18 v0.2 (done)       ­                         questions sent
+               exist                            v0.2 and doc 18 v0.2 (done)       â€“                         questions sent
                21A M1 guide; M1 contract        Sprint 0 continues; till spike 1
                freeze                           (local DB, counter, power loss)                             Gate: 17A/19A
                                                                                                             reviewed; M1
-3 21­25 Sep 22 M2 design and 22A                Sync contract conformance         27 M7 design begins       contract frozen;
+3 21â€“25 Sep 22 M2 design and 22A                Sync contract conformance         27 M7 design begins       contract frozen;
                                                 suite; spike 2 (Sinhala/Tamil                               pace of
                                                 thermal print); 26 M6 design                                design+guide
-                                                begins against M1­M3 contracts                              measured
+                                                begins against M1â€“M3 contracts                              measured
 
-4 28 Sep­2 Oct 23 M3 design and 23A             26 continues; spike 3 (2D scan); 27A; 28 M8 design begins   Gate: M2 contract
+4 28 Sepâ€“2 Oct 23 M3 design and 23A             26 continues; spike 3 (2D scan); 27A; 28 M8 design begins   Gate: M2 contract
                                                 cashier usability round 1                                   frozen; report
                                                                                                             catalogue workshop
-5 5­9 Oct      24 M4 design and 24A             26 review; 26A begins; spike 4    28A; 29 M9 design begins  target
+5 5â€“9 Oct      24 M4 design and 24A             26 review; 26A begins; spike 4    28A; 29 M9 design begins  target
                                                 (sync load at envelope)
                                                                                                             Gate: M3 contract
-6 12­16 Oct    25 M5 design and 25A             26A continues; usability round 2 29A                        frozen; tax advisor
+6 12â€“16 Oct    25 M5 design and 25A             26A continues; usability round 2 29A                        frozen; tax advisor
                                                                                                             answers expected
-7 19­23 Oct    Cross-module reconciliation; 33  26A review                        M7­M9 reviews
-               API bundle assembled from the    Spike findings closed as ADRs     ­                         Gate: M4 contract
-8­9 26 Oct­6   slices; CRs to 18/19                                                                         frozen; 24B
+7 19â€“23 Oct    Cross-module reconciliation; 33  26A review                        M7â€“M9 reviews
+               API bundle assembled from the    Spike findings closed as ADRs     â€“                         Gate: M4 contract
+8â€“9 26 Octâ€“6   slices; CRs to 18/19                                                                         frozen; 24B
 Nov (reserve)                                                                                               numbering
                Rework from advisor answers                                                                  addendum if
                and spikes; 24B                                                                              answered
@@ -328,9 +328,9 @@ prototype finding that changes a contract is raised the same day, because a depe
 on it.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System    Page 7
-7. M1 ­ Party, Tenancy & Security
+7. M1 â€“ Party, Tenancy & Security
 
-Design document: 21 ­ Party, Tenancy and Security Design. Estimated design effort: 6 design-days.
+Design document: 21 â€“ Party, Tenancy and Security Design. Estimated design effort: 6 design-days.
 
 Everything scopes on this module: who the legal parties are, which locations they own, which devices sit where,
 and who may do what. It is small, stable and must be right first, because every other module's row ownership
@@ -338,9 +338,9 @@ and permission checks are its consumers.
 
     7.1 Ownership                                              Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                           FR-PTY-010­070 (parties, relationships, locations, positions);
-                                                               FR-SEC-010­040, 060, 070 (RBAC, authentication, sessions, segregation);
-entity, entity_relationship, location, till_position, device,  FR-GOV-010­060 (visibility, self-administration, regulator access); NFR
+Owned aggregates and tables (doc 18)                           FR-PTY-010â€“070 (parties, relationships, locations, positions);
+                                                               FR-SEC-010â€“040, 060, 070 (RBAC, authentication, sessions, segregation);
+entity, entity_relationship, location, till_position, device,  FR-GOV-010â€“060 (visibility, self-administration, regulator access); NFR
 app_user, role, permission, role_permission, user_role; the    security set; ADR-18, ADR-26
 RLS policy classes; the permission catalogue and role
 templates
@@ -349,7 +349,7 @@ templates
 
 Commands accepted                           Queries served                             Events published
 
-RegisterEntity, OpenTradingRelationship,    ResolveScope(user)  entity/location        entity.registered/updated.v1,
+RegisterEntity, OpenTradingRelationship,    ResolveScope(user) â†’ entity/location       entity.registered/updated.v1,
 AmendRelationshipTerms, RegisterLocation,   scopes and policy class;                   relationship.opened/amended.v1,
 SetPrimaryTill, RegisterTillPosition,       ResolvePermissions(user, rv);              location.registered/updated.v1,
 RetireTillPosition, EnrolDevice,            LookupRelationship(seller, buyer, date);   till_position.registered/retired.v1,
@@ -376,24 +376,24 @@ super-user
 
 7.4 Deliberately not built
 
-· No organisational hierarchy beyond entity  location; no departments, cost centres or regions as entities
+â€¢ No organisational hierarchy beyond entity â†’ location; no departments, cost centres or regions as entities
    (district is an attribute).
 
-· No self-service password reset in phase 1 (entity administrator resets; SMS reset is phase 2).
-· No single sign-on with external providers.
+â€¢ No self-service password reset in phase 1 (entity administrator resets; SMS reset is phase 2).
+â€¢ No single sign-on with external providers.
 
 7.5 Risks, prototypes and review focus
 
-· Review focus: the RLS policy classes must be exercised by a test matrix of principal × table × operation
+â€¢ Review focus: the RLS policy classes must be exercised by a test matrix of principal Ã— table Ã— operation
    before any other module depends on them.
 
-· Risk: the 876-entity onboarding sequence is an operational process, not a design problem; the module must
+â€¢ Risk: the 876-entity onboarding sequence is an operational process, not a design problem; the module must
    expose bulk registration for the onboarding playbook (S-07) without a special code path.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 8
-8. M2 ­ Catalogue & Batch
+8. M2 â€“ Catalogue & Batch
 
-Design document: 22 ­ Catalogue and Batch Design. Estimated design effort: 6 design-days.
+Design document: 22 â€“ Catalogue and Batch Design. Estimated design effort: 6 design-days.
 
 The shared product truth: SKU definition in one global namespace with local and shared status, units and pack
 conversions, barcodes many-to-one with optional batch resolution, tags as the grouping vocabulary, tax
@@ -401,7 +401,7 @@ categories, and physical batches carrying expiry and printed MRP. It is the modu
 
     8.1 Ownership                                        Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                     FR-SKU-010­110 (definition, status, local creation, promotion with alias,
+Owned aggregates and tables (doc 18)                     FR-SKU-010â€“110 (definition, status, local creation, promotion with alias,
 uom, sku, sku_uom_conversion, sku_barcode, sku_alias,    barcodes, UOM, trilingual names, tags, tax category); B-01 to B-17 answers;
 sku_image, tag, sku_tag, tax_category, tax_rate, batch   ADR-07, ADR-08; FR-LOC-020 (trilingual master data); T-03 mitigations
 
@@ -410,7 +410,7 @@ sku_image, tag, sku_tag, tax_category, tax_rate, batch   ADR-07, ADR-08; FR-LOC-
 Commands accepted                             Queries served                                Events published
 
 CreateSku (draft), ActivateLocalSku,          LookupByBarcode(barcode, symbology,           sku.created/activated/shared/promoted/deactivat
-SubmitForSharing, PromoteToShared (with       location)  sku, uom, optional batch;          ed.v1, barcode.registered/retired.v1,
+SubmitForSharing, PromoteToShared (with       location) â†’ sku, uom, optional batch;         ed.v1, barcode.registered/retired.v1,
 alias), DeactivateSku, DefineConversion,      SearchSku(text, language, scope);             conversion.defined.v1,
 RegisterBarcode, RetireBarcode,               GetCatalogueSnapshot(location,                batch.registered/corrected.v1, tag.defined.v1,
 RegisterBatch (from GRN or repack),           since_version) for tills (includes thumbnail  tax_rate.published.v1
@@ -432,7 +432,7 @@ anchor
 Local SKUs live in the same namespace with    No separate ranges (B-09); visibility by owner and RLS; promotion keeps history via alias
 status LOCAL and an owner                     (B-10).
 
-Barcode  batch is optional and owner-scoped The hook that makes barcode-resolved MRP work (multi-MRP study, option B and C)
+Barcode â†’ batch is optional and owner-scoped The hook that makes barcode-resolved MRP work (multi-MRP study, option B and C)
                                                                   without touching factory barcodes.
 
 Batch is global; cost is on the lot           One physical batch, many successive owners at different costs (doc 18 DR-4).
@@ -451,28 +451,28 @@ cache thumbnails only                         coincide with a barcode change. Th
 
 8.4 Deliberately not built
 
-· No product attributes beyond name, description, units, tax and flags in phase 1 (no colour/size matrices, no
+â€¢ No product attributes beyond name, description, units, tax and flags in phase 1 (no colour/size matrices, no
    variant families); a bounded entity-owned attributes jsonb on sku is the escape hatch (Appendix A).
 
-· No supplier catalogue linkage in phase 1 (supplier master arrives with M9/procurement in phase 2;
+â€¢ No supplier catalogue linkage in phase 1 (supplier master arrives with M9/procurement in phase 2;
    batch.supplier_id references a minimal supplier table owned here until then).
 
-· No full-size images on the till, no images on receipts or customer displays, no image-based recognition.
+â€¢ No full-size images on the till, no images on receipts or customer displays, no image-based recognition.
 
 8.5 Risks, prototypes and review focus
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System                    Page 9
-· Risk (programme, not design): the trusted catalogue assembly is the critical path (T-03). The module must
-   ship the steward's tooling ­ bulk import with validation report, duplicate detection across three scripts,
-   translation completeness dashboard ­ as first-class screens, not admin afterthoughts.
+â€¢ Risk (programme, not design): the trusted catalogue assembly is the critical path (T-03). The module must
+   ship the steward's tooling â€“ bulk import with validation report, duplicate detection across three scripts,
+   translation completeness dashboard â€“ as first-class screens, not admin afterthoughts.
 
-· Prototype input: the trigram-plus-ICU search behaviour on real Sinhala and Tamil product names (doc 19
+â€¢ Prototype input: the trigram-plus-ICU search behaviour on real Sinhala and Tamil product names (doc 19
    section 5.4 test set) must be validated before M6 relies on it.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 10
-9. M3 ­ Pricing & Rules
+9. M3 â€“ Pricing & Rules
 
-Design document: 23 ­ Pricing and Rules Design. Estimated design effort: 8 design-days.
+Design document: 23 â€“ Pricing and Rules Design. Estimated design effort: 8 design-days.
 
 Every price a buyer pays and every reduction a customer receives, expressed as data the till can evaluate
 offline. Trade price lists per relationship, one retail list per MPCS, Federation advisory prices, the rule engine
@@ -481,19 +481,19 @@ gazetted control price by date.
 
     9.1 Ownership                                               Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                            FR-PRC-010­130 (trade and retail lists, volume tiers, MRP enforcement,
+Owned aggregates and tables (doc 18)                            FR-PRC-010â€“130 (trade and retail lists, volume tiers, MRP enforcement,
 price_list, price_list_line, discount_rule, control_price; the  rules, markdowns, tax-inclusive pricing, rounding, per-customer preferential
 price resolution algorithm (doc 18 section 4.9)                 price P3); G-01 to G-10; F-07; ADR-14; the September 2026 multi-MRP
                                                                 decision and control-price finding
 
 9.2 Interfaces
 
-Commands accepted                                Queries served                           Events published
+Commands accepted                                Queries served                            Events published
 
-PublishTradePriceList(relationship, lines,       ResolvePrice(location, sku, uom, qty,    price_list.published.v1,
-effective_from), PublishRetailPriceList(entity,  batch?, date)  unit price, mrp_applied,  discount_rule.activated/retired.v1,
-lines), PublishAdvisoryPrices(federation),       control_price_applied, cap_reason;       control_price.entered/rescinded.v1 (all with
-AuthorRule, ActivateRule, RetireRule,            ApplyRules(basket)  benefits with rule   apply_from), mrp_policy.changed.v1
+PublishTradePriceList(relationship, lines,       ResolvePrice(location, sku, uom, qty,     price_list.published.v1,
+effective_from), PublishRetailPriceList(entity,  batch?, date) â†’ unit price, mrp_applied,  discount_rule.activated/retired.v1,
+lines), PublishAdvisoryPrices(federation),       control_price_applied, cap_reason;        control_price.entered/rescinded.v1 (all with
+AuthorRule, ActivateRule, RetireRule,            ApplyRules(basket) â†’ benefits with rule   apply_from), mrp_policy.changed.v1
 EnterControlPrice, RescindControlPrice,          ids; GetPricingSnapshot(location,
 SetMultiMrpPolicy(sku|tag)                       since_version);
                                                  CheckCeilingsForAuthoring(entity, sku,
@@ -530,29 +530,29 @@ rate in force; cash rounding at receipt level
 
 9.4 Deliberately not built
 
-· No scheduled future price lists in phase 1 (G-08 dropped); lists apply on propagation with apply_from at
+â€¢ No scheduled future price lists in phase 1 (G-08 dropped); lists apply on propagation with apply_from at
    business-date granularity.
 
-· No cross-entity promotion funding or settlement (G-06).
-· No member or loyalty pricing of any kind (K-01); per-customer preferential price is phase 3 (FR-PRC-110).
-· No price optimisation or elasticity modelling; price forecasting in procurement (phase 2) is a scenario tool,
+â€¢ No cross-entity promotion funding or settlement (G-06).
+â€¢ No member or loyalty pricing of any kind (K-01); per-customer preferential price is phase 3 (FR-PRC-110).
+â€¢ No price optimisation or elasticity modelling; price forecasting in procurement (phase 2) is a scenario tool,
 
    never an automated decision (L-02).
 
 9.5 Risks, prototypes and review focus
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 11
-· Review focus: the rule schema must be small enough to evaluate in a few milliseconds per basket on an
+â€¢ Review focus: the rule schema must be small enough to evaluate in a few milliseconds per basket on an
    ARM terminal and expressive enough for the doc 13 scenarios; a property-based test that no rule outcome
    can exceed a ceiling is mandatory.
 
-· Risk: gazette currency. The module must expose the control-price register with an operational owner (doc 18
+â€¢ Risk: gazette currency. The module must expose the control-price register with an operational owner (doc 18
    DR-8) and a staleness warning on tills.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 12
-10. M4 ­ Trading Documents
+10. M4 â€“ Trading Documents
 
-Design document: 24 ­ Trading Documents Design (order-to-settlement). Estimated design effort: 10
+Design document: 24 â€“ Trading Documents Design (order-to-settlement). Estimated design effort: 10
 design-days.
 
 The inter-entity flow: a buyer orders, the seller accepts and allocates, dispatches on a delivery note that may
@@ -563,10 +563,10 @@ numbering detail waits for the tax advisor and is added as an addendum.
 
     10.1 Ownership                                        Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                      FR-ORD-010­080 (requisition, suggestion input, approval, allocation FCFS
+Owned aggregates and tables (doc 18)                      FR-ORD-010â€“080 (requisition, suggestion input, approval, allocation FCFS
                                                           with override, partial fulfilment and backorder, lock window, indicative ETA);
-document types ORD, DN, GRN, INV, CN, DN2, PRC            FR-DEL-010­060 (delivery note, multi-drop, proof of delivery, actuals never
-(statement is a report); extension tables doc_order,      forced, auto-discrepancy, photos, offline GRN); FR-BIL-010­150 (invoice,
+document types ORD, DN, GRN, INV, CN, DN2, PRC            FR-DEL-010â€“060 (delivery note, multi-drop, proof of delivery, actuals never
+(statement is a report); extension tables doc_order,      forced, auto-discrepancy, photos, offline GRN); FR-BIL-010â€“150 (invoice,
 doc_delivery_drop, doc_grn, doc_discrepancy, doc_claim;   credit/debit notes, statements, matching to specific invoices, exposure
 document_link usage for DISPUTES, CREDITS, DEBITS,        warn-only, interest rule, e-invoice readiness); A-03 to A-13; C-01 to C-13;
 SETTLES                                                   D-01 to D-09; I-05 to I-07; ADR-01, ADR-03, ADR-12
@@ -616,31 +616,31 @@ timestamps are attributes, not a fleet module
 
 10.4 Deliberately not built
 
-· No vehicle routing, load planning or fleet management (D-01).
-· No automated interest posting (A-12: configurable default rule, manual application until accounting
+â€¢ No vehicle routing, load planning or fleet management (D-01).
+â€¢ No automated interest posting (A-12: configurable default rule, manual application until accounting
 
    integration).
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 13
-· No returnable container balances (D-10).
-· No cross-entity promotional settlement; no pre-reserved number ranges (rejected, ADR-11).
+â€¢ No returnable container balances (D-10).
+â€¢ No cross-entity promotional settlement; no pre-reserved number ranges (rejected, ADR-11).
 
 10.5 Risks, prototypes and review focus
 
-· Review focus: the six state machines (order, delivery note, GRN, discrepancy, claim, invoice/credit note)
+â€¢ Review focus: the six state machines (order, delivery note, GRN, discrepancy, claim, invoice/credit note)
    reconciled line by line with doc 03, with every transition's permission, reason rule and offline-issuability
    stated; the doc 13 scenarios 1 and 2 must pass on paper.
 
-· Gate: numbering addendum after the tax advisor; DR: whether invoice-on-dispatch is offered as a
+â€¢ Gate: numbering addendum after the tax advisor; DR: whether invoice-on-dispatch is offered as a
    relationship term in phase 1 or deferred.
 
-· Risk: the Federation-as-arbiter flow is a governance process; the module should give it a small, explicit
+â€¢ Risk: the Federation-as-arbiter flow is a governance process; the module should give it a small, explicit
    escalation state, not a workflow engine.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 14
-11. M5 ­ Inventory, Costing, Repack & Loss
+11. M5 â€“ Inventory, Costing, Repack & Loss
 
-Design document: 25 ­ Inventory, Costing, Repack and Loss Design. Estimated design effort: 8
+Design document: 25 â€“ Inventory, Costing, Repack and Loss Design. Estimated design effort: 8
 design-days.
 
 Where stock is and what it cost, by location and batch; the append-only movement ledger; weighted-average
@@ -649,9 +649,9 @@ value-threshold approvals; and the write-off lifecycle with its loss categories,
 
     11.1 Ownership                                           Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                         FR-INV-010­100 (balances, movements, weighted average, FEFO, counts,
+Owned aggregates and tables (doc 18)                         FR-INV-010â€“100 (balances, movements, weighted average, FEFO, counts,
                                                              cycle counting, adjustments with thresholds, negative stock with
-stock_lot, stock_movement, repack_recipe; document types     acknowledgement, ageing P2, reorder P2); FR-LOSS-010­060 (categories,
+stock_lot, stock_movement, repack_recipe; document types     acknowledgement, ageing P2, reorder P2); FR-LOSS-010â€“060 (categories,
 CNT, ADJ, WOF, RPK, XFR, OPB with extension tables;          ownership at loss, claims, approval by value, witness and photo, expiry alerts,
 expiry warning tasks; reorder suggestions (P2)               markdown separation); E-01 to E-11; F-01 to F-11; B-06; L-06 (P3); R-02
                                                              (opening balances)
@@ -695,7 +695,7 @@ Repack consumes one SKU and produces              ADR-07, B-06; variance measure
 another through a recipe with expected yield      plus re-execution while the output lot is untouched (doc 13 scenario 3).
 
 Write-off is the highest-fraud-risk lifecycle:    F-04, F-05, N-07; single-staff shops use the remote-witness rule (doc 18 DR-7).
-requester  approver, witness  requester,
+requester â‰  approver, witness â‰  requester,
 photos, value-based approval
 
 Negative stock permitted with explicit            E-09: blocking stops genuine sales whenever records are wrong.
@@ -703,25 +703,25 @@ acknowledgement and an exception event
 
 11.4 Deliberately not built
 
-· No shelf versus back-store locations (E-02); no bin or slot management in warehouses in phase 1.
-· No system-calculated reorder points or ageing reports until phase 2 (E-08, E-11); the movement ledger is
+â€¢ No shelf versus back-store locations (E-02); no bin or slot management in warehouses in phase 1.
+â€¢ No system-calculated reorder points or ageing reports until phase 2 (E-08, E-11); the movement ledger is
 
    designed so both are pure projections later.
-· No cold-chain telemetry (E-10); no disposal certificates (F-08).
+â€¢ No cold-chain telemetry (E-10); no disposal certificates (F-08).
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System                           Page 15
 11.5 Risks, prototypes and review focus
 
-· Review focus: the costing arithmetic must be worked through the doc 13 scenarios with exact rupee results; a
+â€¢ Review focus: the costing arithmetic must be worked through the doc 13 scenarios with exact rupee results; a
    property-based test that lot quantities equal movement sums under random interleavings including reversals.
 
-· Risk: opening balances at onboarding are the data-quality inflection point (R-02); the two-party signed
+â€¢ Risk: opening balances at onboarding are the data-quality inflection point (R-02); the two-party signed
    opening balance document must be designed as a first-class flow, not a migration script.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 16
-12. M6 ­ POS & Offline
+12. M6 â€“ POS & Offline
 
-Design document: 26 ­ POS and Offline Design (till application and sync). Estimated design effort: 15
+Design document: 26 â€“ POS and Offline Design (till application and sync). Estimated design effort: 15
 design-days.
 
 The largest module and the one users touch: sell, refund within session, park and resume, weigh and price, cap
@@ -733,9 +733,9 @@ Then sync: upload in sequence, download snapshots, never merge.
 
 Owned aggregates and tables (doc 18)                          Capabilities (SRS identifiers)
 
-document type RCT with extension doc_receipt_tender; till     FR-POS-010­110 (sale, receipt, void, refund rules, park/resume, weighed
+document type RCT with extension doc_receipt_tender; till     FR-POS-010â€“110 (sale, receipt, void, refund rules, park/resume, weighed
 local database (same logical model as doc 18 for what it      items, negative-stock acknowledgement, offline set, cashier attribution, PIN,
-writes; read-only caches for what it receives); sync outbox   idle lock, shop-management mode); FR-PAY-010, 030­050 (tender recording,
+writes; read-only caches for what it receives); sync outbox   idle lock, shop-management mode); FR-PAY-010, 030â€“050 (tender recording,
 and inbox; peripheral abstraction; receipt renderer; message  cash management: float, drops, blind close, variance); H-01 to H-13; I-01,
 catalogue on device                                           I-03; N-03, N-09; O-02 (Z-report, day sales, till session offline); P-05; Q-07;
                                                               ADR-10, ADR-19, ADR-24; the multi-MRP resolution policy
@@ -765,7 +765,7 @@ commands); doc 19 event envelope; the sync contract.
 
 Decision                                       Rationale
 
-Full local database, same logical model, one   H-01 (1­2 days offline); ADR-10. The till writes documents, lines, state rows, movements
+Full local database, same logical model, one   H-01 (1â€“2 days offline); ADR-10. The till writes documents, lines, state rows, movements
 writer                                         and audit; central pushes read-only caches. No merge code exists.
 
 Draft-then-issue with the counter in the same  Doc 18 section 5.5; industry practice (Section 3). Power loss between steps leaves both or
@@ -803,31 +803,31 @@ picker, GRN and count lines
 
 12.4 Deliberately not built
 
-· No card processing, no payment gateway, no wallet integration (ADR-19).
-· No customer-facing self-checkout, home delivery or online ordering (H-14).
-· No till-to-till communication; no shop server; each till syncs to central independently (the primary till is only a
+â€¢ No card processing, no payment gateway, no wallet integration (ADR-19).
+â€¢ No customer-facing self-checkout, home delivery or online ordering (H-14).
+â€¢ No till-to-till communication; no shop server; each till syncs to central independently (the primary till is only a
 
    counter holder).
-· No per-transaction language switch; no cashier discretionary discount of any kind.
+â€¢ No per-transaction language switch; no cashier discretionary discount of any kind.
 
 12.5 Risks, prototypes and review focus
 
-· Prototypes feeding this design (Stage 3): local database and counter under power loss; Sinhala/Tamil raster
+â€¢ Prototypes feeding this design (Stage 3): local database and counter under power loss; Sinhala/Tamil raster
    printing; 2D scanning; sync at the 15,000-till envelope; two rounds of cashier usability with paper-mirroring
    screens (T-04).
 
-· Review focus: the offline permission set and the blocked-offline list must be exactly the doc 19
+â€¢ Review focus: the offline permission set and the blocked-offline list must be exactly the doc 19
    offline_allowed flags; the sync contract's sequence and acknowledgement semantics must be proven under
    simulated loss, duplicate and reorder of batches.
 
-· Risk: ARM/Android terminal selection is a hardware decision with software consequences (scanner SDK,
+â€¢ Risk: ARM/Android terminal selection is a hardware decision with software consequences (scanner SDK,
    printer driver, secure storage for PIN hashes and device credential); doc 14 must settle the platform before
    week 3.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 18
-13. M7 ­ Customers & Payment Recording
+13. M7 â€“ Customers & Payment Recording
 
-Design document: 27 ­ Customers and Payment Recording Design. Estimated design effort: 5 design-days.
+Design document: 27 â€“ Customers and Payment Recording Design. Estimated design effort: 5 design-days.
 
 The registered customer (a retail-credit concept, not a co-operative member), the digitised khata: per-MPCS
 credit accounts with limits, balances, repayments and ageing; the tender vocabulary at the till; and
@@ -836,10 +836,10 @@ governance are out of scope by decision.
 
     13.1 Ownership                                   Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                 FR-CUS-010­060 (global identity, phone lookup with audited change and
+Owned aggregates and tables (doc 18)                 FR-CUS-010â€“060 (global identity, phone lookup with audited change and
                                                      reuse detection, per-MPCS account, limit and balance, repayments,
 customer, customer_account (per MPCS),               statements, minimal PII, preferential price hook P3); FR-PAY-010, 020,
-customer_phone_history; document type PRC (customer  060­090 (tender types recorded not processed, customer credit tender,
+customer_phone_history; document type PRC (customer  060â€“090 (tender types recorded not processed, customer credit tender,
 side) and receipt tender lines; ageing projection    payment receipts, banking record, reconciliation later); I-01, I-02, I-04; K-01 to
                                                      K-08; ADR-15, ADR-16, ADR-27; PDPA
 
@@ -855,7 +855,7 @@ RecordBanking, IssueCustomerStatement,
 CloseAccount (balance zero)
 
 Depends on: M1 (MPCS scope), M4 (payment receipt base and SETTLES pattern), M6 (tender lines; offline
-account tender is allowed only against the cached balance with a configurable offline exposure cap ­ decision
+account tender is allowed only against the cached balance with a configurable offline exposure cap â€“ decision
 request).
 
 13.3 Key design decisions
@@ -877,21 +877,21 @@ mirroring I-07
 
 13.4 Deliberately not built
 
-· No loyalty, points, membership, share capital, patronage, AGM records (K-01, K-04 to K-07).
-· No bank or payment integration (R-05); banking is a recorded fact.
-· No vouchers or subsidy instruments until later phases (I-01).
+â€¢ No loyalty, points, membership, share capital, patronage, AGM records (K-01, K-04 to K-07).
+â€¢ No bank or payment integration (R-05); banking is a recorded fact.
+â€¢ No vouchers or subsidy instruments until later phases (I-01).
 
 13.5 Risks, prototypes and review focus
 
-· Review focus: the PDPA posture (purpose, retention, subject access) documented per field; phone reuse
+â€¢ Review focus: the PDPA posture (purpose, retention, subject access) documented per field; phone reuse
    detection flow with real number-recycling cases.
 
-· Decision request: offline account-tender cap and behaviour when the cached balance is stale.
+â€¢ Decision request: offline account-tender cap and behaviour when the cached balance is stale.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 19
-14. M8 ­ Reporting Pipeline
+14. M8 â€“ Reporting Pipeline
 
-Design document: 28 ­ Reporting Pipeline Design. Estimated design effort: 6 design-days.
+Design document: 28 â€“ Reporting Pipeline Design. Estimated design effort: 6 design-days.
 
 The pipeline, not the reports: projections from domain events into a read replica, end-of-day aggregates,
 per-entity data-freshness stamps on every federation-level figure, spreadsheet export, and the shared A4
@@ -900,7 +900,7 @@ pipeline.
 
     14.1 Ownership                                              Capabilities (SRS identifiers)
 
-Owned aggregates and tables (doc 18)                            FR-REP-010­050 (near-real-time operational views, end-of-day aggregates,
+Owned aggregates and tables (doc 18)                            FR-REP-010â€“050 (near-real-time operational views, end-of-day aggregates,
                                                                 freshness stamps, spreadsheet export, printed reports); O-01 to O-07; M-04,
 projection tables in a reporting schema (sales by               M-06 (full view-only visibility, no aggregate-only tier); F-09; N-06 (exception
 shop/sku/day, stock position, exposure, loss by category, till  queues); P-03
@@ -940,20 +940,20 @@ day sales, session), not this pipeline
 
 14.4 Deliberately not built
 
-· No self-service report builder; no mobile dashboard application (responsive web suffices, O-06).
-· No anonymised aggregate tier (M-06).
+â€¢ No self-service report builder; no mobile dashboard application (responsive web suffices, O-06).
+â€¢ No anonymised aggregate tier (M-06).
 
 14.5 Risks, prototypes and review focus
 
-· Dependency: the report-catalogue workshop (targeted week 3) supplies the fixed set; the pipeline design
+â€¢ Dependency: the report-catalogue workshop (targeted week 3) supplies the fixed set; the pipeline design
    proceeds without it.
 
-· Review focus: freshness semantics under partial sync; projection idempotency under replay.
+â€¢ Review focus: freshness semantics under partial sync; projection idempotency under replay.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System            Page 20
-15. M9 ­ Integration
+15. M9 â€“ Integration
 
-Design document: 29 ­ Integration Design. Estimated design effort: 5 design-days.
+Design document: 29 â€“ Integration Design. Estimated design effort: 5 design-days.
 
 The outward surface: an OpenAPI-specified, OAuth2-secured API whose first consumer is the future accounting
 system; the journal-posting mappings that make that integration a mapping exercise; readiness for Inland
@@ -999,19 +999,19 @@ shop language with English fallback
 
 15.4 Deliberately not built
 
-· No bank files, no government portal, no marketplace or e-commerce connectors (R-05, R-06, H-14).
-· No inbound write API in phase 1 beyond the accounting consumer's read needs.
+â€¢ No bank files, no government portal, no marketplace or e-commerce connectors (R-05, R-06, H-14).
+â€¢ No inbound write API in phase 1 beyond the accounting consumer's read needs.
 
 15.5 Risks, prototypes and review focus
 
-· Review focus: API scope enforcement uses the same RLS classes; rate limits per client; the posting map
+â€¢ Review focus: API scope enforcement uses the same RLS classes; rate limits per client; the posting map
    must be reviewed by an accountant against the trading-document state machines.
 
-· Decision request: SMS gateway selection is a procurement item, not a design item; the adapter interface is
+â€¢ Decision request: SMS gateway selection is a procurement item, not a design item; the adapter interface is
    designed provider-neutral.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 21
-15A. M10 ­ Procurement (phase 2 boundary)
+15A. M10 â€“ Procurement (phase 2 boundary)
 
 Design document: Phase 2: design document to be numbered when scheduled. Estimated design effort: not
 estimated (phase 2).
@@ -1024,7 +1024,7 @@ not pull into phase 1.
 
 Owned aggregates and tables (doc 18)                           Capabilities (SRS identifiers)
 
-Supplier master (takes over M2's minimal supplier table);      FR-PRO-010­060 (all P2 except the P3 Federation repacking permission flip);
+Supplier master (takes over M2's minimal supplier table);      FR-PRO-010â€“060 (all P2 except the P3 Federation repacking permission flip);
 supplier contracts and agreed prices; quotation register with  L-01 to L-07; ADR-06
 audited award; purchase order; market price observations by
 source; shipment and landed cost; supplier performance;
@@ -1057,11 +1057,11 @@ No public tender portal               aggregates are queryable by SKU, region an
 
 15A.4 Deliberately not built
 
-· Nothing in phase 1 beyond the seams above; no supplier screens, no purchase orders, no landed cost.
+â€¢ Nothing in phase 1 beyond the seams above; no supplier screens, no purchase orders, no landed cost.
 
 15A.5 Risks, prototypes and review focus
 
-· Risk: if the seams are not left now, phase 2 starts with a data migration inside M2 and M4. The seams are
+â€¢ Risk: if the seams are not left now, phase 2 starts with a data migration inside M2 and M4. The seams are
    cheap; check them at the M2 and M4 contract freezes.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 22
@@ -1072,7 +1072,7 @@ No public tender portal               aggregates are queryable by SKU, region an
 Gate                          week                        Commands, queries and events published with versions; at least one
 Contract freeze (per module)  M4 and M5 reviews           dependant has acknowledged
 State-machine reconciliation
-Prototype incorporation       Weeks 2­6 as spikes         Every doc 03 transition mapped; every transition has permission, reason
+Prototype incorporation       Weeks 2â€“6 as spikes         Every doc 03 transition mapped; every transition has permission, reason
 Cross-module reconciliation   complete                    rule, offline flag, audit event
 Stage exit                    Week 6
                                                           Each spike's findings recorded as an ADR or a design change; none left in
@@ -1087,8 +1087,8 @@ Stage exit                    Week 6
 16.2 Decision requests raised by this plan
 
 #     Point                                  Proposed                            Decider                  Needed by
-DR-1                                                                                                      ­
-      Trading documents as a ninth module (M4) Closed: adopted in doc 17 v0.2.1 ­
+DR-1                                                                                                      â€“
+      Trading documents as a ninth module (M4) Closed: adopted in doc 17 v0.2.1 â€“
 DR-2  rather than split across inventory and billing (ADR-37); Procurement kept as                        Week 4 (M4
 DR-3                                                                                                      review)
 DR-4                                                                M10 (P2)                              Week 4 (M7)
@@ -1115,19 +1115,19 @@ DR-7                                                                            
 
 16.3 What Stage 2 hands to Stage 4 and 5
 
-· Nine module design-and-guide pairs with published contracts, committed DDL, seed data and OpenAPI
+â€¢ Nine module design-and-guide pairs with published contracts, committed DDL, seed data and OpenAPI
    slices, and a consolidated change-request list against docs 18 and 19.
 
-· A consolidated configuration register (from each module's section 7) that becomes the onboarding playbook's
+â€¢ A consolidated configuration register (from each module's section 7) that becomes the onboarding playbook's
    input.
 
-· A consolidated test strategy with the doc 13 scenarios allocated to modules and the property-based
+â€¢ A consolidated test strategy with the doc 13 scenarios allocated to modules and the property-based
    invariants named.
 
-· The till platform decision, prototype results and the sync contract, which Stage 4 turns into deployment,
+â€¢ The till platform decision, prototype results and the sync contract, which Stage 4 turns into deployment,
    update and support design.
 
-· An updated decision log: every DR closed or carried with an owner.
+â€¢ An updated decision log: every DR closed or carried with an owner.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 23
 Appendix A. Register of deferred capability
@@ -1176,7 +1176,7 @@ Custom fields on SKU and        D      Adopted for v1: bounded, entity-owned    
                                        attributes jsonb (non-searchable, no            proper columns. Low.
 customer                               behaviour) on sku and customer
 
-Product images                  ­      Adopted for v1 (M2 ownership, M6 display): Full-size images, images on customer
+Product images                  â€“      Adopted for v1 (M2 ownership, M6 display): Full-size images, images on customer
 
                                        thumbnails on till lookups, picker, GRN and display: phase 2. Low.
 
@@ -1233,9 +1233,9 @@ M6        FR-POS, FR-PAY (till subset); H, I-03, O-02, P-05, Q-07 sections; ADR-
 M7        FR-CUS, FR-PAY (customer subset); I-01, I-02, I-04, K section; ADR-15, 16, 27
 M8        FR-REP; O section; M-04, M-06; N-06
 M9        FR-BIL-110, 140; R section; J-02, J-04
-M10 (P2)  FR-PRO; L section; ADR-06; doc 17 §7.10
+M10 (P2)  FR-PRO; L section; ADR-06; doc 17 Â§7.10
 
-End of document. Draft for design review; module blueprints are superseded by their detailed designs (docs 21­29) as each
+End of document. Draft for design review; module blueprints are superseded by their detailed designs (docs 21â€“29) as each
 reaches definition of done.
 
 20 - Stage 2 Module Design Plan and Blueprints | v0.3 draft | Cooperative Retail and Distribution System  Page 25

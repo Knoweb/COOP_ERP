@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-25 ­ M5 Inventory, Costing, Repack & Loss
+25 â€“ M5 Inventory, Costing, Repack & Loss
 
 Module design for where stock is and what it cost: lots by location and batch, the
 append-only movement ledger, weighted-average costing per entity, availability for
@@ -10,18 +10,18 @@ controls, expiry tasks, oversell exceptions, and opening balances.
 
 Field             Value
 Document
-Version           25 ­ M5 Inventory, Costing, Repack & Loss (Stage 2 module design; template of doc 20 §5)
+Version           25 â€“ M5 Inventory, Costing, Repack & Loss (Stage 2 module design; template of doc 20 Â§5)
 Date
-Owning developer  v0.1 ­ draft for design review; contract freeze targeted end of Stage 2 week 6
+Owning developer  v0.1 â€“ draft for design review; contract freeze targeted end of Stage 2 week 6
 
 Inputs            9 September 2026
 
 Depends on        Module developer (full-stack); the till track hosts count, write-off draft, repack and transfer-receipt screens in
                   shop-management mode from this module's specification
 Depended on by
-                  05 SRS (FR-INV-010­100, FR-LOSS-010­060); 03 state machines §9­11; 13 scenarios 3 and 4; 16 answers (E,
-                  F sections, B-06, R-02); 09 ADR-03, ADR-07, ADR-08; 17 v0.2.1 §7.5, ADR-38; 18 v0.2 part B (stock_lot,
-                  stock_movement, repack_recipe); 20 v0.3 M5; 21­24 contracts; 24B; 30 §5.5; 32
+                  05 SRS (FR-INV-010â€“100, FR-LOSS-010â€“060); 03 state machines Â§9â€“11; 13 scenarios 3 and 4; 16 answers (E,
+                  F sections, B-06, R-02); 09 ADR-03, ADR-07, ADR-08; 17 v0.2.1 Â§7.5, ADR-38; 18 v0.2 part B (stock_lot,
+                  stock_movement, repack_recipe); 20 v0.3 M5; 21â€“24 contracts; 24B; 30 Â§5.5; 32
 
                   M1 (locations, thresholds as role parameters), M2 (SKU flags, batch identity, conversions, alias), M4 (GRN, claim,
                   DN, transfer request events), kernel (document base, links, attachments, audit, events, snapshot)
@@ -31,7 +31,7 @@ Depended on by
 
 Two invariants and one temptation. Movements are the only way stock changes, and every movement cites a
 document; balances are sums, materialised for speed and reconciled nightly. The temptation is to reject a sale that the
-records say is impossible ­ two offline tills selling the same last unit ­ and the answer is never: the sale happened, the
+records say is impossible â€“ two offline tills selling the same last unit â€“ and the answer is never: the sale happened, the
 lot goes negative, an exception is raised, and the next count fixes the record (E-09).
 
 25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 1
@@ -60,18 +60,18 @@ delivery notes) (C-12)
 Counts: scheduled by the entity, cycle counting, count while trading,        ABC prioritisation (P2)
 variance with value-threshold approval (E-05 to E-07)
 
-Adjustments as documents with approval bands; negative-stock and             ­
+Adjustments as documents with approval bands; negative-stock and             â€“
 
 oversell exceptions (E-09)
 
 Repack recipes and execution with expected yield; variance against           Federation repacking (P3, permission flip on the same
 expectation; reversal while eligible (B-06, ADR-07)                          mechanism)
 
-Write-off lifecycle: nine loss categories, requester  approver, witness      Disposal certificates (F-08); insurance recovery
+Write-off lifecycle: nine loss categories, requester â‰  approver, witness â‰    Disposal certificates (F-08); insurance recovery
 requester (remote for single-staff shops), photographs, value-banded
 approval, loss attributed to the owner at the time (F-01 to F-05)
 
-Expiry warning tasks by window per category; markdown hand-off to M3 ­
+Expiry warning tasks by window per category; markdown hand-off to M3 â€“
 (F-06, F-07); loss tolerances (F-10); shrinkage reporting basis (F-09)
 
 Intra-entity transfers at cost with receipt at the destination (C-10, C-11,  Cross-entity transfers (those are sales, M4)
@@ -79,10 +79,10 @@ E-01)
 
 Opening balances as two-party signed documents at onboarding (R-02) Historical sales migration (none)
 
-Returns to seller on approved claims; lot re-pointing on batch correction ­
+Returns to seller on approved claims; lot re-pointing on batch correction â€“
 and SKU merge (M2 events)
 
-Phase 2 designed as projections: stock ageing, reorder points and            ­
+Phase 2 designed as projections: stock ageing, reorder points and            â€“
 
 suggestions, ABC cycle counting (E-08, E-11)
 
@@ -102,7 +102,7 @@ FR-INV-090          Reorder points system-calculated and overridable (P2)       
 FR-INV-100          Stock ageing with warnings (P2)                                                          3.9
 FR-LOSS-010         Loss categories recorded separately, never one adjustment (F-01)                         3.8
 FR-LOSS-020         Loss borne by the owner at the moment of loss (F-02, ADR-03)                             3.8
-FR-LOSS-030         Write-off: requester  approver; witness distinct; photographs (F-04, F-05, N-07)         3.8, 4.3
+FR-LOSS-030         Write-off: requester â‰  approver; witness distinct; photographs (F-04, F-05, N-07)        3.8, 4.3
 FR-LOSS-040         Returns to seller for credit via claims (F-03)                                           6.7
 FR-LOSS-050         Expiry alerts by window per category generating count tasks (F-06)                       3.8, 4.6
 
@@ -123,7 +123,7 @@ here.
 
 Aspect                       stock_lot(location, batch, condition GOOD | DAMAGED, qty_on_hand, unit_cost,
 Aggregate                    received_at, last_movement_seq). A lot is one entity's holding of one batch at one location in one
-                             condition; damaged units received on a GRN form a DAMAGED lot (doc 24 §6.1), sellable only through an M3
+                             condition; damaged units received on a GRN form a DAMAGED lot (doc 24 Â§6.1), sellable only through an M3
 Cost                         markdown rule or written off.
 Re-pointing
                              unit_cost is the acquisition cost of that lot: trade price for goods bought from another entity, keyed cost for
@@ -142,7 +142,7 @@ Negative lots                device) (doc 18 part B). Insert-only. movement_seq 
 Batch attribution of a sale  movements (inside the receipt bundle) and by central otherwise; the two sequences are kept apart by a source
                              column so both stay dense.
 
-                             stock_lot.qty_on_hand =  qty_delta for the lot (B-I4); updated in the same transaction as the movement;
+                             stock_lot.qty_on_hand = Î£ qty_delta for the lot (B-I4); updated in the same transaction as the movement;
                              the nightly StockReconcileJob recomputes and raises a REVIEW on drift, never silently fixes.
 
                              A SALE movement may take a lot below zero (offline oversell). The lot is flagged negative_since;
@@ -157,8 +157,8 @@ Batch attribution of a sale  movements (inside the receipt bundle) and by centra
 
 Aspect                       Moving weighted average per entity per SKU (E-03, IAS 2): entity_sku_cost(entity, sku,
 Method                       qty_on_hand, avg_cost) updated on every receipt-type movement (RECEIPT, TRANSFER_IN at the
-                             receiving entity is at cost so unchanged, REPACK_PRODUCE, OPENING_BALANCE) as (qty × avg +
-Lot cost versus entity       qty_in × cost_in) / (qty + qty_in); issues (SALE, WRITE_OFF, TRANSFER_OUT within the entity
+                             receiving entity is at cost so unchanged, REPACK_PRODUCE, OPENING_BALANCE) as (qty Ã— avg +
+Lot cost versus entity       qty_in Ã— cost_in) / (qty + qty_in); issues (SALE, WRITE_OFF, TRANSFER_OUT within the entity
 average                      unchanged, REPACK_CONSUME) carry unit_cost_at_movement = avg_cost at that moment.
 Damaged units
                              The lot keeps its acquisition cost for traceability and for claims; the entity average is the costing figure for cost of
@@ -175,7 +175,7 @@ Suggestion
 Availability                 rank; warehouses get a pick_list per delivery note (M4 delivery_note.issued.v1) with suggested lots
                              that the picker may override with a reason.
 
-                             available(location, sku) =  GOOD lots on hand (non-negative) - quantities on ISSUED
+                             available(location, sku) = Î£ GOOD lots on hand (non-negative) âˆ’ quantities on ISSUED
                              but not DISPATCHED delivery notes; Availability(entity locations, skus) is what M4 shows
                              buyers and uses in allocation runs (DR-1).
 
@@ -189,7 +189,7 @@ Variance and adjustment  status) created by the entity's schedule or by the expi
                          condition, expected_qty at count start, counted_qty); counting while trading is supported by snapshotting
                          expected quantities at task start and applying movements that occur during the count to the expectation (E-06).
 
-                         Submitting a count creates an ADJ document with the variances; approval is banded by value (variance qty ×
+                         Submitting a count creates an ADJ document with the variances; approval is banded by value (variance qty Ã—
                          entity avg cost) against variance_threshold(sku | tag, band, approver permission with
                          limits) (E-07); tolerances (F-10) below which a variance posts without escalation; approved adjustments post
                          COUNT_ADJUST movements; the exception queue receives every count that cleared a negative lot.
@@ -258,7 +258,7 @@ Ageing and reorder
    4.1 Count
 
 From          To           Trigger / command          Guard                                             Permission         Audit / offline
-­             SCHEDULED    ScheduleCount(scope,
+â€“             SCHEDULED    ScheduleCount(scope,
                            date)                      entity scope; scope valid                         inv.count.schedul COUNT_SCHE
                            StartCount
                                                                                                         e                  DULED
@@ -272,29 +272,29 @@ COUNTING SUBMITTED         system: no variance above  all scope lines counted or
 
                                                       series)
 
-SUBMITTED     VARIANCE_RE                             ­                                                 system             ADJ created
+SUBMITTED     VARIANCE_RE                             â€“                                                 system             ADJ created
 SUBMITTED     VIEW
                                                                                                                            DRAFT
               CLOSED
                                                       in-tolerance variances post                       system             COUNT_CLOSE
                                                       automatically                                                        D
 
-VARIANCE_R CLOSED                                     ­                                                 system             COUNT_CLOSE
+VARIANCE_R CLOSED                                     â€“                                                 system             COUNT_CLOSE
 EVIEW
                                                                                                                            D
 
    4.2 Adjustment
 
 From          To           Trigger / command          Guard                                             Permission         Audit / offline
-­             DRAFT                                   entity scope; lines with batches
-                           system (from count) or                                                       inv.adjust.request ­
+â€“             DRAFT                                   entity scope; lines with batches
+                           system (from count) or                                                       inv.adjust.request â€“
                            CreateAdjustment(reason)
 
 DRAFT         PENDING_APP  SubmitAdjustment           issuance (ENTITY series); value                   inv.adjust.request ADJ_SUBMITTE
               ROVAL        ApproveAdjustment          band computed                                                                D
 PENDING_AP
-PROVAL        APPROVED                                approver  requester (SoD                          inv.adjust.approve ADJ_APPROVE
-                                                      INSTANCE); approver's limit 
+PROVAL        APPROVED                                approver â‰  requester (SoD                         inv.adjust.approve ADJ_APPROVE
+                                                      INSTANCE); approver's limit â‰¥
                                                       value; MFA                                        (MFA)              D
 
 PENDING_AP    REJECTED     RejectAdjustment(reason) reason                                              inv.adjust.approve ADJ_REJECTE
@@ -306,7 +306,7 @@ APPROVED                                                                        
 
 From          To           Trigger / command          Guard                                             Permission         Audit / offline
 
-­             DRAFT        RequestWriteOff(lines,     location scope; lot exists; qty  on inv.writeoff.reques ­ / offline (draft)
+â€“             DRAFT        RequestWriteOff(lines,     location scope; lot exists; qty â‰¤ on inv.writeoff.reques â€“ / offline (draft)
                            category, photos)
                                                       hand (or negative-clearing)                       t
                            SubmitWriteOff
@@ -317,12 +317,12 @@ DRAFT         REQUESTED                               issuance (LOCATION series 
                                                       single-staff or category is                                          online
                                                       THEFT/SHRINKAGE)
 
-REQUESTED WITNESSED WitnessWriteOff                   witness  requester (SoD);                         inv.writeoff.witnes WRITEOFF_WI
+REQUESTED WITNESSED WitnessWriteOff                   witness â‰  requester (SoD);                        inv.writeoff.witnes WRITEOFF_WI
                                                       attachments COMPLETE;
                                                       single-staff shop: the approver's                 s                  TNESSED
                                                       witnessing counts (remote)
 
-WITNESSED APPROVED         ApproveWriteOff            approver  requester; value within inv.writeoff.approv WRITEOFF_AP
+WITNESSED APPROVED         ApproveWriteOff            approver â‰  requester; value within inv.writeoff.approv WRITEOFF_AP
 
                                                       approver's band (entity avg cost); e (MFA)                           PROVED
 
@@ -338,8 +338,8 @@ APPROVED POSTED            movements
    4.4 Repack
 
 From          To           Trigger / command          Guard                                             Permission         Audit / offline
-                                                                                                                           ­
-­             DRAFT        PlanRepack(recipe, input   recipe ACTIVE; input lots GOOD                    inv.repack.execut
+                                                                                                                           â€“
+â€“             DRAFT        PlanRepack(recipe, input   recipe ACTIVE; input lots GOOD                    inv.repack.execut
                            lots)                      with qty                                          e
 
    25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System                             Page 6
@@ -354,21 +354,21 @@ EXECUTED REVERSED         against the output lot    output lot untouched (qty = 
 EXECUTED CLOSED                                     produced; no movements against                                                 RSED / online
                                                     it); REVERSES-linked RPK
 
-                                                    ­                                                   system              ­
+                                                    â€“                                                   system              â€“
 
    4.5 Transfer
 
 From        To            Trigger / command         Guard                                               Permission          Audit / offline
                           IssueTransfer (from M4
-­           ISSUED        approval or direct)       same entity; source availability;                   inv.transfer.issue  TRANSFER_IS
+â€“           ISSUED        approval or direct)       same entity; source availability;                   inv.transfer.issue  TRANSFER_IS
                                                     issuance (LOCATION or ENTITY                                            SUED
                           Dispatch                  series); TRANSFER_OUT posted
                           ReceiveTransfer(actuals)
-ISSUED      IN_TRANSIT                              ­                                                   inv.transfer.issue ­
+ISSUED      IN_TRANSIT                              â€“                                                   inv.transfer.issue â€“
 IN_TRANSIT  RECEIVED      CancelTransfer(reason)
                                                     destination scope; TRANSFER_IN shop.transfer.rece TRANSFER_RE
 
-                                                    posted; variance  ADJ draft at ive                                      CEIVED / offline
+                                                    posted; variance â†’ ADJ draft at ive                                     CEIVED / offline
 
                                                     destination
 
@@ -380,19 +380,19 @@ IN_TRANSIT
 
 From        To            Trigger / command         Guard                                               Permission          Audit / offline
                           system (ExpiryScanJob)
-­           OPEN                                    batch enters window at a location system                                EXPIRY_TASK_
+â€“           OPEN                                    batch enters window at a location system                                EXPIRY_TASK_
                                                                                                                             OPENED
-OPEN        COUNTED       linked count submitted    ­                                                   system
-            CLOSED                                                                                      system              ­
-OPEN /                    lot exhausted, written off, or ­
+OPEN        COUNTED       linked count submitted    â€“                                                   system
+            CLOSED                                                                                      system              â€“
+OPEN /                    lot exhausted, written off, or â€“
 COUNTED                   expiry passed with a                                                                              EXPIRY_TASK_
                           suggested write-off created                                                                       CLOSED
 
    4.7 Opening balance
 
 From        To            Trigger / command         Guard                                               Permission          Audit / offline
-­           DRAFT
-                          PrepareOpeningBalance(lin location ONBOARDING; no prior                       inv.opening.prepa ­
+â€“           DRAFT
+                          PrepareOpeningBalance(lin location ONBOARDING; no prior                       inv.opening.prepa â€“
                           es with batch data and cost) movements at the location                        re
 
 DRAFT       SIGNED_ENTIT  SignOpeningBalance        entity officer; MFA                                 inv.opening.sign    OPB_SIGNED_
@@ -504,67 +504,67 @@ inventory_policy.changed.v1
 25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System  Page 9
 6. Key flows
 
-Flow                             Sequence                                                               Failure paths
+Flow                             Sequence                                                                Failure paths
 
-6.1 Receipt into stock           M4 grn.confirmed.v1  per line: GOOD lot (received - damaged)           A GRN reversal (grn.reversed.v1)
-                                 and DAMAGED lot (damaged) at the line's unit cost; RECEIPT             posts negating movements only if lots
-                                 movements; entity average recomputed; M2 assortment adds the           are unconsumed (M4 already guarded
-                                 SKU for the location; lot snapshot delta                               via LotsConsumed)
+6.1 Receipt into stock           M4 grn.confirmed.v1 â†’ per line: GOOD lot (received âˆ’ damaged)           A GRN reversal (grn.reversed.v1)
+                                 and DAMAGED lot (damaged) at the line's unit cost; RECEIPT              posts negating movements only if lots
+                                 movements; entity average recomputed; M2 assortment adds the            are unconsumed (M4 already guarded
+                                 SKU for the location; lot snapshot delta                                via LotsConsumed)
 
-6.2 Sale deduction and           Receipt bundle ingested (M6)  per line SALE movement against           A sale against a batch with no lot at the
-oversell                         the resolved batch's lot  lot goes to -3 because two tills sold the    location (till cache stale) creates the lot
-                                 same units offline  lot.negative.v1  exception queue; availability     at zero minus qty with cost = entity
-                                 excludes it  next count corrects; the cleared negative is reported     average and a REVIEW
+6.2 Sale deduction and           Receipt bundle ingested (M6) â†’ per line SALE movement against           A sale against a batch with no lot at the
+oversell                         the resolved batch's lot â†’ lot goes to âˆ’3 because two tills sold the    location (till cache stale) creates the lot
+                                 same units offline â†’ lot.negative.v1 â†’ exception queue; availability    at zero minus qty with cost = entity
+                                 excludes it â†’ next count corrects; the cleared negative is reported     average and a REVIEW
                                  as SHRINKAGE_UNEXPLAINED or as an over-count depending on
 
                                  the direction
 
-6.3 Scheduled count with         MPCS schedules a monthly count of tag dairy for shop 7  the task       Variance above the accountant's band
-variance                         reaches the till in the snapshot  shop-in-charge counts offline;       escalates to the chairman's band; a
-                                 expectation snapshot taken at start; sales during the count adjust     count on a location with an in-transit
-                                                                                                        transfer warns
-                                 the expectation  submit (LOCATION series)  variances above
-                                 tolerance form an ADJ draft  MPCS accountant approves within
-                                 band (MFA)  COUNT_ADJUST movements
+6.3 Scheduled count with         MPCS schedules a monthly count of tag dairy for shop 7 â†’ the task       Variance above the accountant's band
+variance                         reaches the till in the snapshot â†’ shop-in-charge counts offline;       escalates to the chairman's band; a
+                                 expectation snapshot taken at start; sales during the count adjust      count on a location with an in-transit
+                                                                                                         transfer warns
+                                 the expectation â†’ submit (LOCATION series) â†’ variances above
+                                 tolerance form an ADJ draft â†’ MPCS accountant approves within
+                                 band (MFA) â†’ COUNT_ADJUST movements
 
-6.4 Write-off at a single-staff  Shop-in-charge finds six expired packs  drafts WOF offline with        Category THEFT without photos
-shop                             photos and category EXPIRED  submits when online (LOCATION             refused; approver band exceeded 
-                                 series)  MPCS accountant, as remote witness, reviews photos            routed to the next band; requester =
-                                 and witnesses (attachments COMPLETE)  the same accountant              approver refused by SoD
+6.4 Write-off at a single-staff  Shop-in-charge finds six expired packs â†’ drafts WOF offline with        Category THEFT without photos
+shop                             photos and category EXPIRED â†’ submits when online (LOCATION             refused; approver band exceeded â†’
+                                 series) â†’ MPCS accountant, as remote witness, reviews photos            routed to the next band; requester =
+                                 and witnesses (attachments COMPLETE) â†’ the same accountant              approver refused by SoD
                                  cannot approve if they are also the requester (never the case here)
 
-                                  approves within band (MFA)  WRITE_OFF movements; loss
+                                 â†’ approves within band (MFA) â†’ WRITE_OFF movements; loss
                                  attributed to the MPCS
 
-6.5 Repack and wrong-recipe      Warehouse repacks 50 kg bulk into 1 kg packs by recipe R-012           Reversal after 12 packs were sold
-correction (doc 13 scenario 3)   (expected 49 after loss)  actual 49  REPACK_CONSUME 50                 refused; correction then requires a
-                                 kg, REPACK_PRODUCE 49 EA at cost 9,500/49; output batch                write-off or a second recipe consuming
-                                 registered (M2)  discovers it should have been 5 kg packs              the 1 kg packs as input
-                                 ReverseRepack (output untouched) restores the input lot 
+6.5 Repack and wrong-recipe      Warehouse repacks 50 kg bulk into 1 kg packs by recipe R-012            Reversal after 12 packs were sold
+correction (doc 13 scenario 3)   (expected 49 after loss) â†’ actual 49 â†’ REPACK_CONSUME 50                refused; correction then requires a
+                                 kg, REPACK_PRODUCE 49 EA at cost 9,500/49; output batch                 write-off or a second recipe consuming
+                                 registered (M2) â†’ discovers it should have been 5 kg packs â†’            the 1 kg packs as input
+                                 ReverseRepack (output untouched) restores the input lot â†’
                                  executes recipe R-013
 
-6.6 Transfer between two         M4 transfer_request.approved.v1  IssueTransfer at shop B               Unreceived after transfer_receipt_days
-shops                            (TRANSFER_OUT at cost)  dispatched  shop A receives                     REVIEW
-                                 actuals on its till (TRANSFER_IN)  a short receipt raises an ADJ
+6.6 Transfer between two         M4 transfer_request.approved.v1 â†’ IssueTransfer at shop B               Unreceived after transfer_receipt_days
+shops                            (TRANSFER_OUT at cost) â†’ dispatched â†’ shop A receives                   â†’ REVIEW
+                                 actuals on its till (TRANSFER_IN) â†’ a short receipt raises an ADJ
                                  draft at A; the MPCS decides
 
-6.7 Return to seller on an       M4 claim.approved.v1 with return_required                              ­
+6.7 Return to seller on an       M4 claim.approved.v1 with return_required â†’                             â€“
 approved claim
                                  RETURN_TO_SELLER movement from the buyer's lot (DAMAGED
 
-                                 or GOOD as the claim states)  the seller's receipt of the return is a
+                                 or GOOD as the claim states) â†’ the seller's receipt of the return is a
 
                                  GRN on the seller's side citing the claim
 
-6.8 Expiry window                ExpiryScanJob finds batch B2411A entering its 30-day window at ­
-                                 shop 7  expiry task, count task, and expiry_task.opened.v1 
-                                 M3's markdown rule applies at the till from that day  on the expiry
+6.8 Expiry window                ExpiryScanJob finds batch B2411A entering its 30-day window at â€“
+                                 shop 7 â†’ expiry task, count task, and expiry_task.opened.v1 â†’
+                                 M3's markdown rule applies at the till from that day â†’ on the expiry
                                  date the remainder becomes a suggested WOF (EXPIRED)
                                  awaiting the full lifecycle
 
-6.9 Opening balance at           Federation onboarding officer and the MPCS count shop 7 with           A second OPB for a location with
-onboarding                       batch data and costs  PrepareOpeningBalance  MPCS officer              movements refused
-                                 signs (MFA)  Federation countersigns (MFA) 
+6.9 Opening balance at           Federation onboarding officer and the MPCS count shop 7 with            A second OPB for a location with
+onboarding                       batch data and costs â†’ PrepareOpeningBalance â†’ MPCS officer             movements refused
+                                 signs (MFA) â†’ Federation countersigns (MFA) â†’
                                  OPENING_BALANCE movements; lots and entity averages seeded;
                                  the location may activate (M1 gate, DR-6)
 
@@ -589,8 +589,8 @@ inventory.writeoff_photos_required                    always for THEFT, SHRINKAG
 inventory.remote_witness_allowed                      recommended                                    Federation  inv.policy.set (F)
 inventory.count_frequency (scope)                     true (single-staff shops)                      Entity      inv.count.schedule
 inventory.transfer_receipt_days                       monthly full; weekly cycle by tag              Entity      inv.policy.set
-inventory.repack_reversal_requires_untouched_output   3                                              ­           ­
-inventory.availability_excludes_negative              true (not configurable)                        ­           ­
+inventory.repack_reversal_requires_untouched_output   3                                              â€“           â€“
+inventory.availability_excludes_negative              true (not configurable)                        â€“           â€“
                                                       true (not configurable)
 
 8. Screens as paper
@@ -619,7 +619,7 @@ Expiry list              Expiry list         W/T        entity officer       Two
                                                         Entity, Federation
 Opening stock sheet      Opening stock sheet W          view                 By category and shop; tolerances
 
-Loss and shrinkage       ­                   W
+Loss and shrinkage       â€“                   W
 
 25 - M5 Inventory, Costing, Repack & Loss | v0.1 draft | Cooperative Retail and Distribution System              Page 11
 9. Non-functional design
@@ -627,7 +627,7 @@ Loss and shrinkage       ­                   W
 Aspect                 Design
 9.1 Capacity
                        Movements are the highest-volume table after receipt lines: about 15 million a day at the horizon (five lines per
-9.2 Offline            receipt). Partitioned monthly by received_at; the lot table is small (locations × live batches). Balance updates
+9.2 Offline            receipt). Partitioned monthly by received_at; the lot table is small (locations Ã— live batches). Balance updates
 9.3 Consistency        are single-row increments in the ingestion transaction; the entity average update is one row per (entity, sku) per
 9.4 Controls           receipt-type movement.
 9.5 Visibility
@@ -664,7 +664,7 @@ Performance
                        never negative and equals the recomputed-from-scratch value; a reversal restores the input lot exactly; availability
                        never counts negative lots
 
-                       Doc 13 scenarios 3 and 4 (M5 parts); flows 6.1­6.9; oversell from two till simulators selling the same last units
+                       Doc 13 scenarios 3 and 4 (M5 parts); flows 6.1â€“6.9; oversell from two till simulators selling the same last units
 
                        Injected drift is found and reported; nothing auto-fixed
 
@@ -699,14 +699,14 @@ DR-8  New tables (CR-25-1 to doc 18):                 Adopt (doc 18 DR-7); photo
 12. Traceability
 
 Section  Identifiers
-3.1­3.3  FR-INV-010, 020, 060; E-01 to E-03, E-09; ADR-03, ADR-38; doc 18 B-I3 to B-I5
+3.1â€“3.3  FR-INV-010, 020, 060; E-01 to E-03, E-09; ADR-03, ADR-38; doc 18 B-I3 to B-I5
 3.4      FR-INV-030; E-04; C-12; doc 24 allocation
 3.5      FR-INV-040, 050; E-05 to E-07; F-10
 3.6      FR-INV-080; B-06; ADR-07; doc 13 scenario 3
 3.7      FR-INV-070; C-10, C-11; R-02
 3.8      FR-LOSS-010 to 060; F-01 to F-11; N-07; doc 18 DR-7
 3.9      FR-INV-090, 100; E-08, E-11
-4        Doc 03 §9­11; H-02/H-03
+4        Doc 03 Â§9â€“11; H-02/H-03
 9        M-04, M-05; NFR-PRF; NFR-AUD
 
 End of document. Draft for design review; the contract freezes when M6 acknowledges it, targeted end of Stage 2 week 6.

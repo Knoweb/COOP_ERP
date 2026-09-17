@@ -17,3 +17,9 @@
 *.apk      binary
 *.aab      binary
 *.keystore binary
+
+# Markdown, text extracts and shell scripts are LF on every platform, so extracts
+# regenerated on Windows, Linux or macOS compare equal and scripts run under bash.
+*.md  text eol=lf
+*.txt text eol=lf
+*.sh  text eol=lf

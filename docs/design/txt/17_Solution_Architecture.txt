@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-17 ­ Solution Architecture
+17 â€“ Solution Architecture
 
 Stage 1 foundation artefact: module boundaries, event stream and queue, edge
 architecture, integration surface. Version 0.2 realigns the module map to nine phase-1
@@ -9,9 +9,9 @@ architecture with documents 14, 18, 19, 20, 30 and 31.
 
 Field                        Value
 Document
-Version / status             17 ­ Solution Architecture
+Version / status             17 â€“ Solution Architecture
 Date
-Baseline it designs against  v0.2.1 ­ Draft for design review (supersedes v0.1 of 3 September 2026; v0.2.1 restores detail items dropped in
+Baseline it designs against  v0.2.1 â€“ Draft for design review (supersedes v0.1 of 3 September 2026; v0.2.1 restores detail items dropped in
                              the v0.2 merge)
 Audience
 What changed                 7 September 2026
@@ -40,7 +40,7 @@ review can accept or reverse it deliberately.
 
 # Change                 v0.1 position                           v0.2 position                               Reason
 
-C1 Module count and      Fourteen business modules               Nine phase-1 modules (M1­M9),               Doc 20 blueprints and handover to
+C1 Module count and      Fourteen business modules               Nine phase-1 modules (M1â€“M9),               Doc 20 blueprints and handover to
         grouping         plus kernel                             Procurement as M10 (phase 2), plus          full-stack developers by module;
                                                                  kernel                                      fewer, thicker modules with clear
                                                                                                              contracts. Internal boundaries survive
@@ -121,7 +121,7 @@ Ownership of every document lifecycle, ledger and reference set        Internals
 The event and queue design; edge ingestion; reference distribution to Sync message formats and timing (doc 32)
 tills
 
-The integration surface and the edge application's internal structure  Module designs (docs 21­29), report catalogue (workshop), screens
+The integration surface and the edge application's internal structure  Module designs (docs 21â€“29), report catalogue (workshop), screens
                                                                        (doc 30 and module designs), numbering's final form pending the tax
                                                                        advisor (NFR-CMP-030)
 
@@ -280,12 +280,12 @@ observability                                                                   
    changes another module's state except by an event the other module chooses to handle. The graph is acyclic.
 
 Layer                 Modules                                             Role and rule
-0 ­ Platform kernel   Scope and session; Documents & Numbering base;
+0 â€“ Platform kernel   Scope and session; Documents & Numbering base;
                       Audit; Event backbone (outbox, relay, inbox); Edge  Technical services with no business rules; every module
-1 ­ Master data and   sync gateway; Internationalisation; Attachments;    may use them; they depend on nothing above (doc 18 parts
+1 â€“ Master data and   sync gateway; Internationalisation; Attachments;    may use them; they depend on nothing above (doc 18 parts
 policy                Notifications delivery; Configuration register;     C and D, doc 19).
-2 ­ Transactions      Scheduling
-3 ­ Read side         M1 Party, Tenancy & Security; M2 Catalogue &        Slowly changing reference data and the policies governing
+2 â€“ Transactions      Scheduling
+3 â€“ Read side         M1 Party, Tenancy & Security; M2 Catalogue &        Slowly changing reference data and the policies governing
                       Batch; M3 Pricing & Rules                           transactions. Their published interfaces are what transaction
                                                                           modules call synchronously; their changes reach tills as
                       M4 Trading Documents; M5 Inventory, Costing,        reference-data snapshots (8.5).
@@ -329,8 +329,8 @@ R6 Reporting reads events and its own read models; it may query layer 1 for     
 R7 Every mutating command carries an idempotency key; every singleton job                  Framework interceptor; scheduler configuration test
           runs under a cluster lock.                                                       (P12).
 
-   Decision (Proposed ­ ADR-28, revised). Nine phase-1 modules, Procurement as a phase-2 module with its
-   boundary present from day one, and a platform kernel, in four layers, with rules R1­R7 enforced by automated
+   Decision (Proposed â€“ ADR-28, revised). Nine phase-1 modules, Procurement as a phase-2 module with its
+   boundary present from day one, and a platform kernel, in four layers, with rules R1â€“R7 enforced by automated
    build checks from the first sprint.
 
    17 - Solution Architecture | v0.2.1 draft | Cooperative Retail and Distribution System                        Page 6
@@ -341,7 +341,7 @@ lifecycles, the events it publishes and consumes, and its phase. Event names use
 set is refined in the module designs, the ownership is the decision here. Doc 20 carries each module's
 commands, queries, deliberate omissions and risks; they are not repeated.
 
-7.1 M1 ­ Party, Tenancy & Security
+7.1 M1 â€“ Party, Tenancy & Security
 
 Field        Content
 SRS area     FR-PTY; FR-SEC; FR-GOV
@@ -365,7 +365,7 @@ Phase        direct trading later is configuration. Authentication is the kernel
 
              P1
 
-7.2 M2 ­ Catalogue & Batch
+7.2 M2 â€“ Catalogue & Batch
 
 Field        Content
 
@@ -390,7 +390,7 @@ Notes
 
 Phase        P1
 
-7.3 M3 ­ Pricing & Rules
+7.3 M3 â€“ Pricing & Rules
 
 Field        Content
 SRS area     FR-PRC; G section; F-07
@@ -414,7 +414,7 @@ Phase        by ingestion re-validation and by the till offline (P7, ADR-31). Re
 
              P1 (preferential pricing P3)
 
-7.4 M4 ­ Trading Documents
+7.4 M4 â€“ Trading Documents
 
 Field        Content
 SRS area     FR-ORD; FR-DEL; FR-BIL (except numbering internals); A, C, D, I-05 to I-07, J sections
@@ -427,7 +427,7 @@ lifecycles   mismatch) and claim (raise, inspect, approve, reject); invoice, cre
              journal-posting mapping per document type; immutable invoice snapshot for e-invoicing readiness; intra-MPCS lateral
              transfer request (mediated)
 
-             Order, delivery note, GRN, discrepancy, claim, invoice, credit/debit note, payment receipt (doc 03 sections 2­8); the
+             Order, delivery note, GRN, discrepancy, claim, invoice, credit/debit note, payment receipt (doc 03 sections 2â€“8); the
              six state machines designed in doc 24; numbering addendum 24A after the tax advisor
 
 Publishes    order.*, delivery_note.*, grn.captured/confirmed/closed.v1, discrepancy.*, claim.*, invoice.issued.v1,
@@ -443,7 +443,7 @@ Phase        entity's lots and posts receipts, invoicing is permitted by it, and
 
              P1 (e-invoicing live P3; reorder suggestions feeding orders P2)
 
-7.5 M5 ­ Inventory, Costing, Repack & Loss
+7.5 M5 â€“ Inventory, Costing, Repack & Loss
 
 Field        Content
 
@@ -452,11 +452,11 @@ Owns
              Stock lot (entity holding of a batch at a location, acquisition cost); stock movement ledger (append-only, every
              movement cites a document); derived balances; weighted-average cost per entity; FEFO suggestion; intra-entity
              transfer at cost; count tasks and results; adjustment with value-threshold approval; repack recipe and execution with
-             expected yield and reversal; write-off with loss categories, requester  approver, witness (remote for single-staff
+             expected yield and reversal; write-off with loss categories, requester â‰  approver, witness (remote for single-staff
              shops), photographs, value-banded approval; loss tolerances; expiry warning tasks; negative-stock and oversell
              exception records; opening balances; ageing and reorder points (phase 2)
 
-Documents /  Transfer, adjustment, repack, write-off, count, opening balance (doc 03 sections 9­11)
+Documents /  Transfer, adjustment, repack, write-off, count, opening balance (doc 03 sections 9â€“11)
 lifecycles
              stock.moved.v1, lot.negative.v1, count.*, adjustment.approved.v1, writeoff.requested/witnessed/approved/posted.v1,
 Publishes    repack.executed/reversed.v1, batch.expiring.v1, opening_balance.recorded.v1
@@ -465,11 +465,11 @@ Consumes     grn.confirmed.v1 (lots and receipts), receipt.issued/refunded/voide
 Notes        batch), claim.approved.v1 (return movements), landed_cost.finalised.v1 (P2 restates lot cost)
 
              Provides the availability query for M4 and the lot list distributed to tills (batch, MRP, expiry, FEFO order). Concurrent
-             offline oversells are accepted and flagged (oversell exception), never rejected. Changes C4­C6 apply.
+             offline oversells are accepted and flagged (oversell exception), never rejected. Changes C4â€“C6 apply.
 
 Phase        P1 (ageing, reorder points, ABC cycle counting P2)
 
-7.6 M6 ­ POS & Offline
+7.6 M6 â€“ POS & Offline
 
 Field        Content
 SRS area     FR-POS; FR-PAY (till subset); FR-REP-030; H, I-03, O-02, P-05, Q-07 sections
@@ -478,7 +478,7 @@ Owns         On the edge: till session (float, drops, blind close, variance); re
              tenders, operator; void and same-session refund; parked sales; receipt rendering; local reference cache and version;
 Documents /  local counters for the till-position series and, on the primary till, the location series; local outbox and upload cursor;
 lifecycles   shop-management mode hosting M4 and M5 screens (GRN, count, write-off draft, shop repack); training namespace.
-             At central: ingestion ­ validation, idempotent acceptance, gap detection, re-validation of price and ceiling compliance
+             At central: ingestion â€“ validation, idempotent acceptance, gap detection, re-validation of price and ceiling compliance
              with the shared engine, re-publication into the backbone; sync-health view per till
 
              Receipt, refund, void, till session (doc 03 section 13)
@@ -498,7 +498,7 @@ Phase        Reference-data snapshots from layer 1 and M5 through the distributi
 
              P1 (LAN peer stock visibility P2, NFR-OFF-040)
 
-7.7 M7 ­ Customers & Payment Recording
+7.7 M7 â€“ Customers & Payment Recording
 
 Field        Content
 SRS area     FR-CUS; FR-PAY (customer subset); I-01, I-02, I-04; K section
@@ -521,7 +521,7 @@ Phase        snapshot so account sales work offline against the last known balan
 
              P1 (preferential pricing P3)
 
-7.8 M8 ­ Reporting Pipeline
+7.8 M8 â€“ Reporting Pipeline
 
 Field        Content
 
@@ -545,7 +545,7 @@ Notes
 
 Phase        P1 catalogue; self-service builder backlog
 
-7.9 M9 ­ Integration
+7.9 M9 â€“ Integration
 
 Field        Content
 SRS area     FR-BIL-110, FR-BIL-140; R-05 to R-09; J-02, J-04
@@ -566,7 +566,7 @@ Notes        REST only; an adapter is a translator, never a place for business r
 Field                   Content
 Phase                   P1 (accounting integration and e-invoicing P3)
 
-7.10 M10 ­ Procurement (phase 2)
+7.10 M10 â€“ Procurement (phase 2)
 
 Field                   Content
 
@@ -631,7 +631,7 @@ for jobs. The design keeps them apart (doc 19 section 6 names the four kinds of 
 
 8.1 Where events live
 
-Decision (Proposed ­ ADR-30). The system of record for domain events is an append-only outbox archive in
+Decision (Proposed â€“ ADR-30). The system of record for domain events is an append-only outbox archive in
 PostgreSQL written in the same transaction as the business change; a relay publishes rows to the broker; the
 broker holds nothing that cannot be re-derived from the archive. Central write volume is on the order of a
 thousand events a second at peak and a few thousand during reconnection bursts (doc 14 section 6), which
@@ -647,19 +647,19 @@ source sequence) is the idempotency key for ingestion and the basis of gap detec
 
 8.3 Delivery guarantees and consumer rules
 
-· At-least-once delivery. Every consumer is idempotent by event id; the kernel supplies a per-consumer inbox
+â€¢ At-least-once delivery. Every consumer is idempotent by event id; the kernel supplies a per-consumer inbox
    table.
 
-· Ordering per source, not globally. Events from one till, or from central, apply in sequence; cross-source
+â€¢ Ordering per source, not globally. Events from one till, or from central, apply in sequence; cross-source
    order is by received time with freshness stamps.
 
-· Consumers are registered in code, reviewed, and listed in the module catalogue; the dependency graph
+â€¢ Consumers are registered in code, reviewed, and listed in the module catalogue; the dependency graph
    stays visible.
 
-· Replay is first-class for read models; layer 2 modules never replay: their state is corrected by compensating
+â€¢ Replay is first-class for read models; layer 2 modules never replay: their state is corrected by compensating
    documents, never by re-processing history.
 
-· Poison events go to a dead-letter queue with an alert after three attempts and never block a source's
+â€¢ Poison events go to a dead-letter queue with an alert after three attempts and never block a source's
    subsequent events.
 
 8.4 Event catalogue by producer
@@ -704,7 +704,7 @@ M10 (P2)                                                                        
 
 8.5 Reference-data distribution to tills is not the event stream
 
-Decision (Proposed ­ ADR-34). Tills do not subscribe to domain events. They receive versioned snapshots
+Decision (Proposed â€“ ADR-34). Tills do not subscribe to domain events. They receive versioned snapshots
 and deltas assembled per shop by the edge sync gateway: catalogue with thumbnails for the shop's assortment,
 prices, rules, control prices, tax, lot lists, credit customers and balances, permissions, message catalogue. Each
 snapshot carries a version and an apply_from business date; the till applies it atomically so a bill is never
@@ -848,7 +848,7 @@ named Federation role; no feed exists). Google Play as an update channel is opti
 
 Choice                            Statement
 One database, schema per module
-(Proposed ­ ADR-29)               One PostgreSQL cluster; each module and kernel service owns a schema; no cross-schema foreign
+(Proposed â€“ ADR-29)               One PostgreSQL cluster; each module and kernel service owns a schema; no cross-schema foreign
 Scope on every row                keys; references by identifier; a connection pooler in front.
 
 Documents are append-only         owner_entity_id (and location_id where bound) on every operational table; row-level security policy
@@ -913,7 +913,7 @@ NFR-PRF-030 reconnection burst    Gateway rate limiting and backpressure; per-de
                                   queues; idempotent acceptance                                   from thousands of tills
 NFR-PRF-040 15-minute poll        Versioned snapshot/delta channel                                Delta size and apply time on the target
                                                                                                   terminal
-NFR-AVL-010 RTO 4­8 h, RPO        Replica plus point-in-time recovery; restore runbook            Restore drill before pilot; quarterly
+NFR-AVL-010 RTO 4â€“8 h, RPO        Replica plus point-in-time recovery; restore runbook            Restore drill before pilot; quarterly
 15 min
 NFR-AVL-020/050 offline trading,  Full local database, local counters, shared engine, one-writer  Spike 1: 48-hour disconnected soak with
 GRN, refunds                      split                                                           power-loss injection
@@ -963,7 +963,7 @@ ID            Decision                                                   Rationa
 ADR-28
 (revised)     Nine phase-1 modules plus Procurement (P2) plus a          Modular by mechanism; extraction possible; full-stack
 ADR-29
-ADR-30        kernel, four layers, rules R1­R7 enforced by build checks handover by module; phase-2 boundary exists from day one
+ADR-30        kernel, four layers, rules R1â€“R7 enforced by build checks handover by module; phase-2 boundary exists from day one
 ADR-31
               One PostgreSQL cluster, one schema per module, no          Single operational unit; module independence; scope at the
 ADR-32
@@ -1056,15 +1056,15 @@ Doc 20 omission of Procurement           Documentation    footprint against feat
 
 16. Next steps
 
-· Design review of this version with the technical leads and the DevOps engineer; accept or amend ADR-28 to
+â€¢ Design review of this version with the technical leads and the DevOps engineer; accept or amend ADR-28 to
    ADR-40; record outcomes in doc 09; raise the NFR-UPD-040 and doc 20 M10 change requests.
 
-· Present sections 4, 6, 9.2 and 10.3 to Federation admins: the business-visible boundaries.
-· Stand up the build skeleton: one repository, module descriptors for M1­M10 and the kernel, boundary
+â€¢ Present sections 4, 6, 9.2 and 10.3 to Federation admins: the business-visible boundaries.
+â€¢ Stand up the build skeleton: one repository, module descriptors for M1â€“M10 and the kernel, boundary
 
    verification tests, the document base, outbox and envelope in the kernel, the shared engine as a separate
    library module, two application instances in every environment from day one.
-· Proceed with Stage 2 per doc 20: doc 21 (M1) and doc 32 (sync contract) this week; spikes 1 and 5 as soon
+â€¢ Proceed with Stage 2 per doc 20: doc 21 (M1) and doc 32 (sync contract) this week; spikes 1 and 5 as soon
    as the envelope and outbox exist.
 
 Appendix A. Glossary of abbreviations

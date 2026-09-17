@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-32 ­ Sync Contract
+32 â€“ Sync Contract
 
 The contract between a till and central: what moves in each direction, in what unit, in
 what order, how it is acknowledged, how versions and gaps are handled, and what
@@ -9,10 +9,10 @@ change once terminals are in the field, so it is specified before the till is de
 
 Field     Value
 Document
-Version   32 ­ Sync Contract (design artefact; Stage 1/2 boundary; owned by the till track with the kernel's edge sync
+Version   32 â€“ Sync Contract (design artefact; Stage 1/2 boundary; owned by the till track with the kernel's edge sync
 Date      gateway)
 Status
-Inputs    v0.1 ­ draft for design review
+Inputs    v0.1 â€“ draft for design review
 
 Audience  7 September 2026
 
@@ -94,7 +94,7 @@ Document bundle         receipt.issued/voided/refunded,
                         grn.captured/confirmed, count.recorded,       The complete document: header, lines,    Kernel document base
 Stock movement          writeoff.requested (draft), repack.executed,  extension table rows, links, attachment  inserts; owning module's
 Audit                   transfer.issued (intra-entity at shop)        references with hashes, and the          handler (M6, M4, M5)
-                                                                      DRAFTISSUED state row;                   validates and publishes to the
+                                                                      DRAFTâ†’ISSUED state row;                  validates and publishes to the
 Till lifecycle          stock.moved                                   content_hash                             backbone
 
                         audit.* (every audited action on the till,    Movement rows for one document,          M5 ledger; balances
@@ -142,7 +142,7 @@ Step  Action                                                          Rule
 3     Compare first_seq with last_applied_seq
                                                                       One ingestion per device at a time on any instance (S7)
 4     Apply events in order in chunks of 50 per transaction
-                                                                      first_seq = last+1: proceed. first_seq  last: the batch (or its prefix) is a
+                                                                      first_seq = last+1: proceed. first_seq â‰¤ last: the batch (or its prefix) is a
 5     Business validation with the shared engine (ADR-31)             replay; answer from state without re-applying. first_seq > last+1: gap;
                                                                       409 with expected_seq (Section 7)
 6     Malformed event
@@ -179,7 +179,7 @@ Lost ack
                  If ingestion failed part-way, last_applied_seq is the last committed chunk; the till resends from last_applied_seq +
                  1 with a new batch_id. Already-applied events in the overlap are answered DUPLICATE.
 
-                 The till resends the same batch_id; central finds first_seq  cursor and answers from state; no double application
+                 The till resends the same batch_id; central finds first_seq â‰¤ cursor and answers from state; no double application
                  (S3).
 
 4. Attachments
@@ -281,7 +281,7 @@ Clock
 Situation                         Detection                         Handling
 Batch starts above the cursor     first_seq > last_applied_seq + 1
                                                                     409 with expected_seq. The till must resend from expected_seq; it can,
-Batch starts at or below the      first_seq  last_applied_seq       because unacknowledged rows are never purged. Repeated 409 for
+Batch starts at or below the      first_seq â‰¤ last_applied_seq      because unacknowledged rows are never purged. Repeated 409 for
 cursor                                                              the same device raises SYNC_ANOMALY.
 Duplicate event id with a         Inbox has event_id at another
 different sequence                seq                               Replay: answered from state; events above the cursor within the batch
@@ -356,9 +356,9 @@ Rate limiting
 
 Quantity                       Value                                                    Note
 Events per receipt             About 3 (bundle, one or two audit rows)                  Movements travel inside the bundle
-Bundle size                    About 2­4 KB compressed                                  Five lines, tenders, state row
+Bundle size                    About 2â€“4 KB compressed                                  Five lines, tenders, state row
 Steady upload per till         A few KB per minute                                      Negligible on a 0.5 Mbps uplink
-Two-day backlog per till       About 400 receipts at 200 a day; about 1­2 MB; two to    Drains in under a minute on the weakest link
+Two-day backlog per till       About 400 receipts at 200 a day; about 1â€“2 MB; two to    Drains in under a minute on the weakest link
                                four batches
 Fleet reconnection burst       Thousands of tills, two days each; central target 3,500  Rate limiting spreads it; projections lag with
                                events/s                                                 freshness stamps
@@ -420,13 +420,13 @@ DR-6     the till                                                               
      13. Traceability
 
 Section             Requirements and decisions
-1­3                 ADR-10, ADR-31; NFR-OFF-010/030; NFR-PRF-030; H-01, H-04; doc 19 6.1­6.3; doc 18 5.5
+1â€“3                 ADR-10, ADR-31; NFR-OFF-010/030; NFR-PRF-030; H-01, H-04; doc 19 6.1â€“6.3; doc 18 5.5
 4                   D-08, F-05 (photographic evidence); doc 18 document_attachment
 5                   ADR-34; NFR-PRF-040; G-08 (apply on propagation); doc 19 3.3 (signed permission snapshot); doc 20 M2 thumbnails
 6                   O-03 (freshness stamps); doc 31 health gates
-7­8                 ADR-11; FR-BIL-090 (counter transfer); J-05; N-05 (sync anomalies audited)
+7â€“8                 ADR-11; FR-BIL-090 (counter transfer); J-05; N-05 (sync anomalies audited)
 9                   NFR-SEC set; ADR-27; doc 19 2.1
-10­11               ADR-22; doc 14 sections 6 and 8 (spikes 1, 5)
+10â€“11               ADR-22; doc 14 sections 6 and 8 (spikes 1, 5)
 
      End of document. Draft for design review; message schemas are published as an OpenAPI slice and JSON schemas alongside
      this document once DR-1 to DR-5 are settled.

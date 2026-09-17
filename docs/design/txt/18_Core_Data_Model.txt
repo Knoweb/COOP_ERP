@@ -1,6 +1,6 @@
 Cooperative Retail and Distribution System
 
-18 ≠ Core Data Model
+18 ‚Äì Core Data Model
 
 Logical data model for the platform foundations: entity, location and tenancy scoping;
 stock keeping unit (SKU), unit of measure (UOM), batch and price ceilings; the
@@ -9,14 +9,14 @@ and the append-only audit log.
 
 Field           Value
 Document
-Version         18 ≠ Core Data Model (design artefact; first output of the design phase, Stage 1)
+Version         18 ‚Äì Core Data Model (design artefact; first output of the design phase, Stage 1)
 
-Date            v0.2 ≠ draft for design review (applies change requests CR-21-1, CR-21-2, sku_image, attributes, analyst role;
+Date            v0.2 ‚Äì draft for design review (applies change requests CR-21-1, CR-21-2, sku_image, attributes, analyst role;
 Status          aligns module ownership to doc 17 v0.2.1; adds Part E kernel event and sync tables)
 Inputs
                 8 September 2026
 Audience
-Scope boundary  Draft. Not yet reconciled against 17 ≠ Solution Architecture module boundaries (see Section 8).
+Scope boundary  Draft. Not yet reconciled against 17 ‚Äì Solution Architecture module boundaries (see Section 8).
 
                 02 Domain Model, 03 Document State Machines, 05 SRS, 06 NFR Specification, 07 Matrices, 09 Decisions Log
                 (ADR-03, 07, 08, 10, 11, 14, 15, 18, 26, 27), 16 Questionnaire Answers, and the September 2026 review
@@ -93,11 +93,11 @@ P10 Nothing is hard-deleted    Reference rows carry a status; users are deactiva
 
 Part                       Owning module                     Tables                                               Depends on
 
-A ≠ Entity, location, tenancy M1 Party, Tenancy & Security entity, entity_relationship, location, till_position, device, ≠
+A ‚Äì Entity, location, tenancy M1 Party, Tenancy & Security entity, entity_relationship, location, till_position, device, ‚Äì
                                                                                    app_user, role, permission, role_permission, user_role,
                                                                                    sod_pair
 
-B ≠ Catalogue, batch,      M2 Catalogue & Batch (uom, uom, sku, sku_uom_conversion, sku_barcode,                  A
+B ‚Äì Catalogue, batch,      M2 Catalogue & Batch (uom, uom, sku, sku_uom_conversion, sku_barcode,                  A
 ceilings
                            sku, conversions, barcodes, sku_alias, sku_image, tag, sku_tag, tax_category,
 
@@ -115,29 +115,29 @@ ceilings
 
                            repack_recipe)
 
-C ≠ Document base type Kernel: Documents &                   document_type, numbering_series, document,           A, B
+C ‚Äì Document base type Kernel: Documents &                   document_type, numbering_series, document,           A, B
 
                            Numbering base (document document_line, document_link,
 
                            types owned by M4, M5, M6) document_state_history, document_attachment
 
-D ≠ Audit log              Kernel: Audit                     audit_event, audit_event_type                        A (and references
+D ‚Äì Audit log              Kernel: Audit                     audit_event, audit_event_type                        A (and references
                                                                                                                   any table by type/id)
 
    18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System                                                           Page 2
 Part                    Owning module            Tables                                          Depends on
                                                                                                  A
-E ≠ Event backbone and  Kernel: Event backbone;  event_outbox, event_inbox, device_sync_cursor,
+E ‚Äì Event backbone and  Kernel: Event backbone;  event_outbox, event_inbox, device_sync_cursor,
 sync state              Edge sync gateway        sync_quarantine, snapshot_change_log,
                                                  idempotency_key
 
 Module-specific tables (M4 extension tables, M7 customers and accounts, M8 projections) are introduced by
 their module designs and are not part of this document; a module design raises a change request here only
 when a shared table changes. Part E holds the kernel tables that docs 19 and 32 rely on; the till's local copies of
-parts C≠E follow the same logical model (section 7).
+parts C‚ÄìE follow the same logical model (section 7).
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System                   Page 3
-3. Part A ≠ Entity, location and tenancy scoping
+3. Part A ‚Äì Entity, location and tenancy scoping
 
 The federation has three kinds of legal entity and one kind of place. A shop is a location, not an entity: it holds
 stock and issues receipts, but the legal party to every transaction is the multi-purpose cooperative society
@@ -177,10 +177,10 @@ status                   enum
 created_at, updated_at   timestamptz       no CLOSED state.
                                            Row bookkeeping.
 
-∑ The Federation row has entity_type = FEDERATION and is the only entity whose users may hold the
+‚Ä¢ The Federation row has entity_type = FEDERATION and is the only entity whose users may hold the
    federation-wide read-only view (Section 3.7).
 
-∑ There is no parent/child column between entities. Membership of the federation is implied by existence;
+‚Ä¢ There is no parent/child column between entities. Membership of the federation is implied by existence;
    trading tiers are expressed by entity_relationship, not by hierarchy.
 
 Table entity_relationship
@@ -207,10 +207,10 @@ status                   enum            ACTIVE | SUSPENDED.
 effective_from,          date            Relationships are effective-dated so that a re-negotiated price list is a new row,
 effective_to                             preserving history (P5).
 
-∑ Uniqueness: one ACTIVE row per (seller, buyer) at any date. Overlapping effective ranges are rejected by an
+‚Ä¢ Uniqueness: one ACTIVE row per (seller, buyer) at any date. Overlapping effective ranges are rejected by an
    exclusion constraint.
 
-∑ Intra-entity movements (Federation warehouse to warehouse; MPCS shop to sibling shop) are not
+‚Ä¢ Intra-entity movements (Federation warehouse to warehouse; MPCS shop to sibling shop) are not
    relationships. They are transfer documents inside one entity, at cost, with no invoice (C-10/C-11, E-01).
 
 Table location
@@ -237,7 +237,7 @@ primary_till_position_i  uuid FK         The till that holds the location-scoped
 d                        till_position   Reassignment is an audited event.
 status                   enum            PLANNED | ONBOARDING | ACTIVE | DORMANT.
 
-∑ Stock is held at location level. stock_lot (Part B) references location, never entity directly; entity ownership
+‚Ä¢ Stock is held at location level. stock_lot (Part B) references location, never entity directly; entity ownership
    is derived through the location.
 
 Table till_position
@@ -338,11 +338,11 @@ Row-level security    app.scope_location_id and app.scope_class from the        
 
 Column masking        Four policy classes applied to every operational table: OWN (rows   A distributor cannot see an MPCS's internal data
 views                 where owner_entity_id = scope); PARTY (documents where              beyond the documents they trade (FR-GOV-020);
-                      scope is seller or buyer ≠ read only the trading-facing columns);   a shop sees nothing of a sibling shop (M-05)
+                      scope is seller or buyer ‚Äì read only the trading-facing columns);   a shop sees nothing of a sibling shop (M-05)
                       FEDERATION_VIEW (SELECT on everything, no writes, granted           because shop-scoped users carry a location
-                      only to Federation roles ≠ M-02 to M-04);                           scope and shop-internal tables filter on it.
+                      only to Federation roles ‚Äì M-02 to M-04);                           scope and shop-internal tables filter on it.
                       EXTERNAL_TIMEBOXED (regulator and auditor roles, SELECT
-                      only, with valid_until, every grant audited ≠ M-10, J-09).
+                      only, with valid_until, every grant audited ‚Äì M-10, J-09).
 
                       For PARTY access, trading documents are exposed through             The buyer sees the seller's invoice, not the
                       views that omit the counterparty's internal columns (cost, margin,  seller's cost basis.
@@ -350,26 +350,26 @@ views                 where owner_entity_id = scope); PARTY (documents where    
 
 Invariants for Part A.
 
-∑ A-I1. Every operational table has a non-null owner_entity_id or derives one through a non-null
+‚Ä¢ A-I1. Every operational table has a non-null owner_entity_id or derives one through a non-null
    location_id.
 
-∑ A-I2. location.owner_entity_id is immutable after creation.
-∑ A-I3. At most one ACTIVE entity_relationship per (seller, buyer) at any date.
-∑ A-I4. A till_position belongs to exactly one SHOP location and its position_no is unique within it;
+‚Ä¢ A-I2. location.owner_entity_id is immutable after creation.
+‚Ä¢ A-I3. At most one ACTIVE entity_relationship per (seller, buyer) at any date.
+‚Ä¢ A-I4. A till_position belongs to exactly one SHOP location and its position_no is unique within it;
 
    positions are retired, never deleted.
-∑ A-I5. A device holds at most one till position at a time; the assignment change is an audited event carrying old
+‚Ä¢ A-I5. A device holds at most one till position at a time; the assignment change is an audited event carrying old
 
    and new position.
-∑ A-I6. No user may hold a role whose scope entity differs from their home entity unless the role class is
+‚Ä¢ A-I6. No user may hold a role whose scope entity differs from their home entity unless the role class is
 
    FEDERATION_VIEW or EXTERNAL_TIMEBOXED.
-∑ A-I7. Every location of type SHOP has a primary_till_position_id before it can issue any
+‚Ä¢ A-I7. Every location of type SHOP has a primary_till_position_id before it can issue any
 
    location-scoped document.
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System                                Page 7
-4. Part B ≠ Catalogue, units, batches and price ceilings
+4. Part B ‚Äì Catalogue, units, batches and price ceilings
 
 Three ideas structure this part. The SKU is what is counted and sold; the batch is a physical supply identity
 carrying expiry and the printed maximum retail price (MRP); the stock lot is an entity's holding of a batch at a
@@ -394,7 +394,7 @@ sku_code                varchar(12)      System-generated, opaque, never reused.
 owner_entity_id         UNIQUE           code lookup (B-11).
 status                  uuid FK entity   The steward. Federation for shared SKUs; the creating MPCS or distributor for local
                                          ones (B-08).
-short_name_en           enum             DRAFT | LOCAL | SHARED | INACTIVE. Promotion LOCALSHARED goes
+short_name_en           enum             DRAFT | LOCAL | SHARED | INACTIVE. Promotion LOCAL‚ÜíSHARED goes
 description_en / _si /                   through sku_alias (B-10). INACTIVE while stock remains is parked (B-17) but the
 _ta                     varchar(80) NOT  state exists.
 base_uom_code           NULL             Mandatory (P7). short_name_si, short_name_ta optional for local SKUs,
@@ -403,7 +403,7 @@ batch_tracked
                         FK uom           Unit in which stock balances are held. Weighed goods use KG.
 expiry_tracked          boolean          Weigh-and-price path at the till.
 expiry_warning_days     boolean          Whether receipts must capture a batch (B-04). If false, a synthetic per-GRN batch is
-tax_category_id                          still created so that MRP and cost always have a home ≠ see
+tax_category_id                          still created so that MRP and cost always have a home ‚Äì see
 multi_mrp_policy        boolean          batch.is_synthetic.
 origin_kind                              Subset of batch-tracked categories; enables FEFO (first expired, first out) and expiry
 attributes              smallint         warning windows (F-06).
@@ -427,7 +427,7 @@ sku_id, uom_code        PK (composite)
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System                                       Page 8
 Column            Type            Meaning and rules
-factor_to_base    numeric(14,6)   One uom_code = factor ◊ base units. Defined per SKU by the owner (B-13).
+factor_to_base    numeric(14,6)   One uom_code = factor √ó base units. Defined per SKU by the owner (B-13).
                   date            P5; a supplier changing case size is a new row.
 effective_from,
 effective_to
@@ -440,7 +440,7 @@ Column            Type            Meaning and rules
 barcode           varchar(48)     The scanned string after the scan layer has stripped any GS1 envelope. Unique
                                   together with symbology.
 symbology         enum            EAN13 | EAN8 | UPCA | GS1_128 | GS1_DATAMATRIX | GS1_QR |
-                                  INTERNAL. INTERNAL covers weigh-station 20≠29 prefix labels and batch stickers.
+                                  INTERNAL. INTERNAL covers weigh-station 20‚Äì29 prefix labels and batch stickers.
 sku_id            uuid FK sku
 uom_code          FK uom          A case barcode maps to the CASE unit of the same SKU.
 batch_id          uuid FK batch   Set when this barcode identifies one batch (batch sticker, MRP-wise label, or a 2D
@@ -541,7 +541,7 @@ last_movement_seq                     exception-report event.
                        bigint         Sequence of the last applied movement; guards idempotent re-application on sync
                                       replay.
 
-∑ Weighted-average cost of goods sold is computed per entity across its lots of a SKU at issue time (E-03). The
+‚Ä¢ Weighted-average cost of goods sold is computed per entity across its lots of a SKU at issue time (E-03). The
    lot keeps the acquisition cost; the entity's running average is a derived figure, so both IAS 2 cost and
    batch-level traceability survive.
 
@@ -590,10 +590,10 @@ effective_to            date           Gazette or direction number, for the rece
 gazette_reference       varchar(80)    Federation catalogue steward only; every insert is an audited event. There is no
 entered_by, entered_at                 update: a correction is a new row and an effective_to on the old one.
 
-∑ Enforcement is a hard block, never a warning: no receipt line, price-list line, discount rule outcome or printed
+‚Ä¢ Enforcement is a hard block, never a warning: no receipt line, price-list line, discount rule outcome or printed
    label may exceed the control price in force on the transaction date (G-03).
 
-∑ Federation is the only writer (P6). Tills cache the table; a till whose cache is older than a configured age
+‚Ä¢ Federation is the only writer (P6). Tills cache the table; a till whose cache is older than a configured age
    warns the operator that ceilings may be stale.
 
 Price lists and rules (M3), and the repack recipe (M5); summarised here because Part C documents
@@ -626,33 +626,33 @@ repack_recipe                                                    true.
 For a scanned line, the effective selling price is: min( list price, lowest printed MRP among batches with positive
 on-hand at the location, control price in force ), then discount rules apply, then the control price is re-checked as a
 hard cap. When multi_mrp_policy = BARCODE_RESOLVED and the scanned barcode carries a batch_id, that
-batch's MRP replaces the "lowest" term. When the policy is PICKER, the operator's choice is recorded on the line with
+batch's MRP replaces the ‚Äúlowest‚Äù term. When the policy is PICKER, the operator's choice is recorded on the line with
 the alternatives presented. In every case the receipt line stores batch_id, mrp_applied,
 control_price_applied and cap_reason, so the legality of every line is reproducible from the row alone.
 
 Invariants for Part B.
 
-∑ B-I1. sku.short_name_en is non-null for every status; _si and _ta are non-null for SHARED.
-∑ B-I2. A barcode string is unique per symbology across the whole catalogue; two SKUs can never claim the
+‚Ä¢ B-I1. sku.short_name_en is non-null for every status; _si and _ta are non-null for SHARED.
+‚Ä¢ B-I2. A barcode string is unique per symbology across the whole catalogue; two SKUs can never claim the
 
    same factory barcode. INTERNAL barcodes are unique within their owner entity.
-∑ B-I3. Every stock_lot references a batch of the same SKU as the receiving document line.
-∑ B-I4. stock_lot.qty_on_hand equals the sum of stock_movement.qty_delta for that lot; a nightly
+‚Ä¢ B-I3. Every stock_lot references a batch of the same SKU as the receiving document line.
+‚Ä¢ B-I4. stock_lot.qty_on_hand equals the sum of stock_movement.qty_delta for that lot; a nightly
 
    reconciliation job asserts it and raises an exception event on drift.
-∑ B-I5. No stock_movement row exists without a document_id.
-∑ B-I6. At most one control_price in force per (sku or tag) per date; overlapping rows are rejected by an
+‚Ä¢ B-I5. No stock_movement row exists without a document_id.
+‚Ä¢ B-I6. At most one control_price in force per (sku or tag) per date; overlapping rows are rejected by an
 
    exclusion constraint.
-∑ B-I7. A price_list_line or discount-rule benefit that would yield a price above a control price in force is
+‚Ä¢ B-I7. A price_list_line or discount-rule benefit that would yield a price above a control price in force is
 
    rejected at authoring, not merely at sale.
-∑ B-I8. A batch's printed_mrp is immutable; a mis-keyed MRP is corrected by an audited batch-correction
+‚Ä¢ B-I8. A batch's printed_mrp is immutable; a mis-keyed MRP is corrected by an audited batch-correction
 
    event that creates a new batch and re-points the lot.
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System  Page 12
-5. Part C ≠ The document base type
+5. Part C ‚Äì The document base type
 
 Every trading and stock artefact in the system is a document: order, delivery note, goods received note (GRN),
 invoice, credit and debit note, payment receipt, till receipt, write-off, count, adjustment, repack, transfer, opening
@@ -729,7 +729,7 @@ status               till_position
                                        its series.
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System   Page 13
-∑ Pre-reserved number ranges were evaluated and rejected (J-05, ADR-11). Each series has one counter with
+‚Ä¢ Pre-reserved number ranges were evaluated and rejected (J-05, ADR-11). Each series has one counter with
    one writer; that is the whole mechanism.
 
 Table document
@@ -821,14 +821,14 @@ amount
 created_at, created_by  enum              REVERSES (full void: same lines negated, e.g. till void, GRN reversal); CREDITS
                                           (credit note against invoice; refund receipt against receipt); DEBITS; ADJUSTS
                                           (count adjustment against a count; correction receipt with the delta only); SETTLES
-                                          (payment receipt against specific invoices ≠ I-07, never oldest-first); DISPUTES
+                                          (payment receipt against specific invoices ‚Äì I-07, never oldest-first); DISPUTES
                                           (discrepancy or claim against a GRN or DN); SUPERSEDES (re-issued draft, drafts
                                           only).
 
                         numeric(14,2)     For SETTLES and CREDITS: the amount applied to that specific original, so partial
                         (nullable)        settlement across several invoices is explicit.
 
-∑ Rules: a REVERSES link may exist at most once per original and only while the original is in a reversible
+‚Ä¢ Rules: a REVERSES link may exist at most once per original and only while the original is in a reversible
    state per doc 03 (repack reversal eligibility is one such state rule). A reversed document and its reversal both
    keep their numbers. The net position of any original is the original plus the sum of its linked corrections;
    reports never re-read a corrected original alone.
@@ -887,7 +887,7 @@ Step  Action                                                                    
       acknowledged.                                                                         Central never re-numbers; the device's
                                                                                             number is final.
       Freeze totals, compute content_hash, set issued_at, write the
-      DRAFTISSUED state row and the first audit event.
+      DRAFT‚ÜíISSUED state row and the first audit event.
 
       Apply stock movements for stock-effecting types.
 
@@ -909,32 +909,32 @@ ENTITY                                                                          
 
 Invariants for Part C.
 
-∑ C-I1. No column of document or document_line changes after issued_at is non-null, except status,
+‚Ä¢ C-I1. No column of document or document_line changes after issued_at is non-null, except status,
    which changes only through document_state_history. Enforced by a database trigger that raises on any
    other UPDATE, and by the absence of UPDATE privilege on lines.
 
-∑ C-I2. (series_id, doc_number) is unique and, within a series, dense: for every issued number n > 1,
-   number n-1 exists. Verified by the nightly gap check and by the sync anomaly check.
+‚Ä¢ C-I2. (series_id, doc_number) is unique and, within a series, dense: for every issued number n > 1,
+   number n‚àí1 exists. Verified by the nightly gap check and by the sync anomaly check.
 
-∑ C-I3. A document's series scope matches its type's series_scope: a GRN always draws from a
+‚Ä¢ C-I3. A document's series scope matches its type's series_scope: a GRN always draws from a
    LOCATION series of the receiving shop; an order always from the buyer's ENTITY series.
 
-∑ C-I4. A bilateral document has a non-null counterparty and the pair (owner, counterparty) has an
+‚Ä¢ C-I4. A bilateral document has a non-null counterparty and the pair (owner, counterparty) has an
    entity_relationship in force on business_date.
 
-∑ C-I5. Every issued document has exactly one DRAFTISSUED row in document_state_history with
+‚Ä¢ C-I5. Every issued document has exactly one DRAFT‚ÜíISSUED row in document_state_history with
    occurred_at = document.issued_at.
 
-∑ C-I6. A correction never changes the original: the original's rows are byte-identical before and after the
+‚Ä¢ C-I6. A correction never changes the original: the original's rows are byte-identical before and after the
    correction; the correction is discoverable only through document_link.
 
-∑ C-I7. content_hash recomputed from stored rows equals the stored value; verified on sync and by a
+‚Ä¢ C-I7. content_hash recomputed from stored rows equals the stored value; verified on sync and by a
    sampled nightly job.
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System              Page 16
-6. Part D ≠ Append-only audit log
+6. Part D ‚Äì Append-only audit log
 
-The audit log answers "who did what, to which record, when, from where, and why" for every event in the
+The audit log answers ‚Äúwho did what, to which record, when, from where, and why‚Äù for every event in the
 catalogue of doc 07 section 3. It is deliberately simpler than the tables it observes: one wide table, insert-only,
 partitioned by month, retained indefinitely (J-06), with reserved columns for the phase-2 hash chain (N-05).
 
@@ -1006,11 +1006,11 @@ prev_hash, row_hash
                                           SHA-256(prev_hash || canonical row) per partition.
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System                        Page 17
-∑ Enforcement is structural, not procedural: the application database role holds INSERT on audit_event and
+‚Ä¢ Enforcement is structural, not procedural: the application database role holds INSERT on audit_event and
    nothing else; no trigger, function or job in the application schema may UPDATE or DELETE it; partitions are
    detached to cold storage, never dropped, under the retention policy pending J-06.
 
-∑ Personal data: the audit log stores identifiers, not PII (personally identifiable information). A customer phone
+‚Ä¢ Personal data: the audit log stores identifiers, not PII (personally identifiable information). A customer phone
    change records the customer id and the fact of change; the values live in the customer table under PDPA
    (Personal Data Protection Act) rules (ADR-27).
 
@@ -1021,24 +1021,24 @@ sync, which is why federation-level exception reports carry the per-entity data-
 
 Invariants for Part D.
 
-∑ D-I1. No UPDATE or DELETE ever succeeds on audit_event from the application role; a test asserts the
+‚Ä¢ D-I1. No UPDATE or DELETE ever succeeds on audit_event from the application role; a test asserts the
    privilege set on every deployment.
 
-∑ D-I2. Every document state transition has a corresponding audit event with the same correlation_id.
-∑ D-I3. Every event type marked REVIEW or ALERT has a non-null reviewer role template before it can be
+‚Ä¢ D-I2. Every document state transition has a corresponding audit event with the same correlation_id.
+‚Ä¢ D-I3. Every event type marked REVIEW or ALERT has a non-null reviewer role template before it can be
 
    raised in production.
-∑ D-I4. (device_id, device_seq) is unique and dense per device; gaps raise SYNC_ANOMALY.
-∑ D-I5. Audit reads obey the same RLS policy classes as operational reads; the Federation and auditors read
+‚Ä¢ D-I4. (device_id, device_seq) is unique and dense per device; gaps raise SYNC_ANOMALY.
+‚Ä¢ D-I5. Audit reads obey the same RLS policy classes as operational reads; the Federation and auditors read
 
    view-only.
 
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System  Page 18
 18 - Core Data Model | v0.2 draft | Cooperative Retail and Distribution System  Page 19
-6A. Part E ≠ Event backbone and sync state (kernel)
+6A. Part E ‚Äì Event backbone and sync state (kernel)
 
 The kernel tables docs 19 and 32 rely on. All are append-only or single-writer bookkeeping; none holds business
-facts that are not also in parts A≠D. The till carries local equivalents of event_outbox and idempotency state.
+facts that are not also in parts A‚ÄìD. The till carries local equivalents of event_outbox and idempotency state.
 
 Table event_outbox
 Transactional outbox and archive (doc 19 6.2, doc 17 ADR-30): the system of record for domain events, written
@@ -1071,7 +1071,7 @@ payload
 
 published_at
 
-∑ Insert-only for the application role; the relay holds UPDATE on published_at only.
+‚Ä¢ Insert-only for the application role; the relay holds UPDATE on published_at only.
 
 Table event_inbox
 Per-consumer idempotency record (doc 19 6.2): which event ids a consumer has applied.
@@ -1162,16 +1162,16 @@ created_at              char(64)          A reused key with a different request 
 
 Invariants for Part E.
 
-∑ E-I1. Every business transaction that changes a table in parts A≠C inserts at least one event_outbox row in
+‚Ä¢ E-I1. Every business transaction that changes a table in parts A‚ÄìC inserts at least one event_outbox row in
    the same transaction.
 
-∑ E-I2. (source, source_seq) is unique and dense per source; central raises SYNC_ANOMALY on a gap
+‚Ä¢ E-I2. (source, source_seq) is unique and dense per source; central raises SYNC_ANOMALY on a gap
    that is not explained by sync_quarantine.
 
-∑ E-I3. device_sync_cursor.last_applied_seq never decreases except through the audited sequence-reset
+‚Ä¢ E-I3. device_sync_cursor.last_applied_seq never decreases except through the audited sequence-reset
    procedure (doc 32 section 8).
 
-∑ E-I4. A location's snapshot_change_log versions are dense; a delta is the contiguous range from the device's
+‚Ä¢ E-I4. A location's snapshot_change_log versions are dense; a delta is the contiguous range from the device's
    version + 1.
 
 7. Cross-cutting conventions
@@ -1243,11 +1243,11 @@ DR-8                                                                            
       non-batch-tracked SKUs                                                                            the lot instead; price resolution 4.9
                                                                                                         would branch on tracking flag.
 
-      Alignment with 17 ≠ Solution   Closed in v0.2: ownership  ≠                                       ≠
+      Alignment with 17 ‚Äì Solution   Closed in v0.2: ownership  ‚Äì                                       ‚Äì
 
       Architecture module ownership follows doc 17 v0.2.1
 
-                                     (M1≠M9 and kernel)
+                                     (M1‚ÄìM9 and kernel)
 
       Single-staff write-off witness rule Remote MPCS approver as Federation admins                     witness_user_id becomes nullable with
                                                      witness with mandatory photo (ratification batch)  a stated reason code instead.
@@ -1278,32 +1278,32 @@ state history                                   D-08; F-03 to F-05; H-02/H-03 (o
 audit_event, audit_event_type                   FR-SEC-050 (immutable audit); N-05, N-06, N-07, N-09; doc 07 section 3 event catalogue;
                                                 J-06 retention; ADR-27 minimal PII
 Part E kernel tables                            ADR-30 (outbox archive); doc 19 6.2; doc 32 sections 2, 3, 5, 7; doc 14 1.3 (idempotency)
-sod_pair, entity officer fields, sku_image,     CR-21-1, CR-21-2 (doc 21); doc 20 Appendix A (images, attributes, analyst role ≠ the
+sod_pair, entity officer fields, sku_image,     CR-21-1, CR-21-2 (doc 21); doc 20 Appendix A (images, attributes, analyst role ‚Äì the
 sku.attributes                                  analyst role is a permission row rpt.analyst.query in the M1 seed data, not a table)
 
 10. Abbreviations used in this document
 
 Term        Meaning
-AI          Application Identifier ≠ the numbered data fields inside a GS1 barcode (AI 01 product number, AI 10 batch, AI 17
+AI          Application Identifier ‚Äì the numbered data fields inside a GS1 barcode (AI 01 product number, AI 10 batch, AI 17
             expiry).
-FEFO        First expired, first out ≠ the picking rule for expiry-tracked goods.
-GRN         Goods received note ≠ the receiving entity's record of what actually arrived; the moment ownership transfers.
+FEFO        First expired, first out ‚Äì the picking rule for expiry-tracked goods.
+GRN         Goods received note ‚Äì the receiving entity's record of what actually arrived; the moment ownership transfers.
 GS1         The global standards body for product identification and barcodes.
-ICU         International Components for Unicode ≠ the library providing correct sorting and comparison for Sinhala and Tamil.
+ICU         International Components for Unicode ‚Äì the library providing correct sorting and comparison for Sinhala and Tamil.
 IRD         Inland Revenue Department of Sri Lanka.
 LKR         Sri Lankan rupee.
 MFA / TOTP  Multi-factor authentication / time-based one-time password.
-MPCS        Multi-purpose cooperative society ≠ the legal entity that owns retail shops.
+MPCS        Multi-purpose cooperative society ‚Äì the legal entity that owns retail shops.
 MRP         Maximum retail price printed on a pack.
 PDPA        Personal Data Protection Act No. 9 of 2022 (Sri Lanka).
 PII         Personally identifiable information.
-POS         Point of sale ≠ the till.
+POS         Point of sale ‚Äì the till.
 RBAC        Role-based access control.
-RLS         Row-level security ≠ database policies that filter rows by the caller's scope.
-SKU         Stock keeping unit ≠ the smallest distinctly tracked and counted item.
+RLS         Row-level security ‚Äì database policies that filter rows by the caller's scope.
+SKU         Stock keeping unit ‚Äì the smallest distinctly tracked and counted item.
 UOM         Unit of measure.
 UTC         Coordinated Universal Time.
-UUIDv7      Universally unique identifier, version 7 ≠ time-ordered random identifier safe to generate on disconnected devices.
+UUIDv7      Universally unique identifier, version 7 ‚Äì time-ordered random identifier safe to generate on disconnected devices.
 VAT         Value Added Tax.
 
 End of document. Draft for design review; subject to revision after the decision requests in Section 8 are answered.
