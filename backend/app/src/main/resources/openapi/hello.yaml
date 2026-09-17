@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: COOP ERP Hello API
+  version: 0.0.1
+paths:
+  /v1/hello/greetings:
+    post:
+      operationId: registerGreeting
+      x-permission: hello.greeting.register
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterGreetingRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GreetingResponse' }
+  /v1/hello/greetings/{id}:
+    get:
+      operationId: getGreeting
+      x-permission: hello.greeting.read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Greeting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GreetingResponse' }
+components:
+  schemas:
+    RegisterGreetingRequest:
+      type: object
+      required: [textEn]
+      properties:
+        textEn: { type: string, minLength: 1 }
+        textSi: { type: [string, 'null'] }
+        textTa: { type: [string, 'null'] }
+    GreetingResponse:
+      type: object
+      required: [id, textEn, status]
+      properties:
+        id: { type: string, format: uuid }
+        textEn: { type: string }
+        textSi: { type: [string, 'null'] }
+        textTa: { type: [string, 'null'] }
+        status: { type: string }
