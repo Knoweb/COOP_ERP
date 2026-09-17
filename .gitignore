@@ -40,3 +40,5 @@ playwright-report/
 
 # Local compose state
 infra/compose/data/
+
+**/bin/
