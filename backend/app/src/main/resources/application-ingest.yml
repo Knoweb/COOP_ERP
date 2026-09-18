@@ -3,7 +3,7 @@ spring:
     activate:
       on-profile: ingest
 
-knoweb:
+coop-erp:
   role: ingest
 
 management:
