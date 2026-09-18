@@ -31,4 +31,8 @@ gen-clients:
 	@echo "gen-clients command not yet implemented"
 
 new-module:
-	@echo "new-module command not yet implemented"
+	@if [ -z "$(NAME)" ] || [ -z "$(SCHEMA)" ]; then \
+		echo "Usage: make new-module NAME=m2catalogue SCHEMA=catalogue"; \
+	else \
+		python tools/new_module.py --name $(NAME) --schema $(SCHEMA); \
+	fi
