@@ -3,6 +3,10 @@ services:
     image: postgres:16
     ports:
       - "5434:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=coop_erp
 
   pgbouncer:
     image: edoburu/pgbouncer
@@ -33,7 +37,6 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
-
   # backend:
   #   image: placeholder-backend
   #   ports:
