@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Table;
@@ -22,7 +23,9 @@ import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
 /**
  * Rules R1 to R7 of doc 17 §6.1 as tests (17A §5). They are the only reason a
- * modular monolith stays modular; a violation fails the build.
+ * modular monolith stays modular; a violation fails the build. The rules are
+ * static methods so that {@link ArchitectureRulesBiteTest} can prove each one
+ * reports a violation against deliberately wrong classes.
  */
 class ArchitectureTests {
 
@@ -32,8 +35,22 @@ class ArchitectureTests {
             .withImportOption(new ImportOption.DoNotIncludeTests())
             .importPackages(CoopErpApplication.class.getPackageName());
 
+    private static final String[] BUSINESS_PACKAGES = {
+            "..m1party..",
+            "..m2catalogue..",
+            "..m3pricing..",
+            "..m4trading..",
+            "..m5inventory..",
+            "..m6pos..",
+            "..m7customers..",
+            "..m8reporting..",
+            "..m9integration..",
+            "..m10procurement..",
+            "..hello.."
+    };
+
     /** Module package name to the database schemas it owns (17A §2, doc 18 Part F). */
-    private static final Map<String, Set<String>> SCHEMA_OWNERSHIP = Map.ofEntries(
+    static final Map<String, Set<String>> SCHEMA_OWNERSHIP = Map.ofEntries(
             Map.entry("kernel", Set.of("kernel")),
             Map.entry("hello", Set.of("hello")),
             Map.entry("m1party", Set.of("party", "security")),
@@ -59,9 +76,33 @@ class ArchitectureTests {
     }
 
     @Test
-    void layersAreRespected() {                 // R2, R3: kernel -> master data -> transactions -> read side
+    void layersAreRespected() {                 // R2, R3
+        layersRule().check(CLASSES);
+    }
 
-        layeredArchitecture()
+    @Test
+    void entitiesStayInTheirModuleSchema() {    // R4
+        entitiesInOwnSchemaRule().check(CLASSES);
+    }
+
+    @Test
+    void kernelImportsNoBusinessModule() {      // R5
+        kernelImportsNoModuleRule().check(CLASSES);
+    }
+
+    @Test
+    void businessModulesDoNotAccessKernelInternals() {
+        noKernelInternalsRule().check(CLASSES);
+    }
+
+    @Test
+    void commandHandlersCarryPermissions() {    // R7
+        handlersCarryPermissionRule().check(CLASSES);
+    }
+
+    /** R2, R3: kernel -> master data (M1-M3) -> transactions (M4-M7, M10) -> read side (M8, M9). */
+    static ArchRule layersRule() {
+        return layeredArchitecture()
                 .consideringOnlyDependenciesInLayers()
                 .withOptionalLayers(true)
                 .layer("kernel").definedBy("..kernel..")
@@ -81,78 +122,47 @@ class ArchitectureTests {
                 .whereLayer("master").mayOnlyAccessLayers("kernel")
                 .whereLayer("transactions").mayOnlyAccessLayers("kernel", "master")
                 .whereLayer("read").mayOnlyAccessLayers("kernel", "master", "transactions")
-                .allowEmptyShould(true)
-                .check(CLASSES);
+                .allowEmptyShould(true);
     }
 
-    @Test
-    void entitiesStayInTheirModuleSchema() {    // R4: a module's tables live in its own schema only
-
-        classes()
+    /** R4: every entity names a schema, and one its own module owns. */
+    static ArchRule entitiesInOwnSchemaRule() {
+        return classes()
                 .that()
                 .areAnnotatedWith(Table.class)
                 .should(declareTheirOwnModuleSchema())
-                .allowEmptyShould(true)
-                .check(CLASSES);
+                .allowEmptyShould(true);
     }
 
-    @Test
-    void kernelImportsNoBusinessModule() {      // R5
-
-        noClasses()
+    /** R5: the kernel depends on no module. */
+    static ArchRule kernelImportsNoModuleRule() {
+        return noClasses()
                 .that()
                 .resideInAPackage("..kernel..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(
-                        "..m1party..",
-                        "..m2catalogue..",
-                        "..m3pricing..",
-                        "..m4trading..",
-                        "..m5inventory..",
-                        "..m6pos..",
-                        "..m7customers..",
-                        "..m8reporting..",
-                        "..m9integration..",
-                        "..m10procurement..",
-                        "..hello..")
-                .allowEmptyShould(true)
-                .check(CLASSES);
+                .resideInAnyPackage(BUSINESS_PACKAGES)
+                .allowEmptyShould(true);
     }
 
-    @Test
-    void businessModulesDoNotAccessKernelInternals() {
-
-        noClasses()
+    /** Modules use the kernel through kernel.api only. */
+    static ArchRule noKernelInternalsRule() {
+        return noClasses()
                 .that()
-                .resideInAnyPackage(
-                        "..m1party..",
-                        "..m2catalogue..",
-                        "..m3pricing..",
-                        "..m4trading..",
-                        "..m5inventory..",
-                        "..m6pos..",
-                        "..m7customers..",
-                        "..m8reporting..",
-                        "..m9integration..",
-                        "..m10procurement..",
-                        "..hello..")
+                .resideInAnyPackage(BUSINESS_PACKAGES)
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..kernel.internal..")
-                .allowEmptyShould(true)
-                .check(CLASSES);
+                .allowEmptyShould(true);
     }
 
-    @Test
-    void commandHandlersCarryPermissions() {    // R7: no handler without a permission
-
-        classes()
+    /** R7: no handler without a permission. */
+    static ArchRule handlersCarryPermissionRule() {
+        return classes()
                 .that()
                 .areAnnotatedWith(CommandHandler.class)
                 .should(haveNonBlankPermission())
-                .allowEmptyShould(true)
-                .check(CLASSES);
+                .allowEmptyShould(true);
     }
 
     private static ArchCondition<JavaClass> declareTheirOwnModuleSchema() {
