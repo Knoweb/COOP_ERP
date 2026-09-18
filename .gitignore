@@ -42,3 +42,5 @@ playwright-report/
 infra/compose/data/
 
 **/bin/
+
+web/.vite/

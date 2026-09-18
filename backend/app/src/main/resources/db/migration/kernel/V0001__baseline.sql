@@ -36,10 +36,25 @@ CREATE SCHEMA IF NOT EXISTS customers;
 CREATE SCHEMA IF NOT EXISTS reporting;
 CREATE SCHEMA IF NOT EXISTS integration;
 
--- Application group roles
-CREATE ROLE app_rw NOLOGIN;
-CREATE ROLE app_relay NOLOGIN;
-CREATE ROLE app_report NOLOGIN;
+-- Application group roles (doc 18 P4, P10): the application never holds DDL,
+-- UPDATE or DELETE on ledgers. Roles are cluster-wide, so a second database in
+-- the same cluster (a test database, Testcontainers reuse) must not fail here:
+-- each role is created only when absent.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_rw') THEN
+        CREATE ROLE app_rw NOLOGIN;      -- module code
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_relay') THEN
+        CREATE ROLE app_relay NOLOGIN;   -- outbox relay: UPDATE published_at only
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_report') THEN
+        CREATE ROLE app_report NOLOGIN;  -- reporting projections and the analyst role
+    END IF;
+END
+$$;
 
 GRANT USAGE ON SCHEMA
     kernel,

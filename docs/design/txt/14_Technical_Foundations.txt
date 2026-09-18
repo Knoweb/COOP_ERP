@@ -1,0 +1,551 @@
+Cooperative Retail and Distribution System
+
+14 – Technical Foundations
+
+The planning basis engineering inherits: architecture posture and its rationale, the
+technology stack, the till platform, a provider-neutral hosting and capacity model with the
+hosting decision framed as a matrix, the standards roadmap by phase, the integration
+seams, the assurance sequence that retires the largest technical risks before build, and
+the register of technical decisions resolved and open.
+
+Field     Value
+Document
+Version   14 – Technical Foundations (planning basis; Stage 1 of the design phase; number reserved in the register since
+Date      August 2026)
+Status
+          v0.2 – draft for design review (adds section 1.3, stateless scale-out)
+Inputs
+          7 September 2026
+Audience
+          Draft. Written provider-neutral by decision: hosting is chosen from the matrix in Section 5 once quotes are in; the
+          till terminal model is chosen after the Section 8 spikes. Nothing downstream should cite a provider or a terminal
+          brand.
+
+          06 NFR Specification; 09 Decisions Log (ADR-10, 19–25); 16 Questionnaire Answers (H, Q, R, S); 18 Core Data
+          Model; 19 Cross-Cutting Services; 20 Stage 2 plan v0.2; 30 Frontend Foundations; 31 Update and Distribution;
+          the August 2026 technical discussion (stack fit, hosting cost basis, Android direction) and the September 2026
+          review decisions.
+
+          Engineering leads, DevOps, hardware procurement, the federation technical reviewer. Sections 1, 5 and 9 for
+          programme readers.
+
+What this document is not. It is not the solution architecture (doc 17 owns module boundaries and the event
+backbone) and not the deployment design (doc 35 makes the chosen hosting concrete). It is the floor both of those
+stand on: the choices that are stable across providers and vendors, the numbers that size everything, and the
+decisions that must close before Stage 2 week 3.
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System  Page 1
+1. Architecture posture
+
+Six properties of the problem decide the posture. Each maps to one architectural commitment, and the
+commitments are deliberately few.
+
+Property of the problem                          Commitment                                                     Where it is designed
+876 legal entities trading with each other; one                                                                 Doc 18 section 3.7
+federation view                                  One shared database, rows owned by entity, row-level
+Ownership and risk transfer at GRN; documents    security; no per-tenant schemas                                Doc 18 parts C and D
+are legal records
+Tills must trade 1–2 days offline on poor links  Immutable documents, gapless series, compensating              Doc 19 section 6, doc 32
+                                                 corrections, append-only ledgers
+Single DevOps engineer operating model                                                                          This document, doc 20
+                                                 Offline-first till with a full local database; one writer per  section 4
+10,000 shops, 3 million receipts a day at the    record type; sequence-ordered idempotent sync; no merge        Section 6, doc 19 6.2
+horizon                                          logic
+Trilingual, low computer familiarity                                                                            Doc 19 section 5, doc 30
+                                                 Modular monolith, one deployable, managed or simple
+                                                 services, no orchestration platform in phase 1
+
+                                                 Partitioned ledgers, outbox-fed projections on a replica,
+                                                 ingest designed for reconnection bursts
+
+                                                 Screens as paper; ICU collation and normalisation; raster
+                                                 receipts; three-column names with English anchor
+
+1.1 Modular monolith, enforced
+
+The application is one Spring Boot deployable organised as modules with build-time boundary enforcement
+(Spring Modulith): a module's tables, services and events are its own; other modules use its published
+commands and queries or react to its events through the transactional outbox. The enforcement is what keeps a
+monolith from rotting into a tangle; it also keeps extraction into a separate service possible later, which is the
+answer to “what if one module needs to scale alone” (doc 20 Appendix A).
+
+1.2 Portability as the hedge
+
+Because hosting is undecided and may change at the pilot gate, every infrastructure dependency is chosen for
+portability: PostgreSQL, an AMQP or NATS broker, S3-compatible object storage, OCI containers, OpenID
+Connect. Moving between a cloud provider and local hosting is then a deployment exercise (doc 35), not a
+redesign.
+
+1.3 Stateless scale-out: any request to any instance
+
+Application instances hold no request-affinity state, so an instance can be added, removed or replaced at any
+moment and the load balancer needs no sticky sessions. A request from a user or a till that last spoke to
+instance A is served identically by instance B. The rules that make this true:
+
+Concern           Rule                                         Mechanism
+HTTP session      None. No server-side session store; Spring
+                  Security runs stateless.                     Identity, scope, roles version and MFA freshness travel in the
+Permission and                                                 access token (doc 19 section 1); refresh tokens live in the identity
+reference caches  Per-instance in-memory caches keyed by       provider, not the application.
+Till sync         catalogue version; never authoritative.
+                                                               Invalidation by a version-bump event fanned out through the broker;
+Command retries   Every upload batch is self-contained and     a new instance warms from the database on start. No shared cache
+after failover    idempotent; the acknowledgement is derived   service in phase 1.
+Singleton work    from database state, not instance memory.
+                  A retried command must not execute twice.    The device's last applied source_seq lives in a row locked for
+File and image                                                 update during ingest; the till keeps one batch in flight, so two
+uploads           Outbox relay, end-of-day aggregation, gap    instances can never interleave one device's sequence.
+                  checks, expiry tasks run once, not once per
+                  instance.                                    Idempotency key header on every mutating web command,
+                  Never touch instance disk.                   recorded with the result in the database; the same key returns the
+                                                               same result from any instance.
+
+                                                               Clustered scheduler locks (database advisory lock or ShedLock
+                                                               class); the relay may be partitioned by source for throughput, each
+                                                               partition singly owned.
+
+                                                               Streamed to object storage; large uploads use pre-signed URLs
+                                                               from the device straight to storage.
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                            Page 2
+Concern              Rule                                                Mechanism
+Push to web clients  No instance-bound connections in phase 1.
+                                                                         Polling with stale-while-revalidate; if server-sent events are added
+Database             Adding instances must not exhaust                   later, each instance subscribes to the broker so any instance can
+connections          PostgreSQL connections.                             deliver.
+Load balancer
+                     Layer-7, least-connections or round-robin,          A connection pooler (PgBouncer class) in front of the primary;
+Proof                health-checked, connection-draining on              per-instance pool size × instance count stays under the pooler's
+                     removal, TLS terminated at the edge.                ceiling.
+
+                     Instance-affinity bugs are caught before            Readiness endpoint reports true only after caches are warm and the
+                     production.                                         database is reachable; removal drains in-flight requests before the
+                                                                         instance stops.
+
+                                                                         Development, CI and the pilot always run at least two instances; a
+                                                                         test suite drives one client across both.
+
+The scaling ceiling is therefore the database, not the application: writes scale vertically and by partition pruning,
+reads by the reporting replica. That is the intended shape for a single-DevOps model; the application tier is the
+cheap, elastic part.
+
+2. Technology stack
+
+Layer                   Choice                                           Rationale and constraints
+Backend language and
+framework               Java 21, Spring Boot 3, Spring Modulith          Team experience (Java/Spring); Modulith enforces the module
+Database                                                                 boundaries of doc 20 section 2.1; long-term support releases
+                                                                         only.
+Broker
+Identity provider       PostgreSQL 16+                                   ICU collations for Sinhala and Tamil, row-level security, range
+Object storage                                                           partitioning, exclusion constraints for effective-dated uniqueness,
+Web back office                                                          logical replication for the reporting replica. Schema migrations
+                                                                         with Flyway, forward-only, expand-then-contract.
+Till application
+Driver application      RabbitMQ (quorum queues) by default; NATS Fan-out and buffering only; the outbox retains (doc 19 DR-2).
+API
+Rendering               JetStream as the lighter alternative             Kafka deferred.
+
+Search                  Keycloak-class OIDC provider, self-hosted,       Doc 19 DR-1; TOTP, client-certificate device auth, admin API
+Edge                    single realm                                     wrapped behind the scope rule.
+Runtime and deployment
+                        S3-compatible bucket service                     Attachments, images, release packages, audit hash anchors
+Observability                                                            (write-once bucket).
+
+Secrets and keys        React 18+, TypeScript, Vite; headless            Doc 30 section 3.
+Device management       component primitives styled by the design
+                        system
+
+                        Kotlin, Jetpack Compose, Room/SQLite with Doc 30 DR-1: native for device-owner control, peripherals,
+
+                        encryption, WorkManager for sync                 fsync-controlled local database, raster printing.
+
+                        Same Android stack, minimal                      Doc 30.
+
+                        REST with OpenAPI 3.1; generated typed           Doc 29 / doc 33.
+                        clients
+
+                        Server: PDF pipeline with embedded Noto          Doc 19 5.3.
+                        fonts and HarfBuzz shaping; till: platform text
+                        stack to raster
+
+                        PostgreSQL trigram plus ICU collations           Doc 19 5.4.
+
+                        (phase 1); OpenSearch analysers (phase 2)
+
+                        A CDN/WAF/TLS edge service in front of the DDoS absorption and TLS termination; the tills tolerate edge
+
+                        load balancer (provider-neutral)                 outages by design.
+
+                        Containers on virtual machines behind a load     Single-DevOps model. A managed container platform is
+                        balancer; two or more application instances;     acceptable if the chosen provider offers one that needs no
+                        Ansible or equivalent for configuration; no      cluster operations; otherwise plain VMs (Section 5).
+                        Kubernetes in phase 1
+
+                        Metrics, logs and traces to a self-hosted or     Doc 36.
+                        managed stack (Prometheus/Grafana/Loki
+                        class); crash reporting for the till
+
+                        A key-management service or a self-hosted Doc 31 section 8, doc 34.
+                        vault; release signing key under dual control
+
+                        Device-owner management agent                    Doc 31 DR-1.
+                        (open-source MDM class) validated in the
+                        spikes; vendor console for firmware
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                                        Page 3
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System  Page 4
+3. Till platform
+
+Direction confirmed: ARM-based Android terminals, all new, centrally specified (H-08, T-07). In practice this is
+the class of integrated Android POS terminals with built-in printer and battery. The consequences for design are
+already absorbed: the internal battery turns the power-cut requirement into a device property (Q-07); the
+integrated 80 mm printer takes raster output, which solves trilingual receipts; the peripheral abstraction is the
+platform's own interface over two or three vendor SDKs, with UnifiedPOS used only as vocabulary; updates are
+self-managed through a device-owner agent (doc 31).
+
+3.1 Minimum terminal specification
+
+Attribute           Minimum                                                           Why
+Platform                                                                              Doc 31; long OS support window
+                    Android 11 or later, 64-bit ARM, device-owner provisioning
+Memory and storage  supported (QR or zero-touch), lock-task mode                      Two-day local database plus catalogue thumbnails
+                                                                                      plus headroom for updates
+                    4 GB RAM, 64 GB storage                                           Doc 30 zoning; 56 dp targets
+                                                                                      Trilingual receipts; Z-reports offline
+Screen              8 inch or larger, capacitive, 1280 × 800 or better
+Printer                                                                               GS1 2027; batch resolution
+                    Integrated 80 mm thermal, raster (bitmap) printing at 203 dpi,
+Scanner             auto-cutter                                                       Q-07
+                                                                                      H-07; Q-06 failover
+Battery             2D imager (built-in or USB/serial), reads EAN/UPC, GS1-128,
+Ports               GS1 DataMatrix, QR                                                PIN hashes, device credential, encrypted local
+                                                                                      database
+Security            Internal, 4 hours of trading on battery; mains adapter            15,000 units make logistics a design constraint
+
+                    USB-A/serial for scale, cash drawer (RJ11 or USB), optional
+                    customer display, Ethernet or Wi-Fi plus 4G option
+
+                    Hardware-backed keystore; verified boot
+
+Vendor              Local distribution, warranty and repair presence in Sri Lanka;
+                    3-year parts availability; a published Android SDK for printer,
+                    scanner and drawer
+
+3.2 Peripherals outside the terminal
+
+Device              Specification                                                     Note
+Weighing scale
+                    Serial or USB, protocol documented, price-computing not           The single riskiest integration (Section 8, spike 3);
+Cash drawer         required; label-printing weigh station optional for larger shops  the scale, not the printer, decides the vendor
+
+                    Printer-driven kick or USB                                        Drawer-open-without-sale is an audited event
+                                                                                      (N-09)
+Label printer       Where present: direct-thermal, 2D-capable; prints shelf labels,
+                    batch stickers, weigh labels                                      Optional per shop (B-11); MRP-wise stickers
+Customer display                                                                      (multi-MRP option C)
+Card terminal       Terminal second screen or a small USB display
+Router                                                                                Doc 30 DR-4
+                    Standalone bank terminal; no integration
+                                                                                      ADR-19: reference recorded only
+                    Shop-provided per Q-06; minimum 2 Mbps down / 0.5 up; 4G
+                    failover recommended                                              Go-live gate per site
+
+3.3 Platform choice: Google services or not
+
+                    GMS-certified terminal                                            AOSP terminal
+                                                                                      Device-owner agent only
+Update path         Device-owner agent or Managed Google Play
+                    private app                                                       Out of scope
+
+Developer verification (2026–27) Exempt through the agent path; register anyway as    Leaner
+                                               a hedge                                Common among POS-specific makers
+
+Background load and memory Play services present
+
+Vendor ecosystem    Broader
+
+Decision            Not decided by software: the update path works on
+                    both (doc 31). Choose on hardware merits, SDK
+                    quality, local support and price.
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                                    Page 5
+4. Standards roadmap by phase
+
+Standard or regulation                                       Phase 1                     Phase 2                  Phase 3
+OpenID Connect / OAuth2, TOTP                                Yes
+OWASP ASVS Level 2; NIST SP 800-63B credential rules         Yes                         Batch-resolved pricing
+GS1 barcodes: EAN/UPC, GS1-128, in-store 20–29               Parse and resolve GTIN;     where marked
+prefixes; GS1 DataMatrix and Digital Link parsing (AI        capture batch when present
+01/10/17)                                                                                OpenSearch analysers
+Unicode NFC; ICU collation and formatting for si-LK, ta-LK,  Yes
+en-LK                                                                                    Landed cost for imports
+WCAG 2.2 AA (web); Material accessibility guidance (till)    Yes
+OpenAPI 3.1                                                  Yes                                                               Live integration
+IAS 2 weighted-average costing                               Yes                                                               when mandated
+VAT (standard rate; SVAT abolished 1 October 2025)           Yes
+Consumer Affairs Authority Act s.20(5) gazetted ceilings     Yes (hard block)            Yes
+Personal Data Protection Act No. 9 of 2022                   Compliant by design         When end-of-day exceeds
+Inland Revenue e-invoicing                                   Readiness (immutability,    its window
+                                                             numbering, seam)
+Android Enterprise device-owner provisioning; developer      Yes
+verification
+Audit hash chain with write-once anchors; SIEM export        Reserved columns
+Columnar analytics store
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                                       Page 6
+5. Hosting: the decision matrix
+
+Hosting is deliberately open (September 2026 decision). Three options are live. The design works on all three;
+the cost of each is not only the monthly bill but the operating model it forces. The matrix states what changes
+under each option so the decision is made with the consequences visible. Prices are indicative planning ranges
+from the August 2026 estimate and must be replaced by quotes.
+
+Criterion                Cloud provider with managed                Hyperscaler (AWS-class)        Local hosting (colocation or
+                         services (DigitalOcean-class)                                             Federation premises)
+Indicative monthly run                                                                             Capital purchase plus colocation, power,
+cost at pilot scale      Lowest of the cloud options; the August Highest; broadest managed         links and staff; lowest recurring cloud bill,
+                                                                                                   highest fixed cost
+Managed PostgreSQL       estimate placed it at roughly half to      catalogue                      No: the Federation runs Postgres,
+with replica and                                                                                   backups and failover itself
+point-in-time recovery   60% of the hyperscaler figure
+Managed broker, object                                                                             All self-run
+storage, load balancer   Yes, with cross-region replica options Yes
+Operating model                                                                                    Needs at least two operations staff on
+                         Object storage and load balancer yes;      All managed                    rota plus hardware support; ADR-20
+RTO 4–8 h / RPO 15       broker self-run on a VM                                                   must be revisited
+min (ADR-21)                                                        Single DevOps engineer is      Achievable only with a second site (or a
+                         Single DevOps engineer is credible         credible                       cloud standby) and rehearsed failover;
+Data residency                                                                                     otherwise RTO becomes days after a
+                         Achievable with managed backups and Achievable                            site loss
+Latency for tills        a standby region                                                          In-country by construction; the strongest
+                                                                                                   answer if the policy check turns out to
+Portability              Nearest regions are outside Sri Lanka;     Same                           require it
+                         no legal constraint identified (Q-01) but
+Update distribution and  the government IT policy check is still                                   Lowest, but irrelevant to trading
+fleet                    open                                                                      (offline-first)
+Growth to 12,000 shops
+                         Regional (South or South-East Asia)        Same                           High
+Main risk                latency is acceptable; tills are
+                         offline-first                                                             Package store and update service on the
+                                                                                                   local host; unaffected otherwise
+                         High: Postgres, S3-compatible,             High if the managed            Hardware refresh cycles must be
+                         containers                                 catalogue is used narrowly     budgeted
+                                                                                                   Site loss, staffing, procurement lead
+                         Unaffected (doc 31)                        Unaffected                     time, power
+
+                         Vertical then replica scaling; columnar    Same, with more options
+                         store when needed
+                                                                    Cost; over-use of proprietary
+                         Fewer managed pieces than a                services
+                         hyperscaler
+
+Recommendation for the decision. Choose the cloud provider with managed Postgres unless the government IT
+policy check (Q-08, still open) requires in-country hosting. If local hosting is chosen for cost or policy, adopt a hybrid:
+primary in-country, backups and a warm standby in a cloud region, so the RTO/RPO commitment survives a site loss
+and the operating model stays close to single-DevOps. Decide at the pilot gate at the latest; nothing before pilot
+depends on the answer except doc 35.
+
+6. Capacity model (planning basis)
+
+All sizing derives from the stakeholder-confirmed envelope (ADR-22): 10,000 shops within three years, about
+15,000 tills, about 3 million receipts a day; 12,000 shops at five years. The figures are order-of-magnitude
+planning values; spike 5 (Section 8) replaces them with measured ones.
+
+Quantity                     Planning value                                           Derivation
+Receipts per day (horizon)
+Lines per receipt            3,000,000                                                ADR-22
+Receipts per second
+                             5 average                                                Grocery basket assumption
+Events per receipt reaching
+central                      About 100 average over a 9-hour trading day; 300 3M ÷ 32,400 s; peak factor 3
+                             at evening and festival peaks
+
+                             About 8 (document, lines, state row, movements, Doc 19 6.3
+                             audit)
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                             Page 7
+Quantity                         Planning value                                       Derivation
+Central ingest, steady state                                                          300 receipts × 8, batched per till
+Reconnection burst after a wide  About 1,000 events per second at peak                H-01; ingest is rate-limited per device, the broker
+2-day outage                                                                          absorbs, projections lag with freshness stamps
+Hot data growth                  About 6 million receipts queued; catch-up target     Monthly partitions; cold partitions to cheaper storage
+                                 within 4 hours at about 3,500 events per second
+Audit rows                                                                            Partitioned by received_at; indefinite retention
+                                 About 2.5 KB per receipt with lines; about 7.5 GB    (J-06) drives the tiering policy
+Catalogue snapshot per shop      per day; about 2.7 TB per year before                Doc 20 M2; delta pushes thereafter
+                                 compression
+Back-office concurrent users                                                          Office staff estimate; low intensity
+                                 About 2 per receipt plus back-office events; about
+                                 6 million a day
+
+                                 Under 20 MB including thumbnails for the shop's
+                                 assortment
+
+                                 About 2,000 at peak across 876 entities
+
+6.1 Sizing at pilot and at horizon
+
+Component                        Pilot (about 400 shops)  Horizon (10,000 shops)
+Application instances            2 × 4 vCPU / 8 GB
+                                                          4–6 × 8 vCPU / 16 GB; a second role for ingest-only
+PostgreSQL primary               4 vCPU / 16 GB, NVMe     instances during bursts
+
+Broker                           1 × 2 vCPU / 4 GB        16 vCPU / 64 GB, NVMe; replica for reporting; partition
+Object storage                   Under 100 GB             pruning essential
+Identity provider                1 × 2 vCPU / 4 GB
+Reporting replica                Shared with primary      3-node quorum, 4 vCPU / 8 GB each
+
+                                                          Several TB (attachments, images, packages, cold partitions)
+
+                                                          2 × 4 vCPU / 8 GB
+
+                                                          Dedicated replica; columnar store when end-of-day exceeds
+                                                          its window
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System  Page 8
+7. Integration seams
+
+Seam                              Direction              Phase               Design
+Accounting system                                        Integration when
+                                  Out (journal export);  chosen              Posting maps as data per document type (J-02); OpenAPI
+Inland Revenue e-invoicing        later API              P3                  consumer (R-07)
+
+                                  Out                    P1                  Reserved adapter; invoices already immutable and
+                                                                             gaplessly numbered
+SMS and email gateway             Out                    P1
+                                                                             Provider-neutral adapter; templates in three languages
+Terminal vendor SDKs              In-device              P1                  (R-08)
+                                                         P1
+Device management agent           Central to device                          Behind the peripheral abstraction; two or three vendors at
+                                  Infrastructure                             most
+Object storage, key               Read-only role
+management, broker, edge          None                                       Doc 31
+
+Department of Co-operative                                                   Portable interfaces (Section 1.2)
+Development
+                                                         P1                  External time-boxed access class (M-10); no prescribed
+Banks and payment networks
+                                                                             returns
+
+                                                         –                   ADR-01, ADR-19
+
+8. Assurance sequence: the spikes
+
+Paper cannot settle these; code on real hardware must. Each spike has a pass criterion and feeds a decision.
+They run in Stage 3 alongside module design (doc 20 section 6).
+
+# Spike                           Pass criterion                                         Feeds                  When
+
+1 Till local database and         10,000 receipts issued with hard power cuts injected Doc 18 5.5; doc 26       Weeks 2–3
+
+issuance under power loss at random points: zero lost or duplicated numbers,
+
+                                  database opens clean every time
+
+2 Trilingual raster receipts      Golden receipts in Sinhala, Tamil, English and mixed   Doc 19 5.3; terminal   Week 3
+                                  fallback print correctly on each candidate terminal;   choice
+                                  Z-report offline
+
+3 Weighing scale and              Scale reads reliably over the vendor's port; drawer,   Terminal choice (gating) Weeks 3–4
+        peripherals on candidate  scanner, customer display and label printer function
+        terminals                 through the abstraction; simulator parity
+
+4 2D scanning and GS1             DataMatrix and Digital Link resolve GTIN, batch and    Doc 22, doc 26         Week 4
+        parsing                   expiry; dual-marked packs beep once; 20–29 weigh
+                                  labels decode
+
+5 Sync load at the envelope       Simulated 15,000 tills: steady 1,000 events/s and a    Section 6; doc 35      Week 5
+                                  6-million-receipt reconnection burst absorbed with
+                                  projections lagging but no data loss; measured sizing
+                                  replaces Section 6
+
+6 Device-owner management Silent install, lock task, wake on push, resumable             Doc 31 DR-1; terminal  Weeks 3–4
+                                                                                         choice
+agent                             download, wipe, on both a GMS and an AOSP
+
+                                  candidate
+
+7 Cashier usability rounds        Real cashiers complete sale, refund, weigh and GRN Doc 30; T-04               Weeks 4 and 6
+                                  flows on the prototype with the target tap counts and
+                                  error rates in all three languages
+
+9. Technical decision register
+
+9.1 Resolved (recorded here; ADR entries to follow in doc 09)
+
+Decision                          Resolution                                                             Reference
+Architecture style                Modular monolith with enforced boundaries, transactional outbox, one   Section 1; ADR-20
+                                  database
+Backend stack                     Java 21, Spring Boot 3, Spring Modulith, PostgreSQL 16+, Flyway        Section 2
+Web stack                         React 18+, TypeScript, Vite                                            Doc 30
+Till stack                        Native Android (Kotlin, Compose), dedicated till track                 Doc 30 DR-1
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                                         Page 9
+Decision             Resolution                                                                  Reference
+Till platform
+Identity             ARM Android integrated terminals, centrally specified, all new              Section 3; H-08, T-07
+Broker role
+Update distribution  Self-hosted OIDC provider, single realm                                     Doc 19 DR-1
+
+Portability          Fan-out and buffering only; outbox retains; no log broker in phase 1        Doc 19 DR-2
+
+Hosting neutrality   Device-owner agent, signed packages, rings, health gates, version floor     Doc 31; ADR-24
+Orchestration        refusing sync not selling
+Scale-out model
+                     Postgres, S3-compatible storage, AMQP/NATS, containers, OIDC; no            Section 1.2
+                     proprietary managed service in the critical path
+
+                     Design carries no provider; decision by matrix at the pilot gate at the latest Section 5
+
+                     No Kubernetes in phase 1; containers on VMs behind a load balancer          Section 2
+
+                     Stateless instances, no sticky sessions, idempotent commands, singleton Section 1.3
+                     jobs under cluster locks, connection pooler in front of PostgreSQL
+
+9.2 Open (decision requests)
+
+#     Point                               Proposed                                       Decider                 Needed by
+DR-1  Hosting option                                                                     Chamin, Federation      Pilot gate at the
+                                          Cloud with managed Postgres unless                                     latest; earlier for
+DR-2  Broker product                      in-country is required; hybrid if local                                doc 35
+DR-3  Terminal model shortlist and final                                                                         Stage 2 week 2
+DR-4  choice                              RabbitMQ quorum queues                         Engineering lead        Stage 2 week 4
+DR-5  GMS or AOSP
+DR-6  Management agent product            Two or three candidates through spikes 2, 3, 6; Hardware procurement,  With DR-3
+                                                                                                                 With DR-3
+DR-7  Archival and cold-storage tiering   scale integration is the gating test           engineering lead
+DR-8  policy                                                                                                     Before pilot
+DR-9                                      On hardware merits; both supported             Hardware procurement
+      Columnar store timing                                                                                      Phase 2 planning
+      Government IT policy check on       Open-source device-owner MDM validated in DevOps                       Before DR-1
+      data residency                      spike 6
+      Observability stack product                                                                                Doc 36
+                                          Monthly partitions; partitions older than 24   Federation with tax
+                                          months detached to object storage; indefinite  advisor
+                                          retention pending J-06
+
+                                          Trigger on end-of-day window; not phase 1      DevOps
+
+                                          Legal action item; outcome feeds DR-1          Federation legal
+
+                                          Self-hosted Prometheus/Grafana/Loki class      DevOps
+                                          unless the provider offers an equivalent
+                                          needing no operations
+
+10. Traceability
+
+Section              Requirements and decisions
+1 Posture            ADR-10, ADR-20, ADR-21, ADR-22; Q-02, Q-03; M section; doc 18 principles
+2 Stack              NFR maintainability and security sets; P-04, P-05; R-07; ADR-20
+3 Till platform      H-07, H-08, H-09; Q-06, Q-07; T-07; B-11; ADR-19; ADR-24
+4 Standards          NFR security, localisation, compliance sets; J-03, J-04; G-03; K-08; M-09
+5 Hosting            Q-01, Q-02, Q-03, Q-08; ADR-20, ADR-21; September 2026 hosting-neutrality decision
+6 Capacity           ADR-22; H-01, H-06, H-12; Q-05; NFR performance and capacity
+7 Seams              J-02, J-04; R-05 to R-09; M-10; ADR-01
+8 Assurance          T-04, T-05, T-07; H-02; P-05; doc 20 Stage 3
+
+End of document. Draft for design review; Sections 5 and 6 are replaced by quotes and measured figures as they arrive.
+
+14 - Technical Foundations | v0.2 draft | Cooperative Retail and Distribution System                                    Page 10
+

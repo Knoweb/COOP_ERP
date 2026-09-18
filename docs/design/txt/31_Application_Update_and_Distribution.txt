@@ -1,0 +1,345 @@
+Cooperative Retail and Distribution System
+
+31 – Application Update and Distribution
+
+How software reaches and stays current on up to 15,000 kiosk-locked till terminals
+across all 25 districts with no on-site IT, on poor links, without stopping trade: device
+provisioning, the update agent, signed releases, ring rollout, health gates, rollback, the
+version floor, and the back-office deployment that has to stay compatible with all of it.
+
+Field     Value
+Document
+Version   31 – Application Update and Distribution (design artefact; implements ADR-24; Stage 4 topic brought forward)
+Date
+Status    v0.1 – draft for design review
+Inputs
+          6 September 2026
+Audience
+          Draft. The management-agent product and the terminal platform (GMS-certified versus AOSP) are decision
+          requests that must close together with the hardware selection in doc 14.
+
+          ADR-24 (signed packages, ring deployment, install outside trading hours, server-enforced minimum version floor
+          with grace); Q-10; Q-06, Q-07 (connectivity and power); T-07 (centrally specified hardware); doc 18 (device table),
+          doc 19 (device identity, event model), doc 20 M6; Android Enterprise and Google developer-verification policy as
+          published to August 2026.
+
+          Engineering lead, DevOps, the till track, helpdesk lead, hardware procurement.
+
+Why this is a design problem and not an operations chore. A terminal in a shop with one cashier and no IT will
+never have an update installed by hand. Every update must arrive by itself, install itself when the shop is closed, prove
+it is healthy, and undo itself if it is not – and the central system must keep serving the versions that have not yet
+arrived. Get this wrong and the fleet fragments into versions nobody can support (Q-10).
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. What gets updated, and by which path
+
+Component                    Where it runs             Update path                                               User action
+Web back office              Browser
+Central services             Cloud or local hosting    Server deployment; the client reloads on version mismatch None
+
+                                                       Rolling deployment behind a load balancer; database       None
+                                                       migrations forward-only
+
+Till application             Android terminal in the   This document: silent install by the device-owner         None
+                             shop                      management agent, ring rollout, health gate
+Driver application
+                             Android phone or          Same agent and pipeline as the till                       None
+Management agent itself      terminal
+Terminal operating system                              Self-update via the same silent-install privilege; staged first None
+and firmware                 Android terminal
+                                                       Vendor over-the-air channel, scheduled by the Federation  None
+                             Android terminal          through the vendor console; never automatic during
+                                                       trading
+
+Reference data (catalogue,   Till local cache          Sync snapshots (doc 19 6.3), not this document            None
+prices, rules, permissions,
+message catalogue)
+
+2. Constraints that shape the design
+
+Constraint                                     Source        Consequence
+                                                             Zero-touch: no prompts, no taps, no settings screens on the device
+Up to 15,000 terminals, no on-site IT, generally Q-05, S-02
+low computer familiarity                                     Resumable downloads, small packages, install only after full
+                                                             verification, never mid-transaction
+Poor and intermittent links (about 2 Mbps down Q-06, Q-07    Install outside each shop's own trading hours; never force a restart
+at the weakest sites), power cuts                            during a session
+                                                             Central enforces a floor; the device cannot opt out
+24×7 trading capability, no scheduled          Q-04
+downtime window                                              One managed platform; the agent can be a device owner from first boot
+
+No indefinite deferral; minimum version floor  ADR-24, Q-10  Distribution must go through a device-owner management agent or
+with grace                                                   Managed Google Play; direct APK sideloading is not a strategy
+                                                             One console, one pipeline, automatic gates; no per-device handling
+Hardware new and centrally specified;          T-07, H-08
+ARM/Android terminals
+
+Google developer verification (2026–2027)      Section 3
+
+Single DevOps operating model                  ADR-20
+
+3. Android developer verification: what it means for a private till
+app
+
+Google is introducing a requirement that applications installed on certified Android devices come from
+identity-verified developers, with enforcement beginning in September 2026 in a first group of countries and
+expanding globally in 2027. The published guidance, as of August 2026, is that enterprise deployment is exempt
+when the application is installed through an EMM (enterprise mobility management) device policy controller or
+published as a private application in Managed Google Play, while ordinary APK sideloading falls under the new
+friction. Devices without Google services (AOSP builds) are outside the scheme entirely.
+
+Terminal platform               Verification exposure        Update path that works                    Notes
+                                                             Device-owner management agent
+GMS-certified Android terminal  In scope from 2027 for       (DPC) silent install, or Managed          Managed Play gives free hosting
+(Google services present)       non-managed installs         Google Play private app                   and delta updates but hands
+                                                                                                       rollout timing to Google's update
+AOSP terminal (no Google        Out of scope                 Device-owner management agent             scheduler; the DPC path keeps
+services)                                                    silent install                            timing under Federation control
+
+                                                                                                       Vendor-specific provisioning;
+                                                                                                       fewer background services
+                                                                                                       competing for memory; no Play
+                                                                                                       protections
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System                            Page 2
+Decision: the design uses a device-owner management agent for silent install on either platform, so the
+platform choice can be made on hardware merits in doc 14. As a hedge costing almost nothing, the Federation
+registers as a verified developer and signs releases under that identity, so that even an unmanaged install path
+would remain available for recovery and development devices.
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System  Page 3
+4. Architecture
+
+Element           Role                               Design
+Provisioning
+                  Make a new terminal a managed      Factory-reset terminal; QR-code or zero-touch enrolment sets the management
+Management agent  kiosk before it leaves central     agent as device owner; the agent installs the till app, applies the kiosk (lock-task)
+(DPC)             staging                            policy, disables unknown-source installs and developer options, and enrols the
+Update service                                       device identity (doc 19 2.1). Staging is a table at the Federation, not a task at the
+(central)                                            shop.
+Release pipeline
+                  The only thing on the device that Runs as device owner; polls the update service on the sync cadence and on a
+Till application
+                  can install software               push wake-up when online; downloads, verifies, schedules and performs silent
+Fleet console
+                                                     install; reports version and health; can lock or wipe a device reported stolen.
+
+                  Decide what each device should A small service owned by DevOps: release register, ring membership, rollout state
+
+                  run                                machine, health gates, version floor, per-district status; reads the device table (doc
+
+                                                     18) and writes device.app_version on report.
+
+                  Turn a build into a distributable  Continuous integration builds the APK, runs tests, produces a software bill of
+                  release                            materials, signs with the Federation release key held in a key-management service
+                                                     (never on a laptop), publishes to object storage behind the update service.
+
+                  Cooperate with updates and         Reports version on every sync; refuses to sync (not to sell) below the floor after
+                  enforce the floor                  grace; runs forward-only local migrations on start; performs a self-test after any
+                                                     upgrade.
+
+                  One screen for the DevOps          Version distribution, rollout progress per ring and district, health gate status, stuck
+                  engineer                           devices, halt and resume controls.
+
+4.1 Choosing the management agent
+
+Option                            Fit                                                Concerns
+
+Self-hosted open-source MDM used  Provider-neutral, runs on DigitalOcean or local    Community support; the Federation owns
+as device owner (Headwind MDM     hosting, silent install and kiosk on AOSP and GMS  operations; verify the exact silent-install
+class)                            devices, one console                               behaviour on the chosen terminal model before
+                                                                                     purchase
+Terminal vendor's
+terminal-management system (for   Tuned to the hardware; firmware and app updates Vendor lock-in for the fleet; cloud outside the
+example the store and management  in one place; silent install proven on that device Federation's control; export of device data; cost
+consoles offered by POS terminal
+makers)                                                                                                 per device
+
+Commercial EMM (Android           Mature, supported, Managed Play integration        Per-device licensing at 15,000 devices; heavier
+Enterprise partner)               Exactly the features needed and nothing else       than the single-DevOps model needs
+
+In-house device-owner agent                                                          The Federation builds and maintains a DPC;
+                                                                                     only sensible if the chosen open-source option
+                                                                                     fails validation
+
+Recommendation (DR-1): validate the open-source device-owner MDM on two candidate terminal models
+during the Stage 3 spikes (silent install, lock task, wake on push, resumable download, wipe). Adopt it if it
+passes; fall back to the terminal vendor's system for firmware only, keeping the till app on the
+Federation-controlled path either way.
+
+5. Release and rollout
+
+5.1 Release discipline
+
+Aspect                 Design
+Versioning
+Package size           Semantic version for people; monotonically increasing Android versionCode for the platform. Android does not
+Compatibility          downgrade: a “rollback” is always a new, higher versionCode built from the previous good source.
+Local schema
+                       Target under 30 MB; fonts and the message catalogue ship in the package (no first-run download); images are
+                       never in the package (they are catalogue data).
+
+                       Every release supports the sync contract and snapshot formats of the two previous releases (N−2); central
+                       supports app versions from the floor to current; the API is backward compatible within that window.
+
+                       Migrations are forward-only, idempotent, run at start before the UI; the agent triggers a local database backup to
+                       device storage before install; a failed migration reports and the health gate catches it.
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System             Page 4
+Aspect                         Design
+Signing
+                               One release key in the key-management service; the agent and the till verify signature and package hash before
+                               install; unsigned or mis-signed packages are rejected and reported.
+
+5.2 Rings
+
+Ring              Membership                                             Purpose                       Exit gate
+0 Lab
+                  Federation test bench: every supported terminal        Functional and peripheral     All automated tests pass; manual
+1 Canary          model, simulator, one printer of each type             regression                    checklist signed
+
+2 Wave            About 1% of shops, chosen to cover every district, Real-world health under load      48 hours with health metrics inside
+3 Fleet           every size band, both connectivity profiles                                          thresholds
+
+                  One rollout wave (a group of districts) at a time      Controlled spread             24 hours per wave inside thresholds
+
+                  Everyone else                                          Completion                    Fleet at target version above 97%
+                                                                                                       within the grace period; stragglers to
+                                                                                                       the helpdesk queue
+
+    5.3 Health gates                 Source                          Threshold (initial)                    Action on breach
+                                     Till telemetry on sync                                                 Halt rollout; alert DevOps
+Metric                               Update service and ingest       ≥ 99.5% on the new version             Halt
+Crash-free session rate                                              No worse than the previous version by
+Sync success rate                                                    more than 0.5 points                   Halt; investigate
+
+Receipt issuance rate per till-hour Ingest projections               No drop beyond normal variance         Halt
+                                                                     versus the same shops last week        Automatic re-install of previous
+Peripheral self-test failures        Till telemetry                                                         version on those devices;
+                                     Agent reports                   ≤ 0.5% of updated devices              helpdesk ticket
+Devices stuck in install or                                          ≤ 0.2%
+migration
+
+5.4 On-device sequence
+
+Step      Action                                                                            Safeguard
+1
+2         Agent learns a release applies to this device's ring                              Poll on sync cadence; push wake-up when online
+
+3         Download in the background, resumable, throttled below 50% of measured            Never competes with sync uploads; pauses on
+4         bandwidth                                                                         metered or failing links
+
+5         Verify signature and hash                                                         Reject and report on mismatch
+
+6         Wait for the install window: outside the shop's trading hours                     Window is per shop; a shop with 24-hour trading
+
+7         (location.trading_hours), no open till session, battery above 40% or on mains uses its configured quiet hour
+8
+          Back up the local database; install silently; restart the till app in lock-task   Install is atomic on Android; the backup covers a
+          mode                                                                              failed migration
+
+          Self-test: open database, run migrations, print a test line if a printer is present, Failure reported immediately
+          scanner check, sync handshake
+
+          Report version and health on next sync                                            Feeds the health gate and fleet console
+
+          On a failed self-test or crash loop: agent installs the previous good release     Shop reopens on a working till; helpdesk sees the
+          (higher versionCode rebuild) and raises an ALERT                                  device
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System                                   Page 5
+6. The version floor
+
+ADR-24 forbids indefinite deferral. The floor is what makes that true without stopping trade.
+
+Aspect                     Design
+
+Definition                 The lowest app version central will accept for sync. Set per release by DevOps; normally N−2.
+
+Grace                      When a release raises the floor, devices below it get a configurable grace period (default 14 days) during which
+                           sync continues and the till shows a persistent, non-blocking notice to the supervisor.
+
+After grace                Sync is refused with a clear on-screen reason; selling continues offline (blocking sales would punish the shop
+                           for a fleet problem). The device appears in the helpdesk queue automatically. The helpdesk boundary of Q-09 (no
+                           connectivity troubleshooting) still applies; the fix is almost always connectivity, and the agent installs as soon as
+                           the device reaches central.
+
+Escalation                 A device below the floor for more than the grace period plus 7 days is escalated to the MPCS administrator and
+                           the district onboarding team, since a shop that cannot sync for three weeks has a bigger problem than its app
+                           version.
+
+What the floor never does It never wipes, locks or disables a till; it never applies to the driver app's proof-of-delivery capture; it never triggers
+                                      during the pilot go/no-go window without an explicit decision.
+
+7. Central and web deployment
+
+Aspect                     Design
+Rolling deployment
+                           Two or more instances behind the load balancer; deploy one at a time; health check before traffic; database
+Web client                 migrations applied before code that needs them, written to be compatible with the previous code version
+Sync ingest compatibility  (expand-then-contract).
+Feature exposure
+Local hosting variant      Served with content hashes; the shell compares its build version with the API's advertised version and prompts a
+                           reload on mismatch; API responses stay compatible with the previous client for at least one deployment.
+
+                           Central accepts the envelope and snapshot formats of every app version above the floor; format changes are
+                           additive within the N−2 window.
+
+                           New behaviour that changes what a shop sees is switched on per ring through configuration, not by deploying
+                           different code to different shops.
+
+                           The same pipeline; the update service and package store run on the local host; nothing in the design depends on
+                           a cloud-only service.
+
+8. Security and fleet operations
+
+Concern                    Design
+Release key custody
+Agent authority            Key-management service with dual control for signing; rotation plan with a transition period where both keys are
+Kiosk integrity            trusted.
+Theft and loss
+Fleet visibility           Agent authenticates with the device credential (doc 19); update instructions are signed by central; the agent will not
+Onboarding volume          act on unsigned instructions even from a trusted network.
+Firmware
+                           Lock-task allow-list contains the till app, the agent and the vendor's peripheral services only; USB debugging,
+                           unknown sources and factory reset are policy-disabled; safe-boot disabled.
+
+                           Remote lock and wipe; local database encrypted with a keystore-held key so a stolen terminal yields no data.
+
+                           Fleet console reads device.app_version, last_seen_at, ring, health; per-district and per-wave views; stuck-device
+                           queue integrated with the helpdesk.
+
+                           About 40 shops a week (S-07): provisioning is a staging-table process with QR enrolment and a checklist; the
+                           terminal reaches the shop already managed, enrolled and on the current release.
+
+                           Vendor OTA scheduled through the vendor console in the same quiet-hour windows, one wave at a time, never on
+                           the same day as an app rollout.
+
+9. Decision requests
+
+#           Point                     Proposed                                                      Decider               Needed by
+DR-1        Management agent product
+                                      Open-source device-owner MDM validated in                     Engineering lead,     Hardware
+                                      Stage 3 spikes; vendor console for firmware                   DevOps                selection (doc
+                                      only                                                                                14)
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System                        Page 6
+#     Point                                  Proposed                                               Decider                 Needed by
+DR-2                                         Decide on hardware merits; the update path                                     Doc 14
+DR-3  Terminal platform: GMS-certified or    works on both                                          Hardware
+DR-4  AOSP                                   Yes, now; low cost hedge                               procurement             Before pilot
+DR-5
+      Register the Federation as a verified  1% canary, wave by district, 14-day grace,             Federation admin
+      Android developer                      thresholds of 5.3
+                                             Configured per location; default 02:00–04:00           DevOps with             Before pilot
+      Ring sizes, gate thresholds, grace                                                            Federation
+      period
+                                                                                                    MPCS via                Onboarding
+      Quiet-hour policy for 24-hour shops
+
+                                                                                                    configuration register
+
+End of document. Draft for design review; Stage 4 operational design refines the fleet console and helpdesk runbooks against
+this design.
+
+31 - Application Update and Distribution | v0.1 draft | Cooperative Retail and Distribution System                          Page 7
+

@@ -4,9 +4,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class KnowebApplication {
+public class CoopErpApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(KnowebApplication.class, args);
+        SpringApplication.run(CoopErpApplication.class, args);
     }
 }

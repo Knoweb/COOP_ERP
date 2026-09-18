@@ -1,0 +1,668 @@
+Cooperative Retail and Distribution System
+
+27A – M7 Customers & Payment Recording:
+Implementation Guide
+
+Everything the M7 developer needs: the customers schema as DDL, seed data, package
+layout, the API slice, handler specifications with pseudocode for the four that matter
+(reuse detection, the account-tender consumer, repayment allocation, anonymisation),
+the customer snapshot, the till contracts for account tender and repayment, screens,
+tests and tickets. Self-contained; restated material is marked.
+
+Field             Value
+Document          27A – implementation guide for 27 M7 Customers & Payment Recording v0.1
+Version           v0.1 – for the M7 developer; section 7.3 is the contract with the till track
+Date              9 September 2026
+Prerequisite      Sprint 0; M1 contract (responsible officer, locations); M6 receipt bundle shape (26A §3, tenders); kernel document
+                  base, A4 renderer, notifications
+Estimated effort  About 17 developer-days for one full-stack developer
+Restated content  Marked restated from doc X §Y.
+
+Read this first. Two things must be right from the first commit: personal data never leaks into events, logs or
+snapshots beyond what the till needs to serve the customer (name, phone, balance, limit), and the posting ledger is
+insert-only with the balance as a recomputed cache. The privacy tests in Section 9 run in CI; a payload containing a
+phone number or a NIC fails the build.
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System  Page 1
+1. What you are building
+
+Restated from doc 27 §1. The registered customer, the credit account per MPCS, append-only postings from till
+tenders and repayments, customer payment receipts with oldest-first allocation, statements, the banking record,
+and the privacy workflows.
+
+You build                                                                  You do not build
+                                                                           Membership of any kind; loans; bank integration; the till's tender
+Schema customers: customer, customer_phone, customer_consent,              screen (M6 renders your rules)
+customer_account, account_posting, allocation, doc_customer_payment
+(extension), data_subject_request, banking_record                          Inter-entity payment receipts (M4)
+
+18 commands, 8 queries, 8 event families; 2 consumers; 2 jobs; the         –
+customer snapshot contributor; the CPR bundle hook
+
+Nine web screens; the till-side specifications for lookup, account tender
+and repayment
+
+2. What you inherit
+
+From                   You use                                                      How
+19A §7 document        DocumentService.issue for CPR and adjustment                 Payments and reversals
+base                   documents; DocumentLinks (REVERSES)
+19A §8 sync            Bundle ingestion hook for CPR; SnapshotContributor;          Section 7
+                       change log (urgent on suspend)
+19A §6 i18n,           Statement rendering in the customer's language               Statements
+A4Renderer
+19A §10 notifications  SMS summary via M9's rules on customer_statement.issued.v1   Statements
+19A §3 permissions     Sod.assertDistinct for adjustments; MFA flags                Adjustments, limits
+M1 query               Responsible officer per entity; MPCS scope; locations of an  Privacy requests; snapshot
+                       MPCS (snapshot fan-out)
+M6 bundle              receipt.issued/refunded.v1 with doc_receipt_tender rows      Consumer (Section 6.2)
+                       (kind ACCOUNT, customer_account_id, offline flag)
+Shared engine                                                                       Never re-implement rounding
+17A §7 web shell       Money                                                        Section 8
+                       DocumentHeader, ApprovalBar, ReasonCapture, StepUpDialog,
+                       Timeline
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                Page 2
+3. Schema
+
+Restated from doc 27 §3 (CR-27-1). Location db/migration/m7customers/.
+
+-- V0001__customers.sql (RLS per 17A 6.3; note the identity-vs-account visibility split in 3.1)
+
+CREATE TABLE customers.customer (
+
+customer_id uuid PRIMARY KEY, display_name text NOT NULL COLLATE en_icu, display_name_si text COLLATE
+
+si_icu, display_name_ta text COLLATE ta_icu,
+
+language text NOT NULL DEFAULT 'si', nic_hash char(64), nic_last4 char(4),
+
+attributes jsonb NOT NULL DEFAULT '{}' CHECK (pg_column_size(attributes) <= 2048),
+
+status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE','ANONYMISED')),
+
+registered_by_entity_id uuid NOT NULL, registered_at timestamptz NOT NULL DEFAULT now(),
+
+owner_entity_id uuid NOT NULL);                                                    -- the registering MPCS; identity readable
+
+by any MPCS with an account (policy below)
+
+CREATE TABLE customers.customer_phone (phone_id uuid PRIMARY KEY, customer_id uuid NOT NULL REFERENCES
+
+customers.customer,
+
+phone varchar(20) NOT NULL, is_primary boolean NOT NULL DEFAULT true, valid_from timestamptz NOT NULL
+
+DEFAULT now(), valid_to timestamptz,
+
+changed_by uuid, reason text, owner_entity_id uuid NOT NULL);
+
+CREATE UNIQUE INDEX one_current_primary_phone ON customers.customer_phone (phone) WHERE valid_to IS NULL AND
+
+is_primary;
+
+CREATE INDEX phone_history ON customers.customer_phone (phone, valid_to);
+
+CREATE TABLE customers.customer_consent (consent_id uuid PRIMARY KEY, customer_id uuid NOT NULL REFERENCES
+
+customers.customer,
+
+purpose text NOT NULL CHECK (purpose IN ('CREDIT_ACCOUNT','STATEMENTS_NOTIFICATIONS')), granted_at
+
+timestamptz NOT NULL,
+
+granted_via text NOT NULL CHECK (granted_via IN ('TILL','WEB','PAPER')), withdrawn_at timestamptz, entity_id
+
+uuid NOT NULL, owner_entity_id uuid NOT NULL);
+
+CREATE TABLE customers.customer_tag (customer_id uuid NOT NULL, tag_code varchar(40) NOT NULL, owner_entity_id
+
+uuid NOT NULL, PRIMARY KEY (customer_id, tag_code, owner_entity_id));
+
+CREATE TABLE customers.customer_account (
+
+account_id uuid PRIMARY KEY, customer_id uuid NOT NULL REFERENCES customers.customer, mpcs_entity_id uuid
+
+NOT NULL,
+
+credit_limit numeric(14,2) NOT NULL DEFAULT 0, balance numeric(14,2) NOT NULL DEFAULT 0,         -- cache,
+
+recomputed by handlers
+
+offline_cap numeric(14,2), terms_days smallint NOT NULL DEFAULT 30, hard_block boolean NOT NULL DEFAULT
+
+false,
+
+status text NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','SUSPENDED','CLOSED')), opened_at timestamptz
+
+NOT NULL, opened_by uuid NOT NULL,
+
+owner_entity_id uuid GENERATED ALWAYS AS (mpcs_entity_id) STORED, UNIQUE (customer_id, mpcs_entity_id));
+
+CREATE TABLE customers.account_posting (
+   posting_id uuid NOT NULL, received_at timestamptz NOT NULL DEFAULT now(), account_id uuid NOT NULL,
+   kind text NOT NULL CHECK (kind IN ('CHARGE','CREDIT','PAYMENT','ADJUSTMENT','REVERSAL')), amount
+          numeric(14,2) NOT NULL CHECK (amount <> 0),
+   business_date date NOT NULL, document_id uuid NOT NULL, document_line_id uuid, receipt_number text,
+          location_id uuid, operator_user_id uuid,
+   offline boolean NOT NULL DEFAULT false, limit_breached boolean NOT NULL DEFAULT false, allocated_amount
+          numeric(14,2) NOT NULL DEFAULT 0,
+   owner_entity_id uuid NOT NULL, PRIMARY KEY (received_at, posting_id)) PARTITION BY RANGE (received_at);
+
+CREATE INDEX posting_by_account ON customers.account_posting (account_id, business_date);
+GRANT INSERT ON customers.account_posting TO app_rw; GRANT UPDATE (allocated_amount) ON
+
+       customers.account_posting TO app_rw;
+
+CREATE TABLE customers.allocation (allocation_id uuid PRIMARY KEY, payment_posting_id uuid NOT NULL,
+       charge_posting_id uuid NOT NULL,
+
+   amount numeric(14,2) NOT NULL CHECK (amount > 0), created_at timestamptz NOT NULL DEFAULT now(), reversed_at
+          timestamptz, owner_entity_id uuid NOT NULL);
+
+CREATE TABLE customers.doc_customer_payment (document_id uuid NOT NULL, received_at timestamptz NOT NULL,
+       account_id uuid NOT NULL,
+
+   method text NOT NULL CHECK (method IN ('CASH','TRANSFER','DEPOSIT')), reference text, amount numeric(14,2)
+          NOT NULL CHECK (amount > 0),
+
+   allocation_mode text NOT NULL DEFAULT 'OLDEST_FIRST' CHECK (allocation_mode IN ('OLDEST_FIRST','SPECIFIC')),
+          reversal_of uuid,
+
+   owner_entity_id uuid NOT NULL, PRIMARY KEY (received_at, document_id)) PARTITION BY RANGE (received_at);
+
+CREATE TABLE customers.data_subject_request (request_id uuid PRIMARY KEY, customer_id uuid NOT NULL, kind text
+       NOT NULL CHECK (kind IN ('ACCESS','ERASURE')),
+
+   received_at timestamptz NOT NULL, received_by uuid NOT NULL, status text NOT NULL DEFAULT 'RECEIVED' CHECK
+          (status IN ('RECEIVED','FULFILLED','REFUSED')),
+
+   fulfilled_at timestamptz, fulfilled_by uuid, export_object_key text, refusal_ground text, owner_entity_id
+          uuid NOT NULL);
+
+CREATE TABLE customers.banking_record (record_id uuid PRIMARY KEY, entity_id uuid NOT NULL, location_id uuid,
+       session_ids uuid[] NOT NULL,
+
+   amount numeric(14,2) NOT NULL CHECK (amount >= 0), expected_amount numeric(14,2) NOT NULL, kind text NOT
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                       Page 3
+          NULL CHECK (kind IN ('HANDOVER_TO_OFFICE','BANK_DEPOSIT')),
+   deposited_by uuid NOT NULL, received_by uuid, bank text, reference text, deposit_date date NOT NULL,
+
+          shortfall_reason text,
+   status text NOT NULL DEFAULT 'RECORDED' CHECK (status IN ('RECORDED','RECONCILED')), reconciled_ref text,
+
+          owner_entity_id uuid NOT NULL);
+CREATE TABLE customers.banked_session (session_id uuid PRIMARY KEY, record_id uuid NOT NULL REFERENCES
+
+       customers.banking_record, owner_entity_id uuid NOT NULL);
+
+-- visibility: customer identity rows readable by any entity holding an account for the customer (policy joins
+       customer_account);
+
+-- account, postings, allocations, payments, DSAR, banking: OWN (the MPCS) plus FEDERATION_VIEW.
+
+3.1 Seed data
+
+# seed/m7/config.yaml customers.offline_account_cap 5000 | limit_policy WARN | default_terms_days 30 |
+
+   allocation_mode OLDEST_FIRST |
+
+#                  phone_reuse_window_months 12 | statement_frequency MONTHLY | statement_channel
+
+   SMS_SUMMARY | retention_years 7 | banking_shortfall_review ANY
+
+# seed/m7/permissions.yaml (appended): cus.customer.register (LOCATION, online) | cus.customer.manage (ENTITY)
+
+   | cus.account.manage (ENTITY, mfa)
+
+# cus.account.adjust (ENTITY, mfa) | cus.account.adjust_approve (ENTITY, mfa) | cus.payment.record
+
+   (LOCATION, offline) | cus.payment.reverse (ENTITY, mfa)
+
+# cus.statement.issue (ENTITY) | cus.privacy.record (ENTITY) | cus.privacy.fulfil (ENTITY, mfa) |
+
+   cus.banking.record (LOCATION) | cus.banking.reconcile (ENTITY)
+
+# seed/m7/sod-pairs.yaml (appended to M1's): [cus.account.adjust, cus.account.adjust_approve, INSTANCE]
+
+# seed/m7/notification-rules.yaml (handed to M9): customer_statement.issued -> SMS summary to the customer's
+
+   primary phone when STATEMENTS consent exists
+
+4. Package layout
+
+lk.coopfed.knoweb.m7customers/ @ApplicationModule(allowedDependencies =
+
+   {"kernel","m1party::api","m1party::query"})
+
+   api/       commands (18), events (8 families), value types (PhoneNumber - validated, never logged; NicHash)
+
+   query/     CustomerQueries (lookup, get, list, snapshot), AccountQueries (account, overdue, receivables,
+
+   ageing, statement data), BankingQueries
+
+   internal/
+
+   customer/ Customer, Phone, Consent, handlers, ReuseDetector, Anonymiser
+
+   account/ Account, handlers, LimitPolicy
+
+   ledger/    PostingService (insert-only, balance recache), Allocator (oldest-first, specific),
+
+         AgeingCalculator
+
+   payment/ CustomerPayment handlers, CprBundleHook (till-captured repayments)
+
+   consumers/ ReceiptTenderConsumer (receipt.issued/refunded -> CHARGE/CREDIT), SessionConsumer (expected
+
+         banking)
+
+   statement/ StatementJob, StatementBuilder
+
+   privacy/ DataSubjectRequest handlers, Exporter, RetentionGuard
+
+   banking/ BankingRecord handlers
+
+   snapshot/ CustomerSnapshotContributor
+
+   queries/ *QueriesImpl
+
+   web/       CustomerController, AccountController, PaymentController, StatementController,
+
+   PrivacyController, BankingController
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                   Page 4
+5. API slice: openapi/m7customers.yaml (excerpt)
+
+/v1/customers                                            post registerCustomer {displayName, phone, language, consents[],
+
+via} get lookup (phone | q, mpcsId)
+
+/v1/customers/{id}                                       get patch updateAttributes/tags post /phone {newPhone, reason,
+
+confirmedIdentity?} | /deactivate
+
+/v1/customers/{id}/consents                              post recordConsent | delete withdrawConsent
+
+/v1/customers/{id}/accounts                              post openAccount {mpcsId, creditLimit, termsDays, offlineCap, nic?}
+
+/v1/accounts/{id}                                        get (balance, limit, ageing, postings cursor) post /limit |
+
+/hard-block | /offline-cap | /suspend | /reinstate | /close
+
+/v1/accounts/{id}/adjustments                            post postAdjustment {amount, reason} /{adjId}/approve post
+
+/v1/accounts/{id}/payments                               post recordCustomerPayment {method, amount, reference,
+
+allocationMode, specific?: [{chargePostingId, amount}]}
+
+/v1/customer-payments/{docId}/reverse                    post {reason}
+
+/v1/accounts/{id}/statements                             post issue {period, channel} get list
+
+/v1/mpcs/{id}/overdue                                    get (bucket) /receivables get /ageing get
+
+/v1/privacy/requests                                     post record {customerId, kind} /{id}/fulfil | /refuse post
+
+/v1/banking/records                                      post recordBanking {kind, sessionIds[], amount, bank?, reference?,
+
+depositDate, shortfallReason?} /{id}/reconcile post
+
+/v1/banking/unbanked-sessions                            get (mpcsId)
+
+# example - lookup response (till-safe shape; no NIC)
+
+{ "customerId": "…", "displayName": "K. Perera", "language": "si", "phone": "07xxxxxxxx",
+
+"account": { "accountId": "…", "mpcsId": "…", "creditLimit": 15000.00, "balance": 6200.00, "available":
+
+         8800.00, "offlineCap": 5000.00,
+
+                    "hardBlock": false, "status": "OPEN", "oldestUnpaid": "2026-08-20" }, "tags": ["regular"] }
+
+6. Handler specifications
+
+Command                Guards (in order)                                       Effect                               Events
+
+RegisterCustomer       online (interceptor: command not offline_allowed);      insert customer, primary phone,      customer.registered.v
+                       phone valid E.164-normalised; ReuseDetector             consents                             1;
+                       (6.1) passed or confirmed; CREDIT_ACCOUNT                                                    consent.recorded.v1
+                       consent present
+
+ChangePhone            customer ACTIVE; new phone valid; reuse                 close old phone row (valid_to), insert customer.phone_cha
+                       detection; reason
+                                                                               new primary                          nged.v1
+
+DeactivateCustomer     no OPEN account with balance ≠ 0                        INACTIVE                             customer.deactivated
+                                                                                                                    .v1
+
+UpdateAttributes /     owner MPCS; attributes size                             rows                                 customer.updated.v1
+TagCustomer
+
+OpenAccount            MPCS scope; customer ACTIVE; consent; no                insert OPEN                          account.opened.v1
+                       existing account; NIC captured (hash + last4)
+                       when limit > 0; MFA
+
+AmendLimit /           reason; MFA when the limit increases                    update; audit before/after           account.limit_amend
+SetHardBlock /                                                                                                      ed.v1
+SetOfflineCap
+
+SuspendAccount /       reason; close requires balance = 0 and no               status; snapshot urgent on suspend account.suspended/r
+ReinstateAccount /     unallocated payments                                                                                         einstated/closed.v1
+CloseAccount
+
+PostCharge / PostCredit from receipt tender lines (6.2)                        postings; balance recache; breach    account.charged/cred
+(internal)                                                                     flag                                 ited.v1
+
+RecordCustomerPayme    account OPEN or SUSPENDED; amount > 0;                  CPR document; PAYMENT posting;       customer_payment.r
+nt                     specific allocations ≤ open charges; issuance           Allocator (6.3); balance recache     ecorded.v1
+                       (till-position series at a till via the bundle, ENTITY
+                       series in the office)
+
+ReverseCustomerPaym RECORDED; MFA; reason                                      REVERSES-linked CPR; REVERSAL customer_payment.r
+ent
+                                                                               posting; allocations reversed        eversed.v1
+
+PostAdjustment /       reason; SoD request ≠ approve; MFA                      adjustment document;                 account.adjusted.v1
+ApproveAdjustment                                                              ADJUSTMENT posting on approval
+
+IssueCustomerStatemen period; channel per consent                              render; store key; notification via  customer_statement.i
+t                                                                              event                                ssued.v1
+
+RecordDataSubjectReq   officer scope; ACCESS: export; ERASURE:                 request status; anonymised customer dsar.*.v1; customer.a
+uest / FulfilAccess /  RetentionGuard (no open balance) then                                                                        nonymised.v1
+FulfilErasure /        Anonymiser (6.4); MFA on fulfil; refusal ground
+RefuseRequest
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                               Page 5
+Command          Guards (in order)                                 Effect                               Events
+
+RecordBanking /  sessions CLOSED and unbanked; expected from       record; banked_session rows;         banking.recorded/rec
+MarkReconciled   M6 session facts; shortfall reason when amount <  REVIEW on shortfall                  onciled.v1
+                 expected
+
+6.1 Reuse detection
+
+ReuseDetector.check(phone, forCustomer?): Outcome
+
+current = phones.currentPrimaryHolder(phone)                                       // valid_to IS NULL
+
+if (current != null && current.customerId != forCustomer) return CONFLICT(current)                      // must
+
+ChangePhone on the other customer first
+
+recent = phones.holdersWithin(phone, config.reuseWindowMonths)                     // valid_to within the window
+
+if (recent.isNotEmpty()) return NEEDS_CONFIRMATION(recent.map { it.customerId })                        // operator
+
+confirms different person: name + NIC last4 when an account exists
+
+return CLEAR
+
+// on confirmation the command carries confirmedIdentity = true and the audit event records the previous
+
+holders' ids (never their names)
+
+6.2 Receipt tender consumer
+
+@EventConsumer(types={"receipt.issued.v1","receipt.refunded.v1","receipt.voided.v1"}, consumer="m7.tenders")
+
+for tender in bundle.tenders where kind == ACCOUNT:
+
+acct = accounts.lock(tender.customerAccountId)                                     // FOR UPDATE
+
+kind = when (event) { issued -> CHARGE; refunded, voided -> CREDIT }
+
+amount = if (kind == CHARGE) tender.amount else -tender.amount
+
+breach = kind == CHARGE && (acct.balance + amount > acct.creditLimit)
+
+postings.insert(Posting(acct, kind, amount, businessDate = bundle.document.businessDate, document =
+
+bundle.document.id, receiptNumber, location, operator,
+
+                     offline = tender.offline, limitBreached = breach))
+
+acct.balance += amount; accounts.save(acct)
+
+if (breach) { audit REVIEW ACCOUNT_LIMIT_BREACH(offline = tender.offline); if (acct.hardBlock &&
+
+tender.offline) audit ALERT HARD_BLOCK_BYPASSED_OFFLINE }
+
+events.publish(kind == CHARGE ? AccountCharged : AccountCredited)
+
+changeLog.record(locationsOf(acct.mpcs), "customer", acct.customerId, UPSERT) // balance to tills
+
+(coalesced)
+
+6.3 Allocator and 6.4 Anonymiser
+
+Allocator.allocate(paymentPosting, mode, specific?):
+    open = postings.openCharges(account) ordered by business_date, received_at // amount - allocated_amount >
+           0
+    remaining = payment.amount
+    targets = if (mode == SPECIFIC) specific.map { charge(it.id) to it.amount } else open.map { it to
+           min(it.open, remaining) }
+    for (charge, amt) in targets while remaining > 0: a = min(amt, charge.open, remaining)
+         allocations.insert(payment, charge, a); charge.allocated += a; payment.allocated += a; remaining -= a
+    // remaining > 0 stays unallocated on the payment (credit balance); ageing uses charge.open and
+           business_date
+
+Anonymiser.apply(customer):
+    require(accounts.noneOpenWithBalance(customer), "erasure.open_balance")
+    customer.displayName = "Customer"; displayName_si/ta = null; nic_hash = null; nic_last4 = null; attributes =
+           {}; status = ANONYMISED
+    phones.closeAll(customer, reason = "ERASURE"); consents.withdrawAll(customer); tags.clear(customer)
+    postings, allocations, payment documents: untouched (retention); statements object keys: deleted; audit
+           records the request id only
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                 Page 6
+7. Queries, jobs, snapshot and the till contract
+
+Item                         Implementation
+LookupCustomer
+                             By E.164 phone (current primary) or by name trigram within the MPCS's customers; returns the till-safe shape of
+AgeingCalculator             Section 5; audited when called from accounts screens (not from the sales path).
+
+StatementJob (per            For each open charge: bucket by today − business_date (0–30, 31–60, 61–90, 90+) on the unallocated
+frequency)                   amount.
+SessionConsumer
+BankingShortfallJob          Accounts with movement in the period → StatementBuilder → A4Renderer in the customer's language →
+(daily)                      customer_statement.issued.v1 (M9 sends the SMS summary where consented).
+
+                             till_session.closed.v1 → expected banking per session cached for UnbankedSessions.
+                             Sessions closed more than 3 days ago and unbanked → REVIEW to the MPCS accounts role.
+
+7.3 Snapshot contributor and till contract
+
+CustomerSnapshotContributor: tables(): ["customer"]
+    rowsFor(location): accounts of the owning MPCS with status OPEN or SUSPENDED (and the identity rows behind
+           them) ->
+        { customerId, displayName (shop language with fallback), phone (primary), language, accountId,
+               creditLimit, balance, offlineCap, hardBlock, status, tags[] }
+    // never: nic_hash, nic_last4, attributes, consent details
+    change-log: customer.*, account.*, account.charged/credited (coalesced 5 min), customer_payment.* -> UPSERT
+           for the MPCS's locations; account.suspended -> urgent
+
+Till contract (M6): ACCOUNT tender allowed when status OPEN, amount <= offlineCap (offline) and amount <=
+        (creditLimit - provisionalBalance) unless !hardBlock (warn);
+
+    provisionalBalance = snapshot.balance + local ACCOUNT tenders since snapshot - local CPR amounts since
+           snapshot
+
+CPR bundle (till -> central): document(CPR, till-position series) + doc_customer_payment{accountId, method
+        CASH, amount, reference?, allocationMode OLDEST_FIRST}
+
+    hook: CprBundleHook -> PAYMENT posting + Allocator; a CPR against a CLOSED account posts and raises REVIEW
+           (cash was taken)
+
+8. Screens
+
+Khata page (web, MPCS accounts)                                                      Repayment at the till (in M6, from this
+
+spec)                                                                                | Customer: K. Perera balance Rs
+                                                                                     | Amount [ 2,000 ] cash
++------------------------------------------------------------+                       | new balance Rs 4,200.00 (provisional)
+                                                                                     | [Record payment] -> receipt prints
++----------------------------------------------+
+
+| K. Perera . 07xxxxxxxx . si . NIC ****1234 . [Consents 2] |
+
+6,200.00                  |
+
+| Account M042 . OPEN . limit 15,000 [Amend] hard block [ ] |
+
+|
+
+| balance 6,200.00 . available 8,800 . offline cap 5,000                   |
+
+|
+
+| Ageing: 0-30 4,200 | 31-60 2,000 | 61-90 0 | 90+ 0                       |
+
+|
+
+| Postings: date . kind . amount . receipt/doc . allocated |
+
++----------------------------------------------+
+
+| 2026-09-01 CHARGE 3,500 RCT M042-S07-T1-0001234 . 3,500 |
+
+| 2026-09-05 PAYMENT -3,500 CPR M042-S07-T1-0001301 . alloc |
+
+| [Record payment] [Adjust...] [Statement] [Suspend] [Close] |
+
++------------------------------------------------------------+
+
+Screen                    Components                                       Message ids (m7.)  Notes
+Khata index (lookup)                                                                          Reads audited on the web
+Customer card             search by phone/name, ItemCard-style customer customer.*
+Khata page                rows; till version from the snapshot                                Registration online only; the till opens
+Charge to account (till)                                                                      this in web mode
+Repayment                 form (minimal fields), consents, phone history with customer.*      –
+Statement                 reuse confirmation step, tags, attributes
+Bank slip / cash book                                                                         M6 renders
+                          as sketched; ApprovalBar; StepUpDialog on limit account.*
+                          increase; Timeline of postings                                      Reversal on the web with StepUp
+
+                          tender path in M6's sales screen: cap and limit  tender.*           –
+                          messages from the rules in 7.3                                      Handover then deposit
+
+                          amount, method, reference; provisional balance; payment.*
+                          offline allowed at the till
+
+                          period picker, rendered PDF, SMS preview         statement.*
+
+                          session picker with expected cash, amount, bank, banking.*
+                          reference, shortfall reason
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System             Page 7
+Screen                  Components                                          Message ids (m7.)  Notes
+Privacy requests                                                            privacy.*          Responsible officer only
+                        request list, access export download, erasure with
+Receivables and ageing  guard message and legal ground                      receivables.*      Federation view-only
+
+                        table by bucket; overdue list; export
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                        Page 8
+   9. Tests             Cases                                                                                  Target
+
+Layer                   Every guard of Section 6; ReuseDetector windows and conflicts; Allocator               All branches
+Unit                    oldest-first and specific incl. partial and over-payment; AgeingCalculator buckets;
+                        Anonymiser content; banking expected vs recorded
+Privacy (CI gate)
+                        Event payload scanner: no field matching phone or NIC patterns in any M7 event; Zero findings
+Property-based          snapshot rows contain no nic_* or attributes; logs contain no phone values; access
+                        export contains every field the customer's rows hold
+Contract
+State machine           Balance = Σ postings under random sequences incl. reversals; Σ allocations per         1000 cases each
+Consumers               charge ≤ charge; unallocated payment amount consistent; ageing sums to open
+                        balance
+Scenario
+Performance             Every operation; lookup shape is till-safe; RLS: identity readable by an               Every operation
+Web                     account-holding MPCS, balances OWN only
+
+                        Customer, account, payment, DSAR, banking                                              All transitions
+
+                        ACCOUNT tender → CHARGE; refund → CREDIT; offline breach → REVIEW;                     Six cases
+
+                        hard-block bypassed offline → ALERT; CPR bundle → PAYMENT with allocations;
+
+                        CLOSED account → REVIEW
+
+                        Flows 6.1–6.7 of doc 27 incl. the till simulator for offline tender and repayment      Seven flows
+
+                        Lookup under 50 ms on 500,000 customers; statements for 100,000 accounts               Two targets
+                        under 30 min
+
+                        Playwright: register with reuse confirmation → open account with step-up → record Two flows
+                        payment → statement; access request export
+
+10. Tickets in build order
+
+#      Ticket                                                                            Est. (days) Done when
+M7-01
+       Scaffold; migration with RLS incl. the identity/account visibility split; seeds;  2                 Gate fails on a planted phone field
+M7-02
+       privacy CI gate
+M7-03
+       Customer, phones, consents: register (online-only), change phone with             2.5               Flow 6.1, 6.2
+M7-04
+M7-05  ReuseDetector, deactivate, tags, attributes
+
+M7-06  Accounts: open with NIC capture, limits, hard block, cap,                         2                 State machine tests
+       suspend/reinstate/close; LimitPolicy
+M7-07
+M7-08  PostingService, Allocator, AgeingCalculator; property tests                       2.5               Properties green
+M7-09
+       ReceiptTenderConsumer; CPR document, RecordCustomerPayment (office), 2.5                            Flow 6.3, 6.4
+M7-10  CprBundleHook (till), reversal
+M7-11
+       Snapshot contributor and change-log fan-out; till contract signed with the till 1                   Snapshot tests
+       track
+
+       Statements (job, builder, notification rule); adjustments with SoD                1.5               Flow 6.5
+
+       Privacy requests: access export, erasure with guard and anonymiser, refusal 1.5                     Flow 6.7; export completeness
+
+       Banking records, SessionConsumer, shortfall job; receivables and ageing           1.5               Flow 6.6
+
+       queries
+
+       Web screens (nine) and Playwright flows                                           3                 Two flows green
+
+       Contract freeze: m7customers.yaml v1; review with M6, M8, M9; CR-27-2             0.5               Dependants acknowledge
+
+       applied to 24A
+
+Total about 20 developer-days.
+
+11. Open points: what to assume, whom to ask
+
+Point                                        Assume                                      Decider               If different
+                                             As proposed in doc 27 §11                   Federation accounts;  Config values; Allocator
+Allocation mode, offline repayment                                                       Federation legal      default; H-02 set
+capture, limit policy, erasure wording, NIC  Adopted; CR-27-1, CR-27-2 raised
+capture, banking handover (doc 27 DR-1                                                   Architecture review   –
+to DR-5, DR-7)
+
+CPR as an M7 document; payer_kind
+CUSTOMER removed from 24A (DR-6)
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                                  Page 9
+Point                                       Assume                                 Decider               If different
+Identity visibility across MPCS
+                                            Name and phone visible to any MPCS     Federation legal (PDPA) Restrict to the registering
+Retention years for postings after closure  holding an account for the customer;                                       MPCS; second MPCS
+Statement SMS content                       balances OWN                                                               registers a duplicate identity
+
+                                            7 pending J-06                         Federation legal      RetentionGuard parameter
+
+                                            Balance, due amount, oldest charge     Federation with MPCS  Template
+                                            date, shop name; no line detail        treasurers
+
+End of document. 27A v0.1; m7customers/README.md and its tests become the living version once merged.
+
+27A - M7 Implementation Guide | v0.1 | Cooperative Retail and Distribution System                                      Page 10
+

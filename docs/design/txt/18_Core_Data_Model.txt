@@ -1,0 +1,1359 @@
+Cooperative Retail and Distribution System
+
+18 – Core Data Model
+
+Logical data model for the platform: modelling principles; entity, location and tenancy
+scoping; catalogue, batch and price ceilings; the immutable document base type with
+numbering series and compensating corrections; the append-only audit log; the event
+backbone and sync state; and the module schema register with the cross-module
+invariants the module designs introduced.
+
+Field           Value
+Document
+Version         18 – Core Data Model (design artefact; Stage 1)
+
+Date            v0.3.1 – consolidated: incorporates v0.2 and the Data Model Consolidation Addendum (18B) in one document;
+Status          18B is withdrawn. v0.3.1 restores v0.2 material dropped in the v0.3 rewrite (visibility guarantees, audit notes,
+Inputs          decision consequences, full abbreviation list)
+
+Audience        18 September 2026
+Scope boundary
+                Design of record. Parts A–E are authoritative for kernel and shared tables; Part F registers every module schema
+                and names the implementation guide whose DDL is authoritative for module-owned tables.
+
+                02 Domain Model, 03 Document State Machines, 05 SRS, 06 NFR, 07 Matrices, 09 Decisions Log, 16
+                Questionnaire Answers, 17 Solution Architecture v0.2.1, 19 Kernel Services v0.2, 32 Sync Contract, 24B
+                Numbering Addendum, the module designs and guides 21–29 and 21A–29A, the September 2026 review
+                decisions and the multi-MRP study.
+
+                Engineering leads and database designers. Business readers need only Sections 1, 2 and Part F.
+
+                Logical model at table and column level, with invariants. Physical tuning belongs to the database design and doc
+                35.
+
+How to read this document. Every table lists its columns, types and the rules that bind them. Rules spanning tables
+are numbered invariants at the end of each part; they are the contract application code, database constraints and tests
+must all honour. Where a module design changed a rule from v0.2, the change is stated in place. Abbreviations are
+expanded on first use and collected in Section 10.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System  Page 1
+      1. Modelling principles
+
+      Ten rules govern every table in this model. Where a table departs from one, the departure is stated.
+
+#     Rule                          Statement
+
+P1 One owning entity per row        Every operational row carries owner_entity_id. A document between two legal entities carries
+                                    both parties, but exactly one of them is the owner (the issuer). Tenancy scoping, visibility and audit
+                                    all key off this column.
+
+P2 Identifiers are generated where Primary keys are UUID version 7: globally unique, time-ordered, safe to generate on a disconnected
+
+      the record is born            till. Business-facing numbers are separate attributes.
+
+P3 Documents are immutable          After issuance a document header and its lines are never updated or deleted. Any change is a new
+          once issued               document that references the original (Part C).
+
+P4 Ledgers are append-only          Stock movements, account postings, document state history, the outbox and the audit log are
+                                    insert-only. Balances are derived, never edited. The application role holds INSERT only.
+
+P5 Reference data is                Prices, tax rates, control prices, relationships and conversions carry effective_from /
+          effective-dated           effective_to; a past transaction can always be shown to have been correct at the time.
+
+P6 One writer per record type       The till is the only writer of its own sale, session, receiving and count records; central is the only
+                                    writer of everything else, pushed to tills read-only. No merge logic exists (ADR-10).
+
+P7 Trilingual text with English as name_en mandatory; name_si, name_ta optional except where a status requires them; ICU
+
+      the anchor                    collations on each.
+
+P8 Money and quantity are exact Money numeric(14,2) LKR; unit prices and costs numeric(14,4); quantities numeric(14,3)
+                                                       in the base unit. No floating point.
+
+P9 Time is stored twice             occurred_at in UTC and occurred_local as the device reading; received_at stamped by
+                                    the server; sequence numbers, not clocks, order events.
+
+P10 Nothing is hard-deleted         Reference rows carry a status; users are deactivated; documents are voided by compensating
+                                    documents. The only DELETE privilege belongs to migration tooling.
+
+      2. Model overview
+
+Part                       Owning module (doc 17            Tables                                                 Depends on
+
+                           v0.2.1)
+
+A – Entity, location, tenancy M1 Party, Tenancy & Security  entity, entity_relationship, location, till_position,  –
+
+                                                            device, app_user, permission, role, role_permission,
+
+                                                            user_role, sod_pair, external_grant
+
+B – Catalogue, batch,      M2 (catalogue, batch, images);   uom, supplier, sku, sku_uom_conversion,                A
+ceilings                   M3 (price lists, rules, control
+                           prices, policies); M5 (lots,     sku_barcode, sku_image, sku_alias, tag, sku_tag,
+                           movements, recipes)
+                                                            tax_category, tax_rate, batch, location_assortment,
+
+                                                            stock_lot, stock_movement, control_price, price_list,
+
+                                                            price_list_line, discount_rule, mrp_policy,
+
+                                                            repack_recipe
+
+C – Document base type     Kernel (document types owned     document_type, numbering_series, document,             A, B
+                           by M4, M5, M6, M7)
+                                                            document_line, document_link,
+
+                                                            document_state_history, document_attachment
+
+D – Audit log              Kernel                           audit_event, audit_event_type                          A
+                           Kernel
+E – Event backbone and                                      event_outbox, event_inbox, device_sync_cursor, A
+sync state                                                  sync_quarantine, snapshot_change_log,
+                                                            idempotency_key
+
+F – Module schema register All modules                      Every module-owned table by schema, with its           A–E
+
+                                                            authoritative DDL; cross-module invariants;
+
+                                                            document type ownership
+
+      Module-specific tables (M4 extensions, M5 tasks and thresholds, M7 customers and accounts, M8 projections,
+      M9 clients and exports) are introduced by their module designs and registered in Part F; the module
+      implementation guide's section 3 is the authoritative DDL for them. A module design raises a change request
+      here only when a shared table changes. The till carries local copies of parts C–E following the same logical
+      model (Section 7).
+
+   18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                                Page 2
+3. Part A – Entity, location and tenancy scoping
+
+Three kinds of legal entity and one kind of place. A shop is a location, not an entity: it holds stock and issues
+receipts, but the legal party to every transaction is the MPCS or distributor that owns it. This distinction is
+enforced by the absence of legal attributes on location.
+
+Table entity
+A legal party: the Federation, a distributor (a large MPCS with a distribution role) or an MPCS. About 876 rows
+at go-live.
+
+Column                   Type              Meaning and rules
+entity_id                uuid PK           UUIDv7.
+entity_code              varchar(12)       Human-facing prefix in document numbers, e.g. M042; immutable.
+                         UNIQUE
+entity_type              enum              FEDERATION | DISTRIBUTOR | MPCS; exactly one FEDERATION row.
+legal_name_en / _si /    text              Registered name; English mandatory (P7).
+_ta
+registration_no          varchar(40)       Co-operative registration number.
+vat_registration_no      varchar(20)       Required for all chain entities (J-03); printed on tax invoices of both parties.
+district                 varchar(40)       One of the 25 districts.
+financial_year_start_mo  smallint          Common federation-wide (J-08) but stored per entity.
+nth
+default_language         enum              en | si | ta.
+costing_policy           enum              WEIGHTED_AVERAGE only in phase 1 (E-03).
+credit_exposure_warn_on  boolean           Always true in phase 1 (ADR-12); policy as data.
+ly
+responsible_officer_use  uuid FK app_user  The entity's named responsible officer under the PDPA and the data-governance
+r_id                     (nullable)        agreement (FR-GOV-060); required for activation (CR-21-1).
+data_governance_signed_  date (nullable)   Date the entity signed the data-governance agreement (M-11) (CR-21-1).
+on
+status                   enum              ONBOARDING | ACTIVE | SUSPENDED; no CLOSED state (M-07).
+
+• The Federation row is the only entity whose users may hold the federation-wide read-only view (3.7).
+• There is no parent/child column between entities; trading tiers are expressed by entity_relationship.
+
+Table entity_relationship
+One row per trading pair; the home of bilateral commercial terms (A-06, A-07, A-09, D-06).
+
+Column                   Type              Meaning and rules
+
+relationship_id          uuid PK           seller <> buyer enforced.
+
+seller_entity_id /       uuid FK entity    The effective-dated TRADE list (Part B); must belong to the seller.
+buyer_entity_id
+                                           Informative (ADR-12); changes permission-gated with MFA and audited.
+price_list_id            uuid FK           Ageing basis.
+                         price_list        D-06 time limit.
+                                           C-08 lock window; per-order override on the order.
+credit_limit             numeric(14,2)
+                                           FCFS default; per seller; audited on change (C-03, C-04).
+payment_terms_days       smallint          DRAFT | ACTIVE | SUSPENDED.
+                                           Effective-dated: an amendment closes a row and opens another (P5).
+discrepancy_window_days smallint
+
+order_lock_hours_before smallint
+_eta
+
+allocation_rule          enum
+
+status                   enum
+
+effective_from /         date
+effective_to
+
+• A-I3: at most one ACTIVE row per (seller, buyer) at any date (exclusion constraint). Intra-entity movements
+   are never relationships.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                       Page 3
+   Table location
+   A physical place belonging to exactly one entity: warehouse, shop or office. A shop is one stock location (E-02).
+
+Column               Type                  Meaning and rules
+
+location_id          uuid PK               Immutable (A-I2).
+                                           Unique within the owner; used in location-scoped series, e.g. M042-S07.
+owner_entity_id      uuid FK entity        WAREHOUSE | SHOP | OFFICE; only the first two hold stock.
+
+location_code        varchar(12)           Drops and rollout planning.
+
+location_type        enum                  Per-shop interface and receipt language (P-02, H-09); null inherits the entity default.
+                                           Update windows (doc 31) and day-close.
+name_en / _si / _ta  text                  S | M | L (H-06).
+                                           Go-live gate (Q-06); required for ACTIVE.
+address, district,   text / numeric        Holds the location-scoped numbering series; reassignment audited (A-I7).
+geo_lat, geo_lng
+                                           PLANNED | ONBOARDING | ACTIVE | DORMANT.
+language             enum
+
+trading_hours        jsonb
+
+size_band            enum
+
+connectivity_spec_met boolean
+
+primary_till_position_i uuid FK
+
+d                    till_position
+
+status               enum
+
+   Table till_position
+   A logical checkout lane; till-issued document series bind to the position, not the hardware (ADR-11).
+
+Column               Type                  Meaning and rules
+till_position_id
+location_id          uuid PK
+position_no
+status               uuid FK location Must be a SHOP.
+
+                     smallint              Unique per location; appears in receipt numbers.
+
+                     enum                  ACTIVE | RETIRED; retired positions keep their series; numbers never reused.
+
+   Table device
+   A physical terminal or workstation; assignment to a position is the only link between hardware and numbering.
+
+Column               Type                  Meaning and rules
+
+device_id            uuid PK               Enrolment identity.
+
+hardware_serial      varchar(64)           POS_TERMINAL | WORKSTATION | DRIVER_MOBILE.
+                     UNIQUE                P1.
+                                           At most one device per position (partial unique index); history in the audit log.
+device_kind          enum
+                                           Fleet health; freshness.
+owner_entity_id      uuid FK entity
+                                           Floor enforcement (ADR-24).
+current_till_position_i uuid FK            ENROLLED | ACTIVE | SUSPENDED | RETIRED.
+
+d                    till_position
+
+enrolled_at,         timestamptz
+last_seen_at
+
+app_version          varchar(20)
+
+status               enum
+
+   Users, roles, permissions, segregation
+
+Table            Key columns                                                   Rules
+app_user
+                 user_id PK; home_entity_id; username UNIQUE;                  One home entity. Till operators authenticate by PIN (Argon2id
+                 display_name; language; user_kind BACK_OFFICE                 hash distributed in the operator snapshot); back office by the
+                 | TILL | BOTH | EXTERNAL; provider_subject;                   identity provider with TOTP for financial and administrative
+                 pin_hash; pin_history; sandbox; succeeds_user_id;             functions. Deactivated, never deleted; a returning member of staff
+                 status                                                        gets a new record linked by succeeds_user_id.
+
+   18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                             Page 4
+Table       Key columns                                                     Rules
+
+permission  permission_code PK; module; description_en;                     The catalogue, versioned as a whole
+            offline_allowed; requires_mfa; scope LOCATION |                 (permission_catalogue_version.rv). offline_allowed is what the till
+            ENTITY | FEDERATION; limits_schema                              caches; requires_mfa marks online-only actions; scope is the
+                                                                            finest grantable level.
+
+role        role_id PK; owner_entity_id (null = federation                  Templates clone on adoption; drift is notified, not forced (doc 19
+            template); names; is_template; role_class OWN |                 DR-4).
+            FEDERATION_VIEW | EXTERNAL_TIMEBOXED;
+            template_role_id; template_version_seen; version;
+            status
+
+role_permissio role_id; permission_code; limits jsonb                       Limits carry approval ceilings validated against the permission's
+n                                                                           limits_schema.
+
+user_role   user_id; role_id; scope_entity_id; scope_location_id Scope columns implement M-08: an MPCS administrator grants
+
+            (nullable)                                                      roles scoped to its shops; the Federation holds no downward
+
+                                                                            administrative scope.
+
+sod_pair    sod_pair_id PK; permission_a; permission_b; mode                CR-21-2. INSTANCE: the same user may hold both but not act as
+            INSTANCE | ROLE; owner_entity_id (null =                        both on one document; ROLE: may not coexist in one role.
+            federation default)                                             Federation defaults: writeoff.request/approve,
+                                                                            writeoff.request/witness, adjust.request/approve,
+                                                                            user.manage/audit.review-self,
+                                                                            cus.account.adjust/adjust_approve.
+
+external_grant grant_id PK; grantee_user_id; scope_entity_ids[]; Regulator and auditor access (M-10, J-09); every grant and login
+                           valid_from; valid_until (≤ 12 months); reason; status audited.
+
+3.7 Tenancy scoping and visibility enforcement
+
+One shared database; ownership is a property of rows. Every database session carries the caller's scope as
+settings (app.scope_entity_id, app.scope_location_id, app.scope_class,
+app.granted_entities, set with SET LOCAL per transaction); row-level security policies read them. A
+transaction without a scope fails closed.
+
+Class       Who                           Reads                                                                 Writes
+                                                                                                                Per permission
+OWN         Any user in scope             Rows where owner = scope entity (and location when the
+                                          assignment is location-scoped)                                        Their own side's
+                                                                                                                commands
+PARTY       Seller or buyer of a document Trading-facing columns of documents where the scope
+                                                      entity is a party, through masking views that omit cost,  None
+                                                      margin and internal notes
+                                                                                                                None
+FEDERATION_VIEW Federation roles marked   Everything, including margins and shrinkage (M-02 to
+                                view-all  M-04)                                                                 One phase-1 write
+                                                                                                                (journal
+EXTERNAL_TIMEB Regulator, auditors        Granted scope, read-only, until valid_until                           acknowledgement)
+OXED
+
+API_CLIENT  OAuth2 clients (M9)           Mapped to OWN or PARTY for the client's entity within its
+                                          scopes
+
+What the classes guarantee: no query runs without a declared scope (a missing scope fails closed); a distributor
+cannot see an MPCS's internal data beyond the documents they trade (FR-GOV-020); a shop sees nothing of a
+sibling shop (M-05) because shop-scoped users carry a location scope and shop-internal tables filter on it; the
+buyer sees the seller's invoice, never the seller's cost basis, because PARTY reads go through masking views;
+the Federation and external grantees read everything in their scope and write nothing.
+
+Invariants for Part A.
+
+• A-I1. Every operational table has a non-null owner_entity_id or derives one through a non-null
+   location_id.
+
+• A-I2. location.owner_entity_id is immutable after creation.
+• A-I3. At most one ACTIVE entity_relationship per (seller, buyer) at any date.
+• A-I4. A till_position belongs to exactly one SHOP and its position_no is unique within it; positions
+
+   are retired, never deleted.
+• A-I5. A device holds at most one till position at a time; the change is an audited event.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                      Page 5
+• A-I6. No user holds a role scoped outside their home entity unless the role class is FEDERATION_VIEW or
+   EXTERNAL_TIMEBOXED.
+
+• A-I7. A SHOP has a primary_till_position_id before it can issue any location-scoped document; only
+   the primary till issues them (ADR-47).
+
+• A-I8. No grantor confers a permission they do not hold; an entity never loses its last holder of
+   gov.user.manage; an API client's scopes never exceed its grantor's permissions (I-F9).
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System  Page 6
+4. Part B – Catalogue, units, batches and price ceilings
+
+Three ideas: the SKU is what is counted and sold; the batch is a physical supply identity carrying expiry and the
+printed MRP; the stock lot is an entity's holding of a batch at a location, in a condition, carrying that entity's cost.
+Separating batch from lot lets one physical batch be owned successively by the Federation, a distributor and an
+MPCS at three different costs (ADR-38).
+
+Table uom
+Federation-governed units of measure.
+
+Column                  Type             Meaning and rules
+uom_code                varchar(10) PK   EA, KG, G, L, ML, CASE, PKT, BAG, BOX, DOZ.
+name_en / _si / _ta     text
+is_weight               boolean          Drives the weigh-station path (B-06, B-11).
+
+Table supplier
+Minimal supplier identity until M10 Procurement absorbs it in phase 2 (CR-22-1).
+
+Column                  Type             Meaning and rules
+supplier_id             uuid PK
+owner_entity_id         uuid FK entity   The registering entity.
+name                    text             Unique per owner.
+status                  enum             ACTIVE | INACTIVE.
+
+Table sku
+The smallest distinctly tracked and counted item, in one global namespace (B-01).
+
+Column                  Type             Meaning and rules
+sku_id                  uuid PK
+sku_code                varchar(12)      System-generated, opaque, never reused; used for till code lookup (B-11).
+                        UNIQUE
+owner_entity_id         uuid FK entity   Federation for SHARED; the creating entity for DRAFT and LOCAL (B-08).
+status                  enum             DRAFT | LOCAL | SHARED | INACTIVE; prior_status kept for reactivation.
+                                         INACTIVE keeps selling lots on hand when sell_through applies (doc 22 DR-3).
+short_name_en           varchar(80) NOT  Mandatory (P7); _si, _ta mandatory for SHARED.
+                        NULL
+description_en / _si /  text             KG when sold_by_weight.
+_ta                                      Expiry tracking implies batch tracking. Non-batch-tracked SKUs get a synthetic
+base_uom_code           FK uom           batch per receipt line so MRP and cost always have a home (ADR-38).
+sold_by_weight,         boolean
+batch_tracked,                           New in v0.3 (doc 22 DR-7): false for loose produce and unpriced goods, making a
+expiry_tracked          boolean          null batch MRP legitimate rather than missing.
+has_printed_mrp                          Category default copied at creation.
+                        smallint         Per-SKU tax category (G-09).
+expiry_warning_days     uuid FK
+tax_category_id         tax_category     AUTO_LOWEST | BARCODE_RESOLVED | PICKER; denormalised effective value
+                        enum             maintained from M3's mrp_policy (ADR-41).
+multi_mrp_policy                         PURCHASED | REPACK_OUTPUT | LOCAL_SOURCED.
+                        enum             Bounded, entity-owned free attributes; non-searchable; no behaviour (doc 20
+origin_kind             jsonb (≤ 4 KB)   Appendix A).
+attributes
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System            Page 7
+Table sku_uom_conversion
+Pack conversions for the same physical item (B-02, ADR-07); a genuinely different retail item is a second SKU
+via a repack recipe.
+
+Column                 Type             Meaning and rules
+sku_id, uom_code       PK
+factor_to_base         numeric(14,6)    One unit = factor × base units.
+effective_from,        date             Exclusion constraint per (sku, uom) (P5).
+effective_to
+
+Table sku_barcode
+Many barcodes to one SKU (B-12); the optional batch link makes barcode-resolved MRP possible.
+
+Column                 Type             Meaning and rules
+barcode, symbology     varchar(48),
+                       enum             EAN13 | EAN8 | UPCA | GS1_128 | GS1_DATAMATRIX | GS1_QR |
+sku_id, uom_code                        INTERNAL. Factory symbologies unique federation-wide; INTERNAL unique per
+batch_id               FK               owner (B-I2).
+                       uuid FK batch
+owner_entity_id        (nullable)       A case barcode maps to the CASE unit of the same SKU.
+status                 uuid FK entity
+                       enum             Set when the code identifies one batch: batch sticker, MRP-wise manufacturer code,
+                                        or a 2D code carrying application identifier 10.
+
+                                        In-store codes are owned by the registering entity.
+
+                                        ACTIVE | RETIRED.
+
+• In-store 20–29 labels encode SKU code plus weight or batch, never a price, so the shared engine and the
+   control-price ceiling always apply (ADR-43).
+
+Table sku_image
+Product images (September 2026 decision): one per SKU, optionally one per barcode; tills cache thumbnails
+only.
+
+Column                 Type             Meaning and rules
+image_id               uuid PK          Per pack artwork when set.
+sku_id, barcode        FK, varchar(48)
+(nullable)
+owner_entity_id        uuid FK entity   Federation for SHARED; an entity may hold a local override for its own locations.
+object_key_full,       text             Thumbnail about 128 px, under 10 KB, rides in the shop snapshot.
+object_key_thumb
+content_hash           char(64)         PENDING | ACTIVE | RETIRED; one ACTIVE per (sku, barcode-or-null, owner).
+status                 enum
+
+Table sku_alias
+Preserves an originating entity's history when a local SKU is promoted or merged (B-10, FR-SKU-100).
+
+Column                 Type             Meaning and rules
+alias_sku_id           uuid PK FK sku   The retired or promoted local SKU.
+canonical_sku_id       uuid FK sku      Reports resolve aliases at query time.
+effective_from         date
+
+Tags, tax, assortment
+
+Table               Key columns                          Rules
+tag`, `sku_tag
+                    tag_code PK; names; governed;        A governed vocabulary replaces a mandatory hierarchy (B-15). Policies
+                    owner_entity_id (null for governed)  in M3 and M5 (expiry windows, tolerances, thresholds, control-price
+                                                         scope, multi-MRP policy) attach to governed tags only; local tags carry
+                                                         no behaviour. The governed tag core-range marks goods every shop
+                                                         can sell.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                            Page 8
+Table               Key columns                              Rules
+
+tax_category`,      tax_category_id PK; code; rate_percent;  Standard VAT only (J-03); exclusion constraint per category; publication
+`tax_rate           effective_from/to                        carries apply_from to tills.
+
+location_assortm location_id; sku_id; reasons[];             CR-22-2. The set of SKUs a location's till must know: retail-list SKUs ∪
+                                                             SKUs with a lot at the location ∪ the owner's LOCAL SKUs ∪ core-range
+ent                 sell_through; since                      (I-F1). Materialised by M2 consumers; reconciled nightly.
+
+     Table batch
+     A physical supply identity for a SKU, created when stock first enters the federation. Global, not owned by the
+     holder.
+
+Column              Type                          Meaning and rules
+batch_id
+                    uuid PK (with
+sku_id              created_at
+batch_no            partition key)
+
+supplier_id         uuid FK sku
+manufacture_date,
+expiry_date         varchar(40)                   As printed; unique with (sku, supplier). A near-duplicate number for the same SKU
+printed_mrp                                       and supplier is a steward suspect, not an error.
+
+origin_document_id  uuid FK supplier Batch-level supplier attribution (B-03).
+is_synthetic
+corrects_batch_id   date                          Expiry mandatory when the SKU is expiry-tracked.
+
+status              numeric(14,2)                 The MRP printed on the pack (ADR-08). Non-null when the SKU has
+created_at                                        has_printed_mrp and the receipt line quantity is positive; null otherwise is
+                                                  legitimate (I-F2). Immutable: a mis-keyed MRP is corrected by a replacement batch.
+
+                    uuid FK document The GRN or repack that created it.
+
+                    boolean                       True for non-batch-tracked SKUs (one per receipt line).
+
+                    uuid (nullable) Set on a replacement batch; the original becomes SUPERSEDED and lots re-point
+                                                    (B-I8).
+
+                    enum                          REGISTERED | SUPERSEDED.
+
+                    timestamptz                   Partition key (monthly).
+
+     Table stock_lot
+     An entity's holding of one batch at one location in one condition: the unit of costing and of on-hand balance (M5).
+
+Column              Type                          Meaning and rules
+stock_lot_id
+location_id         uuid PK
+batch_id
+condition           uuid FK location Owner entity derived (A-I1).
+
+qty_on_hand         uuid FK batch
+
+unit_cost           enum                          GOOD | DAMAGED (new in v0.3, doc 25 DR-2): damaged units received on a GRN
+                                                  form a DAMAGED lot at the same unit cost, sellable only through a markdown rule
+received_at                                       or written off. Unique per (location, batch, condition) (I-F3).
+last_movement_seq
+                    numeric(14,3)                 In base units. May be negative (E-09, ADR-45): every negative occurrence is an
+                                                  exception item; negative_since and negative_acknowledged_at track it.
+
+                    numeric(14,4)                 This entity's acquisition cost: trade price at GRN (ADR-03), keyed cost for local
+                                                  supply, recipe-derived for repack outputs, restated by landed cost in phase 2.
+
+                    timestamptz                   Ageing (E-11).
+
+                    bigint                        Idempotent re-application on replay.
+
+     • Weighted-average cost per (entity, SKU) is a separate M5 table (entity_sku_cost); the lot keeps its
+        acquisition cost, the entity average is the costing figure (E-03, IAS 2).
+
+     Table stock_movement
+     Append-only ledger of every quantity change; the only way stock changes (M5).
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                  Page 9
+Column                  Type            Meaning and rules
+movement_id             uuid PK (with
+                        received_at)    Dense per (location, source) where source is a device id or 'central' (I-F4); the
+source, movement_seq                    tie-breaker for ordering offline events.
+                        text, bigint
+                                        Signed, base units.
+location_id, batch_id,  FK, enum        RECEIPT | SALE | SALE_REVERSAL | TRANSFER_OUT | TRANSFER_IN |
+condition                               REPACK_CONSUME | REPACK_PRODUCE | COUNT_ADJUST | WRITE_OFF |
+qty_delta               numeric(14,3)   RETURN_TO_SELLER | OPENING_BALANCE | GRN_REVERSAL. Loss categories
+movement_type           enum            are on the write-off document.
+                                        Cost basis frozen at the time (entity average for issues).
+unit_cost_at_movement   numeric(14,4)   Every movement cites its document (B-I5).
+                        uuid FK
+document_id,            timestamptz     P9.
+document_line_id
+                        uuid FK         Attribution (H-13).
+occurred_at,
+occurred_local,
+received_at
+
+operator_user_id,
+device_id
+
+Table control_price
+Government-gazetted maximum price: a date-effective, SKU- or tag-scoped ceiling that binds all stock
+regardless of the MRP printed on older packs (CAA Act s.20(5)); M3-owned, Federation-written (ADR-41).
+
+Column                  Type            Meaning and rules
+control_price_id        uuid PK
+sku_id | tag_code                       Exactly one set; tag scope covers gazettes that name a category; where both a SKU
+                        uuid |          and a tag ceiling are in force the lower applies (doc 23 DR-2, pending Federation
+                        varchar(40)     legal).
+                                        Tax inclusive; converted through conversions.
+ceiling_price,          numeric(14,2),
+ceiling_uom_code        FK uom          Publication date; null while in force; exclusion constraint per scope (B-I6).
+                        date
+effective_from,                         Receipt footer and audit.
+effective_to            varchar(80)     Federation catalogue steward only; every insert audited; never updated except
+                                        effective_to.
+gazette_reference
+
+entered_by, entered_at
+
+• Enforcement is a hard block at authoring, at label printing and at sale (B-I7); tills cache the table and warn
+   when the snapshot is stale.
+
+Price lists, rules, policies, recipes (M3 and M5; summarised because Part C cites them)
+
+Table              Key columns                                        Rules
+price_list
+                   price_list_id PK; owner_entity_id; kind TRADE      TRADE lists price a relationship; one PUBLISHED RETAIL list per
+price_list_line    | RETAIL | ADVISORY; name; version;                MPCS for all its shops (G-01); ADVISORY lists never resolve a
+discount_rule      source_version_id; status DRAFT |                  price.
+                   PUBLISHED | SUPERSEDED | WITHDRAWN;
+                   apply_from
+
+                   price_list_id; sku_id; uom_code; tier_from_qty;    Effective-dated with an exclusion constraint per (list, sku, uom, tier).
+                   price; effective_from/to                           Authoring rejects a price above any in-stock batch MRP at the
+                                                                      owner's locations or above a control price in force (B-I7).
+
+                   rule_id PK; owner_entity_id; name; kind            The sole mechanism for any reduction at a till (ADR-14); a closed
+                   TIME_LIMITED_PRICE | QUANTITY_BREAK |              vocabulary validated by JSON schema per kind; every reduction
+                   BILL_THRESHOLD | FREE_ITEM |                       stamps its rule id so markdown cost is measured separately (F-07).
+                   EXPIRY_MARKDOWN; predicate jsonb;
+                   benefit jsonb; priority; advisory; valid_from/to;
+                   status
+
+mrp_policy         policy_id PK; sku_id | tag_code; policy; picker SKU scope beats tag; default AUTO_LOWEST (ADR-41).
+                   gap amount / percent; owner_entity_id
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                              Page 10
+Table            Key columns                                Rules
+adjustment_type
+                 code PK; kind SPECIAL_DISCOUNT |           Manual adjustments exist only on Federation→distributor orders
+repack_recipe    DELIVERY_FEE; permission_code; bounds      against a registered type (A-06).
+
+                 recipe_id PK; owner_entity_id; input_sku,  Bulk-to-pack transformation (B-06, ADR-07); variance measured
+                 input_qty; output_sku, output_qty;         against expectation, not booked as shrinkage (M5).
+                 expected_loss_pct; status
+
+4.9 Price resolution at the till (data-level statement)
+
+For a scanned line the effective selling price is min( list price, batch term, control price in force ) where the batch
+term is the lowest printed MRP among batches with positive on-hand at the location (AUTO_LOWEST), the scanned
+batch's MRP (BARCODE_RESOLVED) or the operator's pick (PICKER, only when the candidate gap exceeds the
+threshold), and is absent for SKUs without a printed MRP; then discount rules apply (one line rule by priority, one bill
+rule); then the control price is re-checked as a hard cap; then tax is decomposed and cash tenders round to the rupee
+at receipt level. Every receipt line stores batch_id, mrp_applied, control_price_applied, cap_reason,
+rule_id so its legality is reproducible from the row alone. The same library computes it at central and on the till
+(ADR-31).
+
+Invariants for Part B.
+
+• B-I1. sku.short_name_en is non-null for every status; _si and _ta are non-null for SHARED.
+• B-I2. A factory barcode is unique per symbology federation-wide; INTERNAL codes are unique within their
+
+   owner.
+• B-I3. Every stock_lot references a batch of the same SKU as the receiving document line; unique per
+
+   (location, batch, condition).
+• B-I4. stock_lot.qty_on_hand equals the sum of movements for that lot; a nightly reconciliation asserts it
+
+   and raises an exception on drift, never fixes.
+• B-I5. No stock_movement exists without a document_id.
+• B-I6. At most one control_price in force per scope per date.
+• B-I7. A price-list line, rule benefit or printed label that would exceed a control price in force is rejected at
+
+   authoring or printing, not merely at sale.
+• B-I8. A batch's printed_mrp is immutable; corrections create a replacement batch and re-point lots.
+• B-I9. A batch's printed_mrp is non-null exactly when the SKU has has_printed_mrp and the line quantity is
+
+   positive (I-F2).
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System  Page 11
+5. Part C – The document base type
+
+Every trading and stock artefact is a document: order, delivery note, GRN, discrepancy, claim, invoice, credit
+and debit note, payment receipt, customer payment receipt, till receipt, write-off, count, adjustment, repack,
+transfer, opening balance. They share one header table, one line table and one lifecycle discipline; type-specific
+data lives in extension tables in the owning module's schema, keyed one-to-one on document_id, inheriting
+immutability and partitioning (I-F10).
+
+Table document_type
+Registry of document kinds and their numbering behaviour; flags as decided in 24B.
+
+Column               Type              Meaning and rules
+doc_type_code        varchar(8) PK
+name_en / _si / _ta  text              ORD, DN, GRN, DISC, CLM, INV, CN, DN2, PRC, CPR, RCT, WOF,
+series_scope         enum              CNT, ADJ, RPK, XFR, OPB.
+issuer_role          enum
+bilateral            boolean           Printed heading.
+fiscal               boolean
+offline_issuable     boolean           ENTITY | LOCATION | TILL_POSITION (5.5).
+
+posting_map          jsonb             BUYER | SELLER | HOLDER.
+owning_module        text
+                                       Counterparty mandatory for ORD, DN, GRN (when against a DN), DISC, CLM, INV,
+                                       CN, DN2, PRC.
+
+                                       True for RCT, INV, CN, DN2, PRC, CPR (24B); the others are protected by the
+                                       same mechanism but their gaps are operational findings.
+
+                                       RCT, GRN, CNT, RPK, XFR-receipt, CPR and WOF-draft are offline-issuable on the
+                                       primary till (LOCATION series) or any till (TILL_POSITION series); ORD, INV, CN,
+                                       DN2, PRC are not (H-02/H-03).
+
+                                       Journal-posting roles per line kind and side (J-02); registered into M9's
+                                       posting_map_registry.
+
+                                       M4, M5, M6 or M7 (Part F).
+
+Table numbering_series
+One row per series; sequential and gapless within the series; numbers final at issuance and never reused; voids
+keep their numbers (ADR-11, 24B N-3, N-4).
+
+Column               Type              Meaning and rules
+series_id
+doc_type_code        uuid PK
+owner_entity_id
+location_id,         FK document_type
+till_position_id
+prefix               uuid FK entity Always set.
+
+next_number          uuid FK           Set per scope.
+                     (nullable)
+holder_device_id
+                     varchar(24)       {entity_code}[-{location_code}[-T{position}]]-{type}; display
+fy_reset                               {prefix}-{number:07d}; no year segment (24B N-1).
+status
+                     bigint            Central view; for offline scopes the last synchronised value – the holder device holds
+                                       the authoritative counter.
+
+                     uuid FK device    LOCATION scope: the shop's primary till; TILL_POSITION scope: the assigned
+                     (nullable)        device; null for ENTITY.
+
+                     boolean           False everywhere (24B N-1).
+
+                     enum              ACTIVE | CLOSED; retiring a position closes its series.
+
+• Pre-reserved number ranges were evaluated and rejected (ADR-11). Each series has one counter with one
+   writer.
+
+Table document
+The shared header; immutable after issued_at (P3).
+
+Column               Type              Meaning and rules
+document_id          uuid PK           UUIDv7 generated by the issuing device; present from draft.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                          Page 12
+Column                   Type              Meaning and rules
+doc_type_code,                             Series and number null while draft; display frozen at issuance.
+series_id, doc_number,   uuid FK
+doc_number_display                         Issuer; counterparty mandatory when bilateral.
+owner_entity_id,         uuid FK
+counterparty_entity_id   (nullable)        Type-specific (doc 03; docs 24–27); the base enforces DRAFT before issuance and
+location_id,                               terminal states after.
+till_position_id,        enum              Immutability begins at issued_at; business_date from the location's day-close, never
+device_id                                  the clock.
+status                   timestamptz,
+                         date              H-13.
+issued_at,                                 LKR; foreign currency only on Federation imports (phase 2).
+issued_local,            uuid FK app_user  Frozen at issuance.
+business_date            char(3)
+operator_user_id         numeric(14,2)     Primary upstream document; corrections use document_link.
+currency
+net_amount, tax_amount,  uuid FK document  SHA-256 over the canonical header and lines; verified on sync; hash chain in phase
+gross_amount             (nullable)        2.
+reference_document_id    char(64)          ONLINE | OFFLINE; the device sequence for gap checks.
+                                           For till receipts: what the till computed with (ADR-31, doc 32).
+content_hash             enum, bigint
+                         text, bigint
+origin, device_seq
+engine_version,
+snapshot_version
+
+Table document_line
+Lines are immutable with their header; facts needed to reproduce a price or stock effect are stored, not looked
+up later.
+
+Column                   Type              Meaning and rules
+document_line_id,                          Frozen order.
+document_id, line_no     uuid FK
+sku_id, batch_id         FK,               Batch mandatory on stock-effecting lines; the price-resolution batch on a receipt.
+uom_code, qty            numeric(14,3)     As transacted.
+                         numeric, enum
+unit_price,                                NONE | MRP_LOWEST | MRP_BARCODE | MRP_PICKED | CONTROL_PRICE.
+mrp_applied,
+control_price_applied,                     Frozen; the rule id is the sole source of any reduction (ADR-14).
+cap_reason
+discount_rule_id,        numeric(14,4)     Stock-effecting lines; entity average at issue (carried in the receipt bundle for
+discount_amount,                           reporting).
+tax_rate_percent,
+tax_amount, line_total   enum (nullable) WOF lines: the F-01 categories.
+unit_cost_at_issue
+                         uuid FK           Upstream line.
+loss_category            (nullable)
+reference_line_id
+                         boolean,          Receipt-line facts from the till (E-09; picker; weighed goods).
+negative_ack, picked,
+weight_kg                boolean, numeric
+
+Table document_link
+Typed relationships between documents: the compensating-correction pattern.
+
+Column                   Type              Meaning and rules
+                         uuid FK           The later document points at the original.
+from_document_id,
+to_document_id
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                    Page 13
+Column                   Type            Meaning and rules
+link_type                enum
+                                         REVERSES (full void or reversal: at most once per original, only while reversible per
+amount                   numeric(14,2)   the type's state machine); CREDITS (credit note or refund against an invoice or
+created_at, created_by   (nullable)      receipt; carries amount); DEBITS; ADJUSTS (count adjustment against a count);
+                                         SETTLES (payment receipt against specific invoices, with amount; never oldest-first
+                                         for entities – I-07; customer receipts allocate oldest-first through M7's allocation
+                                         table instead, ADR-46); DISPUTES (discrepancy or claim against a GRN or DN);
+                                         SUPERSEDES (drafts only).
+
+                                         For SETTLES, CREDITS, DEBITS.
+
+      • The net position of any original is the original plus the sum of its linked corrections; reports never re-read a
+         corrected original alone.
+
+Table document_state_history
+Append-only record of every transition; the current status is the last row.
+
+Column                   Type            Meaning and rules
+                                         P9.
+history_id, document_id                  Mandatory for void, reject, reverse and any transition the type's design marks.
+
+from_status, to_status text
+
+occurred_at,             timestamptz
+occurred_local,
+received_at
+
+actor_user_id,           uuid FK
+device_id
+
+reason_code,             text
+reason_text
+
+Table document_attachment
+Photographs and files for discrepancy, claim and write-off documents (D-08, F-05).
+
+Column                   Type            Meaning and rules
+attachment_id,
+document_id              text, char(64)  Blob in object storage; uploaded via pre-signed PUT, possibly after the document
+                         enum            issues.
+object_key,                              PENDING | COMPLETE | FAILED; a decision that depends on evidence waits for
+content_hash                             COMPLETE.
+
+status
+
+captured_at,
+captured_by, device_id
+
+5.5 Issuance protocol and series scope
+
+Step    Action                                                                                Guarantee
+1                                                                                             No invalid document takes a number.
+2       Validate the draft (parties, lines, ceilings, permissions incl. offline_allowed when
+        offline).                                                                             Gapless and monotonic; a crash leaves both
+3                                                                                             or neither.
+4       Take the next number: online, a single-row UPDATE ... RETURNING on
+5       numbering_series in the issuance transaction; offline, the holder device increments   One transaction.
+        its persisted counter in the same local transaction, fsync before acknowledgement.
+                                                                                              Movements cite the document.
+        Freeze totals, compute content_hash, set issued_at, write the DRAFT→ISSUED            The device's number is final.
+        state row and the first audit event.
+
+        Apply stock movements for stock-effecting types.
+
+        On sync, central verifies the hash and device_seq continuity and advances its view;
+        a gap is an anomaly, never silently absorbed; central never re-numbers.
+
+Scope            Document types                                                               Counter holder
+TILL_POSITION    RCT (incl. void and same-session refund), CPR when recorded at a till        The device assigned to the position
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                    Page 14
+Scope     Document types                                                        Counter holder
+LOCATION                                                                        The shop's primary till (ADR-47)
+ENTITY    GRN (shop), CNT, WOF, RPK (shop), XFR receipt                         Central; online only
+
+          ORD (buyer), DN, INV, CN, DN2, PRC (seller), DISC, CLM (issuer), GRN
+          (warehouse), ADJ, RPK (warehouse), XFR issue, OPB, CPR (office)
+
+Invariants for Part C.
+
+• C-I1. No column of document or document_line changes after issued_at is non-null, except status through
+   document_state_history; a database trigger enforces it and lines have no UPDATE privilege. Module
+   extension tables inherit the trigger (I-F10).
+
+• C-I2. (series_id, doc_number) is unique and dense; verified nightly and on sync.
+• C-I3. A document's series scope matches its type; a GRN captured at a shop draws from the receiving shop's
+
+   LOCATION series; an order from the buyer's ENTITY series.
+• C-I4. A bilateral document has a non-null counterparty and a relationship in force on business_date.
+• C-I5. Every issued document has exactly one DRAFT→ISSUED history row with occurred_at = issued_at.
+• C-I6. A correction never changes the original; it is discoverable only through document_link.
+• C-I7. content_hash recomputed from stored rows equals the stored value; verified on sync and by a sampled
+
+   nightly job.
+• C-I8. A customer payment receipt (CPR) is an M7 document; trading payment receipts (PRC) hold entity
+
+   payers only (I-F7).
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System      Page 15
+6. Part D – Append-only audit log
+
+Table audit_event_type
+The event catalogue as data (doc 07 §3 plus the events the module designs added).
+
+Column                  Type            Meaning and rules
+event_type_code         varchar(40) PK
+                                        e.g. VOID, REFUND, WRITE_OFF_REQUEST, WRITE_OFF_WITNESSED,
+severity                enum            WRITE_OFF_APPROVE, STOCK_ADJUST, NEGATIVE_STOCK_SALE,
+reviewer_role_template  FK role         DRAWER_OPEN_NO_SALE, ROLE_CHANGE, USER_DEACTIVATE,
+                        (nullable)      SERIES_REGISTER, SERIES_HOLDER_CHANGE, DEVICE_POSITION_CHANGE,
+offline_capturable      boolean         SYNC_ANOMALY, REGULATOR_GRANT, CREDIT_LIMIT_CHANGE,
+                                        CONTROL_PRICE_ENTER, CONTROL_PRICE_CAP_APPLIED,
+                                        MRP_PICKER_USED, MODE_SWITCH_SHOP_MGMT, PHONE_CHANGE
+                                        (customer), ACCOUNT_LIMIT_BREACH, CHEQUE_BOUNCED,
+                                        DSAR_FULFILLED, API_CLIENT_REGISTERED.
+
+                                        INFO | REVIEW | ALERT; REVIEW and ALERT feed exception queues.
+
+                                        The named reviewer (N-06); required before a REVIEW/ALERT type can be raised
+                                        in production.
+
+                                        All till events are.
+
+Table audit_event
+One row per audited action; insert-only; partitioned monthly; retained indefinitely (J-06, 24B N-6).
+
+Column                  Type            Meaning and rules
+                                        UUIDv7 at the source device.
+audit_id                uuid PK         Partition key received_at.
+
+event_type_code         FK              RLS applies to audit reads as to operational reads.
+                                        One of the two.
+occurred_at,            timestamptz
+occurred_local,                         Polymorphic by design.
+received_at                             Minimal diff; never credential material or personal-data values.
+                                        Mandatory where the type demands; witness for write-offs (remote witness for
+owner_entity_id,        uuid FK         single-staff shops).
+location_id                             Gap detection; grouping of one user action.
+                                        Reserved for the phase-2 hash chain.
+actor_user_id,          uuid,
+actor_system            varchar(40)
+
+device_id,              uuid FK
+till_position_id        (nullable)
+
+subject_table,          varchar(40),
+
+subject_id, document_id uuid, uuid
+
+before_state,           jsonb
+after_state
+
+reason_code,            text, uuid
+reason_text,
+witness_user_id
+
+device_seq,             bigint, uuid
+correlation_id
+
+prev_hash, row_hash     char(64)
+                        (nullable)
+
+• The application role holds INSERT only; no trigger, function or job may UPDATE or DELETE; partitions are
+   detached to cold storage, never dropped.
+
+• Personal data: the audit log stores identifiers, not personal-data values. A customer phone change records
+   the customer id and the fact of change; the values live in the customer table under PDPA rules (ADR-27).
+
+• Relationship to the sync event stream: the till's outbox carries issued documents with their lines and state
+   rows, stock movements and audit events; all are append-only at both ends and replayed idempotently by
+   primary key. The audit log is complete at central only after sync, which is why federation-level exception
+   reports carry the per-entity freshness stamp (O-03).
+
+Invariants for Part D.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                            Page 16
+• D-I1. No UPDATE or DELETE ever succeeds on audit_event from the application role; a deployment test
+   asserts the privilege set.
+
+• D-I2. Every document state transition has an audit event with the same correlation_id.
+• D-I3. Every REVIEW or ALERT type has a reviewer role template before it can be raised in production.
+• D-I4. (device_id, device_seq) is unique and dense per device; gaps raise SYNC_ANOMALY.
+• D-I5. Audit reads obey the RLS classes; the Federation and auditors read view-only.
+
+7. Part E – Event backbone and sync state (kernel)
+
+Table event_outbox
+Transactional outbox and archive (ADR-30): the system of record for domain events; monthly partitions;
+indefinite retention.
+
+Column                   Type          Meaning and rules
+event_id                 uuid PK       UUIDv7.
+                         text          Dotted, versioned, e.g. grn.confirmed.v1.
+event_type               timestamptz   Partition key received_at.
+
+occurred_at,             text, bigint  central or a device id; dense per source.
+occurred_local,          uuid FK       Routing and RLS.
+received_at
+                         text, uuid
+source, source_seq
+                         jsonb         Small; identifiers and changed facts; never personal-data values.
+owner_entity_id,                       Set by the relay; the relay role holds UPDATE on this column only.
+location_id              timestamptz
+                         (nullable)
+aggregate_type,
+aggregate_id
+
+correlation_id,
+causation_id,
+actor_user_id,
+engine_version
+
+payload
+
+published_at
+
+Table event_inbox
+Per-consumer idempotency record.
+
+Column                   Type          Meaning and rules
+consumer, event_id       PK            APPLIED | SKIPPED | FAILED.
+
+applied_at, outcome,
+last_error
+
+Table device_sync_cursor
+The only server-side sync state per device (doc 32); row-locked during ingestion.
+
+Column                   Type          Meaning and rules
+                                       Highest sequence durably applied; idempotent replies.
+device_id                uuid PK
+                                       Revoke, floor notice, re-request-from-seq, series holder change.
+last_applied_seq,
+last_batch_id,
+last_ack_at
+
+snapshot_version_report
+ed,
+app_version_reported
+
+pending_instructions     jsonb
+
+Table sync_quarantine
+Events that could not be applied: stored raw, never lost, never blocking.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                 Page 17
+Column                  Type           Meaning and rules
+                        uuid PK
+quarantine_id                          Schema, hash, duplicate id, sequence anomaly.
+                        text           Resolution is an audited manual action; never deleted.
+device_id, device_seq,
+event_id, raw_payload
+
+reason_code,
+reason_text
+
+received_at,
+resolved_at,
+resolved_by
+
+Table snapshot_change_log
+Per-location change log producing snapshot deltas; retained for the delta window.
+
+Column                  Type           Meaning and rules
+location_id, version
+table_name, row_id, op  PK             Dense per location.
+apply_from, urgent
+                        text, uuid, enum UPSERT | TOMBSTONE.
+created_at
+                        date, boolean  Business-date activation; urgent for control prices, rule withdrawals, account
+                                       suspensions, permission revocations.
+
+                        timestamptz
+
+Table idempotency_key
+Result store for mutating web and API commands.
+
+Column                  Type           Meaning and rules
+                        PK, uuid       Scoped by principal.
+idempotency_key,
+user_id                                A reused key with a different body is rejected; rows expire after 24 hours.
+
+request_hash,
+response_status,
+response_body,
+created_at
+
+Invariants for Part E.
+
+• E-I1. Every business transaction that changes a table in parts A–C or a module schema inserts at least one
+   event_outbox row in the same transaction.
+
+• E-I2. (source, source_seq) is unique and dense per source; gaps not explained by sync_quarantine raise
+   SYNC_ANOMALY.
+
+• E-I3. device_sync_cursor.last_applied_seq never decreases except through the audited sequence-reset
+   procedure.
+
+• E-I4. A location's snapshot_change_log versions are dense; a delta is the contiguous range from the device's
+   version + 1.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                          Page 18
+8. Part F – Module schema register and cross-module invariants
+
+One PostgreSQL schema per module (ADR-29). Parts A–E are authoritative for kernel and shared tables; for
+every other table the implementation guide named here holds the authoritative DDL. No module writes another
+module's schema (R4).
+
+Schema       Owner        Tables                                                                    Authoritative DDL
+kernel       Kernel
+                          document_type, numbering_series, document, document_line,                 Parts C–E; 19A
+                          document_link, document_state_history, document_attachment,
+                          audit_event, audit_event_type, event_outbox, event_inbox,
+                          device_sync_cursor, sync_quarantine, snapshot_change_log,
+                          idempotency_key, notification_log, config_item, config_value,
+                          scheduled_job, job_run, shedlock
+
+party        M1           entity, entity_relationship, location, till_position, device              Part A; 21A §3.1
+
+security     M1           app_user, permission, permission_catalogue_version, role,                 Part A; 21A §3.2
+                          role_permission, user_role, sod_pair, external_grant
+
+catalogue    M2           uom, supplier, sku, sku_uom_conversion, sku_barcode, sku_alias,           Part B; 22A §3
+                          sku_image, tag, sku_tag, tax_category, tax_rate, batch,
+                          location_assortment, duplicate_suspect
+
+pricing      M3           price_list, price_list_line, discount_rule, control_price, mrp_policy,    Part B; 23A §3
+                          adjustment_type, label_job
+
+trading      M4           doc_order, doc_order_line, allocation_run, doc_delivery,                  24A §3 as amended by
+                          doc_delivery_drop, doc_delivery_line, doc_grn, doc_grn_line,              CR-27-2
+                          doc_discrepancy, doc_claim, doc_invoice, doc_payment_receipt (entity
+                          payers only), cheque, relationship_exposure, posting_map,
+                          transfer_request; views v_invoice_party, v_invoice_line_party
+
+inventory    M5           stock_lot, stock_movement, entity_sku_cost, repack_recipe,                Part B (lot, movement, recipe);
+                          loss_category, variance_threshold, loss_tolerance, expiry_window,         25A §3
+                          count_task, expiry_task, pick_list; extensions doc_count_line,
+                          doc_adjustment, doc_writeoff, doc_repack, doc_transfer,
+                          doc_opening_balance
+
+pos          M6 (central  doc_receipt, doc_receipt_tender, till_session, cash_movement,             26A §10 (central), §3 (till)
+customers    mirror)      device_health; the till's local schema mirrors parts C–E plus cache
+                          tables
+             M7
+                          customer, customer_phone, customer_consent, customer_tag,                 27A §3
+                          customer_account, account_posting, allocation,
+                          doc_customer_payment, data_subject_request, banking_record,
+                          banked_session
+
+reporting    M8           projection_state, location_freshness, receipt_fact, receipt_line_fact,    28A §3 (rebuildable
+                          sales_daily, cash_daily, stock_position, stock_movement_fact,             projections; never a source of
+                          loss_fact, trade_document_fact, dispute_register, exposure_snapshot,      truth)
+                          customer_receivables, till_session_fact, pricing_review_fact,
+                          fleet_health, exception_item, report_definition, report_run, export_job,
+                          dashboard_tile, user_dashboard
+
+integration  M9           api_scope, api_client, api_credential_history, api_call_log,              29A §3
+                          posting_map_registry, journal_export, journal_line,
+                          notification_template, notification_rule, provider_config,
+                          e_invoice_submission, webhook_subscription
+
+hello        Template     greeting                                                                  17A §12 (removed before pilot)
+
+8.1 Document type ownership
+
+Owner                     Document types
+M4 Trading Documents      ORD, DN, GRN, DISC, CLM, INV, CN, DN2, PRC
+M5 Inventory              CNT, ADJ, WOF, RPK, XFR, OPB
+M6 POS                    RCT (incl. void and refund receipts)
+M7 Customers              CPR
+
+8.2 Cross-module invariants
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                             Page 19
+• I-F1. A location's location_assortment equals the union of SKUs on its owner's published retail list, SKUs with
+   a lot at the location, the owner's LOCAL SKUs and SKUs tagged core-range; the nightly reconcile reports
+   drift.
+
+• I-F2. batch.printed_mrp is non-null when the SKU's has_printed_mrp is true and the receipt line quantity is
+   positive; null otherwise is legitimate.
+
+• I-F3. stock_lot is unique per (location, batch, condition); a DAMAGED lot carries the unit cost of its GOOD
+   sibling.
+
+• I-F4. stock_movement.movement_seq is dense per (location, source).
+• I-F5. Every receipt line's batch_id names the lot the sale deducts; a sale may take a lot negative; availability
+
+   never counts negative lots (ADR-44, ADR-45).
+• I-F6. No table in the reporting schema is read by a transactional decision; every reporting table is rebuildable
+
+   from event_outbox.
+• I-F7. A customer payment receipt (CPR) is an M7 document; trading.doc_payment_receipt holds entity
+
+   payers only.
+• I-F8. Control prices, segregation pairs and posting maps are data with their own tables, never
+
+   configuration-register items (P10 of doc 17).
+• I-F9. An API client's scopes never exceed the granting administrator's permissions; the same containment
+
+   rule as roles.
+• I-F10. Every module-owned document extension table inherits the kernel immutability trigger and is
+
+   partitioned by the same key as the base.
+• I-F11. Only the primary till issues LOCATION-series documents; other tills capture drafts (ADR-47).
+• I-F12. Customer repayments allocate oldest-first through customers.allocation; entity payments settle specific
+
+   invoices through SETTLES links (I-07, ADR-46).
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System  Page 20
+9. Cross-cutting conventions
+
+Concern              Convention
+Naming
+Keys                 snake_case; singular table names; _id for UUID keys, _code for human codes; every table has created_at.
+Language columns
+                     UUIDv7 everywhere (P2); natural keys are unique constraints, never primary keys.
+Time
+Money and quantity   Three columns per text field (P7); ICU collations si_icu, ta_icu, en_icu; trigram indexes for partial match; NFC
+Soft delete          normalisation at write; sort by the display language; Western Arabic digits in every language. Full-text search
+Partitioning         analysis (OpenSearch-class) is phase 2 and reads from these columns.
+
+Row-level security   timestamptz UTC plus a local reading (P9); business_date from the location's day-close.
+
+Extension tables     numeric(14,2) LKR; numeric(14,4) unit cost and price; numeric(14,3) quantity; cash rounding is a receipt-level field.
+Till local database
+                     No DELETE (P10); every reference table has a status with a terminal value.
+Database roles
+                     document, document_line, extension tables, stock_movement, account_posting, document_state_history,
+                     event_outbox, audit_event, api_call_log, reporting facts: range-partitioned by month on received_at; partitions
+                     created three months ahead; detached to cold storage under the tiering policy (doc 14 DR-6), never dropped.
+
+                     Enabled and forced on every operational table from the first migration with the classes of 3.7; a table without a policy
+                     fails the schema test; PARTY reads go through masking views.
+
+                     Keyed one-to-one on document_id in the owning module's schema; inherit the immutability trigger and partition key.
+
+                     SQLite via Room, encrypted with a keystore-held key; the same logical model for what the till writes (parts C–E plus
+                     receipt and session tables) and read-only cache tables for what it receives; same column names and types.
+
+                     app_rw (module code; INSERT-only on ledgers), app_relay (UPDATE published_at only), app_report and
+                     app_analyst (SELECT on reporting on the replica), migration role (DDL).
+
+10. Decision requests
+
+#       Point                                   Status                       Decider                    If different
+DR-1                                            Closed: no reset (24B N-1)   –                          –
+DR-2    Financial-year reset of numbering       Closed: yes (24B N-2)        –                          –
+DR-3
+        GRN outside the fiscal gapless          Open (assumed both; lower    Federation catalogue       Tag scope dropped: every
+DR-4    obligation                              applies)                     steward; Federation legal  gazetted category must be
+DR-5                                                                         (doc 10 L-04)              enumerated per SKU by the
+DR-6    Control price scope by tag as well as                                                           steward; or a specificity rule
+DR-7    by SKU; lower applies when both in                                                              replaces lower-applies in
+        force                                                                                           M3's CeilingResolver
+DR-8
+        Batch identity global; cost on the lot  Closed: adopted (ADR-38)     –                          –
+DR-9    Synthetic batches for                   Closed: adopted (doc 22)
+        non-batch-tracked SKUs                                               –                          –
+        Alignment with doc 17 module            Closed (v0.2)
+        ownership                                                            –                          –
+        Single-staff write-off witness rule     Closed: remote witness with
+                                                mandatory photos (doc 25     –                          –
+        Control-price operational owner         DR-4)
+                                                Open (assumed Federation     Federation (doc 10 H-05)   Without a named owner the
+                                                catalogue steward)                                      ceiling table goes stale and
+                                                                                                        the hard block enforces
+                                                                                                        wrong ceilings
+
+        Reporting schema excluded from parts Closed: adopted (I-F6)          –                          –
+        A–E invariants (CR-28-1)
+
+11. Decisions recorded from this model (doc 09)
+
+ADR     Decision                                                                             Source
+ADR-37  Trading documents are one module (M4); document base and numbering are kernel        Doc 17 v0.2.1
+ADR-38  Batch identity in M2; stock lot and cost in M5; synthetic batches                    Doc 17, doc 22
+ADR-39  Stateless application tier                                                           Doc 14 §1.3
+ADR-40  Updates through a device-owner management agent; no till-to-till sharing in phase 1  Doc 31, doc 17
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                            Page 21
+ADR         Decision                                                                                  Source
+ADR-41      Multi-MRP resolution AUTO_LOWEST default; control price as a separate date-effective      Multi-MRP study, doc 23
+            ceiling, hard block
+ADR-42      Numbering decisions N-1 to N-6 adopted; tax advisor review advisory                       24B
+ADR-43      In-store labels encode SKU code plus weight or batch, never price                         Doc 22 DR-6
+ADR-44      Availability = non-negative GOOD lots minus issued-undispatched delivery quantities;      Doc 25 DR-1
+            allocation does not reserve
+ADR-45      Oversell accepted: lots may go negative; exception raised; never rejected                 Doc 25, doc 26
+ADR-46      Customer repayments allocate oldest-first; captured offline at the till                   Doc 27 DR-1, DR-2
+ADR-47      Only the primary till issues LOCATION-series documents; other tills capture drafts        Doc 26 DR-2
+ADR-48      Report catalogue as decision-driven data; projections rebuildable; freshness on every     Doc 28
+            federation figure
+ADR-49      Public API exposes module operations under the same scope rules; clients are principals;  Doc 29
+            one write in phase 1
+ADR-50      Native Android for the till with a dedicated till track                                   Doc 30 DR-1, doc 14
+
+12. Traceability to the requirements baseline
+
+Model element                                Requirements and decisions
+Part A
+                                             FR-PTY-010 to 070; FR-SEC-010 to 070; FR-GOV-010 to 060; ADR-02, 03, 11, 18, 26; A,
+Part B: SKU, units, barcodes, images, tags,  M, N sections; CR-21-1, CR-21-2
+tax, assortment
+Part B: batch, lot, movement                 FR-SKU-010 to 110; FR-LOC-020; ADR-07; B section; doc 20 Appendix A; CR-22-1,
+                                             CR-22-2; doc 22 DR-7; ADR-43
+Part B: ceilings, lists, rules, policies
+                                             FR-INV-010 to 100; FR-LOSS-010; ADR-08, ADR-38, ADR-44, ADR-45; E-03, E-04, E-09;
+Part C                                       F-01; CR-25-1
+
+Part D                                       FR-PRC-010 to 130; G-03, G-09, G-10; ADR-14, ADR-31, ADR-41; CAA Act s.20(5);
+Part E                                       CR-23-1
+Part F
+                                             FR-BIL-010 to 150; doc 03; ADR-11; 24B; I-07; D-05, D-07, D-08; F-03 to F-05; H-02/H-03;
+                                             CR-24-1, CR-27-1, CR-27-2
+
+                                             FR-SEC-050; N-05, N-06, N-07, N-09; doc 07 §3; J-06; ADR-27
+
+                                             ADR-30; doc 19 §6; doc 32; doc 14 §1.3
+
+                                             ADR-29; doc 17 rule R4; CR-28-1, CR-29-1; ADR-46, ADR-47
+
+13. Abbreviations
+
+Term        Meaning
+AI          GS1 Application Identifier: the numbered data fields inside a GS1 barcode (01 product number, 10 batch, 17 expiry).
+CAA         Consumer Affairs Authority of Sri Lanka; gazettes maximum retail prices.
+CPR / PRC   Customer payment receipt (M7) / entity payment receipt (M4).
+FEFO        First expired, first out: the picking rule for expiry-tracked goods.
+GRN         Goods received note: the receiving entity's record of what arrived; the moment ownership transfers.
+GS1         The global standards body for product identification and barcodes.
+ICU         International Components for Unicode: the library providing correct sorting and comparison for Sinhala and Tamil.
+IRD         Inland Revenue Department of Sri Lanka.
+LKR         Sri Lankan rupee.
+MFA / TOTP  Multi-factor authentication / time-based one-time password.
+MPCS        Multi-purpose cooperative society: the legal entity that owns retail shops.
+MRP         Maximum retail price printed on a pack; a batch attribute.
+PDPA / PII  Personal Data Protection Act No. 9 of 2022 / personally identifiable information.
+POS         Point of sale: the till.
+RBAC        Role-based access control.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                                     Page 22
+Term    Meaning
+RLS     Row-level security: database policies that filter rows by the caller's scope.
+SKU     Stock keeping unit: the smallest distinctly tracked and counted item.
+UOM     Unit of measure.
+UTC     Coordinated Universal Time.
+UUIDv7  Universally unique identifier, version 7: time-ordered, safe to generate on disconnected devices.
+VAT     Value Added Tax.
+
+End of document. v0.3.1 is the data model of record; 18B is withdrawn. The next revision follows the Stage 4 documents.
+
+18 - Core Data Model | v0.3.1 | Cooperative Retail and Distribution System                                               Page 23
+

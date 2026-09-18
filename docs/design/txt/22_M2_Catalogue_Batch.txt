@@ -1,0 +1,619 @@
+Cooperative Retail and Distribution System
+
+22 – M2 Catalogue & Batch
+
+Module design for the shared product truth: stock keeping units in one global namespace
+with local and shared status, units and pack conversions, barcodes many-to-one with
+optional batch resolution, tags, tax categories, product images, and physical batches
+carrying expiry and the printed maximum retail price. The module the data steward
+operates, and the largest reference set distributed to tills.
+
+Field             Value
+Document
+Version           22 – M2 Catalogue & Batch (Stage 2 module design; template of doc 20 §5)
+Date
+Owning developer  v0.1 – draft for design review; contract freeze targeted end of Stage 2 week 3
+
+Inputs            8 September 2026
+
+Depends on        Module developer (full-stack): backend and web screens end to end; the till track consumes the catalogue
+                  snapshot; M4 and M5 command batch registration
+Depended on by
+                  05 SRS (FR-SKU, FR-LOC-020); 16 answers (B section, P-07, R-02 to R-04, T-03); 09 ADR-07, ADR-08; 17
+                  v0.2.1 §7.2; 18 v0.2 part B; 19 v0.2 §5, §8; 20 v0.3 M2 blueprint and Appendix A (images, attributes); 21 (owner
+                  entities, scopes); 30 §5.2; 32 §5.1; the September 2026 multi-MRP study (barcode-to-batch, 2D readiness)
+
+                  M1 (owner entity, scope, locations for assortment), kernel (audit, events, i18n, snapshot change log, attachments
+                  for images)
+
+                  M3 (SKU, batch MRP, tags, tax), M4 (SKU and batch on documents; batch registration on GRN), M5 (batch
+                  identity, repack outputs), M6 (catalogue snapshot, barcode lookup), M7, M8, M10 (supplier table hand-over)
+
+Why this module decides whether the programme lands. The requirements baseline names the assembly of a
+trusted catalogue as the critical path (T-03) and the data steward as the single largest open action. M2's screens are
+the steward's tools; if bulk import, duplicate detection across three scripts and translation completeness are
+afterthoughts, the catalogue will be assembled in spreadsheets and imported badly. They are first-class here.
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+M2 defines what can be counted and sold: the SKU as the smallest distinctly tracked item (B-01), its units and
+pack conversions, the barcodes that identify it at a scanner, the tags that group it, the tax category that prices it,
+the images that help a cashier recognise it, and the batch as the physical identity that carries expiry and printed
+MRP. It owns identity, not holding: where stock is and what it cost belong to M5 (doc 17 change C4).
+
+In scope (phase 1)                                                       Out of scope
+
+SKU lifecycle in one global namespace: draft, local, shared, inactive;   Colour/size variant matrices, product families (each variant is a
+system-generated opaque codes; mandatory English short name,             SKU by B-01)
+trilingual names for shared SKUs; bounded free attributes
+
+Units of measure and per-SKU pack conversions (case of 24 is the same Serialised items (B-05)
+SKU); weighed goods by kilogram
+
+Barcode registry: many-to-one, symbology-aware, factory and in-store     Barcode printing hardware (M6 peripheral layer); label templates
+(20–29) codes, optional batch link; GS1 application-identifier data      (M3 for price labels, M5 for batch stickers)
+captured from 2D scans
+
+Tags as the governed grouping vocabulary; local tags per entity          A mandatory category hierarchy (B-15)
+
+Tax categories and effective-dated rates (standard VAT)                  Tax computation (shared engine) and invoicing (M4)
+
+Product images and thumbnails; assortment definition per location for the Image recognition; images on receipts or customer displays
+till snapshot
+
+Batch registration from receipts and repacks; synthetic batches; MRP     Stock lots, movements, costs, expiry alerts (M5); price ceilings
+correction by replacement batch                                          and control prices (M3)
+
+Steward tooling: bulk import with validation, duplicate suspects across  Data cleansing itself (a named workstream, R-04)
+scripts, translation completeness, promotion with alias
+
+A minimal supplier table until M10 takes it over                         Supplier contracts, quotations, purchase orders (M10, phase 2)
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                      Design section
+FR-SKU-010
+                    SKU as smallest tracked item; global namespace; owner and status; opaque code; English 3.1, 4.1
+FR-SKU-020          name mandatory (B-01, B-08, B-09)
+
+FR-SKU-030          Case and single as one SKU with a conversion factor; a genuinely different item is a second 3.2, 6.6
+                    SKU via repack (B-02, ADR-07)
+FR-SKU-040
+FR-SKU-050          Batch carries supplier, manufacture and expiry, printed MRP; tracking only where needed     3.7, 4.3, 6.4
+FR-SKU-060          (B-04, ADR-08)
+FR-SKU-070
+FR-SKU-080          Supplier attribution at batch level; one or two SKUs per product left to the owner (B-03)   3.7, 3.9
+FR-SKU-090
+FR-SKU-100          Weighed goods by kilogram; bulk-to-pack via repack recipe (B-06)                            3.2, 6.7
+FR-SKU-110
+FR-LOC-020          Barcodes: not guaranteed; many-to-one; in-store 20–29 labels; code lookup (B-11, B-12)      3.3, 6.5
+B-17 (parked)
+Doc 20 Appendix     Units and conversions defined per SKU by the owner (B-13)                                   3.2
+A
+Multi-MRP study     Trilingual master data with English fallback; data steward named (B-14, P-07, T-03)         3.1, 6.1, 6.2
+R-02 to R-04
+NFR-LOC-010/02      Tags instead of a mandatory hierarchy; governed vocabulary (B-15)                           3.5
+0, NFR-PRF-040
+                    Promote a local SKU to shared with an alias preserving history (B-10)                       4.1, 6.3
+
+                    Tax category per SKU; effective-dated rates (G-09, J-03)                                    3.6
+
+                    Trilingual names in the catalogue; NFC and ICU collation                                    3.1, 9.4
+
+                    Deactivation while stock remains                                                            4.1, 11 (DR-3)
+
+                    Product images; bounded attributes jsonb                                                    3.4, 3.1
+
+                    Barcode-to-batch link; 2D application-identifier capture                                    3.3, 6.5
+                    Opening catalogue from paper and spreadsheets; cleansing workstream; bulk import            6.1
+                    Collation, search, snapshot size and delta                                                  9
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                                             Page 2
+3. Domain model
+
+Tables are those of doc 18 v0.2 part B owned by M2 (schema catalogue): uom, sku, sku_uom_conversion,
+sku_barcode, sku_alias, sku_image, tag, sku_tag, tax_category, tax_rate, batch; plus one table introduced here.
+
+    3.1 SKU             Design
+
+Aspect                  sku with its conversions, barcodes, images, tags and attributes. Root of identity for everything sold or counted.
+Aggregate
+Invariants              sku_code system-generated, opaque, unique, never reused. short_name_en non-null in every status; _si and
+                        _ta non-null for SHARED (B-I1). Owner is the Federation for SHARED; the creating entity for DRAFT and
+Visibility              LOCAL. base_uom_code is KG when sold_by_weight. attributes under 4 KB, no behaviour, not
+                        searchable.
+Flags that drive other
+modules                 SHARED SKUs are readable by every scope (the reference exception to OWN: a policy shared_read on status
+                        = SHARED). LOCAL and DRAFT SKUs are OWN only, and Federation view-only (M-03).
+
+                        batch_tracked, expiry_tracked, has_printed_mrp (new; false for loose produce and unpriced goods so
+                        a null batch MRP is legitimate rather than missing), sold_by_weight, multi_mrp_policy (default from M3's
+                        policy; stored here because it is a SKU property).
+
+3.2 Units and conversions
+
+Aspect                  Design
+Vocabulary
+                        uom is Federation-governed: EA, KG, G, L, ML, CASE, PKT, BAG, BOX, DOZ. An entity cannot add units; it can
+Conversion              define conversions for its own SKUs.
+
+                        sku_uom_conversion(sku, uom, factor_to_base, effective_from/to): CASE = 24 × EA. A
+                        supplier's case-size change is a new effective-dated row, not an edit (P5). Weighed goods: base KG; retail packs
+                        of a bulk SKU are a different SKU produced by an M5 recipe, never a conversion (ADR-07).
+
+    3.3 Barcodes        Design
+
+Aspect                  sku_barcode(barcode, symbology, sku, uom, batch_id?, owner_entity, status). Unique per
+Registry                (barcode, symbology) across the federation for factory symbologies; INTERNAL codes unique within the owner
+                        entity (B-I2).
+In-store codes
+                        GS1 prefixes 20–29 for weigh labels and stickers. The label encodes SKU code and weight (or SKU code and
+Batch link              batch), never a price, so the till resolves the price through the shared engine and the control-price ceiling still
+                        applies (multi-MRP study; doc 18 §4.9).
+2D readiness
+                        batch_id set when the code identifies one batch: an MPCS batch sticker (option C of the study), a manufacturer
+                        code that changed with the MRP (option B), or a 2D code carrying application identifier 10. The till's scan layer
+                        passes the parsed GTIN, lot and expiry; M2's lookup returns the SKU and, when it can, the batch.
+
+                        LookupByBarcode accepts (gtin, lot?, expiry?, symbology); when lot is present and a batch with
+                        that number exists for the SKU, the batch is returned even without a registered batch barcode – this is what
+                        makes GS1 2027 marking pay off without any catalogue work.
+
+    3.4 Images          Design
+
+Aspect                  sku_image(sku, barcode?, owner, object_key_full, object_key_thumb, hash, status)
+Model                   (doc 18 v0.2). One ACTIVE image per (sku, barcode-or-null).
+
+Thumbnails              An M2 job (ImageThumbnailJob) produces the 128 px WebP thumbnail on attach; the snapshot carries only
+                        thumbnail keys; the till fetches lazily and caches (doc 20 M2; doc 32 §5.1).
+Ownership
+                        Federation attaches for SHARED SKUs; an entity may attach for its LOCAL SKUs; an entity may also attach a
+                        local override for a SHARED SKU (different pack in that region), scoped to its own locations.
+
+    3.5 Tags            Design
+
+Aspect                  tag(tag_code, names, governed, owner_entity). Governed tags are Federation-owned and used for
+Vocabulary              federation-wide comparison and for policy attachment (expiry windows, loss tolerances, variance thresholds,
+                        control-price scope, multi-MRP policy). Local tags belong to an entity for its own merchandising.
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System  Page 3
+Aspect               Design
+Rule
+                     A policy in M3 or M5 may attach to a governed tag only; local tags carry no behaviour. Enforced by the
+                     consuming modules' validators through TagQueries.isGoverned.
+
+    3.6 Tax          Design
+
+Aspect               tax_category(code, names) and tax_rate(category, rate_percent, effective_from/to).
+Model                Standard VAT only (J-03); exempt and zero-rated as categories with a 0% rate row. Publication of a new rate is a
+                     Federation command with an apply_from that reaches tills through the snapshot (doc 32 §5.2).
+
+    3.7 Batch        Design
+
+Aspect               batch(sku, batch_no, supplier, manufacture_date, expiry_date, printed_mrp,
+Identity             origin_document, is_synthetic). Global, not owned: one physical batch is held successively by the
+                     Federation, a distributor and an MPCS; each holding is an M5 stock lot with its own cost (doc 17 change C4,
+Uniqueness           ADR-38).
+Synthetic batches
+MRP                  (sku_id, supplier_id, batch_no) unique. A receiver who keys a batch that already exists gets the
+Who creates batches  existing row (the GRN cites it); a receiver who keys a new number for the same physical batch creates a
+                     duplicate identity – accepted, flagged as a duplicate suspect for the steward (Section 6.2).
+
+                     For SKUs with batch_tracked = false each receipt line creates a synthetic batch (is_synthetic =
+                     true, batch_no = 'S-' + document number + line) so that MRP and cost always have a home and
+                     price resolution has one code path (doc 18 DR-5).
+
+                     printed_mrp mandatory when the SKU has has_printed_mrp; immutable. A mis-keyed MRP is corrected by
+                     CorrectBatchMrp: a new batch row, an audited link corrects_batch_id, and M5 re-points the lots (B-I8).
+                     Two concurrent batches may legally carry different MRPs (ADR-08).
+
+                     M4's GRN confirmation (supplier goods at a Federation warehouse; distributor and MPCS receipts cite the
+                     incoming batch or create a local-supply batch) and M5's repack execution (output batch for the produced SKU).
+                     M2 exposes RegisterBatch as an internal command those modules call in their own transaction.
+
+3.8 Assortment (new concept, for the snapshot)
+
+Aspect               Design
+Definition
+                     The set of SKUs a location's till must know: SKUs on the owning MPCS's retail price list (M3 query) ∪ SKUs with
+Materialisation      a lot at the location (M5 query) ∪ LOCAL SKUs of the owning entity ∪ SKUs tagged core-range (a governed
+                     tag the Federation uses for goods every shop should be able to sell).
+
+                     location_assortment(location_id, sku_id, reason, since) maintained by an M2 consumer of
+                     price-list, lot and SKU events; the snapshot contributor reads it; a change to it writes the change-log row for that
+                     location (doc 32 §5.1). Change request CR-22-2 adds the table to doc 18 part B.
+
+3.9 Minimal supplier table (until M10)
+
+Aspect               Design
+Model
+                     supplier(supplier_id, owner_entity, name, status) – enough for batch attribution (B-03) and
+                     Federation receipts. Change request CR-22-1 adds it to doc 18 with the note that M10 absorbs it in phase 2 (doc
+                     20 M10 seams).
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                                          Page 4
+   4. State machines
+
+   4.1 SKU
+
+From        To          Trigger / command           Guard                               Permission            Audit
+–           DRAFT       CreateSku                                                                             SKU_CREATED
+                                                    English name; base unit; tax        cat.sku.create_local
+                        ActivateLocalSku            category; owner = caller scope      (entity) or           SKU_ACTIVATE
+                                                                                        cat.sku.create (F)    D
+                        ActivateSharedSku
+DRAFT       LOCAL                                   Owner entity; at least one          cat.sku.create_local  SKU_SHARED
+                        PromoteToShared (as new     barcode or code-lookup flag;
+                        shared)                     images optional                                           SKU_PROMOT
+                                                                                                              ED
+DRAFT       SHARED      MergeIntoShared(target)     Caller F; three names; governed cat.sku.create (F)
+                                                    tags; conversion for CASE if                              SKU_MERGED
+                        DeactivateSku               applicable
+                        ReactivateSku                                                                         SKU_DEACTIV
+LOCAL       SHARED                                  Caller F; three names complete;     cat.sku.promote (F)   ATED
+                                                    owner becomes Federation;                                 SKU_REACTIV
+                                                    originating entity keeps history                          ATED
+                                                    via alias
+
+LOCAL       INACTIVE                                Caller F; target SHARED; alias cat.sku.promote (F)
+            (aliased)                               row created; barcodes moved;
+                                                    the local SKU's lots re-point (M5)
+
+LOCAL /     INACTIVE                                Reason; see DR-3 for                cat.sku.deactivate
+SHARED                                              stock-remaining behaviour           (owner)
+            LOCAL /
+INACTIVE    SHARED                                  Reason                              cat.sku.deactivate
+                                                                                        (owner)
+
+   Proposed rule for DR-3 (B-17): INACTIVE blocks new orders, purchases and price-list additions, but tills
+   continue to sell lots on hand (the snapshot keeps INACTIVE SKUs with a sell_through flag while any lot
+   exists at the location). This removes the classic failure of a till refusing to sell saleable goods.
+
+   4.2 Barcode
+
+From        To          Trigger / command           Guard                               Permission            Audit
+–           ACTIVE      RegisterBarcode             Unique per symbology                cat.barcode.manage    BARCODE_RE
+                                                    (federation) or per owner           (owner of SKU; any    GISTERED
+ACTIVE      RETIRED     RetireBarcode               (INTERNAL); SKU not                 entity for INTERNAL
+ACTIVE                  LinkBarcodeToBatch          INACTIVE                            on its own SKUs)      BARCODE_RET
+            ACTIVE                                  Reason                              cat.barcode.manage    IRED
+            (relinked)                                                                                        BARCODE_LIN
+                                                    Batch belongs to the SKU            cat.barcode.manage    KED
+
+   4.3 Batch
+
+From        To          Trigger / command           Guard                               Permission            Audit
+
+–           REGISTERED  RegisterBatch (from M4 GRN  SKU active; unique (sku,            internal (caller      BATCH_REGIS
+                        or M5 repack)               supplier, batch_no); MRP
+REGISTERE   SUPERSEDE                               present when required; expiry       module's permission) TERED
+D           D                                       when expiry-tracked
+
+                        CorrectBatchMrp /           Reason; caller owns a lot of the    cat.batch.correct     BATCH_CORR
+                        CorrectBatchExpiry          batch or is F; creates the          (owner) with MFA      ECTED
+                                                    replacement batch
+
+   4.4 Tax rate
+
+From        To          Trigger / command           Guard                               Permission            Audit
+                        PublishTaxRate                                                                        TAX_RATE_PU
+–           SCHEDULED                               Caller F; category exists;          cat.tax.publish (F,   BLISHED
+                                                    apply_from ≥ today; no overlap      MFA)                  –
+SCHEDULE    IN_FORCE    Clock (apply_from)          –
+D                       PublishTaxRate (next)                                           system                TAX_RATE_PU
+            SUPERSEDE                                                                                         BLISHED
+IN_FORCE    D                                       Sets effective_to on the current cat.tax.publish
+
+   22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                               Page 5
+5. Contract
+
+    5.1 Commands           Input (essentials)                 Permission                                 Effect                      Events
+                                                                                                         DRAFT with generated        sku.created.v1
+Command                    names, base uom, tax category,     cat.sku.create_local /                     code
+CreateSku                  flags, tags, attributes            cat.sku.create (F)                         LOCAL / SHARED              sku.activated.v1 /
+                                                                                                                                     sku.shared.v1
+ActivateLocalSku /         sku                                as above                                   Fields (audited diff);      sku.updated.v1
+ActivateSharedSku                                                                                        changing base uom or
+UpdateSku                  names, descriptions, flags,        owner; F for SHARED                        tracking flags requires no  sku.promoted.v1
+                           attributes, tags                                                              lots anywhere (M5 query)
+PromoteToShared                                                                                          Owner → Federation;         sku.merged.v1
+                           local sku, completed names,        cat.sku.promote (F)                        alias row for the origin
+MergeIntoShared            governed tags                                                                 entity                      sku.deactivated/re
+                                                                                                         Alias; barcodes moved;      activated.v1
+DeactivateSku /            local sku, target shared sku       cat.sku.promote (F)                        local INACTIVE              conversion.define
+ReactivateSku                                                                                            Status                      d.v1
+DefineConversion           sku, reason                        cat.sku.deactivate                                                     barcode.registere
+                                                                                                         New effective-dated row     d/retired/linked.v1
+RegisterBarcode /          sku, uom, factor, effective_from owner
+RetireBarcode /                                                                                          Registry row
+LinkBarcodeToBatch         barcode, symbology, sku, uom, cat.barcode.manage
+AttachImage / RetireImage  batch?
+
+DefineTag / TagSku /       sku, barcode?, object key, hash    cat.image.manage                           Image row; thumbnail job    image.attached/re
+UntagSku                                                      (owner)                                                                tired.v1
+                           tag, names, governed (F only)      cat.tag.manage (F for                      Tag rows
+DefineTaxCategory /                                           governed; owner for                                                    tag.defined.v1;
+PublishTaxRate             category; rate, apply_from         local)                                     Effective-dated rate        sku.updated.v1
+RegisterBatch (internal)                                      cat.tax.publish (F, MFA)
+                           sku, supplier, batch_no, dates,                                               Batch row or existing row   tax_rate.published
+CorrectBatchMrp /          printed_mrp, origin document       caller module (M4, M5)                     returned                    .v1
+CorrectBatchExpiry         batch, new value, reason                                                      New batch with
+                                                              cat.batch.correct (MFA)                    corrects_batch_id; old      batch.registered.v
+RegisterSupplier           name, owner                                                                   SUPERSEDED                  1
+                                                              cat.supplier.manage                        Minimal supplier row
+BulkImportSkus             file (sheet), mode (validate |                                                                            batch.corrected.v
+                           commit)                            cat.sku.create /                           Validation report; DRAFT    1
+ResolveDuplicateSuspect    suspect pair, decision (merge |    create_local                               rows on commit
+                           distinct)                          cat.sku.promote (F) or                     Merge path or               supplier.registere
+                                                              owner for local pairs                      suppression record          d.v1
+
+                                                                                                                                     sku.created.v1 per
+                                                                                                                                     row
+
+                                                                                                                                     sku.merged.v1 or
+                                                                                                                                     duplicate.dismisse
+                                                                                                                                     d.v1
+
+    5.2 Queries                         Returns                                                          Scope rule
+                                        sku, uom, factor, optional batch, thumbnail key                  Any authenticated scope for
+Query                                                                                                    SHARED; OWN for LOCAL; the till
+LookupByBarcode(barcode |                                                                                uses the snapshot copy offline
+gtin+lot+expiry, symbology, location)                                                                    As above
+
+SearchSku(text, language, scope, status[]) Paged records ordered by the display language's               As above; attributes OWN only
+                                                            collation; trigram match on all three names  OWN, FEDERATION_VIEW;
+                                                                                                         snapshot builder
+GetSku / ListSkus(filter)               Full record with conversions, barcodes, tags, images             Snapshot builder only
+
+GetAssortment(location)                 SKU ids with reasons                                             Any
+
+GetCatalogueSnapshot(location,          Delta or full for the assortment
+since_version)                          Canonical sku
+
+ResolveAlias(sku)
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                                                  Page 6
+Query                                       Returns                                               Scope rule
+ListBatches(sku, filter)                    Batch identities with expiry and MRP                  OWN via lots (M5 join) or
+                                                                                                  FEDERATION_VIEW
+GetBatch(batch)                             Identity record                                       As above
+TagQueries.isGoverned(tag) /                Tags                                                  Any
+ListTags(scope)
+TaxQueries.rateInForce(category, date)      Rate                                                  Any; also in the shared engine's
+                                                                                                  snapshot
+StewardDashboard()                          Translation completeness, duplicate suspects, orphan  FEDERATION
+                                            barcodes, SKUs without images by tag
+
+5.3 Events published
+
+Event                                       Payload (beyond envelope)                        Consumers
+
+sku.created/activated/shared/promoted/merg  sku id, code, owner, status, flags, tags, alias  Assortment maintainer (M2), snapshot
+ed/updated/deactivated/reactivated.v1       (for merged)                                     change log, M3 (policy defaults), M5 (alias
+                                                                                             re-pointing), M8
+conversion.defined.v1                       sku, uom, factor, effective_from
+barcode.registered/retired/linked.v1        barcode, symbology, sku, uom, batch              Snapshot, M4, M5
+image.attached/retired.v1                   sku, barcode, thumb key
+tag.defined.v1                              tag, governed                                    Snapshot, M6 lookup
+tax_rate.published.v1                       category, rate, apply_from
+                                                                                             Snapshot
+batch.registered/corrected.v1               batch id, sku, supplier, batch_no, expiry,
+                                            printed_mrp, corrects                            M3, M5 validators, M8
+supplier.registered.v1
+duplicate.suspected/dismissed.v1            supplier id, owner                               Snapshot (apply_from), M3, M4, shared
+                                                                                             engine
+                                            pair, score, reason
+                                                                                             M3 (MRP review vs list), M5 (lot re-point on
+                                                                                             correction), M8
+
+                                                                                             M4, M10
+
+                                                                                             Steward dashboard, M8
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System               Page 7
+6. Key flows
+
+Flow                             Sequence                                                             Failure paths
+6.1 Assembling the initial
+catalogue (the T-03 critical     Steward uploads the consolidated sheet in validate mode → report:    Nothing partial: each row commits or is
+path)                            rows accepted, rows with errors (missing English name, unknown       reported; a re-upload of the same
+                                                                                                      sheet is idempotent by a row key
+6.2 Duplicate detection          unit, bad tax category), duplicate suspects across scripts (Section  (sheet row hash); suspects are never
+across scripts                   6.2) → steward fixes the sheet or resolves suspects → commit         auto-merged
+                                 creates DRAFT SKUs → steward completes translations
+6.3 Promoting a local SKU        (dashboard shows completeness by tag) → ActivateSharedSku in
+                                 bulk for rows with three names → barcodes registered from the
+6.4 Batch registration at        sheet → images attached in bulk by SKU code
+receipt
+                                 On import and on CreateSku: normalise names (NFC, case,              A dismissed pair is remembered;
+6.5 Scan resolution at the till  punctuation), transliterate Sinhala and Tamil names to a Latin key   thresholds are configuration; false
+(M2's part)                      with a fixed table, compare (brand tokens, pack size tokens, unit)   positives cost a click, false negatives
+6.6 Case and single              and barcodes; score; pairs above a threshold become                  cost a permanent split in sales history
+6.7 Bulk to pack                 duplicate_suspect rows for the steward
+
+6.8 MRP correction               An MPCS's local item sells well; Federation adds it to the shared    Merge with lots in a different base unit
+                                 range → PromoteToShared (as new) or MergeIntoShared (existing        is refused; barcodes that collide with
+                                 shared SKU) → alias row (origin sku → canonical) →                   the target's are retired with a report
+                                 sku.promoted/merged.v1 → M5 re-points the origin entity's lots; M8
+                                 resolves aliases at query time so trends are unbroken
+
+                                 (FR-SKU-100)
+
+                                 M4 confirms a GRN → per line: RegisterBatch(sku, supplier,           MRP missing for a has_printed_mrp
+                                 batch_no, dates, MRP) → existing batch returned or created           SKU blocks GRN confirmation for that
+                                 (synthetic when not batch-tracked) → batch.registered.v1 → M3        line with a clear message; a new
+                                 compares MRP with the standing list and raises a pricing review      batch_no for an existing physical batch
+                                                                                                      creates a suspect, not an error
+                                 when lower
+
+                                 Scan layer parses (symbology, gtin, lot?, expiry?) → snapshot        Unknown code → code-lookup or
+                                 lookup: barcode → sku, uom, batch link; or gtin + lot → batch by     search by name; a code mapped to an
+                                 number → returns item card data; price resolution is M3's engine     INACTIVE SKU without sell-through →
+                                                                                                      refuse with reason
+
+                                 Supplier delivers cases; GRN line in CASE; conversion 24 → base A missing conversion blocks the GRN
+
+                                 EA; the till sells EA; a case barcode maps to (sku, CASE)            line in that unit
+
+                                 50 kg bulk SKU (KG) is repacked into 1 kg pack SKU (EA) by an M5     No conversion may link the two SKUs
+                                 recipe; the output SKU is a distinct SKU created here (origin        (validator)
+                                 REPACK_OUTPUT); the output batch is registered by M5 with the
+                                 input batch's expiry and a local MRP if labelled
+
+                                 Warehouse keyed 980 instead of 1,080 → CorrectBatchMrp with          A correction after sales were capped
+                                 reason and MFA → new batch (corrects old) → batch.corrected.v1       by the wrong MRP is reported to the
+                                 → M5 re-points lots; M3 re-evaluates ceilings; receipts already      entity's exception queue (money was
+                                 issued keep their recorded mrp_applied                               left on the table, or, if the MRP was too
+                                                                                                      high, an over-charge review)
+
+   7. Configuration                        Default                                   Scope                           Who may change
+                                           0.85                                      Federation                      cat.sku.promote
+Item                                       v1                                        Federation                      –
+catalogue.duplicate_threshold              128 / 10                                  Federation                      –
+catalogue.transliteration_table_version    false                                     Entity                          cat.sku.create_local
+catalogue.thumbnail_px / max_thumb_kb      true (DR-3)                               Federation                      cat.sku.deactivate
+catalogue.local_sku_requires_barcode       core-range                                Federation                      cat.tag.manage
+catalogue.inactive_sell_through            4                                         Federation                      –
+catalogue.assortment_core_tag
+catalogue.attributes_max_kb
+
+8. Screens as paper
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                                      Page 8
+Screen                   Paper mirrored  Surface Roles                               Notes
+                         Price book
+Price book (catalogue                    W  Steward, MPCS                            Search in any script;
+browser)                                                                             status and tag filters;
+                                                                                     thumbnails; bulk
+Product card             Product card    W  Steward, MPCS                            actions on selection
+
+Stock list upload (bulk  Stock list      W  Steward, MPCS                            Three names with
+import)                                                                              completeness marks;
+                                                                                     units and conversions;
+Duplicate suspects       –               W  Steward                                  barcodes with batch
+                                                                                     links; images; tags;
+Translation              –               W  Steward                                  attributes; batch list tab
+
+completeness                                                                         Validate then commit;
+                                                                                     report with row
+Batch card               Batch card      W  Warehouse, MPCS                          reasons; suspects
+                                                                                     panel
+Tax rates                Gazette         W  Federation
+Item lookup              Price list                                                  Side-by-side cards;
+                                         T  Cashier                                  merge or distinct;
+                                                                                     remembered decisions
+
+                                                                                     By tag and owner;
+                                                                                     export of missing rows
+                                                                                     for translators; import
+                                                                                     back
+
+                                                                                     Identity, expiry, MRP,
+                                                                                     supplier, origin
+                                                                                     document; correction
+                                                                                     opens ReasonCapture
+                                                                                     and step-up
+
+                                                                                     Categories and
+                                                                                     effective-dated rates;
+                                                                                     apply_from
+
+                                                                                     Shared ScanField and
+                                                                                     ItemCard (doc 30);
+                                                                                     read-only; sell-through
+                                                                                     badge
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                              Page 9
+9. Non-functional design
+
+Aspect                    Design
+9.1 Capacity
+                          Shared catalogue: tens of thousands of SKUs; local SKUs: up to a few hundred per MPCS (hundreds of
+9.2 Snapshot size         thousands federation-wide); barcodes two to three per SKU; batches: millions per year (synthetic ones dominate).
+                          Batch is partitioned by created_at month; lookups are by (sku, supplier, batch_no) and by id.
+9.3 Search latency
+9.4 Collation and         A shop's assortment: typically 2,000–6,000 SKUs; catalogue rows about 1 KB each with barcodes and
+normalisation             conversions; thumbnails about 8 KB each; a full snapshot under 20 MB including thumbnails, under 5 MB without
+9.5 Security and privacy  (doc 32 §10). Deltas are per changed row.
+9.6 Availability
+                          Trigram indexes on the three names plus sku_code; target under 100 ms for a partial name on the back office;
+                          the till searches its local copy.
+
+                          NFC at write (kernel converter); ICU collations on the name columns; sort by the display language (doc 19 §5.4);
+                          the transliteration table for duplicate scoring is a versioned repository asset.
+
+                          No personal data in the catalogue; supplier names are business names; images are public-safe product
+                          photographs; LOCAL SKU visibility is OWN plus Federation view (M-03).
+
+                          Catalogue reads are on every sale path at central (ingestion re-validation) and on the till (local); the per-instance
+                          cache of SHARED SKUs by id is invalidated by sku.*.v1 events.
+
+10. Test strategy
+
+Layer           What is tested
+Unit
+Contract        Code generation uniqueness; name completeness rules per status; conversion arithmetic incl. effective dates;
+State machine   barcode uniqueness rules per symbology and owner; synthetic batch naming; assortment set arithmetic
+Property-based
+Data quality    Every command and query; LookupByBarcode with gtin+lot resolving a batch without a registered batch barcode;
+Scenario        snapshot contributor output shape
+Performance
+                SKU, barcode, batch, tax rate transitions; promotion and merge paths with alias consequences
+
+                Random import sheets: every row either creates exactly one DRAFT or one report line; re-import is idempotent;
+                duplicate scoring is symmetric and stable under NFC variants of the same name
+
+                The Sinhala/Tamil name test set of doc 19 §5.4 extended with known duplicates and known distinct pairs; threshold
+                tuned on it
+
+                Flows 6.1–6.8; doc 13 scenario 3 (repack) and 4 (batch MRPs) for M2's part; a GRN line for a has_printed_mrp SKU
+                without MRP is blocked
+
+                Import of 20,000 rows with validation under 5 minutes; search under 100 ms; snapshot build for a 6,000-SKU
+                assortment under 5 s
+
+11. Decision requests
+
+#     Point                                          Proposed                                   Decider
+DR-1
+DR-2  Minimal supplier table in M2 until M10         Adopt                                      Architecture review
+      (CR-22-1)
+DR-3
+DR-4  Assortment table and core-range tag (CR-22-2) Adopt                                       Architecture review; Federation
+DR-5                                                                                            names the core-range policy
+DR-6                                                                                            owner
+DR-7
+      Deactivation while stock remains (B-17)        INACTIVE blocks new supply and pricing; tills Federation admins
+                                                     sell through existing lots
+
+      Duplicate threshold and transliteration table  0.85; table v1 curated by the steward with the Data steward (to be named)
+                                                     language reviewers
+
+      Local image override for shared SKUs           Allowed, scoped to the entity's locations  Federation
+
+      In-store label content                         SKU code + weight or batch; never price    Federation, M3 and M6
+                                                                                                designers
+
+      has_printed_mrp flag on SKU                    Adopt (CR to doc 18): makes a null batch MRP Architecture review
+                                                     legitimate for unpriced goods
+
+12. Traceability
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System                                    Page 10
+Section  Identifiers
+3.1–3.2  FR-SKU-010, 020, 050, 070, 080; B-01, B-02, B-06, B-08, B-09, B-13, B-14; ADR-07; doc 18 B-I1; doc 20 Appendix A
+3.3      FR-SKU-060; B-11, B-12; doc 18 B-I2; multi-MRP study options B, C, E
+3.4      Doc 20 M2 and Appendix A (images)
+3.5–3.6  FR-SKU-090, 110; B-15; G-09; J-03
+3.7      FR-SKU-030, 040; B-03, B-04; ADR-08, ADR-38; doc 18 B-I8, DR-4, DR-5
+3.8–3.9  Doc 32 §5.1; doc 20 M10 seams
+4        FR-SKU-100; B-10, B-17
+6        T-03; R-02 to R-04; doc 13 scenarios 3 and 4
+9        NFR-LOC-010/020; NFR-PRF-040; M-03
+
+End of document. Draft for design review; the contract in section 5 freezes when M3 acknowledges it, targeted end of Stage 2
+week 3. Implementation guide: 22A.
+
+22 - M2 Catalogue & Batch | v0.1 draft | Cooperative Retail and Distribution System  Page 11
+

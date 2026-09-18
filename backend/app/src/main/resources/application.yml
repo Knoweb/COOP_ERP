@@ -17,8 +17,8 @@ spring:
     events:
       republish-outstanding-events-on-restart: false
 
-knoweb:
-  role: ${KNOWEB_ROLE:web}
+coop-erp:
+  role: ${COOP_ERP_ROLE:web}
   business-timezone: Asia/Colombo
 
   migration:

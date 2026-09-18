@@ -3,7 +3,7 @@ spring:
     activate:
       on-profile: web
 
-knoweb:
+coop-erp:
   role: web
 
 management:

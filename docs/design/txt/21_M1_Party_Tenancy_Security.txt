@@ -1,0 +1,664 @@
+Cooperative Retail and Distribution System
+
+21 – M1 Party, Tenancy & Security
+
+Module design for the module everything scopes on: legal entities and their trading
+relationships, locations and till positions, devices, users, the permission catalogue and
+role builder, external time-boxed access, and the visibility policy the database enforces.
+
+Field             Value
+Document          21 – M1 Party, Tenancy & Security (Stage 2 module design; template of doc 20 section 5)
+Version           v0.1 – draft for design review; contract freeze targeted end of Stage 2 week 2
+Date              8 September 2026
+Owning developer  Module developer (full-stack): backend and web screens end to end; the till track consumes the permission
+                  snapshot only
+Inputs            05 SRS (FR-PTY, FR-SEC, FR-GOV); 06 NFR (security, compliance); 07 Matrices (roles, RBAC, configuration
+                  register); 16 answers (A, M, N sections); 09 ADR-02, 04, 12, 18, 26; 17 v0.2.1; 18 part A and section 3.7; 19
+Depends on        sections 1–3; 20 M1 blueprint; 30 section 5.1; 32 sections 2 and 8
+Depended on by    Cross-cutting services only (identity provider, audit facade, event backbone, configuration register)
+                  Every other module: scope resolution, permission resolution, relationship lookup, location and device facts
+
+Why this module is first and why it is small. Every row in the system carries an owning entity; every request carries
+a scope and a permission set; every trading document names a relationship. M1 is where those facts are created and
+nowhere else. It has almost no business process of its own, which is exactly why it must be frozen first: a change here
+ripples through all nine modules.
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System  Page 1
+1. Purpose and scope
+
+M1 answers four questions for the rest of the system: who exists (entities, locations, till positions, devices), who
+trades with whom on what terms (relationships), who may do what (users, roles, permissions, grants), and what
+each caller may see (scope and policy class). It owns the reference data and the policy; the kernel enforces the
+policy on every request and database session (doc 19 sections 1 and 3, doc 18 section 3.7).
+
+In scope (phase 1)                                                           Out of scope
+
+Entity register (Federation, distributors, MPCS) with tier, VAT registration, Cooperative membership, shares, governance records (K-01 to
+
+district, financial-year settings, costing policy, default language, status  K-07)
+
+Trading relationships with effective-dated commercial terms: price-list      Any processing of money; interest posting (A-12 deferred)
+reference, credit limit, payment terms, discrepancy window, order lock
+window, allocation rule
+
+Locations (warehouse, shop, office) with owner, code, language, trading Shelf/back-store sub-locations (E-02); organisational hierarchy
+
+hours, size band, connectivity gate, primary till                            beyond entity → location
+
+Till positions and devices; assignment; suspension; enrolment hand-off to Device management itself (doc 31), sync (doc 32)
+the sync gateway and the management agent
+
+Users, credentials policy, PIN policy, sessions and idle locks, deactivation Self-service password reset (phase 2); single sign-on with
+                                                                                                      external providers
+
+Permission catalogue, role builder with templates and parameters,            Business thresholds themselves (owned by M5/M4 as role
+scoped assignment, segregation-of-duties pairs, guardrails                   parameters they define)
+
+External time-boxed grants for regulator and auditors; Federation            Regulator return formats (none exist, M-10)
+view-only class
+
+Bulk registration for the onboarding playbook (entities, locations, users,   Data cleansing of catalogue (M2, T-03)
+devices) with validation reports
+
+2. Requirements coverage
+
+Identifier          Requirement (abridged)                                                                           Design section
+FR-PTY-010
+FR-PTY-020          Entities as legal parties with tier; shop is a location of its entity (ADR-02)                   3.1, 3.3
+FR-PTY-030
+FR-PTY-040          Trading relationships between entities with their own price list and terms (ADR-04)              3.2, 4.3, 6.2
+FR-PTY-050
+FR-PTY-060          Locations with owner entity, type, language, trading hours                                       3.3
+
+FR-PTY-070          Till positions per shop; series follow the position (ADR-11)                                     3.4, 6.6
+FR-SEC-010
+FR-SEC-020          Devices enrolled, assigned to positions, suspended, retired                                      3.4, 4.5, 6.6
+
+FR-SEC-030          Credit limit per relationship, informative; changes permission-gated and audited (A-10, A-11, 3.2, 6.4
+FR-SEC-040          ADR-12)
+FR-SEC-050
+FR-SEC-060          Entity onboarding status and bulk registration                                                   4.1, 6.1
+FR-SEC-070
+FR-GOV-010          Dynamic RBAC: permission catalogue, role builder, default templates (N-01, N-02)                 3.5, 5.1, 6.3
+FR-GOV-020
+FR-GOV-030          Till PIN authentication; back-office password; TOTP for financial and administrative             3.6, 9.2
+                    functions (N-03, N-04)
+FR-GOV-040
+FR-GOV-050          Session and idle-lock policy per surface (N-09)                                                  7, 9.2
+FR-GOV-060
+                    Deactivate, never delete; history retained (N-08)                                                4.4
+
+                    Immutable audit of role, user, credential, grant and device changes (N-05)                       5.3 (events), kernel audit
+
+                    Segregation of duties: requester ≠ approver and configurable pairs (N-07)                        3.5, 6.3
+
+                    No privilege escalation; last-administrator guardrail                                            3.5
+
+                    Federation sees everything view-only (M-02 to M-04, T-02)                                        3.7
+
+                    Counterparty sees only trading-facing data; shops see nothing of siblings (M-05)                 3.7
+
+                    Each entity self-administers; MPCS administers its shops; no Federation downward admin 3.5, 4.4, 6.3
+                    (M-08, ADR-18)
+
+                    Regulator and auditor time-boxed read-only access, every grant audited (M-10, J-09)              3.7, 4.6, 6.5
+
+                    Societies cannot leave; data retained indefinitely (M-07)                                        4.1
+
+                    Data-governance agreement and responsible officer per entity (M-09, M-11, ADR-26)                3.1 (responsible officer),
+                                                                                                                     11
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System                                          Page 2
+Identifier      Requirement (abridged)                                                       Design section
+NFR-SEC-010/03  ASVS L2; NIST credential rules; MFA                                          9.2
+0
+NFR-CMP-010     PDPA: minimal personal data on users                                         9.3
+NFR-AUD-030     Audit event catalogue coverage for governance events                         5.3
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System                  Page 3
+3. Domain model
+
+Tables are those of doc 18 part A; this section states the aggregates, their invariants and the two change
+requests raised against doc 18. Owner of every table here: schema party (entities, relationships, locations,
+positions, devices) and schema security (users, permissions, roles, assignments, grants, pairs).
+
+3.1 Entity
+
+Aspect                  Design
+Aggregate
+Invariants              entity with responsible officer and financial-year settings. Root of ownership for everything else.
+
+Change request CR-21-1  Exactly one FEDERATION row. entity_code immutable and unique. Status never reaches a terminal 'left' state
+                        (FR-GOV-050). costing_policy is WEIGHTED_AVERAGE in phase 1.
+
+                        Add responsible_officer_user_id (nullable until the officer is appointed) and
+                        data_governance_signed_on (date, nullable) to entity for FR-GOV-060; both audited on change.
+
+3.2 Trading relationship
+
+Aspect                  Design
+Aggregate
+Invariants              entity_relationship (effective-dated) with its terms; the anchor for M3 price lists and M4 exposure.
+
+Tier rule               seller ≠ buyer; one ACTIVE row per (seller, buyer) per date (exclusion constraint); a relationship's
+                        price_list_id must belong to the seller (validated against M3's query at activation); credit-limit change
+Intra-entity movements  requires bil.creditlimit.change with MFA and a reason.
+
+                        Phase 1 permits Federation→distributor and distributor→MPCS. Federation→MPCS is not blocked by schema,
+                        only by a configuration flag allow_direct_federation_mpcs (default off), so the change later is data (doc 17
+                        M1 note).
+
+                        Never a relationship. A transfer between two shops of one MPCS is an M5 document; the schema check is
+                        simply seller ≠ buyer.
+
+    3.3 Location        Design
+
+Aspect                  location with primary_till_position_id.
+Aggregate
+Invariants              owner_entity_id immutable (A-I2). Only WAREHOUSE and SHOP may hold stock (enforced by M5's query
+                        refusing OFFICE). A SHOP needs a primary till before it can issue location-series documents (A-I7).
+Language and hours      connectivity_spec_met must be true for status ACTIVE.
+
+                        Language drives the till, receipts and back-office sessions opened at that location (doc 19 section 5.1).
+                        trading_hours drives update windows (doc 31) and the day-open that activates apply_from prices (doc 32).
+
+3.4 Till position and device
+
+Aspect                  Design
+Aggregates
+Invariants              till_position (logical lane) and device (hardware).
+
+Hand-offs               A position belongs to exactly one SHOP and its position_no is unique there; positions retire, never delete. A
+                        device holds at most one position; the assignment change is an audited event with old and new (A-I5). A device
+                        below the version floor after grace cannot be assigned to a new position.
+
+                        Enrolment creates the device row from the management agent's staging record (doc 31); position assignment
+                        triggers series creation through the kernel numbering service (doc 32 section 8); suspension publishes
+                        device.suspended.v1 which the sync gateway turns into a signed revoke.
+
+3.5 Users, roles, permissions
+
+Aspect                  Design
+Aggregates
+                        app_user; permission (catalogue, federation-owned, versioned as a whole); role with role_permission
+Invariants              carrying limits jsonb; user_role with scope columns; sod_pair (new, CR-21-2).
+
+                        A user has one home entity. A role is owned by one entity or is a federation template. Scope of an assignment
+                        must lie within the grantor's own scope. No user may grant a permission they do not hold. An entity always
+                        retains at least one holder of gov.user.manage. FEDERATION-scope permissions appear only in
+                        federation-owned roles. An INSTANCE-mode segregation pair is enforced at the acting module (requester ≠
+                        approver on the document); a ROLE-mode pair is enforced here at role authoring.
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System  Page 4
+Aspect                  Design
+Change request CR-21-2
+                        Add sod_pair (permission_a, permission_b, mode INSTANCE|ROLE, owner_entity_id nullable for federation
+Template drift          defaults) to doc 18. Defaults: writeoff.request/approve, writeoff.request/witness, adjust.request/approve,
+                        user.manage/audit.review(self) at INSTANCE; role.manage guardrails are code.
+
+                        Role rows cloned from a template keep template_role_id and template_version_seen; a newer
+                        template version shows a marker and a diff; no forced propagation (doc 19 DR-4).
+
+3.6 Credentials
+
+Aspect                  Design
+Back office
+                        Password hash and TOTP secret live in the identity provider, not in M1's tables; M1 stores only the provider's
+Till                    subject id and status. Credential resets are commands relayed to the provider through the wrapped admin API
+                        (doc 19 section 2.2).
+
+                        pin_hash (Argon2id) stored in M1 for distribution in the operator snapshot; PIN policy from the configuration
+                        register: length 4–6, lockout after 5 attempts for 15 minutes, no reuse of last 3 (doc 19 DR-5).
+
+3.7 Visibility policy as data
+
+The four row-level security classes are fixed in code (doc 18 section 3.7); M1 supplies the facts they key on: the
+caller's scope entity and location, the caller's policy class from the role class, and the PARTY relationship table.
+M1 also owns the column-masking view definitions for PARTY reads of trading documents (cost, margin and
+internal notes omitted), published as a versioned kernel artefact so M4 can rely on them.
+
+Class                   Who                            Reads                                           Writes
+OWN                                                                                                    Per permission
+PARTY                   Any user in scope              Rows where owner = scope entity (and location,
+FEDERATION_VIEW                                        when the assignment is location-scoped)         Their own side's
+                                                                                                       commands only
+                        Seller or buyer of a document  Trading-facing columns of documents where the   None (except
+                                                       scope entity is a party                         Federation-owned
+                                                                                                       reference data through
+                        Federation roles marked view-all Everything                                    OWN)
+                                                                                                       None
+EXTERNAL_TIMEBOXE Regulator, auditors                  Granted scope, read-only, until valid_until
+D
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System            Page 5
+   4. State machines
+
+   M1 owns no trading documents; its lifecycles are status machines on reference records. They are small but
+   every transition is permission-gated, audited and has a reason rule where doc 03 conventions require one.
+
+   4.1 Entity
+
+From         To         Trigger / command               Guard                                   Permission              Audit
+–                       RegisterEntity                  Unique code; tier valid                                         entity.registered
+             ONBOARDIN                                                                          gov.entity.register     entity.activated
+             G          ActivateEntity                  Responsible officer named; at           (FEDERATION)
+                                                        least one admin user; VAT                                       entity.suspende
+ONBOARDIN ACTIVE                                        registration present                    gov.entity.activate     d
+G                                                       Reason code mandatory                   (FEDERATION)            entity.reinstated
+
+ACTIVE       SUSPENDED SuspendEntity                    Reason code                             gov.entity.suspend
+                                                                                                (FEDERATION,
+SUSPENDE ACTIVE         ReinstateEntity                                                         MFA)
+D
+                                                                                                gov.entity.suspend
+                                                                                                (FEDERATION,
+                                                                                                MFA)
+
+   There is no CLOSED state (FR-GOV-050). Suspension blocks new documents by the entity; existing documents
+   and history remain readable.
+
+   4.2 Trading relationship
+
+From         To         Trigger / command               Guard                                   Permission              Audit
+–            DRAFT      OpenTradingRelationship
+                                                        seller ≠ buyer; tier rule or flag; no prt.relationship.open relationship.ope
+
+                                                        overlapping ACTIVE row                  (seller)                ned
+
+DRAFT        ACTIVE     ActivateRelationship            Price list belongs to seller and is prt.relationship.activa relationship.activ
+
+                                                        published; terms complete               te (seller)             ated
+
+ACTIVE       ACTIVE (new AmendRelationshipTerms         Effective-dated: old row closed,        prt.relationship.amen   relationship.ame
+             row)                                       new row opened; credit-limit            d;                      nded; credit_limi
+                                                        change needs MFA and reason             bil.creditlimit.change  t.changed
+                                                                                                for the limit
+
+ACTIVE       SUSPENDED SuspendRelationship              Reason; open documents                  prt.relationship.suspe relationship.susp
+                                                        unaffected
+                                                                                                nd (seller, MFA)        ended
+
+   4.3 Location
+
+From         To         Trigger / command               Guard                                   Permission              Audit
+–            PLANNED    RegisterLocation                Owner ACTIVE or                         prt.location.register   location.register
+                                                        ONBOARDING; code unique in              (owner admin)           ed
+PLANNED      ONBOARDIN  StartOnboarding                 owner
+             G          ActivateLocation                Device staged                           prt.location.onboard    location.onboard
+                                                                                                                        ing
+ONBOARDIN ACTIVE                                        Connectivity gate met; primary          prt.location.activate   location.activate
+G                                                       till set for SHOP; operators                                    d
+                                                        assigned                                prt.location.dormant
+ACTIVE       DORMANT    MarkDormant                     No open till session; reason            prt.location.activate   location.dormant
+DORMANT      ACTIVE     Reactivate                      Connectivity gate met                                           location.activate
+                                                                                                                        d
+
+   4.4 User
+
+From         To         Trigger / command               Guard                                   Permission              Audit
+                        CreateUser                      Home entity in grantor's scope;         gov.user.manage         user.created
+–            PENDING                                    unique username in federation           (MFA)
+                        First credential set (provider  –                                       system                  user.activated
+PENDING ACTIVE          callback) or PIN issued
+                        Lockout (system)                Failed attempts over policy             system                  account.locked_
+ACTIVE       LOCKED                                                                                                     out
+
+   21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System                                 Page 6
+From      To        Trigger / command           Guard                                        Permission          Audit
+LOCKED    ACTIVE    Unlock / ResetCredential                                                                     user.credential_r
+                                                Administrator in scope                       gov.user.manage     eset
+ACTIVE                                                                                       (MFA)               user.deactivated
+
+          DEACTIVATE DeactivateUser             Not the last user.manage holder; gov.user.manage                 Audit
+          D                                                                                                      device.enrolled
+                                                reason                                       (MFA)
+                                                                                                                 device.assigned
+DEACTIVATED is terminal; a returning member of staff receives a new user record linked by                        device.position_
+succeeds_user_id so history stays attributable to the original.                                                  changed; series.
+                                                                                                                 holder_changed
+4.5 Device                                                                                                       device.suspend
+                                                                                                                 ed
+From      To        Trigger / command           Guard                                        Permission          device.reinstate
+–         ENROLLED  EnrolDevice (from staging)                                                                   d
+                                                Hardware serial unique;                      sys.device.enrol    device.retired
+ENROLLED  ACTIVE    AssignDeviceToPosition      management agent attested                    (MFA)
+ACTIVE    ACTIVE    AssignDeviceToPosition
+                    (re-assign)                 Position free; device above floor            sys.device.enrol
+
+                                                Old device's outbox drained or               sys.device.enrol
+                                                loss recorded (doc 32 section 8)             (MFA)
+
+ACTIVE    SUSPENDED SuspendDevice               Reason (lost, stolen, faulty)                sys.device.suspend
+                                                Physical recovery confirmed                  (MFA)
+SUSPENDE  ACTIVE    ReinstateDevice             Unassigned; wiped
+D         RETIRED   RetireDevice                                                             sys.device.suspend
+                                                                                             (MFA)
+ANY
+                                                                                             sys.device.suspend
+                                                                                             (MFA)
+
+4.6 External grant
+
+From      To        Trigger / command           Guard                                        Permission          Audit
+–         ACTIVE    GrantExternalView                                                                            external_grant.is
+                                                Grantee user of class                        gov.external.grant  sued
+
+                                                EXTERNAL; scope; valid_until ≤ (FEDERATION,                      external_grant.e
+                                                                                                                 xpired
+                                                12 months; reason                            MFA)                external_grant.r
+                                                                                                                 evoked
+ACTIVE    EXPIRED   Clock (system)              valid_until passed                           system
+ACTIVE    REVOKED   RevokeExternalView
+                                                Reason                                       gov.external.grant
+                                                                                             (MFA)
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System                      Page 7
+   5. Contract
+
+   5.1 Commands
+
+Command                 Input (essentials)                     Permission                       Effect                    Events
+
+RegisterEntity          code, type, names, registration,       gov.entity.register (F)          Entity ONBOARDING entity.registered.v1
+                        VAT no, district, defaults
+
+ActivateEntity /        entity, reason                         gov.entity.activate /            Status                    entity.activated/sus
+SuspendEntity /                                                .suspend (F, MFA)                                          pended/reinstated.v
+ReinstateEntity                                                                                                           1
+
+AppointResponsibleOffic entity, user, signed date              gov.entity.register (F) or       CR-21-1 fields            entity.updated.v1
+er                                                             gov.user.manage (own)
+
+OpenTradingRelationshi seller, buyer, price list, terms,       prt.relationship.open            DRAFT row                 relationship.opened
+                                                                                                                          .v1
+p                       effective_from
+
+ActivateRelationship    relationship                           prt.relationship.activate        ACTIVE; M3 query          relationship.activate
+                                                                                                validates list            d.v1
+
+AmendRelationshipTerm relationship, new terms,                 prt.relationship.amend;          Close old row at          relationship.amend
+                                                               bil.creditlimit.change           effective_from − 1, open  ed.v1; credit_limit.c
+s                       effective_from, reason                 (MFA) when limit changes         new                       hanged.v1
+
+SuspendRelationship     relationship, reason                   prt.relationship.suspend         Status                    relationship.suspen
+                                                               (MFA)                                                      ded.v1
+
+RegisterLocation /      owner, code, type, names, address, prt.location.* (owner                Status per 4.3            location.*.v1
+ActivateLocation /
+MarkDormant             language, hours, size band             admin)
+
+SetPrimaryTill          location, position, reason             prt.location.primary             Updates flag; kernel      location.primary_ch
+                                                               (owner admin, MFA)               moves location series     anged.v1; series.ho
+                                                                                                                          lder_changed.v1
+
+RegisterTillPosition /  location, position_no                  prt.position.manage              Position row; kernel      till_position.register
+RetireTillPosition
+                                                                                                creates or closes series ed/retired.v1
+
+EnrolDevice             serial, kind, owner (from staging) sys.device.enrol (MFA) Device ENROLLED                         device.enrolled.v1
+
+AssignDeviceToPosition device, position, reason                sys.device.enrol (MFA on Assignment; counter               device.assigned/po
+                                                                                                                          sition_changed.v1
+                                                               re-assign)                       transfer via kernel
+
+SuspendDevice /         device, reason                         sys.device.suspend               Status; gateway revoke device.suspended/r
+ReinstateDevice /                                              (MFA)                                                                einstated/retired.v1
+RetireDevice
+
+CreateUser              home entity, username, display         gov.user.manage (MFA)            PENDING; provider         user.created.v1
+                        name, language, kind                                                    account created via
+                        (BACK_OFFICE | TILL | BOTH)                                             wrapped admin API
+
+ResetCredential         user, kind                             gov.user.manage (MFA)            Temporary password via user.credential_res
+
+                                                                                                provider, or new PIN      et.v1
+
+                                                                                                hash
+
+DeactivateUser          user, reason                           gov.user.manage (MFA)            DEACTIVATED;              user.deactivated.v1
+                                                                                                provider disabled;
+                                                                                                refresh tokens revoked
+
+CreateRole /            owner entity, name, permissions        gov.role.manage (MFA) Role rows; guardrails                role.changed.v1
+
+AmendRole / RetireRole with limits, template ref
+
+AssignRole /            user, role, scope entity, scope        gov.role.manage (MFA) user_role row                        role.assigned/revok
+RevokeRole              location                                                                                          ed.v1
+
+SetSodPairMode          pair, mode                             gov.role.manage (MFA) sod_pair row                         sod_pair.changed.v
+                                                                                                                          1
+
+GrantExternalView /     grantee, scope, valid_until, reason gov.external.grant (F,              Grant row                 external_grant.issu
+RevokeExternalView                                                         MFA)                                           ed/revoked.v1
+
+BulkRegister            file (entities, locations, positions,  gov.entity.register (F) or       Validated staging;        the per-row events
+                        users, devices)                        gov.user.manage (own)            commit per row;
+                                                                                                validation report
+
+   F = FEDERATION scope only. All commands are idempotent by key (doc 14 section 1.3).
+
+   5.2 Queries
+
+   21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System                                    Page 8
+Query                                     Returns                                                    Scope rule
+ResolveScope(user)                        Home entity, scopes (entity, location) list, policy class  Kernel only
+ResolvePermissions(user, rv)              Effective permission set with limits, per scope            Kernel and till snapshot builder
+LookupRelationship(seller, buyer, date)   Active relationship with terms                             Parties and Federation view
+ListRelationships(entity, role)           As seller or buyer                                         OWN
+GetEntity / ListEntities(filter)          Entity facts                                               OWN, PARTY (names only),
+                                                                                                     FEDERATION_VIEW
+ListLocations(entity) / GetLocation       Locations with primary till, hours, language               OWN; PARTY sees ship-to names for
+                                                                                                     drops
+ListOperators(location)                   Users assigned at the location with PIN hashes and         Kernel snapshot builder only
+                                          offline permissions
+ListDevices(entity)                       Devices, positions, versions, last seen (last seen from    OWN; FEDERATION_VIEW
+                                          M6 health)
+ListRoles(entity) / GetRoleDiff(role)     Roles and template diffs                                   OWN
+ListExternalGrants()                      Active and expired grants                                  FEDERATION
+
+5.3 Events published
+
+Event                                     Payload (beyond envelope)                          Consumers
+                                                                                             Numbering (entity series), M3, M4, M8
+entity.registered/activated/suspended/reinstat entity id, code, type, status
+ed/updated.v1                                                                                M3 (price list binding), M4 (exposure), M8
+
+relationship.opened/activated/amended/susp relationship id, parties, effective range, terms  Numbering, sync gateway (snapshot scope),
+                                                                                             doc 31 windows, M5, M8
+ended.v1; credit_limit.changed.v1         hash; limit old/new                                Numbering, sync gateway
+
+location.registered/onboarding/activated/dor location id, owner, type, language, hours,      Sync gateway (revoke, counter transfer), doc
+                                                                                             31 fleet
+mant/primary_changed.v1                   primary position                                   Sync gateway (operator snapshot), audit
+                                                                                             exception queues
+till_position.registered/retired.v1;      position id, location, number
+series.holder_changed.v1 (kernel)                                                            Sync gateway (permission snapshot), audit
+
+device.enrolled/assigned/position_changed/s device id, serial, position, reason              Audit, M8
+uspended/reinstated/retired.v1
+
+user.created/activated/credential_reset/deacti user id, home entity, kind (no credential
+
+vated.v1; account.locked_out.v1;          material)
+
+authentication.failed.v1
+
+role.changed/assigned/revoked.v1;         role id, owner, version, permission diff
+sod_pair.changed.v1
+
+external_grant.issued/expired/revoked.v1  grant id, grantee, scope, valid_until
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System          Page 9
+6. Key flows
+
+Flow                            Sequence                                                            Failure paths
+6.1 Onboarding an MPCS
+with three shops (playbook,     Federation runs BulkRegister from the onboarding sheet → entity     Validation report lists rejected rows
+about 40 shops a week)          ONBOARDING, locations PLANNED, positions, staged devices →          (duplicate codes, missing VAT no,
+                                MPCS administrator user created with a temporary credential →       invalid district); nothing partial commits
+6.2 Opening a                   MPCS admin creates shop users and assigns roles from templates      per row; a shop without a primary till
+distributor→MPCS                                                                                    cannot activate; an entity without an
+relationship                    (shop-in-charge for single-staff shops) → devices enrolled at       officer stays ONBOARDING but its
+6.3 Building a role for a shop  Federation staging and assigned → connectivity gate recorded per    shops may trade under the distributor
+                                site → ActivateLocation per shop → ActivateEntity once the          relationship only once the entity is
+6.4 Raising a credit limit      responsible officer is named                                        ACTIVE
+
+6.5 Regulator access for an     Distributor sales opens DRAFT with terms and a negotiated price list Overlapping ACTIVE row rejected by
+inspection
+6.6 Replacing a faulty till     (M3) → ActivateRelationship validates the list belongs to the seller the exclusion constraint; unpublished
+
+                                and is published → M4 may now accept orders from the buyer          list rejected with the M3 reason
+
+                                MPCS admin clones the shop-in-charge template → adds                A conflict names the pair and the
+                                prt.count.record limits → guardrail checks: no permission beyond    mode; assignment outside the grantor's
+                                grantor's own, no FEDERATION permission, no ROLE-mode pair          scope is refused
+                                conflict → AssignRole scoped to the shop location
+
+                                Seller accounts opens AmendRelationshipTerms with the new limit     Missing reason or stale MFA rejected;
+                                and reason → step-up TOTP → new effective-dated row →               the old row is never edited
+                                credit_limit.changed.v1 → M4 recomputes exposure warning
+
+                                Federation admin creates an EXTERNAL user →                         Grant beyond 12 months refused;
+                                GrantExternalView with scope and valid_until → every login and      revocation immediate; export volume
+                                export audited → expiry by clock                                    visible on the exception queue
+
+                                Administrator suspends the old device (stolen or faulty) → if its   A drained-check failure blocks
+                                outbox was not drained, records the loss (doc 32 sequence reset) →  assignment until the loss is recorded;
+                                new device enrolled at staging and shipped →                        series gap documented, never hidden
+                                AssignDeviceToPosition triggers counter transfer from the highest
+                                applied number → old device retired
+
+   7. Configuration                               Default                             Scope                        Who may change
+                                                  off                                 Federation                   gov.entity.register (F)
+Item                                              4/6                                 Entity                       gov.user.manage
+allow_direct_federation_mpcs                      5 / 15                              Entity                       gov.user.manage
+pin_length_min / max                              2 / 3 / 10 / 5                      Entity (till values per      gov.user.manage
+pin_lockout_attempts / minutes                                                        location override)
+idle_lock_till_sales / shop_mode / back_office /  12; per-action list: credit limit,  Federation default; entity   gov.role.manage
+admin (minutes)                                   control price, external grant       may shorten
+mfa_freshness_hours                               12                                  Federation                   gov.external.grant
+                                                  INSTANCE for the four defaults      Entity                       gov.role.manage
+external_grant_max_months                         notify and diff                     Federation                   –
+sod_pair modes                                    per site                            Location                     prt.location.*
+template_drift_notification
+location.trading_hours, language, size_band,
+connectivity_spec_met
+
+8. Screens as paper
+
+Screen                   Paper mirrored           Surface Roles                       Notes
+Society register         Register of societies
+                         Trading agreement        W  Federation admin                 List, detail, status actions; onboarding checklist tile
+Agreement sheet          Shop register
+(relationship)           Staff book                                                   (officer, admin user, VAT, shops active)
+Shop list and shop card
+                                                  W  Seller admin, accounts Terms as a form; effective-dated history as a timeline;
+Staff register
+                                                                                      limit change opens ReasonCapture and step-up
+
+                                                  W  Entity admin                     Hours, language, size band, connectivity gate,
+                                                                                      primary till selector (audited), tills and devices
+
+                                                  W  Entity or MPCS admin Create, deactivate, reset; roles shown as duties in the
+
+                                                                                      shop language; scope shown as shop names
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System                                     Page 10
+Screen                      Paper mirrored    Surface Roles          Notes
+Duties list (role builder)  Duty roster                              Permissions grouped by paper document (receipt,
+                                              W  Entity admin        GRN, count, write-off, price list); limits inline; template
+                                                                     diff banner
+Asset register (devices) Asset register       W  Entity admin        Serial, position, version, last seen, suspend and
+                                                                     reassign with reason
+Access letter (external Access letter         W  Federation admin    Grantee, scope, until; audit trail of use
+
+grants)                                          Federation, entity  Upload, validation report with row-level reasons,
+                                                 admin               commit
+Bulk registration           Onboarding sheet  W  Named reviewers     Shared component; governance events (lockouts,
+                                                                     grants, role changes)
+Exception queue             Exceptions book   W
+
+No M1 screen exists on the till; the till consumes the operator and permission snapshots only.
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System     Page 11
+9. Non-functional design
+
+Aspect              Design
+9.1 Capacity
+                    876 entities, about 10,000 locations, 15,000 positions and devices, tens of thousands of users; all small tables.
+9.2 Security        ResolvePermissions is cached per instance keyed by catalogue version; ListOperators runs per snapshot build,
+                    not per request.
+9.3 Privacy
+9.4 Availability    All mutating commands MFA-gated except location and position registration; provider admin API wrapped so no
+9.5 Auditability    Federation role reaches it; PIN hashes Argon2id with per-user salt; credential material never in events or audit;
+                    lockouts audited; ASVS L2 controls mapped in doc 34.
+
+                    User records hold display name, username, language and kind; no personal identifiers beyond what the identity
+                    provider needs; responsible officer is a user reference. PDPA data map in doc 34.
+
+                    M1 reads are on every request path; the permission and scope caches make M1 unavailability survivable for
+                    reads; writes are rare.
+
+                    Every command in 5.1 raises a catalogue event; role changes carry before/after permission sets; grants carry
+                    scope and validity.
+
+10. Test strategy
+
+Layer               What is tested
+Unit
+                    Guardrails: no escalation, last-administrator, FEDERATION-only permissions, tier rule and flag, seller ≠ buyer,
+Contract            effective-date closure arithmetic
+
+State machine       Every command and query in section 5 against the published schema; idempotency by key; MFA step-up challenge
+Property-based      on the gated commands
+
+Row-level security  Every transition in section 4 with its guard; illegal transitions rejected with the reason code
+matrix
+Scenario            Random sequences of role edits never produce a role holding a ROLE-mode pair; random assignment scopes never
+                    exceed the grantor's; exclusion constraint holds under random effective ranges
+Performance
+                    Principal × table × operation across the four classes: a distributor user cannot read MPCS internal rows; a
+                    shop-scoped user cannot read a sibling shop; Federation writes nothing; an expired grant reads nothing
+
+                    Flows 6.1–6.6 end to end, including the counter-transfer hand-off to the kernel and the revoke hand-off to the sync
+                    gateway
+
+                    ResolvePermissions under 2 ms from cache; BulkRegister of 40 shops with 120 users and 60 devices under 60 s with
+                    a full validation report
+
+11. Decision requests
+
+#        Point                                         Proposed                                     Decider
+DR-1     Responsible officer and data-governance date  Adopt; nullable until appointed; activation  Architecture review; Federation
+         on entity (CR-21-1)                           requires the officer                         legal
+DR-2     Segregation pairs as data (CR-21-2)           Adopt with the four INSTANCE defaults        Architecture review
+DR-3     Federation→MPCS direct trading flag           Present, default off                         Federation admins
+DR-4     External grant maximum duration               12 months                                    Federation, Department of
+                                                                                                    Co-operative Development
+DR-5     Returning staff: new user record with         New record with succeeds_user_id             liaison
+DR-6     succession link vs reactivation               Officer named, admin user, VAT registration  Federation admins
+
+         Entity activation prerequisites                                                            Federation admins
+
+12. Traceability
+
+Section             Identifiers
+3.1–3.4             FR-PTY-010 to 070; ADR-02, ADR-04, ADR-11, ADR-12; A-06, A-07, A-09 to A-11, D-06, C-04, C-08; M-07
+3.5–3.7             FR-SEC-010, 060, 070; FR-GOV-010 to 040; N-01, N-02, N-07; M-02 to M-05, M-08, M-10; ADR-18, ADR-26; doc 18 3.7;
+                    doc 19 3
+4                   Doc 03 conventions; N-08; FR-SEC-040; FR-GOV-050; doc 32 section 8
+5                   Doc 20 M1 contract; doc 19 6.1; doc 14 1.3
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System         Page 12
+Section  Identifiers
+6        S-07 (40 shops a week); doc 13 scenarios where relationships and roles appear
+7        Doc 07 section 4 configuration register; N-03, N-09; doc 19 DR-4, DR-5, DR-7
+8        Doc 30 section 5.1; P-08
+9–10     NFR-SEC, NFR-CMP, NFR-AUD; doc 34, doc 39
+
+End of document. Draft for design review; the contract in section 5 freezes when at least one dependant (M2) acknowledges it,
+targeted end of Stage 2 week 2.
+
+21 - M1 Party, Tenancy & Security | v0.1 draft | Cooperative Retail and Distribution System  Page 13
+
