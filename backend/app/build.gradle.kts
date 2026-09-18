@@ -22,6 +22,10 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // The JPA starter arrives with the hello module (S0-12); the @Table annotation is
+    // needed now so the R4 own-schema rule in ArchitectureTests can read entity schemas.
+    implementation("jakarta.persistence:jakarta.persistence-api")
+
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
