@@ -1,31 +1,57 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 17A stub: one instance, no expiry. 19A replaces it with the kernel.idempotency_key
+ * table so every instance answers alike.
+ */
 @Component
 public class InMemoryIdempotencyStore
         implements IdempotencyStore {
 
-    private final Set<String> keys = ConcurrentHashMap.newKeySet();
+    private record Entry(
+            String requestHash,
+            StoredResult result) {
+    }
+
+    private final Map<String, Entry> entries = new ConcurrentHashMap<>();
 
     @Override
-    public boolean claim(String key) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Idempotency key must not be blank");
+    public Optional<StoredResult> find(
+            Key key) {
+        Entry entry = entries.get(compound(key));
+
+        if (entry == null) {
+            return Optional.empty();
         }
 
-        return keys.add(key);
+        if (!entry.requestHash().equals(key.requestHash())) {
+            throw new ProblemException(
+                    "idempotency.request_mismatch",
+                    Map.of("key", key.value()));
+        }
+
+        return Optional.of(entry.result());
     }
 
     @Override
-    public void release(String key) {
-        if (key != null) {
-            keys.remove(key);
-        }
+    public void store(
+            Key key,
+            StoredResult result) {
+        entries.put(
+                compound(key),
+                new Entry(key.requestHash(), result));
+    }
+
+    private static String compound(
+            Key key) {
+        return key.userId() + ":" + key.value();
     }
 }
