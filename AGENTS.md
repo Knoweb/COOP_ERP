@@ -53,6 +53,8 @@ till/app/ till/core/ till/peripherals/ till/sync/
 docs/design/  docs/adr/  docs/sources/                   design PDFs, ADR markdown mirrors, document sources
 ```
 
+Names: the project and every configurable identifier are `coop-erp` (Gradle projects, `spring.application.name`, the `coop-erp:` configuration prefix, `COOP_ERP_ROLE`, `CoopErpApplication`, Makefile, compose and CI names); the package root stays `lk.coopfed.knoweb` as the guides cite it (ADR-051). Where 17A writes `knoweb` for a project or application name, use `coop-erp`.
+
 Each module package: `api/` (published: command records, query interfaces, events), `query/` (published, read-only), `internal/` (private), `web/` (controllers implementing generated OpenAPI interfaces). Modulith `package-info.java` declares allowed dependencies. Layers: kernel → master data (M1–M3) → transactions (M4–M7) → read side (M8, M9). Sideways access is query-only.
 
 ## Non-negotiable rules (the build enforces most of them)

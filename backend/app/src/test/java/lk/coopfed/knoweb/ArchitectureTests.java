@@ -26,11 +26,11 @@ import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
  */
 class ArchitectureTests {
 
-    private static final ApplicationModules MODULES = ApplicationModules.of(KnowebApplication.class);
+    private static final ApplicationModules MODULES = ApplicationModules.of(CoopErpApplication.class);
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(new ImportOption.DoNotIncludeTests())
-            .importPackages(KnowebApplication.class.getPackageName());
+            .importPackages(CoopErpApplication.class.getPackageName());
 
     /** Module package name to the database schemas it owns (17A §2, doc 18 Part F). */
     private static final Map<String, Set<String>> SCHEMA_OWNERSHIP = Map.ofEntries(
@@ -192,7 +192,7 @@ class ArchitectureTests {
     private static String moduleOf(
             JavaClass javaClass) {
 
-        String prefix = KnowebApplication.class.getPackageName() + ".";
+        String prefix = CoopErpApplication.class.getPackageName() + ".";
         String pkg = javaClass.getPackageName();
 
         if (!pkg.startsWith(prefix)) {

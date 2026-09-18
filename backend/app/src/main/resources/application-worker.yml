@@ -3,7 +3,7 @@ spring:
     activate:
       on-profile: worker
 
-knoweb:
+coop-erp:
   role: worker
 
 management:

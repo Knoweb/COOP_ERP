@@ -15,13 +15,13 @@ public class FlywayConfig {
 
     private static final Logger log = LoggerFactory.getLogger(FlywayConfig.class);
 
-    @Value("${knoweb.migration.url}")
+    @Value("${coop-erp.migration.url}")
     private String url;
 
-    @Value("${knoweb.migration.user}")
+    @Value("${coop-erp.migration.user}")
     private String user;
 
-    @Value("${knoweb.migration.password}")
+    @Value("${coop-erp.migration.password}")
     private String password;
 
     @PostConstruct
