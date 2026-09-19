@@ -1,8 +1,0 @@
-# Keep the Docker build context small and free of host build output.
-.gradle/
-.kotlin/
-**/build/
-**/bin/
-*.log
-Dockerfile
-.dockerignore

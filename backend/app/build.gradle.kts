@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("com.google.cloud.tools.jib")
 }
 
 java {
@@ -35,6 +36,34 @@ dependencies {
     testImplementation("org.springframework.modulith:spring-modulith-docs:1.2.5")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// The container image (17A sections 10 and 11). Jib builds it straight from the Gradle build:
+// no Dockerfile, dependencies in their own layer so a code change rebuilds in seconds, and
+// the image a developer runs with `make up` is built the same way as the one CI packages.
+//   ./gradlew :app:jibDockerBuild   builds into the local Docker daemon (used by `make image`)
+//   ./gradlew :app:jib              builds and pushes to a registry (CI publish stage, later)
+// The base image name lives in backend/gradle.properties (jibBaseImage).
+// -PjibFromDaemon=true makes Jib take the base image from the local Docker daemon instead of
+// the registry. `make image` uses it after a `docker pull`: on a machine where nobody is
+// signed in to Docker Hub, Docker Desktop gives Jib an empty credential and the registry
+// answers 401, while `docker pull` itself works anonymously. CI, which pushes with
+// `./gradlew :app:jib` and has no daemon, leaves the flag off.
+val jibBaseImage: String by project
+val jibFromDaemon = providers.gradleProperty("jibFromDaemon").map { it.toBoolean() }.getOrElse(false)
+
+jib {
+    from {
+        image = if (jibFromDaemon) "docker://$jibBaseImage" else jibBaseImage
+    }
+    to {
+        image = "coop-erp/backend:dev"
+    }
+    container {
+        mainClass = "lk.coopfed.knoweb.CoopErpApplication"
+        ports = listOf("8080")
+        user = "10001"   // never root inside the container
+    }
 }
 
 tasks.withType<Test> {

@@ -165,12 +165,10 @@ services:
 
   # The backend, web and worker roles in one container (17A section 10). Flyway runs at
   # start, so "the backend is healthy" also means "the database is migrated".
-  # Deviation from 17A: the image is built by backend/Dockerfile, not by Jib; see PROGRESS.md.
+  # The image is built by Jib (`make image`, which `make up` runs first); compose never builds it.
   backend:
     image: coop-erp/backend:dev
-    build:
-      context: ../../backend
-      dockerfile: Dockerfile
+    pull_policy: never          # a local image: never look for it in a registry
     environment:
       COOP_ERP_ROLE: web,worker
       SPRING_PROFILES_ACTIVE: web,worker

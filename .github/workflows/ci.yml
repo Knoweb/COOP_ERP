@@ -190,6 +190,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # `make up` builds the backend image with Jib, which runs in Gradle on the runner.
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Make backend wrapper executable
+        run: chmod +x backend/gradlew
+
       - name: Verify bootstrap files
         run: |
           test -f README.md

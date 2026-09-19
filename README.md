@@ -28,7 +28,7 @@ Cooperative Retail and Distribution System.
 
 ## Development: the fifteen-minute start
 
-You need Docker (Docker Desktop on Windows and macOS) with the compose plugin 2.24 or newer, GNU make and a POSIX shell. On Windows run make from Git Bash. Nothing else: the backend and the web client are built and run inside containers. Give Docker at least 6 GB of memory.
+You need Docker (Docker Desktop on Windows and macOS) with the compose plugin 2.24 or newer, JDK 21, GNU make and a POSIX shell. On Windows run make from Git Bash. The backend image is built on your machine by Jib, through the Gradle wrapper; the web client is built and run inside a container, so Node is needed only for `make build`, `make test` and `make gen-clients`. Give Docker at least 6 GB of memory.
 
 ```bash
 git clone https://github.com/Knoweb/COOP_ERP.git
@@ -36,7 +36,7 @@ cd COOP_ERP
 make up
 ```
 
-The first `make up` takes about ten minutes: it pulls the images, builds the backend, starts PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit, the backend and the web client, waits until every one reports healthy, loads the development seed rows and prints the addresses. The database is migrated by the backend when it starts.
+The first `make up` takes about ten minutes: it pulls the images, builds the backend image with Jib, starts PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit, the backend and the web client, waits until every one reports healthy, loads the development seed rows and prints the addresses. The database is migrated by the backend when it starts.
 
 Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cashier`, password `dev`. The three users read English, Sinhala and Tamil in that order.
 
@@ -44,6 +44,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 |---|---|
 | `make up` | Start the stack, migrate, seed, print the addresses and the dev logins |
 | `make up-2` | The same with two backend instances behind nginx, to catch bugs that depend on one instance answering every request |
+| `make image` | Build the backend container image with Jib; `make up`, `make up-2` and `make migrate` do this first |
 | `make down` | Stop the stack and keep its data |
 | `make reset` | Stop the stack and delete its data volumes; the next `make up` starts from an empty database |
 | `make migrate` | Rebuild and restart the backend, which runs the new Flyway migrations |
