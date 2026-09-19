@@ -12,11 +12,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MODULES, ScaffoldError, namesFor, plan, problems, rename, run, sharedEdits } from "./new-module.mjs";
+import { MODULES, PLACEHOLDER_PERMISSION_PREFIX, ScaffoldError, namesFor, plan, pluralOf, problems, rename, run, sharedEdits } from "./new-module.mjs";
 
 const REPOSITORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SKU = namesFor({ name: "m2catalogue", schema: "catalogue", entity: "sku" });
 const SKU_ARGS = ["--name", "m2catalogue", "--schema", "catalogue", "--entity", "sku"];
+const PRICE_LIST = namesFor({ name: "m3pricing", schema: "pricing", entity: "price_list" });
+const PRICE_LIST_ARGS = ["--name", "m3pricing", "--schema", "pricing", "--entity", "price_list"];
 
 const B = "backend/app/src";
 const TEMPLATE_PARTS = [
@@ -56,14 +58,34 @@ const text = (root, file) => fs.readFileSync(path.join(root, file), "utf8");
 
 // ---- names ----------------------------------------------------------------------------------
 
-test("names: every spelling the renames need", () => {
+test("names: a single word is spelled the same everywhere", () => {
+  for (const key of ["entity", "entityCamel", "entityKebab", "entityWords"]) {
+    assert.equal(SKU[key], "sku");
+  }
+  assert.equal(SKU.Entity, "Sku");
+  assert.equal(SKU.entities, "skus");
+  assert.equal(SKU.Schema, "Catalogue");
+});
+
+test("names: a compound name gets the spelling each place needs", () => {
+  const { entity, entityCamel, Entity, entityKebab, entityWords, ENTITY, entities, entitiesCamel, Entities, entitiesKebab, entitiesWords } = PRICE_LIST;
   assert.deepEqual(
-    { ...SKU, displayName: undefined },
+    { entity, entityCamel, Entity, entityKebab, entityWords, ENTITY, entities, entitiesCamel, Entities, entitiesKebab, entitiesWords },
     {
-      name: "m2catalogue", schema: "catalogue", entity: "sku", entities: "skus",
-      Entity: "Sku", Entities: "Skus", Schema: "Catalogue", displayName: undefined
+      entity: "price_list", entityCamel: "priceList", Entity: "PriceList", entityKebab: "price-list",
+      entityWords: "price list", ENTITY: "PRICE_LIST",
+      entities: "price_lists", entitiesCamel: "priceLists", Entities: "PriceLists",
+      entitiesKebab: "price-lists", entitiesWords: "price lists"
     });
-  assert.equal(namesFor({ name: "m1party", schema: "party", entity: "party", plural: "parties" }).entities, "parties");
+});
+
+test("names: the plural follows the last word, and PLURAL overrides it", () => {
+  assert.equal(pluralOf("sku"), "skus");
+  assert.equal(pluralOf("tax_category"), "tax_categories");
+  assert.equal(pluralOf("batch"), "batches");
+  assert.equal(pluralOf("delivery_note"), "delivery_notes");
+  assert.equal(pluralOf("day"), "days");
+  assert.equal(namesFor({ name: "m1party", schema: "party", entity: "person", plural: "people" }).Entities, "People");
 });
 
 test("names: a wrong module, schema or entity is refused with a reason", () => {
@@ -72,9 +94,12 @@ test("names: a wrong module, schema or entity is refused with a reason", () => {
   refused({ name: "m10procurement", schema: "procurement", entity: "order" }, /NAME must be one of/);
   refused({ name: "m2catalogue", schema: "party", entity: "sku" }, /SCHEMA for m2catalogue/);
   refused({ name: "m1party", schema: "catalogue", entity: "sku" }, /SCHEMA for m1party/);
-  refused({ name: "m2catalogue", schema: "catalogue" }, /ENTITY must be one lowercase word/);
+  refused({ name: "m2catalogue", schema: "catalogue" }, /ENTITY must be lowercase words/);
   refused({ name: "m2catalogue", schema: "catalogue", entity: "Sku" }, /ENTITY must be/);
-  refused({ name: "m2catalogue", schema: "catalogue", entity: "price_list" }, /ENTITY must be/);
+  refused({ name: "m2catalogue", schema: "catalogue", entity: "price__list" }, /ENTITY must be/);
+  refused({ name: "m2catalogue", schema: "catalogue", entity: "_list" }, /ENTITY must be/);
+  refused({ name: "m2catalogue", schema: "catalogue", entity: "priceList" }, /ENTITY must be/);
+  refused({ name: "m9integration", schema: "integration", entity: "outbound_webhook_delivery" }, /limit is 40/);
   refused({ name: "m2catalogue", schema: "catalogue", entity: "class" }, /Java keyword/);
   refused({ name: "m2catalogue", schema: "catalogue", entity: "sku", plural: "sku" }, /PLURAL/);
   refused({ name: "m2catalogue", schema: "catalogue", entity: "greeting" }, /hello module itself/);
@@ -104,7 +129,8 @@ test("rename: each meaning of hello and greeting gets the right word", () => {
     "/v1/hello/greetings/{id}": "/v1/catalogue/skus/{id}",
     'TYPE = "hello.greeting.registered.v1"': 'TYPE = "sku.registered.v1"',
     '"HELLO_GREETING_REGISTERED"': '"CATALOGUE_SKU_REGISTERED"',
-    'permission = "hello.greeting.register"': 'permission = "catalogue.sku.register"',
+    'permission = "hello.greeting.register"': 'permission = "todo.catalogue.sku.register"',
+    "x-permission: hello.greeting.read": "x-permission: todo.catalogue.sku.read",
     "class RegisterGreetingHandler implements Handles<RegisterGreeting, UUID>": "class RegisterSkuHandler implements Handles<RegisterSku, UUID>",
     "List<Greeting> findTop100ByOrderByCreatedAtDesc();": "List<Sku> findTop100ByOrderByCreatedAtDesc();",
     'import type { components } from "../../generated/hello";': 'import type { components } from "../../generated/m2catalogue";',
@@ -116,6 +142,59 @@ test("rename: each meaning of hello and greeting gets the right word", () => {
   };
   for (const [from, to] of Object.entries(cases)) {
     assert.equal(rename(from, SKU), to);
+  }
+});
+
+test("rename: a compound name is spelled by context", () => {
+  const code = {
+    '@Table(schema = "hello", name = "greeting")': '@Table(schema = "pricing", name = "price_list")',
+    "Greeting greeting = Greeting.create(": "PriceList priceList = PriceList.create(",
+    "repository.save(greeting);": "repository.save(priceList);",
+    "UUID greetingId,": "UUID priceListId,",
+    'Subject.of("greeting", greeting.getId())': 'Subject.of("price_list", priceList.getId())',
+    '"HELLO_GREETING_REGISTERED"': '"PRICING_PRICE_LIST_REGISTERED"',
+    'TYPE = "hello.greeting.registered.v1"': 'TYPE = "price_list.registered.v1"',
+    '"hello.greeting.duplicate"': '"pricing.price_list.duplicate"',
+    '@RequestMapping("/v1/hello/greetings")': '@RequestMapping("/v1/pricing/price-lists")',
+    'execute("TRUNCATE hello.greeting");': 'execute("TRUNCATE pricing.price_list");',
+    "const greetings = useQuery({": "const priceLists = useQuery({",
+    "{greetings.data?.map((greeting) => (": "{priceLists.data?.map((priceList) => (",
+    " * The greeting aggregate. Rules every entity follows:": " * The price list aggregate. Rules every entity follows:",
+    "    // a greeting has no device": "    // a price list has no device",
+    "class RegisterGreetingHandler": "class RegisterPriceListHandler"
+  };
+  for (const [from, to] of Object.entries(code)) {
+    assert.equal(rename(from, PRICE_LIST, "code"), to);
+  }
+  const data = {
+    "CREATE TABLE hello.greeting (": "CREATE TABLE pricing.price_list (",
+    "    CONSTRAINT greeting_owner_text_uq UNIQUE (owner_entity_id, text_en)": "    CONSTRAINT price_list_owner_text_uq UNIQUE (owner_entity_id, text_en)",
+    "-- A greeting is never changed or removed once registered": "-- A price list is never changed or removed once registered",
+    "  /v1/hello/greetings/{id}:": "  /v1/pricing/price-lists/{id}:",
+    "      summary: Register a greeting for the caller": "      summary: Register a price list for the caller",
+    "schema: { $ref: '#/components/schemas/RegisterGreetingRequest' }": "schema: { $ref: '#/components/schemas/RegisterPriceListRequest' }",
+    '    "hello.title": "Greetings",': '    "pricing.title": "Price lists",',
+    '    "hello.register": "Register greeting",': '    "pricing.register": "Register price list",'
+  };
+  for (const [from, to] of Object.entries(data)) {
+    assert.equal(rename(from, PRICE_LIST, "data"), to);
+  }
+  assert.equal(rename("V0001__greeting.sql", PRICE_LIST, "path"), "V0001__price_list.sql");
+  assert.equal(rename("greetings.dev.sql", PRICE_LIST, "path"), "price_lists.dev.sql");
+  assert.equal(rename("internal/RegisterGreetingHandler.java", PRICE_LIST, "path"), "internal/RegisterPriceListHandler.java");
+});
+
+test("plan: a compound name leaves no broken identifier behind", (t) => {
+  for (const file of plan(templateCopy(t), PRICE_LIST)) {
+    if (/\.(java|ts|tsx)$/.test(file.target)) {
+      const codeLines = file.content.split("\n").filter((l) => !/^\s*(\*|\/\*|\/\/)/.test(l));
+      // In code a snake_case name may appear only inside a string, never as an identifier.
+      for (const line of codeLines.filter((l) => /price_list/.test(l))) {
+        assert.ok(/["`].*price_list.*["`]/.test(line), file.target + ": price_list outside a string: " + line.trim());
+      }
+    }
+    // "price listId" or "aprice list": the prose spelling attached to identifier characters.
+    assert.ok(!/price list(?!s?(?![A-Za-z0-9_(]))[A-Za-z0-9_(]|[A-Za-z0-9_]price list/.test(file.content), file.target + ": prose spelling glued to code");
   }
 });
 
@@ -256,4 +335,30 @@ test("run: two modules can be scaffolded side by side, but not with the same agg
 
 test("run: an unknown argument is refused", (t) => {
   assert.throws(() => run(templateCopy(t), ["--nmae", "m2catalogue"]), ScaffoldError);
+});
+
+test("permissions: the copy carries placeholders that the build refuses", (t) => {
+  const files = plan(templateCopy(t), SKU);
+  const handler = files.find((f) => f.target.endsWith("RegisterSkuHandler.java"));
+  const slice = files.find((f) => f.target.endsWith("openapi/m2catalogue.yaml"));
+  assert.equal(PLACEHOLDER_PERMISSION_PREFIX, "todo.");
+  assert.match(handler.content, /@CommandHandler\(permission = "todo\.catalogue\.sku\.register"\)/);
+  assert.match(slice.content, /x-permission: todo\.catalogue\.sku\.register/);
+  assert.match(slice.content, /x-permission: todo\.catalogue\.sku\.read/);
+  // Message ids are not permissions and must not get the prefix.
+  assert.ok(!/todo\.catalogue\.sku\.(duplicate|text_required)/.test(handler.content));
+});
+
+test("run: a compound module is written with the right file names", (t) => {
+  const root = templateCopy(t);
+  run(root, PRICE_LIST_ARGS, () => {});
+  for (const file of [
+    B + "/main/java/lk/coopfed/knoweb/m3pricing/internal/PriceList.java",
+    B + "/main/java/lk/coopfed/knoweb/m3pricing/api/RegisterPriceList.java",
+    B + "/main/resources/db/migration/m3pricing/V0001__price_list.sql",
+    B + "/main/resources/seed/m3pricing/price_lists.dev.sql"
+  ]) {
+    assert.ok(exists(root, file), "missing " + file);
+  }
+  assert.ok(JSON.parse(text(root, B + "/main/resources/i18n/si.json"))["pricing.price_list.duplicate"]);
 });

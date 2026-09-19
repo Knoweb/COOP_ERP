@@ -51,7 +51,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | `make seed` | Load the development seed rows again (safe to repeat) |
 | `make test` | Unit and architecture tests, schema-ownership and i18n checks (needs JDK 21 and Node on the host) |
 | `make gen-clients` | Regenerate `web/src/generated` after changing an OpenAPI slice |
-| `make new-module NAME=m2catalogue SCHEMA=catalogue ENTITY=sku` | Copy the hello module as the start of a real module: backend package, migration, slice, seed, integration test, web module, message ids and route. Refuses to overwrite; `DRY_RUN=1` previews. Then follow the README it writes into the new package |
+| `make new-module NAME=m3pricing SCHEMA=pricing ENTITY=price_list` | Copy the hello module as the start of a real module: backend package, migration, slice, seed, integration test, web module, message ids and route. `ENTITY` is lowercase with underscores and is spelled as each place needs (`PriceList`, `priceList`, `price_list`, `/price-lists`). Refuses to overwrite; `DRY_RUN=1` previews. The copy has placeholder permissions that `make test` refuses: replace them first, then follow the README written into the new package |
 | `make test-scaffold` | Scaffold a throwaway module, prove everything still builds and passes with it, remove it again (needs a clean working tree) |
 
 Ports, users and passwords are development defaults in `infra/compose/compose.yml`. To change one, copy `infra/compose/.env.example` to `infra/compose/.env` and edit it; after changing a database user run `make reset`.

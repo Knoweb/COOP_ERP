@@ -63,6 +63,9 @@ jobs:
       - name: i18n check
         run: node tools/check-i18n.mjs
 
+      - name: Permission check (slice and handler agree, no scaffold placeholders)
+        run: node tools/check-permissions.mjs
+
       - name: Tool tests (new-module scaffolder)
         run: node --test tools/new-module.test.mjs
 

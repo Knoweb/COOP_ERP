@@ -174,7 +174,7 @@ class ArchitectureTests {
                 .allowEmptyShould(true);
     }
 
-    /** R7: no handler without a permission. */
+    /** R7: no handler without a permission, and none with the placeholder of make new-module. */
     static ArchRule handlersCarryPermissionRule() {
         return classes()
                 .that()
@@ -356,8 +356,23 @@ class ArchitectureTests {
                                     javaClass.getName()
                                             + " has an empty "
                                             + "@CommandHandler permission"));
+                } else if (annotation.permission().startsWith(SCAFFOLD_PLACEHOLDER)) {
+                    // make new-module cannot know the real permission codes (cat.sku.create,
+                    // gov.entity.activate ...), so it writes a placeholder. Forgetting to
+                    // replace it would go unnoticed until permissions are enforced (19A K-03).
+                    events.add(
+                            SimpleConditionEvent.violated(
+                                    javaClass,
+                                    javaClass.getName()
+                                            + " still has the scaffold placeholder permission \""
+                                            + annotation.permission()
+                                            + "\"; replace it, here and in the OpenAPI slice, with the"
+                                            + " permission code from the module's implementation guide"));
                 }
             }
         };
     }
+
+    /** Same prefix as PLACEHOLDER_PERMISSION_PREFIX in tools/new-module.mjs. */
+    static final String SCAFFOLD_PLACEHOLDER = "todo.";
 }

@@ -6,7 +6,10 @@
 //
 // NAME    the module package, one of the nine in MODULES below
 // SCHEMA  a database schema that module owns (doc 18 Part F)
-// ENTITY  the first aggregate of the module, one lowercase word: sku, entity, order ...
+// ENTITY  the first aggregate of the module, lowercase with underscores: sku, price_list,
+//         tax_category. The tool spells it as each place needs: PriceList for classes,
+//         priceList for variables, price_list for the table, price-lists in the URL.
+// PLURAL  optional; the default adds s, es or ies to the last word
 //
 // It copies the backend package, migration, OpenAPI slice, seed file, integration test and
 // web module of hello, renaming as it goes, and registers the new module in the four shared
@@ -60,54 +63,135 @@ export function namesFor({ name, schema, entity, plural }) {
       `SCHEMA for ${name} must be one of: ${module.schemas.join(", ")} (got "${schema ?? ""}"). ` +
       "A module writes to its own schemas only (doc 18 Part F).");
   }
-  if (!/^[a-z][a-z0-9]*$/.test(entity ?? "") || JAVA_KEYWORDS.has(entity)) {
+  const SNAKE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
+  if (!SNAKE.test(entity ?? "") || JAVA_KEYWORDS.has(entity)) {
     throw new ScaffoldError(
-      `ENTITY must be one lowercase word that is not a Java keyword, for example sku (got "${entity ?? ""}"). ` +
-      "For a compound name such as price list, scaffold with one word and rename by hand.");
+      `ENTITY must be lowercase words joined by underscores, and not a Java keyword: sku, price_list, tax_category (got "${entity ?? ""}").`);
   }
-  const entities = plural ?? `${entity}s`;
-  if (!/^[a-z][a-z0-9]*$/.test(entities) || entities === entity) {
-    throw new ScaffoldError(`PLURAL must be one lowercase word different from ENTITY (got "${entities}")`);
+  const entities = plural ?? pluralOf(entity);
+  if (!SNAKE.test(entities) || entities === entity) {
+    throw new ScaffoldError(
+      `PLURAL must be lowercase words joined by underscores and differ from ENTITY (got "${entities}")`);
   }
   if (entity === "greeting" || schema === "hello") {
     throw new ScaffoldError("That would recreate the hello module itself.");
   }
+  // kernel.audit_event_type.event_type_code is varchar(40), and the audit stub enforces it.
+  const auditCode = `${schema}_${entity}_REGISTERED`.toUpperCase();
+  if (auditCode.length > 40) {
+    throw new ScaffoldError(
+      `The audit code ${auditCode} would be ${auditCode.length} characters; the limit is 40. Use a shorter ENTITY.`);
+  }
   return {
-    name, schema, entity, entities,
-    Entity: pascal(entity), Entities: pascal(entities), Schema: pascal(schema),
+    name, schema,
+    // One name, six spellings. For a single word such as sku they are all the same word.
+    entity, entities,                                                  // price_list     tables, message ids, events
+    entityCamel: camel(entity), entitiesCamel: camel(entities),        // priceList      Java and TypeScript variables
+    Entity: pascal(camel(entity)), Entities: pascal(camel(entities)),  // PriceList      classes
+    entityKebab: entity.replaceAll("_", "-"), entitiesKebab: entities.replaceAll("_", "-"),   // price-lists  URLs
+    entityWords: entity.replaceAll("_", " "), entitiesWords: entities.replaceAll("_", " "),   // price list   prose
+    ENTITY: entity.toUpperCase(),                                      // PRICE_LIST     audit codes
+    Schema: pascal(schema),
     displayName: module.displayName
   };
 }
 
-/**
- * Renames one piece of text: file content or a file name. Order matters: the specific
- * spellings go first, the bare words "hello" and "greeting" last.
- */
-export function rename(text, n) {
-  const steps = [
-    // The event type is entity-first in the guides (sku.activated.v1), without the module.
-    ["hello.greeting.registered.v1", `${n.entity}.registered.v1`],
-    // Places where "hello" means the module folder, not the schema.
-    ["lk.coopfed.knoweb.hello", `lk.coopfed.knoweb.${n.name}`],
-    ["generated/hello", `generated/${n.name}`],
-    ["openapi/hello.yaml", `openapi/${n.name}.yaml`],
-    ["db/migration/hello", `db/migration/${n.name}`],
-    ["seed/hello", `seed/${n.name}`],
-    ["modules/hello", `modules/${n.name}`],
-    // The aggregate, plural before singular so "greetings" is not turned into "<entity>s".
-    ["GREETING", n.entity.toUpperCase()],
-    ["Greetings", n.Entities],
-    ["greetings", n.entities],
-    ["Greeting", n.Entity],
-    ["greeting", n.entity],
-    // Everything else called hello is named after the schema: the SQL schema, the URL
-    // segment, message ids, the controller, the page, the routes.
-    ["HELLO", n.schema.toUpperCase()],
-    ["Hello", n.Schema],
-    ["hello", n.schema]
-  ];
-  return steps.reduce((result, [from, to]) => result.split(from).join(to), text);
+const camel = (snake) => snake.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+
+/** English plural of the last word: category -> categories, batch -> batches, sku -> skus. PLURAL overrides it. */
+export function pluralOf(snake) {
+  if (/[^aeiou]y$/.test(snake)) {
+    return `${snake.slice(0, -1)}ies`;
+  }
+  return /(s|x|z|ch|sh)$/.test(snake) ? `${snake}es` : `${snake}s`;
 }
+
+/** Permissions of a fresh copy start with this; see the note in rename(). */
+export const PLACEHOLDER_PERMISSION_PREFIX = "todo.";
+
+/**
+ * Renames one piece of text. `kind` says what the text is, because the lowercase word
+ * "greeting" means different things in different places and a compound name such as
+ * price_list is spelled differently in each:
+ *
+ *   "code"  Java, TypeScript: a variable is priceList, a comment says "price list"
+ *   "data"  SQL, YAML, JSON:  what is left after the rules below is prose: "price list"
+ *   "path"  a file name
+ *
+ * Order matters: the specific spellings go first, the bare words "hello" and "greeting" last.
+ */
+export function rename(text, n, kind = "code") {
+  let result = text;
+  const swap = (from, to) => {
+    result = typeof from === "string" ? result.split(from).join(to) : result.replace(from, to);
+  };
+
+  // Permissions cannot be derived: the guides use short codes (cat.sku.create,
+  // gov.entity.activate). The copy gets a placeholder that the architecture tests and
+  // tools/check-permissions.mjs refuse, so a forgotten replacement fails the build.
+  swap(/hello\.greeting\.(register|read)\b/g, `${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.$1`);
+  // The event type is entity-first in the guides (sku.activated.v1), without the module.
+  swap("hello.greeting.registered.v1", `${n.entity}.registered.v1`);
+
+  // Places where "hello" means the module folder, not the schema.
+  swap("lk.coopfed.knoweb.hello", `lk.coopfed.knoweb.${n.name}`);
+  swap("generated/hello", `generated/${n.name}`);
+  swap("openapi/hello.yaml", `openapi/${n.name}.yaml`);
+  swap("db/migration/hello", `db/migration/${n.name}`);
+  swap("seed/hello", `seed/${n.name}`);
+  swap("modules/hello", `modules/${n.name}`);
+
+  // The aggregate where the context fixes the spelling.
+  swap(/\/greetings\b/g, `/${n.entitiesKebab}`);            // URL segment:     /v1/pricing/price-lists
+  swap(/\.greeting\b/g, `.${n.entity}`);                     // table, ids:      pricing.price_list
+  swap('"greeting"', `"${n.entity}"`);                       // table name, audit subject type
+  swap(/greeting_/g, `${n.entity}_`);                        // constraint:      price_list_owner_text_uq
+  swap(/_greeting\b/g, `_${n.entity}`);                      // file:            V0001__price_list.sql
+  swap("greetings.dev.sql", `${n.entities}.dev.sql`);        // file:            price_lists.dev.sql
+  swap("GREETING", n.ENTITY);                                // audit code:      PRICING_PRICE_LIST_REGISTERED
+
+  // Capitalised. Standing alone in a data file it is prose ("Price lists" as a screen title);
+  // everywhere else it is a class name, or part of one (RegisterPriceListRequest).
+  if (kind === "data") {
+    swap(/\bGreetings\b/g, pascal(n.entitiesWords));
+    swap(/\bGreeting\b/g, pascal(n.entityWords));
+  }
+  swap("Greetings", n.Entities);
+  swap("Greeting", n.Entity);
+
+  // Lowercase, what is left: a variable in a line of code, prose in a comment or a data file.
+  if (kind === "path") {
+    swap("greetings", n.entities);
+    swap("greeting", n.entity);
+  } else {
+    result = result
+      .split("\n")
+      .map((line) => {
+        const prose = kind === "data" || /^\s*(\*|\/\*|\/\/)/.test(line);
+        let renamed = line;
+        if (prose) {
+          // Only a word standing alone is prose. Attached to identifier characters it is a
+          // name quoted in a comment (@param greetingId) and keeps the code spelling.
+          renamed = renamed
+            .replace(/(?<![A-Za-z0-9_])greetings(?![A-Za-z0-9_])/g, n.entitiesWords)
+            .replace(/(?<![A-Za-z0-9_])greeting(?![A-Za-z0-9_])/g, n.entityWords);
+        }
+        return renamed
+          .split("greetings").join(n.entitiesCamel)
+          .split("greeting").join(n.entityCamel);
+      })
+      .join("\n");
+  }
+
+  // Everything else called hello is named after the schema: the SQL schema, the URL
+  // segment, message ids, the controller, the page, the routes.
+  swap("HELLO", n.schema.toUpperCase());
+  swap("Hello", n.Schema);
+  swap("hello", n.schema);
+  return result;
+}
+
+const kindOf = (file) => (/\.(java|ts|tsx)$/.test(file) ? "code" : "data");
 
 // ---- the plan: which file goes where ------------------------------------------------------
 
@@ -143,14 +227,14 @@ export function plan(root, n) {
       if (NOT_COPIED.has(path.basename(file)) || posix(path.relative(root, file)) === ROOT_PACKAGE_INFO) {
         continue;
       }
-      const relative = rename(posix(path.relative(fromDir, file)), n);
+      const relative = rename(posix(path.relative(fromDir, file)), n, "path");
       files.push({
         target: `${source.to(n)}/${relative}`,
-        content: rename(read(file), n)
+        content: rename(read(file), n, kindOf(file))
       });
     }
   }
-  files.push({ target: SLICE.to(n), content: rename(read(path.join(root, SLICE.from)), n) });
+  files.push({ target: SLICE.to(n), content: rename(read(path.join(root, SLICE.from)), n, "data") });
   files.push({
     target: `${BACKEND}/main/java/lk/coopfed/knoweb/${n.name}/package-info.java`,
     content: packageInfo(n)
@@ -189,9 +273,9 @@ Read \`hello/README.md\` first: the six rules it lists apply here unchanged.
 
 ## After scaffolding: what to change by hand
 
-The copy compiles and its tests pass, but it is still a greeting with another name. In this order:
+The copy compiles and its integration tests pass, but it is still a greeting with another name, and **\`make test\` fails until step 1 is done**. In this order:
 
-1. **Permissions.** \`${n.schema}.${n.entity}.register\` and \`${n.schema}.${n.entity}.read\` are placeholders. Replace them, in the \`@CommandHandler\` and in \`openapi/${n.name}.yaml\`, with the permission codes of your guide (they look like \`cat.sku.create\`).
+1. **Permissions (the build is red until you do this).** \`${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.register\` and \`${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.read\` are placeholders; nothing can derive the real codes. Replace them, in the \`@CommandHandler\` and in \`openapi/${n.name}.yaml\` (the two must be the same string), with the permission codes of your guide: they look like \`cat.sku.create\`. The architecture tests and \`tools/check-permissions.mjs\` refuse any permission that still starts with \`${PLACEHOLDER_PERMISSION_PREFIX}\`.
 2. **The table.** \`db/migration/${n.name}/V0001__${n.entity}.sql\` has the columns of a greeting. Replace them with the DDL of your guide (section 3). Keep the row-level security block and the narrow grants; add the location clause to \`own_read\` if the table has a \`location_id\`.
 3. **The slice.** \`openapi/${n.name}.yaml\`: replace the operations with those of your guide (section 5), then run \`make gen-clients\`.
 4. **Handler, entity, queries.** Follow the handler specifications of your guide (section 6). One handler per command, each with its audit event and domain event.
@@ -224,7 +308,7 @@ export function sharedEdits(root, n) {
     const catalogue = JSON.parse(read(path.join(root, target)));
     for (const [id, text] of Object.entries(catalogue)) {
       if (id.startsWith("hello.")) {
-        catalogue[rename(id, n)] = text;
+        catalogue[rename(id, n, "data")] = text;
       }
     }
     const sorted = Object.fromEntries(Object.entries(catalogue).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
@@ -365,9 +449,11 @@ export function run(root, argv, log = console.log) {
 
   log("");
   log(`Module ${n.name} scaffolded. Next:`);
-  log("  1. make gen-clients      (the web module imports a client that does not exist yet)");
-  log("  2. make test && make test-int");
-  log(`  3. work through backend/app/src/main/java/lk/coopfed/knoweb/${n.name}/README.md`);
+  log("  1. make gen-clients      (make new-module does this for you; the web module needs its client)");
+  log(`  2. replace the two placeholder permissions (${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.register and .read) with the codes`);
+  log("     of your guide, in the @CommandHandler and in the slice. make test is red until you do.");
+  log("  3. make test && make test-int");
+  log(`  4. work through backend/app/src/main/java/lk/coopfed/knoweb/${n.name}/README.md`);
   return n;
 }
 

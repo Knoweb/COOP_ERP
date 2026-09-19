@@ -122,6 +122,7 @@ test:
 	node --test tools/new-module.test.mjs
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
+	node tools/check-permissions.mjs
 
 # The tests tagged "integration": the whole application against a real PostgreSQL 16 that
 # Testcontainers starts in Docker. Needs a running Docker, not a running `make up` stack.
@@ -133,7 +134,9 @@ gen-clients:
 
 # Copies the hello module as the start of a real module, then generates its web client.
 # The tool checks the three names and refuses to overwrite anything; add DRY_RUN=1 to see
-# what it would do. ENTITY is the first aggregate of the module: one lowercase word.
+# what it would do. ENTITY is the first aggregate of the module, lowercase with underscores:
+# sku, price_list, tax_category. The copy's permissions are placeholders (todo....) that
+# `make test` refuses until you replace them with the codes of the module's guide.
 new-module:
 	node tools/new-module.mjs --name "$(NAME)" --schema "$(SCHEMA)" --entity "$(ENTITY)" $(if $(PLURAL),--plural "$(PLURAL)") $(if $(DRY_RUN),--dry-run)
 	$(if $(DRY_RUN),,sh tools/gen-clients.sh)
@@ -148,8 +151,15 @@ test-scaffold:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "make test-scaffold needs a clean working tree (commit or stash first)." >&2; exit 1; \
 	fi
-	node tools/new-module.mjs --name m3pricing --schema pricing --entity rate
+	node tools/new-module.mjs --name m3pricing --schema pricing --entity price_list
 	sh tools/gen-clients.sh
+	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
+	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \
+		echo "check-permissions accepted the scaffold placeholders" >&2; exit 1; \
+	fi
+	@echo "--- replace them, as the developer does in step 1 of the module README"
+	grep -rl "todo\.pricing\.price_list\." backend/app/src | xargs sed -i "s/todo\.pricing\.price_list\./prc.price_list./g"
+	node tools/check-permissions.mjs
 	cd backend && ./gradlew :app:test :app:integrationTest
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
