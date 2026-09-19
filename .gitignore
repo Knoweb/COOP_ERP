@@ -44,3 +44,6 @@ infra/compose/data/
 **/bin/
 
 web/.vite/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

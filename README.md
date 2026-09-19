@@ -50,6 +50,9 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | `make migrate` | Rebuild and restart the backend, which runs the new Flyway migrations |
 | `make seed` | Load the development seed rows again (safe to repeat) |
 | `make test` | Unit and architecture tests, schema-ownership and i18n checks (needs JDK 21 and Node on the host) |
+| `make test-int` | Integration tests against a real PostgreSQL that Testcontainers starts in Docker (needs Docker, not the running stack) |
+| `make smoke` | Smoke test of the running stack from outside, through the published ports; `make smoke TWO=1` after `make up-2` |
+| `make check-generated` | Regenerate the web clients and the module diagrams in `docs/modules` and fail when the committed ones are stale |
 | `make gen-clients` | Regenerate `web/src/generated` after changing an OpenAPI slice |
 | `make new-module NAME=m3pricing SCHEMA=pricing ENTITY=price_list` | Copy the hello module as the start of a real module: backend package, migration, slice, seed, integration test, web module, message ids and route. `ENTITY` is lowercase with underscores and is spelled as each place needs (`PriceList`, `priceList`, `price_list`, `/price-lists`). Refuses to overwrite; `DRY_RUN=1` previews. The copy has placeholder permissions that `make test` refuses: replace them first, then follow the README written into the new package |
 | `make test-scaffold` | Scaffold a throwaway module, prove everything still builds and passes with it, remove it again (needs a clean working tree) |

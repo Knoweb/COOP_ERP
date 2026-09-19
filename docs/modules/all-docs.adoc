@@ -1,0 +1,19 @@
+== CoopErpApplication
+plantuml::components.puml[]
+
+== Engine
+plantuml::module-engine.puml[]
+include::module-engine.adoc[]
+
+== Platform Kernel
+plantuml::module-kernel.puml[]
+include::module-kernel.adoc[]
+
+== Hello (template module)
+plantuml::module-hello.puml[]
+include::module-hello.adoc[]
+
+== Config
+plantuml::module-config.puml[]
+include::module-config.adoc[]
+

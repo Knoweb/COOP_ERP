@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed urls build test test-int gen-clients new-module test-scaffold
+.PHONY: help image up up-2 down reset migrate seed urls build test test-int gen-clients check-generated new-module test-scaffold smoke
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -48,7 +48,9 @@ help:
 	@echo "make build        build backend and web on the host"
 	@echo "make test         unit and architecture tests, schema-ownership and i18n checks"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
+	@echo "make smoke        smoke test of the running stack (TWO=1 after make up-2)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
+	@echo "make check-generated  fail when the committed clients or module diagrams are stale"
 	@echo "make new-module NAME=m2catalogue SCHEMA=catalogue ENTITY=sku   (DRY_RUN=1 to preview)"
 	@echo "make test-scaffold scaffold a throwaway module and prove everything still passes (clean tree only)"
 
@@ -132,6 +134,25 @@ test-int:
 gen-clients:
 	sh tools/gen-clients.sh
 
+# Generated files are committed: the web clients (from the OpenAPI slices) and the module
+# diagrams in docs/modules (from ArchitectureTests). This target regenerates both and fails
+# when git then sees a difference, which means somebody changed a slice or a module
+# dependency and did not commit what it generates. The pipeline runs it on every push.
+check-generated:
+	sh tools/gen-clients.sh
+	cd backend && ./gradlew :app:test --tests "*ArchitectureTests*"
+	@# Compared by content against what is staged or committed: a changed file, or a new file
+	@# git does not know yet. (`git status` would also report line-ending noise on Windows.)
+	@if ! git diff --quiet -- web/src/generated docs/modules \
+	    || [ -n "$$(git ls-files --others --exclude-standard -- web/src/generated docs/modules)" ]; then \
+		echo "" >&2; \
+		echo "Generated files are stale. The regenerated files are in your working tree: review and commit them." >&2; \
+		git --no-pager diff --stat -- web/src/generated docs/modules >&2; \
+		git ls-files --others --exclude-standard -- web/src/generated docs/modules >&2; \
+		exit 1; \
+	fi
+	@echo "generated files are up to date"
+
 # Copies the hello module as the start of a real module, then generates its web client.
 # The tool checks the three names and refuses to overwrite anything; add DRY_RUN=1 to see
 # what it would do. ENTITY is the first aggregate of the module, lowercase with underscores:
@@ -167,3 +188,8 @@ test-scaffold:
 	git reset --hard --quiet
 	git clean -fdq
 	@echo "scaffolder proof passed; the throwaway module has been removed"
+
+# Smoke test of the running stack, from outside, through the published ports. Start the
+# stack first: `make up` then `make smoke`, or `make up-2` then `make smoke TWO=1`.
+smoke:
+	node tools/smoke.mjs $(if $(TWO),--two)
