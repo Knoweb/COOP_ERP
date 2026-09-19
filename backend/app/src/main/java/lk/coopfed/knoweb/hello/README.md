@@ -38,6 +38,14 @@ A handler that forgets `audit.record(...)` breaks nothing visible: the trail jus
 
 The build rules prove the calls exist; only your test proves they are right. A fifth check comes with the audit catalogue of 19A K-04: every code used exists in the catalogue, and every catalogue code is used somewhere.
 
+## Starting a real module from this one
+
+```bash
+make new-module NAME=m3pricing SCHEMA=pricing ENTITY=price_list   # DRY_RUN=1 to preview
+```
+
+copies everything listed under "What is where" with the names changed, registers the module in the shared files, and writes a README into the new package that lists what to change by hand, in order. The first item is the permissions: the copy carries placeholders (`todo....`) that `make test` refuses, because only the module's guide knows the real codes. Keep hello correct: whatever is wrong here is copied into every module, and `make test-scaffold` (also in CI) fails when a change to hello is something the copy can no longer build or pass.
+
 ## Running it
 
 ```bash

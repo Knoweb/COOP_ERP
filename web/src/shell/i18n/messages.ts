@@ -3,6 +3,7 @@
 // Every id needs all three languages; a missing one shows the English text with the EN tag.
 
 import helloMessages from "../../modules/hello/hello.messages.json";
+// new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
 
@@ -23,7 +24,10 @@ const SHELL_MESSAGES: Catalogue = {
   }
 };
 
-const MODULE_CATALOGUES: Catalogue[] = [helloMessages];
+const MODULE_CATALOGUES: Catalogue[] = [
+  helloMessages,
+  // new-module:entry (make new-module adds a line above this one; keep the comment)
+];
 
 function merge(locale: Locale): Record<string, string> {
   return Object.assign({}, SHELL_MESSAGES[locale], ...MODULE_CATALOGUES.map((c) => c[locale]));

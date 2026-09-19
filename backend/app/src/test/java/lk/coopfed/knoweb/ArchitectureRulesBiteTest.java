@@ -51,6 +51,11 @@ class ArchitectureRulesBiteTest {
     }
 
     @Test
+    void permissionRuleCatchesAScaffoldPlaceholderLeftInPlace() {
+        assertViolation(ArchitectureTests.handlersCarryPermissionRule(), "PlaceholderPermissionHandler");
+    }
+
+    @Test
     void auditRuleCatchesAHandlerThatNeitherAuditsNorPublishes() {
         assertViolation(ArchitectureTests.handlersAuditAndPublishRule(), "SilentHandler");
     }

@@ -1,11 +1,33 @@
 # COOP ERP developer commands (17A section 13). Run `make` or `make help` for the list.
 #
 # Needs: Docker with the compose plugin (2.24 or newer), JDK 21, GNU make, a POSIX shell.
-# On Windows run make from Git Bash, so the recipes below find `sh`.
+# On Windows the POSIX shell is the one that comes with Git for Windows; make finds it by
+# itself (next block), so PowerShell, cmd and Git Bash all work.
 # The backend image is built on the host by Jib (`make image`); the web client runs in a
 # container. `build`, `test` and `gen-clients` also need Node with pnpm on the host.
 
 .DEFAULT_GOAL := help
+
+# ---- Windows: find a POSIX shell ----------------------------------------------------------
+# The recipes below are written for sh (for loops, [ -n ... ], shell scripts). Started from
+# Git Bash, make finds sh on the PATH and SHELL is its full path. Started from PowerShell or
+# cmd there is no sh on the PATH, make leaves SHELL as the bare name "sh.exe" and would run
+# every recipe with cmd.exe, which fails with "CreateProcess ... sh ... failed".
+# Git is installed wherever this repository is used, and Git for Windows ships sh, sed and
+# the rest next to git.exe. So: ask cmd where git.exe is (the Git/cmd folder) and use the
+# sh.exe in Git/bin beside it.
+# The PATH line is needed as well, because make starts a simple command such as
+# `sh tools/gen-clients.sh` directly, without going through SHELL.
+ifeq ($(OS),Windows_NT)
+ifeq ($(SHELL),sh.exe)
+GIT_CMD_DIR := $(shell for %%i in (git.exe) do @echo %%~dp$$PATH:i)
+ifeq ($(GIT_CMD_DIR),)
+$(error make needs a POSIX shell and found neither sh nor git on the PATH. Install Git for Windows, or run make from Git Bash)
+endif
+SHELL := $(GIT_CMD_DIR)..\bin\sh.exe
+export PATH := $(PATH);$(GIT_CMD_DIR)..\usr\bin
+endif
+endif
 
 COMPOSE_DIR := infra/compose
 COMPOSE     := docker compose --project-directory $(COMPOSE_DIR) -f $(COMPOSE_DIR)/compose.yml
@@ -13,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed urls build test test-int gen-clients new-module
+.PHONY: help image up up-2 down reset migrate seed urls build test test-int gen-clients new-module test-scaffold
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -27,7 +49,8 @@ help:
 	@echo "make test         unit and architecture tests, schema-ownership and i18n checks"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
-	@echo "make new-module NAME=m2catalogue SCHEMA=catalogue"
+	@echo "make new-module NAME=m2catalogue SCHEMA=catalogue ENTITY=sku   (DRY_RUN=1 to preview)"
+	@echo "make test-scaffold scaffold a throwaway module and prove everything still passes (clean tree only)"
 
 # Jib builds coop-erp/backend:dev straight into the local Docker daemon. It is fast when
 # nothing changed: only the layer that holds the project classes is rebuilt.
@@ -96,8 +119,10 @@ build:
 
 test:
 	cd backend && ./gradlew test
+	node --test tools/new-module.test.mjs
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
+	node tools/check-permissions.mjs
 
 # The tests tagged "integration": the whole application against a real PostgreSQL 16 that
 # Testcontainers starts in Docker. Needs a running Docker, not a running `make up` stack.
@@ -107,9 +132,38 @@ test-int:
 gen-clients:
 	sh tools/gen-clients.sh
 
+# Copies the hello module as the start of a real module, then generates its web client.
+# The tool checks the three names and refuses to overwrite anything; add DRY_RUN=1 to see
+# what it would do. ENTITY is the first aggregate of the module, lowercase with underscores:
+# sku, price_list, tax_category. The copy's permissions are placeholders (todo....) that
+# `make test` refuses until you replace them with the codes of the module's guide.
 new-module:
-	@if [ -z "$(NAME)" ] || [ -z "$(SCHEMA)" ]; then \
-		echo "Usage: make new-module NAME=m2catalogue SCHEMA=catalogue"; \
-	else \
-		python tools/new_module.py --name $(NAME) --schema $(SCHEMA); \
+	node tools/new-module.mjs --name "$(NAME)" --schema "$(SCHEMA)" --entity "$(ENTITY)" $(if $(PLURAL),--plural "$(PLURAL)") $(if $(DRY_RUN),--dry-run)
+	$(if $(DRY_RUN),,sh tools/gen-clients.sh)
+
+# The done criterion of S0-13 as a command: scaffold a throwaway module, then prove that
+# everything still builds and passes with it in place, including the sixteen integration
+# tests it inherits from hello. It removes the module again with git, so it insists on a
+# clean working tree first and never touches uncommitted work. If a step fails, the
+# scaffolded module is left in place for you to look at; `git reset --hard && git clean -fd`
+# removes it.
+test-scaffold:
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "make test-scaffold needs a clean working tree (commit or stash first)." >&2; exit 1; \
 	fi
+	node tools/new-module.mjs --name m3pricing --schema pricing --entity price_list
+	sh tools/gen-clients.sh
+	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
+	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \
+		echo "check-permissions accepted the scaffold placeholders" >&2; exit 1; \
+	fi
+	@echo "--- replace them, as the developer does in step 1 of the module README"
+	grep -rl "todo\.pricing\.price_list\." backend/app/src | xargs sed -i "s/todo\.pricing\.price_list\./prc.price_list./g"
+	node tools/check-permissions.mjs
+	cd backend && ./gradlew :app:test :app:integrationTest
+	node tools/check-schema-ownership.mjs
+	node tools/check-i18n.mjs
+	cd web && pnpm install --frozen-lockfile && pnpm build
+	git reset --hard --quiet
+	git clean -fdq
+	@echo "scaffolder proof passed; the throwaway module has been removed"
