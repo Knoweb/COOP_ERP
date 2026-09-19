@@ -28,7 +28,7 @@ Cooperative Retail and Distribution System.
 
 ## Development: the fifteen-minute start
 
-You need Docker (Docker Desktop on Windows and macOS) with the compose plugin 2.24 or newer, JDK 21, GNU make and a POSIX shell. On Windows run make from Git Bash. The backend image is built on your machine by Jib, through the Gradle wrapper; the web client is built and run inside a container, so Node is needed only for `make build`, `make test` and `make gen-clients`. Give Docker at least 6 GB of memory.
+You need Docker (Docker Desktop on Windows and macOS) with the compose plugin 2.24 or newer, JDK 21, GNU make and a POSIX shell. On Windows the shell is the one that ships with Git for Windows and make finds it by itself, so PowerShell, cmd and Git Bash all work. The backend image is built on your machine by Jib, through the Gradle wrapper; the web client is built and run inside a container, so Node is needed only for `make build`, `make test` and `make gen-clients`. Give Docker at least 6 GB of memory.
 
 ```bash
 git clone https://github.com/Knoweb/COOP_ERP.git
@@ -51,7 +51,8 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | `make seed` | Load the development seed rows again (safe to repeat) |
 | `make test` | Unit and architecture tests, schema-ownership and i18n checks (needs JDK 21 and Node on the host) |
 | `make gen-clients` | Regenerate `web/src/generated` after changing an OpenAPI slice |
-| `make new-module NAME=m2catalogue SCHEMA=catalogue` | Copy the hello module as a new module |
+| `make new-module NAME=m2catalogue SCHEMA=catalogue ENTITY=sku` | Copy the hello module as the start of a real module: backend package, migration, slice, seed, integration test, web module, message ids and route. Refuses to overwrite; `DRY_RUN=1` previews. Then follow the README it writes into the new package |
+| `make test-scaffold` | Scaffold a throwaway module, prove everything still builds and passes with it, remove it again (needs a clean working tree) |
 
 Ports, users and passwords are development defaults in `infra/compose/compose.yml`. To change one, copy `infra/compose/.env.example` to `infra/compose/.env` and edit it; after changing a database user run `make reset`.
 

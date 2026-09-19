@@ -32,7 +32,7 @@ Status is from the 18 September review recorded in PROGRESS.md, refreshed on 19 
 | S0-10 | Local compose: PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit; dev realm; seeds | done on `feat/s0-10-local-environment` (19 September), verified from an empty state | Seeds for the permission catalogue arrive with 19A and 21A | 1.5 | `make up` and `make up-2` pass |
 | S0-11 | CI pipeline; nightly fresh-clone test | partly | Add the integration-test job, the fresh-clone nightly and the Android build | 1 | Green on `main`; nightly fresh-clone test |
 | S0-12 | Hello module end to end: the proof table of 17A §12 | done on `feat/s0-12-hello-module` (19 September) except three proof rows | Till hello screen; till-side shared-engine parity test; two-instance Playwright run (needs S0-07) | 1.5 | All rows of the proof table pass |
-| S0-13 | `make new-module` | merged, unverified (`tools/new_module.py`, pull request 17) | Generate a throwaway module and confirm the boundary tests still pass; confirm Python is an accepted build-machine dependency or port the script | 0.5 | Copies hello with renames; boundary tests still pass |
+| S0-13 | `make new-module` | done on `feat/s0-13-scaffolder-rework` (19 September): Node tool, proved by `make test-scaffold` | Scaffold the till screen once hello has one | 0.5 | Copies hello with renames; boundary tests still pass |
 
 Order inside the phase: S0-01 and S0-10 first (everything else is verified through them), then S0-03/S0-05/S0-06 on the backend, S0-07/S0-08/S0-09 on the shells, S0-12 last, S0-13 once S0-12 is green. Phase exit: the fifteen-minute start of 17A §13 works on a fresh clone.
 
