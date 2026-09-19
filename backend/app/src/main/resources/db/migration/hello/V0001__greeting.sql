@@ -1,27 +1,43 @@
-CREATE SCHEMA IF NOT EXISTS hello;
+-- hello.greeting: the table of the template module (17A section 12).
+-- Copy this file's shape for every operational table: columns, constraints, row-level
+-- security from the template of 17A section 6.3, then the narrowest grants that work.
+-- The hello schema itself is created by the kernel baseline (one schema per module).
 
 CREATE TABLE hello.greeting (
-    id UUID PRIMARY KEY,
-    owner_entity_id UUID NOT NULL,
-    text_en TEXT NOT NULL,
-    text_si TEXT,
-    text_ta TEXT,
-    status TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('UTC', now()) NOT NULL
+    id              uuid        PRIMARY KEY,                -- UUIDv7 from kernel Ids.next(), never a database default
+    owner_entity_id uuid        NOT NULL,                   -- the legal entity that owns the row; every table has it
+    text_en         text        NOT NULL CHECK (btrim(text_en) <> ''),
+    text_si         text,                                   -- null means "not translated yet"; the screen then shows
+    text_ta         text,                                   -- the English text with the EN fallback tag
+    status          text        NOT NULL CHECK (status IN ('REGISTERED')),
+    -- now() returns timestamptz, an absolute instant. Never wrap it in timezone('UTC', ...):
+    -- that yields a zone-less value which PostgreSQL reads back in the session's zone, and
+    -- the stored instant ends up shifted by the Colombo offset.
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    -- The natural key (17A section 4.4: natural keys are unique constraints, never primary
+    -- keys). It also makes the handler's duplicate guard safe when two requests race.
+    CONSTRAINT greeting_owner_text_uq UNIQUE (owner_entity_id, text_en)
 );
 
+-- Row-level security. ENABLE switches it on; FORCE makes it apply to the table owner too.
 ALTER TABLE hello.greeting ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hello.greeting FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY greeting_own_policy ON hello.greeting
-    FOR ALL
-    TO app_rw
-    USING (owner_entity_id = nullif(current_setting('knoweb.scope.entity_id', true), '')::uuid)
-    WITH CHECK (owner_entity_id = nullif(current_setting('knoweb.scope.entity_id', true), '')::uuid);
+-- The policies read the caller's scope through the kernel helpers, never through
+-- current_setting() directly: the helpers own the setting names (app.scope_entity_id, ...).
+-- A greeting has no location, so the location clause of the template is left out.
+CREATE POLICY own_read ON hello.greeting FOR SELECT TO app_rw
+    USING (owner_entity_id = kernel.scope_entity());
 
-CREATE POLICY greeting_fed_view_policy ON hello.greeting
-    FOR SELECT
-    TO app_rw
-    USING (nullif(current_setting('knoweb.scope.entity_id', true), '') = '00000000-0000-0000-0000-000000000000');
+CREATE POLICY own_write ON hello.greeting FOR INSERT TO app_rw
+    WITH CHECK (owner_entity_id = kernel.scope_entity());
 
+CREATE POLICY fed_view ON hello.greeting FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+
+-- The fourth policy of the template, ext_view (regulators and auditors), needs
+-- kernel.granted_entities(), which 19A ticket K-01 provides. Add it in a new migration then.
+
+-- A greeting is never changed or removed once registered, so: SELECT and INSERT, nothing else.
 GRANT SELECT, INSERT ON hello.greeting TO app_rw;

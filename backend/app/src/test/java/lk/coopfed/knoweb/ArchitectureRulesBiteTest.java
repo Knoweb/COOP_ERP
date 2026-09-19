@@ -50,6 +50,23 @@ class ArchitectureRulesBiteTest {
         assertViolation(ArchitectureTests.handlersCarryPermissionRule(), "BlankPermissionHandler");
     }
 
+    @Test
+    void auditRuleCatchesAHandlerThatNeitherAuditsNorPublishes() {
+        assertViolation(ArchitectureTests.handlersAuditAndPublishRule(), "SilentHandler");
+    }
+
+    @Test
+    void writersRuleCatchesAWriteOutsideACommandHandler() {
+        assertViolation(ArchitectureTests.onlyHandlersWriteRule(), "WritesOutsideAHandler");
+    }
+
+    @Test
+    void writersRuleLeavesACommandHandlerAlone() {
+        // SilentHandler saves too, but it is a handler: the writers rule must not name it.
+        String report = ArchitectureTests.onlyHandlersWriteRule().evaluate(FIXTURES).getFailureReport().toString();
+        assertTrue(!report.contains("SilentHandler"), report);
+    }
+
     private static void assertViolation(
             ArchRule rule,
             String offendingClass) {

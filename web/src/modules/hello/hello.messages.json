@@ -1,1 +1,41 @@
-﻿{}
+{
+  "en": {
+    "hello.title": "Greetings",
+    "hello.register": "Register greeting",
+    "hello.registered": "Greeting registered",
+    "hello.submitting": "Registering…",
+    "hello.field.text_en": "Greeting in English",
+    "hello.field.text_si": "Greeting in Sinhala (optional)",
+    "hello.field.text_ta": "Greeting in Tamil (optional)",
+    "hello.list.title": "Registered greetings",
+    "hello.list.loading": "Loading…",
+    "hello.list.empty": "No greetings yet.",
+    "hello.error.generic": "Something went wrong. Try again."
+  },
+  "si": {
+    "hello.title": "සුබපැතුම්",
+    "hello.register": "සුබපැතුම ලියාපදිංචි කරන්න",
+    "hello.registered": "සුබපැතුම ලියාපදිංචි කරන ලදී",
+    "hello.submitting": "ලියාපදිංචි කරමින්…",
+    "hello.field.text_en": "සුබපැතුම ඉංග්‍රීසියෙන්",
+    "hello.field.text_si": "සුබපැතුම සිංහලෙන් (අත්‍යවශ්‍ය නොවේ)",
+    "hello.field.text_ta": "සුබපැතුම දෙමළෙන් (අත්‍යවශ්‍ය නොවේ)",
+    "hello.list.title": "ලියාපදිංචි කළ සුබපැතුම්",
+    "hello.list.loading": "පූරණය වෙමින්…",
+    "hello.list.empty": "තවම සුබපැතුම් නැත.",
+    "hello.error.generic": "දෝෂයක් සිදු විය. නැවත උත්සාහ කරන්න."
+  },
+  "ta": {
+    "hello.title": "வாழ்த்துகள்",
+    "hello.register": "வாழ்த்தைப் பதிவு செய்",
+    "hello.registered": "வாழ்த்து பதிவு செய்யப்பட்டது",
+    "hello.submitting": "பதிவு செய்யப்படுகிறது…",
+    "hello.field.text_en": "ஆங்கிலத்தில் வாழ்த்து",
+    "hello.field.text_si": "சிங்களத்தில் வாழ்த்து (விருப்பத்திற்குரியது)",
+    "hello.field.text_ta": "தமிழில் வாழ்த்து (விருப்பத்திற்குரியது)",
+    "hello.list.title": "பதிவு செய்யப்பட்ட வாழ்த்துகள்",
+    "hello.list.loading": "ஏற்றப்படுகிறது…",
+    "hello.list.empty": "இன்னும் வாழ்த்துகள் இல்லை.",
+    "hello.error.generic": "ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்."
+  }
+}

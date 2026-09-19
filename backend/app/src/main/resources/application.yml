@@ -14,6 +14,19 @@ spring:
     hikari:
       maximum-pool-size: ${DB_POOL:10}
 
+  # Entities map onto tables that Flyway created; Hibernate never creates or alters anything.
+  # open-in-view off: a transaction ends where the handler or query ends, not when the HTTP
+  # response has been written.
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      # Time rule (AGENTS.md; 17A section 4.4): an instant is timestamptz in the database and
+      # Instant in Java. This pins the JDBC layer to UTC, so the default time zone of a
+      # developer machine or a server can never change what is written or read.
+      hibernate.jdbc.time_zone: UTC
+
   flyway:
     enabled: false
 
@@ -24,6 +37,10 @@ spring:
 coop-erp:
   role: ${COOP_ERP_ROLE:web}
   business-timezone: Asia/Colombo
+
+  # Browser origins allowed to call /v1/** (the Vite dev server). Comma-separated; never "*".
+  web:
+    allowed-origins: ${WEB_ALLOWED_ORIGINS:http://localhost:5173}
 
   # Flyway connects straight to PostgreSQL (5434 on the host), not through PgBouncer: it holds
   # a session-level lock while migrating. coop_migrator owns the database and may run DDL.

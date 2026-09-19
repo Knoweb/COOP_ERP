@@ -25,7 +25,7 @@ help:
 	@echo "make seed         load the development seed rows (safe to repeat)"
 	@echo "make build        build backend and web on the host"
 	@echo "make test         unit and architecture tests, schema-ownership and i18n checks"
-	@echo "make test-int     integration tests (not available yet, see the target)"
+	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
 	@echo "make new-module NAME=m2catalogue SCHEMA=catalogue"
 
@@ -99,12 +99,10 @@ test:
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 
-# Deliberately fails instead of printing a friendly message and exiting 0: a target that
-# pretends to pass hides the gap from CI. Testcontainers and the first integration tests
-# arrive with the hello module (S0-12); replace this recipe then.
+# The tests tagged "integration": the whole application against a real PostgreSQL 16 that
+# Testcontainers starts in Docker. Needs a running Docker, not a running `make up` stack.
 test-int:
-	@echo "No integration tests exist yet: they arrive with the hello module (S0-12)." >&2
-	@exit 1
+	cd backend && ./gradlew :app:integrationTest
 
 gen-clients:
 	sh tools/gen-clients.sh

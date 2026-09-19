@@ -1,1 +1,11 @@
-{}
+{
+  "hello.greeting.duplicate": "This greeting is already registered",
+  "hello.greeting.text_required": "Enter the greeting in English",
+  "hello.register": "Register greeting",
+  "hello.registered": "Greeting registered",
+  "hello.title": "Greetings",
+  "idempotency.key_required": "The request has no Idempotency-Key header",
+  "idempotency.request_mismatch": "This Idempotency-Key was already used for a different request",
+  "scope.invalid": "The selected entity or location is not valid",
+  "scope.required": "Select the entity you are working for"
+}

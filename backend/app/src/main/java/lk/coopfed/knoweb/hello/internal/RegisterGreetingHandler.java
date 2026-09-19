@@ -1,30 +1,86 @@
 package lk.coopfed.knoweb.hello.internal;
 
+import lk.coopfed.knoweb.hello.api.GreetingRegistered;
 import lk.coopfed.knoweb.hello.api.RegisterGreeting;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.EventPublisher;
+import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.Subject;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 import java.util.UUID;
 
-// Assuming @CommandHandler and Handles are in kernel.api
-// import lk.coopfed.knoweb.kernel.api.CommandHandler;
-// import lk.coopfed.knoweb.kernel.api.Handles;
-
-import org.springframework.stereotype.Service;
-
-// @CommandHandler(permission = "hello.greeting.register")
+/**
+ * The shape of every command handler in the system (17A section 12; AGENTS.md):
+ * guards, then the mutation, then audit, then the event, in one transaction, in that order,
+ * and nothing else. If any step throws, the whole transaction rolls back: there is never a
+ * row without its audit record, or an event for a row that was not saved.
+ *
+ * <p>The handler does not check the permission, the idempotency key or the tenant:
+ * the kernel does the first two from the annotation and the request, and row-level
+ * security does the third.
+ */
 @Service
-public class RegisterGreetingHandler /* implements Handles<RegisterGreeting, UUID> */ {
-    
+@CommandHandler(permission = "hello.greeting.register")
+class RegisterGreetingHandler implements Handles<RegisterGreeting, UUID> {
+
+    /** Audit event types are catalogue codes (doc 19 section 4); 19A validates them. */
+    static final String AUDIT_REGISTERED = "HELLO_GREETING_REGISTERED";
+
+    private final GreetingRepository repository;
+    private final AuditFacade audit;
+    private final EventPublisher events;
+
+    RegisterGreetingHandler(GreetingRepository repository, AuditFacade audit, EventPublisher events) {
+        this.repository = repository;
+        this.audit = audit;
+        this.events = events;
+    }
+
+    @Override
     @Transactional
-    public UUID handle(RegisterGreeting cmd, ScopeContext scope) {
-        // 1. guards
-        
+    public UUID handle(RegisterGreeting command, ScopeContext scope) {
+        // 1. guards: each throws a ProblemException whose id is a message id in i18n/*.json
+        if (!scope.hasActiveScope()) {
+            throw new ProblemException("scope.required");
+        }
+        if (command.textEn() == null || command.textEn().isBlank()) {
+            throw new ProblemException("hello.greeting.text_required");
+        }
+        // Row-level security limits this to the caller's entity; the unique constraint on
+        // (owner_entity_id, text_en) is the safety net when two requests race.
+        if (repository.existsByTextEn(command.textEn().strip())) {
+            throw new ProblemException(
+                    "hello.greeting.duplicate",
+                    Map.of("textEn", command.textEn().strip()));
+        }
+
         // 2. mutation
-        
-        // 3. audit.record (blocked by 19A)
-        
-        // 4. events.publish (blocked by 19A)
-        
-        return UUID.randomUUID();
+        Greeting greeting = Greeting.create(
+                Ids.next(),
+                scope.entityId(),
+                command.textEn(),
+                command.textSi(),
+                command.textTa());
+        repository.save(greeting);
+
+        // 3. audit, in the same transaction
+        audit.record(
+                AUDIT_REGISTERED,
+                Subject.of("greeting", greeting.getId()),
+                null,
+                greeting.snapshot(),
+                scope);
+
+        // 4. event, in the same transaction (the outbox)
+        events.publish(new GreetingRegistered(greeting.getId(), scope.entityId()));
+
+        return greeting.getId();
     }
 }

@@ -2,20 +2,27 @@ package lk.coopfed.knoweb;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.Table;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.repository.Repository;
+import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -100,6 +107,17 @@ class ArchitectureTests {
         handlersCarryPermissionRule().check(CLASSES);
     }
 
+
+    @Test
+    void commandHandlersAuditAndPublish() {     // AGENTS.md: guards, mutation, audit, event
+        handlersAuditAndPublishRule().check(CLASSES);
+    }
+
+    @Test
+    void onlyCommandHandlersWriteToTheDatabase() {
+        onlyHandlersWriteRule().check(CLASSES);
+    }
+
     /** R2, R3: kernel -> master data (M1-M3) -> transactions (M4-M7, M10) -> read side (M8, M9). */
     static ArchRule layersRule() {
         return layeredArchitecture()
@@ -163,6 +181,103 @@ class ArchitectureTests {
                 .areAnnotatedWith(CommandHandler.class)
                 .should(haveNonBlankPermission())
                 .allowEmptyShould(true);
+    }
+
+    /**
+     * Every command handler records an audit event and publishes a domain event (AGENTS.md:
+     * guards, mutation, audit.record, events.publish). A forgotten audit call is otherwise
+     * invisible: nothing fails, the trail simply has a hole.
+     *
+     * <p>What this rule proves: the calls exist somewhere in the handler class. What it cannot
+     * prove: that every path reaches them, their order, or their content. The handler's
+     * integration test does that, with the KernelRecorder of the test support package.
+     */
+    static ArchRule handlersAuditAndPublishRule() {
+        return classes()
+                .that()
+                .areAnnotatedWith(CommandHandler.class)
+                .should(call(AuditFacade.class, "record"))
+                .andShould(call(EventPublisher.class, "publish"))
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * The other half: in a business module, only a command handler may write to the database.
+     * A service or controller that saves through a repository changes data that no handler
+     * audited and no event announced.
+     *
+     * <p>Counted as a write: save*, delete*, insert* and update* on a Spring Data repository;
+     * persist, merge and remove on an EntityManager; update, batchUpdate and execute on a
+     * JdbcTemplate. When 19A adds event consumers and scheduled jobs (projections in M8, for
+     * example), their annotations join CommandHandler in the list of allowed writers here.
+     */
+    static ArchRule onlyHandlersWriteRule() {
+        return noClasses()
+                .that()
+                .resideInAnyPackage(BUSINESS_PACKAGES)
+                .and()
+                .areNotAnnotatedWith(CommandHandler.class)
+                .should(writeToTheDatabase())
+                .allowEmptyShould(true);
+    }
+
+    private static ArchCondition<JavaClass> call(
+            Class<?> owner,
+            String methodName) {
+        return new ArchCondition<>(
+                "call " + owner.getSimpleName() + "." + methodName + "(...)") {
+            @Override
+            public void check(
+                    JavaClass javaClass,
+                    ConditionEvents events) {
+                boolean calls = javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(c -> c.getName().equals(methodName)
+                                && c.getTargetOwner().isAssignableTo(owner));
+                if (!calls) {
+                    events.add(
+                            SimpleConditionEvent.violated(
+                                    javaClass,
+                                    javaClass.getName()
+                                            + " is a @CommandHandler but never calls "
+                                            + owner.getSimpleName() + "." + methodName + "(...)"));
+                }
+            }
+        };
+    }
+
+    private static final Pattern REPOSITORY_WRITE = Pattern.compile("(save|delete|insert|update).*");
+    private static final Set<String> ENTITY_MANAGER_WRITE = Set.of("persist", "merge", "remove");
+    private static final Set<String> JDBC_WRITE = Set.of("update", "batchUpdate", "execute");
+
+    /** Used under noClasses(): every write found is reported as one violation. */
+    private static ArchCondition<JavaClass> writeToTheDatabase() {
+        return new ArchCondition<>(
+                "write to the database (only @CommandHandler classes may)") {
+            @Override
+            public void check(
+                    JavaClass javaClass,
+                    ConditionEvents events) {
+                for (JavaMethodCall c : javaClass.getMethodCallsFromSelf()) {
+                    JavaClass target = c.getTargetOwner();
+                    boolean write =
+                            (target.isAssignableTo(Repository.class)
+                                    && REPOSITORY_WRITE.matcher(c.getName()).matches())
+                                    || (target.isAssignableTo(EntityManager.class)
+                                    && ENTITY_MANAGER_WRITE.contains(c.getName()))
+                                    || (target.isAssignableTo(JdbcOperations.class)
+                                    && JDBC_WRITE.contains(c.getName()));
+                    if (write) {
+                        events.add(
+                                SimpleConditionEvent.satisfied(
+                                        c,
+                                        javaClass.getName() + " writes through "
+                                                + target.getSimpleName() + "." + c.getName()
+                                                + "(...) but is not a @CommandHandler; "
+                                                + c.getSourceCodeLocation()));
+                    }
+                }
+            }
+        };
     }
 
     private static ArchCondition<JavaClass> declareTheirOwnModuleSchema() {
