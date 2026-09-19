@@ -10,4 +10,5 @@
 |* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===

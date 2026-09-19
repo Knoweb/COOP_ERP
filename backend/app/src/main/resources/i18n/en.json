@@ -6,6 +6,15 @@
   "hello.title": "Greetings",
   "idempotency.key_required": "The request has no Idempotency-Key header",
   "idempotency.request_mismatch": "This Idempotency-Key was already used for a different request",
+  "request.field.format": "This is not in the expected format",
+  "request.field.invalid": "This value is not valid",
+  "request.field.required": "This is required",
+  "request.field.too_large": "The largest value allowed is {0}",
+  "request.field.too_long": "Too long: the maximum is {0}",
+  "request.field.too_short": "Too short: the minimum is {0}",
+  "request.field.too_small": "The smallest value allowed is {0}",
+  "request.invalid": "Some of the information sent is missing or not valid",
+  "request.malformed": "The request could not be read",
   "scope.invalid": "The selected entity or location is not valid",
   "scope.required": "Select the entity you are working for"
 }

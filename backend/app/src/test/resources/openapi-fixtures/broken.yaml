@@ -1,0 +1,30 @@
+# Deliberately wrong, for OpenApiSliceRulesTest: one violation of each slice rule.
+openapi: 3.0.3
+info:
+  title: Broken slice
+  version: 0.0.1
+paths:
+  /things:
+    get:
+      operationId: listThings
+      responses:
+        '200': { description: not versioned and no permission and no tag }
+  /v1/party/things:
+    get:
+      tags: [Party]
+      operationId: listThings
+      x-permission: prt.thing.read
+      responses:
+        '200': { description: the operationId above is used twice }
+    post:
+      tags: [Party, Other]
+      x-permission: prt.thing.create
+      responses:
+        '201': { description: mutating without the Idempotency-Key and two tags and no operationId }
+components:
+  schemas:
+    Thing:
+      type: object
+      properties:
+        # the comma ends the description: "or so it seems" becomes a key of its own, without a value
+        name: { type: string, description: A name, or so it seems }

@@ -13,12 +13,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Table;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -140,6 +142,77 @@ class ArchitectureTests {
     @Test
     void onlyCommandHandlersWriteToTheDatabase() {
         onlyHandlersWriteRule().check(CLASSES);
+    }
+
+    @Test
+    void controllersImplementTheirGeneratedApi() {  // 17A: OpenAPI first
+        controllersImplementGeneratedApiRule().check(CLASSES);
+    }
+
+    @Test
+    void onlyControllersAskForTheCurrentScope() {
+        currentScopeOnlyInControllersRule().check(CLASSES);
+    }
+
+    /**
+     * The scope of a request enters a module in one place, the controller, and travels from
+     * there as the ScopeContext parameter every handler and query takes. That parameter is what
+     * puts the scope on the database transaction, and what lets the same handler serve a till
+     * sync batch or a job, where there is no HTTP request. A handler that asks
+     * kernel.api.CurrentScope instead works on the web and fails everywhere else.
+     */
+    static ArchRule currentScopeOnlyInControllersRule() {
+        return noClasses()
+                .that()
+                .resideInAnyPackage(BUSINESS_PACKAGES)
+                .and()
+                .resideOutsideOfPackage("..web..")
+                .should()
+                .dependOnClassesThat()
+                .areAssignableTo(CurrentScope.class)
+                .because("only a controller (the module's web package) reads the scope of the HTTP request;"
+                        + " everything else receives it as a ScopeContext parameter")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * OpenAPI first (17A section 3: "the slice is the source; controllers implement generated
+     * interfaces"). A REST controller in a business module implements an interface generated
+     * from its slice, the ones named ...Api in the module's web.generated package. A controller
+     * with hand-written mappings is an endpoint no slice describes: no typed web client, no
+     * x-permission, nothing for the permission check or a reviewer to see.
+     */
+    static ArchRule controllersImplementGeneratedApiRule() {
+        return classes()
+                .that()
+                .resideInAnyPackage(BUSINESS_PACKAGES)
+                .and()
+                .areAnnotatedWith(RestController.class)
+                .should(implementAGeneratedApi())
+                .allowEmptyShould(true);
+    }
+
+    private static ArchCondition<JavaClass> implementAGeneratedApi() {
+        return new ArchCondition<>(
+                "implement an interface generated from their OpenAPI slice (..web.generated.*Api)") {
+            @Override
+            public void check(
+                    JavaClass javaClass,
+                    ConditionEvents events) {
+                boolean implementsGenerated = javaClass.getAllRawInterfaces().stream()
+                        .anyMatch(i -> i.getPackageName().endsWith(".web.generated")
+                                && i.getSimpleName().endsWith("Api"));
+                if (!implementsGenerated) {
+                    events.add(
+                            SimpleConditionEvent.violated(
+                                    javaClass,
+                                    javaClass.getName()
+                                            + " is a @RestController that implements no generated"
+                                            + " ...web.generated.*Api interface; describe its operations in"
+                                            + " openapi/<module>.yaml and implement the interface generated from it"));
+                }
+            }
+        };
     }
 
     /** R2, R3: kernel -> master data (M1-M3) -> transactions (M4-M7, M10) -> read side (M8, M9). */

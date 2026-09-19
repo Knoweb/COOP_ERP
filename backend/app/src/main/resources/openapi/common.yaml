@@ -1,1 +1,79 @@
-# Common OpenAPI definitions
+# Shared parts of every OpenAPI slice. A slice refers to them, it never copies them:
+#
+#   parameters:
+#     - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+#   ...
+#   responses:
+#     '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+#     '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+#
+# This file has no paths, so no interface and no web client is generated from it; the classes
+# and types of what a slice refers to are generated with that slice.
+# It is a valid OpenAPI document on purpose (openapi, info, paths): tools that follow a $ref
+# into it read it as one.
+openapi: 3.1.0
+info:
+  title: COOP ERP common API components
+  version: 0.1.0
+paths: {}
+components:
+  parameters:
+    # AGENTS.md: every mutating operation carries an Idempotency-Key. The kernel checks it for
+    # every module; a controller receives it as a parameter and does not use it.
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      description: A fresh UUID per user action; repeat the same value when retrying the same request
+      schema: { type: string, minLength: 1 }
+  responses:
+    # The two ways a request can fail, for every operation of every module. A slice refers to
+    # them and lists, in the operation's own description, which codes that operation can answer.
+    RequestProblem:
+      description: >
+        400. The request itself is wrong: idempotency.key_required, scope.required, scope.invalid,
+        request.malformed, or request.invalid, which lists in `errors` every field that does not
+        match the slice. The kernel checks the slice's constraints (required, minLength,
+        maximum ...) for every module; a module writes no code for them.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RuleBroken:
+      description: 422. A business rule was broken; `code` says which one
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    # RFC 9457 problem document (17A section 4.4). `code` is a stable message id that a client
+    # may test for; `title` is that message in the caller's language.
+    Problem:
+      type: object
+      required: [status, code]
+      properties:
+        status: { type: integer }
+        code: { type: string, description: A message id such as hello.greeting.duplicate }
+        title: { type: string, description: The message in the caller's language }
+        params: { type: object, additionalProperties: true }
+        errors:
+          type: array
+          description: >
+            Only with code request.invalid: one entry for every part of the request that does
+            not match the slice (a required field left out, a text too long ...).
+          items: { $ref: '#/components/schemas/FieldProblem' }
+    FieldProblem:
+      type: object
+      required: [field, code]
+      properties:
+        field:
+          type: string
+          description: The property of the body, or the header, query or path parameter
+        code:
+          type: string
+          description: A message id such as request.field.required or request.field.too_long
+        message:
+          type: string
+          description: The message in the caller's language
+        params:
+          type: object
+          additionalProperties: true
+          description: What the message mentions (min or max)

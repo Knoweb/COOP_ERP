@@ -67,6 +67,7 @@ Each module package: `api/` (published: command records, query interfaces, event
 - Never hard-code a price, threshold, window or limit; it is a configuration item (`ConfigRegistry`) or a data table.
 - Every user-visible string is a message id with `en`, `si`, `ta` translations; a missing one fails the build.
 - Every mutating operation carries an `Idempotency-Key` and an `x-permission` in its OpenAPI slice that matches the `@CommandHandler` annotation.
+- The shape of a request (`required`, `maxLength`, `minimum`, `format` ...) lives in the OpenAPI schema and the kernel enforces it (400 `request.invalid`); a handler guards business rules only, and any rule that must also hold for a command that does not arrive over HTTP (till sync, a job) is a guard as well. `hello/README.md` is the worked example.
 - Every command handler: guards → mutation → `audit.record(...)` → `events.publish(...)`, in one `@Transactional` method, in that order. Nothing else.
 - Every operational table: `ENABLE ROW LEVEL SECURITY; FORCE ROW LEVEL SECURITY;` plus the four-class policy template (17A §6.3). A table without a policy fails the schema test.
 - Money `numeric(14,2)`, unit cost/price `numeric(14,4)`, quantity `numeric(14,3)`; UUIDv7 keys; `snake_case`; timestamps stored as UTC plus a local reading; sequence numbers, not clocks, order events.

@@ -3,86 +3,95 @@ package lk.coopfed.knoweb.hello.web;
 import lk.coopfed.knoweb.hello.api.GreetingQueries;
 import lk.coopfed.knoweb.hello.api.GreetingView;
 import lk.coopfed.knoweb.hello.api.RegisterGreeting;
+import lk.coopfed.knoweb.hello.web.generated.GreetingResponse;
+import lk.coopfed.knoweb.hello.web.generated.HelloApi;
+import lk.coopfed.knoweb.hello.web.generated.RegisterGreetingRequest;
+import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * HTTP surface of the hello module: one method per operation of openapi/hello.yaml, with
- * the operationId as the method name. A controller only translates: request to command,
- * view to response. It holds no rule, opens no transaction and knows nothing about tenants.
+ * HTTP surface of the hello module. It implements {@link HelloApi}, the interface generated
+ * from openapi/hello.yaml at build time (see "OpenAPI first" in app/build.gradle.kts), and so
+ * do the request and response classes it uses. Paths, parameters, status codes and JSON shapes
+ * are therefore written once, in the slice. Change the slice and this class stops compiling
+ * until it follows: that is the point.
  *
- * <p>What it does not do, because the kernel does it for every controller: read the
- * Idempotency-Key, build the {@link ScopeContext} (declare the parameter and it arrives),
- * turn a ProblemException into an error response, or handle CORS.
+ * <p>A controller only translates: request to command, view to response. It holds no rule,
+ * opens no transaction and knows nothing about tenants. There are no mapping annotations
+ * here; they are on the generated interface.
  *
- * <p>Deviation from 17A section 12: the guide has the controller implement a HelloApi
- * interface generated from the slice. Server-side generation is not in the build yet
- * (S0-06), so this class is written by hand against the slice; when the generator lands it
- * gains {@code implements HelloApi} and the request and response records below go away.
+ * <p>What it does not do, because the kernel does it for every controller: check the
+ * Idempotency-Key (the parameter arrives because the slice declares the header, and is not
+ * used here), resolve the caller's scope (ask {@link CurrentScope}), turn a ProblemException
+ * into an error response, or handle CORS.
  */
 @RestController
-@RequestMapping("/v1/hello/greetings")
-class HelloController {
-
-    /** Request body of registerGreeting; mirrors RegisterGreetingRequest in the slice. */
-    record RegisterGreetingRequest(String textEn, String textSi, String textTa) {
-    }
-
-    /** Mirrors GreetingResponse in the slice. The owner entity is not exposed: the caller knows its own scope. */
-    record GreetingResponse(UUID id, String textEn, String textSi, String textTa, String status, Instant createdAt) {
-
-        static GreetingResponse of(GreetingView view) {
-            return new GreetingResponse(view.id(), view.textEn(), view.textSi(), view.textTa(), view.status(),
-                    view.createdAt());
-        }
-    }
+class HelloController implements HelloApi {
 
     private final Handles<RegisterGreeting, UUID> registerGreeting;
     private final GreetingQueries queries;
+    private final CurrentScope currentScope;
 
-    HelloController(Handles<RegisterGreeting, UUID> registerGreeting, GreetingQueries queries) {
+    HelloController(
+            Handles<RegisterGreeting, UUID> registerGreeting,
+            GreetingQueries queries,
+            CurrentScope currentScope) {
         this.registerGreeting = registerGreeting;
         this.queries = queries;
+        this.currentScope = currentScope;
     }
 
-    @PostMapping
-    ResponseEntity<GreetingResponse> registerGreeting(
-            @RequestBody RegisterGreetingRequest request,
-            ScopeContext scope) {
+    @Override
+    public ResponseEntity<GreetingResponse> registerGreeting(
+            String idempotencyKey,
+            RegisterGreetingRequest request) {
+        ScopeContext scope = currentScope.get();
+
         UUID id = registerGreeting.handle(
-                new RegisterGreeting(request.textEn(), request.textSi(), request.textTa()),
+                new RegisterGreeting(request.getTextEn(), request.getTextSi(), request.getTextTa()),
                 scope);
 
         GreetingView created = queries.find(id, scope).orElseThrow();
         return ResponseEntity
-                .created(URI.create("/v1/hello/greetings/" + id))
-                .body(GreetingResponse.of(created));
+                .created(URI.create(HelloApi.PATH_LIST_GREETINGS + "/" + id))
+                .body(toResponse(created));
     }
 
-    @GetMapping
-    List<GreetingResponse> listGreetings(ScopeContext scope) {
-        return queries.list(scope).stream()
-                .map(GreetingResponse::of)
+    @Override
+    public ResponseEntity<List<GreetingResponse>> listGreetings() {
+        List<GreetingResponse> greetings = queries.list(currentScope.get()).stream()
+                .map(HelloController::toResponse)
                 .toList();
+        return ResponseEntity.ok(greetings);
     }
 
-    @GetMapping("/{id}")
-    ResponseEntity<GreetingResponse> getGreeting(@PathVariable UUID id, ScopeContext scope) {
-        return queries.find(id, scope)
-                .map(GreetingResponse::of)
+    @Override
+    public ResponseEntity<GreetingResponse> getGreeting(UUID id) {
+        return queries.find(id, currentScope.get())
+                .map(HelloController::toResponse)
                 .map(ResponseEntity::ok)
+                // Not 403: whether the greeting exists is itself something another entity must not learn.
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * The small mapper of 17A section 4.4: from the module's own view to the generated response.
+     * The owner entity is left out on purpose; the caller knows its own scope.
+     */
+    private static GreetingResponse toResponse(GreetingView view) {
+        return new GreetingResponse(
+                view.id(),
+                view.textEn(),
+                GreetingResponse.StatusEnum.fromValue(view.status()),
+                view.createdAt())
+                .textSi(view.textSi())
+                .textTa(view.textTa());
     }
 }

@@ -26,6 +26,10 @@ spring:
       # Instant in Java. This pins the JDBC layer to UTC, so the default time zone of a
       # developer machine or a server can never change what is written or read.
       hibernate.jdbc.time_zone: UTC
+      # The validator on the class path checks requests against their OpenAPI slice, nothing
+      # else. Hibernate would also run it on every entity it saves; entities carry no
+      # constraint annotations, their rules are handler guards, so that is switched off.
+      jakarta.persistence.validation.mode: none
 
   flyway:
     enabled: false

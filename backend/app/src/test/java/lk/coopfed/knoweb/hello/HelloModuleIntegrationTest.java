@@ -242,6 +242,75 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo("සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න");
     }
 
+    // ---- the slice is enforced: the kernel checks a request's shape before the controller runs ----
+
+    @Test
+    void aRequestWithoutARequiredFieldIsRefusedFieldByField() {
+        ResponseEntity<JsonNode> response =
+                post(scope(entityA), UUID.randomUUID().toString(), Map.of("textSi", "ආයුබෝවන්"));
+
+        assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
+        JsonNode errors = response.getBody().get("errors");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.get(0).get("field").asText()).isEqualTo("textEn");
+        assertThat(errors.get(0).get("code").asText()).isEqualTo("request.field.required");
+        assertThat(errors.get(0).get("message").asText()).isEqualTo("This is required");
+        // The handler never ran.
+        assertThat(rowCount()).isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aTextLongerThanTheSliceAllowsIsRefusedInTheCallersLanguage() {
+        HttpHeaders tamil = scope(entityA);
+        tamil.set(HttpHeaders.ACCEPT_LANGUAGE, "ta");
+
+        ResponseEntity<JsonNode> response = post(tamil, UUID.randomUUID().toString(),
+                Map.of("textEn", "Hello", "textTa", "வ".repeat(201)));
+
+        assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
+        JsonNode error = response.getBody().get("errors").get(0);
+        assertThat(error.get("field").asText()).isEqualTo("textTa");
+        assertThat(error.get("code").asText()).isEqualTo("request.field.too_long");
+        assertThat(error.get("params").get("max").asInt()).isEqualTo(200);
+        assertThat(error.get("message").asText()).isEqualTo("மிக நீளமானது: அதிகபட்சம் 200");
+        assertThat(rowCount()).isZero();
+    }
+
+    @Test
+    void everyBrokenFieldIsReportedAtOnce() {
+        ResponseEntity<JsonNode> response = post(scope(entityA), UUID.randomUUID().toString(),
+                Map.of("textEn", "", "textSi", "x".repeat(201)));
+
+        assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
+        assertThat(response.getBody().get("errors"))
+                .extracting(error -> error.get("field").asText() + " " + error.get("code").asText())
+                .containsExactly("textEn request.field.too_short", "textSi request.field.too_long");
+    }
+
+    @Test
+    void aBodyThatCannotBeReadIsRefused() {
+        HttpHeaders headers = scope(entityA);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        ResponseEntity<JsonNode> response =
+                http.exchange(URL, HttpMethod.POST, new HttpEntity<>("{ \"textEn\": ", headers), JsonNode.class);
+
+        assertProblem(response, HttpStatus.BAD_REQUEST, "request.malformed");
+    }
+
+    @Test
+    void anIdThatIsNotAUuidIsRefused() {
+        ResponseEntity<JsonNode> response =
+                http.exchange(URL + "/not-a-uuid", HttpMethod.GET, new HttpEntity<>(scope(entityA)), JsonNode.class);
+
+        assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
+        assertThat(response.getBody().get("errors").get(0).get("field").asText()).isEqualTo("id");
+        assertThat(response.getBody().get("errors").get(0).get("code").asText()).isEqualTo("request.field.invalid");
+    }
+
     // ---- time: an instant is stored exactly, whatever zone the server runs in ----
 
     @Test

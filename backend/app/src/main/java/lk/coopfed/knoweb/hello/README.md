@@ -8,9 +8,9 @@ A deliberately trivial module (17A section 12): it registers greetings and lists
 |---|---|
 | `api/` | Published contract: `RegisterGreeting` (command), `GreetingRegistered` (event), `GreetingQueries` and `GreetingView` (read side). Other modules may use this package only. |
 | `internal/` | Private: `Greeting` (entity), `GreetingRepository`, `RegisterGreetingHandler`, `GreetingQueriesImpl`. Package-private classes; nothing outside the module can reach them. |
-| `web/` | `HelloController`: one method per operation of the slice, named after the `operationId`. |
+| `web/` | `HelloController implements HelloApi`, the interface generated from the slice; one method per operation, named after the `operationId`. |
 | `resources/db/migration/hello/` | `V0001__greeting.sql`: table, row-level security from the 17A section 6.3 template, grants. |
-| `resources/openapi/hello.yaml` | The API slice. Written first; controller and web client follow it. |
+| `resources/openapi/hello.yaml` | The API slice. Written first; the Java interface and the web client are generated from it. Shared parts are in `openapi/common.yaml`. |
 | `resources/seed/hello/` | Development rows loaded by `make seed`. |
 | `resources/i18n/{en,si,ta}.json` | Every message id the module can show, in three languages. |
 | `web/src/modules/hello/` | `HelloPage`, `helloApi.ts`, `routes.tsx`, `hello.messages.json`. |
@@ -26,6 +26,38 @@ A deliberately trivial module (17A section 12): it registers greetings and lists
 6. **A point in time is an instant, everywhere.** `timestamptz` with `DEFAULT now()` in the database, `Instant` in Java, ISO-8601 ending in `Z` in the API, and Colombo wall-clock time only on the screen (`shell/i18n/formats.ts`). Never `timestamp` without zone or `LocalDateTime` for "when it happened", and never offset arithmetic. Hibernate is pinned to UTC in `application.yml`, and the integration tests run with the JVM in `Asia/Colombo` so a zone mistake fails `theRegistrationInstantIsExactUnderANonUtcServerZone`. A till fact also stores what the till clock showed, as a second, zone-less column (the `occurred_at` and `occurred_local` pair of 19A); a greeting has no device, so it has the instant only.
 
 What the module does not do, because the kernel does it for every module: idempotency (`Idempotency-Key`), building the scope, error responses, CORS.
+
+## OpenAPI first: the slice, the interface, the controller
+
+The slice `openapi/hello.yaml` is written first and is the only place where a path, a parameter, a status code or a JSON shape is defined. Two things are generated from it:
+
+| Generated | By | Where | Committed |
+|---|---|---|---|
+| Java interface `HelloApi` and the request and response classes | the Gradle build, on every compile | `build/generated/openapi/hello`, package `hello.web.generated` | no, it is build output |
+| TypeScript types for the web client | `make gen-clients` | `web/src/generated/hello.ts` | yes; `make check-generated` fails when it is stale |
+
+`HelloController implements HelloApi`, with no mapping annotations of its own. So:
+
+- add an operation to the slice and the build fails until the controller has it ("does not override abstract method ...");
+- change a parameter or a response type and the controller stops compiling until it follows;
+- a controller with hand-written mappings fails `ArchitectureTests.controllersImplementTheirGeneratedApi`.
+
+A slice also has to obey the rules in `OpenApiSliceRulesTest`: OpenAPI 3.1, paths under `/v1/`, a unique `operationId` (it is the Java method name), one tag (it names the interface: `Hello` gives `HelloApi`), an `x-permission` on every operation, and the `Idempotency-Key` header on every mutating one. What all slices share (that header, the `Problem` document, the 400 and 422 responses) is in `openapi/common.yaml` and is referred to, never copied.
+
+The generated methods have no room for an extra parameter, so a controller asks the kernel for the caller's scope: `currentScope.get()` (`kernel.api.CurrentScope`). Only controllers do that; handlers and queries receive the scope as a parameter, and an architecture rule fails the build for a class outside `web` that uses `CurrentScope` (a handler that did would work on the web and fail for a till sync batch or a job, where there is no request).
+
+### Shape in the slice, rules in the handler
+
+A request can be wrong in two ways, and each has one home.
+
+| | Where it is written | Who checks it | Answer |
+|---|---|---|---|
+| **Shape**: a required field is missing, a text is longer than `maxLength`, a number is under `minimum`, an id is not a UUID, the JSON is broken | the schema in the slice, and nowhere else | the kernel, before the controller runs (`RequestValidationHandler`) | 400 `request.invalid` with an `errors` list, one entry per field: `{ field, code, message, params }`; or 400 `request.malformed` |
+| **Rule**: the text is only spaces, the greeting exists already, the period is closed | a guard in the handler | the handler | 422 with the rule's own message id |
+
+The module writes no code and no message for the first row: the codes are generic (`request.field.required`, `too_short`, `too_long`, `too_small`, `too_large`, `format`, `invalid`) and already translated. So a forgotten null check cannot become a 500: say `required` in the slice and the handler never sees the null.
+
+A rule that must also hold when the command does not arrive over HTTP (till sync, a job) is a guard, even if the slice says it too: the slice protects the door, the guard protects the data. `hello.greeting.text_required` is the example: the slice says `minLength: 1`, and the handler still refuses a text of spaces.
 
 ## What stops a forgotten audit record
 
@@ -71,7 +103,7 @@ Changed the slice? Run `make gen-clients` and commit `web/src/generated/hello.ts
 | Boundary tests pass with a real module present | Passes: `ArchitectureTests` |
 | Migration, schema, RLS and grants | Passes: isolation, federation view, no scope, UPDATE and DELETE denied |
 | Command pipeline: idempotency, audit, outbox in one transaction | Passes against the 17A stubs: same key returns the same greeting and the handler runs once; one audit call and one event; rollback when the event fails. Audit and outbox *rows* arrive with 19A K-04 and K-05, which own those tables |
-| OpenAPI-first controller and generated web client | Passes: the page posts a greeting and lists it. The controller is hand-written against the slice (see deviations) |
+| OpenAPI-first controller and generated web client | Passes: the controller implements the generated `HelloApi`, the page posts a greeting and lists it |
 | i18n end to end | Web passes in three languages with the EN fallback tag. The till screen is open |
 | Shared engine reachable from both sides | Backend passes (`SharedEngineSmokeTest`); the till-side parity test is open |
 | Two instances | Open: needs the login flow (S0-07) for the Playwright run. Known limit: the idempotency store is in memory, so a retry that lands on the other instance is refused as a duplicate instead of replayed, until 19A K-03 |
@@ -79,9 +111,9 @@ Changed the slice? Run `make gen-clients` and commit `web/src/generated/hello.ts
 ## Deviations from 17A, with reasons
 
 - **No `entityId` in `RegisterGreeting`.** The guide lists it, and the guide's own handler ignores it. A client must not name the entity it writes for.
-- **Controller written by hand**, not implementing a generated `HelloApi`: server-side generation is not in the build (S0-06). The request and response records in `HelloController` mirror the slice and go away when it is.
 - **Audit and event stubs log, they do not insert.** 17A section 4.3 says the Sprint 0 stubs insert into `kernel.audit_event` and `kernel.event_outbox`; 19A names those migrations (`V0002`, `V0003`), partitions them and gives them to K-04 and K-05. Creating them here would pre-empt that design, so the tests count calls instead of rows.
 - **No `ext_view` policy yet.** It needs `kernel.granted_entities()` from K-01.
+- **`kernel.api.CurrentScope` is an addition to the kernel contract** (S0-06): the design says the scope filter keeps the `ScopeContext` as a request attribute but names no way for a controller to read it, and a generated interface leaves no room for a scope parameter. Its 17A stub reads headers; 19A K-02 replaces the stub, not the interface.
 - **Scope, idempotency, problem responses and CORS are new 17A stubs** in `kernel/internal/stub`, each naming the 19A ticket that replaces it. Module code does not change when they are replaced.
 - **Web: `helloApi.ts` sends a development scope header and the language comes from `?lang=`**, until the shell has login and its API client (S0-07).
 - **Testcontainers 1.21.4** overrides Spring Boot's managed 1.19, which Docker Engine 29 refuses.
