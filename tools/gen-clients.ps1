@@ -1,1 +1,0 @@
-pnpm --dir web exec openapi-typescript ../backend/app/src/main/resources/openapi/hello.yaml -o src/generated/hello.ts

@@ -20,9 +20,13 @@ import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -76,11 +80,31 @@ class ArchitectureTests {
         MODULES.verify();
     }
 
+    /**
+     * Writes the module graph to docs/modules (17A section 5: "keeps docs/modules/ current").
+     * The files are committed. The pipeline runs this test and then fails when git sees a
+     * difference (`make check-generated`), so a changed dependency between modules always
+     * shows up in a pull request as a changed diagram, where a reviewer will see it.
+     *
+     * <p>The folder is emptied first: the documenter never deletes, so the diagram of a module
+     * that no longer exists would otherwise stay for ever.
+     */
     @Test
-    void documentsTheModuleGraph() {
-        new Documenter(MODULES)
+    void documentsTheModuleGraph() throws IOException {
+        Path folder = Path.of(MODULE_DOCS_FOLDER);
+        if (Files.isDirectory(folder)) {
+            try (Stream<Path> files = Files.list(folder)) {
+                for (Path file : files.toList()) {
+                    Files.delete(file);
+                }
+            }
+        }
+        new Documenter(MODULES, MODULE_DOCS_FOLDER)
                 .writeDocumentation();
     }
+
+    /** Relative to backend/app, the working directory of the Gradle test task. */
+    private static final String MODULE_DOCS_FOLDER = "../../docs/modules";
 
     @Test
     void layersAreRespected() {                 // R2, R3

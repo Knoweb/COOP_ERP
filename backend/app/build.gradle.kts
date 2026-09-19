@@ -3,6 +3,7 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("com.google.cloud.tools.jib")
+    id("org.cyclonedx.bom")
 }
 
 java {
@@ -60,7 +61,7 @@ dependencies {
 // signed in to Docker Hub, Docker Desktop gives Jib an empty credential and the registry
 // answers 401, while `docker pull` itself works anonymously. CI, which pushes with
 // `./gradlew :app:jib` and has no daemon, leaves the flag off.
-val jibBaseImage: String by project
+val jibBaseImage = project.property("jibBaseImage") as String
 val jibFromDaemon = providers.gradleProperty("jibFromDaemon").map { it.toBoolean() }.getOrElse(false)
 
 jib {
@@ -82,11 +83,15 @@ tasks.test {
     useJUnitPlatform {
         excludeTags("integration")
     }
+    // ArchitectureTests writes the module diagrams to docs/modules. Declared as an output, so
+    // Gradle runs the tests again when those files were deleted or edited by hand, and does
+    // not answer "up to date" while the committed diagrams are wrong.
+    outputs.dir(rootProject.file("../docs/modules"))
 }
 
 // `make test-int`: the tests tagged "integration" (Testcontainers). Same source folder as the
 // unit tests, so a module keeps all its tests in one place; the tag decides which task runs them.
-val integrationTest by tasks.registering(Test::class) {
+val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"
     testClassesDirs = sourceSets["test"].output.classesDirs
