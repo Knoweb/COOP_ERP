@@ -4,6 +4,7 @@ plugins {
     id("io.spring.dependency-management")
     id("com.google.cloud.tools.jib")
     id("org.cyclonedx.bom")
+    id("org.openapi.generator")
 }
 
 java {
@@ -11,6 +12,70 @@ java {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
+
+// ---- OpenAPI first (17A sections 3 and 12) ------------------------------------------------
+// The slice openapi/<module>.yaml is the source. From each slice this generates, into
+// build/generated/openapi/<module>, a Java interface per tag (hello.yaml, tag Hello ->
+// HelloApi) and a class per schema (GreetingResponse ...), in the package
+// lk.coopfed.knoweb.<module>.web.generated. The module's controller implements the interface,
+// so a slice and its controller cannot drift apart: an operation added to the slice is a
+// compile error until the controller has it, and so is a changed parameter or response type.
+//
+// Nothing generated is committed or edited: it is build output, regenerated on every compile.
+// One oddity: for a response defined in common.yaml (the 400 and 422 problem documents) the
+// generator names the class after the operation, for example RegisterGreeting400Response. It
+// is the Problem document. No module uses it: the kernel writes every error response.
+// A new slice needs no change here: every file in openapi/ except common.yaml gets a task.
+val openApiDir = layout.projectDirectory.dir("src/main/resources/openapi")
+val openApiSlices = openApiDir.asFileTree.matching { include("*.yaml"); exclude("common.yaml") }.files
+    .sortedBy { it.name }
+
+val generateOpenApi = tasks.register("generateOpenApi") {
+    description = "Generates the server interfaces and DTOs of every OpenAPI slice."
+    group = "build"
+}
+
+openApiSlices.forEach { slice ->
+    val module = slice.nameWithoutExtension
+    val output = layout.buildDirectory.dir("generated/openapi/$module")
+    val generated = "lk.coopfed.knoweb.$module.web.generated"
+
+    val task = tasks.register<org.openapitools.generator.gradle.plugin.tasks.GenerateTask>("generateOpenApi_$module") {
+        generatorName.set("spring")
+        inputSpec.set(slice.absolutePath)
+        outputDir.set(output.get().asFile.absolutePath)
+        apiPackage.set(generated)
+        modelPackage.set(generated)
+        // Only the two kinds of file we use: no pom.xml, README or sample application.
+        globalProperties.set(mapOf("apis" to "", "models" to ""))
+        configOptions.set(
+            mapOf(
+                "interfaceOnly" to "true",            // interfaces, not controllers: the module writes the controller
+                "skipDefaultInterface" to "true",     // no default bodies, so a missing operation does not compile
+                "useTags" to "true",                  // interface name from the tag (Hello -> HelloApi), not from the path
+                "useSpringBoot3" to "true",           // jakarta.*, not javax.*
+                "useBeanValidation" to "true",        // the slice is enforced: required, minLength ... are checked before the controller runs
+                "openApiNullable" to "false",         // plain nullable fields, no JsonNullable wrapper type
+                "documentationProvider" to "none",    // no Swagger annotations, so no Swagger dependency
+                "annotationLibrary" to "none",
+                "useResponseEntity" to "true",        // the controller chooses the status: 201, 404 ...
+                "dateLibrary" to "java8",
+                "hideGenerationTimestamp" to "true"   // no build time in the files: same input, same bytes
+            )
+        )
+        // An instant on the wire is an Instant in Java (hello/README.md, rule 6), not the
+        // generator's default OffsetDateTime.
+        typeMappings.set(mapOf("OffsetDateTime" to "Instant"))
+        importMappings.set(mapOf("java.time.OffsetDateTime" to "java.time.Instant"))
+        // common.yaml is referenced by the slices, so a change to it must regenerate them too.
+        inputs.file(openApiDir.file("common.yaml"))
+    }
+
+    generateOpenApi { dependsOn(task) }
+    sourceSets["main"].java.srcDir(output.map { it.dir("src/main/java") })
+}
+
+tasks.compileJava { dependsOn(generateOpenApi) }
 
 // Spring Boot 3.3 manages Testcontainers 1.19, which speaks a Docker API version that Docker
 // Engine 29 and newer refuse ("client version 1.32 is too old"). 1.21.4 is the 1.x line with
@@ -32,6 +97,12 @@ dependencies {
     // Entities and repositories (17A section 12). The starter also brings Spring AOP, which
     // the kernel uses to put the caller's scope on the database transaction.
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+
+    // What a slice says about the shape of a request (required, minLength, maximum ...) is
+    // generated as constraint annotations and checked before the controller runs. The kernel
+    // turns a violation into a problem document with message ids (RequestValidationHandler),
+    // so no module handles validation itself. Business rules stay guards in the handler.
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 
     runtimeOnly("org.postgresql:postgresql")
 

@@ -1,21 +1,17 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.support.WebDataBinderFactory;
-import org.springframework.web.context.request.NativeWebRequest;
-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
-import org.springframework.web.method.support.ModelAndViewContainer;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Lets a controller method simply declare a {@link ScopeContext} parameter.
- *
- * <p>17A stub: the scope comes from request headers, so the stack works before login does.
- * 19A ticket K-02 replaces this class with one that reads the verified token; controllers
- * do not change. The headers, all optional:
+ * 17A stub of {@link CurrentScope}: the scope comes from request headers, so the stack works
+ * before login does. 19A ticket K-02 replaces this class with one that reads the verified
+ * token; controllers do not change. The headers, all optional:
  *
  * <pre>
  *   X-Scope-Entity     the entity to act in (kept by 19A as the active-scope choice)
@@ -27,9 +23,13 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * </pre>
  *
  * No X-Scope-Entity means no active scope, and row-level security then returns nothing.
+ *
+ * <p>The context is built once and kept as a request attribute, under the name the 19A scope
+ * filter will use, so every call within one request gets the same object and the same
+ * correlation id.
  */
 @Component
-public class DevScopeArgumentResolver implements HandlerMethodArgumentResolver {
+public class DevCurrentScope implements CurrentScope {
 
     static final String HEADER_ENTITY = "X-Scope-Entity";
     static final String HEADER_LOCATION = "X-Scope-Location";
@@ -37,24 +37,32 @@ public class DevScopeArgumentResolver implements HandlerMethodArgumentResolver {
     static final String HEADER_CLASS = "X-Dev-Scope-Class";
     static final String HEADER_CORRELATION = "X-Correlation-Id";
 
+    static final String REQUEST_ATTRIBUTE = ScopeContext.class.getName();
+
     private final DevScopeContextProvider provider;
 
-    public DevScopeArgumentResolver(DevScopeContextProvider provider) {
+    public DevCurrentScope(DevScopeContextProvider provider) {
         this.provider = provider;
     }
 
     @Override
-    public boolean supportsParameter(MethodParameter parameter) {
-        return ScopeContext.class.equals(parameter.getParameterType());
+    public ScopeContext get() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            throw new IllegalStateException(
+                    "CurrentScope.get() was called outside an HTTP request."
+                            + " A job or a consumer builds its ScopeContext explicitly and passes it on.");
+        }
+        HttpServletRequest request = attributes.getRequest();
+
+        if (request.getAttribute(REQUEST_ATTRIBUTE) instanceof ScopeContext known) {
+            return known;
+        }
+        ScopeContext scope = fromHeaders(request);
+        request.setAttribute(REQUEST_ATTRIBUTE, scope);
+        return scope;
     }
 
-    @Override
-    public Object resolveArgument(
-            MethodParameter parameter,
-            ModelAndViewContainer mavContainer,
-            NativeWebRequest webRequest,
-            WebDataBinderFactory binderFactory) {
-        HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
+    private ScopeContext fromHeaders(HttpServletRequest request) {
         String language = request.getHeader("Accept-Language") == null
                 ? null
                 : request.getLocale().getLanguage();

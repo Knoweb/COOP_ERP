@@ -14,7 +14,10 @@ export interface paths {
         /** The greetings visible in the caller's scope, newest first */
         get: operations["listGreetings"];
         put?: never;
-        /** Register a greeting for the caller's entity */
+        /**
+         * Register a greeting for the caller's entity
+         * @description Codes this operation can answer with 422: hello.greeting.text_required (a text of spaces only), hello.greeting.duplicate, idempotency.request_mismatch. A request that does not match the schema below (no textEn, a text over 200 characters) is 400 request.invalid.
+         */
         post: operations["registerGreeting"];
         delete?: never;
         options?: never;
@@ -64,18 +67,51 @@ export interface components {
              */
             createdAt: string;
         };
+        FieldProblem: {
+            /** @description The property of the body, or the header, query or path parameter */
+            field: string;
+            /** @description A message id such as request.field.required or request.field.too_long */
+            code: string;
+            /** @description The message in the caller's language */
+            message?: string;
+            /** @description What the message mentions (min or max) */
+            params?: {
+                [key: string]: unknown;
+            };
+        };
         Problem: {
             status: number;
-            /** @description A message id */
+            /** @description A message id such as hello.greeting.duplicate */
             code: string;
             /** @description The message in the caller's language */
             title?: string;
             params?: {
                 [key: string]: unknown;
             };
+            /** @description Only with code request.invalid: one entry for every part of the request that does not match the slice (a required field left out, a text too long ...). */
+            errors?: components["schemas"]["FieldProblem"][];
         };
     };
-    responses: never;
+    responses: {
+        /** @description 400. The request itself is wrong: idempotency.key_required, scope.required, scope.invalid, request.malformed, or request.invalid, which lists in `errors` every field that does not match the slice. The kernel checks the slice's constraints (required, minLength, maximum ...) for every module; a module writes no code for them. */
+        RequestProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 422. A business rule was broken; `code` says which one */
+        RuleBroken: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
     parameters: {
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
@@ -133,24 +169,8 @@ export interface operations {
                     "application/json": components["schemas"]["GreetingResponse"];
                 };
             };
-            /** @description The request itself is wrong: idempotency.key_required, scope.required, scope.invalid */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A rule was broken: hello.greeting.text_required, hello.greeting.duplicate, idempotency.request_mismatch */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
     getGreeting: {

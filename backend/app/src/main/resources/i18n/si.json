@@ -6,6 +6,15 @@
   "hello.title": "සුබපැතුම්",
   "idempotency.key_required": "ඉල්ලීමේ Idempotency-Key ශීර්ෂය නැත",
   "idempotency.request_mismatch": "මෙම Idempotency-Key වෙනත් ඉල්ලීමක් සඳහා දැනටමත් භාවිතා කර ඇත",
+  "request.field.format": "මෙය අපේක්ෂිත ආකෘතියෙන් නැත",
+  "request.field.invalid": "මෙම අගය වලංගු නැත",
+  "request.field.required": "මෙය අවශ්‍ය වේ",
+  "request.field.too_large": "අවසර ඇති විශාලතම අගය {0}",
+  "request.field.too_long": "ඉතා දිගයි: උපරිම අගය {0}",
+  "request.field.too_short": "ඉතා කෙටියි: අවම අගය {0}",
+  "request.field.too_small": "අවසර ඇති කුඩාම අගය {0}",
+  "request.invalid": "යවන ලද තොරතුරු සමහරක් අඩු හෝ වලංගු නැත",
+  "request.malformed": "ඉල්ලීම කියවිය නොහැකි විය",
   "scope.invalid": "තෝරාගත් ආයතනය හෝ ස්ථානය වලංගු නැත",
   "scope.required": "ඔබ වැඩ කරන ආයතනය තෝරන්න"
 }

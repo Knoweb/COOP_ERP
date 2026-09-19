@@ -136,7 +136,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     /** Keys are per user. In the stub the user is a header; a bad value simply means "no user". */
     private static UUID userOf(HttpServletRequest request) {
-        String user = request.getHeader(DevScopeArgumentResolver.HEADER_USER);
+        String user = request.getHeader(DevCurrentScope.HEADER_USER);
         try {
             return user == null || user.isBlank() ? null : UUID.fromString(user);
         } catch (IllegalArgumentException e) {

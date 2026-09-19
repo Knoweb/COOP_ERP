@@ -51,6 +51,16 @@ class ArchitectureRulesBiteTest {
     }
 
     @Test
+    void openApiRuleCatchesAControllerWithHandWrittenMappings() {
+        assertViolation(ArchitectureTests.controllersImplementGeneratedApiRule(), "HandWrittenController");
+    }
+
+    @Test
+    void scopeRuleCatchesAHandlerThatReadsTheScopeOfTheHttpRequest() {
+        assertViolation(ArchitectureTests.currentScopeOnlyInControllersRule(), "AsksForTheRequestScope");
+    }
+
+    @Test
     void permissionRuleCatchesAScaffoldPlaceholderLeftInPlace() {
         assertViolation(ArchitectureTests.handlersCarryPermissionRule(), "PlaceholderPermissionHandler");
     }

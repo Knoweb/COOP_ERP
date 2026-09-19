@@ -20,7 +20,8 @@ import java.util.Map;
  * </pre>
  *
  * A broken business rule is 422. The few codes below are about the request itself, not
- * about a business rule, and are 400. Used by the controller advice and by the idempotency
+ * about a business rule, and are 400 (request.invalid also lists the fields: see
+ * RequestValidationHandler). Used by the controller advices and by the idempotency
  * filter, which runs before Spring MVC and so cannot rely on the advice.
  */
 @Component
@@ -29,7 +30,9 @@ public class ProblemResponses {
     private static final Map<String, HttpStatus> REQUEST_ERRORS = Map.of(
             "scope.required", HttpStatus.BAD_REQUEST,
             "scope.invalid", HttpStatus.BAD_REQUEST,
-            "idempotency.key_required", HttpStatus.BAD_REQUEST);
+            "idempotency.key_required", HttpStatus.BAD_REQUEST,
+            "request.invalid", HttpStatus.BAD_REQUEST,
+            "request.malformed", HttpStatus.BAD_REQUEST);
 
     private final Messages messages;
 

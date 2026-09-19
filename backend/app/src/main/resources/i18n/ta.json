@@ -6,6 +6,15 @@
   "hello.title": "வாழ்த்துகள்",
   "idempotency.key_required": "கோரிக்கையில் Idempotency-Key தலைப்பு இல்லை",
   "idempotency.request_mismatch": "இந்த Idempotency-Key ஏற்கனவே வேறு கோரிக்கைக்குப் பயன்படுத்தப்பட்டுள்ளது",
+  "request.field.format": "இது எதிர்பார்க்கப்படும் வடிவத்தில் இல்லை",
+  "request.field.invalid": "இந்த மதிப்பு செல்லுபடியாகாது",
+  "request.field.required": "இது தேவை",
+  "request.field.too_large": "அனுமதிக்கப்படும் மிகப் பெரிய மதிப்பு {0}",
+  "request.field.too_long": "மிக நீளமானது: அதிகபட்சம் {0}",
+  "request.field.too_short": "மிகக் குறுகியது: குறைந்தபட்சம் {0}",
+  "request.field.too_small": "அனுமதிக்கப்படும் மிகச் சிறிய மதிப்பு {0}",
+  "request.invalid": "அனுப்பப்பட்ட தகவல்களில் சில விடுபட்டுள்ளன அல்லது செல்லுபடியாகாதவை",
+  "request.malformed": "கோரிக்கையைப் படிக்க முடியவில்லை",
   "scope.invalid": "தேர்ந்தெடுத்த நிறுவனம் அல்லது இடம் செல்லுபடியாகாது",
   "scope.required": "நீங்கள் பணிபுரியும் நிறுவனத்தைத் தேர்ந்தெடுக்கவும்"
 }
