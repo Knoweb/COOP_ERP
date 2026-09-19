@@ -11,8 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The greetings visible in the caller's scope, newest first */
+        get: operations["listGreetings"];
         put?: never;
+        /** Register a greeting for the caller's entity */
         post: operations["registerGreeting"];
         delete?: never;
         options?: never;
@@ -27,6 +29,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** One greeting */
         get: operations["getGreeting"];
         put?: never;
         post?: never;
@@ -49,24 +52,66 @@ export interface components {
             /** Format: uuid */
             id: string;
             textEn: string;
+            /** @description null when not translated; show textEn with the EN tag */
             textSi?: string | null;
+            /** @description null when not translated; show textEn with the EN tag */
             textTa?: string | null;
-            status: string;
+            /** @enum {string} */
+            status: "REGISTERED";
+            /**
+             * Format: date-time
+             * @description An instant in UTC (ends in Z). Convert to local time on the screen only.
+             */
+            createdAt: string;
+        };
+        Problem: {
+            status: number;
+            /** @description A message id */
+            code: string;
+            /** @description The message in the caller's language */
+            title?: string;
+            params?: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
-    parameters: never;
+    parameters: {
+        /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+        IdempotencyKey: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listGreetings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Greetings of the caller's scope; an empty list when there is no active scope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GreetingResponse"][];
+                };
+            };
+        };
+    };
     registerGreeting: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": string;
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path?: never;
             cookie?: never;
@@ -77,13 +122,33 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Created */
+            /** @description Registered */
             201: {
                 headers: {
+                    /** @description Address of the new greeting */
+                    Location?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["GreetingResponse"];
+                };
+            };
+            /** @description The request itself is wrong: idempotency.key_required, scope.required, scope.invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A rule was broken: hello.greeting.text_required, hello.greeting.duplicate, idempotency.request_mismatch */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -99,7 +164,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Greeting */
+            /** @description The greeting */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -107,6 +172,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GreetingResponse"];
                 };
+            };
+            /** @description No such greeting, or the caller's scope may not see it (the two look the same on purpose) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

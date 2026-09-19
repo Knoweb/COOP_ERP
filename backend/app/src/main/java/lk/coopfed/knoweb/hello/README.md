@@ -1,0 +1,79 @@
+# hello — the template module
+
+A deliberately trivial module (17A section 12): it registers greetings and lists them. Its value is that it uses every kernel interface and follows every convention, so `make new-module` can copy it and a reviewer can point at it and say "done like this". When this file and 17A disagree, this file and the tests are right; deviations from the guide are listed at the end.
+
+## What is where
+
+| Path | What it holds |
+|---|---|
+| `api/` | Published contract: `RegisterGreeting` (command), `GreetingRegistered` (event), `GreetingQueries` and `GreetingView` (read side). Other modules may use this package only. |
+| `internal/` | Private: `Greeting` (entity), `GreetingRepository`, `RegisterGreetingHandler`, `GreetingQueriesImpl`. Package-private classes; nothing outside the module can reach them. |
+| `web/` | `HelloController`: one method per operation of the slice, named after the `operationId`. |
+| `resources/db/migration/hello/` | `V0001__greeting.sql`: table, row-level security from the 17A section 6.3 template, grants. |
+| `resources/openapi/hello.yaml` | The API slice. Written first; controller and web client follow it. |
+| `resources/seed/hello/` | Development rows loaded by `make seed`. |
+| `resources/i18n/{en,si,ta}.json` | Every message id the module can show, in three languages. |
+| `web/src/modules/hello/` | `HelloPage`, `helloApi.ts`, `routes.tsx`, `hello.messages.json`. |
+| `src/test/.../hello/HelloModuleIntegrationTest` | The proof table of 17A section 12 as tests. |
+
+## The six rules this module demonstrates
+
+1. **A handler is guards, mutation, audit, event, in one transaction, and nothing else.** See `RegisterGreetingHandler`. If any step throws, nothing is saved; `whenTheEventCannotBePublishedNothingIsSaved` proves it.
+2. **Tenant filtering is the database's job.** No query contains `where owner_entity_id = ...`. Every `@Transactional` method that touches a table takes the `ScopeContext` as a parameter; the kernel puts it on the transaction and the policies in the migration filter the rows. Forget the parameter and you get no rows, never someone else's.
+3. **A guard fails with a `ProblemException` whose id is a message id.** The kernel turns it into an RFC 9457 response titled in the caller's language. Add the id to all three `i18n` files or the build fails.
+4. **The owning entity comes from the scope, never from the request.**
+5. **Documents and ledgers are insert-only.** The table grants `SELECT, INSERT` to `app_rw` and nothing else; the entity has no setters.
+6. **A point in time is an instant, everywhere.** `timestamptz` with `DEFAULT now()` in the database, `Instant` in Java, ISO-8601 ending in `Z` in the API, and Colombo wall-clock time only on the screen (`shell/i18n/formats.ts`). Never `timestamp` without zone or `LocalDateTime` for "when it happened", and never offset arithmetic. Hibernate is pinned to UTC in `application.yml`, and the integration tests run with the JVM in `Asia/Colombo` so a zone mistake fails `theRegistrationInstantIsExactUnderANonUtcServerZone`. A till fact also stores what the till clock showed, as a second, zone-less column (the `occurred_at` and `occurred_local` pair of 19A); a greeting has no device, so it has the instant only.
+
+What the module does not do, because the kernel does it for every module: idempotency (`Idempotency-Key`), building the scope, error responses, CORS.
+
+## What stops a forgotten audit record
+
+A handler that forgets `audit.record(...)` breaks nothing visible: the trail just has a hole. Four things make that hard to do, in the order you will meet them:
+
+1. **The build fails** if a `@CommandHandler` class never calls `AuditFacade.record` and `EventPublisher.publish` (`ArchitectureTests.commandHandlersAuditAndPublish`).
+2. **The build fails** if anything in a business module other than a command handler writes to the database, through a repository, an `EntityManager` or a `JdbcTemplate` (`onlyCommandHandlersWriteToTheDatabase`). A change that does not pass through a handler is a change nobody audited.
+3. **The kernel stubs refuse bad calls on the first run**: an audit type that is not a catalogue code, a missing subject or scope, an event class without a versioned `TYPE`, and any call made outside the handler's transaction.
+4. **Every handler test asserts what was recorded**, with the `kernel` field every integration test inherits (`KernelRecorder`): `kernel.committedAudit()` and `kernel.committedEvents()` hold what would be in the audit and outbox tables, `kernel.rolledBackAudit()` what a failed transaction took back. Take the expected audit event of each command from the handler specification in your module's implementation guide (section 6).
+
+The build rules prove the calls exist; only your test proves they are right. A fifth check comes with the audit catalogue of 19A K-04: every code used exists in the catalogue, and every catalogue code is used somewhere.
+
+## Running it
+
+```bash
+make up          # stack, migration, seed rows
+make test        # unit and architecture tests
+make test-int    # this module against a real PostgreSQL (needs Docker, not the stack)
+```
+
+Then open http://localhost:5173/hello, or `?lang=si` and `?lang=ta`. Two seeded greetings of the development MPCS appear; the one without a translation carries the EN tag.
+
+With curl, the scope is a header until login exists:
+
+```bash
+curl -H "X-Scope-Entity: 0190f000-0000-7000-8000-000000000002" http://localhost:8080/v1/hello/greetings
+```
+
+Changed the slice? Run `make gen-clients` and commit `web/src/generated/hello.ts`. Changed the migration while Sprint 0 has no deployed database? Edit `V0001` and tell the team to `make reset`; once a database that matters exists, every change is a new `V000n` file.
+
+## Proof table (17A section 12)
+
+| Row | State |
+|---|---|
+| Boundary tests pass with a real module present | Passes: `ArchitectureTests` |
+| Migration, schema, RLS and grants | Passes: isolation, federation view, no scope, UPDATE and DELETE denied |
+| Command pipeline: idempotency, audit, outbox in one transaction | Passes against the 17A stubs: same key returns the same greeting and the handler runs once; one audit call and one event; rollback when the event fails. Audit and outbox *rows* arrive with 19A K-04 and K-05, which own those tables |
+| OpenAPI-first controller and generated web client | Passes: the page posts a greeting and lists it. The controller is hand-written against the slice (see deviations) |
+| i18n end to end | Web passes in three languages with the EN fallback tag. The till screen is open |
+| Shared engine reachable from both sides | Backend passes (`SharedEngineSmokeTest`); the till-side parity test is open |
+| Two instances | Open: needs the login flow (S0-07) for the Playwright run. Known limit: the idempotency store is in memory, so a retry that lands on the other instance is refused as a duplicate instead of replayed, until 19A K-03 |
+
+## Deviations from 17A, with reasons
+
+- **No `entityId` in `RegisterGreeting`.** The guide lists it, and the guide's own handler ignores it. A client must not name the entity it writes for.
+- **Controller written by hand**, not implementing a generated `HelloApi`: server-side generation is not in the build (S0-06). The request and response records in `HelloController` mirror the slice and go away when it is.
+- **Audit and event stubs log, they do not insert.** 17A section 4.3 says the Sprint 0 stubs insert into `kernel.audit_event` and `kernel.event_outbox`; 19A names those migrations (`V0002`, `V0003`), partitions them and gives them to K-04 and K-05. Creating them here would pre-empt that design, so the tests count calls instead of rows.
+- **No `ext_view` policy yet.** It needs `kernel.granted_entities()` from K-01.
+- **Scope, idempotency, problem responses and CORS are new 17A stubs** in `kernel/internal/stub`, each naming the 19A ticket that replaces it. Module code does not change when they are replaced.
+- **Web: `helloApi.ts` sends a development scope header and the language comes from `?lang=`**, until the shell has login and its API client (S0-07).
+- **Testcontainers 1.21.4** overrides Spring Boot's managed 1.19, which Docker Engine 29 refuses.

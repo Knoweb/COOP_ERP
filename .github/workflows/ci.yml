@@ -51,6 +51,12 @@ jobs:
         working-directory: backend
         run: ./gradlew clean test
 
+      # Row-level security, grants and the command pipeline against a real PostgreSQL
+      # (Testcontainers; the runner has Docker).
+      - name: Backend integration tests
+        working-directory: backend
+        run: ./gradlew :app:integrationTest
+
       - name: Schema ownership check
         run: node tools/check-schema-ownership.mjs
 

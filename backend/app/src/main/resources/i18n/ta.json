@@ -1,1 +1,11 @@
-{}
+{
+  "hello.greeting.duplicate": "இந்த வாழ்த்து ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது",
+  "hello.greeting.text_required": "வாழ்த்தை ஆங்கிலத்தில் உள்ளிடவும்",
+  "hello.register": "வாழ்த்தைப் பதிவு செய்",
+  "hello.registered": "வாழ்த்து பதிவு செய்யப்பட்டது",
+  "hello.title": "வாழ்த்துகள்",
+  "idempotency.key_required": "கோரிக்கையில் Idempotency-Key தலைப்பு இல்லை",
+  "idempotency.request_mismatch": "இந்த Idempotency-Key ஏற்கனவே வேறு கோரிக்கைக்குப் பயன்படுத்தப்பட்டுள்ளது",
+  "scope.invalid": "தேர்ந்தெடுத்த நிறுவனம் அல்லது இடம் செல்லுபடியாகாது",
+  "scope.required": "நீங்கள் பணிபுரியும் நிறுவனத்தைத் தேர்ந்தெடுக்கவும்"
+}

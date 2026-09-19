@@ -1,91 +1,143 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useT } from '../../shell/i18n/useT';
-import type { components } from '../../generated/hello';
+import { useRef, useState } from "react";
+import type { FormEvent } from "react";
+import { useIntl } from "react-intl";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useT } from "../../shell/i18n/useT";
+import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
+import { useFormatInstant } from "../../shell/i18n/formats";
+import { ApiProblem, listGreetings, registerGreeting } from "./helloApi";
+import type { Greeting } from "./helloApi";
 
-type GreetingResponse = components['schemas']['GreetingResponse'];
-type RegisterGreetingRequest = components['schemas']['RegisterGreetingRequest'];
-
+/**
+ * The template screen: a form that posts a command and a list that reads a query.
+ * Rules it shows:
+ *   - no visible text is written here; every string is a message id in hello.messages.json
+ *   - server data goes through TanStack Query; a successful command invalidates the list
+ *   - an API error shows the `title` of the problem document, which the backend has already
+ *     translated; the screen never invents its own wording for a business rule
+ *   - a text with no translation is shown in English with the EN tag, never hidden
+ *   - an instant from the API is formatted by the shell helper, in the business time zone
+ */
 export function HelloPage() {
   const t = useT();
+  const { locale } = useIntl();
   const queryClient = useQueryClient();
-  const [textEn, setTextEn] = useState('');
+  const formatInstant = useFormatInstant();
 
-  const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
+  const [textEn, setTextEn] = useState("");
+  const [textSi, setTextSi] = useState("");
+  const [textTa, setTextTa] = useState("");
 
-  // Fetch list of greetings. Note: backend spec only defines GET /{id}, 
-  // so we fallback gracefully to empty array if the list endpoint 404s.
-  const { data: greetings = [], isLoading } = useQuery({
-    queryKey: ['greetings'],
-    queryFn: async (): Promise<GreetingResponse[]> => {
-      const res = await fetch(`${apiBase}/v1/hello/greetings`);
-      if (!res.ok) {
-        if (res.status === 404) return [];
-        throw new Error('Failed to fetch greetings');
-      }
-      return res.json();
-    }
+  // One key per user action. It changes only after a success, so pressing the button again
+  // after a network failure repeats the same request and cannot register twice.
+  const idempotencyKey = useRef(crypto.randomUUID());
+
+  const greetings = useQuery({
+    queryKey: ["hello", "greetings", locale],
+    queryFn: () => listGreetings(locale)
   });
 
-  const mutation = useMutation({
-    mutationFn: async (newGreeting: RegisterGreetingRequest) => {
-      const res = await fetch(`${apiBase}/v1/hello/greetings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID() // Required by spec
-        },
-        body: JSON.stringify(newGreeting)
-      });
-      if (!res.ok) throw new Error('Failed to submit greeting');
-      return res.json() as Promise<GreetingResponse>;
-    },
+  const register = useMutation({
+    mutationFn: () =>
+      registerGreeting(
+        { textEn, textSi: textSi || null, textTa: textTa || null },
+        idempotencyKey.current,
+        locale
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['greetings'] });
-      setTextEn('');
+      idempotencyKey.current = crypto.randomUUID();
+      setTextEn("");
+      setTextSi("");
+      setTextTa("");
+      queryClient.invalidateQueries({ queryKey: ["hello", "greetings"] });
+    },
+    onError: (error) => {
+      // A problem document means the server answered: this request is finished, so the next
+      // attempt (with corrected input) is a new action and needs a new key.
+      if (error instanceof ApiProblem) {
+        idempotencyKey.current = crypto.randomUUID();
+      }
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!textEn.trim()) return;
-    mutation.mutate({ textEn });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    register.mutate();
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>{t('hello_world').text}</h1>
-      
-      <form onSubmit={handleSubmit} style={{ marginBottom: '2rem', display: 'flex', gap: '1rem' }}>
-        <input 
-          type="text" 
-          value={textEn} 
-          onChange={(e) => setTextEn(e.target.value)} 
-          placeholder="Enter english greeting"
-          disabled={mutation.isPending}
-          style={{ flex: 1, padding: '0.5rem' }}
-        />
-        <button type="submit" disabled={mutation.isPending || !textEn.trim()} style={{ padding: '0.5rem 1rem' }}>
-          {mutation.isPending ? 'Submitting...' : 'Add Greeting'}
+    <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto" }}>
+      <h1>{t("hello.title").text}</h1>
+
+      <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", marginBottom: "2rem" }}>
+        <TextField label={t("hello.field.text_en").text} value={textEn} onChange={setTextEn} required />
+        <TextField label={t("hello.field.text_si").text} value={textSi} onChange={setTextSi} lang="si" />
+        <TextField label={t("hello.field.text_ta").text} value={textTa} onChange={setTextTa} lang="ta" />
+
+        <button type="submit" disabled={register.isPending || !textEn.trim()}>
+          {register.isPending ? t("hello.submitting").text : t("hello.register").text}
         </button>
+
+        {register.isSuccess && <p role="status">{t("hello.registered").text}</p>}
+        {register.isError && <p role="alert">{errorText(register.error, t("hello.error.generic").text)}</p>}
       </form>
 
-      <div className="greetings-list">
-        <h2>Submitted Greetings</h2>
-        {isLoading ? (
-          <p>Loading...</p>
-        ) : greetings.length === 0 ? (
-          <p>No greetings found.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {greetings.map((g, idx) => (
-              <li key={g.id || idx} style={{ padding: '1rem', border: '1px solid #ccc', marginBottom: '0.5rem', borderRadius: '4px' }}>
-                <strong>{g.textEn}</strong> <span style={{ color: 'gray', fontSize: '0.8rem' }}>(Status: {g.status})</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+      <section>
+        <h2>{t("hello.list.title").text}</h2>
+        {greetings.isLoading && <p>{t("hello.list.loading").text}</p>}
+        {greetings.isError && <p role="alert">{errorText(greetings.error, t("hello.error.generic").text)}</p>}
+        {greetings.data?.length === 0 && <p>{t("hello.list.empty").text}</p>}
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {greetings.data?.map((greeting) => (
+            <li key={greeting.id} style={{ padding: "0.75rem 0", borderBottom: "1px solid #ddd" }}>
+              <GreetingText greeting={greeting} locale={locale} />
+              {/* The API sends UTC; only here does it become Colombo wall-clock time. */}
+              <time dateTime={greeting.createdAt} style={{ display: "block", fontSize: "0.8rem", opacity: 0.7 }}>
+                {formatInstant(greeting.createdAt)}
+              </time>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </main>
   );
+}
+
+/** The greeting in the user's language, or in English with the EN tag when not translated. */
+function GreetingText({ greeting, locale }: { greeting: Greeting; locale: string }) {
+  const translated = locale === "si" ? greeting.textSi : locale === "ta" ? greeting.textTa : greeting.textEn;
+  if (translated) {
+    return <span lang={locale}>{translated}</span>;
+  }
+  return (
+    <span lang="en">
+      {greeting.textEn}
+      <LangFallbackTag />
+    </span>
+  );
+}
+
+function TextField(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  lang?: string;
+}) {
+  return (
+    <label style={{ display: "grid", gap: "0.25rem" }}>
+      {props.label}
+      <input
+        type="text"
+        value={props.value}
+        required={props.required}
+        lang={props.lang}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function errorText(error: unknown, fallback: string): string {
+  return error instanceof ApiProblem && error.problem.title ? error.problem.title : fallback;
 }

@@ -1,6 +1,6 @@
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import { ScopeBanner } from "./shell/scope/ScopeBanner";
-import { HelloPage } from "./modules/hello/HelloPage";
+import { helloRoutes } from "./modules/hello/routes";
 
 const RootLayout = () => {
   return (
@@ -16,10 +16,8 @@ export const router = createBrowserRouter([
     path: "/",
     element: <RootLayout />,
     children: [
-      {
-        path: "hello",
-        element: <HelloPage />
-      }
+      // One line per module: the module owns its routes (17A section 7).
+      ...helloRoutes
     ]
   }
 ]);

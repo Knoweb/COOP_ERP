@@ -11,6 +11,11 @@ java {
     }
 }
 
+// Spring Boot 3.3 manages Testcontainers 1.19, which speaks a Docker API version that Docker
+// Engine 29 and newer refuse ("client version 1.32 is too old"). 1.21.4 is the 1.x line with
+// the fix; the property below overrides the managed version for every Testcontainers module.
+extra["testcontainers.version"] = "1.21.4"
+
 dependencies {
     implementation(project(":shared-engine"))
 
@@ -23,9 +28,9 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
-    // The JPA starter arrives with the hello module (S0-12); the @Table annotation is
-    // needed now so the R4 own-schema rule in ArchitectureTests can read entity schemas.
-    implementation("jakarta.persistence:jakarta.persistence-api")
+    // Entities and repositories (17A section 12). The starter also brings Spring AOP, which
+    // the kernel uses to put the caller's scope on the database transaction.
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
     runtimeOnly("org.postgresql:postgresql")
 
@@ -34,6 +39,12 @@ dependencies {
 
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
     testImplementation("org.springframework.modulith:spring-modulith-docs:1.2.5")
+
+    // Integration tests run against a real PostgreSQL 16 in Docker, because row-level security
+    // and grants cannot be tested against anything else.
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -66,6 +77,26 @@ jib {
     }
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+// `make test`: fast tests only. Anything tagged "integration" needs Docker and is left out.
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+}
+
+// `make test-int`: the tests tagged "integration" (Testcontainers). Same source folder as the
+// unit tests, so a module keeps all its tests in one place; the tag decides which task runs them.
+val integrationTest by tasks.registering(Test::class) {
+    description = "Runs the tests tagged integration against PostgreSQL in Docker."
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    // Run as if the server clock were in Colombo, on every machine and in CI (which is UTC).
+    // A time bug that depends on the default zone then shows up here, not in production:
+    // the first hello migration stored instants five and a half hours off only under this zone.
+    systemProperty("user.timezone", "Asia/Colombo")
+    shouldRunAfter(tasks.test)
 }

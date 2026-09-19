@@ -3,13 +3,15 @@ import { IntlProvider } from "react-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { oidcConfig } from "./shell/auth/oidc";
-import { messages } from "./shell/i18n/messages";
+import { initialLocale, messages } from "./shell/i18n/messages";
 import { router } from "./router";
 
 const queryClient = new QueryClient();
 
 export function App() {
-  const locale = "en"; // Default locale
+  // The language comes from the address (?lang=si) until the shell reads it from the user's
+  // token claim `lang` (S0-07, 19A K-02).
+  const locale = initialLocale();
 
   return (
     <AuthProvider {...oidcConfig}>
