@@ -2,10 +2,14 @@ spring:
   application:
     name: coop-erp-backend
 
+  # The application user. Defaults match infra/compose (`make up`): through PgBouncer on 6432,
+  # as coop_app, a member of app_rw and never a superuser, because a superuser bypasses
+  # row-level security. prepareThreshold=0: PgBouncer pools per transaction, so server-side
+  # prepared statements must stay off.
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5434/coop_erp}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DB_URL:jdbc:postgresql://localhost:6432/coop_erp?prepareThreshold=0}
+    username: ${DB_USER:coop_app}
+    password: ${DB_PASSWORD:coop_app}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL:10}
@@ -21,10 +25,12 @@ coop-erp:
   role: ${COOP_ERP_ROLE:web}
   business-timezone: Asia/Colombo
 
+  # Flyway connects straight to PostgreSQL (5434 on the host), not through PgBouncer: it holds
+  # a session-level lock while migrating. coop_migrator owns the database and may run DDL.
   migration:
-    url: ${DB_URL:jdbc:postgresql://localhost:5434/coop_erp}
-    user: ${MIGRATION_USER:postgres}
-    password: ${MIGRATION_PASSWORD:postgres}
+    url: ${MIGRATION_URL:jdbc:postgresql://localhost:5434/coop_erp}
+    user: ${MIGRATION_USER:coop_migrator}
+    password: ${MIGRATION_PASSWORD:coop_migrator}
 
 management:
   endpoints:

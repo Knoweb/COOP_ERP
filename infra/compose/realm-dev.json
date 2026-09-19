@@ -1,1 +1,141 @@
-{}
+{
+  "realm": "coop",
+  "displayName": "COOP ERP (development)",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "loginWithEmailAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "si", "ta"],
+  "defaultLocale": "en",
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "fed-admin", "description": "Federation administrator (development)" },
+      { "name": "mpcs-admin", "description": "MPCS administrator (development)" },
+      { "name": "cashier", "description": "Shop cashier (development)" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "coop-erp-web",
+      "name": "COOP ERP web back office",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "/",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "ent (home entity)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "ent",
+            "claim.name": "ent",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "cls (policy class)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "cls",
+            "claim.name": "cls",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "lang (display language)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "locale",
+            "claim.name": "lang",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "roles (realm roles)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "fed-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-admin@coop-erp.test",
+      "firstName": "Federation",
+      "lastName": "Admin",
+      "attributes": {
+        "locale": ["en"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["FEDERATION_VIEW"]
+      },
+      "credentials": [{ "type": "password", "value": "dev", "temporary": false }],
+      "realmRoles": ["fed-admin"]
+    },
+    {
+      "username": "mpcs-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "mpcs-admin@coop-erp.test",
+      "firstName": "MPCS",
+      "lastName": "Admin",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f000-0000-7000-8000-000000000002"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "dev", "temporary": false }],
+      "realmRoles": ["mpcs-admin"]
+    },
+    {
+      "username": "cashier",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "cashier@coop-erp.test",
+      "firstName": "Shop",
+      "lastName": "Cashier",
+      "attributes": {
+        "locale": ["ta"],
+        "ent": ["0190f000-0000-7000-8000-000000000002"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "dev", "temporary": false }],
+      "realmRoles": ["cashier"]
+    }
+  ]
+}

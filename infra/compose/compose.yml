@@ -1,48 +1,249 @@
+# Local development stack (17A section 10, ticket S0-10).
+#
+# Start it with `make up` from the repository root, never with a bare `docker compose up`:
+# the Makefile waits for health, loads the seeds and prints the URLs and the dev logins.
+#
+# Every value that looks like a secret here is a development default. Copy .env.example to
+# .env to change one. Nothing in this file is used outside a developer machine or CI.
+
+name: coop-erp
+
 services:
+
+  # PostgreSQL 16. The official image is built with ICU; the init arguments make ICU the
+  # default locale provider, as 17A section 10 requires for the si/ta/en collations.
   postgres:
     image: postgres:16
-    ports:
-      - "5434:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=coop_erp
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-coop_erp}
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=en"
+      # Read by postgres/init/01-roles.sh, which runs once, when the volume is first created.
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:-coop_migrator}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:-coop_migrator}
+      APP_DB_USER: ${APP_DB_USER:-coop_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-coop_app}
+    ports:
+      - "5434:5432"          # 5434 on the host so a locally installed PostgreSQL can keep 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
+  # The application reaches the database through PgBouncer in transaction pooling, as in
+  # production (doc 14; 19A: scope settings use SET LOCAL so they die with the transaction).
+  # Flyway does not: migrations need a real session, so they connect to postgres directly.
   pgbouncer:
-    image: edoburu/pgbouncer
+    image: edoburu/pgbouncer:v1.24.1-p1
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-coop_erp}
+      DB_USER: ${APP_DB_USER:-coop_app}
+      DB_PASSWORD: ${APP_DB_PASSWORD:-coop_app}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "200"
+      DEFAULT_POOL_SIZE: "20"
+      LISTEN_PORT: "6432"
     ports:
       - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   rabbitmq:
     image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-coop}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-coop}
     ports:
       - "5672:5672"
-      - "15672:15672"
+      - "15672:15672"        # management console
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
 
   minio:
-    image: quay.io/minio/minio
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-coopminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-coopminio-dev}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:9000"          # S3 API
+      - "9001:9001"          # console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
+  # One-shot job: creates the four buckets of 17A section 10 and exits. audit-anchors is
+  # created with object lock, which can only be switched on when a bucket is created.
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-coopminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-coopminio-dev}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/attachments local/images local/packages
+        mc mb --ignore-existing --with-lock local/audit-anchors
+        echo "buckets ready"
+    restart: "no"
+
+  # Keycloak stands in for the identity provider (doc 10 E-01). Code never talks to it
+  # directly: IdentityProviderClient in kernel.api hides it.
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.0
-    command: start-dev
+    image: quay.io/keycloak/keycloak:25.0.6
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HEALTH_ENABLED: "true"
+      # The browser and the backend must see the same issuer, so the public address is fixed.
+      KC_HOSTNAME: http://localhost:8085
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
-      - "8085:8080"
+      - "8085:8080"          # 8080 on the host belongs to the backend (17A section 13)
+    volumes:
+      # No data volume on purpose: realm-dev.json is the source of truth. Keycloak keeps its
+      # state inside the container, so `make down` followed by `make up` imports the file again
+      # and an edit to it takes effect. Changes made in the admin console are not kept.
+      - ./realm-dev.json:/opt/keycloak/data/import/realm-dev.json:ro
+    healthcheck:
+      # The image has no curl or wget; bash can open the management port (9000) itself.
+      # /dev/tcp is a bash feature, so bash is named: the default shell of an image may be dash.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
 
+  # Catches every e-mail the notification service sends; nothing leaves the machine.
   mailpit:
-    image: axllent/mailpit
+    image: axllent/mailpit:v1.31.1
     ports:
-      - "1025:1025"
-      - "8025:8025"
-  # backend:
-  #   image: placeholder-backend
-  #   ports:
-  #     - "8080:8080"
+      - "1025:1025"          # SMTP
+      - "8025:8025"          # web inbox
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
-  # web:
-  #   image: placeholder-web
-  #   ports:
-  #     - "5173:5173"
+  # The backend, web and worker roles in one container (17A section 10). Flyway runs at
+  # start, so "the backend is healthy" also means "the database is migrated".
+  # The image is built by Jib (`make image`, which `make up` runs first); compose never builds it.
+  backend:
+    image: coop-erp/backend:dev
+    pull_policy: never          # a local image: never look for it in a registry
+    environment:
+      COOP_ERP_ROLE: web,worker
+      SPRING_PROFILES_ACTIVE: web,worker
+      # prepareThreshold=0: server-side prepared statements do not survive transaction pooling.
+      DB_URL: jdbc:postgresql://pgbouncer:6432/${POSTGRES_DB:-coop_erp}?prepareThreshold=0
+      DB_USER: ${APP_DB_USER:-coop_app}
+      DB_PASSWORD: ${APP_DB_PASSWORD:-coop_app}
+      MIGRATION_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-coop_erp}
+      MIGRATION_USER: ${MIGRATION_DB_USER:-coop_migrator}
+      MIGRATION_PASSWORD: ${MIGRATION_DB_PASSWORD:-coop_migrator}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      # Same technique as the Keycloak check: the JRE image has no curl or wget either.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /actuator/health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          grep -q '"status":"UP"' <&3
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  # Vite dev server with the web/ folder mounted, so an edit on the host reloads the page.
+  # node_modules lives in a volume: the host's copy holds binaries for the host's system.
+  web:
+    image: node:24-alpine
+    working_dir: /app
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        corepack enable
+        corepack prepare pnpm@12.4.2 --activate
+        pnpm install --frozen-lockfile
+        exec pnpm dev --host 0.0.0.0
+    environment:
+      VITE_API_BASE: http://localhost:8080
+      VITE_OIDC_AUTHORITY: http://localhost:8085/realms/coop
+      VITE_OIDC_CLIENT_ID: coop-erp-web
+      CHOKIDAR_USEPOLLING: "true"   # file events do not cross a Windows or macOS bind mount
+      CI: "true"                    # pnpm must never prompt inside a container
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../web:/app
+      - web_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5173/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  minio_data:
+  web_node_modules:
