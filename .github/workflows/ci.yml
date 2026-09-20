@@ -49,6 +49,9 @@ env:
   NODE_VERSION: "24"          # the same major version as the build machines and the web container
   PNPM_VERSION: "12.4.2"
 
+# The Gradle wrappers are committed as executable files (mode 100755). Do not add a
+# `chmod +x` step: it changes the working tree, and `make test-scaffold` rightly refuses to
+# run on a changed tree.
 jobs:
 
   build-verify-test:
@@ -76,9 +79,6 @@ jobs:
         run: |
           corepack enable
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
-      - name: Make the Gradle wrappers executable
-        run: chmod +x backend/gradlew till/gradlew
 
       - name: Install web dependencies
         working-directory: web
@@ -174,9 +174,6 @@ jobs:
           corepack enable
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
-      - name: Make the Gradle wrapper executable
-        run: chmod +x backend/gradlew
-
       - name: Install web dependencies
         working-directory: web
         run: pnpm install --frozen-lockfile
@@ -208,9 +205,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Make the Gradle wrapper executable
-        run: chmod +x backend/gradlew
 
       - name: make up-2
         run: make up-2
@@ -252,9 +246,6 @@ jobs:
         run: |
           corepack enable
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
-      - name: Make the Gradle wrapper executable
-        run: chmod +x backend/gradlew
 
       # The same image `make up` runs, built by Jib.
       - name: Backend image (make image)
@@ -331,9 +322,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Make the Gradle wrapper executable
-        run: chmod +x backend/gradlew
 
       - name: make reset, make up (the fifteen-minute start)
         run: |

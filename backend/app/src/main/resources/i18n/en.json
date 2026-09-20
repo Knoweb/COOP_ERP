@@ -1,4 +1,5 @@
 {
+  "document.immutable": "An issued document cannot be changed; correct it with a new document",
   "hello.greeting.duplicate": "This greeting is already registered",
   "hello.greeting.text_required": "Enter the greeting in English",
   "hello.register": "Register greeting",
