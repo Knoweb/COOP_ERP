@@ -11,5 +11,4 @@
 * `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.stub.LoggingAuditFacade`)
 * `l.c.k.k.api.EventPublisher` (via `l.c.k.k.internal.stub.LoggingEventPublisher`)
 * `l.c.k.k.api.ConfigRegistry` (via `l.c.k.k.internal.stub.SeedConfigRegistry`)
-* `l.c.k.k.api.BusinessClock` (via `l.c.k.k.internal.stub.SystemBusinessClock`)
 |===

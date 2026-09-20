@@ -283,6 +283,61 @@ class ArchitectureTests {
     }
 
     @Test
+    void businessModulesReadTheTimeFromTheKernelClock() {  // 19A section 13
+        noWallClockRule().check(CLASSES);
+    }
+
+    /**
+     * "An injectable Clock (UTC) everywhere; tests use a fixed clock" (19A section 13). A module
+     * injects java.time.Clock and calls clock.instant(), or LocalDate.now(clock) and the like;
+     * for a business date it asks kernel.api.BusinessDate. It never reads the wall clock itself:
+     * Instant.now() cannot be fixed in a test, and LocalDate.now() is the date of whatever time
+     * zone the server runs in, which is UTC in production and Colombo on a laptop.
+     */
+    static ArchRule noWallClockRule() {
+        return classes()
+                .that()
+                .resideInAnyPackage(BUSINESS_PACKAGES)
+                .should(notReadTheWallClock())
+                .allowEmptyShould(true);
+    }
+
+    private static final Set<String> TEMPORALS = Set.of(
+            "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime", "java.time.LocalTime",
+            "java.time.OffsetDateTime", "java.time.ZonedDateTime", "java.time.Year", "java.time.YearMonth");
+
+    private static ArchCondition<JavaClass> notReadTheWallClock() {
+        return new ArchCondition<>("read the time from the injected java.time.Clock") {
+            @Override
+            public void check(
+                    JavaClass javaClass,
+                    ConditionEvents events) {
+                javaClass.getMethodCallsFromSelf().forEach(call -> {
+                    String owner = call.getTargetOwner().getName();
+                    String name = call.getTarget().getName();
+                    boolean takesAClock = call.getTarget().getRawParameterTypes().stream()
+                            .anyMatch(type -> type.isEquivalentTo(java.time.Clock.class));
+                    boolean wallClock = (TEMPORALS.contains(owner) && name.equals("now") && !takesAClock)
+                            || (owner.equals("java.lang.System") && name.equals("currentTimeMillis"))
+                            || (owner.equals("java.time.Clock") && name.startsWith("system"));
+                    if (wallClock) {
+                        events.add(SimpleConditionEvent.violated(
+                                call,
+                                call.getDescription() + ": inject java.time.Clock and use clock.instant()"
+                                        + " or " + "LocalDate.now(clock); for a business date use kernel.api.BusinessDate"));
+                    }
+                });
+                javaClass.getConstructorCallsFromSelf().stream()
+                        .filter(call -> call.getTargetOwner().isEquivalentTo(java.util.Date.class)
+                                && call.getTarget().getRawParameterTypes().isEmpty())
+                        .forEach(call -> events.add(SimpleConditionEvent.violated(
+                                call,
+                                call.getDescription() + ": new Date() reads the wall clock; inject java.time.Clock")));
+            }
+        };
+    }
+
+    @Test
     void onlyControllersAskForTheCurrentScope() {
         currentScopeOnlyInControllersRule().check(CLASSES);
     }

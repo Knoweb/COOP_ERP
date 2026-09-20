@@ -77,6 +77,11 @@ class ArchitectureRulesBiteTest {
     }
 
     @Test
+    void clockRuleCatchesCodeThatReadsTheWallClock() {
+        assertViolation(ArchitectureTests.noWallClockRule(), "ReadsTheWallClock");
+    }
+
+    @Test
     void scopeRuleCatchesAHandlerThatReadsTheScopeOfTheHttpRequest() {
         assertViolation(ArchitectureTests.currentScopeOnlyInControllersRule(), "AsksForTheRequestScope");
     }

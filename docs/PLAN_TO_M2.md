@@ -22,7 +22,7 @@ Status is from the 18 September review recorded in PROGRESS.md, refreshed on 19 
 |---|---|---|---|---|---|
 | S0-01 | Repository, Makefile, version catalogue, README skeleton | partly (Makefile with the 17A targets is on `main`) | `gradle/libs.versions.toml`; README with the fifteen-minute start (§13); decide Gradle 8.10 vs the 9.7.1 wrapper | 0.5 | `make up` prints URLs on an empty stack |
 | S0-02 | Backend Gradle project, Boot app, three profiles, health and metrics | done | – | 1 | App starts under each profile |
-| S0-03 | Kernel package with `api` interfaces and stubs (§4.3) | partly | Reconcile remaining interface shapes with 19A; stubs for every kernel service the hello module calls | 1.5 | Hello handler compiles against them |
+| S0-03 | Kernel package with `api` interfaces and stubs (§4.3) | **done** (close-out 20 Sep: standard `Clock`, `BusinessDate.current(locationId)`, message fallback, stub guard; `docs/PROGRESS.md`) | Nothing | 1.5 | Hello handler compiles against them |
 | S0-04 | Flyway per module, baseline migration, roles, collations, RLS helpers | done | Move Flyway off the `@PostConstruct` in `FlywayConfig` if 17A's wiring is required | 1 | Fresh DB migrates to baseline; schema list matches |
 | S0-05 | ArchitectureTests and pipeline scripts (schema ownership, i18n completeness) | **done** (close-out 20 Sep: both scripts rewritten and tested, four rules added; `docs/PROGRESS.md`) | Nothing | 1 | A deliberate violation fails the build |
 | S0-06 | OpenAPI-first toolchain: generator config, `hello.yaml`, controller stub, `gen-clients` | done on `feat/s0-06-openapi-server-generation` (19 September) | – | 1 | Client generated; stale check works |
