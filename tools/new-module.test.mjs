@@ -29,7 +29,7 @@ const TEMPLATE_PARTS = [
   `${B}/main/resources/i18n`,
   `${B}/test/java/lk/coopfed/knoweb/hello`,
   "web/src/modules/hello",
-  "web/src/router.tsx",
+  "web/src/modules/registry.ts",
   "web/src/shell/i18n/messages.ts"
 ];
 
@@ -42,11 +42,11 @@ function templateCopy(t) {
   }
   // The two registration files of the repository may already list real modules. Take those
   // lines out, so the copy knows hello only, whatever has been scaffolded for real.
-  for (const file of ["web/src/router.tsx", "web/src/shell/i18n/messages.ts"]) {
+  for (const file of ["web/src/modules/registry.ts", "web/src/shell/i18n/messages.ts"]) {
     const helloOnly = text(root, file)
       .split("\n")
-      .filter((line) => !/modules\/(?!hello\/)/.test(line))
-      .filter((line) => !/^\s*(\.\.\.)?(?!hello)[a-z0-9]+(Routes|Messages),\s*$/.test(line))
+      .filter((line) => !/from "(\.\/|\.\.\/\.\.\/modules\/)(?!hello\/)[a-z0-9]+\//.test(line))
+      .filter((line) => !/^\s*(\.\.\.)?(?!hello)[a-z0-9]+(Module|Messages),\s*$/.test(line))
       .join("\n");
     fs.writeFileSync(path.join(root, file), helloOnly);
   }
@@ -134,7 +134,7 @@ test("rename: each meaning of hello and greeting gets the right word", () => {
     "class RegisterGreetingHandler implements Handles<RegisterGreeting, UUID>": "class RegisterSkuHandler implements Handles<RegisterSku, UUID>",
     "List<Greeting> findTop100ByOrderByCreatedAtDesc();": "List<Sku> findTop100ByOrderByCreatedAtDesc();",
     'import type { components } from "../../generated/hello";': 'import type { components } from "../../generated/m2catalogue";',
-    "export const helloRoutes: RouteObject[]": "export const catalogueRoutes: RouteObject[]",
+    "export const helloModule: ModuleDefinition = {": "export const catalogueModule: ModuleDefinition = {",
     "class HelloController": "class CatalogueController",
     '"hello.greeting.duplicate"': '"catalogue.sku.duplicate"',
     "openapi/hello.yaml": "openapi/m2catalogue.yaml",
@@ -215,7 +215,7 @@ test("plan: every hello file has a renamed twin, and nothing of hello is left in
     "web/src/modules/m2catalogue/CataloguePage.tsx",
     "web/src/modules/m2catalogue/catalogueApi.ts",
     "web/src/modules/m2catalogue/catalogue.messages.json",
-    "web/src/modules/m2catalogue/routes.tsx"
+    "web/src/modules/m2catalogue/module.tsx"
   ]) {
     assert.ok(targets.includes(expected), `missing ${expected}`);
   }
@@ -225,6 +225,28 @@ test("plan: every hello file has a renamed twin, and nothing of hello is left in
     assert.ok(!/greeting/i.test(file.content), `${file.target} still mentions a greeting`);
     assert.ok(!/\bhello\b/i.test(file.content.replace(/hello module|hello\/README/gi, "")), `${file.target} still mentions hello`);
   }
+});
+
+test("plan: the web module gets a ModuleDefinition of its own: id, route, navigation label, placeholder permissions", (t) => {
+  const files = plan(templateCopy(t), PRICE_LIST);
+  const definition = files.find((f) => f.target === "web/src/modules/m3pricing/module.tsx").content;
+
+  assert.match(definition, /export const pricingModule: ModuleDefinition = \{/);
+  assert.match(definition, /id: "pricing"/);
+  assert.match(definition, /path: "pricing",\n\s+element: <PricingPage \/>/);
+  assert.match(definition, /navItems: \[\{ labelId: "pricing\.nav", to: "\/pricing" \}\]/);
+  assert.match(definition, /requiredPermissions: \["todo\.pricing\.price_list\.read", "todo\.pricing\.price_list\.register"\]/);
+
+  // The label of the navigation entry exists in the module's own catalogue, in every language.
+  const catalogue = JSON.parse(files.find((f) => f.target === "web/src/modules/m3pricing/pricing.messages.json").content);
+  for (const language of ["en", "si", "ta"]) {
+    assert.ok(catalogue[language]["pricing.nav"], `${language}: pricing.nav is missing`);
+  }
+  assert.equal(catalogue.en["pricing.nav"], "Price lists");
+
+  // The page offers the form to the holder of the same placeholder, so one replacement rule fits both files.
+  const page = files.find((f) => f.target === "web/src/modules/m3pricing/PricingPage.tsx").content;
+  assert.match(page, /useHasPermission\("todo\.pricing\.price_list\.register"\)/);
 });
 
 test("plan: the module descriptor is written for the module, not copied from hello", (t) => {
@@ -242,9 +264,9 @@ test("shared files: message ids in three languages, the route and the web catalo
     assert.ok(catalogue["catalogue.title"]);
     assert.deepEqual(Object.keys(catalogue), Object.keys(catalogue).slice().sort(), `${language}.json is not sorted`);
   }
-  const router = edits["web/src/router.tsx"];
-  assert.match(router, /import \{ catalogueRoutes \} from "\.\/modules\/m2catalogue\/routes";\n\/\/ new-module:import/);
-  assert.match(router, /\.\.\.catalogueRoutes,\n\s+\/\/ new-module:entry/);
+  const registry = edits["web/src/modules/registry.ts"];
+  assert.match(registry, /import \{ catalogueModule \} from "\.\/m2catalogue\/module";\n\/\/ new-module:import/);
+  assert.match(registry, /\n  catalogueModule,\n\s+\/\/ new-module:entry/);
   const messages = edits["web/src/shell/i18n/messages.ts"];
   assert.match(messages, /import catalogueMessages from "\.\.\/\.\.\/modules\/m2catalogue\/catalogue\.messages\.json";/);
   assert.match(messages, /catalogueMessages,\n\s+\/\/ new-module:entry/);
@@ -289,9 +311,9 @@ test("run: a dry run reports the plan and writes nothing", (t) => {
 
   assert.match(lines[0], /^Dry run: m2catalogue/);
   assert.ok(lines.some((l) => l.startsWith("would create") && l.endsWith("V0001__sku.sql")));
-  assert.ok(lines.some((l) => l.startsWith("would edit") && l.endsWith("router.tsx")));
+  assert.ok(lines.some((l) => l.startsWith("would edit") && l.endsWith("registry.ts")));
   assert.ok(!exists(root, "web/src/modules/m2catalogue"));
-  assert.ok(!text(root, "web/src/router.tsx").includes("catalogueRoutes"));
+  assert.ok(!text(root, "web/src/modules/registry.ts").includes("catalogueModule"));
 });
 
 test("run: a real run writes the module, registers it, and removes the placeholder", (t) => {
@@ -306,7 +328,7 @@ test("run: a real run writes the module, registers it, and removes the placehold
   assert.ok(exists(root, `${B}/main/resources/db/migration/m2catalogue/V0001__sku.sql`));
   assert.ok(!exists(root, placeholder), "the .gitkeep placeholder should be gone");
   assert.match(text(root, `${B}/main/resources/db/migration/m2catalogue/V0001__sku.sql`), /CREATE TABLE catalogue\.sku \(/);
-  assert.ok(text(root, "web/src/router.tsx").includes("...catalogueRoutes,"));
+  assert.ok(text(root, "web/src/modules/registry.ts").includes("  catalogueModule,"));
   assert.ok(JSON.parse(text(root, `${B}/main/resources/i18n/ta.json`))["catalogue.sku.duplicate"]);
   // hello itself is untouched
   assert.ok(exists(root, `${B}/main/java/lk/coopfed/knoweb/hello/internal/RegisterGreetingHandler.java`));
@@ -315,10 +337,10 @@ test("run: a real run writes the module, registers it, and removes the placehold
 test("run: a second run for the same module is refused and changes nothing", (t) => {
   const root = templateCopy(t);
   run(root, SKU_ARGS, () => {});
-  const routerAfterFirst = text(root, "web/src/router.tsx");
+  const registryAfterFirst = text(root, "web/src/modules/registry.ts");
 
   assert.throws(() => run(root, SKU_ARGS, () => {}), (e) => e instanceof ScaffoldError && /Nothing was written/.test(e.message));
-  assert.equal(text(root, "web/src/router.tsx"), routerAfterFirst);
+  assert.equal(text(root, "web/src/modules/registry.ts"), registryAfterFirst);
 });
 
 test("run: two modules can be scaffolded side by side, but not with the same aggregate", (t) => {
@@ -326,8 +348,8 @@ test("run: two modules can be scaffolded side by side, but not with the same agg
   run(root, SKU_ARGS, () => {});
   run(root, ["--name", "m3pricing", "--schema", "pricing", "--entity", "rate"], () => {});
 
-  const router = text(root, "web/src/router.tsx");
-  assert.ok(router.includes("...catalogueRoutes,") && router.includes("...pricingRoutes,"));
+  const registry = text(root, "web/src/modules/registry.ts");
+  assert.ok(registry.includes("  catalogueModule,") && registry.includes("  pricingModule,"));
   assert.throws(
     () => run(root, ["--name", "m4trading", "--schema", "trading", "--entity", "sku"], () => {}),
     (e) => e instanceof ScaffoldError && /an aggregate called Sku already exists/.test(e.message));

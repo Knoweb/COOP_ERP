@@ -206,12 +206,12 @@ test-scaffold:
 		echo "check-permissions accepted the scaffold placeholders" >&2; exit 1; \
 	fi
 	@echo "--- replace them, as the developer does in step 1 of the module README"
-	grep -rl "todo\.pricing\.price_list\." backend/app/src | xargs sed -i "s/todo\.pricing\.price_list\./prc.price_list./g"
+	grep -rl "todo\.pricing\.price_list\." backend/app/src web/src | xargs sed -i "s/todo\.pricing\.price_list\./prc.price_list./g"
 	node tools/check-permissions.mjs
 	cd backend && ./gradlew :app:test :app:integrationTest
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
-	cd web && pnpm install --frozen-lockfile && pnpm build
+	cd web && pnpm install --frozen-lockfile && pnpm build && pnpm test
 	git reset --hard --quiet
 	git clean -fdq
 	@echo "scaffolder proof passed; the throwaway module has been removed"

@@ -13,7 +13,7 @@ A deliberately trivial module (17A section 12): it registers greetings and lists
 | `resources/openapi/hello.yaml` | The API slice. Written first; the Java interface and the web client are generated from it. Shared parts are in `openapi/common.yaml`. |
 | `resources/seed/hello/` | Development rows loaded by `make seed`. |
 | `resources/i18n/{en,si,ta}.json` | Every message id the module can show, in three languages. |
-| `web/src/modules/hello/` | `HelloPage`, `helloApi.ts` (the module's calls, through the shell's `useApiClient`; a module never calls `fetch`), `routes.tsx`, `hello.messages.json`. |
+| `web/src/modules/hello/` | `HelloPage`, `helloApi.ts` (the module's calls, through the shell's `useApiClient`; a module never calls `fetch`), `hello.messages.json`, and `module.tsx`: the `ModuleDefinition` (id, routes, navigation entries as message ids, required permissions) that is listed once in `web/src/modules/registry.ts`. The shell builds the router and the navigation from that list and puts the "not allowed" screen in front of every route; the page hides the form from a user without `hello.greeting.register` and says why. |
 | `src/test/.../hello/HelloModuleIntegrationTest` | The proof table of 17A section 12 as tests. |
 
 ## The six rules this module demonstrates

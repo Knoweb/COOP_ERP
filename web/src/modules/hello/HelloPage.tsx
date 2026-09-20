@@ -7,6 +7,7 @@ import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { useHasPermission } from "../../shell/auth/permissions";
 import { useHelloApi } from "./helloApi";
 import type { Greeting } from "./helloApi";
 
@@ -19,12 +20,15 @@ import type { Greeting } from "./helloApi";
  *     translated; the screen never invents its own wording for a business rule
  *   - a text with no translation is shown in English with the EN tag, never hidden
  *   - an instant from the API is formatted by the shell helper, in the business time zone
+ *   - an action the user has no permission for is not offered, and the screen says why (doc 30);
+ *     the server checks the permission anyway, and its refusal is shown like any other problem
  */
 export function HelloPage() {
   const t = useT();
   const { locale } = useIntl();
   const queryClient = useQueryClient();
   const formatInstant = useFormatInstant();
+  const canRegister = useHasPermission("hello.greeting.register");
 
   const [textEn, setTextEn] = useState("");
   const [textSi, setTextSi] = useState("");
@@ -72,18 +76,22 @@ export function HelloPage() {
     <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto" }}>
       <h1>{t("hello.title").text}</h1>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", marginBottom: "2rem" }}>
-        <TextField label={t("hello.field.text_en").text} value={textEn} onChange={setTextEn} error={fieldErrors.textEn} required />
-        <TextField label={t("hello.field.text_si").text} value={textSi} onChange={setTextSi} error={fieldErrors.textSi} lang="si" />
-        <TextField label={t("hello.field.text_ta").text} value={textTa} onChange={setTextTa} error={fieldErrors.textTa} lang="ta" />
+      {!canRegister && <p role="note">{t("hello.read_only").text}</p>}
 
-        <button type="submit" disabled={register.isPending || !textEn.trim()}>
-          {register.isPending ? t("hello.submitting").text : t("hello.register").text}
-        </button>
+      {canRegister && (
+        <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", marginBottom: "2rem" }}>
+          <TextField label={t("hello.field.text_en").text} value={textEn} onChange={setTextEn} error={fieldErrors.textEn} required />
+          <TextField label={t("hello.field.text_si").text} value={textSi} onChange={setTextSi} error={fieldErrors.textSi} lang="si" />
+          <TextField label={t("hello.field.text_ta").text} value={textTa} onChange={setTextTa} error={fieldErrors.textTa} lang="ta" />
 
-        {register.isSuccess && <p role="status">{t("hello.registered").text}</p>}
-        {register.isError && <p role="alert">{errorText(register.error, t("hello.error.generic").text)}</p>}
-      </form>
+          <button type="submit" disabled={register.isPending || !textEn.trim()}>
+            {register.isPending ? t("hello.submitting").text : t("hello.register").text}
+          </button>
+
+          {register.isSuccess && <p role="status">{t("hello.registered").text}</p>}
+          {register.isError && <p role="alert">{errorText(register.error, t("hello.error.generic").text)}</p>}
+        </form>
+      )}
 
       <section>
         <h2>{t("hello.list.title").text}</h2>
