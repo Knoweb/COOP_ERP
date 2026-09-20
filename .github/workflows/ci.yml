@@ -230,19 +230,24 @@ jobs:
           corepack enable
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
+      # BEFORE make up-2, and that order matters. The web container mounts web/ and keeps its
+      # node_modules in a named volume; to mount that volume inside the bind mount Docker
+      # creates web/node_modules on the host, as root. A pnpm install after that fails with
+      # "Permission denied" on a Linux runner. Installing first leaves the folder to the
+      # runner's own user and Docker finds it already there.
+      # --with-deps adds the system libraries Chromium needs on a bare runner; the download is
+      # the same one `make e2e` would do, so its own install step then finds it in place.
+      - name: Install the web dependencies and the Playwright browser
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
       - name: make up-2
         run: make up-2
 
       - name: make smoke TWO=1
         run: make smoke TWO=1
-
-      # --with-deps adds the system libraries Chromium needs on a bare runner; the download
-      # itself is the same one `make e2e` would do, so the step after it finds it in place.
-      - name: Install the Playwright browser
-        working-directory: web
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
 
       - name: make e2e
         run: make e2e

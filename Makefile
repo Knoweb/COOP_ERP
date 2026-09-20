@@ -230,6 +230,11 @@ smoke:
 # two instances nginx fronts both backends on the same port 8080 (infra/compose/compose.two.yml),
 # so the browser and the tests cannot tell the difference, which is the point.
 #
+# On Linux, run `pnpm install` in web/ once BEFORE the first `make up`: the web container keeps
+# its node_modules in a named volume, and to mount that volume inside the bind mount Docker
+# creates web/node_modules on the host as root, after which pnpm cannot write there. Docker
+# Desktop on Windows and macOS does not have the problem.
+#
 # The Chromium build Playwright uses (about 150 MB) is downloaded once; the install is a
 # no-op afterwards. It lands in the user's home folder, which on a machine with a full C:
 # drive is the wrong place: export PLAYWRIGHT_BROWSERS_PATH=D:/tmp/ms-playwright (or any
