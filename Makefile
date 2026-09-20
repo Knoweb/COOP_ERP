@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed urls build test test-int format coverage hooks gen-clients check-generated new-module test-scaffold smoke
+.PHONY: help image up up-2 down reset migrate seed urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -51,6 +51,7 @@ help:
 	@echo "make format       format the Java files you changed (the pipeline checks this)"
 	@echo "make coverage     unit and integration tests, then the coverage report"
 	@echo "make hooks        optional: run the quick checks before every git push"
+	@echo "make lint-ci      check the workflow files before pushing a change to them (needs Docker)"
 	@echo "make smoke        smoke test of the running stack (TWO=1 after make up-2)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
 	@echo "make check-generated  fail when the committed clients or module diagrams are stale"
@@ -150,6 +151,12 @@ coverage:
 hooks:
 	git config core.hooksPath .githooks
 	@echo "installed: .githooks/pre-push runs before every git push (skip once with --no-verify)"
+
+# A workflow file with a syntax error does not fail in the pipeline: the pipeline does not
+# start at all, and the pull request shows no checks. So check before pushing: actionlint reads
+# every file in .github/workflows, shellcheck included.
+lint-ci:
+	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:latest -color
 
 gen-clients:
 	sh tools/gen-clients.sh

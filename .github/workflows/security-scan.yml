@@ -60,10 +60,10 @@ jobs:
           trivy() {
             docker run --rm -v "$PWD:/work" -v /var/run/docker.sock:/var/run/docker.sock -w /work "$TRIVY_IMAGE" "$@"
           }
-          common="--quiet --ignore-unfixed --severity CRITICAL,HIGH --format json"
-          trivy sbom  $common -o scan/backend.json backend/app/build/reports/cyclonedx/bom.json
-          trivy fs    $common -o scan/web.json web/pnpm-lock.yaml
-          trivy image $common --pkg-types os -o scan/image.json coop-erp/backend:dev
+          common=(--quiet --ignore-unfixed --severity "CRITICAL,HIGH" --format json)
+          trivy sbom  "${common[@]}" -o scan/backend.json backend/app/build/reports/cyclonedx/bom.json
+          trivy fs    "${common[@]}" -o scan/web.json web/pnpm-lock.yaml
+          trivy image "${common[@]}" --pkg-types os -o scan/image.json coop-erp/backend:dev
 
       - name: Report, and keep the security issue up to date
         run: |

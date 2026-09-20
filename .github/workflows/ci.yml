@@ -383,7 +383,7 @@ jobs:
 
       - name: gitleaks
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0             detect --source /repo --no-banner --redact
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 detect --source /repo --no-banner --redact
 
   # Tells the team. By itself GitHub mails a failed run to the one person who caused it, and a
   # failed nightly run to whoever last edited the schedule line, so main was once red for a day
@@ -414,22 +414,23 @@ jobs:
         run: |
           gh label create ci-failure --color B60205 --description "main or the nightly run is red" 2>/dev/null || true
           open=$(gh issue list --label ci-failure --state open --json number --jq '.[0].number // empty')
-          jobs=$(printf '%s' "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "skipped") | "- (.key): **(.value.result)**"')
+          jobs=$(printf '%s' "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "skipped") | "- \(.key): **\(.value.result)**"')
 
           if [ "$FAILED" = "true" ]; then
-            body=$(printf '%s
-
-%s
-
-Run: %s
-Event: %s, commit %s
-
-%s
-'               "The pipeline failed on main." "$jobs" "$RUN_URL" "$GITHUB_EVENT_NAME" "${GITHUB_SHA:0:7}"               "$TEAM: main must stay green. Whoever merged last looks first; say so in a comment here so that two people do not fix the same thing.")
+            {
+              echo "The pipeline failed on main."
+              echo
+              echo "$jobs"
+              echo
+              echo "Run: $RUN_URL"
+              echo "Event: $GITHUB_EVENT_NAME, commit ${GITHUB_SHA:0:7}"
+              echo
+              echo "$TEAM: main must stay green. Whoever merged last looks first; say so in a comment here so that two people do not fix the same thing."
+            } > body.md
             if [ -n "$open" ]; then
-              gh issue comment "$open" --body "$body"
+              gh issue comment "$open" --body-file body.md
             else
-              gh issue create --title "main is red: the pipeline failed" --label ci-failure --body "$body"
+              gh issue create --title "main is red: the pipeline failed" --label ci-failure --body-file body.md
             fi
           elif [ -n "$open" ]; then
             gh issue close "$open" --comment "Green again: $RUN_URL"

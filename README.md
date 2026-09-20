@@ -54,6 +54,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | `make format` | Format the Java files you changed; `make test` and the pipeline fail on an unformatted file |
 | `make coverage` | Unit and integration tests, then one coverage report (`backend/app/build/reports/jacoco/test/html/index.html`); a report, not a gate |
 | `make hooks` | Optional, per clone: run the quick checks (schema ownership, message catalogue, permissions) before every `git push` |
+| `make lint-ci` | Check the workflow files with actionlint before pushing a change to them: a broken workflow file does not fail, it silently does not run (needs Docker) |
 | `make smoke` | Smoke test of the running stack from outside, through the published ports; `make smoke TWO=1` after `make up-2` |
 | `make check-generated` | Regenerate the web clients and the module diagrams in `docs/modules` and fail when the committed ones are stale |
 | `make gen-clients` | Regenerate `web/src/generated` after changing an OpenAPI slice |
