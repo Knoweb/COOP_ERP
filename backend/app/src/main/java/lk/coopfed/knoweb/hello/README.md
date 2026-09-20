@@ -13,7 +13,7 @@ A deliberately trivial module (17A section 12): it registers greetings and lists
 | `resources/openapi/hello.yaml` | The API slice. Written first; the Java interface and the web client are generated from it. Shared parts are in `openapi/common.yaml`. |
 | `resources/seed/hello/` | Development rows loaded by `make seed`. |
 | `resources/i18n/{en,si,ta}.json` | Every message id the module can show, in three languages. |
-| `web/src/modules/hello/` | `HelloPage`, `helloApi.ts` (the module's calls, through the shell's `useApiClient`; a module never calls `fetch`), `hello.messages.json`, and `module.tsx`: the `ModuleDefinition` (id, routes, navigation entries as message ids, required permissions) that is listed once in `web/src/modules/registry.ts`. The shell builds the router and the navigation from that list and puts the "not allowed" screen in front of every route; the page hides the form from a user without `hello.greeting.register` and says why. |
+| `web/src/modules/hello/` | `HelloPage`, `helloApi.ts` (the module's calls, through the shell's `useApiClient`; a module never calls `fetch`), `hello.messages.json`, and `module.tsx`: the `ModuleDefinition` (id, routes, navigation entries as message ids, required permissions) that is listed once in `web/src/modules/registry.ts`. The shell builds the router and the navigation from that list and puts the "not allowed" screen in front of every route; the page hides the form from a user without `hello.greeting.register` and says why. **Tokens only:** a module writes no hex colour and no px, rem or em literal; every colour, distance and font size is a token of `web/src/design/tokens.css` (`var(--space-2)`, `var(--color-alert-text)`), the page takes its shape from the shell class `shell-page`, and an amount of money is shown with `<MoneyDisplay amount={...} />` (`web/src/shell/components`), never formatted or calculated in a screen. What exists is shown at `/_design` in the running client. |
 | `src/test/.../hello/HelloModuleIntegrationTest` | The proof table of 17A section 12 as tests. |
 
 ## The six rules this module demonstrates
@@ -93,6 +93,8 @@ The build rules prove the calls exist; only your test proves they are right. A f
 | create a table without row-level security (enabled, forced, at least one policy), or grant `DELETE` or `TRUNCATE` to `app_rw` | `SchemaRulesIntegrationTest` (`make test-int`): it reads the migrated database, so your tables are checked without registering them |
 | answer with a message id that is in no catalogue, leave one language out, leave a text empty, lose a `{0}` in a translation, or type `'` instead of `’` | `tools/check-i18n.mjs` |
 | change a slice or a module dependency without committing what it generates | `make check-generated` |
+| write a hex colour or a px, rem or em literal in `web/src/modules` instead of a design token | `web/src/design/moduleStyle.test.ts` (`pnpm test` in `web/`, and the pipeline) |
+| change a colour token so that a text falls under the WCAG contrast (4.5:1, large text and icons 3:1), or add a colour that no contrast pair checks | `web/src/design/tokens.test.ts` |
 
 ## Starting a real module from this one
 

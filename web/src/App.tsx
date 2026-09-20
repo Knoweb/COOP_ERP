@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AuthProvider } from "react-oidc-context";
 import { IntlProvider } from "react-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +7,7 @@ import { oidcConfig } from "./shell/auth/oidc";
 import { RequireLogin } from "./shell/auth/RequireLogin";
 import { useSession } from "./shell/auth/session";
 import { chooseLocale, messages } from "./shell/i18n/messages";
-import { router } from "./router";
+import { createAppRouter } from "./router";
 
 const queryClient = new QueryClient();
 
@@ -24,13 +25,22 @@ function Localised({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The pages, behind the login. The router is created here, on the first render AFTER login,
+ * and not when the file is loaded: see createAppRouter in router.tsx for the reason.
+ */
+function Pages() {
+  const [router] = useState(createAppRouter);
+  return <RouterProvider router={router} />;
+}
+
 export function App() {
   return (
     <AuthProvider {...oidcConfig}>
       <Localised>
         <RequireLogin>
           <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
+            <Pages />
           </QueryClientProvider>
         </RequireLogin>
       </Localised>

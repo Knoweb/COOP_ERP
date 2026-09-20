@@ -22,6 +22,11 @@ import type { Greeting } from "./helloApi";
  *   - an instant from the API is formatted by the shell helper, in the business time zone
  *   - an action the user has no permission for is not offered, and the screen says why (doc 30);
  *     the server checks the permission anyway, and its refusal is shown like any other problem
+ *   - no colour and no size is written here: the page takes its shape from the shell ("shell-page")
+ *     and every distance, colour and font size is a token of design/tokens.css, var(--space-2).
+ *     A literal such as "#b00020" or "12px" in a module fails the build (design/moduleStyle.test.ts)
+ *   - an amount of money is shown with <MoneyDisplay amount={...} /> (shell/components), never
+ *     formatted or calculated in the screen (this template has no amount to show)
  */
 export function HelloPage() {
   const t = useT();
@@ -73,13 +78,13 @@ export function HelloPage() {
   };
 
   return (
-    <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto" }}>
+    <main className="shell-page">
       <h1>{t("hello.title").text}</h1>
 
       {!canRegister && <p role="note">{t("hello.read_only").text}</p>}
 
       {canRegister && (
-        <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", marginBottom: "2rem" }}>
+        <form onSubmit={submit} style={{ display: "grid", gap: "var(--target-gap)", marginBottom: "var(--space-4)" }}>
           <TextField label={t("hello.field.text_en").text} value={textEn} onChange={setTextEn} error={fieldErrors.textEn} required />
           <TextField label={t("hello.field.text_si").text} value={textSi} onChange={setTextSi} error={fieldErrors.textSi} lang="si" />
           <TextField label={t("hello.field.text_ta").text} value={textTa} onChange={setTextTa} error={fieldErrors.textTa} lang="ta" />
@@ -100,10 +105,10 @@ export function HelloPage() {
         {greetings.data?.length === 0 && <p>{t("hello.list.empty").text}</p>}
         <ul style={{ listStyle: "none", padding: 0 }}>
           {greetings.data?.map((greeting) => (
-            <li key={greeting.id} style={{ padding: "0.75rem 0", borderBottom: "1px solid #ddd" }}>
+            <li key={greeting.id} style={{ padding: "var(--space-1) 0", borderBottom: "var(--border-width) solid var(--color-border)" }}>
               <GreetingText greeting={greeting} locale={locale} />
               {/* The API sends UTC; only here does it become Colombo wall-clock time. */}
-              <time dateTime={greeting.createdAt} style={{ display: "block", fontSize: "0.8rem", opacity: 0.7 }}>
+              <time dateTime={greeting.createdAt} style={{ display: "block", fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
                 {formatInstant(greeting.createdAt)}
               </time>
             </li>
@@ -137,7 +142,7 @@ function TextField(props: {
   error?: string;
 }) {
   return (
-    <label style={{ display: "grid", gap: "0.25rem" }}>
+    <label style={{ display: "grid", gap: "var(--space-half)" }}>
       {props.label}
       <input
         type="text"
@@ -148,7 +153,7 @@ function TextField(props: {
         onChange={(event) => props.onChange(event.target.value)}
       />
       {props.error && (
-        <span role="alert" style={{ color: "#b00020", fontSize: "0.85rem" }}>
+        <span role="alert" style={{ color: "var(--color-alert-text)", fontSize: "var(--font-size-sm)" }}>
           {props.error}
         </span>
       )}

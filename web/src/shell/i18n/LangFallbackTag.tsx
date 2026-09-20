@@ -11,14 +11,6 @@ export function LangFallbackTag() {
     <span
       className="lang-fallback-tag"
       title={intl.formatMessage({ id: "shell.lang_fallback" })}
-      style={{
-        marginLeft: "0.5rem",
-        padding: "0 0.35rem",
-        border: "1px solid currentColor",
-        borderRadius: "3px",
-        fontSize: "0.7rem",
-        opacity: 0.7
-      }}
     >
       EN
     </span>

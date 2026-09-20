@@ -64,7 +64,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | `make reset` | Stop the stack and delete its data volumes; the next `make up` starts from an empty database |
 | `make migrate` | Rebuild and restart the backend, which runs the new Flyway migrations |
 | `make seed` | Load the development seed rows again (safe to repeat) |
-| `make test` | Unit and architecture tests, schema-ownership and i18n checks (needs JDK 21 and Node on the host) |
+| `make test` | Backend unit and architecture tests, the format check, the script checks (schema ownership, message catalogue, permissions), and the web client's lint and tests (needs JDK 21 and Node with pnpm on the host) |
 | `make test-int` | Integration tests against a real PostgreSQL that Testcontainers starts in Docker (needs Docker, not the running stack) |
 | `make format` | Format the Java files you changed; `make test` and the pipeline fail on an unformatted file |
 | `make coverage` | Unit and integration tests, then one coverage report (`backend/app/build/reports/jacoco/test/html/index.html`); a report, not a gate |

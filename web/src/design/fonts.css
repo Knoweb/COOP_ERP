@@ -1,0 +1,30 @@
+/*
+ * The three fonts of doc 30 section 2.1, bundled with the application. They come from the npm
+ * packages @fontsource/* (SIL Open Font Licence 1.1), so the build copies the files into dist/
+ * and the browser fetches them from OUR server. Nothing is loaded from Google or from any other
+ * third party at run time: a society office with a poor connection, or behind a filter, must get
+ * the same screen as the developer.
+ *
+ * What is imported, and why only this:
+ *   - two weights, 400 and 600 (the tokens --font-weight-normal and --font-weight-strong).
+ *     A third weight is three more files; ask before adding one.
+ *   - one subset per package: "latin" of Noto Sans (letters, digits, punctuation, the minus sign
+ *     U+2212), "sinhala" of Noto Sans Sinhala, "tamil" of Noto Sans Tamil. The Sinhala and Tamil
+ *     packages also carry Latin subsets; they are not imported, because Latin letters and all
+ *     digits come from Noto Sans, the first name in --font-ui. That is also what keeps digits
+ *     Western Arabic and of one shape in all three languages (doc 19 DR-6).
+ *   - no italics. Sinhala and Tamil have none, and a slanted English word beside them looks wrong.
+ *
+ * A browser downloads a font file only when the page shows a character that needs it: an English
+ * screen fetches the two Latin files and never the Sinhala or Tamil ones.
+ *
+ * Each of these small files declares one @font-face with font-display: swap: text is shown at
+ * once in a system font and changes when the file has arrived; it is never invisible.
+ */
+
+@import "@fontsource/noto-sans/latin-400.css";
+@import "@fontsource/noto-sans/latin-600.css";
+@import "@fontsource/noto-sans-sinhala/sinhala-400.css";
+@import "@fontsource/noto-sans-sinhala/sinhala-600.css";
+@import "@fontsource/noto-sans-tamil/tamil-400.css";
+@import "@fontsource/noto-sans-tamil/tamil-600.css";

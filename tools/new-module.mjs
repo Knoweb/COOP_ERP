@@ -284,6 +284,7 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 6. **Tests.** \`${n.Schema}ModuleIntegrationTest\` proves isolation, grants, the command pipeline and the time rule for the copied table. Keep those four groups; rewrite the cases for your aggregate.
 7. **Dependencies.** Add the modules your guide names to \`allowedDependencies\` in \`package-info.java\`.
 8. **The event type** is \`${n.entity}.registered.v1\`. Use the names of your guide.
+9. **Screens: tokens only.** In \`web/src/modules/${n.name}\` write no hex colour and no px, rem or em literal: every colour, distance and font size is a token of \`web/src/design/tokens.css\` (\`var(--space-2)\`, \`var(--color-alert-text)\`), and \`pnpm test\` fails on a literal (\`web/src/design/moduleStyle.test.ts\`). Show an amount of money with \`<MoneyDisplay amount={...} />\` and a document state with \`<StateChip />\` (\`web/src/shell/components\`); never format or add up money in a screen, totals come from the server. Open \`/_design\` in the running client to see what exists.
 
 ## Deviations from the implementation guide
 
