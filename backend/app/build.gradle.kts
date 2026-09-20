@@ -79,9 +79,6 @@ openApiSlices.forEach { slice ->
 
 tasks.compileJava { dependsOn(generateOpenApi) }
 
-// Overrides the Testcontainers version Spring Boot manages; the reason is in the catalogue.
-extra["testcontainers.version"] = libs.versions.testcontainers.get()
-
 dependencies {
     implementation(project(":shared-engine"))
 
