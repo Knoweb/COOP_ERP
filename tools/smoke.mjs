@@ -6,8 +6,10 @@
 // with the scope claims, the hello module respects scope and idempotency through PgBouncer,
 // errors are translated, and with TWO=1 that nginx really alternates between two instances.
 //
-// What it is not: the Playwright run of 17A (login, scope banner, hello screen in a browser).
-// That needs the login flow of the web shell (S0-07) and replaces nothing here when it comes.
+// What it is not: the browser. Signing in, the scope banner, the hello screen in three
+// languages and what each role may do are the Playwright tests in web/e2e (`make e2e`, S0-07
+// step 5), which run after this one and replace nothing here: this checks the API and the
+// realm from outside, they check what a user sees.
 //
 // Node standard library only (fetch is built in from Node 18).
 

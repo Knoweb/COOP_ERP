@@ -12,14 +12,15 @@
 #                     schema, i18n and permission checks, web lint)
 #   test              job build-verify-test (unit, integration with Testcontainers, web, till)
 #                     job scaffolder (a module copied from hello still builds and passes)
-#   e2e               job stack-smoke (the composed stack with two backend instances)
+#   e2e               job stack-smoke (the composed stack with two backend instances: first
+#                     tools/smoke.mjs from outside, then the Playwright run in a browser)
 #   package           job package (Jib image, web bundle, shared engine, SBOM; the till APK
 #                     comes from build-verify-test)
 #   nightly           job nightly-fresh-clone (the fifteen-minute start of 17A section 13)
 #
 # Not here yet, on purpose:
-#   - Playwright run and Android emulator smoke (e2e): need the login flow of the web shell
-#     (S0-07) and the till hello screen (S0-08). stack-smoke covers what exists today.
+#   - Android emulator smoke (e2e): needs the till hello screen (S0-08). stack-smoke covers
+#     what exists today.
 #   - publish: no registry has been chosen (doc 35 is unwritten). Add the job with the registry.
 #   - coverage floors: set per module by its implementation guide; hello has none. The report
 #     exists (job build-verify-test, artefact coverage-report), the gate does not.
@@ -196,7 +197,11 @@ jobs:
 
   # The whole stack as `make up-2` starts it: PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak,
   # Mailpit, two backend instances behind nginx and the web client. Then tools/smoke.mjs from
-  # outside, through the published ports.
+  # outside, through the published ports, and then the Playwright run in a real browser, which
+  # signs in as each development user. Both run against the TWO-instance stack, which is the
+  # "two instances: nothing breaks" row of the 17A proof table (section 12).
+  # The runner publishes the same ports the developer machine does, so localhost:5173 and
+  # localhost:8085 work here exactly as they do locally and no address has to be overridden.
   stack-smoke:
     name: Stack smoke (two instances)
     runs-on: ubuntu-latest
@@ -219,11 +224,43 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # make e2e installs the web dependencies with pnpm, so the runner needs it.
+      - name: Set up pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+      # BEFORE make up-2, and that order matters. The web container mounts web/ and keeps its
+      # node_modules in a named volume; to mount that volume inside the bind mount Docker
+      # creates web/node_modules on the host, as root. A pnpm install after that fails with
+      # "Permission denied" on a Linux runner. Installing first leaves the folder to the
+      # runner's own user and Docker finds it already there.
+      # --with-deps adds the system libraries Chromium needs on a bare runner; the download is
+      # the same one `make e2e` would do, so its own install step then finds it in place.
+      - name: Install the web dependencies and the Playwright browser
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
       - name: make up-2
         run: make up-2
 
       - name: make smoke TWO=1
         run: make smoke TWO=1
+
+      - name: make e2e
+        run: make e2e
+
+      - name: Upload the Playwright report and traces when something failed
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
 
       - name: Container logs when something failed
         if: failure()

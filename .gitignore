@@ -33,10 +33,12 @@ captures/
 *.log
 logs/
 
-# Testing
+# Testing (the last three are what Playwright writes: traces, screenshots and its report)
 coverage/
 test-results/
 playwright-report/
+blob-report/
+.playwright/
 
 # Local compose state
 infra/compose/data/

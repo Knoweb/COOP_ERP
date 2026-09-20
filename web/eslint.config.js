@@ -23,5 +23,17 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
     }
+  },
+  // The Playwright tests are linted too, and not ignored: they are code the team will copy
+  // when a module gets its own end-to-end tests, and a typo there costs a pipeline run to
+  // find. They run in Node and not in a browser, so they get the Node globals (process,
+  // crypto) instead; the React hooks rules do not apply and are simply not added here.
+  {
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: { ...globals.node, crypto: "readonly" }
+    }
   }
 );

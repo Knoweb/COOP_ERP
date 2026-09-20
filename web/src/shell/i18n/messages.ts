@@ -2,7 +2,10 @@
 // A module adds its `<module>.messages.json` to MODULE_CATALOGUES below and nothing else.
 // Every id needs all three languages; a missing one shows the English text with the EN tag.
 
-import helloMessages from "../../modules/hello/hello.messages.json";
+// `with { type: "json" }` is the standard import attribute for a JSON module. The bundler does
+// not need it, but the Playwright tests (web/e2e) import this file straight into Node, which
+// refuses a JSON import without it. Keep it on every catalogue line below.
+import helloMessages from "../../modules/hello/hello.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";

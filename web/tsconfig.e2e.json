@@ -1,0 +1,15 @@
+{
+  // A second TypeScript project, for the Playwright tests only.
+  //
+  // Why not simply add "e2e" to tsconfig.json: the tests run in Node (process.env, the file
+  // system) and the application runs in a browser. If Node's global types were switched on for
+  // one project they would be switched on for both, and `process.env.SOMETHING` in a screen
+  // would compile happily and then be undefined in the browser. Two projects keep each side
+  // with the globals it really has. `pnpm build` builds both (see package.json).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["e2e", "playwright.config.ts"]
+}

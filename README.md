@@ -71,6 +71,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | `make hooks` | Optional, per clone: run the quick checks (schema ownership, message catalogue, permissions) before every `git push` |
 | `make lint-ci` | Check the workflow files with actionlint before pushing a change to them: a broken workflow file does not fail, it silently does not run (needs Docker) |
 | `make smoke` | Smoke test of the running stack from outside, through the published ports; `make smoke TWO=1` after `make up-2` |
+| `make e2e` | The end-to-end tests: a real browser signs in as each development user on the identity server's page and reads the back office (scope banner, navigation and the hello screen in English, Sinhala and Tamil; what each role may do). Needs the stack running, like `make smoke`; `TWO=1` is accepted and changes nothing, because with two instances nginx fronts both backends on the same port. The Chromium build is downloaded once; set `PLAYWRIGHT_BROWSERS_PATH` first if your home drive has no room |
 | `make check-generated` | Regenerate the web clients and the module diagrams in `docs/modules` and fail when the committed ones are stale |
 | `make gen-clients` | Regenerate `web/src/generated` after changing an OpenAPI slice |
 | `make new-module NAME=m3pricing SCHEMA=pricing ENTITY=price_list` | Copy the hello module as the start of a real module: backend package, migration, slice, seed, integration test, web module, message ids and route. `ENTITY` is lowercase with underscores and is spelled as each place needs (`PriceList`, `priceList`, `price_list`, `/price-lists`). Refuses to overwrite; `DRY_RUN=1` previews. The copy has placeholder permissions that `make test` refuses: replace them first, then follow the README written into the new package |
@@ -82,7 +83,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 |---|---|---|
 | Build, unit and architecture tests, the format check, the four script checks, integration tests against a real PostgreSQL 16 (a throwaway container per run), web lint, tests and build, the till build, coverage report | `ci.yml`, job "Build, verify, test" | every pull request, every push to `main` |
 | A module scaffolded from hello still builds and passes | `ci.yml`, job "Scaffolder proof" | same |
-| The whole stack with two backend instances behind nginx, smoke-tested from outside | `ci.yml`, job "Stack smoke" | same |
+| The whole stack with two backend instances behind nginx, smoke-tested from outside, then the back office in a real browser: signing in as each development user, the scope banner, the navigation and the hello screen in three languages, what each role may do, a deep link that survives a login, sign-out (Playwright, Chromium; report and traces uploaded when it fails) | `ci.yml`, job "Stack smoke" | same |
 | Backend image, web bundle, shared engine, bill of materials | `ci.yml`, job "Package" | same |
 | No secret in any commit (gitleaks) | `ci.yml`, job "Secret scan" | same |
 | The pull request title is a conventional commit | `pr-title.yml` | when a pull request is opened or its title is edited |
