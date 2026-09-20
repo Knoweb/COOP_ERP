@@ -19,10 +19,10 @@ Branches are short-lived and merged by squash; the **title of the pull request**
 Versions are pinned in `backend/gradle/libs.versions.toml`, `web/package.json` and `infra/compose/compose.yml`; `docs/adr/ADR-052-*.md` says where they are newer than 17A names.
 
 - Java 21
-- Spring Boot 3.3.x
-- Spring Modulith 1.2.x
+- Spring Boot 3.5.x
+- Spring Modulith 1.4.x
 - PostgreSQL 16
-- Flyway 10.x
+- Flyway 11.x
 - React 18 + TypeScript + Vite
 - Kotlin / Android / Jetpack Compose
 - RabbitMQ
