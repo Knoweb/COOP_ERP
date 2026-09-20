@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke
+.PHONY: help image up up-2 down reset migrate seed urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke e2e
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -53,6 +53,7 @@ help:
 	@echo "make hooks        optional: run the quick checks before every git push"
 	@echo "make lint-ci      check the workflow files before pushing a change to them (needs Docker)"
 	@echo "make smoke        smoke test of the running stack (TWO=1 after make up-2)"
+	@echo "make e2e          Playwright tests in a browser against the running stack (make up first)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
 	@echo "make check-generated  fail when the committed clients or module diagrams are stale"
 	@echo "make new-module NAME=m2catalogue SCHEMA=catalogue ENTITY=sku   (DRY_RUN=1 to preview)"
@@ -221,3 +222,17 @@ test-scaffold:
 # stack first: `make up` then `make smoke`, or `make up-2` then `make smoke TWO=1`.
 smoke:
 	node tools/smoke.mjs $(if $(TWO),--two)
+
+# The end-to-end tests: a real browser signs in as each development user on the identity
+# server's own page and reads the back office (17A section 7). Like `make smoke` it needs the
+# stack to be running already: `make up` then `make e2e`, or `make up-2` then `make e2e`.
+# TWO=1 is accepted and changes nothing, because the addresses are the same either way: with
+# two instances nginx fronts both backends on the same port 8080 (infra/compose/compose.two.yml),
+# so the browser and the tests cannot tell the difference, which is the point.
+#
+# The Chromium build Playwright uses (about 150 MB) is downloaded once; the install is a
+# no-op afterwards. It lands in the user's home folder, which on a machine with a full C:
+# drive is the wrong place: export PLAYWRIGHT_BROWSERS_PATH=D:/tmp/ms-playwright (or any
+# other folder with room) before running, and the download and the run both follow it.
+e2e:
+	cd web && pnpm install --frozen-lockfile && pnpm exec playwright install chromium && pnpm exec playwright test

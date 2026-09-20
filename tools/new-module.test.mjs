@@ -268,7 +268,12 @@ test("shared files: message ids in three languages, the route and the web catalo
   assert.match(registry, /import \{ catalogueModule \} from "\.\/m2catalogue\/module";\n\/\/ new-module:import/);
   assert.match(registry, /\n  catalogueModule,\n\s+\/\/ new-module:entry/);
   const messages = edits["web/src/shell/i18n/messages.ts"];
-  assert.match(messages, /import catalogueMessages from "\.\.\/\.\.\/modules\/m2catalogue\/catalogue\.messages\.json";/);
+  // The import attribute belongs to the generated line: web/e2e reads messages.ts in Node,
+  // which refuses a JSON import without it.
+  assert.match(
+    messages,
+    /import catalogueMessages from "\.\.\/\.\.\/modules\/m2catalogue\/catalogue\.messages\.json" with \{ type: "json" \};/
+  );
   assert.match(messages, /catalogueMessages,\n\s+\/\/ new-module:entry/);
 });
 

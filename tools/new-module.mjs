@@ -327,7 +327,9 @@ export function sharedEdits(root, n) {
   edits.push({
     target: WEB_MESSAGES,
     content: insertBeforeMarkers(read(path.join(root, WEB_MESSAGES)), WEB_MESSAGES, {
-      [IMPORT_MARKER]: `import ${n.schema}Messages from "../../modules/${n.name}/${n.schema}.messages.json";`,
+      // The import attribute is not optional: web/e2e reads this file in Node, which refuses a
+      // JSON import without it (see the comment on the hello line in messages.ts).
+      [IMPORT_MARKER]: `import ${n.schema}Messages from "../../modules/${n.name}/${n.schema}.messages.json" with { type: "json" };`,
       [ENTRY_MARKER]: `  ${n.schema}Messages,`
     })
   });

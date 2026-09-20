@@ -17,5 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client"]
   },
+  // The Playwright tests are a project of their own: tsconfig.e2e.json says why.
   "include": ["src", "vite.config.ts"]
 }
