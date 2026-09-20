@@ -1,0 +1,78 @@
+# Dependency updates. Without this nothing tells the team that Spring Boot, a Gradle plugin, an
+# npm package, a GitHub Action or a container image has a newer version or a security fix.
+#
+# Weekly, on Monday morning Colombo time, and grouped: one pull request per area for the
+# ordinary minor and patch updates, so the week starts with four or five pull requests and not
+# forty. A major version arrives as its own pull request, because it needs a decision.
+# Security fixes are not held back by the schedule: GitHub opens those at once.
+#
+# Every pull request runs the whole pipeline. Green means it may be merged; the versions that
+# 17A fixes on purpose are listed under `ignore` with the reason.
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Asia/Colombo }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, backend]
+    groups:
+      backend-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # 17A section 3 fixes Spring Boot 3.3.x and Spring Modulith 1.2.x. Patch updates are
+      # welcome; a newer minor or major line is an architect's decision, recorded as an ADR.
+      - dependency-name: "org.springframework.boot*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "org.springframework.modulith*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  - package-ecosystem: gradle
+    directory: /till
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Asia/Colombo }
+    open-pull-requests-limit: 3
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, till]
+    groups:
+      till-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Asia/Colombo }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, web]
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # 17A section 3 fixes React 18 and Vite 5.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Asia/Colombo }
+    commit-message: { prefix: "ci(deps)" }
+    labels: [dependencies, ci]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The images of the local stack (infra/compose). PostgreSQL stays on 16 (17A section 3).
+  - package-ecosystem: docker-compose
+    directory: /infra/compose
+    schedule: { interval: monthly }
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, infra]
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]

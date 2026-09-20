@@ -12,6 +12,8 @@ plugins {
     // Server-side interfaces and DTOs from the OpenAPI slices (17A: "openapi-generator, Java
     // server stubs"). Configured in app/build.gradle.kts.
     id("org.openapi.generator") version "7.25.0" apply false
+    // One Java code style for everybody, whatever the IDE (configured in app/build.gradle.kts).
+    id("com.diffplug.spotless") version "8.0.0" apply false
 }
 
 allprojects {

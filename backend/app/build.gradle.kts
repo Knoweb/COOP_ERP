@@ -5,6 +5,8 @@ plugins {
     id("com.google.cloud.tools.jib")
     id("org.cyclonedx.bom")
     id("org.openapi.generator")
+    id("com.diffplug.spotless")
+    jacoco
 }
 
 java {
@@ -162,6 +164,44 @@ tasks.test {
 
 // `make test-int`: the tests tagged "integration" (Testcontainers). Same source folder as the
 // unit tests, so a module keeps all its tests in one place; the tag decides which task runs them.
+// ---- Code style ------------------------------------------------------------------------------
+// One formatter decides, so a review is about the change and not about whose IDE wrapped the
+// line. `make format` rewrites your files; `make test` and the pipeline run spotlessCheck.
+//
+// ratchetFrom: only files that differ from origin/main are checked and formatted. The code
+// that was there before the formatter arrived stays as it is until somebody touches it, so
+// there is no commit that reformats the whole repository and breaks every open branch.
+// (In the pipeline this needs the history: the checkout steps use fetch-depth 0.)
+spotless {
+    ratchetFrom("origin/main")
+    java {
+        target("src/*/java/**/*.java")               // not build/generated: nobody edits that
+        palantirJavaFormat("2.74.0")                 // 4 spaces, 120 columns: what the code already looks like
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// ---- Coverage ----------------------------------------------------------------------------------
+// A report, not a gate: the floors are set per module by its implementation guide (17A section
+// 11). Until then this gives them a baseline. One report over both test tasks, because a
+// handler is covered by its integration test and a kernel class by its unit test.
+//   ./gradlew :app:jacocoTestReport   ->   app/build/reports/jacoco/test/html/index.html
+tasks.named<JacocoReport>("jacocoTestReport") {
+    executionData(fileTree(layout.buildDirectory) { include("jacoco/*.exec") })
+    reports {
+        xml.required.set(true)                       // for tools
+        csv.required.set(true)                       // for the summary the pipeline prints
+        html.required.set(true)                      // for people
+    }
+    // Generated from the OpenAPI slices: not ours to test.
+    classDirectories.setFrom(files(classDirectories.files.map {
+        fileTree(it) { exclude("**/web/generated/**") }
+    }))
+    mustRunAfter(tasks.test, "integrationTest")
+}
+
 val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"

@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed urls build test test-int gen-clients check-generated new-module test-scaffold smoke
+.PHONY: help image up up-2 down reset migrate seed urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -48,6 +48,10 @@ help:
 	@echo "make build        build backend and web on the host"
 	@echo "make test         unit and architecture tests, schema-ownership and i18n checks"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
+	@echo "make format       format the Java files you changed (the pipeline checks this)"
+	@echo "make coverage     unit and integration tests, then the coverage report"
+	@echo "make hooks        optional: run the quick checks before every git push"
+	@echo "make lint-ci      check the workflow files before pushing a change to them (needs Docker)"
 	@echo "make smoke        smoke test of the running stack (TWO=1 after make up-2)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
 	@echo "make check-generated  fail when the committed clients or module diagrams are stale"
@@ -120,7 +124,7 @@ build:
 	cd web && pnpm install --frozen-lockfile && pnpm build
 
 test:
-	cd backend && ./gradlew test
+	cd backend && ./gradlew spotlessCheck test
 	node --test tools/new-module.test.mjs tools/checks.test.mjs
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
@@ -130,6 +134,29 @@ test:
 # Testcontainers starts in Docker. Needs a running Docker, not a running `make up` stack.
 test-int:
 	cd backend && ./gradlew :app:integrationTest
+
+# Rewrites the Java files that differ from origin/main into the one code style of the project.
+# `make test` and the pipeline fail on a file that is not formatted; this is the cure.
+format:
+	cd backend && ./gradlew spotlessApply
+
+# One report over the unit and the integration tests. A report, not a gate: coverage floors
+# are set per module by its implementation guide.
+coverage:
+	cd backend && ./gradlew :app:test :app:integrationTest :app:jacocoTestReport
+	@echo "coverage report: backend/app/build/reports/jacoco/test/html/index.html"
+
+# Optional and per clone: git runs .githooks/pre-push before every push (schema ownership,
+# message catalogue, permissions: a few seconds). Undo with: git config --unset core.hooksPath
+hooks:
+	git config core.hooksPath .githooks
+	@echo "installed: .githooks/pre-push runs before every git push (skip once with --no-verify)"
+
+# A workflow file with a syntax error does not fail in the pipeline: the pipeline does not
+# start at all, and the pull request shows no checks. So check before pushing: actionlint reads
+# every file in .github/workflows, shellcheck included.
+lint-ci:
+	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:latest -color
 
 gen-clients:
 	sh tools/gen-clients.sh

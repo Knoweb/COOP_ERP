@@ -83,7 +83,8 @@ Each module package: `api/` (published: command records, query interfaces, event
 - **Document sources live here.** Any document you re-issue or create is written as Markdown (or the generator script) under `docs/sources/` and rendered to PDF into `docs/design/`; upload the PDF to the Drive folder and bump the register. Never edit a PDF's content without a source. The step-by-step procedure is in `docs/README.md`.
 - **Keep the module README as the living guide.** Once a module is built, `backend/app/src/main/java/lk/coopfed/knoweb/<module>/README.md` (plus the seed files and tests) supersedes the nA guide for day-to-day work; note deviations from the guide there.
 - **Record progress in the repository.** `docs/PROGRESS.md` (done, next, deviations) is updated after every ticket so that any person or tool can resume from it; nothing that matters lives only in a conversation.
-- Conventional commits (`feat(m1): …`, `fix(kernel): …`, `docs(18): …`); short-lived branches; squash merge to `main`.
+- Conventional commits (`feat(m1): …`, `fix(kernel): …`, `docs(18): …`); short-lived branches; squash merge to `main`. The repository allows squash merges only and takes the **pull request title** as the commit on `main`, so the title is the conventional commit; a check fails when it is not. Fill in the pull request template: what was verified, deviations, whether the architect is needed.
+- Run `make format` before you push Java: one formatter decides the style, and `make test` and the pipeline fail on an unformatted file. Only files that differ from `origin/main` are checked, so old code is reformatted when it is touched, never in bulk. `make hooks` (optional) runs the quick checks before every push.
 
 ## Vocabulary
 

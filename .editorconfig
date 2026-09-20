@@ -1,0 +1,31 @@
+# What every editor does by itself when it opens a file of this repository: IntelliJ, Android
+# Studio and VS Code read this without a plugin. The Java formatter (make format) and ESLint
+# decide the details; this keeps indentation, line endings and the last line right before
+# they run, for every kind of file, including the ones no formatter looks at.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{java,kt,kts}]
+max_line_length = 120
+
+[*.{ts,tsx,js,mjs,cjs,json,yml,yaml,css,html}]
+indent_size = 2
+
+# A tab is syntax in a Makefile.
+[Makefile]
+indent_style = tab
+
+# Two trailing spaces are a line break in Markdown.
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows scripts keep Windows line endings (.gitattributes says the same).
+[*.{bat,cmd}]
+end_of_line = crlf

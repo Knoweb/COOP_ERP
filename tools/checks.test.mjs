@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { OWNERSHIP, problemsOfMigration, problemsOfMigrations } from "./check-schema-ownership.mjs";
 import { messageIdsUsedIn, problemsOfCatalogues, problemsOfJavaSources } from "./check-i18n.mjs";
 import { MODULES } from "./new-module.mjs";
+import { compareVersions, summarise, versionToMoveTo } from "./vulnerability-report.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -197,4 +198,29 @@ test("an id the code answers with but no catalogue has is refused", () => {
 
 test("the real catalogue and sources pass", () => {
   execFileSync(process.execPath, ["tools/check-i18n.mjs"], { cwd: repo, stdio: "pipe" });
+});
+
+// ---- vulnerability report ---------------------------------------------------------------
+
+test("versions compare number by number, not as text", () => {
+  assert.ok(compareVersions("10.1.9", "10.1.31") < 0);
+  assert.ok(compareVersions("3.5.12", "3.5.2") > 0);
+  assert.equal(compareVersions("2.18.8", "2.18.8"), 0);
+});
+
+test("the version to move to stays on the installed major line and cures every advisory", () => {
+  // Trivy lists a fix per maintained line; 9.x is below what is installed, 11.x is another line.
+  assert.equal(versionToMoveTo("10.1.31", ["9.0.118, 10.1.55, 11.0.25", "10.1.58, 11.0.30", "9.0.107, 10.1.40"]), "10.1.58");
+  // No fix on the installed line: the lowest fix above it.
+  assert.equal(versionToMoveTo("3.3.5", ["3.4.9, 3.5.12"]), "3.4.9");
+  assert.equal(versionToMoveTo("1.0.0", [""]), "see the advisories");
+});
+
+test("a package is listed once, with its worst severity first", () => {
+  const packages = summarise({ Results: [{ Vulnerabilities: [
+    { PkgName: "b", InstalledVersion: "1.0", FixedVersion: "1.1", VulnerabilityID: "CVE-1", Severity: "HIGH" },
+    { PkgName: "a", InstalledVersion: "2.0", FixedVersion: "2.1", VulnerabilityID: "CVE-2", Severity: "HIGH" },
+    { PkgName: "b", InstalledVersion: "1.0", FixedVersion: "1.2", VulnerabilityID: "CVE-3", Severity: "CRITICAL" }
+  ] }] });
+  assert.deepEqual(packages.map((p) => [p.name, p.worst, p.ids.length]), [["b", "CRITICAL", 2], ["a", "HIGH", 1]]);
 });
