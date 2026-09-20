@@ -2,7 +2,21 @@
 
 Cooperative Retail and Distribution System.
 
+## Read this first
+
+| If you want to | Read |
+|---|---|
+| work in this repository, as a person or with an AI coding tool | [AGENTS.md](AGENTS.md): what the system is, the rules the build enforces, how we work |
+| know where the work stands, and every deviation from the guides with its reason | [docs/PROGRESS.md](docs/PROGRESS.md) |
+| find a design document, or learn how the documentation is organised | [docs/README.md](docs/README.md) |
+| build a module | the hello module's [README](backend/app/src/main/java/lk/coopfed/knoweb/hello/README.md): the template every module copies, and the table of what the build checks for you |
+| see the plan up to the first two modules | [docs/PLAN_TO_M2.md](docs/PLAN_TO_M2.md) |
+
+Branches are short-lived and merged by squash; the **title of the pull request** becomes the commit on `main`, so write it as a conventional commit (`feat(m1): register an entity`). Run `make format` and `make test` before you push. A design you think is wrong is a change request in `docs/change-requests/`, not a local fix.
+
 ## Technology
+
+Versions are pinned in `backend/gradle/libs.versions.toml`, `web/package.json` and `infra/compose/compose.yml`; `docs/adr/ADR-052-*.md` says where they are newer than 17A names.
 
 - Java 21
 - Spring Boot 3.3.x
@@ -43,6 +57,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | Command | What it does |
 |---|---|
 | `make up` | Start the stack, migrate, seed, print the addresses and the dev logins |
+| `make build` | Build the backend and the web client on the host, without tests |
 | `make up-2` | The same with two backend instances behind nginx, to catch bugs that depend on one instance answering every request |
 | `make image` | Build the backend container image with Jib; `make up`, `make up-2` and `make migrate` do this first |
 | `make down` | Stop the stack and keep its data |

@@ -20,7 +20,7 @@ Status is from the 18 September review recorded in PROGRESS.md, refreshed on 19 
 
 | Ticket | Guide scope | Status | Left to do | Est. | Done when (17A) |
 |---|---|---|---|---|---|
-| S0-01 | Repository, Makefile, version catalogue, README skeleton | partly (Makefile with the 17A targets is on `main`) | `gradle/libs.versions.toml`; README with the fifteen-minute start (§13); decide Gradle 8.10 vs the 9.7.1 wrapper | 0.5 | `make up` prints URLs on an empty stack |
+| S0-01 | Repository, Makefile, version catalogue, README skeleton | **done** (close-out 20 Sep: version catalogue, ADR-052, README entry points; `docs/PROGRESS.md`) | Nothing | 0.5 | `make up` prints URLs on an empty stack |
 | S0-02 | Backend Gradle project, Boot app, three profiles, health and metrics | done | – | 1 | App starts under each profile |
 | S0-03 | Kernel package with `api` interfaces and stubs (§4.3) | **done** (close-out 20 Sep: standard `Clock`, `BusinessDate.current(locationId)`, message fallback, stub guard; `docs/PROGRESS.md`) | Nothing | 1.5 | Hello handler compiles against them |
 | S0-04 | Flyway per module, baseline migration, roles, collations, RLS helpers | done | Move Flyway off the `@PostConstruct` in `FlywayConfig` if 17A's wiring is required | 1 | Fresh DB migrates to baseline; schema list matches |

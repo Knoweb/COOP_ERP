@@ -1,0 +1,41 @@
+# The version catalogue of the backend build (17A section 3). Every version the build names is
+# here and nowhere else: a plugin, a library outside Spring Boot's own version management, a
+# tool a plugin runs. The build files refer to it as libs.versions.x, libs.plugins.x, libs.x.
+#
+# What is NOT here, on purpose: the libraries Spring Boot manages (starters, Flyway, the
+# PostgreSQL driver, Jackson, JUnit ...). They have no version in the build files at all; the
+# Spring Boot version decides them, so they move together and stay compatible.
+#
+# Changing a version: Dependabot proposes patch and minor updates every Monday. A version that
+# 17A fixes (marked below) changes by change request, not by pull request alone.
+
+[versions]
+java = "21"                        # 17A: Java 21 LTS
+spring-boot = "3.3.5"              # 17A: 3.3.x. CR-17A-2 asks for the supported 3.5 line.
+spring-dependency-management = "1.1.6"
+spring-modulith = "1.2.5"          # 17A: 1.2.x, moves with Spring Boot
+kotlin = "2.0.21"                  # 17A: 2.0.x. The till consumes the shared engine: both move together.
+archunit = "1.3.0"                 # 17A: 1.3+
+# Spring Boot 3.3 manages Testcontainers 1.19, which speaks a Docker API version that Docker
+# Engine 29 and newer refuse ("client version 1.32 is too old"). This overrides it.
+testcontainers = "1.21.4"          # 17A: 1.20+
+jib = "3.5.4"
+cyclonedx = "3.4.1"
+openapi-generator = "7.25.0"
+spotless = "8.0.0"
+palantir-java-format = "2.74.0"    # the formatter Spotless runs
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+jib = { id = "com.google.cloud.tools.jib", version.ref = "jib" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
+openapi-generator = { id = "org.openapi.generator", version.ref = "openapi-generator" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+
+[libraries]
+spring-modulith-starter-core = { module = "org.springframework.modulith:spring-modulith-starter-core", version.ref = "spring-modulith" }
+spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
+spring-modulith-docs = { module = "org.springframework.modulith:spring-modulith-docs", version.ref = "spring-modulith" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
