@@ -95,4 +95,6 @@ Watch the repository (the eye at the top of its GitHub page, "All activity" or a
 
 Ports, users and passwords are development defaults in `infra/compose/compose.yml`. To change one, copy `infra/compose/.env.example` to `infra/compose/.env` and edit it; after changing a database user run `make reset`.
 
+After pulling a change to `web/package.json`, restart the web container so that it installs the new packages: `docker compose -p coop-erp restart web` (`make up` leaves a running container alone; the sign is "Failed to resolve import" in the browser).
+
 To run the backend from the IDE instead of the container, stop that one container with `docker compose -p coop-erp stop backend` and start `CoopErpApplication`: its defaults point at the stack's PgBouncer and PostgreSQL ports.
