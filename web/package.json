@@ -17,7 +17,7 @@
     "react-dom": "^18.3.1",
     "react-intl": "^6.6.6",
     "react-oidc-context": "^3.1.0",
-    "react-router-dom": "^6.23.0"
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
