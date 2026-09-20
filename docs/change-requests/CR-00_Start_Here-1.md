@@ -1,6 +1,6 @@
 # CR-00_Start_Here-1 — File list names the wrong format and folder for the two live registers
 
-- **Status:** raised
+- **Status:** accepted (architect, 2026-09-20); the documents are not re-issued yet
 - **Date raised:** 2026-09-18
 - **Raised by:** Claude Code session, while checking the 18 September document update against the register
 - **Documents affected:** `00_Start_Here.docx` v1.1 §3 (the file list) and the "which is which" table

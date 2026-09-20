@@ -23,7 +23,7 @@ A deliberately trivial module (17A section 12): it registers greetings and lists
 3. **A guard fails with a `ProblemException` whose id is a message id.** The kernel turns it into an RFC 9457 response titled in the caller's language. Add the id to all three `i18n` files or the build fails.
 4. **The owning entity comes from the scope, never from the request.**
 5. **Documents and ledgers are insert-only.** The table grants `SELECT, INSERT` to `app_rw` and nothing else; the entity has no setters.
-6. **A point in time is an instant, everywhere.** `timestamptz` with `DEFAULT now()` in the database, `Instant` in Java, ISO-8601 ending in `Z` in the API, and Colombo wall-clock time only on the screen (`shell/i18n/formats.ts`). Never `timestamp` without zone or `LocalDateTime` for "when it happened", and never offset arithmetic. Hibernate is pinned to UTC in `application.yml`, and the integration tests run with the JVM in `Asia/Colombo` so a zone mistake fails `theRegistrationInstantIsExactUnderANonUtcServerZone`. A till fact also stores what the till clock showed, as a second, zone-less column (the `occurred_at` and `occurred_local` pair of 19A); a greeting has no device, so it has the instant only.
+6. **A point in time is an instant, everywhere.** `timestamptz` with `DEFAULT now()` in the database, `Instant` in Java, ISO-8601 ending in `Z` in the API, and Colombo wall-clock time only on the screen (`shell/i18n/formats.ts`). Never `timestamp` without zone or `LocalDateTime` for "when it happened", and never offset arithmetic. Hibernate is pinned to UTC in `application.yml`, and the integration tests run with the JVM in `Asia/Colombo` so a zone mistake fails `theRegistrationInstantIsExactUnderANonUtcServerZone`. A till fact also stores what the till clock showed, as a second, zone-less column (the `occurred_at` and `occurred_local` pair of 19A); a greeting has no device, so it has the instant only. When code needs the time it injects `java.time.Clock` and calls `clock.instant()`; it never calls `Instant.now()` or `LocalDate.now()`, which a test cannot fix and which follow the server's zone. A business date is not the calendar date: ask `kernel.api.BusinessDate.current(locationId)`.
 
 What the module does not do, because the kernel does it for every module: idempotency (`Idempotency-Key`), building the scope, error responses, CORS.
 
@@ -85,6 +85,7 @@ The build rules prove the calls exist; only your test proves they are right. A f
 | write a handler that never audits or never publishes | `commandHandlersAuditAndPublish` |
 | write a handler whose `handle` is not `@Transactional` | `commandHandlersRunInOneTransaction` |
 | write to the database from anything but a command handler | `onlyCommandHandlersWriteToTheDatabase` |
+| call `Instant.now()`, `LocalDate.now()`, `System.currentTimeMillis()` or `new Date()` where you should use the injected `Clock` | `businessModulesReadTheTimeFromTheKernelClock` |
 | write a controller with its own mappings, or read `CurrentScope` outside `web` | `controllersImplementTheirGeneratedApi`, `onlyControllersAskForTheCurrentScope` |
 | break a slice rule (no permission, no tag, no Idempotency-Key, a comma inside an inline description) | `OpenApiSliceRulesTest` |
 | name a permission in a handler that its slice does not have | `tools/check-permissions.mjs` |
