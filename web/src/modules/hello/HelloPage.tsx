@@ -1,11 +1,13 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { useIntl } from "react-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useFormatInstant } from "../../shell/i18n/formats";
-import { ApiProblem, listGreetings, registerGreeting } from "./helloApi";
+import { ApiProblem } from "../../shell/api/client";
+import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { useHelloApi } from "./helloApi";
 import type { Greeting } from "./helloApi";
 
 /**
@@ -30,22 +32,19 @@ export function HelloPage() {
 
   // One key per user action. It changes only after a success, so pressing the button again
   // after a network failure repeats the same request and cannot register twice.
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const api = useHelloApi();
+  const idempotencyKey = useIdempotencyKey();
 
   const greetings = useQuery({
     queryKey: ["hello", "greetings", locale],
-    queryFn: () => listGreetings(locale)
+    queryFn: () => api.listGreetings()
   });
 
   const register = useMutation({
     mutationFn: () =>
-      registerGreeting(
-        { textEn, textSi: textSi || null, textTa: textTa || null },
-        idempotencyKey.current,
-        locale
-      ),
+      api.registerGreeting({ textEn, textSi: textSi || null, textTa: textTa || null }, idempotencyKey.current()),
     onSuccess: () => {
-      idempotencyKey.current = crypto.randomUUID();
+      idempotencyKey.next();
       setTextEn("");
       setTextSi("");
       setTextTa("");
@@ -55,10 +54,14 @@ export function HelloPage() {
       // A problem document means the server answered: this request is finished, so the next
       // attempt (with corrected input) is a new action and needs a new key.
       if (error instanceof ApiProblem) {
-        idempotencyKey.current = crypto.randomUUID();
+        idempotencyKey.next();
       }
     }
   });
+
+  // What the server refused field by field (400 request.invalid), shown under each field; any
+  // other problem is one sentence under the form. Both arrive in the user's language.
+  const fieldErrors = register.error instanceof ApiProblem ? register.error.fieldErrors : {};
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -70,9 +73,9 @@ export function HelloPage() {
       <h1>{t("hello.title").text}</h1>
 
       <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", marginBottom: "2rem" }}>
-        <TextField label={t("hello.field.text_en").text} value={textEn} onChange={setTextEn} required />
-        <TextField label={t("hello.field.text_si").text} value={textSi} onChange={setTextSi} lang="si" />
-        <TextField label={t("hello.field.text_ta").text} value={textTa} onChange={setTextTa} lang="ta" />
+        <TextField label={t("hello.field.text_en").text} value={textEn} onChange={setTextEn} error={fieldErrors.textEn} required />
+        <TextField label={t("hello.field.text_si").text} value={textSi} onChange={setTextSi} error={fieldErrors.textSi} lang="si" />
+        <TextField label={t("hello.field.text_ta").text} value={textTa} onChange={setTextTa} error={fieldErrors.textTa} lang="ta" />
 
         <button type="submit" disabled={register.isPending || !textEn.trim()}>
           {register.isPending ? t("hello.submitting").text : t("hello.register").text}
@@ -123,6 +126,7 @@ function TextField(props: {
   onChange: (value: string) => void;
   required?: boolean;
   lang?: string;
+  error?: string;
 }) {
   return (
     <label style={{ display: "grid", gap: "0.25rem" }}>
@@ -132,8 +136,14 @@ function TextField(props: {
         value={props.value}
         required={props.required}
         lang={props.lang}
+        aria-invalid={props.error ? true : undefined}
         onChange={(event) => props.onChange(event.target.value)}
       />
+      {props.error && (
+        <span role="alert" style={{ color: "#b00020", fontSize: "0.85rem" }}>
+          {props.error}
+        </span>
+      )}
     </label>
   );
 }
