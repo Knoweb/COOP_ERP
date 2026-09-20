@@ -46,7 +46,7 @@ help:
 	@echo "make migrate      rebuild and restart the backend, which runs the Flyway migrations"
 	@echo "make seed         load the development seed rows (safe to repeat)"
 	@echo "make build        build backend and web on the host"
-	@echo "make test         unit and architecture tests, schema-ownership and i18n checks"
+	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
 	@echo "make format       format the Java files you changed (the pipeline checks this)"
 	@echo "make coverage     unit and integration tests, then the coverage report"
@@ -129,6 +129,7 @@ test:
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 	node tools/check-permissions.mjs
+	cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm test
 
 # The tests tagged "integration": the whole application against a real PostgreSQL 16 that
 # Testcontainers starts in Docker. Needs a running Docker, not a running `make up` stack.

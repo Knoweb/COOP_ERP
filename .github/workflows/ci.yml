@@ -91,8 +91,8 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
 
-      # Unit and architecture tests, the scaffolder's own tests, and the schema-ownership,
-      # i18n and permission checks.
+      # Unit and architecture tests, the scaffolder's own tests, the schema-ownership, i18n and
+      # permission checks, and the web client's lint and tests: what a developer runs before a push.
       - name: make test
         run: make test
 
@@ -119,14 +119,6 @@ jobs:
       # generate today.
       - name: make check-generated
         run: make check-generated
-
-      - name: Web lint
-        working-directory: web
-        run: pnpm lint
-
-      - name: Web tests
-        working-directory: web
-        run: pnpm test
 
       - name: Web build
         working-directory: web
@@ -345,6 +337,12 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+
+      # make test also runs the web client's lint and tests, which need pnpm on the host.
+      - name: Set up pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
       - name: make reset, make up (the fifteen-minute start)
         run: |
