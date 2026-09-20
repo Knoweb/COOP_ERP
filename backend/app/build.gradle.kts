@@ -11,7 +11,7 @@ plugins {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.get().toInt()))
     }
 }
 
@@ -79,10 +79,8 @@ openApiSlices.forEach { slice ->
 
 tasks.compileJava { dependsOn(generateOpenApi) }
 
-// Spring Boot 3.3 manages Testcontainers 1.19, which speaks a Docker API version that Docker
-// Engine 29 and newer refuse ("client version 1.32 is too old"). 1.21.4 is the 1.x line with
-// the fix; the property below overrides the managed version for every Testcontainers module.
-extra["testcontainers.version"] = "1.21.4"
+// Overrides the Testcontainers version Spring Boot manages; the reason is in the catalogue.
+extra["testcontainers.version"] = libs.versions.testcontainers.get()
 
 dependencies {
     implementation(project(":shared-engine"))
@@ -90,7 +88,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
-    implementation("org.springframework.modulith:spring-modulith-starter-core:1.2.5")
+    implementation(libs.spring.modulith.starter.core)
 
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.flywaydb:flyway-core")
@@ -109,10 +107,10 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.modulith:spring-modulith-starter-test:1.2.5")
+    testImplementation(libs.spring.modulith.starter.test)
 
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
-    testImplementation("org.springframework.modulith:spring-modulith-docs:1.2.5")
+    testImplementation(libs.archunit.junit5)
+    testImplementation(libs.spring.modulith.docs)
 
     // Integration tests run against a real PostgreSQL 16 in Docker, because row-level security
     // and grants cannot be tested against anything else.
@@ -176,7 +174,7 @@ spotless {
     ratchetFrom("origin/main")
     java {
         target("src/*/java/**/*.java")               // not build/generated: nobody edits that
-        palantirJavaFormat("2.74.0")                 // 4 spaces, 120 columns: what the code already looks like
+        palantirJavaFormat(libs.versions.palantir.java.format.get())               // 4 spaces, 120 columns: what the code already looks like
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()

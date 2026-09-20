@@ -4,7 +4,7 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(libs.versions.java.get().toInt())
 
     compilerOptions {
         freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
