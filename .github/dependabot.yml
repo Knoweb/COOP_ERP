@@ -27,6 +27,12 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "org.springframework.modulith*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Kotlin: 17A section 3 fixes 2.0.x, and the shared engine is compiled here and consumed
+      # by the till, so both builds move to a new Kotlin line together, by decision.
+      - dependency-name: "org.jetbrains.kotlin*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "jvm"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: gradle
     directory: /till
@@ -75,4 +81,9 @@ updates:
     labels: [dependencies, infra]
     ignore:
       - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+      # Node stays on the LTS line the pipeline and the build machines use (24). Odd releases
+      # such as 25 live for six months; the next move is to the next LTS, by hand, everywhere
+      # at once: here, NODE_VERSION in ci.yml and the developer machines.
+      - dependency-name: "node"
         update-types: ["version-update:semver-major"]
