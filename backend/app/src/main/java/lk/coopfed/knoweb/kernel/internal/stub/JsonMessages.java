@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.kernel.internal.stub;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,8 @@ public class JsonMessages implements Messages {
 
     private final Map<String, Map<String, String>> catalogues = new LinkedHashMap<>();
 
+    /** The constructor Spring uses. With two constructors it has to be told which. */
+    @Autowired
     public JsonMessages(ObjectMapper mapper) {
         this(mapper, "i18n/");
     }
