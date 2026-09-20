@@ -157,8 +157,10 @@ hooks:
 # A workflow file with a syntax error does not fail in the pipeline: the pipeline does not
 # start at all, and the pull request shows no checks. So check before pushing: actionlint reads
 # every file in .github/workflows, shellcheck included.
+# MSYS_NO_PATHCONV: started from Git Bash on Windows, MSYS would rewrite the container path
+# /repo into C:/Program Files/Git/repo. The variable does nothing anywhere else.
 lint-ci:
-	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:latest -color
+	MSYS_NO_PATHCONV=1 docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:latest -color
 
 gen-clients:
 	sh tools/gen-clients.sh
