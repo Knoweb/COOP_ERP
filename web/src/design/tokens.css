@@ -115,5 +115,5 @@
   /* A colour used for nothing else, so that practice can never be mistaken for the real thing. */
   --color-training: #6a1b9a; /* 9.39:1 against surface, as a frame and as a background */
   --color-on-training: #ffffff; /* 9.39:1 */
-  --color-training-bg: #f3e5f5; /* the header in training mode; text on it 13.0:1 */
+  --color-training-bg: #f3e5f5; /* the header in training mode; text on it 12.18:1, muted text 5.33:1 */
 }
