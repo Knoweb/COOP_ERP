@@ -72,7 +72,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 | No secret in any commit (gitleaks) | `ci.yml`, job "Secret scan" | same |
 | The pull request title is a conventional commit | `pr-title.yml` | when a pull request is opened or its title is edited |
 | The fifteen-minute start from a fresh clone | `ci.yml`, job "Nightly fresh clone" | every night, 01:30 in Colombo |
-| **The team is told** when `main` or the nightly run fails: an issue labelled `ci-failure` mentions the maintainers, and closes by itself on the next green run | `ci.yml`, job "Notify the team" | on failure |
+| **The team is told** when `main` or the nightly run fails: an issue labelled `ci-failure` mentions the maintainers, and closes by itself on the next green run. With the five `NOTIFY_*` repository secrets set (named in `ci.yml`), a mail goes out as well, on red and again on green | `ci.yml`, job "Notify the team" | on failure |
 | Vulnerable dependencies: one issue labelled `security`, with the version to move to | `security-scan.yml` | Monday 06:00 in Colombo, and by hand |
 | Dependency updates, grouped per area; security fixes at once | `dependabot.yml` | Monday 06:00 in Colombo |
 

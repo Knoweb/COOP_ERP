@@ -434,4 +434,52 @@ jobs:
             fi
           elif [ -n "$open" ]; then
             gh issue close "$open" --comment "Green again: $RUN_URL"
+            echo "recovered=true" >> "$GITHUB_ENV"
           fi
+
+      # Mail as well, straight from here, so that it does not depend on how each person has set
+      # up GitHub notifications. Sent when the run failed, and once more when main is green
+      # again. It is switched on by five repository secrets (Settings, Secrets and variables,
+      # Actions); without them this step says so and does nothing:
+      #   NOTIFY_SMTP_URL       smtps://smtp.gmail.com:465   (or the mail server of the organisation)
+      #   NOTIFY_SMTP_USER      the account that sends
+      #   NOTIFY_SMTP_PASSWORD  its password; for Gmail an app password, never the real one
+      #   NOTIFY_MAIL_FROM      the sender address
+      #   NOTIFY_MAIL_TO        the receivers, separated by commas; a team list address is best
+      - name: Mail the team
+        if: env.FAILED == 'true' || env.recovered == 'true'
+        env:
+          SMTP_URL: ${{ secrets.NOTIFY_SMTP_URL }}
+          SMTP_USER: ${{ secrets.NOTIFY_SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.NOTIFY_SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.NOTIFY_MAIL_FROM }}
+          MAIL_TO: ${{ secrets.NOTIFY_MAIL_TO }}
+        run: |
+          if [ -z "$SMTP_URL" ] || [ -z "$MAIL_TO" ]; then
+            echo "No mail: the NOTIFY_* secrets are not set. The issue above is the notification."
+            exit 0
+          fi
+          if [ "$FAILED" = "true" ]; then
+            subject="[COOP ERP] main is RED: the pipeline failed"
+            text=$(cat body.md)
+          else
+            subject="[COOP ERP] main is green again"
+            text="The pipeline passed again: $RUN_URL"
+          fi
+          {
+            echo "From: COOP ERP pipeline <$MAIL_FROM>"
+            echo "To: $MAIL_TO"
+            echo "Subject: $subject"
+            echo "Content-Type: text/plain; charset=utf-8"
+            echo
+            echo "$text"
+          } > mail.txt
+          recipients=()
+          IFS=',' read -ra addresses <<< "$MAIL_TO"
+          for address in "${addresses[@]}"; do
+            recipients+=(--mail-rcpt "$(echo "$address" | xargs)")
+          done
+          curl --silent --show-error --fail --ssl-reqd --url "$SMTP_URL" \
+            --user "$SMTP_USER:$SMTP_PASSWORD" --mail-from "$MAIL_FROM" "${recipients[@]}" \
+            --upload-file mail.txt
+          echo "mail sent to ${#addresses[@]} address(es)"
