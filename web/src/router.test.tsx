@@ -210,3 +210,28 @@ describe("the module registry", () => {
     expect(placeholders).toEqual([]);
   });
 });
+
+describe("the router after a login", () => {
+  afterEach(cleanup);
+
+  // The bug this guards against: after a login the browser comes back on "/?code=...", and the
+  // login callback then restores the address the user had asked for with history.replaceState,
+  // which no router hears. A router created when the file was loaded had read "/" and showed the
+  // start page under the address /_design. So the router is created by a function, after login.
+  it("reads the address when it is created, so the page asked for before the login is the page shown", async () => {
+    const { createAppRouter } = await import("./router");
+    window.history.replaceState({}, "", "/?code=abc&state=xyz");   // the browser returns from the login
+    window.history.replaceState({}, "", "/_design");                // the callback restores the address
+
+    const router = createAppRouter();                               // App creates it only now
+
+    expect(router.state.location.pathname).toBe("/_design");
+    router.dispose();
+  });
+
+  it("is not created as a side effect of loading the file", async () => {
+    const module = await import("./router");
+
+    expect(Object.keys(module).sort()).toEqual(["createAppRouter", "shellRoutes"]);
+  });
+});

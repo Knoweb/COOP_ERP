@@ -72,4 +72,15 @@ export function shellRoutes(modules: ModuleDefinition[]): RouteObject[] {
   ];
 }
 
-export const router = createBrowserRouter(shellRoutes(MODULES));
+/**
+ * The router of the application. A FUNCTION, called once by App after login has finished, and
+ * deliberately not a constant created when this file is loaded.
+ *
+ * Why: a router reads the address once, when it is created. After a login the browser comes
+ * back on "/?code=...&state=...", and only then does the login callback put the address the
+ * user had asked for back (shell/auth/oidc.ts). A router created at load time had already read
+ * "/", never heard of the change, and showed the start page under the address /_design.
+ */
+export function createAppRouter() {
+  return createBrowserRouter(shellRoutes(MODULES));
+}

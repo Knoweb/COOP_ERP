@@ -251,7 +251,19 @@ button:disabled {
 .state-chip--void {
   background: var(--color-void-bg);
   color: var(--color-void-text);
-  /* No strike-through: a line through Sinhala or Tamil letters makes the word unreadable. */
+  /* No strike-through: a line through Sinhala or Tamil letters makes the word unreadable.
+     What says "cancelled" without colour and without touching the letters: a diagonal hatch
+     across the whole chip, like the stamp on a voided paper form, and a double edge. So void
+     differs from the other four by symbol, word, hatch and edge, and by colour last. */
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-void-bg) 0,
+    var(--color-void-bg) 6px,
+    var(--color-void-hatch) 6px,
+    var(--color-void-hatch) 8px
+  );
+  border-style: double;
+  border-width: 3px;
 }
 
 .state-chip--alert {

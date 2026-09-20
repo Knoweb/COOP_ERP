@@ -107,6 +107,7 @@
   --color-disputed-bg: #fff4e0;
   --color-void-text: #424242; /* 8.66:1 */
   --color-void-bg: #eeeeee;
+  --color-void-hatch: #dcdcdc; /* the darker stripe of the void hatch; the text is 7.33:1 on it */
   --color-alert-text: #b00020; /* 6.21:1 on its background, 7.33:1 on surface (field errors) */
   --color-alert-bg: #fde7ea;
 

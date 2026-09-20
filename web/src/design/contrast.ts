@@ -38,6 +38,8 @@ export const CONTRAST_PAIRS: ContrastPair[] = [
   { foreground: "--color-issued-text", background: "--color-issued-bg", minimum: TEXT },
   { foreground: "--color-disputed-text", background: "--color-disputed-bg", minimum: TEXT },
   { foreground: "--color-void-text", background: "--color-void-bg", minimum: TEXT },
+  // The void chip is hatched: its text lies on both stripes, so it must be readable on both.
+  { foreground: "--color-void-text", background: "--color-void-hatch", minimum: TEXT },
   { foreground: "--color-alert-text", background: "--color-alert-bg", minimum: TEXT },
   // A field error is alert text straight on the page.
   { foreground: "--color-alert-text", background: "--color-surface", minimum: TEXT },
