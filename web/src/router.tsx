@@ -1,4 +1,5 @@
 import { createBrowserRouter, Outlet } from "react-router-dom";
+import { UserMenu } from "./shell/auth/UserMenu";
 import { ScopeBanner } from "./shell/scope/ScopeBanner";
 import { helloRoutes } from "./modules/hello/routes";
 // new-module:import (make new-module adds a line above this one; keep the comment)
@@ -6,7 +7,10 @@ import { helloRoutes } from "./modules/hello/routes";
 const RootLayout = () => {
   return (
     <div>
-      <ScopeBanner />
+      <header className="shell-header">
+        <ScopeBanner />
+        <UserMenu />
+      </header>
       <Outlet />
     </div>
   );
