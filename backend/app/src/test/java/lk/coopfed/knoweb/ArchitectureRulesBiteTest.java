@@ -56,6 +56,27 @@ class ArchitectureRulesBiteTest {
     }
 
     @Test
+    void schemaRuleCatchesAnEntityWithNoTableAnnotationAtAll() {
+        assertViolation(ArchitectureTests.entitiesInOwnSchemaRule(), "EntityWithoutTable");
+    }
+
+    @Test
+    void apiRuleCatchesAnEntityInAPublishedPackage() {
+        assertViolation(ArchitectureTests.apiPackagesArePlainRule(), "LeakedEntity");
+    }
+
+    @Test
+    void eventRuleCatchesAnEventWithoutAVersionedType() {
+        assertViolation(ArchitectureTests.domainEventsRule(), "EventWithoutType");
+        assertViolation(ArchitectureTests.domainEventsRule(), "EventWithUnversionedType");
+    }
+
+    @Test
+    void transactionRuleCatchesAHandlerWithoutATransaction() {
+        assertViolation(ArchitectureTests.handlersAreTransactionalRule(), "NotTransactionalHandler");
+    }
+
+    @Test
     void scopeRuleCatchesAHandlerThatReadsTheScopeOfTheHttpRequest() {
         assertViolation(ArchitectureTests.currentScopeOnlyInControllersRule(), "AsksForTheRequestScope");
     }

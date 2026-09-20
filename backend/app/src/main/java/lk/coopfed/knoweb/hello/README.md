@@ -70,6 +70,28 @@ A handler that forgets `audit.record(...)` breaks nothing visible: the trail jus
 
 The build rules prove the calls exist; only your test proves they are right. A fifth check comes with the audit catalogue of 19A K-04: every code used exists in the catalogue, and every catalogue code is used somewhere.
 
+## What the build checks for you
+
+`make test` runs all of these, and so does the pipeline. Each has a deliberately broken example that proves it catches what it says (`ArchitectureRulesBiteTest`, `OpenApiSliceRulesTest`, `tools/checks.test.mjs`), so when one fails on your code, read the sentence it prints: it names the class or the line and what to write instead.
+
+| If you ... | ... this fails |
+|---|---|
+| depend on a module your `package-info.java` does not allow, or on another module's `internal` | `modulithStructureIsValid`, `layersAreRespected` |
+| use anything of the kernel but `kernel.api` | `businessModulesDoNotAccessKernelInternals` |
+| map an entity to another module's schema, to no schema, or write `@Entity` without `@Table` | `entitiesStayInTheirModuleSchema` |
+| put an entity, or anything from `internal` or `web`, into your `api` package | `publishedPackagesHoldNoEntitiesAndNoInternals` |
+| write an event that is not a record in `api` with a `TYPE` like `pricing.price_list.published.v1` | `domainEventsAreVersionedRecords` |
+| write a handler without a permission, or leave the scaffold's `todo.` permission | `commandHandlersCarryPermissions`, `tools/check-permissions.mjs` |
+| write a handler that never audits or never publishes | `commandHandlersAuditAndPublish` |
+| write a handler whose `handle` is not `@Transactional` | `commandHandlersRunInOneTransaction` |
+| write to the database from anything but a command handler | `onlyCommandHandlersWriteToTheDatabase` |
+| write a controller with its own mappings, or read `CurrentScope` outside `web` | `controllersImplementTheirGeneratedApi`, `onlyControllersAskForTheCurrentScope` |
+| break a slice rule (no permission, no tag, no Idempotency-Key, a comma inside an inline description) | `OpenApiSliceRulesTest` |
+| name a permission in a handler that its slice does not have | `tools/check-permissions.mjs` |
+| touch another module's schema in a migration or a seed, leave a table name without its schema, add a cross-module foreign key, or misspell the migration folder | `tools/check-schema-ownership.mjs` |
+| answer with a message id that is in no catalogue, leave one language out, leave a text empty, lose a `{0}` in a translation, or type `'` instead of `’` | `tools/check-i18n.mjs` |
+| change a slice or a module dependency without committing what it generates | `make check-generated` |
+
 ## Starting a real module from this one
 
 ```bash

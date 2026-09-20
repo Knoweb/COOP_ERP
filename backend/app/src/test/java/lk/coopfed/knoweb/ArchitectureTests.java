@@ -9,22 +9,29 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Table;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -150,6 +157,132 @@ class ArchitectureTests {
     }
 
     @Test
+    void publishedPackagesHoldNoEntitiesAndNoInternals() {  // 17A section 4.4: only records cross the boundary
+        apiPackagesArePlainRule().check(CLASSES);
+    }
+
+    @Test
+    void domainEventsAreVersionedRecords() {                // 17A section 4.4; doc 19 section 6.1
+        domainEventsRule().check(CLASSES);
+    }
+
+    @Test
+    void commandHandlersRunInOneTransaction() {             // AGENTS.md: one @Transactional method
+        handlersAreTransactionalRule().check(CLASSES);
+    }
+
+    /**
+     * What a module publishes (its api package, and query where it has one) is what other
+     * modules compile against: commands, events, views, interfaces. A JPA entity there hands
+     * the module's tables to everybody ("never return entities across the boundary, only
+     * records", 17A section 4.4), and a reference to internal or web makes those public too.
+     */
+    static ArchRule apiPackagesArePlainRule() {
+        return noClasses()
+                .that()
+                .resideInAnyPackage(BUSINESS_PACKAGES)
+                .and()
+                .resideInAnyPackage("..api..", "..query..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("jakarta.persistence..", "org.hibernate..", "lk.coopfed..internal..", "lk.coopfed..web..")
+                .because("a published package holds records and interfaces only; entities, repositories"
+                        + " and controllers stay inside the module")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * A domain event is a record in the module's api package with a constant TYPE in the dotted,
+     * versioned form (hello.greeting.registered.v1). The outbox of 19A K-05 stores the type of
+     * every event and consumers subscribe by it; an event without one only fails there, in
+     * another developer's module, weeks later.
+     */
+    static ArchRule domainEventsRule() {
+        return classes()
+                .that()
+                .implement(DomainEvent.class)
+                .should(beAVersionedRecordInApi())
+                .allowEmptyShould(true);
+    }
+
+    static final Pattern EVENT_TYPE = Pattern.compile("[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+\\.v[1-9][0-9]*");
+
+    private static ArchCondition<JavaClass> beAVersionedRecordInApi() {
+        return new ArchCondition<>("be records in an api package with a constant TYPE like module.thing.happened.v1") {
+            @Override
+            public void check(
+                    JavaClass javaClass,
+                    ConditionEvents events) {
+                List<String> wrong = new ArrayList<>();
+                if (!javaClass.isRecord()) {
+                    wrong.add("is not a record");
+                }
+                if (!javaClass.getPackageName().contains(".api")) {
+                    wrong.add("is not in the module's api package");
+                }
+                String type = null;
+                try {
+                    Field field = javaClass.reflect().getDeclaredField("TYPE");
+                    if (Modifier.isStatic(field.getModifiers())
+                            && Modifier.isFinal(field.getModifiers())
+                            && Modifier.isPublic(field.getModifiers())
+                            && field.get(null) instanceof String value) {
+                        type = value;
+                    }
+                } catch (ReflectiveOperationException e) {
+                    // no such field: reported below
+                }
+                if (type == null) {
+                    wrong.add("has no public static final String TYPE");
+                } else if (!EVENT_TYPE.matcher(type).matches()) {
+                    wrong.add("has TYPE \"" + type + "\", which is not dotted lowercase ending in a version (.v1)");
+                }
+                if (!wrong.isEmpty()) {
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName() + " is a DomainEvent that " + String.join(", ", wrong)));
+                }
+            }
+        };
+    }
+
+    /**
+     * Guards, mutation, audit record and event are one transaction (AGENTS.md): the handle
+     * method, or the handler class, is @Transactional. Without it each repository call commits
+     * by itself, and a failure after the first leaves a row with no audit record and no event.
+     * The kernel's scope aspect also hangs on that annotation: it is what puts the caller's
+     * scope on the database session.
+     */
+    static ArchRule handlersAreTransactionalRule() {
+        return classes()
+                .that()
+                .areAnnotatedWith(CommandHandler.class)
+                .should(handleInATransaction())
+                .allowEmptyShould(true);
+    }
+
+    private static ArchCondition<JavaClass> handleInATransaction() {
+        return new ArchCondition<>("have a @Transactional handle method") {
+            @Override
+            public void check(
+                    JavaClass javaClass,
+                    ConditionEvents events) {
+                boolean transactional = javaClass.isAnnotatedWith(Transactional.class)
+                        || javaClass.getMethods().stream()
+                        .filter(method -> method.getName().equals("handle"))
+                        .filter(method -> !method.reflect().isBridge())
+                        .anyMatch(method -> method.isAnnotatedWith(Transactional.class));
+                if (!transactional) {
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName() + " is a @CommandHandler whose handle method is not"
+                                    + " @Transactional (org.springframework.transaction.annotation)"));
+                }
+            }
+        };
+    }
+
+    @Test
     void onlyControllersAskForTheCurrentScope() {
         currentScopeOnlyInControllersRule().check(CLASSES);
     }
@@ -245,6 +378,8 @@ class ArchitectureTests {
         return classes()
                 .that()
                 .areAnnotatedWith(Table.class)
+                .or()
+                .areAnnotatedWith(Entity.class)
                 .should(declareTheirOwnModuleSchema())
                 .allowEmptyShould(true);
     }
@@ -388,7 +523,11 @@ class ArchitectureTests {
 
                 String module = moduleOf(javaClass);
                 Set<String> allowed = SCHEMA_OWNERSHIP.getOrDefault(module, Set.of());
-                String schema = javaClass.getAnnotationOfType(Table.class).schema();
+                // An @Entity without @Table is mapped to a table named after the class, in
+                // whatever schema the connection's search path points at.
+                String schema = javaClass.isAnnotatedWith(Table.class)
+                        ? javaClass.getAnnotationOfType(Table.class).schema()
+                        : null;
 
                 if (schema == null || schema.isBlank()) {
                     events.add(
