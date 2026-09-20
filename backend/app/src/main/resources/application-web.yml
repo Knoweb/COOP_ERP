@@ -1,13 +1,4 @@
-spring:
-  config:
-    activate:
-      on-profile: web
-
-coop-erp:
-  role: web
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+# Settings of the web role only (17A section 4.1). Loaded when COOP_ERP_ROLE names "web".
+# Starts: HTTP endpoints (back-office API, edge sync API, driver API), the scope filter, the idempotency interceptor.
+# What every role shares is in application.yml; a component of this role alone carries
+# @Profile("web"). Nothing differs yet, so this file is empty on purpose.

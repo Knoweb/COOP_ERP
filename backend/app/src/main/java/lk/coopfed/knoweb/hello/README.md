@@ -90,6 +90,7 @@ The build rules prove the calls exist; only your test proves they are right. A f
 | break a slice rule (no permission, no tag, no Idempotency-Key, a comma inside an inline description) | `OpenApiSliceRulesTest` |
 | name a permission in a handler that its slice does not have | `tools/check-permissions.mjs` |
 | touch another module's schema in a migration or a seed, leave a table name without its schema, add a cross-module foreign key, or misspell the migration folder | `tools/check-schema-ownership.mjs` |
+| create a table without row-level security (enabled, forced, at least one policy), or grant `DELETE` or `TRUNCATE` to `app_rw` | `SchemaRulesIntegrationTest` (`make test-int`): it reads the migrated database, so your tables are checked without registering them |
 | answer with a message id that is in no catalogue, leave one language out, leave a text empty, lose a `{0}` in a translation, or type `'` instead of `’` | `tools/check-i18n.mjs` |
 | change a slice or a module dependency without committing what it generates | `make check-generated` |
 

@@ -105,6 +105,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
     runtimeOnly("org.postgresql:postgresql")
+    // /actuator/prometheus (17A S0-02: health and metrics). The version is managed by Spring Boot.
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(libs.spring.modulith.starter.test)

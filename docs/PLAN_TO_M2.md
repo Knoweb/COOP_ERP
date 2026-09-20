@@ -21,9 +21,9 @@ Status is from the 18 September review recorded in PROGRESS.md, refreshed on 19 
 | Ticket | Guide scope | Status | Left to do | Est. | Done when (17A) |
 |---|---|---|---|---|---|
 | S0-01 | Repository, Makefile, version catalogue, README skeleton | **done** (close-out 20 Sep: version catalogue, ADR-052, README entry points; `docs/PROGRESS.md`) | Nothing | 0.5 | `make up` prints URLs on an empty stack |
-| S0-02 | Backend Gradle project, Boot app, three profiles, health and metrics | done | – | 1 | App starts under each profile |
+| S0-02 | Backend Gradle project, Boot app, three profiles, health and metrics | **done** (close-out 20 Sep: the roles now activate profiles, metrics and probes exposed; `docs/PROGRESS.md`) | Nothing | 1 | App starts under each profile |
 | S0-03 | Kernel package with `api` interfaces and stubs (§4.3) | **done** (close-out 20 Sep: standard `Clock`, `BusinessDate.current(locationId)`, message fallback, stub guard; `docs/PROGRESS.md`) | Nothing | 1.5 | Hello handler compiles against them |
-| S0-04 | Flyway per module, baseline migration, roles, collations, RLS helpers | done | Move Flyway off the `@PostConstruct` in `FlywayConfig` if 17A's wiring is required | 1 | Fresh DB migrates to baseline; schema list matches |
+| S0-04 | Flyway per module, baseline migration, roles, collations, RLS helpers | **done** (close-out 20 Sep: the schema test exists; `docs/PROGRESS.md`) | Decide with doc 35 whether migrations run from every instance or as a deployment step | 1 | Fresh DB migrates to baseline; schema list matches |
 | S0-05 | ArchitectureTests and pipeline scripts (schema ownership, i18n completeness) | **done** (close-out 20 Sep: both scripts rewritten and tested, four rules added; `docs/PROGRESS.md`) | Nothing | 1 | A deliberate violation fails the build |
 | S0-06 | OpenAPI-first toolchain: generator config, `hello.yaml`, controller stub, `gen-clients` | done on `feat/s0-06-openapi-server-generation` (19 September) | – | 1 | Client generated; stale check works |
 | S0-07 | Web shell: PKCE auth, scope context and banner, module registration, i18n loader, design tokens, component seeds | open (a shell exists, unverified against the guide) | Verify each item against 17A §9 and doc 30; fix gaps | 3 | Login → banner → hello page in three languages |
