@@ -1,0 +1,12 @@
+#!/bin/sh
+# Optional, installed by `make hooks`. Runs the checks that take seconds before a push leaves
+# the machine, so the pipeline is not the first to say that a translation is missing.
+# The slow checks (tests, the stack) stay with `make test` and the pipeline.
+# To push without it once: git push --no-verify
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-push: schema ownership, message catalogue, permissions"
+node tools/check-schema-ownership.mjs
+node tools/check-i18n.mjs
+node tools/check-permissions.mjs

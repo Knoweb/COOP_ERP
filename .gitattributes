@@ -23,6 +23,8 @@
 *.md  text eol=lf
 *.txt text eol=lf
 *.sh  text eol=lf
+# Git hooks are shell scripts without an extension; with CRLF the shebang line breaks.
+.githooks/** text eol=lf
 
 # Files that are read inside Linux containers or by make must be LF on every platform:
 # a CRLF gradlew or Dockerfile does not run, and make recipes break on a trailing CR.

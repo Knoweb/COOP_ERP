@@ -1,0 +1,49 @@
+# The title of a pull request becomes the commit message on main: the repository allows squash
+# merges only, with the title as the commit title. AGENTS.md asks for conventional commits, so
+# the title is checked here, where it can still be changed.
+#
+# A workflow of its own, and not a job of ci.yml, because it also has to run when somebody
+# edits the title, and an edited title is no reason to build and test everything again.
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-title:
+    name: Conventional commit title
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check the title
+        # Through the environment, never pasted into the script: a title is text an outsider
+        # can write.
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|chore|ci|build|test|refactor|perf|style|revert)(\([a-z0-9][a-z0-9_./-]*\))?!?: [^ ].{3,}$'
+          if printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "ok: $TITLE"
+          else
+            {
+              echo "### The title is not a conventional commit"
+              echo
+              echo "Title: \`$TITLE\`"
+              echo
+              echo "Write it as \`type(scope): what changed\`, for example:"
+              echo
+              echo "- \`feat(m1): register an entity\`"
+              echo "- \`fix(kernel): fall back to English for an unknown language\`"
+              echo "- \`docs: accept CR-17A-1\`"
+              echo
+              echo "Types: feat, fix, docs, chore, ci, build, test, refactor, perf, style, revert."
+              echo "The scope is optional and lowercase: m1, kernel, hello, web, till, build, deps."
+              echo "Edit the title; this check runs again by itself."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::The pull request title is not a conventional commit: $TITLE"
+            exit 1
+          fi
