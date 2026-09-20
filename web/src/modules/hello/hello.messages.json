@@ -1,6 +1,8 @@
 {
   "en": {
+    "hello.nav": "Greetings",
     "hello.title": "Greetings",
+    "hello.read_only": "Read only: your role may see greetings but not register them.",
     "hello.register": "Register greeting",
     "hello.registered": "Greeting registered",
     "hello.submitting": "Registering…",
@@ -13,7 +15,9 @@
     "hello.error.generic": "Something went wrong. Try again."
   },
   "si": {
+    "hello.nav": "සුබපැතුම්",
     "hello.title": "සුබපැතුම්",
+    "hello.read_only": "කියවීමට පමණි: ඔබේ භූමිකාවට සුබපැතුම් බැලිය හැකි නමුත් ලියාපදිංචි කළ නොහැක.",
     "hello.register": "සුබපැතුම ලියාපදිංචි කරන්න",
     "hello.registered": "සුබපැතුම ලියාපදිංචි කරන ලදී",
     "hello.submitting": "ලියාපදිංචි කරමින්…",
@@ -26,7 +30,9 @@
     "hello.error.generic": "දෝෂයක් සිදු විය. නැවත උත්සාහ කරන්න."
   },
   "ta": {
+    "hello.nav": "வாழ்த்துகள்",
     "hello.title": "வாழ்த்துகள்",
+    "hello.read_only": "படிக்க மட்டும்: உங்கள் பங்கு வாழ்த்துகளைப் பார்க்கலாம், ஆனால் பதிவு செய்ய முடியாது.",
     "hello.register": "வாழ்த்தைப் பதிவு செய்",
     "hello.registered": "வாழ்த்து பதிவு செய்யப்பட்டது",
     "hello.submitting": "பதிவு செய்யப்படுகிறது…",

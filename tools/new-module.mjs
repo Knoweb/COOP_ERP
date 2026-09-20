@@ -13,7 +13,8 @@
 //
 // It copies the backend package, migration, OpenAPI slice, seed file, integration test and
 // web module of hello, renaming as it goes, and registers the new module in the four shared
-// files a module has to appear in: the three i18n catalogues, web/src/router.tsx and
+// files a module has to appear in: the three i18n catalogues, web/src/modules/registry.ts
+// (the list the shell builds the router and the navigation from) and
 // web/src/shell/i18n/messages.ts. It never overwrites anything: if a target already exists
 // it stops before writing a single file.
 //
@@ -275,7 +276,7 @@ Read \`hello/README.md\` first: the six rules it lists apply here unchanged.
 
 The copy compiles and its integration tests pass, but it is still a greeting with another name, and **\`make test\` fails until step 1 is done**. In this order:
 
-1. **Permissions (the build is red until you do this).** \`${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.register\` and \`${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.read\` are placeholders; nothing can derive the real codes. Replace them, in the \`@CommandHandler\` and in \`openapi/${n.name}.yaml\` (the two must be the same string), with the permission codes of your guide: they look like \`cat.sku.create\`. The architecture tests and \`tools/check-permissions.mjs\` refuse any permission that still starts with \`${PLACEHOLDER_PERMISSION_PREFIX}\`.
+1. **Permissions (the build is red until you do this).** \`${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.register\` and \`${PLACEHOLDER_PERMISSION_PREFIX}${n.schema}.${n.entity}.read\` are placeholders; nothing can derive the real codes. Replace them, in the \`@CommandHandler\` and in \`openapi/${n.name}.yaml\` (the two must be the same string), with the permission codes of your guide: they look like \`cat.sku.create\`. The architecture tests and \`tools/check-permissions.mjs\` refuse any permission that still starts with \`${PLACEHOLDER_PERMISSION_PREFIX}\`. The web module carries the same two placeholders: in \`web/src/modules/${n.name}/module.tsx\` (\`requiredPermissions\`: who sees the module in the navigation and may open its routes) and in \`${n.Schema}Page.tsx\` (who is offered the form); replace them with the same codes, or \`pnpm test\` stays red (\`router.test.tsx\`). Until 19A K-08 only the development user \`fed-admin\` sees a new module, because the temporary role map of \`web/src/shell/auth/permissions.ts\` gives that role everything and knows no other code; do not add your codes there unless you need another development user to see the module.
 2. **The table.** \`db/migration/${n.name}/V0001__${n.entity}.sql\` has the columns of a greeting. Replace them with the DDL of your guide (section 3). Keep the row-level security block and the narrow grants; add the location clause to \`own_read\` if the table has a \`location_id\`.
 3. **The slice.** \`openapi/${n.name}.yaml\`: replace the operations with those of your guide (section 5). The slice comes first: the build generates the Java interface \`${n.Schema}Api\` and the request and response classes from it (package \`${n.name}.web.generated\`, never edited, never committed), and \`${n.Schema}Controller\` stops compiling until it implements what the slice says. Then run \`make gen-clients\` and commit the web client. Write the shape of each request in its schema (\`required\`, \`maxLength\`, \`minimum\` ...): the kernel enforces it and answers 400 \`request.invalid\`, so the handler guards business rules only (hello/README.md, "Shape in the slice, rules in the handler"). Refer to \`common.yaml\` for the Idempotency-Key header and the 400 and 422 responses; \`OpenApiSliceRulesTest\` checks the rules every slice obeys.
 4. **Handler, entity, queries.** Follow the handler specifications of your guide (section 6). One handler per command, each with its audit event and domain event.
@@ -293,7 +294,7 @@ None yet.
 // ---- the shared files a module registers itself in ----------------------------------------
 
 const I18N_DIR = `${BACKEND}/main/resources/i18n`;
-const ROUTER = "web/src/router.tsx";
+const REGISTRY = "web/src/modules/registry.ts";
 const WEB_MESSAGES = "web/src/shell/i18n/messages.ts";
 const IMPORT_MARKER = "// new-module:import";
 const ENTRY_MARKER = "// new-module:entry";
@@ -316,10 +317,10 @@ export function sharedEdits(root, n) {
   }
 
   edits.push({
-    target: ROUTER,
-    content: insertBeforeMarkers(read(path.join(root, ROUTER)), ROUTER, {
-      [IMPORT_MARKER]: `import { ${n.schema}Routes } from "./modules/${n.name}/routes";`,
-      [ENTRY_MARKER]: `      ...${n.schema}Routes,`
+    target: REGISTRY,
+    content: insertBeforeMarkers(read(path.join(root, REGISTRY)), REGISTRY, {
+      [IMPORT_MARKER]: `import { ${n.schema}Module } from "./${n.name}/module";`,
+      [ENTRY_MARKER]: `  ${n.schema}Module,`
     })
   });
   edits.push({
