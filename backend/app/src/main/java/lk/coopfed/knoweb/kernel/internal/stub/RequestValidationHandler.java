@@ -5,6 +5,14 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import jakarta.validation.metadata.ConstraintDescriptor;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import org.springframework.context.MessageSourceResolvable;
@@ -22,15 +30,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 /**
  * One place where a request that does not match its OpenAPI slice becomes an HTTP response.
@@ -69,9 +68,11 @@ public class RequestValidationHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail body(MethodArgumentNotValidException e, HttpServletRequest request) {
         Locale locale = request.getLocale();
-        return invalid(locale, e.getBindingResult().getFieldErrors().stream()
-                .map(error -> entry(error.getField(), error, error.getRejectedValue(), locale))
-                .toList());
+        return invalid(
+                locale,
+                e.getBindingResult().getFieldErrors().stream()
+                        .map(error -> entry(error.getField(), error, error.getRejectedValue(), locale))
+                        .toList());
     }
 
     /**
@@ -82,9 +83,11 @@ public class RequestValidationHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail parameters(ConstraintViolationException e, HttpServletRequest request) {
         Locale locale = request.getLocale();
-        return invalid(locale, e.getConstraintViolations().stream()
-                .map(violation -> entry(nameOf(violation), violation, locale))
-                .toList());
+        return invalid(
+                locale,
+                e.getConstraintViolations().stream()
+                        .map(violation -> entry(nameOf(violation), violation, locale))
+                        .toList());
     }
 
     /** The same, for a controller that is not {@code @Validated}: Spring MVC checks it itself. */
@@ -92,14 +95,15 @@ public class RequestValidationHandler {
     public ProblemDetail parameters(HandlerMethodValidationException e, HttpServletRequest request) {
         Locale locale = request.getLocale();
         List<Map<String, Object>> errors = new ArrayList<>();
-        for (ParameterValidationResult result : e.getAllValidationResults()) {
+        // getAllValidationResults() is deprecated for removal in Spring 6.2; same list, new name.
+        for (ParameterValidationResult result : e.getParameterValidationResults()) {
             if (result instanceof ParameterErrors body) {
-                body.getFieldErrors().forEach(error ->
-                        errors.add(entry(error.getField(), error, error.getRejectedValue(), locale)));
+                body.getFieldErrors()
+                        .forEach(error -> errors.add(entry(error.getField(), error, error.getRejectedValue(), locale)));
             } else {
                 String name = nameOf(result.getMethodParameter());
-                result.getResolvableErrors().forEach(error ->
-                        errors.add(entry(name, error, result.getArgument(), locale)));
+                result.getResolvableErrors()
+                        .forEach(error -> errors.add(entry(name, error, result.getArgument(), locale)));
             }
         }
         return invalid(locale, errors);
@@ -120,17 +124,20 @@ public class RequestValidationHandler {
 
     private ProblemDetail invalid(Locale locale, List<Map<String, Object>> errors) {
         ProblemDetail problem = problems.toProblem(new ProblemException(INVALID), locale);
-        problem.setProperty("errors", errors.stream()
-                .sorted(Comparator.comparing(error -> String.valueOf(error.get("field"))))
-                .toList());
+        problem.setProperty(
+                "errors",
+                errors.stream()
+                        .sorted(Comparator.comparing(error -> String.valueOf(error.get("field"))))
+                        .toList());
         return problem;
     }
 
     /**
      * Spring wraps the validator's finding. Usually the constraint is inside. For a plain method
-     * parameter Spring 6.1 keeps only its own description: the constraint's name as the last
-     * code, and as arguments the parameter, then the attribute values in the alphabetical order
-     * of their names (Size: max, min; DecimalMin: inclusive, value).
+     * parameter Spring keeps only its own description: the constraint's name as the last code,
+     * and as arguments the parameter, then the attribute values in the alphabetical order of
+     * their names (Size: max, min; DecimalMin: inclusive, value). Spring 6.2 changed method
+     * validation internally but not this shape; RequestValidationHandlerTest is the proof.
      */
     private Map<String, Object> entry(String field, MessageSourceResolvable error, Object rejected, Locale locale) {
         if (error instanceof ObjectError wrapped && wrapped.contains(ConstraintViolation.class)) {
@@ -142,12 +149,13 @@ public class RequestValidationHandler {
             return entry(field, "request.field.invalid", Map.of(), locale);
         }
         String constraint = codes[codes.length - 1];
-        Map<String, Object> attributes = switch (constraint) {
-            case "Size" -> Map.of("max", arguments[1], "min", arguments[2]);
-            case "Min", "Max" -> Map.of("value", arguments[1]);
-            case "DecimalMin", "DecimalMax" -> Map.of("value", arguments[2]);
-            default -> Map.of();
-        };
+        Map<String, Object> attributes =
+                switch (constraint) {
+                    case "Size" -> Map.of("max", arguments[1], "min", arguments[2]);
+                    case "Min", "Max" -> Map.of("value", arguments[1]);
+                    case "DecimalMin", "DecimalMax" -> Map.of("value", arguments[2]);
+                    default -> Map.of();
+                };
         return entry(field, constraint, attributes, rejected, locale);
     }
 
@@ -173,9 +181,9 @@ public class RequestValidationHandler {
                         : entry(field, "request.field.too_long", Map.of("max", attributes.get("max")), locale);
             }
             case "Min", "DecimalMin" ->
-                    entry(field, "request.field.too_small", Map.of("min", attributes.get("value")), locale);
+                entry(field, "request.field.too_small", Map.of("min", attributes.get("value")), locale);
             case "Max", "DecimalMax" ->
-                    entry(field, "request.field.too_large", Map.of("max", attributes.get("value")), locale);
+                entry(field, "request.field.too_large", Map.of("max", attributes.get("value")), locale);
             case "Pattern", "Email" -> entry(field, "request.field.format", Map.of(), locale);
             default -> entry(field, "request.field.invalid", Map.of(), locale);
         };

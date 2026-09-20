@@ -1,5 +1,9 @@
 package lk.coopfed.knoweb;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
+
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
@@ -12,6 +16,17 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Table;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
@@ -24,22 +39,6 @@ import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
-
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
-import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
 /**
  * Rules R1 to R7 of doc 17 §6.1 as tests (17A §5). They are the only reason a
@@ -56,17 +55,17 @@ class ArchitectureTests {
             .importPackages(CoopErpApplication.class.getPackageName());
 
     private static final String[] BUSINESS_PACKAGES = {
-            "..m1party..",
-            "..m2catalogue..",
-            "..m3pricing..",
-            "..m4trading..",
-            "..m5inventory..",
-            "..m6pos..",
-            "..m7customers..",
-            "..m8reporting..",
-            "..m9integration..",
-            "..m10procurement..",
-            "..hello.."
+        "..m1party..",
+        "..m2catalogue..",
+        "..m3pricing..",
+        "..m4trading..",
+        "..m5inventory..",
+        "..m6pos..",
+        "..m7customers..",
+        "..m8reporting..",
+        "..m9integration..",
+        "..m10procurement..",
+        "..hello.."
     };
 
     /** Module package name to the database schemas it owns (17A §2, doc 18 Part F). */
@@ -85,7 +84,7 @@ class ArchitectureTests {
             Map.entry("m10procurement", Set.<String>of()));
 
     @Test
-    void modulithStructureIsValid() {           // R1, R5: published packages, allowed dependencies
+    void modulithStructureIsValid() { // R1, R5: published packages, allowed dependencies
         MODULES.verify();
     }
 
@@ -108,7 +107,9 @@ class ArchitectureTests {
                 }
             }
         }
-        new Documenter(MODULES, MODULE_DOCS_FOLDER)
+        // Documenter(ApplicationModules, String) is deprecated for removal in Spring Modulith 1.4;
+        // the output folder is an Options value now. Nothing else about the call changed.
+        new Documenter(MODULES, Documenter.Options.defaults().withOutputFolder(MODULE_DOCS_FOLDER))
                 .writeDocumentation();
     }
 
@@ -116,17 +117,17 @@ class ArchitectureTests {
     private static final String MODULE_DOCS_FOLDER = "../../docs/modules";
 
     @Test
-    void layersAreRespected() {                 // R2, R3
+    void layersAreRespected() { // R2, R3
         layersRule().check(CLASSES);
     }
 
     @Test
-    void entitiesStayInTheirModuleSchema() {    // R4
+    void entitiesStayInTheirModuleSchema() { // R4
         entitiesInOwnSchemaRule().check(CLASSES);
     }
 
     @Test
-    void kernelImportsNoBusinessModule() {      // R5
+    void kernelImportsNoBusinessModule() { // R5
         kernelImportsNoModuleRule().check(CLASSES);
     }
 
@@ -136,13 +137,12 @@ class ArchitectureTests {
     }
 
     @Test
-    void commandHandlersCarryPermissions() {    // R7
+    void commandHandlersCarryPermissions() { // R7
         handlersCarryPermissionRule().check(CLASSES);
     }
 
-
     @Test
-    void commandHandlersAuditAndPublish() {     // AGENTS.md: guards, mutation, audit, event
+    void commandHandlersAuditAndPublish() { // AGENTS.md: guards, mutation, audit, event
         handlersAuditAndPublishRule().check(CLASSES);
     }
 
@@ -152,22 +152,22 @@ class ArchitectureTests {
     }
 
     @Test
-    void controllersImplementTheirGeneratedApi() {  // 17A: OpenAPI first
+    void controllersImplementTheirGeneratedApi() { // 17A: OpenAPI first
         controllersImplementGeneratedApiRule().check(CLASSES);
     }
 
     @Test
-    void publishedPackagesHoldNoEntitiesAndNoInternals() {  // 17A section 4.4: only records cross the boundary
+    void publishedPackagesHoldNoEntitiesAndNoInternals() { // 17A section 4.4: only records cross the boundary
         apiPackagesArePlainRule().check(CLASSES);
     }
 
     @Test
-    void domainEventsAreVersionedRecords() {                // 17A section 4.4; doc 19 section 6.1
+    void domainEventsAreVersionedRecords() { // 17A section 4.4; doc 19 section 6.1
         domainEventsRule().check(CLASSES);
     }
 
     @Test
-    void commandHandlersRunInOneTransaction() {             // AGENTS.md: one @Transactional method
+    void commandHandlersRunInOneTransaction() { // AGENTS.md: one @Transactional method
         handlersAreTransactionalRule().check(CLASSES);
     }
 
@@ -185,7 +185,8 @@ class ArchitectureTests {
                 .resideInAnyPackage("..api..", "..query..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("jakarta.persistence..", "org.hibernate..", "lk.coopfed..internal..", "lk.coopfed..web..")
+                .resideInAnyPackage(
+                        "jakarta.persistence..", "org.hibernate..", "lk.coopfed..internal..", "lk.coopfed..web..")
                 .because("a published package holds records and interfaces only; entities, repositories"
                         + " and controllers stay inside the module")
                 .allowEmptyShould(true);
@@ -210,9 +211,7 @@ class ArchitectureTests {
     private static ArchCondition<JavaClass> beAVersionedRecordInApi() {
         return new ArchCondition<>("be records in an api package with a constant TYPE like module.thing.happened.v1") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
                 List<String> wrong = new ArrayList<>();
                 if (!javaClass.isRecord()) {
                     wrong.add("is not a record");
@@ -239,8 +238,7 @@ class ArchitectureTests {
                 }
                 if (!wrong.isEmpty()) {
                     events.add(SimpleConditionEvent.violated(
-                            javaClass,
-                            javaClass.getName() + " is a DomainEvent that " + String.join(", ", wrong)));
+                            javaClass, javaClass.getName() + " is a DomainEvent that " + String.join(", ", wrong)));
                 }
             }
         };
@@ -264,14 +262,12 @@ class ArchitectureTests {
     private static ArchCondition<JavaClass> handleInATransaction() {
         return new ArchCondition<>("have a @Transactional handle method") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
                 boolean transactional = javaClass.isAnnotatedWith(Transactional.class)
                         || javaClass.getMethods().stream()
-                        .filter(method -> method.getName().equals("handle"))
-                        .filter(method -> !method.reflect().isBridge())
-                        .anyMatch(method -> method.isAnnotatedWith(Transactional.class));
+                                .filter(method -> method.getName().equals("handle"))
+                                .filter(method -> !method.reflect().isBridge())
+                                .anyMatch(method -> method.isAnnotatedWith(Transactional.class));
                 if (!transactional) {
                     events.add(SimpleConditionEvent.violated(
                             javaClass,
@@ -283,7 +279,7 @@ class ArchitectureTests {
     }
 
     @Test
-    void businessModulesReadTheTimeFromTheKernelClock() {  // 19A section 13
+    void businessModulesReadTheTimeFromTheKernelClock() { // 19A section 13
         noWallClockRule().check(CLASSES);
     }
 
@@ -303,15 +299,19 @@ class ArchitectureTests {
     }
 
     private static final Set<String> TEMPORALS = Set.of(
-            "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime", "java.time.LocalTime",
-            "java.time.OffsetDateTime", "java.time.ZonedDateTime", "java.time.Year", "java.time.YearMonth");
+            "java.time.Instant",
+            "java.time.LocalDate",
+            "java.time.LocalDateTime",
+            "java.time.LocalTime",
+            "java.time.OffsetDateTime",
+            "java.time.ZonedDateTime",
+            "java.time.Year",
+            "java.time.YearMonth");
 
     private static ArchCondition<JavaClass> notReadTheWallClock() {
         return new ArchCondition<>("read the time from the injected java.time.Clock") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
                 javaClass.getMethodCallsFromSelf().forEach(call -> {
                     String owner = call.getTargetOwner().getName();
                     String name = call.getTarget().getName();
@@ -323,8 +323,8 @@ class ArchitectureTests {
                     if (wallClock) {
                         events.add(SimpleConditionEvent.violated(
                                 call,
-                                call.getDescription() + ": inject java.time.Clock and use clock.instant()"
-                                        + " or " + "LocalDate.now(clock); for a business date use kernel.api.BusinessDate"));
+                                call.getDescription() + ": inject java.time.Clock and use clock.instant()" + " or "
+                                        + "LocalDate.now(clock); for a business date use kernel.api.BusinessDate"));
                     }
                 });
                 javaClass.getConstructorCallsFromSelf().stream()
@@ -381,23 +381,19 @@ class ArchitectureTests {
     }
 
     private static ArchCondition<JavaClass> implementAGeneratedApi() {
-        return new ArchCondition<>(
-                "implement an interface generated from their OpenAPI slice (..web.generated.*Api)") {
+        return new ArchCondition<>("implement an interface generated from their OpenAPI slice (..web.generated.*Api)") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
                 boolean implementsGenerated = javaClass.getAllRawInterfaces().stream()
                         .anyMatch(i -> i.getPackageName().endsWith(".web.generated")
                                 && i.getSimpleName().endsWith("Api"));
                 if (!implementsGenerated) {
-                    events.add(
-                            SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName()
-                                            + " is a @RestController that implements no generated"
-                                            + " ...web.generated.*Api interface; describe its operations in"
-                                            + " openapi/<module>.yaml and implement the interface generated from it"));
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName()
+                                    + " is a @RestController that implements no generated"
+                                    + " ...web.generated.*Api interface; describe its operations in"
+                                    + " openapi/<module>.yaml and implement the interface generated from it"));
                 }
             }
         };
@@ -408,23 +404,20 @@ class ArchitectureTests {
         return layeredArchitecture()
                 .consideringOnlyDependenciesInLayers()
                 .withOptionalLayers(true)
-                .layer("kernel").definedBy("..kernel..")
-                .layer("master").definedBy(
-                        "..m1party..",
-                        "..m2catalogue..",
-                        "..m3pricing..")
-                .layer("transactions").definedBy(
-                        "..m4trading..",
-                        "..m5inventory..",
-                        "..m6pos..",
-                        "..m7customers..",
-                        "..m10procurement..")
-                .layer("read").definedBy(
-                        "..m8reporting..",
-                        "..m9integration..")
-                .whereLayer("master").mayOnlyAccessLayers("kernel")
-                .whereLayer("transactions").mayOnlyAccessLayers("kernel", "master")
-                .whereLayer("read").mayOnlyAccessLayers("kernel", "master", "transactions")
+                .layer("kernel")
+                .definedBy("..kernel..")
+                .layer("master")
+                .definedBy("..m1party..", "..m2catalogue..", "..m3pricing..")
+                .layer("transactions")
+                .definedBy("..m4trading..", "..m5inventory..", "..m6pos..", "..m7customers..", "..m10procurement..")
+                .layer("read")
+                .definedBy("..m8reporting..", "..m9integration..")
+                .whereLayer("master")
+                .mayOnlyAccessLayers("kernel")
+                .whereLayer("transactions")
+                .mayOnlyAccessLayers("kernel", "master")
+                .whereLayer("read")
+                .mayOnlyAccessLayers("kernel", "master", "transactions")
                 .allowEmptyShould(true);
     }
 
@@ -508,25 +501,19 @@ class ArchitectureTests {
                 .allowEmptyShould(true);
     }
 
-    private static ArchCondition<JavaClass> call(
-            Class<?> owner,
-            String methodName) {
-        return new ArchCondition<>(
-                "call " + owner.getSimpleName() + "." + methodName + "(...)") {
+    private static ArchCondition<JavaClass> call(Class<?> owner, String methodName) {
+        return new ArchCondition<>("call " + owner.getSimpleName() + "." + methodName + "(...)") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
                 boolean calls = javaClass.getMethodCallsFromSelf().stream()
                         .anyMatch(c -> c.getName().equals(methodName)
                                 && c.getTargetOwner().isAssignableTo(owner));
                 if (!calls) {
-                    events.add(
-                            SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName()
-                                            + " is a @CommandHandler but never calls "
-                                            + owner.getSimpleName() + "." + methodName + "(...)"));
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName()
+                                    + " is a @CommandHandler but never calls "
+                                    + owner.getSimpleName() + "." + methodName + "(...)"));
                 }
             }
         };
@@ -538,29 +525,23 @@ class ArchitectureTests {
 
     /** Used under noClasses(): every write found is reported as one violation. */
     private static ArchCondition<JavaClass> writeToTheDatabase() {
-        return new ArchCondition<>(
-                "write to the database (only @CommandHandler classes may)") {
+        return new ArchCondition<>("write to the database (only @CommandHandler classes may)") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
                 for (JavaMethodCall c : javaClass.getMethodCallsFromSelf()) {
                     JavaClass target = c.getTargetOwner();
-                    boolean write =
-                            (target.isAssignableTo(Repository.class)
+                    boolean write = (target.isAssignableTo(Repository.class)
                                     && REPOSITORY_WRITE.matcher(c.getName()).matches())
-                                    || (target.isAssignableTo(EntityManager.class)
+                            || (target.isAssignableTo(EntityManager.class)
                                     && ENTITY_MANAGER_WRITE.contains(c.getName()))
-                                    || (target.isAssignableTo(JdbcOperations.class)
-                                    && JDBC_WRITE.contains(c.getName()));
+                            || (target.isAssignableTo(JdbcOperations.class) && JDBC_WRITE.contains(c.getName()));
                     if (write) {
-                        events.add(
-                                SimpleConditionEvent.satisfied(
-                                        c,
-                                        javaClass.getName() + " writes through "
-                                                + target.getSimpleName() + "." + c.getName()
-                                                + "(...) but is not a @CommandHandler; "
-                                                + c.getSourceCodeLocation()));
+                        events.add(SimpleConditionEvent.satisfied(
+                                c,
+                                javaClass.getName() + " writes through "
+                                        + target.getSimpleName() + "." + c.getName()
+                                        + "(...) but is not a @CommandHandler; "
+                                        + c.getSourceCodeLocation()));
                     }
                 }
             }
@@ -569,12 +550,9 @@ class ArchitectureTests {
 
     private static ArchCondition<JavaClass> declareTheirOwnModuleSchema() {
 
-        return new ArchCondition<>(
-                "declare @Table(schema = ...) within their own module's schemas") {
+        return new ArchCondition<>("declare @Table(schema = ...) within their own module's schemas") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
 
                 String module = moduleOf(javaClass);
                 Set<String> allowed = SCHEMA_OWNERSHIP.getOrDefault(module, Set.of());
@@ -585,28 +563,25 @@ class ArchitectureTests {
                         : null;
 
                 if (schema == null || schema.isBlank()) {
-                    events.add(
-                            SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName()
-                                            + " declares no schema on @Table; "
-                                            + "every entity names its module schema"));
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName()
+                                    + " declares no schema on @Table; "
+                                    + "every entity names its module schema"));
                 } else if (!allowed.contains(schema)) {
-                    events.add(
-                            SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName()
-                                            + " maps to schema \"" + schema
-                                            + "\" but module " + module
-                                            + " owns " + allowed));
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName()
+                                    + " maps to schema \"" + schema
+                                    + "\" but module " + module
+                                    + " owns " + allowed));
                 }
             }
         };
     }
 
     /** The module is the first package segment below the application's root package. */
-    private static String moduleOf(
-            JavaClass javaClass) {
+    private static String moduleOf(JavaClass javaClass) {
 
         String prefix = CoopErpApplication.class.getPackageName() + ".";
         String pkg = javaClass.getPackageName();
@@ -623,42 +598,31 @@ class ArchitectureTests {
 
     private static ArchCondition<JavaClass> haveNonBlankPermission() {
 
-        return new ArchCondition<>(
-                "declare a non-blank @CommandHandler permission") {
+        return new ArchCondition<>("declare a non-blank @CommandHandler permission") {
             @Override
-            public void check(
-                    JavaClass javaClass,
-                    ConditionEvents events) {
+            public void check(JavaClass javaClass, ConditionEvents events) {
 
-                CommandHandler annotation = javaClass.reflect()
-                        .getAnnotation(
-                                CommandHandler.class);
+                CommandHandler annotation = javaClass.reflect().getAnnotation(CommandHandler.class);
 
                 boolean valid = annotation != null
                         && annotation.permission() != null
-                        && !annotation.permission()
-                                .isBlank();
+                        && !annotation.permission().isBlank();
 
                 if (!valid) {
 
-                    events.add(
-                            SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName()
-                                            + " has an empty "
-                                            + "@CommandHandler permission"));
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass, javaClass.getName() + " has an empty " + "@CommandHandler permission"));
                 } else if (annotation.permission().startsWith(SCAFFOLD_PLACEHOLDER)) {
                     // make new-module cannot know the real permission codes (cat.sku.create,
                     // gov.entity.activate ...), so it writes a placeholder. Forgetting to
                     // replace it would go unnoticed until permissions are enforced (19A K-03).
-                    events.add(
-                            SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName()
-                                            + " still has the scaffold placeholder permission \""
-                                            + annotation.permission()
-                                            + "\"; replace it, here and in the OpenAPI slice, with the"
-                                            + " permission code from the module's implementation guide"));
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName()
+                                    + " still has the scaffold placeholder permission \""
+                                    + annotation.permission()
+                                    + "\"; replace it, here and in the OpenAPI slice, with the"
+                                    + " permission code from the module's implementation guide"));
                 }
             }
         };
