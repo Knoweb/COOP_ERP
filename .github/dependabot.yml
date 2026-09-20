@@ -54,7 +54,7 @@ updates:
       web-minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # 17A section 3 fixes React 18 and Vite 5.
+      # 17A section 3 fixes React 18; Vite is held on the 6 line (CR-17A-2 moved it from 5).
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
