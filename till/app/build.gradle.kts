@@ -25,12 +25,17 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
+    }
+}
+
+// The Kotlin compiler's JVM target, in the compilerOptions DSL. The older form inside the
+// android block (kotlinOptions { jvmTarget = "17" }) is deprecated since Kotlin 2.0 and is an
+// error from Kotlin 2.4 on, so it would break the build the day the till moves Kotlin.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

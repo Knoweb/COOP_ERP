@@ -49,6 +49,13 @@ updates:
       # Without this hold a "minor and patch" group carried Kotlin 2.0 to 2.4 (#39).
       - dependency-name: "org.jetbrains.kotlin*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # The Gradle shorthand kotlin("android") and kotlin("jvm") in till/build.gradle.kts is
+      # named by Dependabot with the short word alone, "android" and "jvm", which the pattern
+      # above does not match: the first version of this hold let Kotlin 2.4 through again (#54).
+      - dependency-name: "android"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "jvm"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       # KSP and the Compose compiler plugin are versioned with Kotlin and move with it.
       - dependency-name: "com.google.devtools.ksp*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
