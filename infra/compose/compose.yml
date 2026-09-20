@@ -210,7 +210,7 @@ services:
   # Vite dev server with the web/ folder mounted, so an edit on the host reloads the page.
   # node_modules lives in a volume: the host's copy holds binaries for the host's system.
   web:
-    image: node:24-alpine
+    image: node:25-alpine
     working_dir: /app
     command:
       - /bin/sh
