@@ -2,6 +2,20 @@ spring:
   application:
     name: coop-erp-backend
 
+  # One artefact, three roles (17A section 4.1): web, worker, ingest. COOP_ERP_ROLE names the
+  # roles of this instance, as Spring profiles: "web" on a laptop, "web,worker" in the local
+  # stack, one role per instance in production. A role changes which components start, never
+  # the code: a component of one role carries @Profile("worker") (or web, or ingest).
+  # Without the web role an instance serves health and metrics and nothing else
+  # (kernel.internal.RoleHttpFilter).
+  profiles:
+    active: ${COOP_ERP_ROLE:web}
+
+  # Rolling deployment (doc 14 section 1.3): on shutdown stop taking requests, let the ones in
+  # flight finish, then stop.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
   # The application user. Defaults match infra/compose (`make up`): through PgBouncer on 6432,
   # as coop_app, a member of app_rw and never a superuser, because a superuser bypasses
   # row-level security. prepareThreshold=0: PgBouncer pools per transaction, so server-side
@@ -38,6 +52,9 @@ spring:
     events:
       republish-outstanding-events-on-restart: false
 
+server:
+  shutdown: graceful
+
 coop-erp:
   role: ${COOP_ERP_ROLE:web}
   business-timezone: Asia/Colombo
@@ -53,8 +70,16 @@ coop-erp:
     user: ${MIGRATION_USER:coop_migrator}
     password: ${MIGRATION_PASSWORD:coop_migrator}
 
+# Health and metrics (17A S0-02), under every role. /actuator/health/liveness and /readiness
+# are what an orchestrator probes; /actuator/prometheus is what a metrics server scrapes.
+# They are not protected yet: 19A K-02 brings authentication, and doc 35 decides whether the
+# management port is published at all.
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

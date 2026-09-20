@@ -1,13 +1,4 @@
-spring:
-  config:
-    activate:
-      on-profile: ingest
-
-coop-erp:
-  role: ingest
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+# Settings of the ingest role only (17A section 4.1). Loaded when COOP_ERP_ROLE names "ingest".
+# Starts: the edge sync ingestion consumers only, the burst role (19A, doc 32). No HTTP endpoints except health and metrics.
+# What every role shares is in application.yml; a component of this role alone carries
+# @Profile("ingest"). Nothing differs yet, so this file is empty on purpose.

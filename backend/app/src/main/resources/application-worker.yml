@@ -1,13 +1,4 @@
-spring:
-  config:
-    activate:
-      on-profile: worker
-
-coop-erp:
-  role: worker
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+# Settings of the worker role only (17A section 4.1). Loaded when COOP_ERP_ROLE names "worker".
+# Starts: the outbox relay, broker consumers, scheduled jobs, rendering, notifications (19A). No HTTP endpoints except health and metrics.
+# What every role shares is in application.yml; a component of this role alone carries
+# @Profile("worker"). Nothing differs yet, so this file is empty on purpose.

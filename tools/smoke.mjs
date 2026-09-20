@@ -65,6 +65,14 @@ await check("backend is healthy (so the database is migrated)", async () => {
   expect(health.status === "UP", `health is ${JSON.stringify(health)}`);
 });
 
+await check("readiness probe and metrics answer (17A S0-02: health and metrics)", async () => {
+  const readiness = await json(await fetch(`${BACKEND}/actuator/health/readiness`));
+  expect(readiness.status === "UP", `readiness is ${JSON.stringify(readiness)}`);
+  const metrics = await fetch(`${BACKEND}/actuator/prometheus`);
+  expect(metrics.status === 200, `/actuator/prometheus answered HTTP ${metrics.status}`);
+  expect((await metrics.text()).includes("jvm_memory_used_bytes"), "no JVM metrics in the Prometheus output");
+});
+
 await check("web client answers", async () => {
   const response = await fetch(`${WEB}/hello`);
   expect(response.status === 200, `HTTP ${response.status}`);
