@@ -109,6 +109,31 @@ describe("the shell assembled from module definitions", () => {
     expect(screen.getByText("Page not found")).toBeTruthy();
   });
 
+  // Every real module groups its screens under one parent route that has no page of its own:
+  // /party/entities, /party/locations. The guard must let the children through for a user who
+  // may see the module, and must still stop everybody else.
+  const grouped: ModuleDefinition = {
+    id: "grouped",
+    routes: [{ path: "party", children: [{ path: "entities", element: <p>the entities page</p> }] }],
+    navItems: [{ labelId: "hello.nav", to: "/party/entities" }],
+    requiredPermissions: ["hello.greeting.register"]
+  };
+
+  it("shows the screens under a parent route that has no page of its own", () => {
+    session = signedInAs("mpcs-admin");
+    renderShell([grouped], "/party/entities");
+
+    expect(screen.getByText("the entities page")).toBeTruthy();
+  });
+
+  it("guards the screens under such a parent route as well", () => {
+    session = signedInAs("cashier");
+    renderShell([grouped], "/party/entities");
+
+    expect(screen.queryByText("the entities page")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("not allowed");
+  });
+
   it("refuses to start with two modules of the same id", () => {
     expect(() => shellRoutes([greetings, { ...registerOnly, id: "greetings" }])).toThrow(/Two modules are registered with the id "greetings"/);
   });

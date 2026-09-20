@@ -54,6 +54,36 @@ for (const file of walk(JAVA_ROOT).filter((f) => f.endsWith(".java"))) {
   }
 }
 
+// The web client names permissions too: in a module definition (requiredPermissions), in
+// useHasPermission("..."), and in <RequirePermission anyOf={[...]}>. A wrong code there breaks
+// nothing loudly: the navigation entry or the button is simply hidden from everybody, because
+// nobody holds a permission that does not exist. So every permission-shaped string of a web
+// module must be an x-permission of that module's slice.
+const WEB_MODULES = path.resolve("web/src/modules");
+if (fs.existsSync(WEB_MODULES)) {
+  for (const entry of fs.readdirSync(WEB_MODULES, { withFileTypes: true }).filter((e) => e.isDirectory())) {
+    const module = entry.name;
+    const sources = walk(path.join(WEB_MODULES, module)).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f));
+    for (const file of sources) {
+      const source = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+      const where = path.relative(process.cwd(), file).split(path.sep).join("/");
+      const named = [
+        ...[...source.matchAll(/requiredPermissions\s*:\s*\[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/"([^"]+)"/g)]),
+        ...[...source.matchAll(/anyOf\s*=\s*\{\s*\[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/"([^"]+)"/g)]),
+        ...source.matchAll(/useHasPermission\(\s*"([^"]+)"/g)
+      ].map((m) => m[1]);
+
+      for (const permission of named) {
+        if (permission.startsWith(PLACEHOLDER)) {
+          problems.push(`${where}: permission "${permission}" is a scaffold placeholder; use the code from the module's guide`);
+        } else if (!sliceOf[module]?.has(permission)) {
+          problems.push(`${where}: permission "${permission}" is not the x-permission of any operation in openapi/${module}.yaml, so nobody holds it and what it guards is hidden from everybody`);
+        }
+      }
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error("Permission check failed:");
   for (const problem of problems) {
