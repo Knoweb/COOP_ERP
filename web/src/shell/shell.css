@@ -1,73 +1,342 @@
 /*
- * The frame of the back office: header (scope banner, user), navigation, shell messages.
- * Deliberately plain. The design tokens (colours, spacing, type) are S0-07 step 4; when they
- * exist, the literal values below become tokens. Do not grow a design system here.
+ * The rules of the back-office shell: the base of every page (font, text, controls), the frame
+ * (header, scope banner, navigation), the shell's messages and the shared components.
+ * Deliberately plain, and every colour, size and distance is a token of design/tokens.css. The
+ * only literals are the 1px of the screen-reader recipe and the 100vh of the training frame,
+ * which are mechanics and not design. Do not grow a component library here; the base library is open
+ * item E-03 (DECISIONS_PENDING.md) and arrives with M1's first forms.
  *
- * Colour is never the only signal (doc 30): every state below is also said in words by the
- * component. These rules only add emphasis.
+ * Colour is never the only signal (doc 30): every state below is also said in words, and where
+ * there is room with a symbol, by the component. These rules only add emphasis.
  */
+
+/* ---- Base: what every page gets without asking -------------------------------------------- */
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-normal);
+  /* 1.5 for headings too: Sinhala and Tamil stack marks above and below the letter. */
+  line-height: var(--line-height);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-2);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--line-height);
+}
+
+h1 {
+  font-size: var(--font-size-xl);
+}
+
+h2 {
+  font-size: var(--font-size-lg);
+}
+
+h3 {
+  font-size: var(--font-size-md);
+}
+
+p {
+  margin: 0 0 var(--space-2);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+/* Controls do not inherit the font of the page by themselves; without this a button is Arial. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Anything clicked is at least 48 x 48 px (doc 30, WCAG 2.2 target size). */
+button,
+input,
+select {
+  box-sizing: border-box;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-border-control);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+button {
+  cursor: pointer;
+}
+
+/* A disabled control keeps its text readable; the screen says in words why it is disabled. */
+button:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+  color: var(--color-text-muted);
+}
+
+/* Keyboard users must always see where they are. One ring, the accent, on everything. */
+:focus-visible {
+  outline: var(--border-width-strong) solid var(--color-accent);
+  outline-offset: var(--border-width-strong);
+}
+
+/* For a screen reader only: text that says what a symbol shows (the minus of a negative amount). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- The frame ---------------------------------------------------------------------------- */
 
 .shell-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid #999;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-subtle);
 }
 
 .scope-banner {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1.25rem;
-  padding: 0.25rem 0.5rem;
-  border-left: 0.4rem solid #1b5e20;
+  gap: var(--space-half) var(--space-3);
+  padding: var(--space-half) var(--space-1);
+  border-left: var(--border-width-marker) solid var(--color-accent);
 }
 
-/* Any class but OWN: the user looks at other parties' data. A heavier, dashed edge. */
+/* Any class but OWN: the user looks at other parties' data. A dashed edge and another ground. */
 .scope-banner--not-own {
-  border-left: 0.4rem dashed #8a4b00;
-  background: #fff4e0;
+  border-left: var(--border-width-marker) dashed var(--color-disputed-text);
+  background: var(--color-disputed-bg);
+  color: var(--color-text);
 }
 
 .scope-banner--warning {
-  border: 2px solid #b00020;
-  background: #fde7ea;
+  border: var(--border-width-strong) solid var(--color-alert-text);
+  background: var(--color-alert-bg);
+  color: var(--color-text);
 }
 
 .user-menu {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--target-gap);
   white-space: nowrap;
 }
 
 .shell-nav {
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid #ddd;
+  padding: 0 var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .shell-nav ul {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
+  gap: 0 var(--target-gap);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* The current page: bold and underlined, not only a colour. */
+/* A navigation entry is a target: 48 px high, its text in the middle. */
+.shell-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  padding: 0 var(--space-1);
+}
+
+/* The current page: strong and underlined, not only a colour. */
 .shell-nav a[aria-current="page"] {
-  font-weight: bold;
+  font-weight: var(--font-weight-strong);
   text-decoration: underline;
 }
 
 .shell-nav__empty {
   margin: 0;
+  padding: var(--space-1) 0;
 }
 
+/* The shape of a page: one readable column in the middle. Every module page uses it on <main>. */
+.shell-page,
 .shell-message {
-  max-width: 40rem;
+  max-width: var(--page-max-width);
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--space-4) var(--space-2);
+}
+
+/* The small "EN" mark beside a text that has no translation (shell/i18n/LangFallbackTag.tsx). */
+.lang-fallback-tag {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-half);
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* ---- Shared components (shell/components) ------------------------------------------------- */
+
+/*
+ * MoneyDisplay. Tabular figures give every digit the same width, so amounts in a column line up
+ * digit under digit and a total does not jump sideways while it changes. nowrap: an amount broken
+ * over two lines is read as two amounts.
+ */
+.money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.money--total {
+  font-size: var(--font-size-total);
+  font-weight: var(--font-weight-strong);
+}
+
+.money--invalid {
+  color: var(--color-text-muted);
+}
+
+/* StateChip: symbol, then the word. The colours come in pairs made for each other (tokens.css). */
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  white-space: nowrap;
+}
+
+.state-chip__symbol {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
+.state-chip--draft {
+  background: var(--color-draft-bg);
+  color: var(--color-draft-text);
+  /* A draft is not final yet, and the broken edge says so without any colour. */
+  border-style: dashed;
+}
+
+.state-chip--issued {
+  background: var(--color-issued-bg);
+  color: var(--color-issued-text);
+}
+
+.state-chip--disputed {
+  background: var(--color-disputed-bg);
+  color: var(--color-disputed-text);
+}
+
+.state-chip--void {
+  background: var(--color-void-bg);
+  color: var(--color-void-text);
+  /* No strike-through: a line through Sinhala or Tamil letters makes the word unreadable. */
+}
+
+.state-chip--alert {
+  background: var(--color-alert-bg);
+  color: var(--color-alert-text);
+}
+
+/*
+ * Training mode (doc 30 sections 2.2 and 2.3: "training mode is loud"). Three signals, so that no
+ * single one has to be noticed: the band across the top says it in words, the whole page sits in
+ * a frame of the training colour, and the header changes its ground.
+ */
+.training-badge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-half) var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-training);
+  color: var(--color-on-training);
+  text-align: center;
+}
+
+.training-badge__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-strong);
+}
+
+.shell--training {
+  box-sizing: border-box;
+  min-height: 100vh;
+  border: var(--border-width-marker) solid var(--color-training);
+  border-top: none;
+}
+
+.shell--training .shell-header {
+  background: var(--color-training-bg);
+}
+
+/* ---- The reference page /_design (shell/design/DesignPage.tsx) ---------------------------- */
+
+.design-page section {
+  margin-bottom: var(--space-6);
+  /* A wide table scrolls inside its section on a phone; the page itself never scrolls sideways. */
+  overflow-x: auto;
+}
+
+.design-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.design-page th,
+.design-page td {
+  padding: var(--space-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.design-page th {
+  background: var(--color-surface-subtle);
+  font-weight: var(--font-weight-strong);
+}
+
+.design-page code {
+  font-size: var(--font-size-sm);
+}
+
+.design-page__swatch {
+  display: inline-block;
+  padding: var(--space-half) var(--space-1);
+  border: var(--border-width) solid var(--color-border-control);
+  border-radius: var(--radius);
+}
+
+.design-page__bar {
+  height: var(--space-2);
+  background: var(--color-accent);
+}
+
+.design-page__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--target-gap);
 }

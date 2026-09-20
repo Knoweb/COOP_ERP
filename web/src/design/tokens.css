@@ -1,0 +1,119 @@
+/*
+ * The design tokens of the back office (doc 30 section 2.1). A token is a named value: a colour,
+ * a size, a distance. This file holds tokens and nothing else: no selector but :root, no rule
+ * that styles an element. The rules that use the tokens are in shell/shell.css.
+ *
+ * Why tokens: a screen that writes "#b00020" or "12px" has taken a design decision by itself,
+ * and forty screens written by fifteen people take forty different ones. A screen that writes
+ * var(--color-alert-text) has taken none, and a change here changes every screen at once.
+ * In web/src/modules a literal colour or length fails the build (design/moduleStyle.test.ts).
+ *
+ * Two rules for whoever changes this file:
+ *   1. Every colour is checked for contrast by design/tokens.test.ts (WCAG 2.2: 4.5:1 for text,
+ *      3:1 for large text, icons and the edges of controls). A new colour token must be added to
+ *      the pairs of that test, or to its list of decorative colours; the test fails otherwise.
+ *   2. Lengths are in rem, so that a user who has set a larger font in the browser gets a larger
+ *      screen, not only larger letters in boxes that stayed small. 1rem = 16 px unless the user
+ *      says otherwise; the comments give the px value doc 30 names. Hairlines stay in px.
+ *
+ * There is no dark theme. Doc 30 does not ask for one, and every pair would need its own check.
+ */
+
+:root {
+  /* ---- Type ------------------------------------------------------------------------------ */
+
+  /*
+   * One family name per script, because no single Noto file holds Latin, Sinhala and Tamil.
+   * The browser takes each character from the first font in the list that has it: Latin letters
+   * and ALL digits from Noto Sans, Sinhala from Noto Sans Sinhala, Tamil from Noto Sans Tamil.
+   * The three are bundled with the application (design/fonts.css); the names after them are
+   * only for the moment before the files have loaded.
+   */
+  --font-ui: "Noto Sans", "Noto Sans Sinhala", "Noto Sans Tamil", system-ui, -apple-system, "Segoe UI",
+    "Nirmala UI", "Iskoola Pota", "Latha", sans-serif;
+
+  /* The one type scale of doc 30: 12 / 14 / 16 / 20 / 28 / 40 px. There are no sizes between. */
+  --font-size-xs: 0.75rem; /* 12 px: tags, the EN mark */
+  --font-size-sm: 0.875rem; /* 14 px: secondary text, field errors, time stamps */
+  --font-size-md: 1rem; /* 16 px: body text, inputs, buttons */
+  --font-size-lg: 1.25rem; /* 20 px: section titles */
+  --font-size-xl: 1.75rem; /* 28 px: page titles */
+  --font-size-total: 2.5rem; /* 40 px: money totals, and nothing else */
+
+  /*
+   * 1.5 everywhere, headings included. Sinhala and Tamil stack marks above and below the letter;
+   * the tighter line height that suits an English heading cuts them off or makes lines collide.
+   */
+  --line-height: 1.5;
+
+  /* Two weights only: each further weight is another font file per script to download. */
+  --font-weight-normal: 400;
+  --font-weight-strong: 600;
+
+  /* ---- Space: the 8 px grid -------------------------------------------------------------- */
+
+  --space-half: 0.25rem; /* 4 px: the half step, inside a component only (icon to its label) */
+  --space-1: 0.5rem; /* 8 px */
+  --space-2: 1rem; /* 16 px */
+  --space-3: 1.5rem; /* 24 px */
+  --space-4: 2rem; /* 32 px */
+  --space-6: 3rem; /* 48 px */
+  --space-8: 4rem; /* 64 px */
+
+  /* ---- Targets --------------------------------------------------------------------------- */
+
+  /* Anything clicked or tapped is at least 48 x 48 px, with 12 px to the next target. */
+  --target-min: 3rem; /* 48 px */
+  --target-gap: 0.75rem; /* 12 px: the one distance that is not on the 8 px grid; doc 30 names it */
+
+  /* A page is shaped like a document: one column that stays readable on a wide monitor. */
+  --page-max-width: 40rem; /* 640 px */
+
+  /* ---- Edges ----------------------------------------------------------------------------- */
+
+  --border-width: 1px;
+  --border-width-strong: 2px;
+  --border-width-marker: 0.5rem; /* 8 px: the coloured edge of the scope banner */
+  --radius: 0.25rem; /* 4 px */
+  --radius-pill: 999rem; /* fully round ends, whatever the height */
+
+  /* ---- Colour: neutral surfaces ---------------------------------------------------------- */
+
+  --color-surface: #ffffff; /* the page */
+  --color-surface-subtle: #f4f5f7; /* header, table heads, panels */
+  --color-text: #1f2933; /* 14.76:1 on surface, 13.53:1 on subtle */
+  --color-text-muted: #52606d; /* 6.46:1 on surface, 5.92:1 on subtle */
+  --color-border: #d1d5db; /* decorative divider: carries no meaning, so no contrast demand */
+  --color-border-control: #6b7280; /* edge of an input or button: 4.83:1 on surface (needs 3:1) */
+
+  /* ---- Colour: the one accent ------------------------------------------------------------ */
+
+  /* Links, the primary button, the focus ring, the scope banner's edge. One accent, not three. */
+  --color-accent: #1b5e20; /* 7.87:1 on surface, 7.21:1 on subtle */
+  --color-on-accent: #ffffff; /* text on an accent background: 7.87:1 */
+
+  /* ---- Colour: document states ----------------------------------------------------------- */
+
+  /*
+   * Each state has a text colour and a background made for each other. Colour is never the only
+   * signal (doc 30, P-08): StateChip always adds a symbol and the word. About one man in twelve
+   * cannot tell the green of "issued" from the amber of "disputed".
+   */
+  --color-draft-text: #0d47a1; /* 7.56:1 on its background */
+  --color-draft-bg: #e3f2fd;
+  --color-issued-text: #1b5e20; /* 6.93:1 */
+  --color-issued-bg: #e6f4ea;
+  --color-disputed-text: #8a4b00; /* 6.24:1 */
+  --color-disputed-bg: #fff4e0;
+  --color-void-text: #424242; /* 8.66:1 */
+  --color-void-bg: #eeeeee;
+  --color-alert-text: #b00020; /* 6.21:1 on its background, 7.33:1 on surface (field errors) */
+  --color-alert-bg: #fde7ea;
+
+  /* ---- Colour: training mode ------------------------------------------------------------- */
+
+  /* A colour used for nothing else, so that practice can never be mistaken for the real thing. */
+  --color-training: #6a1b9a; /* 9.39:1 against surface, as a frame and as a background */
+  --color-on-training: #ffffff; /* 9.39:1 */
+  --color-training-bg: #f3e5f5; /* the header in training mode; text on it 13.0:1 */
+}

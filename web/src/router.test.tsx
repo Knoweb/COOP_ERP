@@ -45,7 +45,10 @@ function renderShell(modules: ModuleDefinition[], address: string, locale: Local
 }
 
 describe("the shell assembled from module definitions", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   it("mounts the routes of every registered module under the banner and the navigation", () => {
     session = signedInAs("mpcs-admin");
@@ -132,6 +135,44 @@ describe("the shell assembled from module definitions", () => {
 
     expect(screen.queryByText("the entities page")).toBeNull();
     expect(screen.getByRole("alert").textContent).toContain("not allowed");
+  });
+
+  it("shows the design reference to any signed-in user, in their language, and keeps it out of the navigation", () => {
+    // A cashier holds no permission that any module of this test asks for; the page needs none.
+    session = signedInAs("a-role-nobody-defined", "ta");
+    renderShell([greetings], "/_design", "ta");
+
+    expect(screen.getByRole("heading", { level: 1, name: "வடிவமைப்புக் குறிப்பு" })).toBeTruthy();
+    expect(screen.queryByRole("alert", { name: /அனுமதி/ })).toBeNull();
+    expect(screen.queryAllByRole("link").map((link) => link.getAttribute("href"))).not.toContain("/_design");
+  });
+
+  it("shows on the design reference the contrast of every colour pair, measured from the real tokens", () => {
+    session = signedInAs("cashier");
+    renderShell([greetings], "/_design");
+
+    // Body text on the page: #1f2933 on #ffffff. If this number changes, tokens.css changed.
+    expect(screen.getAllByText("14.76:1").length).toBeGreaterThan(0);
+    expect(screen.getByText("Rs 1,234,567.891")).toBeTruthy();
+  });
+
+  it("is silent about training outside training mode", () => {
+    session = signedInAs("cashier");
+    const { container } = renderShell([greetings], "/");
+
+    expect(screen.queryByRole("region", { name: "TRAINING MODE" })).toBeNull();
+    expect(container.querySelector(".shell--training")).toBeNull();
+  });
+
+  it("is loud in training mode: the band on top of every page and the frame around it", () => {
+    vi.stubEnv("VITE_TRAINING_MODE", "true");
+    session = signedInAs("cashier");
+    const { container } = renderShell([greetings], "/greetings");
+
+    expect(screen.getByRole("region", { name: "TRAINING MODE" })).toBeTruthy();
+    expect(container.querySelector(".shell--training")).toBeTruthy();
+    // The page is still there and usable: training mode changes how it looks, not what it does.
+    expect(screen.getByText("the greetings page")).toBeTruthy();
   });
 
   it("refuses to start with two modules of the same id", () => {
