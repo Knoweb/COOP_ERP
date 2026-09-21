@@ -10,7 +10,6 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.slf4j.MDC;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -34,10 +33,7 @@ public class ScopeFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain chain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
         ScopeContext scope = currentScope.get();
@@ -70,8 +66,7 @@ public class ScopeFilter extends OncePerRequestFilter {
             throw new ProblemException("scope.required");
         }
 
-        if (scope.activeScope() != null
-                && !scope.scopes().contains(scope.activeScope())) {
+        if (scope.activeScope() != null && !scope.scopes().contains(scope.activeScope())) {
             throw new ProblemException("scope.invalid");
         }
     }
