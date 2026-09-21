@@ -1,26 +1,41 @@
 -- M1 Party, Tenancy & Security
 -- party schema foundation
 
+
+-- =========================================================
+-- party.entity
+-- =========================================================
+
 CREATE TABLE party.entity (
     entity_id uuid PRIMARY KEY,
     entity_code varchar(12) NOT NULL UNIQUE,
 
     entity_type text NOT NULL
-        CHECK (entity_type IN ('FEDERATION', 'DISTRIBUTOR', 'MPCS')),
+        CHECK (
+            entity_type IN (
+                'FEDERATION',
+                'DISTRIBUTOR',
+                'MPCS'
+            )
+        ),
 
-    legal_name_en text NOT NULL COLLATE en_icu,
-    legal_name_si text COLLATE si_icu,
-    legal_name_ta text COLLATE ta_icu,
+    legal_name_en text NOT NULL COLLATE kernel.en_icu,
+    legal_name_si text COLLATE kernel.si_icu,
+    legal_name_ta text COLLATE kernel.ta_icu,
 
     registration_no varchar(40),
     vat_registration_no varchar(20),
     district varchar(40),
 
     financial_year_start_month smallint NOT NULL DEFAULT 1
-        CHECK (financial_year_start_month BETWEEN 1 AND 12),
+        CHECK (
+            financial_year_start_month BETWEEN 1 AND 12
+        ),
 
     default_language text NOT NULL DEFAULT 'en'
-        CHECK (default_language IN ('en', 'si', 'ta')),
+        CHECK (
+            default_language IN ('en', 'si', 'ta')
+        ),
 
     costing_policy text NOT NULL DEFAULT 'WEIGHTED_AVERAGE',
 
@@ -30,7 +45,13 @@ CREATE TABLE party.entity (
     data_governance_signed_on date,
 
     status text NOT NULL DEFAULT 'ONBOARDING'
-        CHECK (status IN ('ONBOARDING', 'ACTIVE', 'SUSPENDED')),
+        CHECK (
+            status IN (
+                'ONBOARDING',
+                'ACTIVE',
+                'SUSPENDED'
+            )
+        ),
 
     owner_entity_id uuid
         GENERATED ALWAYS AS (entity_id) STORED
@@ -40,6 +61,10 @@ CREATE UNIQUE INDEX one_federation
     ON party.entity ((entity_type))
     WHERE entity_type = 'FEDERATION';
 
+
+-- =========================================================
+-- party.entity_relationship
+-- =========================================================
 
 CREATE TABLE party.entity_relationship (
     relationship_id uuid PRIMARY KEY,
@@ -58,7 +83,13 @@ CREATE TABLE party.entity_relationship (
     allocation_rule text NOT NULL DEFAULT 'FCFS',
 
     status text NOT NULL DEFAULT 'DRAFT'
-        CHECK (status IN ('DRAFT', 'ACTIVE', 'SUSPENDED')),
+        CHECK (
+            status IN (
+                'DRAFT',
+                'ACTIVE',
+                'SUSPENDED'
+            )
+        ),
 
     effective_from date NOT NULL,
     effective_to date,
@@ -66,7 +97,9 @@ CREATE TABLE party.entity_relationship (
     owner_entity_id uuid
         GENERATED ALWAYS AS (seller_entity_id) STORED,
 
-    CHECK (seller_entity_id <> buyer_entity_id),
+    CHECK (
+        seller_entity_id <> buyer_entity_id
+    ),
 
     CHECK (
         effective_to IS NULL
@@ -78,13 +111,20 @@ CREATE TABLE party.entity_relationship (
         buyer_entity_id WITH =,
         daterange(
             effective_from,
-            coalesce(effective_to, 'infinity'::date),
+            coalesce(
+                effective_to,
+                'infinity'::date
+            ),
             '[]'
         ) WITH &&
     )
     WHERE (status = 'ACTIVE')
 );
 
+
+-- =========================================================
+-- party.location
+-- =========================================================
 
 CREATE TABLE party.location (
     location_id uuid PRIMARY KEY,
@@ -94,11 +134,17 @@ CREATE TABLE party.location (
     location_code varchar(12) NOT NULL,
 
     location_type text NOT NULL
-        CHECK (location_type IN ('WAREHOUSE', 'SHOP', 'OFFICE')),
+        CHECK (
+            location_type IN (
+                'WAREHOUSE',
+                'SHOP',
+                'OFFICE'
+            )
+        ),
 
-    name_en text NOT NULL COLLATE en_icu,
-    name_si text COLLATE si_icu,
-    name_ta text COLLATE ta_icu,
+    name_en text NOT NULL COLLATE kernel.en_icu,
+    name_si text COLLATE kernel.si_icu,
+    name_ta text COLLATE kernel.ta_icu,
 
     address text,
     district varchar(40),
@@ -107,12 +153,24 @@ CREATE TABLE party.location (
     geo_lng numeric(9,6),
 
     language text
-        CHECK (language IN ('en', 'si', 'ta')),
+        CHECK (
+            language IN (
+                'en',
+                'si',
+                'ta'
+            )
+        ),
 
     trading_hours jsonb,
 
     size_band text
-        CHECK (size_band IN ('S', 'M', 'L')),
+        CHECK (
+            size_band IN (
+                'S',
+                'M',
+                'L'
+            )
+        ),
 
     connectivity_spec_met boolean NOT NULL DEFAULT false,
 
@@ -128,9 +186,16 @@ CREATE TABLE party.location (
             )
         ),
 
-    UNIQUE (owner_entity_id, location_code)
+    UNIQUE (
+        owner_entity_id,
+        location_code
+    )
 );
 
+
+-- =========================================================
+-- Location owner immutability
+-- =========================================================
 
 CREATE OR REPLACE FUNCTION party.location_owner_immutable()
 RETURNS trigger
@@ -151,6 +216,10 @@ FOR EACH ROW
 EXECUTE FUNCTION party.location_owner_immutable();
 
 
+-- =========================================================
+-- party.till_position
+-- =========================================================
+
 CREATE TABLE party.till_position (
     till_position_id uuid PRIMARY KEY,
 
@@ -160,13 +229,25 @@ CREATE TABLE party.till_position (
     position_no smallint NOT NULL,
 
     status text NOT NULL DEFAULT 'ACTIVE'
-        CHECK (status IN ('ACTIVE', 'RETIRED')),
+        CHECK (
+            status IN (
+                'ACTIVE',
+                'RETIRED'
+            )
+        ),
 
     owner_entity_id uuid NOT NULL,
 
-    UNIQUE (location_id, position_no)
+    UNIQUE (
+        location_id,
+        position_no
+    )
 );
 
+
+-- =========================================================
+-- party.device
+-- =========================================================
 
 CREATE TABLE party.device (
     device_id uuid PRIMARY KEY,
@@ -206,3 +287,295 @@ CREATE TABLE party.device (
 CREATE UNIQUE INDEX one_device_per_position
     ON party.device (current_till_position_id)
     WHERE current_till_position_id IS NOT NULL;
+
+
+-- =========================================================
+-- Row-level security
+-- =========================================================
+
+
+-- =========================================================
+-- party.entity RLS
+-- =========================================================
+
+ALTER TABLE party.entity
+    ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE party.entity
+    FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY own_read
+    ON party.entity
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_write
+    ON party.entity
+    FOR INSERT
+    TO app_rw
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_update
+    ON party.entity
+    FOR UPDATE
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    )
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY fed_view
+    ON party.entity
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'FEDERATION_VIEW'
+    );
+
+
+-- =========================================================
+-- party.entity_relationship RLS
+-- =========================================================
+
+ALTER TABLE party.entity_relationship
+    ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE party.entity_relationship
+    FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY own_read
+    ON party.entity_relationship
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_write
+    ON party.entity_relationship
+    FOR INSERT
+    TO app_rw
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_update
+    ON party.entity_relationship
+    FOR UPDATE
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    )
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY fed_view
+    ON party.entity_relationship
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'FEDERATION_VIEW'
+    );
+
+
+-- =========================================================
+-- party.location RLS
+-- =========================================================
+
+ALTER TABLE party.location
+    ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE party.location
+    FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY own_read
+    ON party.location
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    );
+
+CREATE POLICY own_write
+    ON party.location
+    FOR INSERT
+    TO app_rw
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_update
+    ON party.location
+    FOR UPDATE
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    )
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    );
+
+CREATE POLICY fed_view
+    ON party.location
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'FEDERATION_VIEW'
+    );
+
+
+-- =========================================================
+-- party.till_position RLS
+-- =========================================================
+
+ALTER TABLE party.till_position
+    ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE party.till_position
+    FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY own_read
+    ON party.till_position
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    );
+
+CREATE POLICY own_write
+    ON party.till_position
+    FOR INSERT
+    TO app_rw
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    );
+
+CREATE POLICY own_update
+    ON party.till_position
+    FOR UPDATE
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    )
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+        AND (
+            kernel.scope_location() IS NULL
+            OR location_id = kernel.scope_location()
+        )
+    );
+
+CREATE POLICY fed_view
+    ON party.till_position
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'FEDERATION_VIEW'
+    );
+
+
+-- =========================================================
+-- party.device RLS
+-- =========================================================
+
+ALTER TABLE party.device
+    ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE party.device
+    FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY own_read
+    ON party.device
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_write
+    ON party.device
+    FOR INSERT
+    TO app_rw
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY own_update
+    ON party.device
+    FOR UPDATE
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    )
+    WITH CHECK (
+        kernel.scope_class() = 'OWN'
+        AND owner_entity_id = kernel.scope_entity()
+    );
+
+CREATE POLICY fed_view
+    ON party.device
+    FOR SELECT
+    TO app_rw
+    USING (
+        kernel.scope_class() = 'FEDERATION_VIEW'
+    );
+
+
+-- =========================================================
+-- Grants
+-- =========================================================
+
+GRANT SELECT, INSERT, UPDATE
+    ON ALL TABLES IN SCHEMA party
+    TO app_rw;
