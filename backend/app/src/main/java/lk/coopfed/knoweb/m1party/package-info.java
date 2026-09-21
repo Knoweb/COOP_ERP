@@ -10,4 +10,3 @@
         displayName = "M1 Party, Tenancy & Security",
         allowedDependencies = {"kernel"})
 package lk.coopfed.knoweb.m1party;
-
