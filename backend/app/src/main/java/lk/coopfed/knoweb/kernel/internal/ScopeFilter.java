@@ -24,7 +24,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 @Component
 @Profile("web")
-@Order(Ordered.HIGHEST_PRECEDENCE + 20)
+@Order(-100) // Must run after RequestContextFilter (-105)
 public class ScopeFilter extends OncePerRequestFilter {
 
     private final CurrentScope currentScope;
