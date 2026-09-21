@@ -13,6 +13,10 @@ include::module-engine.adoc[]
 plantuml::module-kernel.puml[,,format=svg]
 include::module-kernel.adoc[]
 
+== M1 Party, Tenancy & Security
+plantuml::module-m1party.puml[,,format=svg]
+include::module-m1party.adoc[]
+
 == Hello (template module)
 plantuml::module-hello.puml[,,format=svg]
 include::module-hello.adoc[]
