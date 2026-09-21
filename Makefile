@@ -70,12 +70,18 @@ image:
 # --wait blocks until every service reports healthy, so when this returns the database is
 # migrated (the backend runs Flyway at start) and the dev realm is imported.
 # --remove-orphans clears the second backend and nginx left behind by an earlier `make up-2`.
+# The web container mounts a volume at web/node_modules. When that folder does not exist yet
+# (a fresh clone), Docker creates it, and on Linux it then belongs to root: the next
+# `pnpm install` on the host fails with "Permission denied". That is what broke the nightly
+# fresh clone. Creating it first keeps it the caller's.
 up: image
+	@mkdir -p web/node_modules
 	$(COMPOSE) up --detach --wait --remove-orphans
 	@$(MAKE) --no-print-directory seed
 	@$(MAKE) --no-print-directory urls
 
 up-2: image
+	@mkdir -p web/node_modules
 	$(COMPOSE_TWO) up --detach --wait --remove-orphans
 	@$(MAKE) --no-print-directory seed
 	@$(MAKE) --no-print-directory urls
