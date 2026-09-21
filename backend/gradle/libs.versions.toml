@@ -22,6 +22,16 @@ openapi-generator = "7.25.0"
 spotless = "8.10.2"
 palantir-java-format = "2.74.0"    # the formatter Spotless runs
 
+# Security patches ahead of Spring Boot. These two libraries ARE managed by Spring Boot; the
+# entries below override its version (backend/app/build.gradle.kts sets tomcat.version and
+# postgresql.version from them) because the vulnerability scan found advisories whose fix is
+# newer than what Spring Boot 3.5.16 carries. An override leaves the set Spring tests
+# together, so each one is temporary: `checkVersionOverrides` (part of `check`) fails the
+# build as soon as Spring Boot manages the same version or a newer one, and the entry and its
+# line in the build file are then deleted. Dependabot does not see these entries.
+tomcat = "10.1.60"                 # Boot 3.5.16: 10.1.55. CVE-2026-65182, -65905, -68525 (CRITICAL), "fixed in 10.1.58", which was never published: 10.1.59 is the first release with the fix.
+postgresql = "42.7.12"             # Boot 3.5.16: 42.7.11. CVE-2026-54291 (HIGH), fixed in 42.7.12.
+
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

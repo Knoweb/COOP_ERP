@@ -79,6 +79,61 @@ openApiSlices.forEach { slice ->
 
 tasks.compileJava { dependsOn(generateOpenApi) }
 
+// Security patches ahead of Spring Boot: the property names are Spring Boot's own
+// (spring-boot-dependencies), the versions and the reasons are in the catalogue.
+val managedVersionOverrides =
+    mapOf(
+        "tomcat.version" to libs.versions.tomcat.get(),
+        "postgresql.version" to libs.versions.postgresql.get(),
+    )
+
+managedVersionOverrides.forEach { (property, version) -> extra[property] = version }
+
+// An override that Spring Boot has caught up with holds the library BACK from then on. This
+// reads the versions out of Spring Boot's own bill of materials and fails when one of ours is
+// no longer ahead of it, so a Spring Boot update cannot leave a stale override behind.
+val springBootBom =
+    configurations.detachedConfiguration(
+        dependencies.create(
+            "org.springframework.boot:spring-boot-dependencies:${libs.versions.spring.boot.get()}@pom"
+        )
+    )
+
+val checkVersionOverrides by
+    tasks.registering {
+        group = "verification"
+        description = "Fails when Spring Boot manages a version we still override."
+        val bom: FileCollection = springBootBom
+        val overrides = managedVersionOverrides
+        inputs.files(bom)
+        inputs.property("overrides", overrides)
+        doLast {
+            val pom = bom.singleFile.readText()
+            fun parts(version: String) = version.split('.', '-').map { it.toIntOrNull() ?: 0 }
+            fun newer(a: String, b: String): Boolean {
+                val (x, y) = parts(a) to parts(b)
+                for (i in 0 until maxOf(x.size, y.size)) {
+                    val d = x.getOrElse(i) { 0 } - y.getOrElse(i) { 0 }
+                    if (d != 0) return d > 0
+                }
+                return false
+            }
+            overrides.forEach { (property, ours) ->
+                val managed =
+                    Regex("<${Regex.escape(property)}>([^<]+)</").find(pom)?.groupValues?.get(1)
+                        ?: throw GradleException("Spring Boot no longer manages $property: remove the override.")
+                if (!newer(ours, managed)) {
+                    throw GradleException(
+                        "Spring Boot manages $property $managed, the override says $ours: " +
+                            "delete the override here and its entry in gradle/libs.versions.toml."
+                    )
+                }
+            }
+        }
+    }
+
+tasks.check { dependsOn(checkVersionOverrides) }
+
 dependencies {
     implementation(project(":shared-engine"))
 
