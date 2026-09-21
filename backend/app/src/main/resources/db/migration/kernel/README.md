@@ -23,11 +23,12 @@ changes the table above in the same pull request.
 Module migrations are not affected: each module has its own folder and its own Flyway history
 table, so every module starts again at `V0001`.
 
-## The order the files are merged in matters — today it must be ascending
+## The lanes may merge in any order: locally yes, deployed no
 
-`FlywayConfig` runs with `outOfOrder = false` and `validateOnMigrate = true`. Measured against
-PostgreSQL 16 on 21 September 2026: after `V0030` has been applied, adding `V0010` and
-migrating again does **not** apply it and does **not** skip it quietly. It fails:
+Flyway is strict by default (`coop-erp.migration.out-of-order`, default `false`, with
+`validateOnMigrate = true`). Measured against PostgreSQL 16 on 21 September 2026: under the
+strict setting, after `V0030` has been applied, adding `V0010` and migrating again does **not**
+apply it and does **not** skip it quietly. It fails:
 
 ```
 FlywayValidateException: Validate failed: Migrations have failed validation
@@ -39,11 +40,21 @@ Flyway runs that validation inside `migrate()`, and `FlywayConfig.migrate()` is 
 `outOfOrder = true` applies `V0010` and logs that the schema is no longer reproducible.
 
 A fresh database is never affected — CI, Testcontainers and `make reset` migrate in ascending
-order whatever the merge order was — so this fails on developer machines and on any long-lived
-environment while the pipeline stays green. Until the setting is decided (it is in this pull
-request's "Needs the architect"), **merge the kernel's ranges in ascending order**, or run
-`make reset` after pulling a lane whose numbers are lower than what your database already has.
-Nothing in this pull request changes Flyway's behaviour.
+order whatever the merge order was — so under the strict setting this would fail on developer
+machines while the pipeline stays green.
+
+Decided by the architect on 21 September 2026: **the local stack allows it, nothing else does.**
+`infra/compose/compose.yml` sets `MIGRATION_OUT_OF_ORDER=true` for the backend, so a developer's
+database survives the lanes merging in any order. The application's own default stays strict,
+because a deployed database must be reproducible from the files in ascending order;
+`MigrationOrderDefaultTest` pins both halves. Two consequences:
+
+- A backend started outside compose (from the IDE, against the compose database) is strict. Set
+  `MIGRATION_OUT_OF_ORDER=true` for it, or run `make reset`.
+- **Before the first deployed environment exists, the question closes by itself:** from then on
+  a migration is only ever added above the highest version that environment has applied, which
+  is the ordinary Flyway rule, and the ranges above have served their purpose. Doc 35
+  (deployment) is where that is written down.
 
 ## The rest of the conventions
 

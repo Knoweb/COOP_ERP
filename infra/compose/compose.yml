@@ -179,6 +179,10 @@ services:
       MIGRATION_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-coop_erp}
       MIGRATION_USER: ${MIGRATION_DB_USER:-coop_migrator}
       MIGRATION_PASSWORD: ${MIGRATION_DB_PASSWORD:-coop_migrator}
+      # Local stack only: the kernel lanes of 19A merge their reserved Flyway ranges in any
+      # order, and this database outlives those merges. Without it the backend refuses to start
+      # when V0010 arrives after V0030. A deployed environment keeps the strict default.
+      MIGRATION_OUT_OF_ORDER: ${MIGRATION_OUT_OF_ORDER:-true}
     ports:
       - "8080:8080"
     depends_on:
