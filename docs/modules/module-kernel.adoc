@@ -11,4 +11,6 @@
 * `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.stub.LoggingAuditFacade`)
 * `l.c.k.k.api.EventPublisher` (via `l.c.k.k.internal.stub.LoggingEventPublisher`)
 * `l.c.k.k.api.ConfigRegistry` (via `l.c.k.k.internal.stub.SeedConfigRegistry`)
+|Events listened to
+|* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===

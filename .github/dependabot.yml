@@ -21,8 +21,10 @@ updates:
       backend-minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # 17A section 3 fixes Spring Boot 3.3.x and Spring Modulith 1.2.x. Patch updates are
-      # welcome; a newer minor or major line is an architect's decision, recorded as an ADR.
+      # Spring Boot is held on 3.5.x and Spring Modulith on 1.4.x (CR-17A-2, accepted by the
+      # architect on 2026-09-21; 17A section 3 said 3.3.x / 1.2.x and is re-issued with it).
+      # Patch updates are welcome; a newer minor or major line is an architect's decision,
+      # recorded as an ADR. The hold below is by update type, so it works on any line.
       - dependency-name: "org.springframework.boot*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "org.springframework.modulith*"

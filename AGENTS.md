@@ -37,7 +37,7 @@ If two documents disagree: the register decides versions; the design document's 
 
 ## Stack (fixed)
 
-Java 21, Spring Boot 3.3, Spring Modulith 1.2, PostgreSQL 16 (ICU collations, `pg_trgm`, `btree_gist`, `pgcrypto`), Flyway, Gradle (Kotlin DSL), Testcontainers, ArchUnit. Web: React 18, TypeScript 5, Vite, TanStack Query, OpenAPI-generated clients. Till: Kotlin 2, Jetpack Compose, Room + SQLCipher, WorkManager, Hilt, minSdk 30. Shared engine: pure Kotlin JVM library used by backend and till. Local: docker compose (PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit). Identity provider and broker are assumptions behind interfaces (`IdentityProviderClient`, `BrokerAdapter`); do not couple code to Keycloak or RabbitMQ specifics.
+Java 21, Spring Boot 3.5, Spring Modulith 1.4 (CR-17A-2; 17A section 3 says 3.3 / 1.2 until it is re-issued), PostgreSQL 16 (ICU collations, `pg_trgm`, `btree_gist`, `pgcrypto`), Flyway, Gradle (Kotlin DSL), Testcontainers, ArchUnit. Web: React 18, TypeScript 5, Vite, TanStack Query, OpenAPI-generated clients. Till: Kotlin 2, Jetpack Compose, Room + SQLCipher, WorkManager, Hilt, minSdk 30. Shared engine: pure Kotlin JVM library used by backend and till. Local: docker compose (PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit). Identity provider and broker are assumptions behind interfaces (`IdentityProviderClient`, `BrokerAdapter`); do not couple code to Keycloak or RabbitMQ specifics.
 
 ## Repository layout (from 17A)
 
