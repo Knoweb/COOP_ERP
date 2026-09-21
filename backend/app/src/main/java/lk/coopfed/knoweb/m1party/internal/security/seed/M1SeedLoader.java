@@ -14,7 +14,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 public class M1SeedLoader {
@@ -23,6 +23,7 @@ public class M1SeedLoader {
 
     private final JdbcClient jdbc;
     private final ConfigSeeder configSeeder;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("classpath:seed/m1party/permissions.yaml")
     private Resource permissionsResource;
@@ -36,31 +37,33 @@ public class M1SeedLoader {
     @Value("classpath:seed/m1party/config.yaml")
     private Resource configResource;
 
-    public M1SeedLoader(JdbcClient jdbc, ConfigSeeder configSeeder) {
+    public M1SeedLoader(JdbcClient jdbc, ConfigSeeder configSeeder, TransactionTemplate transactionTemplate) {
         this.jdbc = jdbc;
         this.configSeeder = configSeeder;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Transactional
     public void loadSeeds() {
         log.info("Loading M1 seeds...");
         ObjectMapper mapper = new ObjectMapper();
 
-        try {
-            jdbc.sql("SET LOCAL app.scope_class = 'SYSTEM_SEED'").update();
-            loadConfig(mapper);
-            loadPermissions(mapper);
-            loadRoleTemplates(mapper);
-            loadSodPairs(mapper);
-            bumpCatalogueVersion();
-            log.info("M1 seeds loaded successfully.");
-        } catch (Exception e) {
-            log.error("Failed to load M1 seeds", e);
-            throw new RuntimeException("Seed loading failed", e);
-        } finally {
-            jdbc.sql("RESET app.scope_class").update();
-        }
+        transactionTemplate.executeWithoutResult(status -> {
+            try {
+                jdbc.sql("SET app.scope_class = 'SYSTEM_SEED'").update();
+                loadConfig(mapper);
+                loadPermissions(mapper);
+                loadRoleTemplates(mapper);
+                loadSodPairs(mapper);
+                bumpCatalogueVersion();
+                log.info("M1 seeds loaded successfully.");
+            } catch (Exception e) {
+                log.error("Failed to load M1 seeds", e);
+                throw new RuntimeException("Seed loading failed", e);
+            } finally {
+                jdbc.sql("RESET app.scope_class").update();
+            }
+        });
     }
 
     private <T> T loadYaml(Resource resource, ObjectMapper mapper, Class<T> type) {

@@ -28,6 +28,9 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
         // Run seed loader manually to ensure it works on demand and is idempotent
         seedLoader.loadSeeds();
 
+        // loadSeeds() resets the connection's app.scope_class, so we must re-apply it for the test's queries
+        jdbc.sql("SET LOCAL app.scope_class = 'FEDERATION_VIEW'").update();
+
         // Verify config
         assertThat(configRegistry.get("trade.federation_direct.enabled", null))
                 .isPresent()
@@ -59,6 +62,9 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
 
         // Second pass: should not throw exception (Idempotent)
         seedLoader.loadSeeds();
+
+        // Re-apply scope again after the second pass resets it
+        jdbc.sql("SET LOCAL app.scope_class = 'FEDERATION_VIEW'").update();
 
         int permCountAfter = jdbc.sql("SELECT COUNT(*) FROM security.permission")
                 .query(Integer.class)
