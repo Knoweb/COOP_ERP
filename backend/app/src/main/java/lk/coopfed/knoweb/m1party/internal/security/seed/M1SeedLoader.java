@@ -24,16 +24,16 @@ public class M1SeedLoader {
     private final JdbcClient jdbc;
     private final ConfigSeeder configSeeder;
 
-    @Value("classpath:seed/m1/permissions.yaml")
+    @Value("classpath:seed/m1party/permissions.yaml")
     private Resource permissionsResource;
 
-    @Value("classpath:seed/m1/role-templates.yaml")
+    @Value("classpath:seed/m1party/role-templates.yaml")
     private Resource roleTemplatesResource;
 
-    @Value("classpath:seed/m1/sod-pairs.yaml")
+    @Value("classpath:seed/m1party/sod-pairs.yaml")
     private Resource sodPairsResource;
 
-    @Value("classpath:seed/m1/config.yaml")
+    @Value("classpath:seed/m1party/config.yaml")
     private Resource configResource;
 
     public M1SeedLoader(JdbcClient jdbc, ConfigSeeder configSeeder) {
