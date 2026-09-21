@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
-
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,8 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
     void seedLocations() {
         JdbcTemplate admin = superuserJdbc();
 
-        admin.execute("""
+        admin.execute(
+                """
                 truncate table
                     party.device,
                     party.till_position,
@@ -53,51 +53,30 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void ownScopeReadsOnlyItsEntityRows() {
-        List<UUID> visible = visibleLocations(
-                ENTITY_A,
-                null,
-                "OWN");
+        List<UUID> visible = visibleLocations(ENTITY_A, null, "OWN");
 
-        assertThat(visible)
-                .containsExactlyInAnyOrder(
-                        LOCATION_A1,
-                        LOCATION_A2);
+        assertThat(visible).containsExactlyInAnyOrder(LOCATION_A1, LOCATION_A2);
     }
 
     @Test
     void locationScopedOwnUserCannotReadSiblingShop() {
-        List<UUID> visible = visibleLocations(
-                ENTITY_A,
-                LOCATION_A1,
-                "OWN");
+        List<UUID> visible = visibleLocations(ENTITY_A, LOCATION_A1, "OWN");
 
-        assertThat(visible)
-                .containsExactly(LOCATION_A1);
+        assertThat(visible).containsExactly(LOCATION_A1);
     }
 
     @Test
     void federationViewReadsAcrossEntities() {
-        List<UUID> visible = visibleLocations(
-                ENTITY_A,
-                null,
-                "FEDERATION_VIEW");
+        List<UUID> visible = visibleLocations(ENTITY_A, null, "FEDERATION_VIEW");
 
-        assertThat(visible)
-                .containsExactlyInAnyOrder(
-                        LOCATION_A1,
-                        LOCATION_A2,
-                        LOCATION_B1);
+        assertThat(visible).containsExactlyInAnyOrder(LOCATION_A1, LOCATION_A2, LOCATION_B1);
     }
 
     @Test
     void federationViewCannotWrite() {
         UUID attemptedLocation = UUID.fromString("00000000-0000-0000-0000-000000000999");
 
-        assertThatThrownBy(() -> inScope(
-                ENTITY_A,
-                null,
-                "FEDERATION_VIEW",
-                () -> {
+        assertThatThrownBy(() -> inScope(ENTITY_A, null, "FEDERATION_VIEW", () -> {
                     jdbc.update(
                             """
                                     insert into party.location (
@@ -128,28 +107,19 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
          * fall through the OWN policy merely because scope_entity_id happens to
          * match a row owner.
          */
-        List<UUID> visible = visibleLocations(
-                ENTITY_A,
-                null,
-                "EXTERNAL_TIMEBOXED");
+        List<UUID> visible = visibleLocations(ENTITY_A, null, "EXTERNAL_TIMEBOXED");
 
         assertThat(visible).isEmpty();
     }
 
     @Test
     void noneScopeReadsNothing() {
-        List<UUID> visible = visibleLocations(
-                null,
-                null,
-                "NONE");
+        List<UUID> visible = visibleLocations(null, null, "NONE");
 
         assertThat(visible).isEmpty();
     }
 
-    private List<UUID> visibleLocations(
-            UUID entityId,
-            UUID locationId,
-            String policyClass) {
+    private List<UUID> visibleLocations(UUID entityId, UUID locationId, String policyClass) {
 
         return inScope(
                 entityId,
@@ -164,29 +134,17 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
                         UUID.class));
     }
 
-    private <T> T inScope(
-            UUID entityId,
-            UUID locationId,
-            String policyClass,
-            Supplier<T> work) {
+    private <T> T inScope(UUID entityId, UUID locationId, String policyClass, Supplier<T> work) {
 
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
         return transaction.execute(status -> {
-            jdbc.queryForObject(
-                    "select set_config('app.scope_entity_id', ?, true)",
-                    String.class,
-                    setting(entityId));
+            jdbc.queryForObject("select set_config('app.scope_entity_id', ?, true)", String.class, setting(entityId));
 
             jdbc.queryForObject(
-                    "select set_config('app.scope_location_id', ?, true)",
-                    String.class,
-                    setting(locationId));
+                    "select set_config('app.scope_location_id', ?, true)", String.class, setting(locationId));
 
-            jdbc.queryForObject(
-                    "select set_config('app.scope_class', ?, true)",
-                    String.class,
-                    policyClass);
+            jdbc.queryForObject("select set_config('app.scope_class', ?, true)", String.class, policyClass);
 
             try {
                 return work.get();
@@ -203,11 +161,7 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static void insertLocation(
-            JdbcTemplate admin,
-            UUID locationId,
-            UUID ownerEntityId,
-            String code,
-            String name) {
+            JdbcTemplate admin, UUID locationId, UUID ownerEntityId, String code, String name) {
 
         admin.update(
                 """
