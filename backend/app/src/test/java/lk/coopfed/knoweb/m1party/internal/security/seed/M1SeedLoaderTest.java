@@ -2,7 +2,7 @@ package lk.coopfed.knoweb.m1party.internal.security.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import lk.coopfed.knoweb.kernel.internal.stub.SeedConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,7 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
     private JdbcClient jdbc;
 
     @Autowired
-    private SeedConfigRegistry configRegistry;
+    private ConfigRegistry configRegistry;
 
     @Test
     @org.springframework.transaction.annotation.Transactional

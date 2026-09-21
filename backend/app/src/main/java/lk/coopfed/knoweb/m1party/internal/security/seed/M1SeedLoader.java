@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import lk.coopfed.knoweb.kernel.internal.stub.SeedConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.ConfigSeeder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +22,7 @@ public class M1SeedLoader {
     private static final Logger log = LoggerFactory.getLogger(M1SeedLoader.class);
 
     private final JdbcClient jdbc;
-    private final SeedConfigRegistry configRegistry;
+    private final ConfigSeeder configSeeder;
 
     @Value("classpath:seed/m1/permissions.yaml")
     private Resource permissionsResource;
@@ -36,9 +36,9 @@ public class M1SeedLoader {
     @Value("classpath:seed/m1/config.yaml")
     private Resource configResource;
 
-    public M1SeedLoader(JdbcClient jdbc, SeedConfigRegistry configRegistry) {
+    public M1SeedLoader(JdbcClient jdbc, ConfigSeeder configSeeder) {
         this.jdbc = jdbc;
-        this.configRegistry = configRegistry;
+        this.configSeeder = configSeeder;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -77,7 +77,7 @@ public class M1SeedLoader {
         for (SeedRecords.ConfigData data : seed.config()) {
             configs.put(data.key(), data.value());
         }
-        configRegistry.addDefaults(configs);
+        configSeeder.addDefaults(configs);
         log.info("Loaded {} config seeds into SeedConfigRegistry", configs.size());
     }
 

@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.ConfigSeeder;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
  * {@code coop-erp.business-timezone}, the same property the business date uses.
  */
 @Component
-public class SeedConfigRegistry implements ConfigRegistry {
+public class SeedConfigRegistry implements ConfigRegistry, ConfigSeeder {
 
     private final Map<String, String> defaults = new ConcurrentHashMap<>();
 
@@ -24,6 +25,7 @@ public class SeedConfigRegistry implements ConfigRegistry {
         defaults.put("business.timezone", businessTimezone);
     }
 
+    @Override
     public void addDefaults(Map<String, String> items) {
         defaults.putAll(items);
     }
