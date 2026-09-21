@@ -1,0 +1,5 @@
+config:
+  - key: "trade.federation_direct.enabled"
+    value: "false"
+  - key: "security.policy.mfa_enabled"
+    value: "true"

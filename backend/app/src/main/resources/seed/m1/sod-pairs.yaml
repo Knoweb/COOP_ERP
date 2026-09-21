@@ -1,0 +1,9 @@
+pairs:
+  - id: "01921319-dfc4-7264-b580-c11df5ed4c53"
+    permission_a: "gov.role.manage"
+    permission_b: "gov.user.manage"
+    mode: "INSTANCE"
+  - id: "0192131a-0518-7ba6-8f3a-965a956edb3b"
+    permission_a: "gov.entity.manage"
+    permission_b: "gov.external.grant"
+    mode: "INSTANCE"
