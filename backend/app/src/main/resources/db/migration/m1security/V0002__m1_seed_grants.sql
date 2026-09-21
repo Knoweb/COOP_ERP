@@ -3,6 +3,9 @@
 
 GRANT INSERT, UPDATE ON security.permission TO app_rw;
 GRANT INSERT ON security.permission_catalogue_version TO app_rw;
+GRANT INSERT ON security.role TO app_rw;
+GRANT INSERT ON security.role_permission TO app_rw;
+GRANT INSERT ON security.sod_pair TO app_rw;
 
 CREATE POLICY seed_write ON security.permission
     FOR ALL
