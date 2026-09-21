@@ -35,6 +35,11 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "jvm"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # ShedLock (declared in the catalogue for 19A K-12) is held on the 6 line: 6.x is built
+      # against Spring Framework 6.2, which Spring Boot 3.5 carries, and 7.x against Spring
+      # Framework 7, which is Spring Boot 4. It moves when Spring Boot does, by decision.
+      - dependency-name: "net.javacrumbs.shedlock*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: gradle
     directory: /till
