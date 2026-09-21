@@ -132,7 +132,7 @@ Changed the slice? Run `make gen-clients` and commit `web/src/generated/hello.ts
 | OpenAPI-first controller and generated web client | Passes: the controller implements the generated `HelloApi`, the page posts a greeting and lists it |
 | i18n end to end | Web passes in three languages with the EN fallback tag. The till screen is open |
 | Shared engine reachable from both sides | Backend passes (`SharedEngineSmokeTest`); the till-side parity test is open |
-| Two instances | Open: needs the login flow (S0-07) for the Playwright run. Known limit: the idempotency store is in memory, so a retry that lands on the other instance is refused as a duplicate instead of replayed, until 19A K-03 |
+| Two instances | Passes: the pipeline's stack-smoke job starts two backend instances behind nginx (`make up-2`), runs `make smoke TWO=1` and then the Playwright suite (`make e2e`, S0-07 step 5) against them. Known limit: the idempotency store is in memory, so a retry that lands on the other instance is refused as a duplicate instead of replayed, until 19A K-03 |
 
 ## Deviations from 17A, with reasons
 
