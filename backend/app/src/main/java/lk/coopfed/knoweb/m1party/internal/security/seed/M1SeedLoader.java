@@ -50,7 +50,7 @@ public class M1SeedLoader {
 
         transactionTemplate.executeWithoutResult(status -> {
             try {
-                jdbc.sql("SET app.scope_class = 'SYSTEM_SEED'").update();
+                jdbc.sql("SET LOCAL app.scope_class = 'SYSTEM_SEED'").update();
                 loadConfig(mapper);
                 loadPermissions(mapper);
                 loadRoleTemplates(mapper);
@@ -60,8 +60,6 @@ public class M1SeedLoader {
             } catch (Exception e) {
                 log.error("Failed to load M1 seeds", e);
                 throw new RuntimeException("Seed loading failed", e);
-            } finally {
-                jdbc.sql("RESET app.scope_class").update();
             }
         });
     }
