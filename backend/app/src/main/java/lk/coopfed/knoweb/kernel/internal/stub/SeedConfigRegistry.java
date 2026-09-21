@@ -25,6 +25,10 @@ public class SeedConfigRegistry implements ConfigRegistry {
         defaults.put("business.timezone", businessTimezone);
     }
 
+    public void addDefaults(Map<String, String> items) {
+        defaults.putAll(items);
+    }
+
     @Override
     public Optional<String> get(
             String key,
