@@ -14,14 +14,14 @@ import type { Session } from "./session";
 const EVERY_PERMISSION = "*";
 
 /**
- * TEMPORARY, until 19A K-08 (the permission resolver).
+ * TEMPORARY, until 19A K-03 (the permission resolver).
  *
  * The real rule (doc 19): a role is a set of permissions, maintained as data in M1, and the
  * kernel resolves the permissions of a user in a scope. Neither exists yet. The token of the
- * dev realm (infra/compose/realm-dev.json) carries `roles` only, so until K-08 the three
+ * dev realm (infra/compose/realm-dev.json) carries `roles` only, so until K-03 the three
  * development roles are given their permissions here, by hand.
  *
- * K-08 replaces this map with the resolved permission set the server hands out; the two
+ * K-03 replaces this map with the resolved permission set the server hands out; the two
  * functions below keep their signatures, so no caller changes. Do not add production roles
  * here, and do not grow this into a rule engine.
  *
