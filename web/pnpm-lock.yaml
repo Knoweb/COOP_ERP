@@ -176,8 +176,8 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0
       '@tanstack/react-query':
-        specifier: ^5.28.0
-        version: 5.103.0(react@18.3.1)
+        specifier: ^5.103.1
+        version: 5.103.1(react@18.3.1)
       oidc-client-ts:
         specifier: ^3.0.1
         version: 3.5.0
@@ -214,7 +214,7 @@ importers:
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
         specifier: ^24.10.1
-        version: 24.13.6
+        version: 24.13.5
       '@types/react':
         specifier: ^18.3.3
         version: 18.3.31
@@ -223,7 +223,7 @@ importers:
         version: 18.3.7(@types/react@18.3.31)
       '@vitejs/plugin-react':
         specifier: ^4.2.1
-        version: 4.7.0(supports-color@10.2.2)(vite@6.4.3(@types/node@24.13.6))
+        version: 4.7.0(supports-color@10.2.2)(vite@6.4.3(@types/node@24.13.5))
       eslint:
         specifier: ^9.39.5
         version: 9.39.5(supports-color@10.2.2)
@@ -247,10 +247,10 @@ importers:
         version: 8.70.0(eslint@9.39.5(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.3)
       vite:
         specifier: ^6.4.3
-        version: 6.4.3(@types/node@24.13.6)
+        version: 6.4.3(@types/node@24.13.5)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@types/node@24.13.6)(jsdom@30.1.0)(vite@6.4.3(@types/node@24.13.6))
+        version: 4.1.11(@types/node@24.13.5)(jsdom@30.1.0)(vite@6.4.3(@types/node@24.13.5))
 
 packages:
 
@@ -815,11 +815,11 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tanstack/query-core@5.103.0':
-    resolution: {integrity: sha512-PfafnHQHEu7mZDsSalxSW/EBxPgF77k3atIJeQbqbb1Z7DmK2mH6YLJyqrvbbDk5M6Ua/egs7LLEs04a8robxA==}
+  '@tanstack/query-core@5.103.1':
+    resolution: {integrity: sha512-rms8HqTGp6zA00dM+cUQ2eBcgzNJefuu5CAMB37i/6MiGT1zulPOytCFu2a0qjLqVR2n1jENPj9woqFQNuCzWA==}
 
-  '@tanstack/react-query@5.103.0':
-    resolution: {integrity: sha512-Kn/cvTrNwFYpS/q1MYghMsVTSinmAKV1U2AnM3/x07PiczvC+nMoySqNpQK1jgDzVCOIHk5LlF2FhTlJKQmPAQ==}
+  '@tanstack/react-query@5.103.1':
+    resolution: {integrity: sha512-rmAPPApNEK17VXRJhtE1rja53n23VV5w30C0saCgJhhX+EpdUnVqMGV/s5nnzV43X75KTHKzuoiuxSzGTBIkag==}
     peerDependencies:
       react: ^18 || ^19
 
@@ -869,8 +869,8 @@ packages:
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
-  '@types/node@24.13.6':
-    resolution: {integrity: sha512-SGrw/h3KPFshy3OE6ZL53LMBG5vGQQ8/gIpiqz/kRZhPJ7HgwCEs8LBuNtWLa8dvGZVpSF7+Bf+c11HUrCb/yg==}
+  '@types/node@24.13.5':
+    resolution: {integrity: sha512-TXyindR+lBr22aJIdMQzCFHPHR6cR4js838mRDCSz5hOKWZvZwsXSSiXDmjRj4iJmgl+sR9O+1mkoVBSMadNug==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -2280,11 +2280,11 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tanstack/query-core@5.103.0': {}
+  '@tanstack/query-core@5.103.1': {}
 
-  '@tanstack/react-query@5.103.0(react@18.3.1)':
+  '@tanstack/react-query@5.103.1(react@18.3.1)':
     dependencies:
-      '@tanstack/query-core': 5.103.0
+      '@tanstack/query-core': 5.103.1
       react: 18.3.1
 
   '@testing-library/dom@10.4.2':
@@ -2342,7 +2342,7 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
-  '@types/node@24.13.6':
+  '@types/node@24.13.5':
     dependencies:
       undici-types: 7.18.2
 
@@ -2448,7 +2448,7 @@ snapshots:
       '@typescript-eslint/types': 8.70.0
       eslint-visitor-keys: 5.0.1
 
-  '@vitejs/plugin-react@4.7.0(supports-color@10.2.2)(vite@6.4.3(@types/node@24.13.6))':
+  '@vitejs/plugin-react@4.7.0(supports-color@10.2.2)(vite@6.4.3(@types/node@24.13.5))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))
@@ -2456,7 +2456,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.4.3(@types/node@24.13.6)
+      vite: 6.4.3(@types/node@24.13.5)
     transitivePeerDependencies:
       - supports-color
 
@@ -2469,13 +2469,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.1
 
-  '@vitest/mocker@4.1.11(vite@6.4.3(@types/node@24.13.6))':
+  '@vitest/mocker@4.1.11(vite@6.4.3(@types/node@24.13.5))':
     dependencies:
       '@vitest/spy': 4.1.11
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 6.4.3(@types/node@24.13.6)
+      vite: 6.4.3(@types/node@24.13.5)
 
   '@vitest/pretty-format@4.1.11':
     dependencies:
@@ -3189,7 +3189,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  vite@6.4.3(@types/node@24.13.6):
+  vite@6.4.3(@types/node@24.13.5):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.7)
@@ -3198,13 +3198,13 @@ snapshots:
       rollup: 4.63.3
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 24.13.6
+      '@types/node': 24.13.5
       fsevents: 2.3.3
 
-  vitest@4.1.11(@types/node@24.13.6)(jsdom@30.1.0)(vite@6.4.3(@types/node@24.13.6)):
+  vitest@4.1.11(@types/node@24.13.5)(jsdom@30.1.0)(vite@6.4.3(@types/node@24.13.5)):
     dependencies:
       '@vitest/expect': 4.1.11
-      '@vitest/mocker': 4.1.11(vite@6.4.3(@types/node@24.13.6))
+      '@vitest/mocker': 4.1.11(vite@6.4.3(@types/node@24.13.5))
       '@vitest/pretty-format': 4.1.11
       '@vitest/runner': 4.1.11
       '@vitest/snapshot': 4.1.11
@@ -3221,10 +3221,10 @@ snapshots:
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
-      vite: 6.4.3(@types/node@24.13.6)
+      vite: 6.4.3(@types/node@24.13.5)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 24.13.6
+      '@types/node': 24.13.5
       jsdom: 30.1.0
     transitivePeerDependencies:
       - msw
