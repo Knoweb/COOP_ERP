@@ -1,12 +1,12 @@
 package lk.coopfed.knoweb.m1party.internal.security.seed;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import lk.coopfed.knoweb.kernel.internal.stub.SeedConfigRegistry;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
@@ -29,28 +29,40 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
         seedLoader.loadSeeds();
 
         // Verify config
-        assertThat(configRegistry.get("trade.federation_direct.enabled", null)).isPresent().contains("false");
+        assertThat(configRegistry.get("trade.federation_direct.enabled", null))
+                .isPresent()
+                .contains("false");
 
         // Verify permissions loaded
-        int permCount = jdbc.sql("SELECT COUNT(*) FROM security.permission").query(Integer.class).single();
+        int permCount = jdbc.sql("SELECT COUNT(*) FROM security.permission")
+                .query(Integer.class)
+                .single();
         assertThat(permCount).isGreaterThan(0);
 
         // Verify role templates
-        int templateCount = jdbc.sql("SELECT COUNT(*) FROM security.role WHERE is_template = true").query(Integer.class).single();
+        int templateCount = jdbc.sql("SELECT COUNT(*) FROM security.role WHERE is_template = true")
+                .query(Integer.class)
+                .single();
         assertThat(templateCount).isGreaterThan(0);
 
         // Verify SoD pairs
-        int sodCount = jdbc.sql("SELECT COUNT(*) FROM security.sod_pair").query(Integer.class).single();
+        int sodCount = jdbc.sql("SELECT COUNT(*) FROM security.sod_pair")
+                .query(Integer.class)
+                .single();
         assertThat(sodCount).isGreaterThan(0);
 
         // Verify catalogue version
-        int version = jdbc.sql("SELECT COALESCE(MAX(rv), 0) FROM security.permission_catalogue_version").query(Integer.class).single();
+        int version = jdbc.sql("SELECT COALESCE(MAX(rv), 0) FROM security.permission_catalogue_version")
+                .query(Integer.class)
+                .single();
         assertThat(version).isGreaterThan(0);
 
         // Second pass: should not throw exception (Idempotent)
         seedLoader.loadSeeds();
 
-        int permCountAfter = jdbc.sql("SELECT COUNT(*) FROM security.permission").query(Integer.class).single();
+        int permCountAfter = jdbc.sql("SELECT COUNT(*) FROM security.permission")
+                .query(Integer.class)
+                .single();
         assertThat(permCountAfter).isEqualTo(permCount); // Count should remain the same
     }
 }

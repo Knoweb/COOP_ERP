@@ -1,21 +1,20 @@
 package lk.coopfed.knoweb.m1party.internal.security.seed;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.config.YamlMapFactoryBean;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import lk.coopfed.knoweb.kernel.internal.stub.SeedConfigRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.YamlMapFactoryBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 @Component
 public class M1SeedLoader {
@@ -85,12 +84,13 @@ public class M1SeedLoader {
     private void loadPermissions(ObjectMapper mapper) throws IOException {
         SeedRecords.PermissionsSeed seed = loadYaml(permissionsResource, mapper, SeedRecords.PermissionsSeed.class);
         if (seed == null) return;
-        
+
         for (SeedRecords.PermissionData p : seed.permissions()) {
             boolean offline = p.offline_allowed() != null ? p.offline_allowed() : false;
             boolean mfa = p.requires_mfa() != null ? p.requires_mfa() : false;
-            
-            jdbc.sql("""
+
+            jdbc.sql(
+                            """
                 INSERT INTO security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)
                 VALUES (:code, :module, :desc, :offline, :mfa, :scope)
                 ON CONFLICT (permission_code) DO UPDATE SET
@@ -99,42 +99,45 @@ public class M1SeedLoader {
                     requires_mfa = EXCLUDED.requires_mfa,
                     scope = EXCLUDED.scope
             """)
-            .param("code", p.code())
-            .param("module", p.module())
-            .param("desc", p.description_en())
-            .param("offline", offline)
-            .param("mfa", mfa)
-            .param("scope", p.scope())
-            .update();
+                    .param("code", p.code())
+                    .param("module", p.module())
+                    .param("desc", p.description_en())
+                    .param("offline", offline)
+                    .param("mfa", mfa)
+                    .param("scope", p.scope())
+                    .update();
         }
         log.info("Loaded {} permissions", seed.permissions().size());
     }
 
     private void loadRoleTemplates(ObjectMapper mapper) throws IOException {
-        SeedRecords.RoleTemplatesSeed seed = loadYaml(roleTemplatesResource, mapper, SeedRecords.RoleTemplatesSeed.class);
+        SeedRecords.RoleTemplatesSeed seed =
+                loadYaml(roleTemplatesResource, mapper, SeedRecords.RoleTemplatesSeed.class);
         if (seed == null) return;
-        
+
         for (SeedRecords.RoleTemplateData t : seed.templates()) {
-            jdbc.sql("""
+            jdbc.sql(
+                            """
                 INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
                 VALUES (:id, NULL, :name, true, :roleClass, 'ACTIVE')
                 ON CONFLICT (role_id) DO NOTHING
             """)
-            .param("id", t.role_id())
-            .param("name", t.name_en())
-            .param("roleClass", t.role_class())
-            .update();
-            
+                    .param("id", t.role_id())
+                    .param("name", t.name_en())
+                    .param("roleClass", t.role_class())
+                    .update();
+
             // Insert role permissions
             for (String perm : t.permissions()) {
-                jdbc.sql("""
+                jdbc.sql(
+                                """
                     INSERT INTO security.role_permission (role_id, permission_code)
                     VALUES (:id, :perm)
                     ON CONFLICT (role_id, permission_code) DO NOTHING
                 """)
-                .param("id", t.role_id())
-                .param("perm", perm)
-                .update();
+                        .param("id", t.role_id())
+                        .param("perm", perm)
+                        .update();
             }
         }
         log.info("Loaded {} role templates", seed.templates().size());
@@ -143,7 +146,7 @@ public class M1SeedLoader {
     private void loadSodPairs(ObjectMapper mapper) throws IOException {
         SeedRecords.SodPairsSeed seed = loadYaml(sodPairsResource, mapper, SeedRecords.SodPairsSeed.class);
         if (seed == null) return;
-        
+
         for (SeedRecords.SodPairData pair : seed.pairs()) {
             // permission_a < permission_b must be true due to check constraint, ensure correct order
             String permA = pair.permission_a();
@@ -154,28 +157,31 @@ public class M1SeedLoader {
                 permB = temp;
             }
 
-            jdbc.sql("""
+            jdbc.sql(
+                            """
                 INSERT INTO security.sod_pair (sod_pair_id, permission_a, permission_b, mode, owner_entity_id)
                 VALUES (:id, :permA, :permB, :mode, NULL)
                 ON CONFLICT (sod_pair_id) DO NOTHING
             """)
-            .param("id", pair.id())
-            .param("permA", permA)
-            .param("permB", permB)
-            .param("mode", pair.mode())
-            .update();
+                    .param("id", pair.id())
+                    .param("permA", permA)
+                    .param("permB", permB)
+                    .param("mode", pair.mode())
+                    .update();
         }
         log.info("Loaded {} SoD pairs", seed.pairs().size());
     }
-    
+
     private void bumpCatalogueVersion() {
-        jdbc.sql("""
+        jdbc.sql(
+                        """
             INSERT INTO security.permission_catalogue_version (rv, published_at)
             VALUES (
                 COALESCE((SELECT MAX(rv) FROM security.permission_catalogue_version), 0) + 1,
                 now()
             )
-        """).update();
+        """)
+                .update();
         log.info("Bumped permission catalogue version");
     }
 }

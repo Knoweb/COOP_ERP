@@ -1,13 +1,12 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 17A stub: seed defaults only, the same for every scope. 19A K-11 replaces it with the
@@ -30,9 +29,7 @@ public class SeedConfigRegistry implements ConfigRegistry {
     }
 
     @Override
-    public Optional<String> get(
-            String key,
-            ScopeContext scope) {
+    public Optional<String> get(String key, ScopeContext scope) {
         return Optional.ofNullable(defaults.get(key));
     }
 }
