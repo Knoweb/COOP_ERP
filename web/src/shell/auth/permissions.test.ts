@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hasAnyPermission, hasPermission } from "./permissions";
 
-// The map behind these answers is temporary (19A K-08 replaces it); the behaviour tested here
+// The map behind these answers is temporary (19A K-03 replaces it); the behaviour tested here
 // is what stays: unknown means no, and a user needs one of the permissions asked for.
 describe("what a user may see", () => {
   it("gives a development role the permissions written down for it", () => {

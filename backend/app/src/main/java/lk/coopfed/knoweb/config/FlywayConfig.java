@@ -23,9 +23,12 @@ public class FlywayConfig {
     @Value("${coop-erp.migration.password}")
     private String password;
 
+    @Value("${coop-erp.migration.out-of-order:false}")
+    private boolean outOfOrder;
+
     @PostConstruct
     public void migrate() {
-        log.info("Starting manual Flyway migrations for all modules");
+        log.info("Starting manual Flyway migrations for all modules (out of order: {})", outOfOrder);
 
         // Kernel must run first.
         migrateModule("kernel", "classpath:db/migration/kernel", new String[] {"kernel"}, "kernel");
@@ -88,7 +91,7 @@ public class FlywayConfig {
                 .locations(location)
                 .schemas(schemas)
                 .defaultSchema(historySchema)
-                .outOfOrder(false)
+                .outOfOrder(outOfOrder)
                 .validateOnMigrate(true)
                 .load();
 

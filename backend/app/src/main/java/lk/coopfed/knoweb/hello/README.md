@@ -66,7 +66,7 @@ A handler that forgets `audit.record(...)` breaks nothing visible: the trail jus
 1. **The build fails** if a `@CommandHandler` class never calls `AuditFacade.record` and `EventPublisher.publish` (`ArchitectureTests.commandHandlersAuditAndPublish`).
 2. **The build fails** if anything in a business module other than a command handler writes to the database, through a repository, an `EntityManager` or a `JdbcTemplate` (`onlyCommandHandlersWriteToTheDatabase`). A change that does not pass through a handler is a change nobody audited.
 3. **The kernel stubs refuse bad calls on the first run**: an audit type that is not a catalogue code, a missing subject or scope, an event class without a versioned `TYPE`, and any call made outside the handler's transaction.
-4. **Every handler test asserts what was recorded**, with the `kernel` field every integration test inherits (`KernelRecorder`): `kernel.committedAudit()` and `kernel.committedEvents()` hold what would be in the audit and outbox tables, `kernel.rolledBackAudit()` what a failed transaction took back. Take the expected audit event of each command from the handler specification in your module's implementation guide (section 6).
+4. **Every handler test asserts what was recorded**, with the `kernel` field every integration test inherits (`KernelRecorder`): `kernel.committedAudit()` and `kernel.committedEvents()` hold what would be in the audit and outbox tables, `kernel.rolledBackAudit()` what a failed transaction took back. Take the expected audit event of each command from the handler specification in your module's implementation guide (section 6). The recorder watches the `AuditFacade` and `EventPublisher` interfaces and names no implementation: `KernelRecording` wraps whichever bean implements them, the real service runs first with all its own refusals, and what it was asked to do is recorded afterwards. So these assertions mean the same thing when 19A K-04 and K-05 replace the logging stubs with the audit table and the outbox writer, and no test changes.
 
 The build rules prove the calls exist; only your test proves they are right. A fifth check comes with the audit catalogue of 19A K-04: every code used exists in the catalogue, and every catalogue code is used somewhere.
 
@@ -132,7 +132,7 @@ Changed the slice? Run `make gen-clients` and commit `web/src/generated/hello.ts
 | OpenAPI-first controller and generated web client | Passes: the controller implements the generated `HelloApi`, the page posts a greeting and lists it |
 | i18n end to end | Web passes in three languages with the EN fallback tag. The till screen is open |
 | Shared engine reachable from both sides | Backend passes (`SharedEngineSmokeTest`); the till-side parity test is open |
-| Two instances | Open: needs the login flow (S0-07) for the Playwright run. Known limit: the idempotency store is in memory, so a retry that lands on the other instance is refused as a duplicate instead of replayed, until 19A K-03 |
+| Two instances | Passes: the pipeline's stack-smoke job starts two backend instances behind nginx (`make up-2`), runs `make smoke TWO=1` and then the Playwright suite (`make e2e`, S0-07 step 5) against them. Known limit: the idempotency store is in memory, so a retry that lands on the other instance is refused as a duplicate instead of replayed, until 19A K-03 |
 
 ## Deviations from 17A, with reasons
 

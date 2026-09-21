@@ -1,21 +1,17 @@
 package lk.coopfed.knoweb.testsupport;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
-import lk.coopfed.knoweb.kernel.internal.stub.LoggingAuditFacade;
-import lk.coopfed.knoweb.kernel.internal.stub.LoggingEventPublisher;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Remembers every audit record and every event the application produces during a test, so
@@ -32,14 +28,20 @@ import java.util.concurrent.atomic.AtomicReference;
  *       undone: useful to show that a failure rolled everything back together</li>
  * </ul>
  *
- * <p>It wraps the real 17A stubs, so their strict checks still run. Every integration test
- * gets it through {@link PostgresIntegrationTest}, as the field {@code kernel}, emptied
- * before each test. It replaces Mockito spies on the kernel: those count calls, but know
- * nothing about commit and rollback.
+ * <p>Every integration test gets it through {@link PostgresIntegrationTest}, as the field
+ * {@code kernel}, emptied before each test. It replaces Mockito spies on the kernel: those
+ * count calls, but know nothing about commit and rollback.
+ *
+ * <p><strong>It watches the interfaces, not one implementation.</strong> It is not itself an
+ * {@link AuditFacade} or an {@link EventPublisher} and it names no class of the kernel:
+ * {@link KernelRecording} wraps whichever bean implements those two interfaces and reports
+ * here. So when K-04 replaces the logging audit stub with the insert into
+ * {@code kernel.audit_event}, and K-05 the logging publisher with the outbox writer, the
+ * twenty-eight integration tests keep working with no change: the real service still runs
+ * first, with all its own checks, and what it was asked to do is still recorded here.
  */
 @Component
-@Primary
-public class KernelRecorder implements AuditFacade, EventPublisher {
+public class KernelRecorder {
 
     /** One call of {@code audit.record(...)}, with every argument. */
     public record AuditRecord(
@@ -49,48 +51,13 @@ public class KernelRecorder implements AuditFacade, EventPublisher {
             Object after,
             ScopeContext scope,
             String reason,
-            UUID witnessUserId) {
-    }
-
-    private final LoggingAuditFacade realAudit;
-    private final LoggingEventPublisher realEvents;
+            UUID witnessUserId) {}
 
     private final List<AuditRecord> committedAudit = new CopyOnWriteArrayList<>();
     private final List<AuditRecord> rolledBackAudit = new CopyOnWriteArrayList<>();
     private final List<DomainEvent> committedEvents = new CopyOnWriteArrayList<>();
     private final List<DomainEvent> rolledBackEvents = new CopyOnWriteArrayList<>();
     private final AtomicReference<RuntimeException> nextPublishFailure = new AtomicReference<>();
-
-    public KernelRecorder(LoggingAuditFacade realAudit, LoggingEventPublisher realEvents) {
-        this.realAudit = realAudit;
-        this.realEvents = realEvents;
-    }
-
-    @Override
-    public void record(
-            String eventType,
-            Subject subject,
-            Object before,
-            Object after,
-            ScopeContext scope,
-            String reason,
-            UUID witnessUserId) {
-        realAudit.record(eventType, subject, before, after, scope, reason, witnessUserId);
-        sortByOutcome(
-                new AuditRecord(eventType, subject, before, after, scope, reason, witnessUserId),
-                committedAudit,
-                rolledBackAudit);
-    }
-
-    @Override
-    public void publish(DomainEvent event) {
-        RuntimeException failure = nextPublishFailure.getAndSet(null);
-        if (failure != null) {
-            throw failure;
-        }
-        realEvents.publish(event);
-        sortByOutcome(event, committedEvents, rolledBackEvents);
-    }
 
     /** Audit records whose transaction committed: what kernel.audit_event would hold. */
     public List<AuditRecord> committedAudit() {
@@ -126,7 +93,27 @@ public class KernelRecorder implements AuditFacade, EventPublisher {
         nextPublishFailure.set(null);
     }
 
-    /** The real stubs have already insisted that a transaction is open, so one always is here. */
+    /**
+     * Throws whatever {@link #failNextPublishWith} armed, and disarms it. Called by
+     * {@link KernelRecording} before the real publisher runs, so that the handler fails at
+     * the same point it would fail if the outbox insert failed.
+     */
+    void failIfArmed() {
+        RuntimeException failure = nextPublishFailure.getAndSet(null);
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    void auditRecorded(AuditRecord record) {
+        sortByOutcome(record, committedAudit, rolledBackAudit);
+    }
+
+    void eventPublished(DomainEvent event) {
+        sortByOutcome(event, committedEvents, rolledBackEvents);
+    }
+
+    /** The real service has already insisted that a transaction is open, so one always is here. */
     private static <T> void sortByOutcome(T item, List<T> whenCommitted, List<T> whenRolledBack) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
