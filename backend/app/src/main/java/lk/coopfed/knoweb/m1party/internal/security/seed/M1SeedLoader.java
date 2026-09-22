@@ -96,11 +96,7 @@ public class M1SeedLoader {
                             """
                 INSERT INTO security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)
                 VALUES (:code, :module, :desc, :offline, :mfa, :scope)
-                ON CONFLICT (permission_code) DO UPDATE SET
-                    description_en = EXCLUDED.description_en,
-                    offline_allowed = EXCLUDED.offline_allowed,
-                    requires_mfa = EXCLUDED.requires_mfa,
-                    scope = EXCLUDED.scope
+                ON CONFLICT (permission_code) DO NOTHING
             """)
                     .param("code", p.code())
                     .param("module", p.module())
