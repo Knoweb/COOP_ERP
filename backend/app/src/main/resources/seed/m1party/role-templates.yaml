@@ -1,0 +1,28 @@
+templates:
+  - role_id: "01921319-6218-7268-9844-32b55abfb620"
+    name_en: "Federation Viewer"
+    role_class: "FEDERATION_VIEW"
+    permissions:
+      - "gov.entity.view"
+      - "prt.relationship.view"
+      - "prt.location.view"
+      - "sys.device.view"
+  - role_id: "01921319-948f-78cc-b6fb-c603b1ab0474"
+    name_en: "Regulator"
+    role_class: "EXTERNAL_TIMEBOXED"
+    permissions:
+      - "gov.entity.view"
+      - "prt.location.view"
+  - role_id: "01921319-bf93-78c6-a67b-117865c69784"
+    name_en: "Entity Administrator"
+    role_class: "OWN"
+    permissions:
+      - "gov.user.manage"
+      - "gov.role.manage"
+      - "prt.relationship.manage"
+      - "prt.relationship.view"
+      - "prt.location.manage"
+      - "prt.location.view"
+      - "prt.position.manage"
+      - "sys.device.manage"
+      - "sys.device.view"

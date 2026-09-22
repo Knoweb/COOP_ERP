@@ -21,3 +21,7 @@ include::module-m1party.adoc[]
 plantuml::module-hello.puml[,,format=svg]
 include::module-hello.adoc[]
 
+== M1 Party, Tenancy & Security
+plantuml::module-m1party.puml[,,format=svg]
+include::module-m1party.adoc[]
+

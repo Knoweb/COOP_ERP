@@ -8,5 +8,5 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M1 Party, Tenancy & Security",
-        allowedDependencies = {"kernel"})
+        allowedDependencies = {"kernel", "kernel::api"})
 package lk.coopfed.knoweb.m1party;
