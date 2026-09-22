@@ -44,7 +44,7 @@ openApiSlices.forEach { slice ->
 
     val task = tasks.register<org.openapitools.generator.gradle.plugin.tasks.GenerateTask>("generateOpenApi_$module") {
         generatorName.set("spring")
-        inputSpec.set(slice.absolutePath)
+        inputSpec.set(slice.toURI().toString())
         outputDir.set(output.get().asFile.absolutePath)
         apiPackage.set(generated)
         modelPackage.set(generated)

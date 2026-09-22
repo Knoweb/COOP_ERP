@@ -2,8 +2,16 @@
 |===
 |Base package
 |`lk.coopfed.knoweb.m1party`
+|Spring components
+|_Services_
+
+* `l.c.k.m.query.PartyQueries` (via `l.c.k.m.internal.queries.PartyQueriesImpl`)
 |Bean references
-|* `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
+|* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
+* `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
+* `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===
