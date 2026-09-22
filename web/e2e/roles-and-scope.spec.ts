@@ -2,7 +2,7 @@
 //
 // Two different rules are checked here and they must not be confused:
 //   - the ROLE decides what the screen offers (shell/auth/permissions.ts, temporary until
-//     19A K-08). A cashier may read greetings and not register them, so there is no form;
+//     19A K-03). A cashier may read greetings and not register them, so there is no form;
 //   - the SCOPE decides which rows the server returns (row-level security). The Federation
 //     view sees every entity, an MPCS user sees its own society only.
 

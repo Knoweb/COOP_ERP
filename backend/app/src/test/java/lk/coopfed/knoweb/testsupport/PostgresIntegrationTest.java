@@ -33,7 +33,7 @@ import org.testcontainers.utility.MountableFile;
  */
 @Tag("integration")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(KernelRecorder.class)
+@Import({KernelRecorder.class, KernelRecording.class})
 public abstract class PostgresIntegrationTest {
 
     private static final String DATABASE = "coop_erp";
@@ -55,19 +55,16 @@ public abstract class PostgresIntegrationTest {
         kernel.reset();
     }
 
-    protected static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16")
-                    .withDatabaseName(DATABASE)
-                    .withUsername("postgres")
-                    .withPassword("postgres")
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale-provider=icu --icu-locale=en")
-                    .withEnv("MIGRATION_DB_USER", MIGRATOR)
-                    .withEnv("MIGRATION_DB_PASSWORD", MIGRATOR)
-                    .withEnv("APP_DB_USER", APP_USER)
-                    .withEnv("APP_DB_PASSWORD", APP_USER)
-                    .withCopyFileToContainer(
-                            MountableFile.forHostPath(ROLE_SCRIPT),
-                            "/docker-entrypoint-initdb.d/01-roles.sh");
+    protected static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
+            .withDatabaseName(DATABASE)
+            .withUsername("postgres")
+            .withPassword("postgres")
+            .withEnv("POSTGRES_INITDB_ARGS", "--locale-provider=icu --icu-locale=en")
+            .withEnv("MIGRATION_DB_USER", MIGRATOR)
+            .withEnv("MIGRATION_DB_PASSWORD", MIGRATOR)
+            .withEnv("APP_DB_USER", APP_USER)
+            .withEnv("APP_DB_PASSWORD", APP_USER)
+            .withCopyFileToContainer(MountableFile.forHostPath(ROLE_SCRIPT), "/docker-entrypoint-initdb.d/01-roles.sh");
 
     static {
         POSTGRES.start();
@@ -89,9 +86,7 @@ public abstract class PostgresIntegrationTest {
      * test; that must go through the application, which connects as {@code coop_app}.
      */
     protected static JdbcTemplate superuserJdbc() {
-        return new JdbcTemplate(new DriverManagerDataSource(
-                POSTGRES.getJdbcUrl(),
-                POSTGRES.getUsername(),
-                POSTGRES.getPassword()));
+        return new JdbcTemplate(
+                new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
     }
 }

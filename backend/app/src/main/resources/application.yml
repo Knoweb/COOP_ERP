@@ -69,6 +69,12 @@ coop-erp:
     url: ${MIGRATION_URL:jdbc:postgresql://localhost:5434/coop_erp}
     user: ${MIGRATION_USER:coop_migrator}
     password: ${MIGRATION_PASSWORD:coop_migrator}
+    # Strict by default: a migration with a lower version than one already applied stops the
+    # start, which is what a deployed database needs (its schema must be reproducible from the
+    # files in order). The local stack switches it on (infra/compose/compose.yml), because the
+    # 19A lanes merge their reserved version ranges in any order and a developer's database
+    # lives across those merges; see db/migration/kernel/README.md.
+    out-of-order: ${MIGRATION_OUT_OF_ORDER:false}
 
 # Health and metrics (17A S0-02), under every role. /actuator/health/liveness and /readiness
 # are what an orchestrator probes; /actuator/prometheus is what a metrics server scrapes.

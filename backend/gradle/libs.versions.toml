@@ -32,6 +32,13 @@ palantir-java-format = "2.74.0"    # the formatter Spotless runs
 tomcat = "10.1.60"                 # Boot 3.5.16: 10.1.55. CVE-2026-65182, -65905, -68525 (CRITICAL), "fixed in 10.1.58", which was never published: 10.1.59 is the first release with the fix.
 postgresql = "42.7.12"             # Boot 3.5.16: 42.7.11. CVE-2026-54291 (HIGH), fixed in 42.7.12.
 
+# For the 19A kernel tickets. Spring Boot does not manage these three, so each names a
+# version; the libraries Spring Boot does manage (the starters below, Caffeine) name none, as
+# the header says. Verified on Maven Central on 21 September 2026.
+icu4j = "78.3"                     # K-06. The latest release.
+aws-sdk = "2.55.1"                 # K-09. The latest release of the AWS SDK v2 line.
+shedlock = "6.10.0"                # K-12. The latest of the 6 line, which is built against Spring Framework 6.2, the one Spring Boot 3.5 carries. ShedLock 7 is built against Spring Framework 7 (Spring Boot 4) and is held in .github/dependabot.yml until this repository moves.
+
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
@@ -46,3 +53,25 @@ spring-modulith-starter-core = { module = "org.springframework.modulith:spring-m
 spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
 spring-modulith-docs = { module = "org.springframework.modulith:spring-modulith-docs", version.ref = "spring-modulith" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+# ---- Declared for the 19A kernel tickets, on nobody's class path yet -------------------------
+# Four lanes build K-01 to K-13 in parallel and every one of them would otherwise add a line to
+# this file at the same time. The libraries are named here once; the ticket in each comment is
+# the one that adds the dependency to backend/app/build.gradle.kts. Until it does, an entry
+# here changes nothing that is built or shipped: a catalogue entry is a name and a version,
+# not a dependency.
+#
+# Two of them must NOT reach the application's class path before their ticket is ready to
+# handle what they switch on, and that is why the ticket is named:
+#   oauth2 resource server  brings Spring Security, whose default chain answers 401 to every
+#                           endpoint, so the hello module and every test would fail at once
+#   amqp                    brings a RabbitMQ connection factory and a health indicator, so
+#                           /actuator/health turns DOWN wherever no broker runs
+spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }  # K-02 adds it, with the security configuration that keeps the endpoints open that must stay open
+spring-boot-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp" }  # K-05 adds it, behind BrokerAdapter (AGENTS.md: no code couples to RabbitMQ), and only after the database-polling relay passes its tests
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine" }  # K-03 permission cache, K-11 configuration cache (19A sections 3 and 11)
+icu4j = { module = "com.ibm.icu:icu4j", version.ref = "icu4j" }  # K-06: ICU MessageFormat, NFC, collation, LATN digits (19A section 6)
+aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }  # K-09 imports this as a platform so the aws modules cannot drift apart
+aws-sdk-s3 = { module = "software.amazon.awssdk:s3", version.ref = "aws-sdk" }  # K-09. The S3 protocol, not a vendor: 19A section 9 asks for a provider-neutral client with path-style addressing, which is what MinIO needs and what the same code gives on any other S3 service. MinIO's own io.minio client would tie the kernel to MinIO, which AGENTS.md forbids for the broker and the identity provider for the same reason.
+shedlock-spring = { module = "net.javacrumbs.shedlock:shedlock-spring", version.ref = "shedlock" }  # K-12 job runner (19A section 12)
+shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-provider-jdbc-template", version.ref = "shedlock" }  # K-12: the kernel.shedlock table, no second data store
