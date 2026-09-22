@@ -1,15 +1,15 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.regex.Pattern;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.regex.Pattern;
 
 /**
  * 17A stub of the event outbox: it writes a log line, not a row. 19A ticket K-05 replaces it
@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
  * </ul>
  */
 @Component
+@Profile("kernel-stubs")
 public class LoggingEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventPublisher.class);
@@ -38,12 +39,14 @@ public class LoggingEventPublisher implements EventPublisher {
         }
         String type = typeOf(event);
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException(
-                    "events.publish(" + type + ") was called outside a transaction;"
-                            + " call it inside the handler's @Transactional method, after audit.record");
+            throw new IllegalStateException("events.publish(" + type + ") was called outside a transaction;"
+                    + " call it inside the handler's @Transactional method, after audit.record");
         }
 
-        log.info("DOMAIN_EVENT_STUB type={} eventClass={}", type, event.getClass().getName());
+        log.info(
+                "DOMAIN_EVENT_STUB type={} eventClass={}",
+                type,
+                event.getClass().getName());
     }
 
     /** Reads the TYPE constant every event class must declare. */
@@ -61,8 +64,8 @@ public class LoggingEventPublisher implements EventPublisher {
             }
             return type;
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new IllegalArgumentException(
-                    eventClass.getName() + " must declare: public static final String TYPE = \"module.thing.happened.v1\"");
+            throw new IllegalArgumentException(eventClass.getName()
+                    + " must declare: public static final String TYPE = \"module.thing.happened.v1\"");
         }
     }
 }
