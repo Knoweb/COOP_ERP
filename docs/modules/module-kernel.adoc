@@ -3,7 +3,11 @@
 |Base package
 |`lk.coopfed.knoweb.kernel`
 |Spring components
-|* `l.c.k.k.api.BusinessDate` (via `l.c.k.k.internal.stub.CalendarBusinessDate`)
+|* `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.JdbcAuditFacade`)
+* `l.c.k.k.api.EventPublisher` (via `l.c.k.k.internal.event.JdbcEventPublisher`)
+* `l.c.k.k.api.IdempotencyStore` (via `l.c.k.k.internal.idempotency.JdbcIdempotencyStore`)
+* `l.c.k.k.api.PermissionResolver` (via `l.c.k.k.internal.security.JdbcPermissionResolver`)
+* `l.c.k.k.api.BusinessDate` (via `l.c.k.k.internal.stub.CalendarBusinessDate`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.stub.DevCurrentScope`)
 * `l.c.k.k.api.DocumentBaseRepository` (via `l.c.k.k.internal.stub.InMemoryDocumentBaseRepository`)
 * `l.c.k.k.api.IdempotencyStore` (via `l.c.k.k.internal.stub.InMemoryIdempotencyStore`)
