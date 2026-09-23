@@ -54,3 +54,10 @@ GRANT SELECT, INSERT
 GRANT SELECT, INSERT, UPDATE
     ON kernel.outbox_event
     TO app_rw;
+ALTER TABLE kernel.audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kernel.audit_log FORCE ROW LEVEL SECURITY;
+CREATE POLICY application_access ON kernel.audit_log FOR ALL TO app_rw USING (true);
+
+ALTER TABLE kernel.outbox_event ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kernel.outbox_event FORCE ROW LEVEL SECURITY;
+CREATE POLICY application_access ON kernel.outbox_event FOR ALL TO app_rw USING (true);

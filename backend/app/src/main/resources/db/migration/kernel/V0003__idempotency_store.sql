@@ -16,6 +16,10 @@ CREATE TABLE kernel.idempotency_key (
 CREATE INDEX ix_kernel_idempotency_expiry
     ON kernel.idempotency_key (expires_at);
 
-GRANT SELECT, INSERT, UPDATE, DELETE
+GRANT SELECT, INSERT, UPDATE
     ON kernel.idempotency_key
     TO app_rw;
+
+ALTER TABLE kernel.idempotency_key ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kernel.idempotency_key FORCE ROW LEVEL SECURITY;
+CREATE POLICY application_access ON kernel.idempotency_key FOR ALL TO app_rw USING (true);
