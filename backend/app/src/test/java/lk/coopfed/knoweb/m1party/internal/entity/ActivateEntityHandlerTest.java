@@ -55,6 +55,36 @@ class ActivateEntityHandlerTest {
         MockitoAnnotations.openMocks(this);
 
         handler = new ActivateEntityHandler(repository, prerequisites, audit, events);
+
+        // The caller of every lifecycle command is the Federation (FederationCaller).
+        RegisterEntity federation = new RegisterEntity(
+                "COOPFED",
+                "FEDERATION",
+                "Cooperative Federation",
+                null,
+                null,
+                "REG-001",
+                "VAT-001",
+                "Colombo",
+                "en",
+                1);
+        when(repository.findById(FEDERATION_ID))
+                .thenReturn(Optional.of(
+                        Entity.register(FEDERATION_ID, federation, "COOPFED", "FEDERATION", "en", (short) 1)));
+    }
+
+    @Test
+    void anEntityCannotActivateItself() {
+        Entity entity = onboardingEntity("VAT-301");
+        when(repository.findById(ENTITY_ID)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(
+                        () -> handler.handle(new ActivateEntity(ENTITY_ID), ScopeContext.dev(USER_ID, ENTITY_ID, null)))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("m1.entity.federation_required");
+
+        verify(repository, never()).saveAndFlush(any());
+        verify(events, never()).publish(any());
     }
 
     @Test
