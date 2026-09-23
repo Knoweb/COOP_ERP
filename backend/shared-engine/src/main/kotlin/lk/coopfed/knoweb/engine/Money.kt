@@ -21,10 +21,11 @@ data class Money private constructor(
             Money(BigDecimal.ZERO.setScale(2))
 
         /**
-         * Temporary Sprint 0 parity behaviour.
-         *
-         * M3/23A replaces the pricing/rounding implementation.
-         */
+        * Returns the cash amount rounded to the nearest whole rupee.
+        *
+        * Receipt resolution uses Rounding.toRupee() when the
+        * rounding adjustment must also be recorded separately.
+        */
         @JvmStatic
         fun roundCash(value: Money): Money =
             Rounding.roundCash(value)
