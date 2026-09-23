@@ -35,7 +35,7 @@ class SuspendEntityHandler implements Handles<SuspendEntity, UUID> {
     @Transactional
     public UUID handle(SuspendEntity command, ScopeContext scope) {
 
-        requireScope(scope);
+        FederationCaller.require(scope, repository);
 
         if (command == null || command.entityId() == null) {
             throw new ProblemException("request.field.required", Map.of("field", "entityId"));
@@ -70,17 +70,6 @@ class SuspendEntityHandler implements Handles<SuspendEntity, UUID> {
         events.publish(new EntitySuspended(entity.getId(), entity.entityCode(), entity.entityType(), entity.status()));
 
         return entity.getId();
-    }
-
-    private static void requireScope(ScopeContext scope) {
-
-        if (scope == null || !scope.hasActiveScope()) {
-            throw new ProblemException("scope.required");
-        }
-
-        if (scope.locationId() != null) {
-            throw new ProblemException("scope.invalid");
-        }
     }
 
     private static void requireReason(String reasonCode) {

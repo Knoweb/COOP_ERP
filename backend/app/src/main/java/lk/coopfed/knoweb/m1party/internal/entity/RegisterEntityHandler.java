@@ -10,7 +10,6 @@ import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
-import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
@@ -46,22 +45,7 @@ class RegisterEntityHandler implements Handles<RegisterEntity, UUID> {
     public UUID handle(RegisterEntity command, ScopeContext scope) {
 
         // 1. caller must be the Federation in an entity-wide OWN scope.
-        if (scope == null
-                || !scope.hasActiveScope()
-                || scope.entityId() == null
-                || scope.locationId() != null
-                || scope.policyClass() != PolicyClass.OWN) {
-
-            throw new ProblemException("m1.entity.federation_required");
-        }
-
-        Entity caller = repository
-                .findById(scope.entityId())
-                .orElseThrow(() -> new ProblemException("m1.entity.federation_required"));
-
-        if (!caller.isFederation()) {
-            throw new ProblemException("m1.entity.federation_required");
-        }
+        Entity caller = FederationCaller.require(scope, repository);
 
         // 2. code unique.
         String entityCode = normalizeCode(command.entityCode());

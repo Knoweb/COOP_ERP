@@ -41,6 +41,15 @@ function placeholders(text) {
 }
 
 /** Problems inside the three catalogue files themselves. */
+/**
+ * A Sinhala or Tamil text with no letter of any script and at least one "?" is a text a
+ * codepage destroyed, not a text. Digits, punctuation and Latin words (VAT, PIN) alone are
+ * fine, since some texts are only those.
+ */
+function lostItsScript(text) {
+  return text.includes("?") && !/\p{L}/u.test(text.replace(/[A-Za-z]/g, ""));
+}
+
 export function problemsOfCatalogues(catalogues) {
   const problems = [];
   const ids = new Set(LANGUAGES.flatMap((language) => Object.keys(catalogues[language])));
@@ -56,6 +65,13 @@ export function problemsOfCatalogues(catalogues) {
         problems.push(
           `${language}.json: the text of ${id} contains the ASCII apostrophe ('), which a message format ` +
           `reads as a quote and drops, together with any {0} after it; write ’ instead`
+        );
+      } else if (language !== "en" && lostItsScript(text)) {
+        // A Sinhala or Tamil text saved through a codepage that cannot hold it becomes a row
+        // of "?" and passes every other check here. #72 shipped eight of them.
+        problems.push(
+          `${language}.json: the text of ${id} is "${text}": it was saved through a codepage that lost the ` +
+          `script; save the file as UTF-8 and write the text again`
         );
       }
     }

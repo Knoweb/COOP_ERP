@@ -54,6 +54,44 @@ class EntityStatusLifecycleHandlerTest {
         suspendHandler = new SuspendEntityHandler(repository, audit, events);
 
         reinstateHandler = new ReinstateEntityHandler(repository, audit, events);
+
+        // The caller of every lifecycle command is the Federation (FederationCaller).
+        when(repository.findById(FEDERATION_ID)).thenReturn(Optional.of(federation()));
+    }
+
+    @Test
+    void anEntityCannotSuspendOrReinstateItself() {
+        // The scope is entity-wide OWN, as the guard requires, but the caller is an MPCS.
+        Entity mpcs = activeEntity();
+        when(repository.findById(ENTITY_ID)).thenReturn(Optional.of(mpcs));
+        ScopeContext ownScope = ScopeContext.dev(USER_ID, ENTITY_ID, null);
+
+        assertThatThrownBy(
+                        () -> suspendHandler.handle(new SuspendEntity(ENTITY_ID, "GOVERNANCE_REVIEW", null), ownScope))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("m1.entity.federation_required");
+        assertThatThrownBy(() ->
+                        reinstateHandler.handle(new ReinstateEntity(ENTITY_ID, "GOVERNANCE_REVIEW", null), ownScope))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("m1.entity.federation_required");
+
+        verify(repository, never()).saveAndFlush(any());
+        verify(events, never()).publish(any());
+    }
+
+    private static Entity federation() {
+        RegisterEntity command = new RegisterEntity(
+                "COOPFED",
+                "FEDERATION",
+                "Cooperative Federation",
+                null,
+                null,
+                "REG-001",
+                "VAT-001",
+                "Colombo",
+                "en",
+                1);
+        return Entity.register(FEDERATION_ID, command, "COOPFED", "FEDERATION", "en", (short) 1);
     }
 
     @Test

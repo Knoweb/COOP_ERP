@@ -43,6 +43,8 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
                     party.device,
                     party.till_position,
                     party.location,
+                    party.entity_relationship,
+                    party.entity_party_directory,
                     party.federation_identity,
                     party.entity
                 cascade
@@ -182,6 +184,90 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
         List<UUID> visible = visibleLocations(ENTITY_A, null, "EXTERNAL_TIMEBOXED");
 
         assertThat(visible).isEmpty();
+    }
+
+    // ---- party.entity_party_directory (V0003, restricted by V0004) ----------------------------
+    //
+    // The directory is what a counterparty may know of an entity: its legal name. Before V0004
+    // every PARTY-class caller read every entity's name; now it reads its own and those of the
+    // entities it has an active relationship with.
+
+    private static final UUID ENTITY_C = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+
+    @Test
+    void aPartyCallerReadsItsOwnNameAndItsActiveCounterpartiesOnly() {
+        JdbcTemplate admin = superuserJdbc();
+        insertEntity(admin, ENTITY_C, "M002", "MPCS", "MPCS Two");
+        insertRelationship(admin, ENTITY_A, ENTITY_B, "ACTIVE"); // the Federation sells to B
+        insertRelationship(admin, ENTITY_A, ENTITY_C, "DRAFT"); // and not yet to C
+
+        assertThat(visibleDirectory(ENTITY_B)).containsExactlyInAnyOrder(ENTITY_B, ENTITY_A);
+        assertThat(visibleDirectory(ENTITY_C))
+                .as("a DRAFT relationship shows nobody")
+                .containsExactly(ENTITY_C);
+    }
+
+    @Test
+    void aPartyCallerWithNoRelationshipReadsNoOtherName() {
+        assertThat(visibleDirectory(ENTITY_B)).containsExactly(ENTITY_B);
+    }
+
+    @Test
+    void aPartyCallerReadsOnlyTheRelationshipsItIsASideOf() {
+        JdbcTemplate admin = superuserJdbc();
+        insertEntity(admin, ENTITY_C, "M002", "MPCS", "MPCS Two");
+        insertRelationship(admin, ENTITY_A, ENTITY_B, "ACTIVE");
+        insertRelationship(admin, ENTITY_A, ENTITY_C, "ACTIVE");
+
+        List<UUID> buyers = inScope(
+                ENTITY_B,
+                null,
+                "PARTY",
+                () -> jdbc.queryForList("select buyer_entity_id from party.entity_relationship", UUID.class));
+
+        assertThat(buyers).containsExactly(ENTITY_B);
+    }
+
+    @Test
+    void theApplicationCannotWriteTheDirectoryAndTheTriggerStillCan() {
+        JdbcTemplate admin = superuserJdbc();
+
+        // The trigger (SECURITY DEFINER, as the migrator, a member of app_seed) filled the
+        // directory when the entities were inserted, under FORCE ROW LEVEL SECURITY.
+        assertThat(admin.queryForObject("select count(*) from party.entity_party_directory", Integer.class))
+                .isEqualTo(2);
+
+        assertThatThrownBy(() -> inScope(
+                        ENTITY_B,
+                        null,
+                        "OWN",
+                        () -> jdbc.update(
+                                "insert into party.entity_party_directory (entity_id, legal_name_en) values (?, ?)",
+                                ENTITY_B,
+                                "renamed")))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    private List<UUID> visibleDirectory(UUID callerEntity) {
+        return inScope(
+                callerEntity,
+                null,
+                "PARTY",
+                () -> jdbc.queryForList(
+                        "select entity_id from party.entity_party_directory order by entity_id", UUID.class));
+    }
+
+    private static void insertRelationship(JdbcTemplate admin, UUID seller, UUID buyer, String status) {
+        admin.update(
+                """
+                insert into party.entity_relationship (
+                    relationship_id, seller_entity_id, buyer_entity_id, effective_from, status
+                )
+                values (gen_random_uuid(), ?, ?, current_date, ?)
+                """,
+                seller,
+                buyer,
+                status);
     }
 
     @Test
