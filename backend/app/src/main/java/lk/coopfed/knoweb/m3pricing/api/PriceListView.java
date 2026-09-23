@@ -11,11 +11,4 @@ import java.util.UUID;
  * Colombo wall-clock time on the screen and nowhere else.
  */
 public record PriceListView(
-        UUID id,
-        UUID ownerEntityId,
-        String textEn,
-        String textSi,
-        String textTa,
-        String status,
-        Instant createdAt) {
-}
+        UUID id, UUID ownerEntityId, String textEn, String textSi, String textTa, String status, Instant createdAt) {}

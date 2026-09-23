@@ -7,11 +7,10 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
-import lk.coopfed.knoweb.m3pricing.api.PriceListView;
-import org.springframework.data.domain.Persistable;
-
 import java.time.Instant;
 import java.util.UUID;
+import lk.coopfed.knoweb.m3pricing.api.PriceListView;
+import org.springframework.data.domain.Persistable;
 
 /**
  * The price list aggregate. Rules every entity in the system follows:
@@ -59,8 +58,7 @@ public class PriceList implements Persistable<UUID> {
     private boolean isNew = true;
 
     /** For JPA only. */
-    protected PriceList() {
-    }
+    protected PriceList() {}
 
     private PriceList(UUID id, UUID ownerEntityId, String textEn, String textSi, String textTa) {
         this.id = id;

@@ -1,9 +1,18 @@
 package lk.coopfed.knoweb.m3pricing;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.m3pricing.api.PriceListRegistered;
 import lk.coopfed.knoweb.m3pricing.api.PriceListView;
-import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,16 +25,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.Map;
-import java.util.TimeZone;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The proof table of 17A section 12, as tests. Every module's integration test has the same
@@ -109,9 +108,11 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
 
         // Spring wraps the database error; PostgreSQL's own words are the root cause.
         assertThatThrownBy(() -> appJdbc.update("update pricing.price_list set status = 'CHANGED'"))
-                .rootCause().hasMessageContaining("permission denied");
+                .rootCause()
+                .hasMessageContaining("permission denied");
         assertThatThrownBy(() -> appJdbc.update("delete from pricing.price_list"))
-                .rootCause().hasMessageContaining("permission denied");
+                .rootCause()
+                .hasMessageContaining("permission denied");
     }
 
     // ---- command pipeline: idempotency, audit and event in one transaction ----
@@ -221,9 +222,10 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aMissingTranslationIsNullSoTheClientCanShowTheFallbackTag() {
         JsonNode created = post(
-                scope(entityA),
-                UUID.randomUUID().toString(),
-                Map.of("textEn", "Pricing", "textSi", "ආයුබෝවන්", "textTa", " ")).getBody();
+                        scope(entityA),
+                        UUID.randomUUID().toString(),
+                        Map.of("textEn", "Pricing", "textSi", "ආයුබෝවන්", "textTa", " "))
+                .getBody();
 
         assertThat(created.get("textSi").asText()).isEqualTo("ආයුබෝවන්");
         assertThat(created.get("textTa").isNull()).isTrue();
@@ -235,11 +237,9 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
         HttpHeaders sinhala = scope(entityA);
         sinhala.set(HttpHeaders.ACCEPT_LANGUAGE, "si");
 
-        ResponseEntity<JsonNode> response =
-                post(sinhala, UUID.randomUUID().toString(), Map.of("textEn", " "));
+        ResponseEntity<JsonNode> response = post(sinhala, UUID.randomUUID().toString(), Map.of("textEn", " "));
 
-        assertThat(response.getBody().get("title").asText())
-                .isEqualTo("සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න");
+        assertThat(response.getBody().get("title").asText()).isEqualTo("සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න");
     }
 
     // ---- the slice is enforced: the kernel checks a request's shape before the controller runs ----
@@ -266,8 +266,8 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
         HttpHeaders tamil = scope(entityA);
         tamil.set(HttpHeaders.ACCEPT_LANGUAGE, "ta");
 
-        ResponseEntity<JsonNode> response = post(tamil, UUID.randomUUID().toString(),
-                Map.of("textEn", "Pricing", "textTa", "வ".repeat(201)));
+        ResponseEntity<JsonNode> response =
+                post(tamil, UUID.randomUUID().toString(), Map.of("textEn", "Pricing", "textTa", "வ".repeat(201)));
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
         JsonNode error = response.getBody().get("errors").get(0);
@@ -280,12 +280,13 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void everyBrokenFieldIsReportedAtOnce() {
-        ResponseEntity<JsonNode> response = post(scope(entityA), UUID.randomUUID().toString(),
-                Map.of("textEn", "", "textSi", "x".repeat(201)));
+        ResponseEntity<JsonNode> response =
+                post(scope(entityA), UUID.randomUUID().toString(), Map.of("textEn", "", "textSi", "x".repeat(201)));
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
         assertThat(response.getBody().get("errors"))
-                .extracting(error -> error.get("field").asText() + " " + error.get("code").asText())
+                .extracting(error ->
+                        error.get("field").asText() + " " + error.get("code").asText())
                 .containsExactly("textEn request.field.too_short", "textSi request.field.too_long");
     }
 
@@ -307,7 +308,8 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
                 http.exchange(URL + "/not-a-uuid", HttpMethod.GET, new HttpEntity<>(scope(entityA)), JsonNode.class);
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
-        assertThat(response.getBody().get("errors").get(0).get("field").asText()).isEqualTo("id");
+        assertThat(response.getBody().get("errors").get(0).get("field").asText())
+                .isEqualTo("id");
         assertThat(response.getBody().get("errors").get(0).get("code").asText()).isEqualTo("request.field.invalid");
     }
 
@@ -325,10 +327,11 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
 
         String onTheWire = created.get("createdAt").asText();
         Instant fromApi = Instant.parse(onTheWire);
-        Instant inDatabase = superuserJdbc().queryForObject(
-                "select created_at from pricing.price_list where id = ?",
-                (row, n) -> row.getObject(1, OffsetDateTime.class).toInstant(),
-                id);
+        Instant inDatabase = superuserJdbc()
+                .queryForObject(
+                        "select created_at from pricing.price_list where id = ?",
+                        (row, n) -> row.getObject(1, OffsetDateTime.class).toInstant(),
+                        id);
 
         // The API speaks UTC, and says the same instant the database holds.
         assertThat(onTheWire).endsWith("Z");
@@ -357,7 +360,11 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
         if (idempotencyKey != null) {
             all.set("Idempotency-Key", idempotencyKey);
         }
-        ResponseEntity<JsonNode> res = http.exchange(URL, HttpMethod.POST, new HttpEntity<>(body, all), JsonNode.class); if (res.getStatusCode().is5xxServerError()) { System.out.println("DEBUG POST 500: " + res.getBody()); } return res;
+        ResponseEntity<JsonNode> res = http.exchange(URL, HttpMethod.POST, new HttpEntity<>(body, all), JsonNode.class);
+        if (res.getStatusCode().is5xxServerError()) {
+            System.out.println("DEBUG POST 500: " + res.getBody());
+        }
+        return res;
     }
 
     private ResponseEntity<JsonNode> list(HttpHeaders headers) {

@@ -12,8 +12,4 @@ package lk.coopfed.knoweb.m3pricing.api;
  * @param textSi the price list in Sinhala; null when not translated yet
  * @param textTa the price list in Tamil; null when not translated yet
  */
-public record RegisterPriceList(
-        String textEn,
-        String textSi,
-        String textTa) {
-}
+public record RegisterPriceList(String textEn, String textSi, String textTa) {}

@@ -1,10 +1,9 @@
 package lk.coopfed.knoweb.m3pricing.api;
 
-import lk.coopfed.knoweb.kernel.api.ScopeContext;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 
 /**
  * Read access to price lists. Every method takes the caller's {@link ScopeContext}: the kernel

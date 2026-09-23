@@ -1,7 +1,7 @@
 package lk.coopfed.knoweb.m3pricing.internal;
 
-import lk.coopfed.knoweb.m3pricing.api.PriceListRegistered;
-import lk.coopfed.knoweb.m3pricing.api.RegisterPriceList;
+import java.util.Map;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
@@ -10,11 +10,10 @@ import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m3pricing.api.PriceListRegistered;
+import lk.coopfed.knoweb.m3pricing.api.RegisterPriceList;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * The shape of every command handler in the system (17A section 12; AGENTS.md):
@@ -62,21 +61,12 @@ class RegisterPriceListHandler implements Handles<RegisterPriceList, UUID> {
         }
 
         // 2. mutation
-        PriceList priceList = PriceList.create(
-                Ids.next(),
-                scope.entityId(),
-                command.textEn(),
-                command.textSi(),
-                command.textTa());
+        PriceList priceList =
+                PriceList.create(Ids.next(), scope.entityId(), command.textEn(), command.textSi(), command.textTa());
         repository.save(priceList);
 
         // 3. audit, in the same transaction
-        audit.record(
-                AUDIT_REGISTERED,
-                Subject.of("price_list", priceList.getId()),
-                null,
-                priceList.snapshot(),
-                scope);
+        audit.record(AUDIT_REGISTERED, Subject.of("price_list", priceList.getId()), null, priceList.snapshot(), scope);
 
         // 4. event, in the same transaction (the outbox)
         events.publish(new PriceListRegistered(priceList.getId(), scope.entityId()));

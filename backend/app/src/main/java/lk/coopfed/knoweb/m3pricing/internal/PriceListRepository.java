@@ -1,9 +1,8 @@
 package lk.coopfed.knoweb.m3pricing.internal;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  * Persistence for price lists. Note what is missing: no method takes an entity id to filter

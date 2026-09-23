@@ -6,5 +6,4 @@ package lk.coopfed.knoweb.kernel.api;
  * Event implementations should expose a static TYPE constant,
  * e.g. hello.greeting.registered.v1.
  */
-public interface DomainEvent {
-}
+public interface DomainEvent {}
