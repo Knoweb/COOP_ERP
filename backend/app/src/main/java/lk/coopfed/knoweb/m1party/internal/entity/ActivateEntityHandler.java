@@ -41,13 +41,7 @@ class ActivateEntityHandler implements Handles<ActivateEntity, UUID> {
     @Transactional
     public UUID handle(ActivateEntity command, ScopeContext scope) {
 
-        if (scope == null || !scope.hasActiveScope()) {
-            throw new ProblemException("scope.required");
-        }
-
-        if (scope.locationId() != null) {
-            throw new ProblemException("scope.invalid");
-        }
+        FederationCaller.require(scope, repository);
 
         if (command == null || command.entityId() == null) {
             throw new ProblemException("request.field.required", Map.of("field", "entityId"));

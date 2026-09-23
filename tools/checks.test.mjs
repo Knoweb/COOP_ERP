@@ -532,6 +532,44 @@ test(
 );
 
 test(
+  "a Sinhala or Tamil text that a codepage turned into question marks is refused",
+  () => {
+    one(
+      problemsOfCatalogues(
+        texts(
+          { "a.b": "Enter the VAT number" },
+          { "a.b": "???? ??????? VAT ???? ??????" },
+          { "a.b": "VAT எண்ணை உள்ளிடவும்" }
+        )
+      ),
+      /si\.json: the text of a\.b is .* lost the script/
+    );
+    // A text of digits, punctuation and Latin words alone (a code, a unit) is not a lost
+    // script, and a question in a real script is a question.
+    assert.deepEqual(
+      problemsOfCatalogues(
+        texts(
+          { "a.b": "VAT-12 (kg)" },
+          { "a.b": "VAT-12 (kg)" },
+          { "a.b": "VAT-12 (kg)" }
+        )
+      ),
+      []
+    );
+    assert.deepEqual(
+      problemsOfCatalogues(
+        texts(
+          { "a.b": "Continue?" },
+          { "a.b": "ඉදිරියට යන්නද?" },
+          { "a.b": "தொடரவா?" }
+        )
+      ),
+      []
+    );
+  }
+);
+
+test(
   "a translation that lost its placeholder is refused",
   () => {
     one(
