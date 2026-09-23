@@ -33,5 +33,6 @@
   "m1.entity.vat_required": "Enter the VAT registration number before activating the entity",
   "m1.entity.not_active": "Only an active entity can be suspended",
   "m1.entity.not_suspended": "Only a suspended entity can be reinstated",
-  "m1.entity.reason_required": "A reason is required for this entity status change"
+  "m1.entity.reason_required": "A reason is required for this entity status change",
+  "m1.entity.responsible_officer_invalid": "The selected user cannot be the responsible officer for this entity"
 }

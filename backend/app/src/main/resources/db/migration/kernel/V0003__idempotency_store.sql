@@ -1,6 +1,6 @@
-CREATE SCHEMA IF NOT EXISTS kernel;
+CREATE SCHEMA kernel;
 
-CREATE TABLE IF NOT EXISTS kernel.idempotency_key (
+CREATE TABLE kernel.idempotency_key (
     user_id uuid NOT NULL,
     idempotency_key varchar(255) NOT NULL,
     request_hash varchar(64) NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS kernel.idempotency_key (
         PRIMARY KEY (user_id, idempotency_key)
 );
 
-CREATE INDEX IF NOT EXISTS ix_kernel_idempotency_expiry
+CREATE INDEX ix_kernel_idempotency_expiry
     ON kernel.idempotency_key (expires_at);
 
 GRANT SELECT, INSERT, UPDATE, DELETE

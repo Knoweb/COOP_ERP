@@ -1,11 +1,11 @@
-CREATE SCHEMA IF NOT EXISTS kernel;
+CREATE SCHEMA kernel;
 
 
 -- =========================================================
 -- Durable audit log
 -- =========================================================
 
-CREATE TABLE IF NOT EXISTS kernel.audit_log (
+CREATE TABLE kernel.audit_log (
     audit_id uuid PRIMARY KEY,
     event_type varchar(160) NOT NULL,
 
@@ -22,10 +22,10 @@ CREATE TABLE IF NOT EXISTS kernel.audit_log (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS ix_kernel_audit_log_event_type
+CREATE INDEX ix_kernel_audit_log_event_type
     ON kernel.audit_log (event_type);
 
-CREATE INDEX IF NOT EXISTS ix_kernel_audit_log_created_at
+CREATE INDEX ix_kernel_audit_log_created_at
     ON kernel.audit_log (created_at);
 
 
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS ix_kernel_audit_log_created_at
 -- Transactional outbox
 -- =========================================================
 
-CREATE TABLE IF NOT EXISTS kernel.outbox_event (
+CREATE TABLE kernel.outbox_event (
     event_id uuid PRIMARY KEY,
     event_type varchar(200) NOT NULL,
     payload jsonb NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS kernel.outbox_event (
     published_at timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS ix_kernel_outbox_unpublished
+CREATE INDEX ix_kernel_outbox_unpublished
     ON kernel.outbox_event (created_at)
     WHERE published_at IS NULL;
 
