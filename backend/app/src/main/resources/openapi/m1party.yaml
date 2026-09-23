@@ -1,0 +1,446 @@
+openapi: 3.1.0
+
+info:
+  title: COOP ERP M1 Party API
+  version: 0.1.0
+
+paths:
+
+  /v1/party/entities:
+
+    get:
+      tags: [Entities]
+      operationId: listEntities
+      summary: List entities visible in the caller's scope
+      x-permission: gov.entity.view
+      parameters:
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum:
+              - ONBOARDING
+              - ACTIVE
+              - SUSPENDED
+
+        - in: query
+          name: district
+          required: false
+          schema:
+            type: string
+            maxLength: 40
+
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+
+      responses:
+
+        '200':
+          description: Entity page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityPage'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+
+    post:
+      tags: [Entities]
+      operationId: registerEntity
+      summary: Register an entity in ONBOARDING status
+      x-permission: gov.entity.register
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterEntityRequest'
+
+      responses:
+
+        '201':
+          description: Entity registered
+          headers:
+            Location:
+              description: Address of the registered entity
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/entities/{entityId}:
+
+    get:
+      tags: [Entities]
+      operationId: getEntity
+      summary: Get one entity visible in the caller's scope
+      x-permission: gov.entity.view
+
+      parameters:
+
+        - in: path
+          name: entityId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityResponse'
+
+        '404':
+          description: Entity does not exist or is not visible to this scope
+
+
+  /v1/party/entities/{entityId}/activate:
+
+    post:
+      tags: [Entities]
+      operationId: activateEntity
+      summary: Activate an onboarding entity
+      x-permission: gov.entity.activate
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+
+        - in: path
+          name: entityId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Entity activated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/entities/{entityId}/suspend:
+
+    post:
+      tags: [Entities]
+      operationId: suspendEntity
+      summary: Suspend an active entity
+      x-permission: gov.entity.suspend
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+
+        - in: path
+          name: entityId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityReasonRequest'
+
+      responses:
+
+        '204':
+          description: Entity suspended
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/entities/{entityId}/reinstate:
+
+    post:
+      tags: [Entities]
+      operationId: reinstateEntity
+      summary: Reinstate a suspended entity
+      x-permission: gov.entity.suspend
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+
+        - in: path
+          name: entityId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityReasonRequest'
+
+      responses:
+
+        '204':
+          description: Entity reinstated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+components:
+
+  schemas:
+
+    RegisterEntityRequest:
+      type: object
+
+      required:
+        - entityCode
+        - entityType
+        - legalNameEn
+        - defaultLanguage
+        - financialYearStartMonth
+
+      properties:
+
+        entityCode:
+          type: string
+          minLength: 1
+          maxLength: 12
+
+        entityType:
+          type: string
+          enum:
+            - DISTRIBUTOR
+            - MPCS
+
+        legalNameEn:
+          type: string
+          minLength: 1
+
+        legalNameSi:
+          type:
+            - string
+            - 'null'
+
+        legalNameTa:
+          type:
+            - string
+            - 'null'
+
+        registrationNo:
+          type:
+            - string
+            - 'null'
+          maxLength: 40
+
+        vatRegistrationNo:
+          type:
+            - string
+            - 'null'
+          maxLength: 20
+
+        district:
+          type:
+            - string
+            - 'null'
+          maxLength: 40
+
+        defaultLanguage:
+          type: string
+          enum:
+            - en
+            - si
+            - ta
+
+        financialYearStartMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+
+
+    EntityReasonRequest:
+      type: object
+
+      required:
+        - reasonCode
+
+      properties:
+
+        reasonCode:
+          type: string
+          minLength: 1
+
+        reasonText:
+          type:
+            - string
+            - 'null'
+
+
+    EntityResponse:
+      type: object
+
+      required:
+        - entityId
+        - legalNameEn
+
+      properties:
+
+        entityId:
+          type: string
+          format: uuid
+
+        entityCode:
+          type:
+            - string
+            - 'null'
+
+        entityType:
+          type:
+            - string
+            - 'null'
+          enum:
+            - FEDERATION
+            - DISTRIBUTOR
+            - MPCS
+            - null
+
+        legalNameEn:
+          type: string
+
+        legalNameSi:
+          type:
+            - string
+            - 'null'
+
+        legalNameTa:
+          type:
+            - string
+            - 'null'
+
+        registrationNo:
+          type:
+            - string
+            - 'null'
+
+        vatRegistrationNo:
+          type:
+            - string
+            - 'null'
+
+        district:
+          type:
+            - string
+            - 'null'
+
+        financialYearStartMonth:
+          type:
+            - integer
+            - 'null'
+
+        defaultLanguage:
+          type:
+            - string
+            - 'null'
+          enum:
+            - en
+            - si
+            - ta
+            - null
+
+        responsibleOfficerUserId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+
+        dataGovernanceSignedOn:
+          type:
+            - string
+            - 'null'
+          format: date
+
+        status:
+          type:
+            - string
+            - 'null'
+          enum:
+            - ONBOARDING
+            - ACTIVE
+            - SUSPENDED
+            - null
+
+
+    EntityPage:
+      type: object
+
+      required:
+        - items
+
+      properties:
+
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityResponse'
+
+        nextCursor:
+          type:
+            - string
+            - 'null'
+          format: uuid

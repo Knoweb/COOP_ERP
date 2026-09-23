@@ -1,4 +1,19 @@
 permissions:
+  - code: "gov.entity.register"
+    module: "m1party"
+    description_en: "Register federation-managed entities"
+    scope: "FEDERATION"
+    requires_mfa: false
+  - code: "gov.entity.activate"
+    module: "m1party"
+    description_en: "Activate federation-managed entities"
+    scope: "FEDERATION"
+    requires_mfa: true
+  - code: "gov.entity.suspend"
+    module: "m1party"
+    description_en: "Suspend and reinstate federation-managed entities"
+    scope: "FEDERATION"
+    requires_mfa: true
   - code: "gov.entity.manage"
     module: "m1party"
     description_en: "Register and suspend entities"

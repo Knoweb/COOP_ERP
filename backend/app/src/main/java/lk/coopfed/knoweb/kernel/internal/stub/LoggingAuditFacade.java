@@ -1,15 +1,15 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
+import java.util.UUID;
+import java.util.regex.Pattern;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * 17A stub of the audit service: it writes a log line, not a row. 19A ticket K-04 replaces
@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
  * a ProblemException: no user can fix them.
  */
 @Component
+@Profile("kernel-stubs")
 public class LoggingAuditFacade implements AuditFacade {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingAuditFacade.class);
@@ -50,17 +51,14 @@ public class LoggingAuditFacade implements AuditFacade {
                             + " (capitals, digits, underscores; at most 40 characters): " + eventType);
         }
         if (subject == null || subject.type() == null || subject.type().isBlank() || subject.id() == null) {
-            throw new IllegalArgumentException(
-                    "Audit record " + eventType + " needs a subject with a type and an id");
+            throw new IllegalArgumentException("Audit record " + eventType + " needs a subject with a type and an id");
         }
         if (scope == null || !scope.hasActiveScope()) {
-            throw new IllegalArgumentException(
-                    "Audit record " + eventType + " needs a scope with an active entity");
+            throw new IllegalArgumentException("Audit record " + eventType + " needs a scope with an active entity");
         }
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException(
-                    "audit.record(" + eventType + ") was called outside a transaction;"
-                            + " call it inside the handler's @Transactional method, after the mutation");
+            throw new IllegalStateException("audit.record(" + eventType + ") was called outside a transaction;"
+                    + " call it inside the handler's @Transactional method, after the mutation");
         }
 
         log.info(
