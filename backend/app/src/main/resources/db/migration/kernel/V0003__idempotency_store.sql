@@ -1,4 +1,4 @@
-CREATE SCHEMA kernel;
+CREATE SCHEMA IF NOT EXISTS kernel;
 
 CREATE TABLE kernel.idempotency_key (
     user_id uuid NOT NULL,

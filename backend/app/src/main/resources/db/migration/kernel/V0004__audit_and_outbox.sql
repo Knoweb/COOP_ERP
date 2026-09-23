@@ -1,4 +1,4 @@
-CREATE SCHEMA kernel;
+CREATE SCHEMA IF NOT EXISTS kernel;
 
 
 -- =========================================================
