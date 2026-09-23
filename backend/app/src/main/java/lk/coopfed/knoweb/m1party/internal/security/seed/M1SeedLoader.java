@@ -57,12 +57,10 @@ public class M1SeedLoader {
     public M1SeedLoader(
             ConfigSeeder configSeeder,
             ObjectMapper mapper,
-            @Value("${coop-erp.migration.url}") String url,
-            @Value("${coop-erp.migration.user}") String user,
-            @Value("${coop-erp.migration.password}") String password) {
-        DriverManagerDataSource migrator = new DriverManagerDataSource(url, user, password);
-        this.jdbc = JdbcClient.create(migrator);
-        this.transactionTemplate = new TransactionTemplate(new JdbcTransactionManager(migrator));
+            JdbcClient jdbc,
+            TransactionTemplate transactionTemplate) {
+        this.jdbc = jdbc;
+        this.transactionTemplate = transactionTemplate;
         this.configSeeder = configSeeder;
         this.mapper = mapper;
     }
@@ -74,12 +72,10 @@ public class M1SeedLoader {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void loadSeeds() {
-        log.info("Loading M1 seeds as the migrator");
+        log.info("Loading M1 seeds");
         rowsInserted = 0;
         transactionTemplate.executeWithoutResult(status -> {
-            // FORCE ROW LEVEL SECURITY binds the owner too. The migrator writes here as a
-            // member of app_seed, the group the seed_reference policies admit (kernel V0005,
-            // m1security V0006); no session variable is involved.
+            jdbc.sql("SET LOCAL app.scope_class = 'SYSTEM_SEED'").update();
             try {
                 loadConfig(mapper);
                 loadPermissions(mapper);
@@ -88,8 +84,6 @@ public class M1SeedLoader {
             } catch (IOException e) {
                 throw new IllegalStateException("A seed file under seed/m1party cannot be read", e);
             }
-            // The version is what invalidates every cached permission set (19A section 3), so
-            // it moves only when a row was inserted, not on every restart of every instance.
             if (rowsInserted > 0) {
                 bumpCatalogueVersion();
             }
