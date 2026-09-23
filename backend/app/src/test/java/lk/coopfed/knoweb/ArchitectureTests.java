@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Rules R1 to R7 of doc 17 Â§6.1 as tests (17A Â§5). They are the only reason a
+ * Rules R1 to R7 of doc 17 §6.1 as tests (17A §5). They are the only reason a
  * modular monolith stays modular; a violation fails the build. The rules are
  * static methods so that {@link ArchitectureRulesBiteTest} can prove each one
  * reports a violation against deliberately wrong classes.
@@ -68,7 +68,7 @@ class ArchitectureTests {
         "..hello.."
     };
 
-    /** Module package name to the database schemas it owns (17A Â§2, doc 18 Part F). */
+    /** Module package name to the database schemas it owns (17A §2, doc 18 Part F). */
     static final Map<String, Set<String>> SCHEMA_OWNERSHIP = Map.ofEntries(
             Map.entry("kernel", Set.of("kernel")),
             Map.entry("hello", Set.of("hello")),
@@ -111,8 +111,6 @@ class ArchitectureTests {
         // the output folder is an Options value now. Nothing else about the call changed.
         new Documenter(MODULES, Documenter.Options.defaults().withOutputFolder(MODULE_DOCS_FOLDER))
                 .writeDocumentation();
-
-        normalizeComponentsDiagram();
     }
 
     /** Relative to backend/app, the working directory of the Gradle test task. */
@@ -632,47 +630,4 @@ class ArchitectureTests {
 
     /** Same prefix as PLACEHOLDER_PERMISSION_PREFIX in tools/new-module.mjs. */
     static final String SCAFFOLD_PLACEHOLDER = "todo.";
-
-    /**
-     * Spring Modulith can emit otherwise-identical C4 relationships in a different order
-     * on Windows and Linux. Canonicalise relation blocks so committed generated docs are
-     * byte-for-byte reproducible in developer machines and CI.
-     */
-    private static void normalizeComponentsDiagram() {
-        var path = java.nio.file.Path.of(MODULE_DOCS_FOLDER, "components.puml");
-
-        try {
-            var lines = new java.util.ArrayList<>(
-                    java.nio.file.Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8));
-
-            int start = 0;
-
-            while (start < lines.size()) {
-                if (!lines.get(start).startsWith("Rel(")) {
-                    start++;
-                    continue;
-                }
-
-                int end = start + 1;
-
-                while (end < lines.size() && lines.get(end).startsWith("Rel(")) {
-                    end++;
-                }
-
-                var sorted = new java.util.ArrayList<>(lines.subList(start, end));
-                sorted.sort(String::compareTo);
-
-                for (int index = 0; index < sorted.size(); index++) {
-                    lines.set(start + index, sorted.get(index));
-                }
-
-                start = end;
-            }
-
-            java.nio.file.Files.writeString(path, String.join("\n", lines), java.nio.charset.StandardCharsets.UTF_8);
-
-        } catch (java.io.IOException exception) {
-            throw new java.io.UncheckedIOException("Could not normalise generated components.puml", exception);
-        }
-    }
 }
