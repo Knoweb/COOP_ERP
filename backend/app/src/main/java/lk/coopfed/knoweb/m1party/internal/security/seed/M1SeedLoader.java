@@ -13,9 +13,24 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * Loads M1's reference data (permission catalogue, role templates, SoD pairs, configuration
+ * defaults) from the YAML files under {@code seed/m1party} when the application starts (21A
+ * section 3.3: "upsert by key; never changes rows an entity has edited").
+ *
+ * <p>Decided by the architect on 23 September 2026: it connects as the migrator, the owner of
+ * the schemas, exactly as {@link lk.coopfed.knoweb.config.FlywayConfig} does for the
+ * migrations, and not as the application. The application role {@code app_rw} may not write
+ * the permission catalogue and no policy lets it; reference data is a migration-time concern.
+ * The migrator's credentials are the ones already configured for Flyway
+ * ({@code coop-erp.migration.*}); one connection is opened for this transaction and closed
+ * after it.
+ */
 @Component
 public class M1SeedLoader {
 
@@ -24,6 +39,8 @@ public class M1SeedLoader {
     private final JdbcClient jdbc;
     private final ConfigSeeder configSeeder;
     private final TransactionTemplate transactionTemplate;
+    private final ObjectMapper mapper;
+    private int rowsInserted;
 
     @Value("classpath:seed/m1party/permissions.yaml")
     private Resource permissionsResource;
@@ -37,31 +54,47 @@ public class M1SeedLoader {
     @Value("classpath:seed/m1party/config.yaml")
     private Resource configResource;
 
-    public M1SeedLoader(JdbcClient jdbc, ConfigSeeder configSeeder, TransactionTemplate transactionTemplate) {
-        this.jdbc = jdbc;
+    public M1SeedLoader(
+            ConfigSeeder configSeeder,
+            ObjectMapper mapper,
+            @Value("${coop-erp.migration.url}") String url,
+            @Value("${coop-erp.migration.user}") String user,
+            @Value("${coop-erp.migration.password}") String password) {
+        DriverManagerDataSource migrator = new DriverManagerDataSource(url, user, password);
+        this.jdbc = JdbcClient.create(migrator);
+        this.transactionTemplate = new TransactionTemplate(new JdbcTransactionManager(migrator));
         this.configSeeder = configSeeder;
-        this.transactionTemplate = transactionTemplate;
+        this.mapper = mapper;
     }
 
+    /**
+     * Runs once the application is up. A failure here is a failure to start: an instance
+     * without its permission catalogue must not serve requests, so nothing is caught or
+     * wrapped and Spring Boot stops the application with the cause in the log.
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void loadSeeds() {
-        log.info("Loading M1 seeds...");
-        ObjectMapper mapper = new ObjectMapper();
-
+        log.info("Loading M1 seeds as the migrator");
+        rowsInserted = 0;
         transactionTemplate.executeWithoutResult(status -> {
+            // FORCE ROW LEVEL SECURITY binds the owner too. The migrator writes here as a
+            // member of app_seed, the group the seed_reference policies admit (kernel V0005,
+            // m1security V0006); no session variable is involved.
             try {
-                jdbc.sql("SET LOCAL app.scope_class = 'SYSTEM_SEED'").update();
                 loadConfig(mapper);
                 loadPermissions(mapper);
                 loadRoleTemplates(mapper);
                 loadSodPairs(mapper);
+            } catch (IOException e) {
+                throw new IllegalStateException("A seed file under seed/m1party cannot be read", e);
+            }
+            // The version is what invalidates every cached permission set (19A section 3), so
+            // it moves only when a row was inserted, not on every restart of every instance.
+            if (rowsInserted > 0) {
                 bumpCatalogueVersion();
-                log.info("M1 seeds loaded successfully.");
-            } catch (Exception e) {
-                log.error("Failed to load M1 seeds", e);
-                throw new RuntimeException("Seed loading failed", e);
             }
         });
+        log.info("M1 seeds loaded, {} row(s) inserted", rowsInserted);
     }
 
     private <T> T loadYaml(Resource resource, ObjectMapper mapper, Class<T> type) {
@@ -92,7 +125,7 @@ public class M1SeedLoader {
             boolean offline = p.offline_allowed() != null ? p.offline_allowed() : false;
             boolean mfa = p.requires_mfa() != null ? p.requires_mfa() : false;
 
-            jdbc.sql(
+            inserted(jdbc.sql(
                             """
                 INSERT INTO security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)
                 VALUES (:code, :module, :desc, :offline, :mfa, :scope)
@@ -104,7 +137,7 @@ public class M1SeedLoader {
                     .param("offline", offline)
                     .param("mfa", mfa)
                     .param("scope", p.scope())
-                    .update();
+                    .update());
         }
         log.info("Loaded {} permissions", seed.permissions().size());
     }
@@ -115,7 +148,7 @@ public class M1SeedLoader {
         if (seed == null) return;
 
         for (SeedRecords.RoleTemplateData t : seed.templates()) {
-            jdbc.sql(
+            inserted(jdbc.sql(
                             """
                 INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
                 VALUES (:id, NULL, :name, true, :roleClass, 'ACTIVE')
@@ -124,11 +157,11 @@ public class M1SeedLoader {
                     .param("id", t.role_id())
                     .param("name", t.name_en())
                     .param("roleClass", t.role_class())
-                    .update();
+                    .update());
 
             // Insert role permissions
             for (String perm : t.permissions()) {
-                jdbc.sql(
+                inserted(jdbc.sql(
                                 """
                     INSERT INTO security.role_permission (role_id, permission_code)
                     VALUES (:id, :perm)
@@ -136,7 +169,7 @@ public class M1SeedLoader {
                 """)
                         .param("id", t.role_id())
                         .param("perm", perm)
-                        .update();
+                        .update());
             }
         }
         log.info("Loaded {} role templates", seed.templates().size());
@@ -156,7 +189,7 @@ public class M1SeedLoader {
                 permB = temp;
             }
 
-            jdbc.sql(
+            inserted(jdbc.sql(
                             """
                 INSERT INTO security.sod_pair (sod_pair_id, permission_a, permission_b, mode, owner_entity_id)
                 VALUES (:id, :permA, :permB, :mode, NULL)
@@ -166,9 +199,14 @@ public class M1SeedLoader {
                     .param("permA", permA)
                     .param("permB", permB)
                     .param("mode", pair.mode())
-                    .update();
+                    .update());
         }
         log.info("Loaded {} SoD pairs", seed.pairs().size());
+    }
+
+    /** Sums the rows the idempotent inserts really inserted, so a no-op start stays a no-op. */
+    private void inserted(int rows) {
+        rowsInserted += rows;
     }
 
     private void bumpCatalogueVersion() {

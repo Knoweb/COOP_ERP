@@ -1,14 +1,25 @@
 package lk.coopfed.knoweb.m1party.internal.security.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+/**
+ * The seed loader runs on start (the context of this test started it once already) and
+ * connects as the migrator. The counts below are the rows of the four YAML files under
+ * seed/m1party; change them together with the files.
+ */
 class M1SeedLoaderTest extends PostgresIntegrationTest {
+
+    private static final int PERMISSIONS = 15;
+    private static final int ROLE_TEMPLATES = 3;
+    private static final int SOD_PAIRS = 2;
 
     @Autowired
     private M1SeedLoader seedLoader;
@@ -20,55 +31,43 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
     private ConfigRegistry configRegistry;
 
     @Test
-    @org.springframework.transaction.annotation.Transactional
-    void loadsSeedsIdempotently() {
-        // Set scope so the test can read reference data
-        jdbc.sql("SET LOCAL app.scope_class = 'FEDERATION_VIEW'").update();
+    void theStartUpLoadPutEveryRowInPlaceExactlyOnce() {
+        JdbcTemplate db = superuserJdbc();
 
-        // Run seed loader manually to ensure it works on demand and is idempotent
+        assertThat(count(db, "security.permission")).isEqualTo(PERMISSIONS);
+        assertThat(count(db, "security.role WHERE is_template")).isEqualTo(ROLE_TEMPLATES);
+        assertThat(count(db, "security.sod_pair")).isEqualTo(SOD_PAIRS);
+        assertThat(configRegistry.get("trade.federation_direct.enabled", null)).contains("false");
+    }
+
+    @Test
+    void aSecondRunInsertsNothingAndLeavesTheCatalogueVersionAlone() {
+        JdbcTemplate db = superuserJdbc();
+        int versionBefore = db.queryForObject(
+                "SELECT COALESCE(MAX(rv), 0) FROM security.permission_catalogue_version", Integer.class);
+        assertThat(versionBefore).isGreaterThan(0); // the start-up load bumped it once
+
         seedLoader.loadSeeds();
 
-        // loadSeeds() resets the connection's app.scope_class, so we must re-apply it for the test's queries
-        jdbc.sql("SET LOCAL app.scope_class = 'FEDERATION_VIEW'").update();
+        assertThat(count(db, "security.permission")).isEqualTo(PERMISSIONS);
+        assertThat(db.queryForObject("SELECT MAX(rv) FROM security.permission_catalogue_version", Integer.class))
+                .as("no row was inserted, so every cached permission set stays valid")
+                .isEqualTo(versionBefore);
+    }
 
-        // Verify config
-        assertThat(configRegistry.get("trade.federation_direct.enabled", null))
-                .isPresent()
-                .contains("false");
+    @Test
+    void theApplicationRoleCannotWriteTheCatalogue() {
+        // V0006 undid the seed grants of V0002: the catalogue is reference data, written by the
+        // migrator only. The application connection is app_rw.
+        assertThatThrownBy(() -> jdbc.sql(
+                                "INSERT INTO security.permission (permission_code, module, description_en, scope)"
+                                        + " VALUES ('zz.test.write', 'zz', 'must fail', 'LOCATION')")
+                        .update())
+                .rootCause()
+                .hasMessageContaining("permission denied");
+    }
 
-        // Verify permissions loaded
-        int permCount = jdbc.sql("SELECT COUNT(*) FROM security.permission")
-                .query(Integer.class)
-                .single();
-        assertThat(permCount).isGreaterThan(0);
-
-        // Verify role templates
-        int templateCount = jdbc.sql("SELECT COUNT(*) FROM security.role WHERE is_template = true")
-                .query(Integer.class)
-                .single();
-        assertThat(templateCount).isGreaterThan(0);
-
-        // Verify SoD pairs
-        int sodCount = jdbc.sql("SELECT COUNT(*) FROM security.sod_pair")
-                .query(Integer.class)
-                .single();
-        assertThat(sodCount).isGreaterThan(0);
-
-        // Verify catalogue version
-        int version = jdbc.sql("SELECT COALESCE(MAX(rv), 0) FROM security.permission_catalogue_version")
-                .query(Integer.class)
-                .single();
-        assertThat(version).isGreaterThan(0);
-
-        // Second pass: should not throw exception (Idempotent)
-        seedLoader.loadSeeds();
-
-        // Re-apply scope again after the second pass resets it
-        jdbc.sql("SET LOCAL app.scope_class = 'FEDERATION_VIEW'").update();
-
-        int permCountAfter = jdbc.sql("SELECT COUNT(*) FROM security.permission")
-                .query(Integer.class)
-                .single();
-        assertThat(permCountAfter).isEqualTo(permCount); // Count should remain the same
+    private static int count(JdbcTemplate db, String from) {
+        return db.queryForObject("SELECT COUNT(*) FROM " + from, Integer.class);
     }
 }
