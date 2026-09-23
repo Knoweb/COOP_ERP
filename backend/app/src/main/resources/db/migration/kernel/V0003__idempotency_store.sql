@@ -16,7 +16,7 @@ CREATE TABLE kernel.idempotency_key (
 CREATE INDEX ix_kernel_idempotency_expiry
     ON kernel.idempotency_key (expires_at);
 
-GRANT SELECT, INSERT, UPDATE
+GRANT SELECT, INSERT, UPDATE, DELETE
     ON kernel.idempotency_key
     TO app_rw;
 
