@@ -25,7 +25,7 @@ public class DevStubsGuard {
 
     static final String MESSAGE = "The kernel runs on its 17A development stubs: identity and scope are"
             + " taken from request headers without authentication, idempotency keys live in this"
-            + " instance's memory, audit records and events are logged and not stored.";
+            + " instance's memory, events are logged and not stored.";
 
     public DevStubsGuard(Environment environment) {
         if (environment.acceptsProfiles(Profiles.of("prod", "production"))) {
