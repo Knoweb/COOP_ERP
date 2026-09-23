@@ -5,7 +5,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
  * table so every instance answers alike.
  */
 @Component
-@Profile("idempotency-memory")
 public class InMemoryIdempotencyStore implements IdempotencyStore {
 
     private record Entry(String requestHash, StoredResult result) {}

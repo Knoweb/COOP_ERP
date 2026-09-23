@@ -178,6 +178,7 @@ gen-clients:
 check-generated:
 	sh tools/gen-clients.sh
 	cd backend && ./gradlew :app:test --tests "*ArchitectureTests*"
+	node tools/normalize-components-puml.mjs
 	@# Compared by content against what is staged or committed: a changed file, or a new file
 	@# git does not know yet. (`git status` would also report line-ending noise on Windows.)
 	@if ! git diff --quiet -- web/src/generated docs/modules \
