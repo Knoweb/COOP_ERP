@@ -7,7 +7,6 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -25,7 +24,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * </ul>
  */
 @Component
-@Profile("kernel-stubs")
 public class LoggingEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventPublisher.class);

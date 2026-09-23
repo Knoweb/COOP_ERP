@@ -7,7 +7,6 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -29,7 +28,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * a ProblemException: no user can fix them.
  */
 @Component
-@Profile("kernel-stubs")
 public class LoggingAuditFacade implements AuditFacade {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingAuditFacade.class);
