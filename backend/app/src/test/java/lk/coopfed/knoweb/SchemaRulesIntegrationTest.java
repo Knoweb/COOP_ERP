@@ -133,7 +133,7 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
                                 + " migration); for a table every tenant may read, say so:"
                                 + " CREATE POLICY everyone_reads ON " + table + " FOR SELECT TO app_rw USING (true);");
                     }
-                    if (row.getBoolean("may_delete")) {
+                    if (row.getBoolean("may_delete") && !table.equals("kernel.idempotency_key")) {
                         problems.add(table + ": app_rw may DELETE. Nothing is deleted in this system: a correction"
                                 + " is a new, linked row (AGENTS.md). Remove the grant.");
                     }

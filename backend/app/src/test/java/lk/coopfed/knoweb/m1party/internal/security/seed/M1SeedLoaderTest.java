@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
-    private static final int PERMISSIONS = 15;
+    private static final int PERMISSIONS = 17;
     private static final int ROLE_TEMPLATES = 3;
     private static final int SOD_PAIRS = 2;
 
@@ -43,6 +43,10 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
     @Test
     void aSecondRunInsertsNothingAndLeavesTheCatalogueVersionAlone() {
         JdbcTemplate db = superuserJdbc();
+
+        db.update(
+                "UPDATE security.permission SET description_en = 'Edited text' WHERE permission_code = 'gov.entity.register'");
+
         int versionBefore = db.queryForObject(
                 "SELECT COALESCE(MAX(rv), 0) FROM security.permission_catalogue_version", Integer.class);
         assertThat(versionBefore).isGreaterThan(0); // the start-up load bumped it once
@@ -53,6 +57,13 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
         assertThat(db.queryForObject("SELECT MAX(rv) FROM security.permission_catalogue_version", Integer.class))
                 .as("no row was inserted, so every cached permission set stays valid")
                 .isEqualTo(versionBefore);
+
+        String descriptionAfter = db.queryForObject(
+                "SELECT description_en FROM security.permission WHERE permission_code = 'gov.entity.register'",
+                String.class);
+        assertThat(descriptionAfter)
+                .as("existing rows remain completely untouched")
+                .isEqualTo("Edited text");
     }
 
     @Test

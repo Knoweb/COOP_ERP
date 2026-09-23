@@ -210,14 +210,14 @@ test-scaffold:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "make test-scaffold needs a clean working tree (commit or stash first)." >&2; exit 1; \
 	fi
-	node tools/new-module.mjs --name m3pricing --schema pricing --entity price_list
+	node tools/new-module.mjs --name m9integration --schema integration --entity webhook
 	sh tools/gen-clients.sh
 	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
 	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \
 		echo "check-permissions accepted the scaffold placeholders" >&2; exit 1; \
 	fi
 	@echo "--- replace them, as the developer does in step 1 of the module README"
-	grep -rl "todo\.pricing\.price_list\." backend/app/src web/src | xargs sed -i "s/todo\.pricing\.price_list\./prc.price_list./g"
+	grep -rl "todo\.integration\.webhook\." backend/app/src web/src | xargs sed -i "s/todo\.integration\.webhook\./int.webhook./g"
 	node tools/check-permissions.mjs
 	cd backend && ./gradlew :app:test :app:integrationTest
 	node tools/check-schema-ownership.mjs

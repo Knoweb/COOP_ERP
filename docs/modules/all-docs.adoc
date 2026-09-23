@@ -21,3 +21,7 @@ include::module-hello.adoc[]
 plantuml::module-m1party.puml[,,format=svg]
 include::module-m1party.adoc[]
 
+== M3 Pricing & Rules
+plantuml::module-m3pricing.puml[,,format=svg]
+include::module-m3pricing.adoc[]
+
