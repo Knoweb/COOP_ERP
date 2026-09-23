@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/entities/{entityId}/responsible-officer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Appoint or change the responsible officer for an entity */
+        put: operations["appointResponsibleOfficer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/party/entities/{entityId}/suspend": {
         parameters: {
             query?: never;
@@ -107,6 +124,12 @@ export interface components {
             /** @enum {string} */
             defaultLanguage: "en" | "si" | "ta";
             financialYearStartMonth: number;
+        };
+        AppointResponsibleOfficerRequest: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: date */
+            dataGovernanceSignedOn: string;
         };
         EntityReasonRequest: {
             reasonCode: string;
@@ -302,6 +325,42 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    appointResponsibleOfficer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                entityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointResponsibleOfficerRequest"];
+            };
+        };
+        responses: {
+            /** @description Responsible officer updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Entity does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             422: components["responses"]["RuleBroken"];
         };
     };
