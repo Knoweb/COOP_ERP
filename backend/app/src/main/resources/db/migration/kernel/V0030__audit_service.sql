@@ -19,7 +19,8 @@ VALUES
     ('ENTITY_ACTIVATED', 'INFO', NULL, false, 'Entity activated'),
     ('ENTITY_SUSPENDED', 'INFO', NULL, false, 'Entity suspended'),
     ('ENTITY_REINSTATED', 'INFO', NULL, false, 'Entity reinstated'),
-    ('ENTITY_UPDATED', 'INFO', NULL, false, 'Responsible officer appointment')
+    ('ENTITY_UPDATED', 'INFO', NULL, false, 'Responsible officer appointment'),
+    ('PRICING_PRICE_LIST_REGISTERED', 'INFO', NULL, false, 'Scaffolder proof registration')
 ON CONFLICT (event_type_code) DO NOTHING;
 
 ALTER TABLE kernel.audit_event_type ENABLE ROW LEVEL SECURITY;
