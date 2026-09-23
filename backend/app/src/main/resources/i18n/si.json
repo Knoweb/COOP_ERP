@@ -20,7 +20,7 @@
   "m1.entity.not_onboarding": "සක්‍රිය කළ හැක්කේ ඇතුළත් වෙමින් පවතින ආයතනයක් පමණි",
   "m1.entity.not_suspended": "නැවත පිහිටුවිය හැක්කේ අත්හිටුවා ඇති ආයතනයක් පමණි",
   "m1.entity.reason_required": "මෙම ආයතන තත්ත්ව වෙනස සඳහා හේතුවක් අවශ්‍යයි",
-  "m1.entity.responsible_officer_invalid": "තෝරාගත් පරිශීලකයා මෙම ආයතනය සඳහා වගකිවයුතු නිලධාරියෙකු විය නොහැක",
+  "m1.entity.responsible_officer_invalid": "වගකිවයුතු නිලධාරියා මෙම ආයතනයට අයත් පරිශීලකයෙකු විය යුතුය",
   "m1.entity.responsible_officer_required": "ආයතනය සක්‍රිය කිරීමට පෙර වගකිවයුතු නිලධාරියෙකු පත් කරන්න",
   "m1.entity.type_invalid": "වලංගු ආයතන වර්ගයක් තෝරන්න",
   "m1.entity.vat_required": "ආයතනය සක්‍රිය කිරීමට පෙර VAT ලියාපදිංචි අංකය ඇතුළත් කරන්න",

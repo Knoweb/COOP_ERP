@@ -20,7 +20,7 @@
   "m1.entity.not_onboarding": "Only an onboarding entity can be activated",
   "m1.entity.not_suspended": "Only a suspended entity can be reinstated",
   "m1.entity.reason_required": "A reason is required for this entity status change",
-  "m1.entity.responsible_officer_invalid": "The selected user cannot be the responsible officer for this entity",
+  "m1.entity.responsible_officer_invalid": "The responsible officer must belong to this entity",
   "m1.entity.responsible_officer_required": "Appoint a responsible officer before activating the entity",
   "m1.entity.type_invalid": "Select a valid entity type",
   "m1.entity.vat_required": "Enter the VAT registration number before activating the entity",

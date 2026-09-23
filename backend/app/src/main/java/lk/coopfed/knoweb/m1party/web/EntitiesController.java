@@ -7,12 +7,14 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.ActivateEntity;
+import lk.coopfed.knoweb.m1party.api.AppointResponsibleOfficer;
 import lk.coopfed.knoweb.m1party.api.RegisterEntity;
 import lk.coopfed.knoweb.m1party.api.ReinstateEntity;
 import lk.coopfed.knoweb.m1party.api.SuspendEntity;
 import lk.coopfed.knoweb.m1party.query.EntityFilter;
 import lk.coopfed.knoweb.m1party.query.EntityView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m1party.web.generated.AppointResponsibleOfficerRequest;
 import lk.coopfed.knoweb.m1party.web.generated.EntitiesApi;
 import lk.coopfed.knoweb.m1party.web.generated.EntityPage;
 import lk.coopfed.knoweb.m1party.web.generated.EntityReasonRequest;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 class EntitiesController implements EntitiesApi {
 
     private final Handles<RegisterEntity, UUID> registerEntity;
+    private final Handles<AppointResponsibleOfficer, UUID> appointResponsibleOfficer;
     private final Handles<ActivateEntity, UUID> activateEntity;
     private final Handles<SuspendEntity, UUID> suspendEntity;
     private final Handles<ReinstateEntity, UUID> reinstateEntity;
@@ -33,6 +36,7 @@ class EntitiesController implements EntitiesApi {
 
     EntitiesController(
             Handles<RegisterEntity, UUID> registerEntity,
+            Handles<AppointResponsibleOfficer, UUID> appointResponsibleOfficer,
             Handles<ActivateEntity, UUID> activateEntity,
             Handles<SuspendEntity, UUID> suspendEntity,
             Handles<ReinstateEntity, UUID> reinstateEntity,
@@ -40,6 +44,7 @@ class EntitiesController implements EntitiesApi {
             CurrentScope currentScope) {
 
         this.registerEntity = registerEntity;
+        this.appointResponsibleOfficer = appointResponsibleOfficer;
         this.activateEntity = activateEntity;
         this.suspendEntity = suspendEntity;
         this.reinstateEntity = reinstateEntity;
@@ -70,6 +75,17 @@ class EntitiesController implements EntitiesApi {
 
         return ResponseEntity.created(URI.create(EntitiesApi.PATH_LIST_ENTITIES + "/" + entityId))
                 .body(toResponse(created));
+    }
+
+    @Override
+    public ResponseEntity<Void> appointResponsibleOfficer(
+            UUID entityId, String idempotencyKey, AppointResponsibleOfficerRequest request) {
+
+        appointResponsibleOfficer.handle(
+                new AppointResponsibleOfficer(entityId, request.getUserId(), request.getDataGovernanceSignedOn()),
+                currentScope.get());
+
+        return ResponseEntity.noContent().build();
     }
 
     @Override

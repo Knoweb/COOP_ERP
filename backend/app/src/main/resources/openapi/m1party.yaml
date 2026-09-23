@@ -162,6 +162,47 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/party/entities/{entityId}/responsible-officer:
+
+    put:
+      tags: [Entities]
+      operationId: appointResponsibleOfficer
+      summary: Appoint or change the responsible officer for an entity
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: entityId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointResponsibleOfficerRequest'
+
+      responses:
+
+        '204':
+          description: Responsible officer updated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: Entity does not exist
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/party/entities/{entityId}/suspend:
 
     post:
@@ -313,6 +354,23 @@ components:
           minimum: 1
           maximum: 12
 
+
+    AppointResponsibleOfficerRequest:
+      type: object
+
+      required:
+        - userId
+        - dataGovernanceSignedOn
+
+      properties:
+
+        userId:
+          type: string
+          format: uuid
+
+        dataGovernanceSignedOn:
+          type: string
+          format: date
 
     EntityReasonRequest:
       type: object
