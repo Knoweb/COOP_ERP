@@ -178,6 +178,9 @@ gen-clients:
 check-generated:
 	sh tools/gen-clients.sh
 	cd backend && ./gradlew :app:test --tests "*ArchitectureTests*"
+	@# The documenter writes the Rel lines of components.puml in an order that differs from run
+	@# to run, so the file looked changed in every pull request. Sorting them makes the check
+	@# compare content, not luck.
 	node tools/normalize-components-puml.mjs
 	@# Compared by content against what is staged or committed: a changed file, or a new file
 	@# git does not know yet. (`git status` would also report line-ending noise on Windows.)
