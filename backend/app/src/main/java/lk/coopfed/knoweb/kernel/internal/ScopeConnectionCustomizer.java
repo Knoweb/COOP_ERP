@@ -10,12 +10,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * Applies one request/job scope to the current database transaction.
- *
- * <p>All settings are transaction-local because PgBouncer may reuse the same
- * server connection for another caller after the transaction ends.
- */
 @Aspect
 @Component
 @Order(TransactionOrderConfig.SCOPE_CUSTOMIZER_ORDER)
@@ -23,6 +17,7 @@ public class ScopeConnectionCustomizer {
 
     private static final String SET_SCOPE = "select "
             + "set_config('app.user_id', ?, true), "
+            + "set_config('app.correlation_id', ?, true), "
             + "set_config('app.scope_entity_id', ?, true), "
             + "set_config('app.scope_location_id', ?, true), "
             + "set_config('app.scope_class', ?, true), "
@@ -38,6 +33,7 @@ public class ScopeConnectionCustomizer {
             + " && (@annotation(org.springframework.transaction.annotation.Transactional)"
             + " || @within(org.springframework.transaction.annotation.Transactional))")
     public Object applyScope(ProceedingJoinPoint call) throws Throwable {
+
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("ScopeConnectionCustomizer ran outside an active transaction");
         }
@@ -48,6 +44,8 @@ public class ScopeConnectionCustomizer {
 
         String userId = scope == null ? "" : text(scope.userId());
 
+        String correlationId = scope == null ? "" : text(scope.correlationId());
+
         String entityId = PolicyClass.NONE.name().equals(policyClass) ? "" : text(scope.entityId());
 
         String locationId = PolicyClass.NONE.name().equals(policyClass) ? "" : text(scope.locationId());
@@ -57,7 +55,7 @@ public class ScopeConnectionCustomizer {
                         ? GrantedEntities.settingValue(scope.grantedEntities())
                         : "{}";
 
-        jdbc.queryForList(SET_SCOPE, userId, entityId, locationId, policyClass, grantedEntities);
+        jdbc.queryForList(SET_SCOPE, userId, correlationId, entityId, locationId, policyClass, grantedEntities);
 
         return call.proceed();
     }
@@ -73,6 +71,7 @@ public class ScopeConnectionCustomizer {
     }
 
     private static String sessionClass(ScopeContext scope) {
+
         if (scope == null || !scope.hasActiveScope()) {
             return PolicyClass.NONE.name();
         }

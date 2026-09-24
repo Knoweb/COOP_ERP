@@ -7,7 +7,6 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -23,7 +22,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *       change it announces, or a crash between the two leaves them disagreeing</li>
  * </ul>
  */
-@Component
 public class LoggingEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventPublisher.class);

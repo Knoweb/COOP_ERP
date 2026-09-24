@@ -15,6 +15,9 @@ public class PartitionJob {
 
     @Scheduled(cron = "0 10 0 * * *", zone = "UTC")
     public void createUpcomingPartitions() {
+
         jdbc.execute("select kernel.ensure_audit_partitions(3)");
+
+        jdbc.execute("select kernel.ensure_event_outbox_partitions(3)");
     }
 }
