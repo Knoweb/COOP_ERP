@@ -82,3 +82,18 @@ Therefore callers must access audit rows through the partitioned parent/view;
 the parent's RLS remains the security boundary for routed parent access.
 The partition job still applies RLS/policies to children as defence in depth
 and for protection against accidental direct child-table access.
+
+## K-03a idempotency partitions
+
+`kernel.idempotency_key` is partitioned by UTC day. The command interceptor
+claims the key inside the command transaction before calling the handler and
+records the serialized command result before that transaction commits. A
+concurrent request on another instance therefore waits on PostgreSQL rather
+than executing the command twice.
+
+Partition maintenance runs with the configured migration credentials. The
+retention window is configurable with
+`coop-erp.idempotency.retention-hours` (default `24`), future partition creation
+with `coop-erp.idempotency.partition-days-ahead`, and the maintenance schedule
+with `coop-erp.idempotency.partition-cron`. Expiry drops old partitions; it does
+not DELETE rows.

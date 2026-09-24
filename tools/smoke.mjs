@@ -22,6 +22,7 @@ const TWO_INSTANCES = process.argv.includes("--two");
 const FEDERATION = "0190f000-0000-7000-8000-000000000001";
 const MPCS = "0190f000-0000-7000-8000-000000000002";
 const GREETINGS = `${BACKEND}/v1/hello/greetings`;
+const SMOKE_USER = crypto.randomUUID();
 
 let failures = 0;
 
@@ -55,7 +56,7 @@ const scope = (entity, extra = {}) => ({ "X-Scope-Entity": entity, ...extra });
 function register(textEn, key, headers) {
   return fetch(GREETINGS, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Idempotency-Key": key, ...headers },
+    headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Dev-User": SMOKE_USER, ...headers },
     body: JSON.stringify({ textEn })
   });
 }
@@ -154,19 +155,37 @@ if (TWO_INSTANCES) {
       upstreams.add(response.headers.get("x-upstream"));
     }
     upstreams.delete(null);
-    expect(upstreams.size === 2, `saw ${upstreams.size} instance(s): ${[...upstreams].join(", ") || "no X-Upstream header (is this make up-2?)"}`);
-  });
-} else {
-  // One instance: the in-memory idempotency store of the 17A stub holds. With two instances a
-  // retry can land on the other one; that case belongs to 19A K-03 (kernel.idempotency_key).
-  await check("a retry with the same Idempotency-Key returns the same greeting", async () => {
-    const text = `Smoke retry ${crypto.randomUUID()}`;
-    const key = crypto.randomUUID();
-    const first = await json(await register(text, key, scope(MPCS)));
-    const retry = await json(await register(text, key, scope(MPCS)));
-    expect(first.id && first.id === retry.id, `first ${first.id}, retry ${retry.id ?? JSON.stringify(retry)}`);
+    expect(upstreams.size === 2, `saw ${upstreams.size} instance(s): ${[...upstreams].join(", ") || "no X-Upstream header"}`);
   });
 }
+
+await check(
+  TWO_INSTANCES
+    ? "the same Idempotency-Key replays across two backend instances"
+    : "a retry with the same Idempotency-Key returns the same greeting",
+  async () => {
+    const text = `Smoke retry ${crypto.randomUUID()}`;
+    const key = crypto.randomUUID();
+    const headers = scope(MPCS);
+
+    const firstResponse = await register(text, key, headers);
+    const firstUpstream = firstResponse.headers.get("x-upstream");
+    const first = await json(firstResponse);
+
+    const retryResponse = await register(text, key, headers);
+    const retryUpstream = retryResponse.headers.get("x-upstream");
+    const retry = await json(retryResponse);
+
+    expect(firstResponse.status === 201, `first HTTP ${firstResponse.status}: ${JSON.stringify(first)}`);
+    expect(retryResponse.status === 201, `retry HTTP ${retryResponse.status}: ${JSON.stringify(retry)}`);
+    expect(first.id && first.id === retry.id, `first ${first.id}, retry ${retry.id ?? JSON.stringify(retry)}`);
+
+    if (TWO_INSTANCES) {
+      expect(firstUpstream && retryUpstream, "missing X-Upstream header");
+      expect(firstUpstream !== retryUpstream, `retry stayed on ${firstUpstream}`);
+    }
+  }
+);
 
 console.log(failures === 0 ? "Smoke test passed" : `Smoke test FAILED: ${failures} check(s)`);
 process.exit(failures === 0 ? 0 : 1);
