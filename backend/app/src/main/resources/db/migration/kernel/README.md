@@ -82,6 +82,7 @@ Therefore callers must access audit rows through the partitioned parent/view;
 the parent's RLS remains the security boundary for routed parent access.
 The partition job still applies RLS/policies to children as defence in depth
 and for protection against accidental direct child-table access.
+
 ## K-03a idempotency partitions
 
 `kernel.idempotency_key` is partitioned by UTC day. The command interceptor
