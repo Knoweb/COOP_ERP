@@ -142,6 +142,10 @@ dependencies {
 
     implementation(libs.spring.modulith.starter.core)
 
+    // K-12: one run per schedule across instances, locked through a row of kernel.shedlock (19A section 12).
+    implementation(libs.shedlock.spring)
+    implementation(libs.shedlock.provider.jdbc.template)
+
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.flywaydb:flyway-core")

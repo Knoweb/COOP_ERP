@@ -31,6 +31,7 @@
   "hello.title": "සුබපැතුම්",
   "idempotency.key_required": "ඉල්ලීමේ Idempotency-Key ශීර්ෂය නැත",
   "idempotency.request_mismatch": "මෙම Idempotency-Key වෙනත් ඉල්ලීමක් සඳහා දැනටමත් භාවිතා කර ඇත",
+  "location.not_in_scope": "ස්ථානය ඔබේ විෂය පථයේ නැත",
   "m1.entity.admin_required": "ආයතනය සක්‍රිය කිරීමට පෙර පරිශීලක කළමනාකරණ අවසර ඇති සක්‍රිය පරිශීලකයෙකු අවම වශයෙන් පවරන්න",
   "m1.entity.code_duplicate": "මෙම ආයතන කේතය දැනටමත් ලියාපදිංචි කර ඇත",
   "m1.entity.code_invalid": "වලංගු ආයතන කේතයක් ඇතුළත් කරන්න",

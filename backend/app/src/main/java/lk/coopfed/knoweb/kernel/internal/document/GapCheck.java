@@ -1,13 +1,19 @@
 package lk.coopfed.knoweb.kernel.internal.document;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.JobExecution;
+import lk.coopfed.knoweb.kernel.api.ScheduledJob;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The density check of C-I2 (19A section 7, GapCheckJob): every series holds exactly the
@@ -15,27 +21,30 @@ import org.springframework.transaction.support.TransactionTemplate;
  * with it), so every hole is a finding, and doc 18 says a gap is "an anomaly, never silently
  * absorbed".
  *
- * <p>{@link #findGaps} reads under the caller's scope, so the nightly run reads as a
- * federation-wide viewer and sees every series. What it finds is logged at WARN here; the
- * REVIEW audit record ({@code NUMBERING_GAP}) and the exception "unless explained by
- * sync_quarantine" need a scoped system job and the quarantine table, which K-12 and K-08
- * bring: the job runner gives a system job the scope an audit record needs, and the
- * quarantine says which holes belong to a till that has not synchronised yet.
+ * <p>{@link #findGaps} reads under the caller's scope. The nightly job reads as a
+ * federation-wide viewer, so it sees every series, and records each gap as a
+ * {@code NUMBERING_GAP} REVIEW audit record in the system scope (K-12) when
+ * {@code coop-erp.system.entity-id} is set, and logs it otherwise. The exception "unless
+ * explained by sync_quarantine" waits for the quarantine table of K-08.
  */
 @Component
 public class GapCheck {
 
     private static final Logger log = LoggerFactory.getLogger(GapCheck.class);
 
+    static final String AUDIT_GAP = "NUMBERING_GAP";
+
     /** A series whose issued documents do not fill its counter. */
     public record Gap(UUID seriesId, String prefix, long expectedCount, long foundCount, long firstMissing) {}
 
     private final JdbcTemplate jdbc;
-    private final TransactionTemplate transaction;
+    private final SystemScope system;
+    private final AuditFacade audit;
 
-    public GapCheck(JdbcTemplate jdbc, TransactionTemplate transaction) {
+    public GapCheck(JdbcTemplate jdbc, SystemScope system, AuditFacade audit) {
         this.jdbc = jdbc;
-        this.transaction = transaction;
+        this.system = system;
+        this.audit = audit;
     }
 
     /** The gaps among the series the current scope can see. Call inside a scoped transaction. */
@@ -50,21 +59,22 @@ public class GapCheck {
                         rs.getLong("first_missing")));
     }
 
-    /** Nightly, after the day-close window: every series, as a federation-wide viewer. */
-    @Scheduled(cron = "0 40 0 * * *", zone = "UTC")
-    public void nightly() {
-        List<Gap> gaps = transaction.execute(status -> {
-            jdbc.queryForList("select set_config('app.scope_class', 'FEDERATION_VIEW', true),"
-                    + " set_config('app.scope_entity_id', '', true),"
-                    + " set_config('app.scope_location_id', '', true),"
-                    + " set_config('app.granted_entities', '{}', true)");
-            return findGaps();
-        });
+    /** Nightly, after the day-close window: every series. Critical: a failure is retried at once. */
+    @ScheduledJob(
+            name = "gap-check",
+            cron = "0 40 0 * * *",
+            critical = true,
+            lockTimeout = "PT30M",
+            maxRuntime = "PT15M")
+    public int nightly(JobExecution execution) {
+        List<Gap> gaps = system.inScope(SystemScope.federationView(), this::findGaps);
 
-        if (gaps == null || gaps.isEmpty()) {
+        if (gaps.isEmpty()) {
             log.info("Numbering gap check: every series is dense");
-            return;
+            return 0;
         }
+
+        Optional<ScopeContext> scope = execution.systemScope();
 
         for (Gap gap : gaps) {
             log.warn(
@@ -74,6 +84,23 @@ public class GapCheck {
                     gap.foundCount(),
                     gap.expectedCount(),
                     gap.firstMissing());
+
+            scope.ifPresent(ctx -> system.inScope(ctx, () -> {
+                audit.record(
+                        AUDIT_GAP,
+                        Subject.of("numbering_series", gap.seriesId()),
+                        null,
+                        Map.of(
+                                "prefix", gap.prefix(),
+                                "expected", String.valueOf(gap.expectedCount()),
+                                "found", String.valueOf(gap.foundCount()),
+                                "firstMissing", String.valueOf(gap.firstMissing())),
+                        ctx,
+                        "Series is not dense");
+                return null;
+            }));
         }
+
+        return gaps.size();
     }
 }
