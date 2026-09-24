@@ -97,3 +97,24 @@ retention window is configurable with
 with `coop-erp.idempotency.partition-days-ahead`, and the maintenance schedule
 with `coop-erp.idempotency.partition-cron`. Expiry drops old partitions; it does
 not DELETE rows.
+
+## K-05 event backbone
+
+`kernel.event_outbox` is the caller-transaction archive for versioned domain
+events. Central events take `source_seq` from `kernel.central_source_seq`; it is
+strictly increasing but is not required to be dense. Device-source density is a
+sync concern and is checked separately.
+
+The application role may insert outbox rows but cannot mark them published.
+Worker instances open a separate pool as `coop_relay`, a login that has
+`app_relay` only. The database relay takes one advisory lock per source, reads
+unpublished rows in `source_seq` order, publishes through `BrokerAdapter`, and
+sets `published_at` only after the broker confirms the message.
+
+The RabbitMQ adapter publishes persistent messages to topic exchange `domain`
+with the event type as routing key. Each `@EventConsumer` gets a durable quorum
+queue with single-active-consumer enabled. Consumers claim
+`kernel.event_inbox (consumer, event_id)` in the same transaction as their
+handler; duplicate delivery is therefore harmless. The third failed delivery
+records an ALERT audit event and sends the message to `domain.dlq`.
+`Replayer` can republish archived events directly to one consumer queue.

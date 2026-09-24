@@ -39,6 +39,8 @@ public abstract class PostgresIntegrationTest {
     private static final String DATABASE = "coop_erp";
     private static final String MIGRATOR = "coop_migrator";
     private static final String APP_USER = "coop_app";
+    private static final String RELAY_USER = "coop_relay";
+    private static final String RELAY_PASSWORD = "coop_relay";
 
     /** Relative to backend/app, the working directory of the Gradle test task. */
     private static final String ROLE_SCRIPT = "../../infra/compose/postgres/init/01-roles.sh";
@@ -64,6 +66,8 @@ public abstract class PostgresIntegrationTest {
             .withEnv("MIGRATION_DB_PASSWORD", MIGRATOR)
             .withEnv("APP_DB_USER", APP_USER)
             .withEnv("APP_DB_PASSWORD", APP_USER)
+            .withEnv("RELAY_DB_USER", RELAY_USER)
+            .withEnv("RELAY_DB_PASSWORD", RELAY_PASSWORD)
             .withCopyFileToContainer(MountableFile.forHostPath(ROLE_SCRIPT), "/docker-entrypoint-initdb.d/01-roles.sh");
 
     static {
@@ -78,6 +82,10 @@ public abstract class PostgresIntegrationTest {
         registry.add("coop-erp.migration.url", POSTGRES::getJdbcUrl);
         registry.add("coop-erp.migration.user", () -> MIGRATOR);
         registry.add("coop-erp.migration.password", () -> MIGRATOR);
+        registry.add("coop-erp.relay.url", POSTGRES::getJdbcUrl);
+        registry.add("coop-erp.relay.user", () -> RELAY_USER);
+        registry.add("coop-erp.relay.password", () -> RELAY_PASSWORD);
+        registry.add("management.health.rabbit.enabled", () -> "false");
     }
 
     /**
