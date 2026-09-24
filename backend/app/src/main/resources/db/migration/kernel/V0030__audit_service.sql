@@ -6,22 +6,6 @@ CREATE TABLE kernel.audit_event_type (
     description_en text NOT NULL
 );
 
-INSERT INTO kernel.audit_event_type (
-    event_type_code,
-    severity,
-    reviewer_role_template,
-    offline_capturable,
-    description_en
-)
-VALUES
-    ('HELLO_GREETING_REGISTERED', 'INFO', NULL, false, 'Hello greeting registered'),
-    ('ENTITY_REGISTERED', 'INFO', NULL, false, 'Entity registered'),
-    ('ENTITY_ACTIVATED', 'INFO', NULL, false, 'Entity activated'),
-    ('ENTITY_SUSPENDED', 'INFO', NULL, false, 'Entity suspended'),
-    ('ENTITY_REINSTATED', 'INFO', NULL, false, 'Entity reinstated'),
-    ('ENTITY_UPDATED', 'INFO', NULL, false, 'Responsible officer appointment'),
-    ('PRICING_PRICE_LIST_REGISTERED', 'INFO', NULL, false, 'Scaffolder proof registration')
-ON CONFLICT (event_type_code) DO NOTHING;
 
 ALTER TABLE kernel.audit_event_type ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kernel.audit_event_type FORCE ROW LEVEL SECURITY;
@@ -88,8 +72,7 @@ CREATE POLICY own_read
     FOR SELECT
     TO app_rw
     USING (
-        kernel.scope_class() = 'OWN'
-        AND owner_entity_id = kernel.scope_entity()
+        owner_entity_id = kernel.scope_entity()
         AND (
             kernel.scope_location() IS NULL
             OR location_id = kernel.scope_location()
@@ -101,8 +84,7 @@ CREATE POLICY own_write
     FOR INSERT
     TO app_rw
     WITH CHECK (
-        kernel.scope_class() = 'OWN'
-        AND owner_entity_id = kernel.scope_entity()
+        owner_entity_id = kernel.scope_entity()
     );
 
 CREATE POLICY fed_view
@@ -211,8 +193,7 @@ BEGIN
             EXECUTE format(
                 'CREATE POLICY own_read ON kernel.%I '
                 || 'FOR SELECT TO app_rw USING ('
-                || 'kernel.scope_class() = ''OWN'' '
-                || 'AND owner_entity_id = kernel.scope_entity() '
+                || 'owner_entity_id = kernel.scope_entity() '
                 || 'AND (kernel.scope_location() IS NULL '
                 || 'OR location_id = kernel.scope_location()))',
                 partition_name
@@ -236,8 +217,7 @@ BEGIN
             EXECUTE format(
                 'CREATE POLICY own_write ON kernel.%I '
                 || 'FOR INSERT TO app_rw WITH CHECK ('
-                || 'kernel.scope_class() = ''OWN'' '
-                || 'AND owner_entity_id = kernel.scope_entity())',
+                || 'owner_entity_id = kernel.scope_entity())',
                 partition_name
             );
         END IF;

@@ -1,4 +1,4 @@
-# hello — the template module
+# hello â€” the template module
 
 A deliberately trivial module (17A section 12): it registers greetings and lists them. Its value is that it uses every kernel interface and follows every convention, so `make new-module` can copy it and a reviewer can point at it and say "done like this". When this file and 17A disagree, this file and the tests are right; deviations from the guide are listed at the end.
 
@@ -91,7 +91,7 @@ The build rules prove the calls exist; only your test proves they are right. A f
 | name a permission in a handler that its slice does not have | `tools/check-permissions.mjs` |
 | touch another module's schema in a migration or a seed, leave a table name without its schema, add a cross-module foreign key, or misspell the migration folder | `tools/check-schema-ownership.mjs` |
 | create a table without row-level security (enabled, forced, at least one policy), or grant `DELETE` or `TRUNCATE` to `app_rw` | `SchemaRulesIntegrationTest` (`make test-int`): it reads the migrated database, so your tables are checked without registering them |
-| answer with a message id that is in no catalogue, leave one language out, leave a text empty, lose a `{0}` in a translation, or type `'` instead of `’` | `tools/check-i18n.mjs` |
+| answer with a message id that is in no catalogue, leave one language out, leave a text empty, lose a `{0}` in a translation, or type `'` instead of `â€™` | `tools/check-i18n.mjs` |
 | change a slice or a module dependency without committing what it generates | `make check-generated` |
 | write a hex colour or a px, rem or em literal in `web/src/modules` instead of a design token | `web/src/design/moduleStyle.test.ts` (`pnpm test` in `web/`, and the pipeline) |
 | change a colour token so that a text falls under the WCAG contrast (4.5:1, large text and icons 3:1), or add a colour that no contrast pair checks | `web/src/design/tokens.test.ts` |

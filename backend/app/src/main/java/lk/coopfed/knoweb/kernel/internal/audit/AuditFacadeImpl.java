@@ -90,7 +90,7 @@ public class AuditFacadeImpl implements AuditFacade {
                     correlation_id
                 )
                 values (
-                    gen_random_uuid(),
+                    ?,
                     ?,
                     now(),
                     ?,
@@ -107,6 +107,7 @@ public class AuditFacadeImpl implements AuditFacade {
                     ?
                 )
                 """,
+                lk.coopfed.knoweb.kernel.api.Ids.next(),
                 eventType,
                 scope.entityId(),
                 scope.locationId(),
