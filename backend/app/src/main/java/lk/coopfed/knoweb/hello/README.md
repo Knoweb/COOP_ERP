@@ -9,7 +9,7 @@ A deliberately trivial module (17A section 12): it registers greetings and lists
 | `api/` | Published contract: `RegisterGreeting` (command), `GreetingRegistered` (event), `GreetingQueries` and `GreetingView` (read side). Other modules may use this package only. |
 | `internal/` | Private: `Greeting` (entity), `GreetingRepository`, `RegisterGreetingHandler`, `GreetingQueriesImpl`. Package-private classes; nothing outside the module can reach them. |
 | `web/` | `HelloController implements HelloApi`, the interface generated from the slice; one method per operation, named after the `operationId`. |
-| `resources/db/migration/hello/` | `V0001__greeting.sql`: table, row-level security from the 17A section 6.3 template, grants. |
+| `resources/db/migration/hello/` | `V0001__greeting.sql`: table, row-level security from the 17A section 6.3 template, grants. `V0002`: the own_* policies test the class (CR-17A-3). The template to copy is `db/migration/RLS_POLICY_TEMPLATE.md`. |
 | `resources/openapi/hello.yaml` | The API slice. Written first; the Java interface and the web client are generated from it. Shared parts are in `openapi/common.yaml`. |
 | `resources/seed/hello/` | Development rows loaded by `make seed`. |
 | `resources/i18n/{en,si,ta}.json` | Every message id the module can show, in three languages. |
