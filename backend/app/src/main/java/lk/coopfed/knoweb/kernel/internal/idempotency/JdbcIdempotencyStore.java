@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -12,78 +13,101 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class JdbcIdempotencyStore implements IdempotencyStore {
 
     private final JdbcTemplate jdbc;
+    private final int windowHours;
 
-    public JdbcIdempotencyStore(JdbcTemplate jdbc) {
+    public JdbcIdempotencyStore(
+            JdbcTemplate jdbc, @Value("${coop-erp.idempotency.retention-hours:24}") int windowHours) {
+
+        if (windowHours <= 0) {
+            throw new IllegalArgumentException("coop-erp.idempotency.retention-hours must be positive");
+        }
+
         this.jdbc = jdbc;
+        this.windowHours = windowHours;
     }
 
     @Override
     public Claim claim(Key key) {
         requireTransaction();
 
-        int inserted = jdbc.update(
+        // The table primary key contains created_on because PostgreSQL requires the
+        // partition key in the unique key. This transaction-scoped lock keeps the
+        // logical (user, idempotency-key) unique across UTC-day partitions too.
+        jdbc.queryForList(
                 """
-                INSERT INTO kernel.idempotency_key (
-                    user_id,
-                    idempotency_key,
-                    created_on,
-                    request_hash
+                SELECT pg_advisory_xact_lock(
+                    hashtextextended(?, 0)
                 )
-                VALUES (
-                    ?,
-                    ?,
-                    (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date,
-                    ?
-                )
-                ON CONFLICT (
-                    user_id,
-                    idempotency_key,
-                    created_on
-                )
-                DO NOTHING
                 """,
-                key.userId(),
-                key.value(),
-                key.requestHash());
+                key.userId() + ":" + key.value());
 
-        if (inserted == 1) {
-            return new Claimed();
-        }
-
-        List<Row> rows = jdbc.query(
+        List<Row> existing = jdbc.query(
                 """
-                SELECT
-                    request_hash,
-                    response_status,
-                    response_body
-                FROM kernel.idempotency_key
-                WHERE user_id = ?
-                  AND idempotency_key = ?
-                  AND created_on =
-                      (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
-                """,
+                        SELECT
+                            request_hash,
+                            response_status,
+                            response_body
+                        FROM kernel.idempotency_key
+                        WHERE user_id = ?
+                          AND idempotency_key = ?
+                          AND created_on >=
+                              (
+                                  (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+                                  - make_interval(hours => ?)
+                              )::date
+                          AND created_at >=
+                              CURRENT_TIMESTAMP
+                              - make_interval(hours => ?)
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                        """,
                 (rs, rowNum) -> new Row(
                         rs.getString("request_hash"),
                         rs.getObject("response_status", Integer.class),
                         rs.getString("response_body")),
                 key.userId(),
-                key.value());
+                key.value(),
+                windowHours,
+                windowHours);
 
-        if (rows.size() != 1) {
-            throw new IllegalStateException("Idempotency claim conflict completed without a visible row");
+        if (!existing.isEmpty()) {
+            Row row = existing.getFirst();
+
+            if (!row.requestHash().equals(key.requestHash())) {
+                throw new ProblemException("idempotency.request_mismatch", Map.of("key", key.value()));
+            }
+
+            if (row.responseStatus() == null) {
+                throw new IllegalStateException("Idempotency claim committed without a result");
+            }
+
+            return new Replay(new StoredResult(row.responseStatus(), row.responseBody()));
         }
 
-        Row row = rows.getFirst();
+        int inserted = jdbc.update(
+                """
+                        INSERT INTO kernel.idempotency_key (
+                            user_id,
+                            idempotency_key,
+                            created_on,
+                            request_hash
+                        )
+                        VALUES (
+                            ?,
+                            ?,
+                            (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date,
+                            ?
+                        )
+                        """,
+                key.userId(),
+                key.value(),
+                key.requestHash());
 
-        if (!row.requestHash().equals(key.requestHash())) {
-            throw new ProblemException("idempotency.request_mismatch", Map.of("key", key.value()));
+        if (inserted != 1) {
+            throw new IllegalStateException("Idempotency claim was not inserted");
         }
 
-        if (row.responseStatus() == null || row.responseBody() == null) {
-            throw new IllegalStateException("Committed idempotency row has no recorded result");
-        }
-
-        return new Replay(new StoredResult(row.responseStatus(), row.responseBody()));
+        return new Claimed();
     }
 
     @Override
@@ -93,20 +117,29 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
         int updated = jdbc.update(
                 """
-                UPDATE kernel.idempotency_key
-                SET response_status = ?,
-                    response_body = ?
-                WHERE user_id = ?
-                  AND idempotency_key = ?
-                  AND created_on =
-                      (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
-                  AND request_hash = ?
-                """,
+                        UPDATE kernel.idempotency_key
+                           SET response_status = ?,
+                               response_body = ?
+                         WHERE user_id = ?
+                           AND idempotency_key = ?
+                           AND request_hash = ?
+                           AND response_status IS NULL
+                           AND created_on >=
+                               (
+                                   (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+                                   - make_interval(hours => ?)
+                               )::date
+                           AND created_at >=
+                               CURRENT_TIMESTAMP
+                               - make_interval(hours => ?)
+                        """,
                 result.status(),
                 result.body(),
                 key.userId(),
                 key.value(),
-                key.requestHash());
+                key.requestHash(),
+                windowHours,
+                windowHours);
 
         if (updated != 1) {
             throw new IllegalStateException("Idempotency result has no matching claim");
@@ -115,8 +148,7 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
     private static void requireTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-
-            throw new IllegalStateException("IdempotencyStore must run inside the command transaction");
+            throw new IllegalStateException("Idempotency store must run inside the command transaction");
         }
     }
 
