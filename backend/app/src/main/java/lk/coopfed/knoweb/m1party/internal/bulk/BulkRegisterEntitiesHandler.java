@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 class BulkRegisterEntitiesHandler implements Handles<BulkRegisterEntities, ValidationReport> {
 
     /** Configuration item, seeded by seed/m1party/config.yaml; a limit is never a literal (AGENTS.md). */
-    static final String MAX_ROWS_KEY = "m1.bulk.max_rows";
+    static final String MAX_ROWS_SETTING = "m1.bulk.max_rows";
 
     static final String AUDIT_REGISTERED = "ENTITY_REGISTERED";
 
@@ -84,7 +84,7 @@ class BulkRegisterEntitiesHandler implements Handles<BulkRegisterEntities, Valid
         if (!missing.isEmpty()) {
             throw new ProblemException("bulk.file.header_invalid", Map.of("missing", String.join(", ", missing)));
         }
-        int maxRows = config.getInt(MAX_ROWS_KEY, scope, 500);
+        int maxRows = config.getInt(MAX_ROWS_SETTING, scope, 500);
         if (table.rows().size() > maxRows) {
             throw new ProblemException(
                     "bulk.file.too_many_rows", Map.of("rows", table.rows().size(), "maxRows", maxRows));
