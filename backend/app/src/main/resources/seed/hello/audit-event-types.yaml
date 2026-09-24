@@ -1,0 +1,5 @@
+audit_event_types:
+  - code: HELLO_GREETING_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Hello greeting registered

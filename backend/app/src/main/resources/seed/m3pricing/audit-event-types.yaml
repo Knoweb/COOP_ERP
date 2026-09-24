@@ -1,0 +1,5 @@
+audit_event_types:
+  - code: PRICING_PRICE_LIST_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Price list registered
