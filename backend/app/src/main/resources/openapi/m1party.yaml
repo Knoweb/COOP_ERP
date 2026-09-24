@@ -283,6 +283,53 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/party/bulk-register:
+    post:
+      tags: [Bulk]
+      operationId: bulkRegister
+      summary: Register the entities of a CSV file, all or none, and answer a validation report
+      description: >
+        The file is UTF-8 text with a header row; the columns are the fields of
+        RegisterEntityRequest in snake case (entity_code, entity_type, legal_name_en, legal_name_si,
+        legal_name_ta, registration_no, vat_registration_no, district, default_language,
+        financial_year_start_month); the first three are required. Every row is validated first;
+        when any row has a problem nothing is registered and the report says which rows and why;
+        when every row passes, all are registered in one transaction (M1-11, 21A section 5).
+      x-permission: gov.entity.register
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The CSV file
+
+      responses:
+
+        '200':
+          description: The validation report; status REGISTERED or REJECTED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkValidationReport'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -502,3 +549,54 @@ components:
             - string
             - 'null'
           format: uuid
+
+    BulkValidationReport:
+      type: object
+      required: [status, rows, registered, rejected, results]
+      properties:
+        status:
+          type: string
+          enum: [REGISTERED, REJECTED]
+        rows:
+          type: integer
+        registered:
+          type: integer
+        rejected:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkRowResult'
+
+    BulkRowResult:
+      type: object
+      required: [line, entityCode, status, problems]
+      properties:
+        line:
+          type: integer
+          description: The line of the file the row starts on; the header is line 1
+        entityCode:
+          type: string
+        status:
+          type: string
+          enum: [OK, ERROR]
+        entityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkRowProblem'
+
+    BulkRowProblem:
+      type: object
+      required: [field, code]
+      properties:
+        field:
+          type: string
+          description: The column of the file
+        code:
+          type: string
+          description: A message id from the bulk.* catalogue

@@ -1,4 +1,12 @@
 {
+  "bulk.file.empty": "The file has no rows to register",
+  "bulk.file.header_invalid": "The file is missing a required column: {0}",
+  "bulk.file.too_many_rows": "The file has {0} rows; at most {1} can be registered at once",
+  "bulk.row.code_exists": "This entity code is already registered",
+  "bulk.row.duplicate_in_file": "This entity code appears earlier in the file",
+  "bulk.row.value_invalid": "The value is not one of the allowed values",
+  "bulk.row.value_required": "A value is required",
+  "bulk.row.value_too_long": "The value is too long",
   "document.immutable": "An issued document cannot be changed; correct it with a new document",
   "hello.greeting.duplicate": "This greeting is already registered",
   "hello.greeting.text_required": "Enter the greeting in English",

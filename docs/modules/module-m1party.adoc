@@ -7,7 +7,8 @@
 
 * `l.c.k.m.query.PartyQueries` (via `l.c.k.m.internal.queries.PartyQueriesImpl`)
 |Bean references
-|* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
+|* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
+* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
 * `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)

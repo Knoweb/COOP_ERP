@@ -1,4 +1,12 @@
 {
+  "bulk.file.empty": "ගොනුවේ ලියාපදිංචි කිරීමට පේළි නොමැත",
+  "bulk.file.header_invalid": "ගොනුවේ අවශ්‍ය තීරුවක් නොමැත: {0}",
+  "bulk.file.too_many_rows": "ගොනුවේ පේළි {0} ක් ඇත; එකවර ලියාපදිංචි කළ හැක්කේ උපරිම {1} ක් පමණි",
+  "bulk.row.code_exists": "මෙම ආයතන කේතය දැනටමත් ලියාපදිංචි කර ඇත",
+  "bulk.row.duplicate_in_file": "මෙම ආයතන කේතය ගොනුවේ කලින් ද ඇත",
+  "bulk.row.value_invalid": "අගය අවසර ලත් අගයක් නොවේ",
+  "bulk.row.value_required": "අගයක් අවශ්‍යයි",
+  "bulk.row.value_too_long": "අගය දිග වැඩියි",
   "document.immutable": "නිකුත් කළ ලේඛනයක් වෙනස් කළ නොහැක; නව ලේඛනයකින් එය නිවැරදි කරන්න",
   "hello.greeting.duplicate": "මෙම සුබපැතුම දැනටමත් ලියාපදිංචි කර ඇත",
   "hello.greeting.text_required": "සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න",

@@ -3,3 +3,5 @@ config:
     value: "false"
   - key: "security.policy.mfa_enabled"
     value: "true"
+  - key: "m1.bulk.max_rows"
+    value: "500"
