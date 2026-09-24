@@ -7,8 +7,7 @@ public final class Ids {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private Ids() {
-    }
+    private Ids() {}
 
     public static UUID next() {
         long timestamp = System.currentTimeMillis();
@@ -27,8 +26,6 @@ public final class Ids {
         leastSignificantBits &= 0x3FFFFFFFFFFFFFFFL;
         leastSignificantBits |= 0x8000000000000000L;
 
-        return new UUID(
-                mostSignificantBits,
-                leastSignificantBits);
+        return new UUID(mostSignificantBits, leastSignificantBits);
     }
 }

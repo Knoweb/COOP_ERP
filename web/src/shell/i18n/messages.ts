@@ -6,6 +6,7 @@
 // not need it, but the Playwright tests (web/e2e) import this file straight into Node, which
 // refuses a JSON import without it. Keep it on every catalogue line below.
 import helloMessages from "../../modules/hello/hello.messages.json" with { type: "json" };
+import pricingMessages from "../../modules/m3pricing/pricing.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
@@ -182,6 +183,7 @@ const SHELL_MESSAGES: Catalogue = {
 
 const MODULE_CATALOGUES: Catalogue[] = [
   helloMessages,
+  pricingMessages,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];
 

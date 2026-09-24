@@ -1,0 +1,103 @@
+# OpenAPI slice of the pricing module (17A sections 5 and 12). The slice is written first; the
+# controller and the web client follow it. Rules every slice obeys (AGENTS.md):
+#   - every operation names its permission in x-permission, and that string is the same as
+#     the permission on the @CommandHandler (or the query's permission)
+#   - every mutating operation requires the Idempotency-Key header
+#   - errors are RFC 9457 problem documents whose `code` is a message id
+#   - the shape of a request (required, minLength, maxLength, minimum ...) is written in the
+#     schema and nowhere else: the kernel enforces it; a business rule is a handler guard
+#   - what every slice shares (the Idempotency-Key header, the Problem schema) lives in
+#     common.yaml and is referred to, never copied
+#   - every operation has a tag: it names the generated Java interface (Pricing -> PricingApi)
+# After changing this file run `make gen-clients` and commit web/src/generated/m3pricing.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP Pricing API
+  version: 0.1.0
+paths:
+  /v1/pricing/price-lists:
+    get:
+      tags: [Pricing]
+      operationId: listPriceLists
+      summary: The price lists visible in the caller's scope, newest first
+      x-permission: prc.price_list.read
+      responses:
+        '200':
+          description: Price lists of the caller's scope; an empty list when there is no active scope
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PriceListResponse' }
+    post:
+      tags: [Pricing]
+      operationId: registerPriceList
+      summary: Register a price list for the caller's entity
+      description: >
+        Codes this operation can answer with 422: pricing.price_list.text_required (a text of
+        spaces only), pricing.price_list.duplicate, idempotency.request_mismatch. A request that
+        does not match the schema below (no textEn, a text over 200 characters) is 400
+        request.invalid.
+      x-permission: prc.price_list.register
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterPriceListRequest' }
+      responses:
+        '201':
+          description: Registered
+          headers:
+            Location:
+              description: Address of the new price list
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/price-lists/{id}:
+    get:
+      tags: [Pricing]
+      operationId: getPriceList
+      summary: One price list
+      x-permission: prc.price_list.read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The price list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListResponse' }
+        '404':
+          description: No such price list, or the caller's scope may not see it (the two look the same on purpose)
+components:
+  schemas:
+    RegisterPriceListRequest:
+      type: object
+      required: [textEn]
+      properties:
+        # The shape of the request. The kernel checks it before the controller runs and answers
+        # 400 request.invalid; the handler checks the business rules and answers 422.
+        textEn: { type: string, minLength: 1, maxLength: 200 }
+        textSi: { type: [string, 'null'], maxLength: 200 }
+        textTa: { type: [string, 'null'], maxLength: 200 }
+    PriceListResponse:
+      type: object
+      required: [id, textEn, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        textEn: { type: string }
+        textSi: { type: [string, 'null'], description: null when not translated; show textEn with the EN tag }
+        textTa: { type: [string, 'null'], description: null when not translated; show textEn with the EN tag }
+        status: { type: string, enum: [REGISTERED] }
+        createdAt:
+          type: string
+          format: date-time
+          description: An instant in UTC (ends in Z). Convert to local time on the screen only.

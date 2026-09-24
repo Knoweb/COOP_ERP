@@ -51,6 +51,7 @@ help:
 	@echo "make format       format the Java files you changed (the pipeline checks this)"
 	@echo "make coverage     unit and integration tests, then the coverage report"
 	@echo "make hooks        optional: run the quick checks before every git push"
+	@echo "make sync         start of the day: update main, drop line-ending noise, prune worktrees"
 	@echo "make lint-ci      check the workflow files before pushing a change to them (needs Docker)"
 	@echo "make smoke        smoke test of the running stack (TWO=1 after make up-2)"
 	@echo "make e2e          Playwright tests in a browser against the running stack (make up first)"
@@ -160,6 +161,17 @@ hooks:
 	git config core.hooksPath .githooks
 	@echo "installed: .githooks/pre-push runs before every git push (skip once with --no-verify)"
 
+# The start of every working day, in either shell. `--ff-only` refuses when somebody committed on
+# local main directly, which is then sorted out rather than merged over. The checkout of
+# docs/modules drops the line-ending noise a Windows checkout shows there (the blobs are LF).
+sync:
+	git checkout main
+	git fetch --prune
+	git pull --ff-only
+	git checkout -- docs/modules web/src/generated
+	git worktree prune
+	@echo "main is at $$(git log --oneline -1)"
+
 # A workflow file with a syntax error does not fail in the pipeline: the pipeline does not
 # start at all, and the pull request shows no checks. So check before pushing: actionlint reads
 # every file in .github/workflows, shellcheck included.
@@ -178,6 +190,9 @@ gen-clients:
 check-generated:
 	sh tools/gen-clients.sh
 	cd backend && ./gradlew :app:test --tests "*ArchitectureTests*"
+	@# The documenter writes the Rel lines of components.puml in an order that differs from run
+	@# to run, so the file looked changed in every pull request. Sorting them makes the check
+	@# compare content, not luck.
 	node tools/normalize-components-puml.mjs
 	@# Compared by content against what is staged or committed: a changed file, or a new file
 	@# git does not know yet. (`git status` would also report line-ending noise on Windows.)
@@ -210,14 +225,14 @@ test-scaffold:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "make test-scaffold needs a clean working tree (commit or stash first)." >&2; exit 1; \
 	fi
-	node tools/new-module.mjs --name m3pricing --schema pricing --entity price_list
+	node tools/new-module.mjs --name m9integration --schema integration --entity webhook
 	sh tools/gen-clients.sh
 	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
 	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \
 		echo "check-permissions accepted the scaffold placeholders" >&2; exit 1; \
 	fi
 	@echo "--- replace them, as the developer does in step 1 of the module README"
-	grep -rl "todo\.pricing\.price_list\." backend/app/src web/src | xargs sed -i "s/todo\.pricing\.price_list\./prc.price_list./g"
+	grep -rl "todo\.integration\.webhook\." backend/app/src web/src | xargs sed -i "s/todo\.integration\.webhook\./int.webhook./g"
 	node tools/check-permissions.mjs
 	cd backend && ./gradlew :app:test :app:integrationTest
 	node tools/check-schema-ownership.mjs

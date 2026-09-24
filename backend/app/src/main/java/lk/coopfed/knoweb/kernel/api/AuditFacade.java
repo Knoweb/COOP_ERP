@@ -14,35 +14,11 @@ public interface AuditFacade {
             UUID witnessUserId);
 
     default void record(
-            String eventType,
-            Subject subject,
-            Object before,
-            Object after,
-            ScopeContext scope,
-            String reason) {
-        record(
-                eventType,
-                subject,
-                before,
-                after,
-                scope,
-                reason,
-                null);
+            String eventType, Subject subject, Object before, Object after, ScopeContext scope, String reason) {
+        record(eventType, subject, before, after, scope, reason, null);
     }
 
-    default void record(
-            String eventType,
-            Subject subject,
-            Object before,
-            Object after,
-            ScopeContext scope) {
-        record(
-                eventType,
-                subject,
-                before,
-                after,
-                scope,
-                null,
-                null);
+    default void record(String eventType, Subject subject, Object before, Object after, ScopeContext scope) {
+        record(eventType, subject, before, after, scope, null, null);
     }
 }
