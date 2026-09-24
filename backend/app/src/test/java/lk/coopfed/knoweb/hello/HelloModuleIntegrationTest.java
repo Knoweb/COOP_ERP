@@ -1,6 +1,15 @@
 package lk.coopfed.knoweb.hello;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.UUID;
 import lk.coopfed.knoweb.hello.api.GreetingRegistered;
 import lk.coopfed.knoweb.hello.api.GreetingView;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -17,16 +26,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.Map;
-import java.util.TimeZone;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 /**
  * The proof table of 17A section 12, as tests. Every module's integration test has the same
  * four groups: tenant isolation, grants, the command pipeline, and the API contract.
@@ -36,6 +35,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * token and these tests then send a token instead.
  */
 class HelloModuleIntegrationTest extends PostgresIntegrationTest {
+
+    // K03A_TEST_USER_ISOLATION
+    private static final ThreadLocal<String> REQUEST_USER =
+            ThreadLocal.withInitial(() -> UUID.randomUUID().toString());
+
+    @org.junit.jupiter.api.BeforeEach
+    void resetK03aRequestUser() {
+        REQUEST_USER.set(UUID.randomUUID().toString());
+    }
 
     private static final String URL = "/v1/hello/greetings";
 
@@ -109,9 +117,11 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
 
         // Spring wraps the database error; PostgreSQL's own words are the root cause.
         assertThatThrownBy(() -> appJdbc.update("update hello.greeting set status = 'CHANGED'"))
-                .rootCause().hasMessageContaining("permission denied");
+                .rootCause()
+                .hasMessageContaining("permission denied");
         assertThatThrownBy(() -> appJdbc.update("delete from hello.greeting"))
-                .rootCause().hasMessageContaining("permission denied");
+                .rootCause()
+                .hasMessageContaining("permission denied");
     }
 
     // ---- command pipeline: idempotency, audit and event in one transaction ----
@@ -221,9 +231,10 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aMissingTranslationIsNullSoTheClientCanShowTheFallbackTag() {
         JsonNode created = post(
-                scope(entityA),
-                UUID.randomUUID().toString(),
-                Map.of("textEn", "Hello", "textSi", "ආයුබෝවන්", "textTa", " ")).getBody();
+                        scope(entityA),
+                        UUID.randomUUID().toString(),
+                        Map.of("textEn", "Hello", "textSi", "ආයුබෝවන්", "textTa", " "))
+                .getBody();
 
         assertThat(created.get("textSi").asText()).isEqualTo("ආයුබෝවන්");
         assertThat(created.get("textTa").isNull()).isTrue();
@@ -235,11 +246,9 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
         HttpHeaders sinhala = scope(entityA);
         sinhala.set(HttpHeaders.ACCEPT_LANGUAGE, "si");
 
-        ResponseEntity<JsonNode> response =
-                post(sinhala, UUID.randomUUID().toString(), Map.of("textEn", " "));
+        ResponseEntity<JsonNode> response = post(sinhala, UUID.randomUUID().toString(), Map.of("textEn", " "));
 
-        assertThat(response.getBody().get("title").asText())
-                .isEqualTo("සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න");
+        assertThat(response.getBody().get("title").asText()).isEqualTo("සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න");
     }
 
     // ---- the slice is enforced: the kernel checks a request's shape before the controller runs ----
@@ -266,8 +275,8 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
         HttpHeaders tamil = scope(entityA);
         tamil.set(HttpHeaders.ACCEPT_LANGUAGE, "ta");
 
-        ResponseEntity<JsonNode> response = post(tamil, UUID.randomUUID().toString(),
-                Map.of("textEn", "Hello", "textTa", "வ".repeat(201)));
+        ResponseEntity<JsonNode> response =
+                post(tamil, UUID.randomUUID().toString(), Map.of("textEn", "Hello", "textTa", "வ".repeat(201)));
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
         JsonNode error = response.getBody().get("errors").get(0);
@@ -280,12 +289,13 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void everyBrokenFieldIsReportedAtOnce() {
-        ResponseEntity<JsonNode> response = post(scope(entityA), UUID.randomUUID().toString(),
-                Map.of("textEn", "", "textSi", "x".repeat(201)));
+        ResponseEntity<JsonNode> response =
+                post(scope(entityA), UUID.randomUUID().toString(), Map.of("textEn", "", "textSi", "x".repeat(201)));
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
         assertThat(response.getBody().get("errors"))
-                .extracting(error -> error.get("field").asText() + " " + error.get("code").asText())
+                .extracting(error ->
+                        error.get("field").asText() + " " + error.get("code").asText())
                 .containsExactly("textEn request.field.too_short", "textSi request.field.too_long");
     }
 
@@ -307,7 +317,8 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
                 http.exchange(URL + "/not-a-uuid", HttpMethod.GET, new HttpEntity<>(scope(entityA)), JsonNode.class);
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "request.invalid");
-        assertThat(response.getBody().get("errors").get(0).get("field").asText()).isEqualTo("id");
+        assertThat(response.getBody().get("errors").get(0).get("field").asText())
+                .isEqualTo("id");
         assertThat(response.getBody().get("errors").get(0).get("code").asText()).isEqualTo("request.field.invalid");
     }
 
@@ -325,10 +336,11 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
 
         String onTheWire = created.get("createdAt").asText();
         Instant fromApi = Instant.parse(onTheWire);
-        Instant inDatabase = superuserJdbc().queryForObject(
-                "select created_at from hello.greeting where id = ?",
-                (row, n) -> row.getObject(1, OffsetDateTime.class).toInstant(),
-                id);
+        Instant inDatabase = superuserJdbc()
+                .queryForObject(
+                        "select created_at from hello.greeting where id = ?",
+                        (row, n) -> row.getObject(1, OffsetDateTime.class).toInstant(),
+                        id);
 
         // The API speaks UTC, and says the same instant the database holds.
         assertThat(onTheWire).endsWith("Z");
@@ -342,6 +354,7 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders scope(UUID entity) {
         HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Dev-User", REQUEST_USER.get());
         headers.set("X-Scope-Entity", entity.toString());
         return headers;
     }

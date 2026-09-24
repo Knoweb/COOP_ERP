@@ -36,6 +36,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class PricingModuleIntegrationTest extends PostgresIntegrationTest {
 
+    // K03A_TEST_USER_ISOLATION
+    private static final ThreadLocal<String> REQUEST_USER =
+            ThreadLocal.withInitial(() -> UUID.randomUUID().toString());
+
+    @org.junit.jupiter.api.BeforeEach
+    void resetK03aRequestUser() {
+        REQUEST_USER.set(UUID.randomUUID().toString());
+    }
+
     private static final String URL = "/v1/pricing/price-lists";
 
     private final UUID entityA = Ids.next();
@@ -345,6 +354,7 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders scope(UUID entity) {
         HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Dev-User", REQUEST_USER.get());
         headers.set("X-Scope-Entity", entity.toString());
         return headers;
     }

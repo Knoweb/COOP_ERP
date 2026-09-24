@@ -1,13 +1,16 @@
 package lk.coopfed.archfixtures.m2catalogue;
 
-import lk.coopfed.knoweb.kernel.internal.stub.InMemoryIdempotencyStore;
+import lk.coopfed.knoweb.kernel.internal.CommandInterceptor;
 
-/** Violates the kernel.api-only rule: a module reaching into kernel.internal. */
+/**
+ * Deliberately illegal dependency used by architecture tests to prove that
+ * feature modules may not depend on kernel internals.
+ */
 public class UsesKernelInternals {
 
-    private final InMemoryIdempotencyStore store = new InMemoryIdempotencyStore();
+    private CommandInterceptor interceptor;
 
-    public InMemoryIdempotencyStore store() {
-        return store;
+    public CommandInterceptor interceptor() {
+        return interceptor;
     }
 }
