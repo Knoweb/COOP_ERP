@@ -150,11 +150,11 @@ public class Entity implements Persistable<UUID> {
         this.dataGovernanceSignedOn = dataGovernanceSignedOn;
     }
 
-    String entityCode() {
+    public String entityCode() {
         return entityCode;
     }
 
-    String entityType() {
+    public String entityType() {
         return entityType;
     }
 
@@ -162,7 +162,7 @@ public class Entity implements Persistable<UUID> {
         return status;
     }
 
-    Map<String, Object> auditState() {
+    public Map<String, Object> auditState() {
         Map<String, Object> state = new LinkedHashMap<>();
 
         state.put("entityId", id);

@@ -1,0 +1,20 @@
+# gitleaks (the pipeline's secret scan, ci.yml job secret-scan) runs with its default rules plus
+# what is allowed here. Every entry says why; a real secret is rotated, never allowed.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "False positives of the generic-api-key rule"
+# Seed files carry configuration item names and values, permission codes and role templates,
+# committed reference data by design; a password never lives there (they come from the
+# environment). A line such as `key: "m1.bulk.max_rows"` is a configuration key's name.
+paths = [
+  '''backend/app/src/main/resources/seed/.*''',
+]
+# A configuration item's name in Java (MAX_ROWS_... = "m1.bulk.max_rows"), in a commit of
+# 24 September 2026 that named the constant *_KEY: the rule reads "key" beside a string as a
+# credential. The constant was renamed; the commit stays in the history.
+regexes = [
+  '''m1\.bulk\.max_rows''',
+]

@@ -107,6 +107,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/bulk-register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register the entities of a CSV file, all or none, and answer a validation report
+         * @description The file is UTF-8 text with a header row; the columns are the fields of RegisterEntityRequest in snake case (entity_code, entity_type, legal_name_en, legal_name_si, legal_name_ta, registration_no, vat_registration_no, district, default_language, financial_year_start_month); the first three are required. Every row is validated first; when any row has a problem nothing is registered and the report says which rows and why; when every row passes, all are registered in one transaction (M1-11, 21A section 5).
+         */
+        post: operations["bulkRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -161,6 +181,30 @@ export interface components {
             items: components["schemas"]["EntityResponse"][];
             /** Format: uuid */
             nextCursor?: string | null;
+        };
+        BulkValidationReport: {
+            /** @enum {string} */
+            status: "REGISTERED" | "REJECTED";
+            rows: number;
+            registered: number;
+            rejected: number;
+            results: components["schemas"]["BulkRowResult"][];
+        };
+        BulkRowResult: {
+            /** @description The line of the file the row starts on; the header is line 1 */
+            line: number;
+            entityCode: string;
+            /** @enum {string} */
+            status: "OK" | "ERROR";
+            /** Format: uuid */
+            entityId?: string | null;
+            problems: components["schemas"]["BulkRowProblem"][];
+        };
+        BulkRowProblem: {
+            /** @description The column of the file */
+            field: string;
+            /** @description A message id from the bulk.* catalogue */
+            code: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -417,6 +461,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    bulkRegister: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The CSV file
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The validation report; status REGISTERED or REJECTED */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkValidationReport"];
+                };
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];

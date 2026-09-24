@@ -8,12 +8,16 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Set;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.internal.IdempotencyRequestAttributes;
@@ -58,15 +62,42 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
+        String prefix = request.getMethod() + " " + request.getRequestURI() + "\n";
+        String contentType = request.getContentType();
+
+        if (contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("multipart/")) {
+            // A file upload (21A: bulk registration). The container parses the parts once and keeps
+            // them; reading the raw stream here instead would leave nothing for that parse, and
+            // Spring would then answer "Required part is not present". So the hash is taken from
+            // the parts (name, size, bytes, in order) and the request goes on as it is.
+            request.setAttribute(IdempotencyRequestAttributes.KEY, key);
+            request.setAttribute(IdempotencyRequestAttributes.REQUEST_HASH, sha256(prefix, partsOf(request)));
+            chain.doFilter(request, response);
+            return;
+        }
+
         byte[] body = request.getInputStream().readAllBytes();
 
-        String requestHash = sha256(request.getMethod() + " " + request.getRequestURI() + "\n", body);
+        String requestHash = sha256(prefix, body);
 
         request.setAttribute(IdempotencyRequestAttributes.KEY, key);
 
         request.setAttribute(IdempotencyRequestAttributes.REQUEST_HASH, requestHash);
 
         chain.doFilter(new ReplayableRequest(request, body), response);
+    }
+
+    /** The parts of a multipart request, in order, as one byte sequence: name, size and content of each. */
+    private static byte[] partsOf(HttpServletRequest request) throws IOException, ServletException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (Part part : request.getParts()) {
+            out.write((part.getName() + ":" + part.getSize() + "\n").getBytes(StandardCharsets.UTF_8));
+            try (InputStream in = part.getInputStream()) {
+                in.transferTo(out);
+            }
+            out.write('\n');
+        }
+        return out.toByteArray();
     }
 
     private void writeProblem(HttpServletRequest request, HttpServletResponse response, ProblemException error)
