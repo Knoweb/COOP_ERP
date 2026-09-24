@@ -7,6 +7,7 @@
 // refuses a JSON import without it. Keep it on every catalogue line below.
 import helloMessages from "../../modules/hello/hello.messages.json" with { type: "json" };
 import pricingMessages from "../../modules/m3pricing/pricing.messages.json" with { type: "json" };
+import partyMessages from "../../modules/m1party/party.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
@@ -49,6 +50,11 @@ const SHELL_MESSAGES: Catalogue = {
     "shell.state.disputed": "Disputed",
     "shell.state.void": "Void",
     "shell.state.alert": "Alert",
+    "shell.reason.code": "Reason",
+    "shell.reason.text": "Details (optional)",
+    "shell.reason.confirm": "Confirm",
+    "shell.reason.cancel": "Cancel",
+    "shell.fact.empty": "Not set",
     "shell.training.title": "TRAINING MODE",
     "shell.training.text": "This is practice. Nothing you do here is real, and no document made here counts.",
     "shell.design.title": "Design reference",
@@ -104,6 +110,11 @@ const SHELL_MESSAGES: Catalogue = {
     "shell.state.disputed": "විවාදිත",
     "shell.state.void": "අවලංගු",
     "shell.state.alert": "අනතුරු ඇඟවීම",
+    "shell.reason.code": "හේතුව",
+    "shell.reason.text": "විස්තර (අත්‍යවශ්‍ය නොවේ)",
+    "shell.reason.confirm": "තහවුරු කරන්න",
+    "shell.reason.cancel": "අවලංගු කරන්න",
+    "shell.fact.empty": "සකසා නැත",
     "shell.training.title": "පුහුණු ප්‍රකාරය",
     "shell.training.text": "මෙය පුහුණුවකි. ඔබ මෙහි කරන කිසිවක් සැබෑ නොවේ; මෙහි සාදන කිසිදු ලේඛනයක් ගණන් නොගැනේ.",
     "shell.design.title": "නිර්මාණ යොමුව",
@@ -159,6 +170,11 @@ const SHELL_MESSAGES: Catalogue = {
     "shell.state.disputed": "சர்ச்சைக்குரியது",
     "shell.state.void": "ரத்து",
     "shell.state.alert": "எச்சரிக்கை",
+    "shell.reason.code": "காரணம்",
+    "shell.reason.text": "விவரங்கள் (விருப்பத்திற்குரியது)",
+    "shell.reason.confirm": "உறுதிப்படுத்து",
+    "shell.reason.cancel": "ரத்துசெய்",
+    "shell.fact.empty": "அமைக்கப்படவில்லை",
     "shell.training.title": "பயிற்சி முறை",
     "shell.training.text": "இது பயிற்சி. இங்கு நீங்கள் செய்வது எதுவும் உண்மையானது அல்ல; இங்கு உருவாக்கப்படும் எந்த ஆவணமும் கணக்கில் சேராது.",
     "shell.design.title": "வடிவமைப்புக் குறிப்பு",
@@ -184,6 +200,7 @@ const SHELL_MESSAGES: Catalogue = {
 const MODULE_CATALOGUES: Catalogue[] = [
   helloMessages,
   pricingMessages,
+  partyMessages,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];
 

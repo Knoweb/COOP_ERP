@@ -1,11 +1,14 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { IntlProvider } from "react-intl";
 import { afterEach, describe, expect, it } from "vitest";
 import shellCss from "../shell.css?raw";
 import { messages } from "../i18n/messages";
 import type { Locale } from "../i18n/messages";
+import { ApprovalBar } from "./ApprovalBar";
+import { DocumentHeader } from "./DocumentHeader";
 import { MoneyDisplay } from "./MoneyDisplay";
+import { ReasonCapture } from "./ReasonCapture";
 import { CHIP_STATES, StateChip } from "./StateChip";
 import { TrainingBadge } from "./TrainingBadge";
 
@@ -137,5 +140,133 @@ describe("TrainingBadge", () => {
     cleanup();
     renderIn("ta", <TrainingBadge active={true} />);
     expect(screen.getByRole("region", { name: "பயிற்சி முறை" })).toBeTruthy();
+  });
+});
+
+describe("DocumentHeader", () => {
+  it("shows the code, the title, the state as a chip and every fact by its label", () => {
+    renderIn(
+      "en",
+      <DocumentHeader
+        code="M042"
+        title="Gampaha MPCS"
+        state={{ look: "issued", label: "Active" }}
+        facts={[
+          { label: "District", value: "Gampaha" },
+          { label: "VAT number", value: undefined }
+        ]}
+      />
+    );
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Gampaha MPCS");
+    expect(screen.getByText("M042")).toBeTruthy();
+    expect(screen.getByText("Active").closest(".state-chip--issued")).toBeTruthy();
+    expect(screen.getByText("District").nextSibling?.textContent).toBe("Gampaha");
+  });
+
+  it("shows a dash for a fact with no value, so that 'not set' is not mistaken for 'not loaded'", () => {
+    renderIn("en", <DocumentHeader code="M042" title="Gampaha MPCS" facts={[{ label: "VAT number" }]} />);
+    expect(screen.getByText("VAT number").nextSibling?.textContent).toBe("—");
+  });
+
+  it("puts what it is given as children inside the header, where an ApprovalBar goes", () => {
+    const { container } = renderIn(
+      "en",
+      <DocumentHeader code="M042" title="Gampaha MPCS">
+        <ApprovalBar actions={[{ id: "activate", label: "Activate", onClick: () => {} }]} />
+      </DocumentHeader>
+    );
+    expect(container.querySelector("header .approval-bar")).toBeTruthy();
+  });
+});
+
+describe("ApprovalBar", () => {
+  it("renders nothing for a document that offers no action", () => {
+    const { container } = renderIn("en", <ApprovalBar actions={[]} />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("runs the action when its button is pressed", () => {
+    let pressed = 0;
+    renderIn("en", <ApprovalBar actions={[{ id: "activate", label: "Activate", onClick: () => pressed++ }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Activate" }));
+    expect(pressed).toBe(1);
+  });
+
+  it("shows an unavailable action disabled WITH its reason, never hidden (21A section 8)", () => {
+    renderIn(
+      "en",
+      <ApprovalBar
+        actions={[{ id: "activate", label: "Activate", onClick: () => {}, disabledReason: "Appoint a responsible officer first" }]}
+      />
+    );
+    const button = screen.getByRole("button", { name: "Activate" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    // The reason is tied to the button, so a screen reader says it with the button's name.
+    expect(button.getAttribute("aria-describedby")).toBe("approval-reason-activate");
+    expect(document.getElementById("approval-reason-activate")?.textContent).toBe("Appoint a responsible officer first");
+  });
+
+  it("disables an action that is under way, without a reason", () => {
+    renderIn("en", <ApprovalBar actions={[{ id: "suspend", label: "Suspend", onClick: () => {}, pending: true }]} />);
+    const button = screen.getByRole("button", { name: "Suspend" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("marks the one primary action and has a style rule for it", () => {
+    renderIn("en", <ApprovalBar actions={[{ id: "activate", label: "Activate", onClick: () => {}, primary: true }]} />);
+    expect(screen.getByRole("button", { name: "Activate" }).className).toContain("approval-bar__button--primary");
+    expect(shellCss).toContain(".approval-bar__button--primary");
+  });
+});
+
+describe("ReasonCapture", () => {
+  const codes = [
+    { code: "COMPLIANCE", label: "Compliance failure" },
+    { code: "OTHER", label: "Other" }
+  ];
+
+  it("asks the question, offers the codes, and gives back the chosen code with the text", () => {
+    const confirmed: [string, string | null][] = [];
+    renderIn(
+      "en",
+      <ReasonCapture
+        title="Why is this society being suspended?"
+        codes={codes}
+        onConfirm={(code, text) => confirmed.push([code, text])}
+        onCancel={() => {}}
+      />
+    );
+    expect(screen.getByRole("dialog", { name: "Why is this society being suspended?" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "OTHER" } });
+    fireEvent.change(screen.getByLabelText("Details (optional)"), { target: { value: "  audit finding  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(confirmed).toEqual([["OTHER", "audit finding"]]);
+  });
+
+  it("gives null, not an empty string, when no text was written", () => {
+    const confirmed: [string, string | null][] = [];
+    renderIn("en", <ReasonCapture title="Why?" codes={codes} onConfirm={(code, text) => confirmed.push([code, text])} onCancel={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(confirmed).toEqual([["COMPLIANCE", null]]);
+  });
+
+  it("cancels without confirming", () => {
+    let confirmed = 0;
+    let cancelled = 0;
+    renderIn("en", <ReasonCapture title="Why?" codes={codes} onConfirm={() => confirmed++} onCancel={() => cancelled++} />);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(cancelled).toBe(1);
+    expect(confirmed).toBe(0);
+  });
+
+  it("speaks Sinhala and Tamil", () => {
+    renderIn("si", <ReasonCapture title="ඇයි?" codes={codes} onConfirm={() => {}} onCancel={() => {}} />);
+    expect(screen.getByRole("button", { name: "තහවුරු කරන්න" })).toBeTruthy();
+    cleanup();
+    renderIn("ta", <ReasonCapture title="ஏன்?" codes={codes} onConfirm={() => {}} onCancel={() => {}} />);
+    expect(screen.getByRole("button", { name: "உறுதிப்படுத்து" })).toBeTruthy();
   });
 });

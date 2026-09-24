@@ -36,6 +36,19 @@ export const FED_ADMIN: DevUser = {
   policyClass: "FEDERATION_VIEW"
 };
 
+/**
+ * The Federation acting for ITSELF (policy class OWN): the user the society register is for.
+ * fed-admin above holds the FEDERATION_VIEW class, which sees every entity but may not
+ * register, activate or suspend one (21A section 6: those commands need an OWN scope on the
+ * Federation entity).
+ */
+export const FED_OFFICER: DevUser = {
+  username: "fed-officer",
+  displayName: "Federation Officer",
+  locale: "en",
+  policyClass: "OWN"
+};
+
 export const MPCS_ADMIN: DevUser = {
   username: "mpcs-admin",
   displayName: "MPCS Admin",
@@ -50,7 +63,7 @@ export const CASHIER: DevUser = {
   policyClass: "OWN"
 };
 
-export const ALL_DEV_USERS = [FED_ADMIN, MPCS_ADMIN, CASHIER];
+export const ALL_DEV_USERS = [FED_ADMIN, FED_OFFICER, MPCS_ADMIN, CASHIER];
 
 /**
  * The real text of a message id in the language of this user, taken from the catalogues the

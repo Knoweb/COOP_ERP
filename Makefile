@@ -136,6 +136,7 @@ urls:
 	@echo ""
 	@echo "  dev logins (password: dev)"
 	@echo "    fed-admin    Federation administrator, English"
+	@echo "    fed-officer  Federation officer acting for the Federation itself (society register), English"
 	@echo "    mpcs-admin   MPCS administrator, Sinhala"
 	@echo "    cashier      shop cashier, Tamil"
 	@echo ""

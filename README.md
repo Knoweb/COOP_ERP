@@ -52,7 +52,7 @@ make up
 
 The first `make up` takes about ten minutes: it pulls the images, builds the backend image with Jib, starts PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit, the backend and the web client, waits until every one reports healthy, loads the development seed rows and prints the addresses. The database is migrated by the backend when it starts.
 
-Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cashier`, password `dev`. The three users read English, Sinhala and Tamil in that order.
+Then open http://localhost:5173 and sign in as `fed-admin`, `fed-officer`, `mpcs-admin` or `cashier`, password `dev`. They read English, English, Sinhala and Tamil in that order; `fed-officer` acts for the Federation itself, which is what the society register needs.
 
 | Command | What it does |
 |---|---|

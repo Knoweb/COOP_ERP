@@ -108,6 +108,21 @@
       "realmRoles": ["fed-admin"]
     },
     {
+      "username": "fed-officer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-officer@coop-erp.test",
+      "firstName": "Federation",
+      "lastName": "Officer",
+      "attributes": {
+        "locale": ["en"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "dev", "temporary": false }],
+      "realmRoles": ["fed-admin"]
+    },
+    {
       "username": "mpcs-admin",
       "enabled": true,
       "emailVerified": true,
