@@ -16,18 +16,25 @@ public class Replayer {
 
     private final JdbcTemplate jdbc;
     private final BrokerAdapter broker;
+    private final EventConsumerRegistry registry;
 
     @Autowired
-    public Replayer(@Qualifier("relayDataSource") DataSource relayDataSource, BrokerAdapter broker) {
+    public Replayer(
+            @Qualifier("relayDataSource") DataSource relayDataSource,
+            BrokerAdapter broker,
+            EventConsumerRegistry registry) {
 
         this.jdbc = new JdbcTemplate(relayDataSource);
         this.broker = broker;
+        this.registry = registry;
     }
 
-    Replayer(DataSource relayDataSource, BrokerAdapter broker, boolean testConstructor) {
+    Replayer(
+            DataSource relayDataSource, BrokerAdapter broker, EventConsumerRegistry registry, boolean testConstructor) {
 
         this.jdbc = new JdbcTemplate(relayDataSource);
         this.broker = broker;
+        this.registry = registry;
     }
 
     public int replay(String consumer, long fromSeq) {
@@ -38,6 +45,13 @@ public class Replayer {
 
         if (fromSeq < 0) {
             throw new IllegalArgumentException("fromSeq must not be negative");
+        }
+
+        // Only the types this consumer subscribes to: a type it has no handler for would be
+        // refused at delivery and, before #88, requeued for ever.
+        java.util.Set<String> types = registry.bindings().getOrDefault(consumer, java.util.Set.of());
+        if (types.isEmpty()) {
+            throw new IllegalArgumentException("No @EventConsumer registered for " + consumer);
         }
 
         List<OutboxMessage> messages = jdbc.query(
@@ -60,6 +74,7 @@ public class Replayer {
                         FROM kernel.event_outbox
                         WHERE source = 'central'
                           AND source_seq >= ?
+                          AND event_type = ANY (?)
                         ORDER BY source_seq
                         """,
                 (rs, rowNum) -> new OutboxMessage(
@@ -77,7 +92,8 @@ public class Replayer {
                         rs.getObject("actor_user_id", java.util.UUID.class),
                         rs.getString("engine_version"),
                         rs.getString("payload")),
-                fromSeq);
+                fromSeq,
+                types.toArray(String[]::new));
 
         for (OutboxMessage message : messages) {
             broker.publishToConsumer(consumer, message);
