@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * 17A stub of the event outbox: it writes a log line, not a row. 19A ticket K-05 replaces it
  * with the insert into kernel.event_outbox and the relay to the broker; callers do not change.
  *
- * <p>Strict on purpose, like {@link LoggingAuditFacade}:
+ * <p>Strict on purpose:
  * <ul>
  *   <li>the event class has a {@code public static final String TYPE} in the dotted,
  *       versioned form {@code module.thing.happened.v1} (17A section 4.4); it becomes the

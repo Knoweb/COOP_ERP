@@ -1,0 +1,25 @@
+audit_event_types:
+  - code: ENTITY_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Entity registered
+
+  - code: ENTITY_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Entity activated
+
+  - code: ENTITY_SUSPENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Entity suspended
+
+  - code: ENTITY_REINSTATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Entity reinstated
+
+  - code: ENTITY_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Responsible officer appointment
