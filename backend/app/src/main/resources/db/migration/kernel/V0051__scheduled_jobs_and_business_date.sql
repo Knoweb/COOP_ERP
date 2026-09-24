@@ -70,7 +70,8 @@ GRANT UPDATE (module, cron, continuous, fixed_delay, lock_timeout, max_runtime, 
     ON kernel.scheduled_job TO app_rw;
 GRANT SELECT, INSERT ON kernel.job_run TO app_rw;
 GRANT UPDATE (finished_at, outcome, items_processed, error) ON kernel.job_run TO app_rw;
-GRANT SELECT, INSERT, UPDATE, DELETE ON kernel.shedlock TO app_rw;
+-- ShedLock takes a row by INSERT and holds or releases it by UPDATE; it never deletes (17A 6.2: no DELETE for app_rw).
+GRANT SELECT, INSERT, UPDATE ON kernel.shedlock TO app_rw;
 
 -- ---- K-13: the business date of a location ----------------------------------------------------
 
