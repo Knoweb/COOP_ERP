@@ -9,6 +9,9 @@ Only `V0001__baseline.sql` exists today (schemas, extensions, ICU collations, ro
 row-level-security helper functions of 17A section 6.1). Everything below `V0010` stays free
 for whatever the baseline still needs.
 
+The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
+19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.
+
 | Range | Lane | Tickets | Tables of 19A |
 |---|---|---|---|
 | `V0010`â€“`V0029` | A, security | K-01 scope, K-02 identity, K-03 permissions | the PARTY policy template and the masking-view convention (section 1); the idempotency table (section 3) |
