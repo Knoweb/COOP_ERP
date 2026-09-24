@@ -42,13 +42,61 @@ public record DocumentRecord(
         return issuedAt != null;
     }
 
+    /** The issuance protocol sets the hash last, over everything else it froze. */
+    public DocumentRecord withContentHash(String hash) {
+        return new DocumentRecord(
+                id,
+                docTypeCode,
+                seriesId,
+                docNumber,
+                docNumberDisplay,
+                ownerEntityId,
+                counterpartyEntityId,
+                locationId,
+                tillPositionId,
+                deviceId,
+                status,
+                issuedAt,
+                issuedLocal,
+                businessDate,
+                operatorUserId,
+                currency,
+                netAmount,
+                taxAmount,
+                grossAmount,
+                referenceDocumentId,
+                hash,
+                origin,
+                deviceSeq,
+                notes);
+    }
+
     /** The only change an issued document accepts: a new status, via the state history. */
     public DocumentRecord withStatus(String newStatus) {
         return new DocumentRecord(
-                id, docTypeCode, seriesId, docNumber, docNumberDisplay,
-                ownerEntityId, counterpartyEntityId, locationId, tillPositionId, deviceId,
-                newStatus, issuedAt, issuedLocal, businessDate, operatorUserId,
-                currency, netAmount, taxAmount, grossAmount, referenceDocumentId,
-                contentHash, origin, deviceSeq, notes);
+                id,
+                docTypeCode,
+                seriesId,
+                docNumber,
+                docNumberDisplay,
+                ownerEntityId,
+                counterpartyEntityId,
+                locationId,
+                tillPositionId,
+                deviceId,
+                newStatus,
+                issuedAt,
+                issuedLocal,
+                businessDate,
+                operatorUserId,
+                currency,
+                netAmount,
+                taxAmount,
+                grossAmount,
+                referenceDocumentId,
+                contentHash,
+                origin,
+                deviceSeq,
+                notes);
     }
 }

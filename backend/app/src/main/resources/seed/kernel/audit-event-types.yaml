@@ -3,3 +3,29 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: Event consumer moved an event to the dead-letter queue
+  # K-07: documents and numbering (doc 18 part C; doc 07 section 3 names SERIES_REGISTER and
+  # SERIES_HOLDER_CHANGE; the past tense follows the catalogue's own convention).
+  - code: SERIES_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Numbering series registered
+  - code: SERIES_HOLDER_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Numbering series counter moved to another device
+  - code: SERIES_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: Numbering series closed
+  - code: DOCUMENT_ISSUED
+    severity: INFO
+    offline_capturable: true
+    description_en: Document issued and numbered
+  - code: DOCUMENT_LINKED
+    severity: INFO
+    offline_capturable: true
+    description_en: Correcting document linked to its original
+  - code: NUMBERING_GAP
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A numbering series is not dense
