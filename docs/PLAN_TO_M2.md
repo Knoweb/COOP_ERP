@@ -76,6 +76,9 @@ The table above stays as 19A wrote it. These decisions sit on top of it and are 
 
 ## Phase 3 — the module gate
 
+**Amended 24 September 2026 (architect).** The gate below is no longer a gate in time: the team is large enough that modules are built in parallel with the kernel, one developer per module (M1 since 21 September, M3 since 23 September), each module ticket naming the kernel ticket it waits for, and the hello module staying green throughout against the stubs until the real service lands. What the table asks for still has to be true before a module is *released*; it no longer has to be true before a module is *started*. `AGENTS.md` says the same.
+
+
 | # | Task | Done when |
 |---|---|---|
 | 3.1 | Hello module integration tests pass against real kernel services (scoped user cannot read outside scope, command interceptor order, audit row per command, outbox relay) | `make test-int` green with no stub on the path |
