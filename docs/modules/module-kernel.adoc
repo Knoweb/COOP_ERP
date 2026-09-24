@@ -4,12 +4,12 @@
 |`lk.coopfed.knoweb.kernel`
 |Spring components
 |* `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)
+* `l.c.k.k.api.EventPublisher` (via `l.c.k.k.internal.event.OutboxWriter`)
 * `l.c.k.k.api.IdempotencyStore` (via `l.c.k.k.internal.idempotency.JdbcIdempotencyStore`)
 * `l.c.k.k.api.BusinessDate` (via `l.c.k.k.internal.stub.CalendarBusinessDate`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.stub.DevCurrentScope`)
 * `l.c.k.k.api.DocumentBaseRepository` (via `l.c.k.k.internal.stub.InMemoryDocumentBaseRepository`)
 * `l.c.k.k.api.Messages` (via `l.c.k.k.internal.stub.JsonMessages`)
-* `l.c.k.k.api.EventPublisher` (via `l.c.k.k.internal.stub.LoggingEventPublisher`)
 * `l.c.k.k.api.ConfigRegistry`, `l.c.k.k.api.ConfigSeeder` (via `l.c.k.k.internal.stub.SeedConfigRegistry`)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
