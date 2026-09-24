@@ -137,7 +137,7 @@ Changed the slice? Run `make gen-clients` and commit `web/src/generated/hello.ts
 ## Deviations from 17A, with reasons
 
 - **No `entityId` in `RegisterGreeting`.** The guide lists it, and the guide's own handler ignores it. A client must not name the entity it writes for.
-- **Audit and event stubs log, they do not insert.** 17A section 4.3 says the Sprint 0 stubs insert into `kernel.audit_event` and `kernel.event_outbox`; 19A names those migrations (`V0002`, `V0003`), partitions them and gives them to K-04 and K-05. Creating them here would pre-empt that design, so the tests count calls instead of rows.
+- **Audit and event backbones log, they do not insert.** 17A section 4.3 says the Sprint 0 stubs insert into `kernel.audit_event` and `kernel.event_outbox`; 19A names those migrations (`V0002`, `V0003`), partitions them and gives them to K-04 and K-05. Creating them here would pre-empt that design, so the tests count calls instead of rows.
 - **No `ext_view` policy yet.** It needs `kernel.granted_entities()` from K-01.
 - **`kernel.api.CurrentScope` is an addition to the kernel contract** (S0-06): the design says the scope filter keeps the `ScopeContext` as a request attribute but names no way for a controller to read it, and a generated interface leaves no room for a scope parameter. Its 17A stub reads headers; 19A K-02 replaces the stub, not the interface.
 - **Scope, idempotency, problem responses and CORS are new 17A stubs** in `kernel/internal/stub`, each naming the 19A ticket that replaces it. Module code does not change when they are replaced.

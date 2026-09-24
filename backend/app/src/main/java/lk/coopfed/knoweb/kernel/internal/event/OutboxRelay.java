@@ -1,9 +1,10 @@
 package lk.coopfed.knoweb.kernel.internal.event;
 
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import jakarta.annotation.PreDestroy;
 import java.util.List;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Profile;
@@ -18,46 +19,37 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ConditionalOnBean(BrokerAdapter.class)
 public class OutboxRelay implements AutoCloseable {
 
-    private final HikariDataSource dataSource;
+    private final HikariDataSource ownedDataSource;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final BrokerAdapter broker;
     private final int batchSize;
 
+    @Autowired
     public OutboxRelay(
-            @Value("${coop-erp.relay.url:jdbc:postgresql://localhost:5434/coop_erp}") String url,
-            @Value("${coop-erp.relay.user:coop_relay}") String user,
-            @Value("${coop-erp.relay.password:coop_relay}") String password,
-            @Value("${coop-erp.relay.pool-size:2}") int poolSize,
+            @Qualifier("relayDataSource") DataSource dataSource,
             @Value("${coop-erp.relay.batch-size:500}") int batchSize,
             BrokerAdapter broker) {
 
-        this(openDataSource(url, user, password, poolSize), batchSize, broker);
+        this.ownedDataSource = null;
+        this.jdbc = new JdbcTemplate(dataSource);
+        this.transaction = new TransactionTemplate(new JdbcTransactionManager(dataSource));
+        this.batchSize = batchSize;
+        this.broker = broker;
     }
 
     OutboxRelay(HikariDataSource dataSource, int batchSize, BrokerAdapter broker) {
 
-        this.dataSource = dataSource;
+        this.ownedDataSource = dataSource;
         this.jdbc = new JdbcTemplate(dataSource);
-
         this.transaction = new TransactionTemplate(new JdbcTransactionManager(dataSource));
-
         this.batchSize = batchSize;
         this.broker = broker;
     }
 
     static HikariDataSource openDataSource(String url, String user, String password, int poolSize) {
 
-        HikariConfig config = new HikariConfig();
-
-        config.setJdbcUrl(url);
-        config.setUsername(user);
-        config.setPassword(password);
-        config.setMaximumPoolSize(poolSize);
-        config.setMinimumIdle(0);
-        config.setPoolName("coop-relay");
-
-        return new HikariDataSource(config);
+        return RelayDataSourceConfiguration.create(url, user, password, poolSize);
     }
 
     @Scheduled(
@@ -70,6 +62,35 @@ public class OutboxRelay implements AutoCloseable {
     public int relayOnce() {
 
         Integer result = transaction.execute(status -> {
+            List<String> sources = jdbc.queryForList(
+                    """
+                                            SELECT source
+                                              FROM kernel.event_outbox
+                                             WHERE published_at IS NULL
+                                             ORDER BY source, source_seq
+                                             LIMIT 1
+                                            """,
+                    String.class);
+
+            if (sources.isEmpty()) {
+                return 0;
+            }
+
+            String source = sources.getFirst();
+
+            Boolean locked = jdbc.queryForObject(
+                    """
+                                            SELECT pg_try_advisory_xact_lock(
+                                                hashtextextended(?, 0)
+                                            )
+                                            """,
+                    Boolean.class,
+                    "outbox-relay:" + source);
+
+            if (!Boolean.TRUE.equals(locked)) {
+                return 0;
+            }
+
             List<OutboxMessage> messages = jdbc.query(
                     """
                                             SELECT
@@ -89,9 +110,8 @@ public class OutboxRelay implements AutoCloseable {
                                                 payload::text AS payload
                                             FROM kernel.event_outbox
                                             WHERE published_at IS NULL
-                                            ORDER BY
-                                                source,
-                                                source_seq
+                                              AND source = ?
+                                            ORDER BY source_seq
                                             LIMIT ?
                                             FOR UPDATE SKIP LOCKED
                                             """,
@@ -110,6 +130,7 @@ public class OutboxRelay implements AutoCloseable {
                             rs.getObject("actor_user_id", java.util.UUID.class),
                             rs.getString("engine_version"),
                             rs.getString("payload")),
+                    source,
                     batchSize);
 
             int published = 0;
@@ -149,8 +170,10 @@ public class OutboxRelay implements AutoCloseable {
     }
 
     @Override
-    @PreDestroy
     public void close() {
-        dataSource.close();
+
+        if (ownedDataSource != null) {
+            ownedDataSource.close();
+        }
     }
 }

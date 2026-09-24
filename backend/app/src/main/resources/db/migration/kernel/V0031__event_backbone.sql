@@ -57,8 +57,7 @@ CREATE POLICY event_outbox_app_insert
     FOR INSERT
     TO app_rw
     WITH CHECK (
-        kernel.scope_class() = 'OWN'
-        AND owner_entity_id = kernel.scope_entity()
+        owner_entity_id = kernel.scope_entity()
     );
 
 CREATE POLICY event_outbox_relay_select
@@ -131,7 +130,11 @@ GRANT SELECT, INSERT
     ON kernel.event_inbox
     TO app_rw;
 
-REVOKE UPDATE, DELETE, TRUNCATE
+GRANT UPDATE (applied_at, outcome, last_error)
+    ON kernel.event_inbox
+    TO app_rw;
+
+REVOKE DELETE, TRUNCATE
     ON kernel.event_inbox
     FROM app_rw;
 
@@ -210,8 +213,7 @@ BEGIN
                 || 'ON kernel.%I '
                 || 'FOR INSERT TO app_rw '
                 || 'WITH CHECK ('
-                || 'kernel.scope_class() = ''OWN'' '
-                || 'AND owner_entity_id = kernel.scope_entity()'
+                || 'owner_entity_id = kernel.scope_entity()'
                 || ')',
                 partition_name
             );
@@ -289,3 +291,6 @@ GRANT EXECUTE
     TO app_rw;
 
 SELECT kernel.ensure_event_outbox_partitions(3);
+
+-- K-05 relay read access
+GRANT SELECT ON TABLE kernel.event_outbox TO app_relay;

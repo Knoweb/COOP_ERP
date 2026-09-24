@@ -1,0 +1,5 @@
+audit_event_types:
+  - code: EVENT_CONSUMER_DEAD_LETTERED
+    severity: ALERT
+    offline_capturable: false
+    description_en: Event consumer moved an event to the dead-letter queue

@@ -16,9 +16,9 @@ public class InboxGuard {
 
     public boolean applyOnce(String consumer, UUID eventId, Runnable handler) {
 
-        if (consumer == null || consumer.isBlank()) {
-            throw new IllegalArgumentException("Consumer name must not be blank");
-        }
+        requireTransaction();
+
+        requireConsumer(consumer);
 
         if (eventId == null) {
             throw new IllegalArgumentException("Event id must not be null");
@@ -28,31 +28,85 @@ public class InboxGuard {
             throw new IllegalArgumentException("Event handler must not be null");
         }
 
-        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-
-            throw new IllegalStateException("InboxGuard must run in the consumer transaction");
-        }
-
-        int inserted = jdbc.update(
+        int claimed = jdbc.update(
                 """
                         INSERT INTO kernel.event_inbox (
                             consumer,
                             event_id,
-                            outcome
+                            outcome,
+                            last_error
                         )
-                        VALUES (?, ?, 'APPLIED')
+                        VALUES (
+                            ?,
+                            ?,
+                            'APPLIED',
+                            NULL
+                        )
                         ON CONFLICT (consumer, event_id)
-                        DO NOTHING
+                        DO UPDATE
+                           SET applied_at = now(),
+                               outcome = 'APPLIED',
+                               last_error = NULL
+                         WHERE kernel.event_inbox.outcome = 'FAILED'
                         """,
                 consumer,
                 eventId);
 
-        if (inserted == 0) {
+        if (claimed == 0) {
             return false;
         }
 
         handler.run();
 
         return true;
+    }
+
+    public void markFailed(String consumer, UUID eventId, String error) {
+
+        requireTransaction();
+        requireConsumer(consumer);
+
+        if (eventId == null) {
+            throw new IllegalArgumentException("Event id must not be null");
+        }
+
+        jdbc.update(
+                """
+                INSERT INTO kernel.event_inbox (
+                    consumer,
+                    event_id,
+                    outcome,
+                    last_error
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    'FAILED',
+                    ?
+                )
+                ON CONFLICT (consumer, event_id)
+                DO UPDATE
+                   SET applied_at = now(),
+                       outcome = 'FAILED',
+                       last_error = EXCLUDED.last_error
+                """,
+                consumer,
+                eventId,
+                error);
+    }
+
+    private static void requireConsumer(String consumer) {
+
+        if (consumer == null || consumer.isBlank()) {
+            throw new IllegalArgumentException("Consumer name must not be blank");
+        }
+    }
+
+    private static void requireTransaction() {
+
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+
+            throw new IllegalStateException("InboxGuard must run in the consumer transaction");
+        }
     }
 }

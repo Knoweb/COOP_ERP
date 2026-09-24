@@ -2,3 +2,12 @@
 # Starts: the outbox relay, broker consumers, scheduled jobs, rendering, notifications (19A). No HTTP endpoints except health and metrics.
 # What every role shares is in application.yml; a component of this role alone carries
 # @Profile("worker"). Nothing differs yet, so this file is empty on purpose.
+
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:coop}
+    password: ${RABBITMQ_PASSWORD:coop}
+    publisher-confirm-type: correlated
+    publisher-returns: true
