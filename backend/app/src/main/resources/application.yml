@@ -80,7 +80,12 @@ coop-erp:
 # are what an orchestrator probes; /actuator/prometheus is what a metrics server scrapes.
 # They are not protected yet: 19A K-02 brings authentication, and doc 35 decides whether the
 # management port is published at all.
+# The RabbitMQ health indicator is on in the worker role only (application-worker.yml): the
+# other roles never talk to the broker, so its absence must not turn their health DOWN.
 management:
+  health:
+    rabbit:
+      enabled: false
   endpoints:
     web:
       exposure:

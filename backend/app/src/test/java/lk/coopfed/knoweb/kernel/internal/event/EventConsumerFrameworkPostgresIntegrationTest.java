@@ -162,7 +162,10 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
 
         try {
 
-            Replayer replayer = new Replayer(relayDataSource, broker, true);
+            EventConsumerRegistry registry = new EventConsumerRegistry();
+            registry.register(projection);
+
+            Replayer replayer = new Replayer(relayDataSource, broker, registry, true);
 
             assertThat(replayer.replay("test.projection", 1)).isEqualTo(2);
 

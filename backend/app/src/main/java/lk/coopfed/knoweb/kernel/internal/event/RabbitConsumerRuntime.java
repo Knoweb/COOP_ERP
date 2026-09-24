@@ -1,11 +1,14 @@
 package lk.coopfed.knoweb.kernel.internal.event;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Message;
@@ -24,6 +27,8 @@ import org.springframework.stereotype.Component;
 @Profile("worker")
 @ConditionalOnBean(RabbitBrokerAdapter.class)
 public class RabbitConsumerRuntime {
+
+    private static final Logger log = LoggerFactory.getLogger(RabbitConsumerRuntime.class);
 
     private final ConnectionFactory connectionFactory;
     private final EventConsumerRegistry registry;
@@ -120,8 +125,24 @@ public class RabbitConsumerRuntime {
 
             channel.basicAck(deliveryTag, false);
 
+        } catch (JsonProcessingException | IllegalArgumentException poison) {
+
+            // A body that cannot be read, or a consumer/type pair nobody registered, fails the same
+            // way on every delivery: requeued, it would come straight back for ever and block the
+            // queue. It is refused without requeue (the queue's dead-letter exchange keeps it) and
+            // logged; a person decides. Handler failures never reach here: the dispatcher retries
+            // them and dead-letters after three attempts.
+            log.error(
+                    "Consumer {} refuses a message it can never apply ({}); not requeued",
+                    consumer,
+                    poison.getMessage());
+
+            channel.basicNack(deliveryTag, false, false);
+
         } catch (Exception failure) {
 
+            // Everything else (the broker refusing a republish, the database away) is transient:
+            // requeue and let the next delivery try again.
             channel.basicNack(deliveryTag, false, true);
 
             throw failure;

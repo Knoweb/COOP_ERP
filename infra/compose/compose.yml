@@ -80,9 +80,13 @@ services:
       timeout: 10s
       retries: 12
 
+  # MinIO from the Bitnami legacy images: on 24 September 2026 MinIO withdrew its own images
+  # from quay.io and Docker Hub (every tag answers 401), and the stack could not start anywhere.
+  # The legacy images are frozen (no updates) and are a stand-in for development only; the
+  # object store of a deployed environment is K-09's and doc 35's decision, behind the S3
+  # protocol (19A section 9), so nothing in code names the vendor.
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address ":9001"
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-coopminio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-coopminio-dev}
@@ -90,9 +94,11 @@ services:
       - "9000:9000"          # S3 API
       - "9001:9001"          # console
     volumes:
-      - minio_data:/data
+      # A volume of its own: the one MinIO's image wrote (minio_data) belongs to root, and this
+      # image runs as user 1001. Nothing had stored an object yet. Both are removed by make reset.
+      - minio_bitnami_data:/bitnami/minio/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -100,7 +106,7 @@ services:
   # One-shot job: creates the four buckets of 17A section 10 and exits. audit-anchors is
   # created with object lock, which can only be switched on when a bucket is created.
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: bitnamilegacy/minio-client:2025.7.21-debian-12-r3
     depends_on:
       minio:
         condition: service_healthy
@@ -112,6 +118,12 @@ services:
       - -c
       - |
         set -e
+        # The image starts a throwaway MinIO during its setup and stops it before the real one,
+        # so "healthy" can come early; wait until the real server answers (up to 60 s).
+        for i in $$(seq 1 30); do
+          if mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then break; fi
+          echo "waiting for minio ($$i)"; sleep 2
+        done
         mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
         mc mb --ignore-existing local/attachments local/images local/packages
         mc mb --ignore-existing --with-lock local/audit-anchors
@@ -259,4 +271,5 @@ volumes:
   postgres_data:
   rabbitmq_data:
   minio_data:
+  minio_bitnami_data:
   web_node_modules:

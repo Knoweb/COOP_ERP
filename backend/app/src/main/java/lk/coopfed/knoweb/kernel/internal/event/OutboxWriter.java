@@ -10,6 +10,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lk.coopfed.knoweb.engine.Envelope;
@@ -244,6 +245,62 @@ public class OutboxWriter implements EventPublisher {
         }
 
         rejectSensitiveFields(eventType, payload);
+    }
+
+    /**
+     * The words that name personal or secret data (AGENTS.md: never a phone number, NIC, password,
+     * PIN or token in an event payload; doc 18: never personal-data values), matched as whole
+     * words of the field name, split on case and on underscores. So {@code customerName},
+     * {@code mobile_no} and {@code emailAddress} are refused, and {@code technicianId} or
+     * {@code shippingId} (which merely contain "nic" and "pin") are not.
+     */
+    static final Set<String> FORBIDDEN_WORDS = Set.of(
+            "name",
+            "firstname",
+            "lastname",
+            "surname",
+            "fullname",
+            "phone",
+            "mobile",
+            "telephone",
+            "msisdn",
+            "whatsapp",
+            "email",
+            "mail",
+            "address",
+            "street",
+            "city",
+            "nic",
+            "passport",
+            "licence",
+            "license",
+            "password",
+            "pin",
+            "otp",
+            "token",
+            "secret",
+            "credential",
+            "dob",
+            "birthdate",
+            "dateofbirth",
+            "birthday");
+
+    static boolean isForbiddenField(String key) {
+        String[] words =
+                key.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase().split("[^a-z0-9]+");
+        for (String word : words) {
+            if (FORBIDDEN_WORDS.contains(word)) {
+                return true;
+            }
+        }
+        // Joined forms a split cannot see: "firstname", "dateofbirth", "emailaddress".
+        String joined = String.join("", words);
+        for (String forbidden : FORBIDDEN_WORDS) {
+            if (forbidden.length() >= 5 && joined.contains(forbidden)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void rejectSensitiveFields(String eventType, JsonNode node) {

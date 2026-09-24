@@ -3,11 +3,14 @@ package lk.coopfed.knoweb.kernel.internal;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -18,6 +21,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 @Order(TransactionOrderConfig.COMMAND_INTERCEPTOR_ORDER)
 public class CommandInterceptor {
+
+    private static final Logger log = LoggerFactory.getLogger(CommandInterceptor.class);
 
     private static final int COMMAND_SUCCESS = 200;
 
@@ -35,7 +40,19 @@ public class CommandInterceptor {
         RequestData request = currentRequest();
 
         if (request == null) {
+            // K-03a covers commands that arrive over HTTP. A command from a sync batch, a job or a
+            // consumer has no request and is NOT protected yet; said out loud here so that the gap
+            // is visible in the log and not discovered by a double-applied fact. K-08 (sync) and
+            // K-12 (jobs) give those callers their own keys. K-03b adds the permission and MFA
+            // checks before this point (19A section 3: permission -> MFA -> idempotency -> handler).
+            log.warn(
+                    "{} ran outside an HTTP request: no idempotency check (K-03a covers HTTP only)",
+                    call.getSignature().getDeclaringType().getSimpleName());
             return call.proceed();
+        }
+
+        if (!request.hasUser()) {
+            throw new ProblemException("scope.required");
         }
 
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -103,8 +120,16 @@ public class CommandInterceptor {
             return null;
         }
 
-        return new RequestData(keyText, hashText);
+        // Until K-02 reads the user from the token, the user is the X-Dev-User header, and a request
+        // without one used to get a fresh random user, so a retry never matched and the command ran
+        // twice with nobody the wiser. A mutating request without a user is refused instead.
+        String user = attributes.getRequest().getHeader(DEV_USER_HEADER);
+
+        return new RequestData(keyText, hashText, user != null && !user.isBlank());
     }
 
-    private record RequestData(String key, String requestHash) {}
+    private record RequestData(String key, String requestHash, boolean hasUser) {}
+
+    /** The header the 17A development stub reads (DevCurrentScope.HEADER_USER); K-02 removes both. */
+    private static final String DEV_USER_HEADER = "X-Dev-User";
 }

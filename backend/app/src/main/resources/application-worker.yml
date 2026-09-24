@@ -1,7 +1,13 @@
 # Settings of the worker role only (17A section 4.1). Loaded when COOP_ERP_ROLE names "worker".
 # Starts: the outbox relay, broker consumers, scheduled jobs, rendering, notifications (19A). No HTTP endpoints except health and metrics.
 # What every role shares is in application.yml; a component of this role alone carries
-# @Profile("worker"). Nothing differs yet, so this file is empty on purpose.
+# @Profile("worker"). This role is the one that talks to the broker (19A K-05): its connection
+# and its health indicator are here and nowhere else.
+
+management:
+  health:
+    rabbit:
+      enabled: true
 
 spring:
   rabbitmq:

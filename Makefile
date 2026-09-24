@@ -45,6 +45,7 @@ help:
 	@echo "make reset        stop the stack and delete its data volumes"
 	@echo "make migrate      rebuild and restart the backend, which runs the Flyway migrations"
 	@echo "make seed         load the development seed rows (safe to repeat)"
+	@echo "make roles        apply the database users and groups to the running database (make up does this)"
 	@echo "make build        build backend and web on the host"
 	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
 	@echo "make test-int     integration tests against PostgreSQL in Docker (Testcontainers)"
@@ -77,12 +78,17 @@ image:
 # fresh clone. Creating it first keeps it the caller's.
 up: image
 	@mkdir -p web/node_modules
+	@# postgres first and the roles on it, so that the backend finds every user it logs in as.
+	$(COMPOSE) up --detach --wait postgres
+	@$(MAKE) --no-print-directory roles
 	$(COMPOSE) up --detach --wait --remove-orphans
 	@$(MAKE) --no-print-directory seed
 	@$(MAKE) --no-print-directory urls
 
 up-2: image
 	@mkdir -p web/node_modules
+	$(COMPOSE_TWO) up --detach --wait postgres
+	@$(MAKE) --no-print-directory roles
 	$(COMPOSE_TWO) up --detach --wait --remove-orphans
 	@$(MAKE) --no-print-directory seed
 	@$(MAKE) --no-print-directory urls
@@ -99,6 +105,13 @@ reset:
 # So "migrate" means: rebuild the image with the new migration files and start it again.
 migrate: image
 	$(COMPOSE) up --detach --wait --force-recreate --no-deps backend
+
+# The database users and groups, applied to the running database on every start so that a user
+# added later (coop_relay, #87) reaches an existing database without `make reset`. The same
+# script runs at volume creation; it is idempotent. Needs the containers env, which compose
+# gives the postgres container.
+roles:
+	@$(COMPOSE) exec -T postgres sh /docker-entrypoint-initdb.d/01-roles.sh
 
 # Seeds run as the PostgreSQL superuser inside the postgres container: they write rows for
 # several entities at once, which row-level security forbids to the application user.
