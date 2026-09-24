@@ -81,7 +81,7 @@ Then open http://localhost:5173 and sign in as `fed-admin`, `mpcs-admin` or `cas
 
 | What | Where | When |
 |---|---|---|
-| Build, unit and architecture tests, the format check, the four script checks, integration tests against a real PostgreSQL 16 (a throwaway container per run), web lint, tests and build, the till build, coverage report | `ci.yml`, job "Build, verify, test" | every pull request, every push to `main` |
+| Build, unit and architecture tests, the format check, the four script checks, integration tests against a real PostgreSQL 16 (a throwaway container per run), web lint, tests and build, coverage report | `ci.yml`, job "Build, verify, test" | every pull request, every push to `main` |
 | A module scaffolded from hello still builds and passes | `ci.yml`, job "Scaffolder proof" | same |
 | The whole stack with two backend instances behind nginx, smoke-tested from outside, then the back office in a real browser: signing in as each development user, the scope banner, the navigation and the hello screen in three languages, what each role may do, a deep link that survives a login, sign-out (Playwright, Chromium; report and traces uploaded when it fails) | `ci.yml`, job "Stack smoke" | same |
 | Backend image, web bundle, shared engine, bill of materials | `ci.yml`, job "Package" | same |
