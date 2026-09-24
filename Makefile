@@ -51,6 +51,7 @@ help:
 	@echo "make format       format the Java files you changed (the pipeline checks this)"
 	@echo "make coverage     unit and integration tests, then the coverage report"
 	@echo "make hooks        optional: run the quick checks before every git push"
+	@echo "make sync         start of the day: update main, drop line-ending noise, prune worktrees"
 	@echo "make lint-ci      check the workflow files before pushing a change to them (needs Docker)"
 	@echo "make smoke        smoke test of the running stack (TWO=1 after make up-2)"
 	@echo "make e2e          Playwright tests in a browser against the running stack (make up first)"
@@ -159,6 +160,17 @@ coverage:
 hooks:
 	git config core.hooksPath .githooks
 	@echo "installed: .githooks/pre-push runs before every git push (skip once with --no-verify)"
+
+# The start of every working day, in either shell. `--ff-only` refuses when somebody committed on
+# local main directly, which is then sorted out rather than merged over. The checkout of
+# docs/modules drops the line-ending noise a Windows checkout shows there (the blobs are LF).
+sync:
+	git checkout main
+	git fetch --prune
+	git pull --ff-only
+	git checkout -- docs/modules web/src/generated
+	git worktree prune
+	@echo "main is at $$(git log --oneline -1)"
 
 # A workflow file with a syntax error does not fail in the pipeline: the pipeline does not
 # start at all, and the pull request shows no checks. So check before pushing: actionlint reads
