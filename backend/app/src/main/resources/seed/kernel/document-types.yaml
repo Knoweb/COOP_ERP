@@ -1,0 +1,186 @@
+# The registry of document kinds (doc 18 part C, table document_type), flags as decided in 24B.
+# Loaded on every start by DocumentTypeSeedLoader as the migrator (a member of app_seed):
+# reference data, upserted, so a flag revisited here reaches every database.
+#
+#   series_scope      where the number comes from: the issuer's ENTITY series; the LOCATION
+#                     series of the shop; the TILL_POSITION series of the till. For the kinds a
+#                     shop issues from its LOCATION series and a warehouse from its ENTITY
+#                     series (GRN, CNT, WOF, RPK, XFR), the scope here is the finest one; the
+#                     numbering service falls back to the entity's series where the finer one
+#                     was never registered.
+#   issuer_role       whose document it is: the BUYER, the SELLER, or the HOLDER of the stock.
+#   bilateral         a counterparty is mandatory.
+#   fiscal            gaplessness and immutability are a compliance matter (24B section 2).
+#   offline_issuable  a till may issue it without the server (H-02, H-03).
+#   owning_module     whose validator and state machine apply (part F).
+document_types:
+  - code: ORD
+    name_en: Order
+    name_si: ඇණවුම
+    name_ta: ஆணை
+    series_scope: ENTITY
+    issuer_role: BUYER
+    bilateral: true
+    fiscal: false
+    offline_issuable: false
+    owning_module: m4trading
+  - code: DN
+    name_en: Delivery note
+    name_si: බෙදාහැරීමේ සටහන
+    name_ta: விநியோகக் குறிப்பு
+    series_scope: ENTITY
+    issuer_role: SELLER
+    bilateral: true
+    fiscal: false
+    offline_issuable: false
+    owning_module: m4trading
+  - code: GRN
+    name_en: Goods received note
+    name_si: භාණ්ඩ ලැබීමේ සටහන
+    name_ta: பொருள் பெறுகைக் குறிப்பு
+    series_scope: LOCATION
+    issuer_role: BUYER
+    bilateral: true
+    fiscal: false
+    offline_issuable: true
+    owning_module: m4trading
+  - code: DISC
+    name_en: Discrepancy report
+    name_si: විෂමතා වාර්තාව
+    name_ta: முரண்பாட்டு அறிக்கை
+    series_scope: ENTITY
+    issuer_role: BUYER
+    bilateral: true
+    fiscal: false
+    offline_issuable: false
+    owning_module: m4trading
+  - code: CLM
+    name_en: Claim
+    name_si: හිමිකම් ඉල්ලීම
+    name_ta: உரிமைகோரல்
+    series_scope: ENTITY
+    issuer_role: BUYER
+    bilateral: true
+    fiscal: false
+    offline_issuable: false
+    owning_module: m4trading
+  - code: INV
+    name_en: Tax invoice
+    name_si: බදු ඉන්වොයිසිය
+    name_ta: வரி விலைப்பட்டியல்
+    series_scope: ENTITY
+    issuer_role: SELLER
+    bilateral: true
+    fiscal: true
+    offline_issuable: false
+    owning_module: m4trading
+  - code: CN
+    name_en: Credit note
+    name_si: බැර සටහන
+    name_ta: வரவுக் குறிப்பு
+    series_scope: ENTITY
+    issuer_role: SELLER
+    bilateral: true
+    fiscal: true
+    offline_issuable: false
+    owning_module: m4trading
+  - code: DN2
+    name_en: Debit note
+    name_si: හර සටහන
+    name_ta: பற்றுக் குறிப்பு
+    series_scope: ENTITY
+    issuer_role: SELLER
+    bilateral: true
+    fiscal: true
+    offline_issuable: false
+    owning_module: m4trading
+  - code: PRC
+    name_en: Payment receipt
+    name_si: ගෙවීම් රිසිට්පත
+    name_ta: கட்டணப் பற்றுச்சீட்டு
+    series_scope: ENTITY
+    issuer_role: SELLER
+    bilateral: true
+    fiscal: true
+    offline_issuable: false
+    owning_module: m4trading
+  - code: CPR
+    name_en: Customer payment receipt
+    name_si: පාරිභෝගික ගෙවීම් රිසිට්පත
+    name_ta: வாடிக்கையாளர் கட்டணப் பற்றுச்சீட்டு
+    series_scope: TILL_POSITION
+    issuer_role: SELLER
+    bilateral: false
+    fiscal: true
+    offline_issuable: true
+    owning_module: m7customers
+  - code: RCT
+    name_en: Till receipt
+    name_si: මුදල් ලේඛන රිසිට්පත
+    name_ta: பணப்பெட்டி ரசீது
+    series_scope: TILL_POSITION
+    issuer_role: SELLER
+    bilateral: false
+    fiscal: true
+    offline_issuable: true
+    owning_module: m6pos
+  - code: WOF
+    name_en: Write-off
+    name_si: කපා හැරීම
+    name_ta: தள்ளுபடி எழுதல்
+    series_scope: LOCATION
+    issuer_role: HOLDER
+    bilateral: false
+    fiscal: false
+    offline_issuable: true
+    owning_module: m5inventory
+  - code: CNT
+    name_en: Stock count
+    name_si: තොග ගණනය
+    name_ta: இருப்பு எண்ணிக்கை
+    series_scope: LOCATION
+    issuer_role: HOLDER
+    bilateral: false
+    fiscal: false
+    offline_issuable: true
+    owning_module: m5inventory
+  - code: ADJ
+    name_en: Stock adjustment
+    name_si: තොග ගැලපීම
+    name_ta: இருப்புச் சரிசெய்தல்
+    series_scope: ENTITY
+    issuer_role: HOLDER
+    bilateral: false
+    fiscal: false
+    offline_issuable: false
+    owning_module: m5inventory
+  - code: RPK
+    name_en: Repack
+    name_si: නැවත ඇසුරුම
+    name_ta: மறுபொதியிடல்
+    series_scope: LOCATION
+    issuer_role: HOLDER
+    bilateral: false
+    fiscal: false
+    offline_issuable: true
+    owning_module: m5inventory
+  - code: XFR
+    name_en: Stock transfer
+    name_si: තොග මාරුව
+    name_ta: இருப்பு மாற்றம்
+    series_scope: LOCATION
+    issuer_role: HOLDER
+    bilateral: false
+    fiscal: false
+    offline_issuable: true
+    owning_module: m5inventory
+  - code: OPB
+    name_en: Opening balance
+    name_si: ආරම්භක ශේෂය
+    name_ta: தொடக்க இருப்பு
+    series_scope: ENTITY
+    issuer_role: HOLDER
+    bilateral: false
+    fiscal: false
+    offline_issuable: false
+    owning_module: m5inventory

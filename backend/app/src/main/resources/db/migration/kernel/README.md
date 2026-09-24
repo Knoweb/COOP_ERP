@@ -5,9 +5,9 @@ are built in four lanes (`docs/PLAN_TO_M2.md`, Part B, wave 2) and two lanes tha
 `V0002` produce a conflict that no test catches until the files meet on `main`. So the numbers
 are reserved per lane before the lanes start.
 
-Only `V0001__baseline.sql` exists today (schemas, extensions, ICU collations, roles, the
-row-level-security helper functions of 17A section 6.1). Everything below `V0010` stays free
-for whatever the baseline still needs.
+Below `V0010` are the baseline and what it still needed (`V0001` to `V0006`). Taken so far:
+`V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0050` (K-07
+documents and numbering).
 
 The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
 19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.

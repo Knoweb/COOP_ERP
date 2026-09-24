@@ -74,3 +74,14 @@ Three cases the template does not cover, and what does:
   `CR-21A-1` item 2 asks 17A to adopt.
 - **A user's own rows regardless of tenant** (the idempotency key): a policy on
   `app.user_id`, which the customizer sets for the request's user (kernel `V0010`).
+
+A fourth case, from K-07:
+
+- **The rows of a document** (`kernel.document_line`, `document_link`, `document_state_history`,
+  `document_attachment`, and a module's extension table keyed on `document_id`) carry no
+  owner column: the header decides. They get `document_read` on
+  `kernel.document_visible(document_id)` and `document_write` on
+  `kernel.document_owned(document_id)`, two `SECURITY INVOKER` functions that ask the header
+  under the caller's own policies. So a row is visible under whichever class sees its document
+  (OWN, PARTY through the counterparty, FEDERATION_VIEW, EXTERNAL through the grant) and
+  writable only by the owner in an OWN scope, with nothing copied and nothing to keep in step.

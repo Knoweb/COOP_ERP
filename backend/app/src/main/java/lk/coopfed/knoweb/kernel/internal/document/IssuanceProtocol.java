@@ -1,0 +1,237 @@
+package lk.coopfed.knoweb.kernel.internal.document;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.BusinessDate;
+import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
+import lk.coopfed.knoweb.kernel.api.DocumentIssuance;
+import lk.coopfed.knoweb.kernel.api.DocumentIssued;
+import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
+import lk.coopfed.knoweb.kernel.api.DocumentOrigin;
+import lk.coopfed.knoweb.kernel.api.DocumentRecord;
+import lk.coopfed.knoweb.kernel.api.DocumentStateHistoryRecord;
+import lk.coopfed.knoweb.kernel.api.DocumentType;
+import lk.coopfed.knoweb.kernel.api.DocumentTypeHandler;
+import lk.coopfed.knoweb.kernel.api.DocumentTypes;
+import lk.coopfed.knoweb.kernel.api.EventPublisher;
+import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.Subject;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/**
+ * The issuance protocol of doc 18 section 5.5, in the order 19A section 7 gives it. One
+ * transaction, the caller's: a failure at any step, the type's validator included, rolls
+ * back the number with everything else.
+ */
+@Component
+class IssuanceProtocol implements DocumentIssuance {
+
+    static final String STATUS_DRAFT = "DRAFT";
+    static final String STATUS_ISSUED = "ISSUED";
+    static final String AUDIT_ISSUED = "DOCUMENT_ISSUED";
+
+    private final DocumentTypes types;
+    private final Map<String, DocumentTypeHandler> handlers = new HashMap<>();
+    private final JdbcNumberingService numbering;
+    private final DocumentBaseRepository documents;
+    private final BusinessDate businessDate;
+    private final AuditFacade audit;
+    private final EventPublisher events;
+    private final Clock clock;
+    private final ZoneId businessZone;
+
+    IssuanceProtocol(
+            DocumentTypes types,
+            List<DocumentTypeHandler> typeHandlers,
+            JdbcNumberingService numbering,
+            DocumentBaseRepository documents,
+            BusinessDate businessDate,
+            AuditFacade audit,
+            EventPublisher events,
+            Clock clock,
+            @Value("${coop-erp.business-timezone}") String businessZone) {
+        this.types = types;
+        this.numbering = numbering;
+        this.documents = documents;
+        this.businessDate = businessDate;
+        this.audit = audit;
+        this.events = events;
+        this.clock = clock;
+        this.businessZone = ZoneId.of(businessZone);
+
+        for (DocumentTypeHandler handler : typeHandlers) {
+            DocumentTypeHandler already = handlers.putIfAbsent(handler.docTypeCode(), handler);
+            if (already != null) {
+                throw new IllegalStateException("Two DocumentTypeHandler beans own the document type "
+                        + handler.docTypeCode() + ": " + already.getClass().getName() + " and "
+                        + handler.getClass().getName());
+            }
+        }
+    }
+
+    @Override
+    public DocumentRecord issue(DocumentRecord draft, List<DocumentLineRecord> lines, ScopeContext ctx) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException(
+                    "DocumentIssuance.issue was called outside a transaction; call it inside the handler's"
+                            + " @Transactional method");
+        }
+
+        // 1. the base's checks, then the type's validator: no invalid document takes a number.
+        if (draft.id() == null || !STATUS_DRAFT.equals(draft.status()) || draft.isIssued()) {
+            throw new ProblemException("document.not_draft");
+        }
+
+        DocumentType type = types.find(draft.docTypeCode())
+                .orElseThrow(() -> new ProblemException(
+                        "document.type_unknown", Map.of("docTypeCode", String.valueOf(draft.docTypeCode()))));
+
+        DocumentTypeHandler handler = handlers.get(type.code());
+
+        if (handler == null) {
+            throw new ProblemException("document.type_unowned", Map.of("docTypeCode", type.code()));
+        }
+
+        if (ctx == null || ctx.entityId() == null || !ctx.entityId().equals(draft.ownerEntityId())) {
+            throw new ProblemException("document.owner_mismatch");
+        }
+
+        if (type.bilateral() && draft.counterpartyEntityId() == null) {
+            throw new ProblemException("document.counterparty_required", Map.of("docTypeCode", type.code()));
+        }
+
+        Optional<DocumentRecord> stored = documents.findById(draft.id());
+
+        if (stored.isPresent() && stored.get().isIssued()) {
+            throw new ProblemException("document.not_draft");
+        }
+
+        List<DocumentLineRecord> documentLines = stored.isPresent() ? documents.findLines(draft.id()) : List.of();
+
+        if (documentLines.isEmpty()) {
+            documentLines = lines == null ? List.of() : List.copyOf(lines);
+        }
+
+        handler.validate(draft, documentLines, ctx);
+
+        // 2. the number, from the finest series that exists for this issuer at this place.
+        Series series = numbering
+                .seriesFor(type.code(), draft.ownerEntityId(), draft.locationId(), draft.tillPositionId())
+                .orElseThrow(() -> new ProblemException("document.series_missing", Map.of("docTypeCode", type.code())));
+
+        long number = numbering.takeNumber(series.seriesId());
+        String display = String.format(JdbcNumberingService.NUMBER_FORMAT, series.prefix(), number);
+
+        // 3. freeze totals, hash, timestamps; store the rows and the DRAFT -> ISSUED state row.
+        // Microseconds: what timestamptz keeps, so the stored instant is exactly the hashed one.
+        Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        LocalDateTime issuedLocal = LocalDateTime.ofInstant(issuedAt, businessZone);
+        LocalDate date = draft.locationId() != null
+                ? businessDate.current(draft.locationId())
+                : LocalDate.ofInstant(issuedAt, businessZone);
+
+        Totals totals = Totals.of(documentLines);
+
+        DocumentRecord numbered = new DocumentRecord(
+                draft.id(),
+                type.code(),
+                series.seriesId(),
+                number,
+                display,
+                draft.ownerEntityId(),
+                draft.counterpartyEntityId(),
+                draft.locationId(),
+                draft.tillPositionId(),
+                draft.deviceId(),
+                STATUS_ISSUED,
+                issuedAt,
+                issuedLocal,
+                date,
+                draft.operatorUserId() != null ? draft.operatorUserId() : ctx.userId(),
+                draft.currency() == null ? "LKR" : draft.currency(),
+                totals.net(),
+                totals.tax(),
+                totals.gross(),
+                draft.referenceDocumentId(),
+                null,
+                draft.origin() == null ? DocumentOrigin.ONLINE : draft.origin(),
+                draft.deviceSeq(),
+                draft.notes());
+
+        DocumentRecord issued = numbered.withContentHash(ContentHash.of(numbered, documentLines));
+
+        documents.save(issued);
+
+        if (stored.isEmpty() && !documentLines.isEmpty()) {
+            documents.saveLines(issued.id(), documentLines);
+        }
+
+        documents.addStateTransition(new DocumentStateHistoryRecord(
+                Ids.next(),
+                issued.id(),
+                STATUS_DRAFT,
+                STATUS_ISSUED,
+                issuedAt,
+                issuedLocal,
+                ctx.userId(),
+                ctx.deviceId(),
+                null,
+                null));
+
+        audit.record(
+                AUDIT_ISSUED,
+                Subject.of("document", issued.id()),
+                Map.of("status", STATUS_DRAFT),
+                Map.of(
+                        "status", STATUS_ISSUED,
+                        "docTypeCode", type.code(),
+                        "docNumberDisplay", display,
+                        "grossAmount", String.valueOf(totals.gross()),
+                        "contentHash", issued.contentHash()),
+                ctx);
+
+        // 4. the owning module's post-issue hook, in the same transaction.
+        handler.afterIssue(issued, documentLines, ctx);
+
+        // 5. the base's event; the type-specific one is the module's.
+        events.publish(new DocumentIssued(
+                issued.id(), type.code(), display, issued.ownerEntityId(), issued.counterpartyEntityId()));
+
+        return issued;
+    }
+
+    /** Totals frozen from the lines (money scale 2): net is the sum of line totals, gross is net plus tax. */
+    record Totals(BigDecimal net, BigDecimal tax, BigDecimal gross) {
+
+        static Totals of(List<DocumentLineRecord> lines) {
+            BigDecimal net = BigDecimal.ZERO;
+            BigDecimal tax = BigDecimal.ZERO;
+            for (DocumentLineRecord line : lines) {
+                net = net.add(orZero(line.lineTotal()));
+                tax = tax.add(orZero(line.taxAmount()));
+            }
+            net = net.setScale(2, RoundingMode.HALF_UP);
+            tax = tax.setScale(2, RoundingMode.HALF_UP);
+            return new Totals(net, tax, net.add(tax));
+        }
+
+        private static BigDecimal orZero(BigDecimal value) {
+            return value == null ? BigDecimal.ZERO : value;
+        }
+    }
+}
