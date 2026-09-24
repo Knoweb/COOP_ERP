@@ -118,6 +118,12 @@ services:
       - -c
       - |
         set -e
+        # The image starts a throwaway MinIO during its setup and stops it before the real one,
+        # so "healthy" can come early; wait until the real server answers (up to 60 s).
+        for i in $$(seq 1 30); do
+          if mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then break; fi
+          echo "waiting for minio ($$i)"; sleep 2
+        done
         mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
         mc mb --ignore-existing local/attachments local/images local/packages
         mc mb --ignore-existing --with-lock local/audit-anchors
