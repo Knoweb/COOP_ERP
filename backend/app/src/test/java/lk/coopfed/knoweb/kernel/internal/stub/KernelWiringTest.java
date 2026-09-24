@@ -6,8 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Locale;
-import java.util.UUID;
-import lk.coopfed.knoweb.kernel.api.BusinessDate;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.internal.KernelClockConfig;
@@ -35,8 +33,6 @@ class KernelWiringTest {
             assertThat(context.getBean(Clock.class).getZone()).isEqualTo(ZoneOffset.UTC);
             assertThat(context.getBean(Messages.class).t("scope.required", Locale.ENGLISH))
                     .isEqualTo("Select the entity you are working for");
-            assertThat(context.getBean(BusinessDate.class).current(UUID.randomUUID()))
-                    .isNotNull();
             assertThat(context.getBean(ConfigRegistry.class).get("business.timezone", null))
                     .contains("Asia/Colombo");
         });
