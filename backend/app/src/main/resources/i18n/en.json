@@ -240,5 +240,6 @@
   "sync.location_mismatch": "A device may only read its own location",
   "sync.sequence_gap": "Events are missing before this batch; resend from the expected sequence",
   "sync.snapshot.unavailable": "Snapshots are not served yet",
-  "token.invalid": "Your sign-in is not valid or has expired; sign in again"
+  "token.invalid": "Your sign-in is not valid or has expired; sign in again",
+  "request.forbidden": "You do not have permission to perform this action."
 }
