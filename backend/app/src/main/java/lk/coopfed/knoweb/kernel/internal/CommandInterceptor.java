@@ -89,7 +89,7 @@ public class CommandInterceptor {
             throw new IllegalStateException("A command handler takes the ScopeContext of the request");
         }
         if (scope.userId() == null) {
-            // No token and no development user header: nobody to run the command as, nobody to
+            // A device or system token without a user: nobody to run the command as, nobody to
             // attribute it to, and no idempotency key that could be a user's (K-03a).
             throw new ProblemException("scope.required");
         }

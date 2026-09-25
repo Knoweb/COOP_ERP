@@ -9,15 +9,18 @@
 // changed slice is a compile error here, exactly as it is for the controller on the server.
 //
 // What this adds to every request, so that no screen can forget it:
-//   - the bearer token of the signed-in user
+//   - the bearer token of the signed-in user: the server reads who the user is from it
+//   - X-Scope-Entity, the entity the user acts in now (19A section 1: the active scope is
+//     the caller's choice among the scopes the token and the assignments give)
 //   - Accept-Language, so that error messages come back in the user's language
 //   - a refusal to send a mutating request without an Idempotency-Key (see idempotency.ts)
-// and what it does with every answer: an error response becomes a thrown ApiProblem.
-//
-// Not here yet: the step-up retry. It needs a backend that issues the challenge (19A K-02).
+// and what it does with every answer: an error response becomes a thrown ApiProblem, and a
+// 401 that asks for a fresh second factor (mfa.required, 19A section 2) sends the user to the
+// identity server to present it, back to the same page, where the action is taken again.
 
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
+import { useAuth } from "react-oidc-context";
 import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { components } from "../../generated/common";
 import { useSession, type Session } from "../auth/session";
@@ -27,6 +30,9 @@ const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /** The error document of the API (RFC 9457 with our members; openapi/common.yaml). */
 export type Problem = components["schemas"]["Problem"];
+
+/** The problem code the server answers when the action needs a second factor fresher than it has. */
+export const STEP_UP_REQUIRED = "mfa.required";
 
 /**
  * An error answer of the API. `problem.code` is a stable message id a screen may test for;
@@ -56,21 +62,15 @@ export async function problemOf(response: Response): Promise<Problem> {
   return { status: response.status, code: "unknown" };
 }
 
-/**
- * TEMPORARY, until 19A K-02. The backend does not read the token yet: its 17A stub takes the
- * caller's identity and scope from request headers. So the client derives those headers from
- * the token's claims, and the server already behaves as it will when it reads the token
- * itself. K-02 deletes this function and the stub together; nothing else changes.
- */
-function developmentScopeHeaders(session: Session): Record<string, string> {
-  const headers: Record<string, string> = { "X-Dev-User": session.userId, "X-Dev-Scope-Class": session.policyClass };
-  if (session.entityId) {
-    headers["X-Scope-Entity"] = session.entityId;
-  }
-  return headers;
-}
+export type RequestContext = {
+  accessToken: string;
+  locale: string;
+  session: Session;
+  /** Sends the user to the identity server for a fresh second factor; optional for tests. */
+  stepUp?: () => void;
+};
 
-export function apiMiddleware(getContext: () => { accessToken: string; locale: string; session: Session }): Middleware {
+export function apiMiddleware(getContext: () => RequestContext): Middleware {
   return {
     onRequest({ request }) {
       if (MUTATING.has(request.method) && !request.headers.get("Idempotency-Key")) {
@@ -84,15 +84,19 @@ export function apiMiddleware(getContext: () => { accessToken: string; locale: s
       const { accessToken, locale, session } = getContext();
       request.headers.set("Authorization", `Bearer ${accessToken}`);
       request.headers.set("Accept-Language", locale);
-      for (const [name, value] of Object.entries(developmentScopeHeaders(session))) {
-        request.headers.set(name, value);
+      if (session.entityId) {
+        request.headers.set("X-Scope-Entity", session.entityId);
       }
       return request;
     },
 
     async onResponse({ response }) {
       if (!response.ok) {
-        throw new ApiProblem(await problemOf(response));
+        const problem = await problemOf(response);
+        if (response.status === 401 && problem.code === STEP_UP_REQUIRED) {
+          getContext().stepUp?.();
+        }
+        throw new ApiProblem(problem);
       }
       return response;
     }
@@ -106,13 +110,21 @@ export function apiMiddleware(getContext: () => { accessToken: string; locale: s
 export function useApiClient<Paths extends object>(): Client<Paths> {
   const session = useSession();
   const { locale } = useIntl();
+  const auth = useAuth();
 
   return useMemo(() => {
     if (!session) {
       throw new Error("useApiClient needs a signed-in user; is this outside RequireLogin?");
     }
     const client = createClient<Paths>({ baseUrl: API_BASE });
-    client.use(apiMiddleware(() => ({ accessToken: session.accessToken, locale, session })));
+    // Step-up (doc 19 section 2.2: "the challenge is at the action, not at login"): a fresh
+    // sign-in at the identity server, which asks for the second factor, and back to this page.
+    const stepUp = () =>
+      void auth.signinRedirect({
+        prompt: "login",
+        state: { returnTo: window.location.pathname + window.location.search }
+      });
+    client.use(apiMiddleware(() => ({ accessToken: session.accessToken, locale, session, stepUp })));
     return client;
-  }, [session, locale]);
+  }, [session, locale, auth]);
 }

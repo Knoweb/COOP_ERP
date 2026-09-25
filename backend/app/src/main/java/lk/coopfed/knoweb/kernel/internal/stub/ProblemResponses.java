@@ -37,6 +37,7 @@ public class ProblemResponses {
             // K-02: a token the resource server refuses, and a second factor that is not fresh
             // enough for the action (19A section 2: step-up is 401 with the provider's address).
             "token.invalid", HttpStatus.UNAUTHORIZED,
+            "auth.required", HttpStatus.UNAUTHORIZED,
             "mfa.required", HttpStatus.UNAUTHORIZED);
 
     private final Messages messages;

@@ -22,7 +22,7 @@ class KernelWiringTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withBean(ObjectMapper.class)
-            .withUserConfiguration(KernelClockConfig.class, IcuMessages.class, DevStubsGuard.class)
+            .withUserConfiguration(KernelClockConfig.class, IcuMessages.class)
             .withPropertyValues("coop-erp.business-timezone=Asia/Colombo");
 
     @Test
@@ -33,13 +33,5 @@ class KernelWiringTest {
             assertThat(context.getBean(Messages.class).t("scope.required", Locale.ENGLISH))
                     .isEqualTo("Select the entity you are working for");
         });
-    }
-
-    @Test
-    void theStubsRefuseToStartUnderAProductionProfile() {
-        runner.withPropertyValues("spring.profiles.active=production").run(context -> assertThat(context)
-                .getFailure()
-                .rootCause()
-                .hasMessageContaining("Refusing to start under a production profile"));
     }
 }

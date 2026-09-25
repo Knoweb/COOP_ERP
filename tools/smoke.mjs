@@ -22,10 +22,22 @@ const TWO_INSTANCES = process.argv.includes("--two");
 const FEDERATION = "0190f000-0000-7000-8000-000000000001";
 const MPCS = "0190f000-0000-7000-8000-000000000002";
 const GREETINGS = `${BACKEND}/v1/hello/greetings`;
-// The MPCS administrator of the dev realm and seed/m1security/users.dev.sql: permissions are
-// enforced in the stack (K-03b), so the user that registers must hold a role there. Until the
-// second K-02 pull request the user may still be named in the X-Dev-User header.
-const SMOKE_USER = "0190f000-0000-7000-8000-0000000000a3";
+// The users of the dev realm (infra/compose/realm-dev.json) and of seed/m1security/users.dev.sql.
+// Permissions are enforced in the stack (K-03b), so the user that registers must hold a role
+// there, and every request carries that user's token (K-02): the smoke test signs in as the
+// back office does, with the password grant the dev realm allows the web client.
+const tokens = {};
+
+async function signIn(username) {
+  const response = await fetch(`${KEYCLOAK}/realms/coop/protocol/openid-connect/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "password", client_id: "coop-erp-web", username, password: "dev", scope: "openid" })
+  });
+  const token = (await json(response)).access_token;
+  expect(token, `${username}: no access token (HTTP ${response.status})`);
+  return token;
+}
 
 let failures = 0;
 
@@ -54,12 +66,19 @@ const json = async (response) => {
   }
 };
 
-const scope = (entity, extra = {}) => ({ "X-Scope-Entity": entity, ...extra });
+// As the user whose home the entity is: the MPCS administrator for the MPCS, the Federation
+// officer (OWN) for the Federation, the Federation administrator for the federation view.
+const scope = (entity, extra = {}) => ({
+  Authorization: `Bearer ${entity === MPCS ? tokens.mpcsAdmin : tokens.fedOfficer}`,
+  "X-Scope-Entity": entity,
+  ...extra
+});
+const federationView = () => ({ Authorization: `Bearer ${tokens.fedAdmin}`, "X-Scope-Entity": FEDERATION });
 
 function register(textEn, key, headers) {
   return fetch(GREETINGS, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Idempotency-Key": key, "X-Dev-User": SMOKE_USER, ...headers },
+    headers: { "Content-Type": "application/json", "Idempotency-Key": key, ...headers },
     body: JSON.stringify({ textEn })
   });
 }
@@ -101,6 +120,12 @@ await check("dev realm issues a token with the scope claims, for each dev user",
   }
 });
 
+await check("the smoke users sign in (K-02: every request carries a token)", async () => {
+  tokens.mpcsAdmin = await signIn("mpcs-admin");
+  tokens.fedOfficer = await signIn("fed-officer");
+  tokens.fedAdmin = await signIn("fed-admin");
+});
+
 await check("an entity sees its own seeded greetings", async () => {
   const greetings = await json(await fetch(GREETINGS, { headers: scope(MPCS) }));
   const texts = greetings.map((g) => g.textEn);
@@ -108,13 +133,14 @@ await check("an entity sees its own seeded greetings", async () => {
   expect(!texts.includes("Welcome from the Federation"), "the MPCS can see the Federation's greeting");
 });
 
-await check("without a scope nothing is visible", async () => {
-  const greetings = await json(await fetch(GREETINGS));
-  expect(Array.isArray(greetings) && greetings.length === 0, `got ${greetings.length} rows`);
+await check("without a token the API refuses and says to sign in", async () => {
+  const response = await fetch(GREETINGS);
+  const problem = await json(response);
+  expect(response.status === 401 && problem.code === "auth.required", `HTTP ${response.status}: ${JSON.stringify(problem)}`);
 });
 
 await check("the federation view sees every entity", async () => {
-  const greetings = await json(await fetch(GREETINGS, { headers: scope(FEDERATION, { "X-Dev-Scope-Class": "FEDERATION_VIEW" }) }));
+  const greetings = await json(await fetch(GREETINGS, { headers: federationView() }));
   const texts = greetings.map((g) => g.textEn);
   expect(texts.includes("Welcome from the society") && texts.includes("Welcome from the Federation"), `got ${JSON.stringify(texts)}`);
 });
