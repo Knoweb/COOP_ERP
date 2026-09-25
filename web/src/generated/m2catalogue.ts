@@ -3,15 +3,425 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/v1/catalogue/skus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List or search SKUs visible in the current scope */
+        get: operations["listSkus"];
+        put?: never;
+        /** Create a SKU as DRAFT in the caller scope */
+        post: operations["createSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        /** Get one SKU visible in the current scope */
+        get: operations["getSku"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update the mutable details of a SKU
+         * @description Owner updates LOCAL/DRAFT records; Federation updates Federation-owned records including SHARED. Changing base UOM or tracking flags is subject to the inventory no-lots guard.
+         */
+        patch: operations["updateSku"];
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate a DRAFT SKU as LOCAL or SHARED */
+        post: operations["activateSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate a LOCAL or SHARED SKU */
+        post: operations["deactivateSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore an INACTIVE SKU to its prior LOCAL or SHARED state */
+        post: operations["reactivateSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
-    responses: never;
-    parameters: never;
+    schemas: {
+        SkuDetailsRequest: {
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            descriptionEn?: string;
+            descriptionSi?: string;
+            descriptionTa?: string;
+            baseUomCode: string;
+            soldByWeight: boolean;
+            batchTracked: boolean;
+            expiryTracked: boolean;
+            hasPrintedMrp: boolean;
+            expiryWarningDays?: number;
+            /** Format: uuid */
+            taxCategoryId: string;
+            /** @enum {string} */
+            multiMrpPolicy: "AUTO_LOWEST" | "BARCODE_RESOLVED" | "PICKER";
+            /** @enum {string} */
+            originKind: "PURCHASED" | "REPACK_OUTPUT" | "LOCAL_SOURCED";
+            attributes?: {
+                [key: string]: unknown;
+            };
+        };
+        ActivateSkuRequest: {
+            /** @enum {string} */
+            target: "LOCAL" | "SHARED";
+        };
+        ReasonRequest: {
+            reasonCode?: string;
+            reasonText?: string;
+        };
+        SkuResponse: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** @enum {string} */
+            status: "DRAFT" | "LOCAL" | "SHARED" | "INACTIVE";
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            descriptionEn?: string;
+            descriptionSi?: string;
+            descriptionTa?: string;
+            baseUomCode: string;
+            soldByWeight: boolean;
+            batchTracked: boolean;
+            expiryTracked: boolean;
+            hasPrintedMrp: boolean;
+            expiryWarningDays?: number;
+            /** Format: uuid */
+            taxCategoryId: string;
+            multiMrpPolicy: string;
+            originKind: string;
+            attributes?: {
+                [key: string]: unknown;
+            };
+        };
+        SkuPageResponse: {
+            items: components["schemas"]["SkuResponse"][];
+            nextOffset?: number;
+        };
+        FieldProblem: {
+            /** @description The property of the body, or the header, query or path parameter */
+            field: string;
+            /** @description A message id such as request.field.required or request.field.too_long */
+            code: string;
+            /** @description The message in the caller's language */
+            message?: string;
+            /** @description What the message mentions (min or max) */
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        Problem: {
+            status: number;
+            /** @description A message id such as hello.greeting.duplicate */
+            code: string;
+            /** @description The message in the caller's language */
+            title?: string;
+            params?: {
+                [key: string]: unknown;
+            };
+            /** @description Only with code request.invalid: one entry for every part of the request that does not match the slice (a required field left out, a text too long ...). */
+            errors?: components["schemas"]["FieldProblem"][];
+        };
+    };
+    responses: {
+        /** @description 400. The request itself is wrong: idempotency.key_required, scope.required, scope.invalid, request.malformed, or request.invalid, which lists in `errors` every field that does not match the slice. The kernel checks the slice's constraints (required, minLength, maximum ...) for every module; a module writes no code for them. */
+        RequestProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 422. A business rule was broken; `code` says which one */
+        RuleBroken: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
+    parameters: {
+        /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+        IdempotencyKey: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    listSkus: {
+        parameters: {
+            query?: {
+                /** @description Search SKU code and English, Sinhala and Tamil names */
+                q?: string;
+                /** @description Display/sort language */
+                lang?: "en" | "si" | "ta";
+                status?: "DRAFT" | "LOCAL" | "SHARED" | "INACTIVE";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Visible SKU page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuPageResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    createSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkuDetailsRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU created as DRAFT */
+            201: {
+                headers: {
+                    /** @description Address of the created SKU */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getSku: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SKU */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkuResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description SKU is not visible or does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkuDetailsRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    activateSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivateSkuRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    deactivateSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU deactivated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reactivateSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU reactivated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+}

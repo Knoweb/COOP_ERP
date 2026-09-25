@@ -241,5 +241,18 @@
   "sync.sequence_gap": "මෙම කාණ්ඩයට පෙර සිදුවීම් අතුරුදහන්ව ඇත; අපේක්ෂිත අනුක්‍රමයේ සිට නැවත යවන්න",
   "sync.snapshot.unavailable": "ස්නැප්ෂොට් තවම සපයනු නොලැබේ",
   "token.invalid": "ඔබගේ පිවිසුම වලංගු නැත හෝ කල් ඉකුත් වී ඇත; නැවත පිවිසෙන්න",
-  "request.forbidden": "මෙම ක්රියාව සිදු කිරීමට ඔබට අවසර නොමැත."
+  "request.forbidden": "මෙම ක්රියාව සිදු කිරීමට ඔබට අවසර නොමැත.",
+  "m2.sku.code_generation_failed": "අද්විතීය SKU කේතයක් ජනනය කළ නොහැකි විය",
+  "m2.sku.inactive": "අක්‍රිය SKU එකක් යාවත්කාලීන කළ නොහැක",
+  "m2.sku.shared_translations_required": "හවුල් SKU සඳහා ඉංග්‍රීසි, සිංහල සහ දෙමළ නම් අවශ්‍ය වේ",
+  "m2.sku.transition_invalid": "මෙම SKU තත්ත්ව මාරුවට අවසර නැත",
+  "m2.sku.prior_status_missing": "ප්‍රතිස්ථාපනය කිරීමට SKU එකට වලංගු පෙර තත්ත්වයක් නොමැත",
+  "m2.sku.weight_requires_kg": "බර අනුව අලෙවි කරන SKU එකක මූලික ඒකකය KG විය යුතුය",
+  "m2.sku.expiry_requires_batch": "කල් ඉකුත් වීම නිරීක්ෂණයට බැච් නිරීක්ෂණය අවශ්‍ය වේ",
+  "m2.sku.not_found": "වත්මන් පරාසය තුළ SKU එක හමු නොවීය",
+  "m2.sku.owner_mismatch": "SKU එක වෙනත් හිමිකාර ආයතනයකට අයත් වේ",
+  "m2.sku.reason_required": "මෙම SKU තත්ත්ව වෙනස සඳහා හේතුවක් අවශ්‍ය වේ",
+  "m2.sku.base_uom_unknown": "තෝරාගත් මූලික ඒකකය අර්ථ දක්වා නොමැත",
+  "m2.sku.tax_category_unknown": "තෝරාගත් බදු කාණ්ඩය අර්ථ දක්වා නොමැත",
+  "m2.sku.attributes_too_large": "SKU ගුණාංග සඳහා අවසර දී ඇති ප්‍රමාණය ඉක්මවා ඇත"
 }

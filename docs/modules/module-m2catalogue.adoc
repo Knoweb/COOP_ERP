@@ -2,9 +2,19 @@
 |===
 |Base package
 |`lk.coopfed.knoweb.m2catalogue`
+|Spring components
+|_Services_
+
+* `l.c.k.m.query.CatalogueQueries` (via `l.c.k.m.internal.queries.CatalogueQueriesImpl`)
+
+_Others_
+
+* `l.c.k.m.api.InventoryLotQuery` (via `l.c.k.m.internal.integration.NoInventoryLotQuery`)
 |Bean references
 |* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===
