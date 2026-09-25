@@ -23,3 +23,23 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Responsible officer appointment
+
+  - code: ROLE_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Role created, its permissions changed or retired
+
+  - code: ROLE_ASSIGNED
+    severity: INFO
+    offline_capturable: false
+    description_en: Role assigned to a user
+
+  - code: ROLE_REVOKED
+    severity: INFO
+    offline_capturable: false
+    description_en: Role assignment revoked
+
+  - code: SOD_PAIR_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Separation-of-duties pair added, changed or removed
