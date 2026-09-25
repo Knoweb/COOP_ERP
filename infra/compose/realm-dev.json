@@ -93,6 +93,8 @@
   ],
   "users": [
     {
+      "id": "0190f000-0000-7000-8000-0000000000a1",
+
       "username": "fed-admin",
       "enabled": true,
       "emailVerified": true,
@@ -108,6 +110,8 @@
       "realmRoles": ["fed-admin"]
     },
     {
+      "id": "0190f000-0000-7000-8000-0000000000a2",
+
       "username": "fed-officer",
       "enabled": true,
       "emailVerified": true,
@@ -123,6 +127,8 @@
       "realmRoles": ["fed-admin"]
     },
     {
+      "id": "0190f000-0000-7000-8000-0000000000a3",
+
       "username": "mpcs-admin",
       "enabled": true,
       "emailVerified": true,
@@ -138,6 +144,8 @@
       "realmRoles": ["mpcs-admin"]
     },
     {
+      "id": "0190f000-0000-7000-8000-0000000000a4",
+
       "username": "cashier",
       "enabled": true,
       "emailVerified": true,

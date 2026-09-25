@@ -104,5 +104,6 @@
   "series.prefix_too_long": "The series prefix is longer than 24 characters",
   "series.scope_invalid": "The series scope does not fit the document type or the ids given",
   "series.type_unknown": "The document type of the series is not in the registry",
-  "sod.same_person": "The person who made the request cannot approve it"
+  "sod.same_person": "The person who made the request cannot approve it",
+  "token.invalid": "Your sign-in is not valid or has expired; sign in again"
 }
