@@ -103,6 +103,16 @@ permissions:
     module: "m1party"
     description_en: "View device status"
     scope: "ENTITY"
+  - code: "sys.device.enrol"
+    module: "m1party"
+    description_en: "Enrol devices and assign them to till positions"
+    scope: "ENTITY"
+    requires_mfa: true
+  - code: "sys.device.suspend"
+    module: "m1party"
+    description_en: "Suspend, reinstate and retire devices"
+    scope: "ENTITY"
+    requires_mfa: true
   - code: "prc.price_list.read"
     module: "m3pricing"
     description_en: "View price lists"

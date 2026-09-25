@@ -105,3 +105,31 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Credit limit of a trading relationship changed
+  - code: DEVICE_ENROLLED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device enrolled at a location
+  - code: DEVICE_ASSIGNED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device assigned to a free till position
+  - code: DEVICE_POSITION_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till position taken over by another device, counters transferred
+  - code: DEVICE_OUTBOX_LOSS_RECORDED
+    severity: ALERT
+    offline_capturable: false
+    description_en: Outbox of a replaced device recorded as lost; its unsent numbers are a documented gap
+  - code: DEVICE_SUSPENDED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Device suspended and revoked
+  - code: DEVICE_REINSTATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device reinstated after recovery
+  - code: DEVICE_RETIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device retired and revoked
