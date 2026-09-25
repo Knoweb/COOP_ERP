@@ -1,5 +1,12 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -11,7 +18,12 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import lk.coopfed.knoweb.kernel.internal.i18n.IcuMessages;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -25,18 +37,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 /**
  * Every constraint a slice can express comes out as a message id, by each of the three routes
  * Spring reports a violation. No database and no application context: the hello integration
@@ -44,19 +44,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class RequestValidationHandlerTest {
 
-    private final Messages messages = new JsonMessages(new ObjectMapper());
+    private final Messages messages = new IcuMessages(new ObjectMapper());
     private final RequestValidationHandler handler =
             new RequestValidationHandler(new ProblemResponses(messages), messages);
-    private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new OrdersController())
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new OrdersController())
             .setControllerAdvice(handler)
             .build();
 
     @Test
     void everyKindOfConstraintInABodyBecomesItsMessageId() throws Exception {
-        String body = """
+        String body =
+                """
                 { "quantity": 0, "discount": 101, "price": "0.00", "code": "abc", "tags": ["one"],
-                  "note": "%s" }""".formatted("x".repeat(11));
+                  "note": "%s" }"""
+                        .formatted("x".repeat(11));
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
@@ -109,14 +110,17 @@ class RequestValidationHandlerTest {
         Set<ConstraintViolation<OrdersController>> violations = Validation.buildDefaultValidatorFactory()
                 .getValidator()
                 .forExecutables()
-                .validateParameters(controller, OrdersController.class.getMethod("list", int.class), new Object[]{500});
+                .validateParameters(
+                        controller, OrdersController.class.getMethod("list", int.class), new Object[] {500});
 
         ProblemDetail problem =
                 handler.parameters(new ConstraintViolationException(violations), new MockHttpServletRequest());
 
         assertThat(problem.getStatus()).isEqualTo(400);
         assertThat(problem.getProperties()).containsEntry("code", "request.invalid");
-        assertThat(problem.getProperties().get("errors")).asInstanceOf(InstanceOfAssertFactories.LIST).singleElement()
+        assertThat(problem.getProperties().get("errors"))
+                .asInstanceOf(InstanceOfAssertFactories.LIST)
+                .singleElement()
                 .isEqualTo(Map.of(
                         "field", "pageSize",
                         "code", "request.field.too_large",
@@ -143,24 +147,22 @@ class RequestValidationHandlerTest {
 
     // What the generator writes for a slice, by hand: every keyword a schema can carry.
     record OrderRequest(
-            @NotNull String customer,                       // required
-            @Min(1) Integer quantity,                       // minimum
-            @Max(100) Integer discount,                     // maximum
-            @DecimalMin("0.01") BigDecimal price,           // minimum on a number
-            @Pattern(regexp = "[A-Z]{3}") String code,      // pattern
-            @Size(min = 2) List<String> tags,               // minItems
-            @Size(max = 10) String note) {                  // maxLength
+            @NotNull String customer, // required
+            @Min(1) Integer quantity, // minimum
+            @Max(100) Integer discount, // maximum
+            @DecimalMin("0.01") BigDecimal price, // minimum on a number
+            @Pattern(regexp = "[A-Z]{3}") String code, // pattern
+            @Size(min = 2) List<String> tags, // minItems
+            @Size(max = 10) String note) { // maxLength
     }
 
     @RestController
     static class OrdersController {
 
         @PostMapping("/orders")
-        public void create(@Valid @RequestBody OrderRequest request) {
-        }
+        public void create(@Valid @RequestBody OrderRequest request) {}
 
         @GetMapping("/orders")
-        public void list(@RequestParam("page-size") @Max(100) int pageSize) {
-        }
+        public void list(@RequestParam("page-size") @Max(100) int pageSize) {}
     }
 }

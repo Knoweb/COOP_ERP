@@ -13,10 +13,13 @@
 * `l.c.k.k.api.DocumentTypes` (via `l.c.k.k.internal.document.JdbcDocumentTypes`)
 * `l.c.k.k.api.NumberingService` (via `l.c.k.k.internal.document.JdbcNumberingService`)
 * `l.c.k.k.api.EventPublisher` (via `l.c.k.k.internal.event.OutboxWriter`)
+* `l.c.k.k.api.Formats` (via `l.c.k.k.internal.i18n.IcuFormats`)
+* `l.c.k.k.api.Messages` (via `l.c.k.k.internal.i18n.IcuMessages`)
 * `l.c.k.k.api.IdempotencyStore` (via `l.c.k.k.internal.idempotency.JdbcIdempotencyStore`)
+* `l.c.k.k.api.Notifications` (via `l.c.k.k.internal.notification.NotificationService`)
+* `l.c.k.k.api.PermissionResolver` (via `l.c.k.k.internal.security.JdbcPermissionResolver`)
+* `l.c.k.k.api.Sod` (via `l.c.k.k.internal.security.JdbcSod`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.stub.DevCurrentScope`)
-* `l.c.k.k.api.Messages` (via `l.c.k.k.internal.stub.JsonMessages`)
-* `l.c.k.k.api.SyncStatus` (via `l.c.k.k.internal.sync.NoGatewaySyncStatus`)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 * `org.springframework.boot.context.event.ApplicationReadyEvent` 

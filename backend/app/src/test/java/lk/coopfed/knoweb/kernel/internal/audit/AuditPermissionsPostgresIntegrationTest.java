@@ -108,7 +108,8 @@ class AuditPermissionsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID subject = UUID.randomUUID();
         UUID correlation = UUID.randomUUID();
 
-        inScope(ENTITY_A, "FEDERATION_VIEW", () -> {
+        // Written by the owner in its own scope: the read-only classes write nothing (CR-17A-3).
+        inScope(ENTITY_A, "OWN", () -> {
             jdbc.update(
                     """
                             INSERT INTO kernel.audit_event (

@@ -2,7 +2,12 @@ package lk.coopfed.knoweb.kernel.internal;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Map;
+import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
+import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -11,6 +16,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -26,12 +32,30 @@ public class CommandInterceptor {
 
     private static final int COMMAND_SUCCESS = 200;
 
+    /** How fresh a second factor must be for a permission that asks for one (doc 19 DR-7 refines it). */
+    static final Duration MFA_FRESHNESS = Duration.ofMinutes(10);
+
     private final IdempotencyStore idempotency;
     private final ObjectMapper mapper;
+    private final PermissionResolver permissions;
+    private final Clock clock;
+    private final boolean enforcePermissions;
 
-    public CommandInterceptor(IdempotencyStore idempotency, ObjectMapper mapper) {
+    public CommandInterceptor(
+            IdempotencyStore idempotency,
+            ObjectMapper mapper,
+            PermissionResolver permissions,
+            Clock clock,
+            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
         this.idempotency = idempotency;
         this.mapper = mapper;
+        this.permissions = permissions;
+        this.clock = clock;
+        this.enforcePermissions = enforcePermissions;
+        if (!enforcePermissions) {
+            log.warn("Permissions are resolved but NOT enforced (coop-erp.security.enforce-permissions=false):"
+                    + " the development stub takes the user from a header; K-02 turns enforcement on");
+        }
     }
 
     @Around("@within(lk.coopfed.knoweb.kernel.api.CommandHandler)")
@@ -66,6 +90,9 @@ public class CommandInterceptor {
             throw new IllegalStateException("HTTP commands need an authenticated user for idempotency");
         }
 
+        // 19A section 3, in this order: permission -> MFA -> idempotency -> handler.
+        checkPermission(call, scope);
+
         IdempotencyStore.Key key = new IdempotencyStore.Key(request.key(), scope.userId(), request.requestHash());
 
         IdempotencyStore.Claim claim = idempotency.claim(key);
@@ -81,6 +108,45 @@ public class CommandInterceptor {
         idempotency.complete(key, new IdempotencyStore.StoredResult(COMMAND_SUCCESS, resultBody));
 
         return result;
+    }
+
+    /**
+     * The handler's permission (its @CommandHandler) against the caller's roles in the scope,
+     * then the second factor where the catalogue asks for one. Refuses only when enforcement is
+     * on; until then a would-be refusal is logged, so the gap between the roles and the handlers
+     * shows before K-02 makes it bite.
+     */
+    private void checkPermission(ProceedingJoinPoint call, ScopeContext scope) {
+        Class<?> type = call.getSignature().getDeclaringType();
+        CommandHandler handler = type.getAnnotation(CommandHandler.class);
+        String permission = handler == null ? null : handler.permission();
+        if (permission == null || permission.isBlank()) {
+            return;
+        }
+
+        boolean allowed = permissions.allows(scope, permission);
+        boolean mfaFresh = !permissions.requiresMfa(permission)
+                || (scope.mfaAt() != null
+                        && !scope.mfaAt().isBefore(clock.instant().minus(MFA_FRESHNESS)));
+
+        if (!enforcePermissions) {
+            if (!allowed || !mfaFresh) {
+                log.info(
+                        "Would refuse {} for user {} at entity {}: allowed={}, mfaFresh={} (not enforced)",
+                        permission,
+                        scope.userId(),
+                        scope.entityId(),
+                        allowed,
+                        mfaFresh);
+            }
+            return;
+        }
+        if (!allowed) {
+            throw new ProblemException("permission.denied", Map.of("permission", permission));
+        }
+        if (!mfaFresh) {
+            throw new ProblemException("mfa.required", Map.of("permission", permission));
+        }
     }
 
     private Object deserialize(ProceedingJoinPoint call, String body) throws Exception {

@@ -60,3 +60,8 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: Attachment upload missing or its hash did not match
+  # K-10: notifications.
+  - code: NOTIFICATION_FAILED
+    severity: ALERT
+    offline_capturable: false
+    description_en: Notification could not be delivered after every attempt
