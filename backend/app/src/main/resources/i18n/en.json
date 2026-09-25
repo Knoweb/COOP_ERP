@@ -1,4 +1,7 @@
 {
+  "attachment.content_type_invalid": "The file type is not one that can be attached",
+  "attachment.document_not_found": "The document for the attachment could not be found",
+  "attachment.hash_invalid": "The file hash must be 64 hexadecimal characters",
   "bulk.file.empty": "The file has no rows to register",
   "bulk.file.header_invalid": "The file is missing a required column: {0}",
   "bulk.file.too_many_rows": "The file has {0} rows; at most {1} can be registered at once",

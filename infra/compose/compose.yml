@@ -186,6 +186,10 @@ services:
     environment:
       COOP_ERP_ROLE: web,worker
       COOP_ERP_SYSTEM_ENTITY_ID: 0190f000-0000-7000-8000-000000000001
+      OBJECT_STORE_ENDPOINT: http://minio:9000
+      OBJECT_STORE_PUBLIC_ENDPOINT: http://localhost:9000
+      OBJECT_STORE_ACCESS_KEY: ${MINIO_ROOT_USER:-coopminio}
+      OBJECT_STORE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-coopminio-dev}
       SPRING_PROFILES_ACTIVE: web,worker
       # prepareThreshold=0: server-side prepared statements do not survive transaction pooling.
       DB_URL: jdbc:postgresql://pgbouncer:6432/${POSTGRES_DB:-coop_erp}?prepareThreshold=0
