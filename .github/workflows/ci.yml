@@ -34,9 +34,9 @@
 # How the jobs are ordered, and why. build-verify-test, till, scaffolder, stack-smoke and
 # secret-scan start together: none of them needs another's output (each compiles what it
 # needs itself), and a pull request is answered in the time of the longest one instead of the
-# sum of two. Only package waits for build-verify-test, so that the artefacts of a run are
-# never built from a commit whose tests failed. The price is paid only by a red run, where the
-# other jobs now finish instead of being skipped.
+# sum of two. Only package, and only on main, waits for build-verify-test, so that the
+# artefacts of main are never built from a commit whose tests failed. The price is paid only
+# by a red run, where the other jobs now finish instead of being skipped.
 
 name: CI
 
@@ -86,15 +86,18 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Set up pnpm
-        run: |
-          corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install web dependencies
         working-directory: web
@@ -127,7 +130,7 @@ jobs:
       # The committed web clients and module diagrams must be what the slices and the code
       # generate today.
       - name: make check-generated
-        run: make check-generated
+        run: make check-generated ARCH_TESTS=:app:test
 
       - name: Web build
         working-directory: web
@@ -146,16 +149,34 @@ jobs:
   # The till (Android) part of "test" and "package": its JVM tests and the debug APK. Its own
   # job, because it shares nothing with the backend build and took fifty seconds of the
   # critical path when it ran after it.
+  # On a pull request that touches neither till/ nor the shared engine the steps are skipped
+  # and the job still reports success, so the check stays green and required. The filter is
+  # inside the job, not on the workflow, for that reason. Push to main and the nightly run build
+  # it always.
   till:
     name: Till tests and APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read      # dorny/paths-filter lists the changed files of the pull request
     timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Did the till change?
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            till:
+              - 'till/**'
+              - 'backend/shared-engine/**'
+              - '.github/workflows/ci.yml'
+
       - name: Set up Java 21
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -163,20 +184,24 @@ jobs:
           cache: gradle
 
       - name: Install Android SDK packages
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Till JVM tests
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         working-directory: till
         run: ./gradlew :core:test :peripherals:test :sync:test
 
       - name: Till APK (signed with the debug key)
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         working-directory: till
         run: ./gradlew :app:assembleDebug
 
       - name: Upload the till APK
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: till-debug-apk
@@ -185,7 +210,7 @@ jobs:
           retention-days: 7
 
       - name: Upload test reports when something failed
-        if: failure()
+        if: failure() && (github.event_name != 'pull_request' || steps.changes.outputs.till == 'true')
         uses: actions/upload-artifact@v7
         with:
           name: till-test-reports
@@ -211,15 +236,18 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Set up pnpm
-        run: |
-          corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install web dependencies
         working-directory: web
@@ -251,16 +279,19 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      # make e2e installs the web dependencies with pnpm, so the runner needs it.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      # make e2e installs the web dependencies with pnpm, so the runner needs it.
-      - name: Set up pnpm
-        run: |
-          corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       # BEFORE make up-2, and that order matters. The web container mounts web/ and keeps its
       # node_modules in a named volume; to mount that volume inside the bind mount Docker
@@ -311,10 +342,15 @@ jobs:
         if: always()
         run: make down
 
+  # On a pull request nothing is published, so package starts with the other jobs and the run
+  # answers in the time of its longest job. On main it still waits for a green
+  # build-verify-test, so that no artefact of main is built from a commit whose tests failed.
+  # One job with a condition rather than two jobs, so that the check keeps its name "Package".
   package:
     name: Package
     runs-on: ubuntu-latest
     needs: build-verify-test
+    if: always() && (github.event_name == 'pull_request' || needs.build-verify-test.result == 'success')
     timeout-minutes: 30
 
     steps:
@@ -328,18 +364,23 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
-      - name: Set up pnpm
-        run: |
-          corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
-      # The same image `make up` runs, built by Jib.
+      # The same image `make up` runs, built by Jib. Only on main, where it is kept: on a pull
+      # request stack-smoke builds the same image with `make up-2` and runs it, which proves more.
       - name: Backend image (make image)
+        if: github.event_name != 'pull_request'
         run: make image
 
       - name: Shared engine artefact and software bill of materials
@@ -376,8 +417,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      # On every run the image is built, which proves it packages. It is kept as an artefact
-      # only for main: a few hundred megabytes per pull request push would be waste.
+      # Kept as an artefact only for main: a few hundred megabytes per pull request push would be
+      # waste.
       - name: Save the backend image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: docker save coop-erp/backend:dev | gzip > backend-image.tar.gz
@@ -411,16 +452,19 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # make test also runs the web client's lint and tests, which need pnpm on the host.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      # make test also runs the web client's lint and tests, which need pnpm on the host.
-      - name: Set up pnpm
-        run: |
-          corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: make reset, make up (the fifteen-minute start)
         run: |
@@ -432,6 +476,14 @@ jobs:
 
       - name: make test
         run: make test
+
+      - name: make down (before the scaffolder proof)
+        run: make down
+
+      # The pull request runs the narrowed proof (the copy's own tests and the rules every
+      # module must keep); the whole unit and integration suite on the copy runs here.
+      - name: make test-scaffold, whole suite
+        run: make test-scaffold SCAFFOLD_TESTS=":app:test :app:integrationTest"
 
       - name: Container logs when something failed
         if: failure()

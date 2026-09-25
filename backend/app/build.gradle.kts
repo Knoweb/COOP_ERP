@@ -298,5 +298,9 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     // A time bug that depends on the default zone then shows up here, not in production:
     // the first hello migration stored instants five and a half hours off only under this zone.
     systemProperty("user.timezone", "Asia/Colombo")
+    // Two JVMs share the classes. Each starts its own PostgreSQL container (the static one of
+    // PostgresIntegrationTest is per JVM), and every other container maps a random port, so
+    // the forks share no state. Two databases at max_connections=400 fit the 7 GB runner.
+    maxParallelForks = 2
     shouldRunAfter(tasks.test)
 }
