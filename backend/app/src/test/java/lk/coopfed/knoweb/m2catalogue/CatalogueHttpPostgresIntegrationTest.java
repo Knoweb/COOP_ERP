@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,14 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 MPCS);
 
         kernel.reset();
+    }
+
+    @AfterEach
+    void removeTestTaxCategory() {
+        JdbcTemplate admin = superuserJdbc();
+        admin.execute("truncate table catalogue.sku cascade");
+        admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
 
     @Test

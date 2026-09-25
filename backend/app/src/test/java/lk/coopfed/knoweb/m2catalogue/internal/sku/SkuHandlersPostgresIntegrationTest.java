@@ -22,6 +22,7 @@ import lk.coopfed.knoweb.m2catalogue.api.SkuReactivated;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,6 +92,14 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 FEDERATION);
 
         kernel.reset();
+    }
+
+    @AfterEach
+    void removeTestTaxCategory() {
+        JdbcTemplate admin = superuserJdbc();
+        admin.execute("truncate table catalogue.sku cascade");
+        admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
 
     @Test

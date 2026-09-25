@@ -26,6 +26,7 @@ paths:
       tags: [Catalogue]
       operationId: listSkus
       summary: List or search SKUs visible in the current scope
+      x-permission: cat.sku.view
       parameters:
         - in: query
           name: q
@@ -136,6 +137,7 @@ paths:
       tags: [Catalogue]
       operationId: getSku
       summary: Get one SKU visible in the current scope
+      x-permission: cat.sku.view
 
       responses:
         '200':
