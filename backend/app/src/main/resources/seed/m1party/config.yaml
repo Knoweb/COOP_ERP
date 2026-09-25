@@ -5,5 +5,7 @@ config:
     value: "true"
   - key: "m1.bulk.max_rows"
     value: "500"
+  - key: "m1.relationship.credit_limit_mfa_max_age"
+    value: "PT10M"
   - key: "m1.external_grant.max_months"
     value: "12"
