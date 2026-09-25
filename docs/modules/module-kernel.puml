@@ -1,0 +1,19 @@
+@startuml
+set separator none
+title Platform Kernel
+
+top to bottom direction
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
+  Component(CoopErpApplication.CoopErpApplication.Engine, "Engine", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.PlatformKernel, "Platform Kernel", $techn="Module", $descr="", $tags="", $link="")
+}
+
+Rel(CoopErpApplication.CoopErpApplication.PlatformKernel, CoopErpApplication.CoopErpApplication.Engine, "depends on", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+@enduml

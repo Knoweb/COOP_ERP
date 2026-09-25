@@ -1,0 +1,25 @@
+@startuml
+set separator none
+title CoopErpApplication
+
+top to bottom direction
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
+  Component(CoopErpApplication.CoopErpApplication.Engine, "Engine", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.PlatformKernel, "Platform Kernel", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.Hellotemplatemodule, "Hello (template module)", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "M1 Party, Tenancy & Security", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.M3PricingRules, "M3 Pricing & Rules", $techn="Module", $descr="", $tags="", $link="")
+}
+
+Rel(CoopErpApplication.CoopErpApplication.Hellotemplatemodule, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M3PricingRules, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.PlatformKernel, CoopErpApplication.CoopErpApplication.Engine, "depends on", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+@enduml

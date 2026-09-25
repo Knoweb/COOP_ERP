@@ -1,0 +1,7 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`lk.coopfed.knoweb.config`
+|Spring components
+|* `l.c.k.c.FlywayConfig`
+|===

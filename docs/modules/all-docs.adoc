@@ -1,0 +1,27 @@
+== CoopErpApplication
+plantuml::components.puml[,,format=svg]
+
+== Config
+plantuml::module-config.puml[,,format=svg]
+include::module-config.adoc[]
+
+== Engine
+plantuml::module-engine.puml[,,format=svg]
+include::module-engine.adoc[]
+
+== Platform Kernel
+plantuml::module-kernel.puml[,,format=svg]
+include::module-kernel.adoc[]
+
+== Hello (template module)
+plantuml::module-hello.puml[,,format=svg]
+include::module-hello.adoc[]
+
+== M1 Party, Tenancy & Security
+plantuml::module-m1party.puml[,,format=svg]
+include::module-m1party.adoc[]
+
+== M3 Pricing & Rules
+plantuml::module-m3pricing.puml[,,format=svg]
+include::module-m3pricing.adoc[]
+

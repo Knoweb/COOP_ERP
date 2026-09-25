@@ -2207,8 +2207,6 @@ components:
 
   parameters:
 
-  parameters:
-
     LocationId:
       in: path
       name: locationId
