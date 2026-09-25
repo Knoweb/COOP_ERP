@@ -17,4 +17,10 @@ paths = [
 # credential. The constant was renamed; the commit stays in the history.
 regexes = [
   '''m1\.bulk\.max_rows''',
+  # The alphabet a one-time password is drawn from (KeycloakAdminClient, K-02, 25 September
+  # 2026): every unambiguous letter and digit, once, in order. The rule read a constant named
+  # PASSWORD_* beside that long string as a credential; it is the set of characters, not one.
+  # The pipeline fetches every branch, so the commit on the K-02 branch failed the scan of
+  # main. The constant was rewritten; the commit stays in the history.
+  '''ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789''',
 ]
