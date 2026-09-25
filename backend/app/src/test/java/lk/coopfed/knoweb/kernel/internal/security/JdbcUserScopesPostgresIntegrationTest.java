@@ -49,16 +49,18 @@ class JdbcUserScopesPostgresIntegrationTest extends PostgresIntegrationTest {
                 ENTITY,
                 SHOP);
         admin.update(
-                "insert into security.external_grant (grant_id, grantee_user_id, scope_entity_ids, valid_from, valid_until, reason, status)"
-                        + " values (?, ?, ARRAY[?]::uuid[], now() - interval '1 day', now() + interval '1 day', 'audit', 'ACTIVE')",
+                "insert into security.external_grant (grant_id, grantee_user_id, scope_entity_ids, valid_from, valid_until, reason, status, owner_entity_id)"
+                        + " values (?, ?, ARRAY[?]::uuid[], now() - interval '1 day', now() + interval '1 day', 'audit', 'ACTIVE', ?)",
                 UUID.randomUUID(),
                 USER,
-                GRANTED);
+                GRANTED,
+                ENTITY);
         admin.update(
-                "insert into security.external_grant (grant_id, grantee_user_id, scope_entity_ids, valid_from, valid_until, reason, status)"
-                        + " values (?, ?, ARRAY[?]::uuid[], now() - interval '3 day', now() - interval '1 day', 'ended', 'EXPIRED')",
+                "insert into security.external_grant (grant_id, grantee_user_id, scope_entity_ids, valid_from, valid_until, reason, status, owner_entity_id)"
+                        + " values (?, ?, ARRAY[?]::uuid[], now() - interval '3 day', now() - interval '1 day', 'ended', 'EXPIRED', ?)",
                 UUID.randomUUID(),
                 USER,
+                ENTITY,
                 ENTITY);
         scopes.invalidateAll();
     }
