@@ -28,6 +28,10 @@ permissions:
     description_en: "Manage user credentials and status"
     scope: "ENTITY"
     requires_mfa: true
+  - code: "gov.user.view"
+    module: "m1party"
+    description_en: "View the users of the entity or the shop"
+    scope: "ENTITY"
   - code: "gov.role.manage"
     module: "m1party"
     description_en: "Manage roles and assignments"

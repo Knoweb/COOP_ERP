@@ -23,3 +23,28 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Responsible officer appointment
+
+  - code: USER_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: User created and login opened at the identity provider
+
+  - code: USER_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: User details changed
+
+  - code: USER_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: User activated by the first credential or unlocked by a new one
+
+  - code: USER_CREDENTIAL_RESET
+    severity: INFO
+    offline_capturable: false
+    description_en: User credential reset (temporary password, second factor or till PIN)
+
+  - code: USER_DEACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: User deactivated, login disabled and sessions ended

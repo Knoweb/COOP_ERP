@@ -107,6 +107,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/security/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the users the caller's scope may see
+         * @description An entity-wide scope sees every user of its entity; a shop-scoped one the users that work at that shop (an assignment there or an entity-wide one), never a sibling shop's operators. Never a PIN or its hash.
+         */
+        get: operations["listUsers"];
+        put?: never;
+        /**
+         * Create a user of the caller's entity and its login at the identity provider
+         * @description The user starts PENDING with no credential; issue the first one with reset-credential. 422 codes: m1.user.entity_scope_required, m1.user.home_entity_out_of_scope, m1.user.kind_invalid, m1.user.external_federation_only, m1.user.language_invalid, m1.user.username_invalid, m1.user.username_taken, m1.user.display_name_required, m1.user.succeeds_invalid, identity.username_taken, identity.unavailable.
+         */
+        post: operations["createUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one user visible in the caller's scope */
+        get: operations["getUser"];
+        /**
+         * Change a user's name shown, language and kind
+         * @description 422 codes: m1.user.not_found, m1.user.deactivated, m1.user.display_name_required, m1.user.language_invalid, m1.user.kind_invalid, m1.user.kind_change_invalid.
+         */
+        put: operations["updateUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users/{userId}/reset-credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a temporary password, reset the second factor, or set the till PIN
+         * @description PASSWORD answers the one-time password in temporaryPassword (delivery RETURNED) unless a notification rule delivered it (NOTIFIED); a replay of the same request does not repeat it. PIN needs pin, checked against the entity's PIN policy. A PENDING or LOCKED user becomes ACTIVE with a new password or PIN. 422 codes: m1.user.not_found, m1.user.deactivated, m1.user.credential_invalid, m1.user.password_not_applicable, m1.user.no_login, m1.user.pin_not_applicable, m1.user.pin_required, m1.user.pin_digits_only, m1.user.pin_length, m1.user.pin_reused, identity.scope, identity.unavailable.
+         */
+        post: operations["resetCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users/{userId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate a user for good, disable the login and end its sessions
+         * @description 422 codes: m1.user.not_found, m1.user.deactivated, m1.user.reason_required, m1.user.last_user_manager, m1.user.responsible_officer, identity.scope, identity.unavailable.
+         */
+        post: operations["deactivateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/party/bulk-register": {
         parameters: {
             query?: never;
@@ -179,6 +264,81 @@ export interface components {
         };
         EntityPage: {
             items: components["schemas"]["EntityResponse"][];
+            /** Format: uuid */
+            nextCursor?: string | null;
+        };
+        CreateUserRequest: {
+            /**
+             * Format: uuid
+             * @description The caller's entity when left out; no other entity is accepted
+             */
+            homeEntityId?: string | null;
+            /** @description The sign-in name, unique in the federation; stored in lower case */
+            username: string;
+            displayName: string;
+            /** @enum {string} */
+            language: "en" | "si" | "ta";
+            /** @enum {string} */
+            userKind: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+            /**
+             * Format: uuid
+             * @description A deactivated user of the same entity this one succeeds (returning staff)
+             */
+            succeedsUserId?: string | null;
+        };
+        UpdateUserRequest: {
+            displayName: string;
+            /** @enum {string} */
+            language: "en" | "si" | "ta";
+            /** @enum {string} */
+            userKind: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+        };
+        ResetCredentialRequest: {
+            /** @enum {string} */
+            credential: "PASSWORD" | "SECOND_FACTOR" | "PIN";
+            /** @description The new till PIN, with credential PIN only; the entity's policy may narrow the length */
+            pin?: string | null;
+        };
+        UserReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        CredentialResetResponse: {
+            /** Format: uuid */
+            userId: string;
+            /** @enum {string} */
+            credential: "PASSWORD" | "SECOND_FACTOR" | "PIN";
+            /** @enum {string} */
+            status: "PENDING" | "ACTIVE" | "LOCKED" | "DEACTIVATED";
+            /**
+             * @description RETURNED - the temporary password is in this response, this once; NOTIFIED - a notification rule delivered it; NONE - nothing to deliver
+             * @enum {string}
+             */
+            delivery: "NOTIFIED" | "RETURNED" | "NONE";
+            /** @description Only with delivery RETURNED; shown once, never stored by the platform */
+            temporaryPassword?: string | null;
+        };
+        UserResponse: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            homeEntityId: string;
+            username: string;
+            displayName: string;
+            /** @enum {string} */
+            language: "en" | "si" | "ta";
+            /** @enum {string} */
+            userKind: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+            /** @enum {string} */
+            status: "PENDING" | "ACTIVE" | "LOCKED" | "DEACTIVATED";
+            pinSet: boolean;
+            /** Format: date-time */
+            pinChangedAt?: string | null;
+            /** Format: uuid */
+            succeedsUserId?: string | null;
+        };
+        UserPage: {
+            items: components["schemas"]["UserResponse"][];
             /** Format: uuid */
             nextCursor?: string | null;
         };
@@ -456,6 +616,183 @@ export interface operations {
         };
         responses: {
             /** @description Entity reinstated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "ACTIVE" | "LOCKED" | "DEACTIVATED";
+                userKind?: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPage"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    createUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description User created */
+            201: {
+                headers: {
+                    /** @description Address of the created user */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description User does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description User changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    resetCredential: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Credential issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialResetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    deactivateUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description User deactivated */
             204: {
                 headers: {
                     [name: string]: unknown;

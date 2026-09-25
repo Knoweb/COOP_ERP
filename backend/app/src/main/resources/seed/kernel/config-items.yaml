@@ -60,6 +60,68 @@ config_items:
     change_permission: sys.config.manage
     sensitive: true
     module: m1party
+  # The till PIN policy (doc 19 section 2.1 and DR-5; doc 21 section 7): 4 to 6 digits as the
+  # entity sets, 5 attempts then a 15-minute lockout, none of the last 3 again. M1 checks length
+  # and reuse when a PIN is set (M1-07); the till enforces the lockout from its snapshot.
+  - key: security.pin.length_min
+    value_type: INTEGER
+    schema: { minimum: 4, maximum: 6 }
+    description_en: The fewest digits a till PIN may have
+    description_si: මුදල් ලේඛන PIN අංකයක තිබිය යුතු අවම ඉලක්කම් ගණන
+    description_ta: பணப்பெட்டி PIN எண்ணில் இருக்க வேண்டிய குறைந்தபட்ச இலக்கங்கள்
+    default: 4
+    scope_kind: ENTITY
+    change_permission: gov.user.manage
+    sensitive: true
+    till_visible: true
+    module: m1party
+  - key: security.pin.length_max
+    value_type: INTEGER
+    schema: { minimum: 4, maximum: 6 }
+    description_en: The most digits a till PIN may have
+    description_si: මුදල් ලේඛන PIN අංකයක තිබිය හැකි උපරිම ඉලක්කම් ගණන
+    description_ta: பணப்பெட்டி PIN எண்ணில் இருக்கக்கூடிய அதிகபட்ச இலக்கங்கள்
+    default: 6
+    scope_kind: ENTITY
+    change_permission: gov.user.manage
+    sensitive: true
+    till_visible: true
+    module: m1party
+  - key: security.pin.lockout_attempts
+    value_type: INTEGER
+    schema: { minimum: 3, maximum: 10 }
+    description_en: How many wrong PINs in a row lock an operator out of the till
+    description_si: මුදල් ලේඛනයෙන් ක්‍රියාකරුවෙකු අගුලු දැමීමට පෙර ඉඩ දෙන වැරදි PIN උත්සාහ ගණන
+    description_ta: பணப்பெட்டியிலிருந்து இயக்குநரைப் பூட்டுவதற்கு முன் அனுமதிக்கப்படும் தவறான PIN முயற்சிகள்
+    default: 5
+    scope_kind: ENTITY
+    change_permission: gov.user.manage
+    sensitive: true
+    till_visible: true
+    module: m1party
+  - key: security.pin.lockout_duration
+    value_type: DURATION
+    schema: { minimum: "PT1M", maximum: "PT24H" }
+    description_en: How long a till operator stays locked out after too many wrong PINs
+    description_si: වැරදි PIN උත්සාහ වැඩි වූ පසු මුදල් ලේඛන ක්‍රියාකරුවෙකු අගුලු දමා තබන කාලය
+    description_ta: அதிகமான தவறான PIN முயற்சிகளுக்குப் பின் பணப்பெட்டி இயக்குநர் பூட்டப்பட்டிருக்கும் நேரம்
+    default: "PT15M"
+    scope_kind: ENTITY
+    change_permission: gov.user.manage
+    sensitive: true
+    till_visible: true
+    module: m1party
+  - key: security.pin.history_depth
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 10 }
+    description_en: How many of a user's last PINs, the current one included, a new PIN must differ from
+    description_si: නව PIN අංකයක් වෙනස් විය යුතු, වත්මන් එකද ඇතුළුව, පරිශීලකයාගේ අවසන් PIN අංක ගණන
+    description_ta: புதிய PIN வேறுபட வேண்டிய, தற்போதையது உட்பட, பயனரின் கடைசி PIN எண்களின் எண்ணிக்கை
+    default: 3
+    scope_kind: ENTITY
+    change_permission: gov.user.manage
+    sensitive: true
+    module: m1party
   - key: till.idle_lock
     value_type: DURATION
     schema: { minimum: "PT30S", maximum: "PT1H" }

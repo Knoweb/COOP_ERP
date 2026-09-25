@@ -18,6 +18,19 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 8. **The event type** is `party.registered.v1`. Use the names of your guide.
 9. **Screens: tokens only.** In `web/src/modules/m1party` write no hex colour and no px, rem or em literal: every colour, distance and font size is a token of `web/src/design/tokens.css` (`var(--space-2)`, `var(--color-alert-text)`), and `pnpm test` fails on a literal (`web/src/design/moduleStyle.test.ts`). Show an amount of money with `<MoneyDisplay amount={...} />` and a document state with `<StateChip />` (`web/src/shell/components`); never format or add up money in a screen, totals come from the server. Open `/_design` in the running client to see what exists.
 
+## Users and credentials (M1-07)
+
+`internal/user`: `CreateUser`, `UpdateUser`, `ResetCredential`, `DeactivateUser`, all `gov.user.manage` with MFA, all in an entity-wide OWN scope (a shop-scoped session is refused with `m1.user.entity_scope_required`). Paths under `/v1/security/users` in `openapi/m1party.yaml`; `gov.user.view` reads them.
+
+- **The provider** is reached only through `kernel.api.IdentityProviderClient`. CreateUser writes the row PENDING, then creates the login (the platform's user id is its `uid`), then stores the subject on `provider_subject`. DeactivateUser disables the login and ends its sessions.
+- **Credentials**: `ResetCredential` with `credential` PASSWORD (a one-time password from the provider), SECOND_FACTOR (the provider forgets the TOTP) or PIN (the till PIN). A PENDING or LOCKED user becomes ACTIVE with a new password or PIN (`user.activated.v1`). The temporary password goes out by a notification when M9 holds an ACTIVE rule under the key `user.temporary_password` whose audience resolves (`TemporaryPasswordDelivery`); otherwise it is answered once (`delivery: RETURNED`), marked `@JsonIgnore` so the idempotency store never keeps it, and a replay answers without it.
+- **PIN policy** (`PinPolicy`, doc 19 section 2.1 and DR-5): digits only, `security.pin.length_min`/`length_max` (4 to 6, the entity may narrow, never widen), none of the last `security.pin.history_depth` (3). Argon2id through `kernel.api.PinHasher`; `pin_history` keeps the last hashes, newest first. `security.pin.lockout_attempts` and `lockout_duration` are till-visible configuration: the till counts attempts, not the backend.
+- **Deactivation guards**, in order: in scope; not already deactivated; a reason; not the last holder of `gov.user.manage` entity-wide (as ActivateEntity counts them); not the entity's responsible officer. The PIN hash is cleared; assignments are kept.
+- **Row-level security** (`m1security/V0012`): a shop-scoped session reads the users with an assignment at its shop or an entity-wide one, never a sibling shop's operators; an entity-wide session reads all the entity's users.
+- **Events** carry the user's id twice (`appUserId` for the outbox's aggregate id, `userId` for consumers such as the kernel's permission cache) and never a credential.
+
 ## Deviations from the implementation guide
 
-None yet.
+- **M1-07, user events** carry `appUserId` beside `userId` (the outbox skips `userId` when it looks for the aggregate id). `user.updated.v1` is added for the change of details, which 21A does not list.
+- **M1-07, activation**: doc 21 section 4.4 activates a user on "first credential set (provider callback)"; there is no callback, so the platform activates when it issues the first password or PIN.
+- **M1-07, deactivation** also refuses the entity's responsible officer (doc 21 DR-1); "no open till session" waits for M6's query, as in M1-05.
