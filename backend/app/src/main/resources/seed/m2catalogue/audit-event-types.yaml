@@ -1,0 +1,99 @@
+# M2 Catalogue & Batch: the audit event types of the handler specifications (22A section 6,
+# column "Audit"). Loaded by the kernel's AuditEventTypeSeedLoader, which reads every
+# seed/*/audit-event-types.yaml. The guide names no severity; every type is INFO until the
+# review queues of doc 19 say otherwise. Codes are at most 40 characters.
+audit_event_types:
+  - code: SKU_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Catalogue item created as a draft
+
+  - code: SKU_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Catalogue item activated as local
+
+  - code: SKU_SHARED
+    severity: INFO
+    offline_capturable: false
+    description_en: Catalogue item activated as shared
+
+  - code: SKU_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Catalogue item updated
+
+  - code: SKU_PROMOTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Local catalogue item promoted to the shared catalogue
+
+  - code: SKU_MERGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Local catalogue item merged into a shared item
+
+  - code: SKU_DEACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Catalogue item deactivated
+
+  - code: SKU_REACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Catalogue item reactivated
+
+  - code: CONVERSION_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Unit conversion defined for a catalogue item
+
+  - code: BARCODE_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Barcode registered
+
+  - code: BARCODE_RETIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Barcode retired
+
+  - code: BARCODE_LINKED
+    severity: INFO
+    offline_capturable: false
+    description_en: Barcode linked to a batch
+
+  - code: IMAGE_ATTACHED
+    severity: INFO
+    offline_capturable: false
+    description_en: Item image attached
+
+  - code: TAG_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Tag defined
+
+  - code: TAX_RATE_PUBLISHED
+    severity: INFO
+    offline_capturable: false
+    description_en: Tax rate published
+
+  - code: BATCH_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Batch registered
+
+  - code: BATCH_CORRECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Batch corrected by a replacement batch
+
+  - code: SUPPLIER_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Supplier registered
+
+  - code: SUSPECT_RESOLVED
+    severity: INFO
+    offline_capturable: false
+    description_en: Duplicate suspect resolved

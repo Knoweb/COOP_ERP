@@ -1,0 +1,7 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`lk.coopfed.knoweb.m2catalogue`
+|Events listened to
+|* `org.springframework.boot.context.event.ApplicationReadyEvent` 
+|===
