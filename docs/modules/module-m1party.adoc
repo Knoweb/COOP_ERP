@@ -11,6 +11,8 @@
 |* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.NumberingService` (in Platform Kernel)
+* `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
 * `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
 * `l.c.k.k.api.IdentityProviderClient` (in Platform Kernel)
 * `l.c.k.k.api.PinHasher` (in Platform Kernel)

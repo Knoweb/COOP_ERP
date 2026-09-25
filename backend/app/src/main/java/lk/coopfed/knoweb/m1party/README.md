@@ -18,6 +18,15 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 8. **The event type** is `party.registered.v1`. Use the names of your guide.
 9. **Screens: tokens only.** In `web/src/modules/m1party` write no hex colour and no px, rem or em literal: every colour, distance and font size is a token of `web/src/design/tokens.css` (`var(--space-2)`, `var(--color-alert-text)`), and `pnpm test` fails on a literal (`web/src/design/moduleStyle.test.ts`). Show an amount of money with `<MoneyDisplay amount={...} />` and a document state with `<StateChip />` (`web/src/shell/components`); never format or add up money in a screen, totals come from the server. Open `/_design` in the running client to see what exists.
 
+## Locations and till positions (M1-05)
+
+`internal/location`: `Location` and `TillPosition` (JPA), one handler per command, `LocationGuards` (the shared guards), `LocationFacts` (reads the device at a position and whether a shop has an operator), `SeriesHooks` (every call to the kernel's `NumberingService`), `TradingHours` (the JSON of `trading_hours`). Controller `web/LocationsController`, tag `Locations` of the slice.
+
+- A **shop** gets its LOCATION series (GRN, WOF, CNT, RPK, XFR) when it is registered; a warehouse or an office gets none and numbers from the entity's series. Which types are per location or per till is read from the kernel's document type registry, never listed in M1.
+- A **till position** gets its TILL_POSITION series (RCT, CPR) in the same transaction as the row (the "done when" of M1-05). Retiring it closes them; a closed series is never reopened and a position number is never reused.
+- **SetPrimaryTill** moves the counters of the shop's location series to the device at the new primary till, through `NumberingService.holderChange`; with no device there yet (devices are M1-06) nothing moves, and the event says `holderDeviceId: null`. It also registers the shop's location series where they are missing (idempotent), so a shop from a seed gets them.
+- Every command needs an OWN scope; RegisterLocation needs it entity-wide. Row-level security decides everything else: a shop-scoped caller reads, changes and adds positions to its own shop only.
+
 ## Users and credentials (M1-07)
 
 `internal/user`: `CreateUser`, `UpdateUser`, `ResetCredential`, `DeactivateUser`, all `gov.user.manage` with MFA, all in an entity-wide OWN scope (a shop-scoped session is refused with `m1.user.entity_scope_required`). Paths under `/v1/security/users` in `openapi/m1party.yaml`; `gov.user.view` reads them.
@@ -31,6 +40,9 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 
 ## Deviations from the implementation guide
 
+- **Permissions (M1-05).** 21A section 3.3's `prt.location.register`, `prt.location.activate` and `prt.location.primary` (MFA) are added to the catalogue beside the older `prt.location.manage`/`.view`, whose removal is `CR-21A-1` item 1's. UpdateLocation uses `prt.location.register` (21A names no update code); StartOnboarding, MarkDormant, Reactivate and ConfirmLocationConnectivity use `prt.location.activate` (doc 21 names `prt.location.onboard` and `.dormant`, which 21A's catalogue does not have).
+- **Commands 21A does not list by name:** UpdateLocation (the facts of doc 21 section 7: hours, language, size band) and ConfirmLocationConnectivity (the gate of doc 21 section 3.3, "a fact, not a toggle"), both published as `location.updated.v1`, an event doc 21 section 5.3 does not list.
+- **Guards added:** RetireTillPosition refuses the shop's primary till (`m1.position.is_primary`); SetPrimaryTill refuses the position that is already primary (`m1.location.primary_unchanged`). **Guards waiting:** "no open till session" (MarkDormant, RetireTillPosition) waits for M6's query; "device staged" (StartOnboarding, doc 21) waits for M1-06 and doc 31.
 - **M1-07, user events** carry `appUserId` beside `userId` (the outbox skips `userId` when it looks for the aggregate id). `user.updated.v1` is added for the change of details, which 21A does not list.
 - **M1-07, activation**: doc 21 section 4.4 activates a user on "first credential set (provider callback)"; there is no callback, so the platform activates when it issues the first password or PIN.
 - **M1-07, deactivation** also refuses the entity's responsible officer (doc 21 DR-1); "no open till session" waits for M6's query, as in M1-05.

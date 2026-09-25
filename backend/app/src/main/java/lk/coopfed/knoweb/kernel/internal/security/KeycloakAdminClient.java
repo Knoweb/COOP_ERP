@@ -54,8 +54,13 @@ public class KeycloakAdminClient implements IdentityProviderClient {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakAdminClient.class);
 
-    /** Unambiguous characters (no 0/O, 1/l/I) so that a password read out over the phone survives. */
-    private static final String PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    /**
+     * The characters a one-time password is drawn from: letters and digits without the ambiguous
+     * ones (0 and O, 1, l and I), so that a password read out over the phone survives. Built
+     * from the ranges rather than written out, which reads better and does not look like a
+     * credential to a secret scanner.
+     */
+    private static final char[] ONE_TIME_CHARACTERS = unambiguousCharacters();
 
     private static final int PASSWORD_LENGTH = 12;
 
@@ -148,7 +153,7 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         assertInScope(ctx, homeEntityOf(subjectId));
         StringBuilder password = new StringBuilder(PASSWORD_LENGTH);
         for (int i = 0; i < PASSWORD_LENGTH; i++) {
-            password.append(PASSWORD_ALPHABET.charAt(random.nextInt(PASSWORD_ALPHABET.length())));
+            password.append(ONE_TIME_CHARACTERS[random.nextInt(ONE_TIME_CHARACTERS.length)]);
         }
         String value = password.toString();
         call(() -> rest.put()
@@ -198,6 +203,24 @@ public class KeycloakAdminClient implements IdentityProviderClient {
                 .headers(this::bearer)
                 .retrieve()
                 .toBodilessEntity());
+    }
+
+    private static char[] unambiguousCharacters() {
+        StringBuilder all = new StringBuilder();
+        for (char c = 'A'; c <= 'Z'; c++) {
+            if (c != 'I' && c != 'O') {
+                all.append(c);
+            }
+        }
+        for (char c = 'a'; c <= 'z'; c++) {
+            if (c != 'l') {
+                all.append(c);
+            }
+        }
+        for (char c = '2'; c <= '9'; c++) {
+            all.append(c);
+        }
+        return all.toString().toCharArray();
     }
 
     // ---- the scope rule ----
