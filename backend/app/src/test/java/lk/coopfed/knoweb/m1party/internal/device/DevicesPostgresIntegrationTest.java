@@ -35,6 +35,7 @@ import lk.coopfed.knoweb.m1party.query.DeviceQueries;
 import lk.coopfed.knoweb.m1party.query.DeviceView;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -630,7 +631,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theSliceEnrolsAssignsListsAndSuspendsADevice() {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", USER.toString());
+        headers.setBearerAuth(TestIdentityProvider.token(USER, MPCS));
         headers.set("X-Scope-Entity", MPCS.toString());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
