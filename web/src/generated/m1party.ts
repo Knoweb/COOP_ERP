@@ -457,6 +457,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the devices visible in the caller's scope, with the position each holds */
+        get: operations["listDevices"];
+        put?: never;
+        /** Enrol a device at a location of the caller's entity, from its staging record */
+        post: operations["enrolDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one device visible in the caller's scope */
+        get: operations["getDevice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign a device to a till position; the position's counters move to it
+         * @description A position still held by a suspended device is taken over (the replacement of a faulty or stolen till): its counters move to the new device, which needs the old device's outbox drained, or outboxLossRecorded set by the administrator to record its loss.
+         */
+        post: operations["assignDeviceToPosition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend an active device (lost, stolen, faulty); the till is revoked */
+        post: operations["suspendDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reinstate a suspended device once it is physically recovered */
+        post: operations["reinstateDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire an unassigned, wiped device for good; the till is revoked */
+        post: operations["retireDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/security/roles": {
         parameters: {
             query?: never;
@@ -917,6 +1023,61 @@ export interface components {
             effectiveFrom: string;
             /** Format: date */
             effectiveTo?: string | null;
+        };
+        EnrolDeviceRequest: {
+            hardwareSerial: string;
+            /** @enum {string} */
+            deviceKind: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE";
+            /** Format: uuid */
+            locationId: string;
+            appVersion: components["schemas"]["AppVersion"];
+            /** @description The management agent's staging record that attests the device (doc 31) */
+            stagingReference: string;
+        };
+        AssignDeviceRequest: {
+            /** Format: uuid */
+            tillPositionId: string;
+            reasonCode: string;
+            reasonText?: string | null;
+            /**
+             * @description Set when the device giving the position up cannot be shown drained: its loss is recorded, and the numbers it took and never sent become a documented gap.
+             * @default false
+             */
+            outboxLossRecorded: boolean;
+        };
+        SuspendDeviceRequest: {
+            /** @enum {string} */
+            reasonCode: "LOST" | "STOLEN" | "FAULTY";
+            reasonText?: string | null;
+        };
+        DeviceReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        /** @description A till release number, dot-separated whole numbers (doc 31) */
+        AppVersion: string;
+        DeviceResponse: {
+            /** Format: uuid */
+            deviceId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            locationId: string;
+            hardwareSerial: string;
+            /** @enum {string} */
+            deviceKind: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE";
+            /** @enum {string} */
+            status: "ENROLLED" | "ACTIVE" | "SUSPENDED" | "RETIRED";
+            /** Format: uuid */
+            tillPositionId?: string | null;
+            positionNo?: number | null;
+            /** @description Whether the position it holds is its shop's primary till */
+            primaryTill: boolean;
+            appVersion?: string | null;
+            /** Format: date-time */
+            enrolledAt?: string | null;
+            /** Format: date-time */
+            lastSeenAt?: string | null;
         };
         RolePermissionItem: {
             permissionCode: string;
@@ -1931,6 +2092,208 @@ export interface operations {
         };
         responses: {
             /** @description Relationship suspended */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDevices: {
+        parameters: {
+            query?: {
+                locationId?: string;
+                status?: "ENROLLED" | "ACTIVE" | "SUSPENDED" | "RETIRED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The devices, by location and serial */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    enrolDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Device enrolled */
+            201: {
+                headers: {
+                    /** @description Address of the enrolled device */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Device */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            /** @description Device does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    assignDeviceToPosition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Device assigned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    suspendDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Device suspended */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reinstateDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Device reinstated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Device retired */
             204: {
                 headers: {
                     [name: string]: unknown;
