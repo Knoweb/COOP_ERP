@@ -318,6 +318,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/security/external-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Federation's register of external grants, active, expired and revoked */
+        get: operations["listExternalGrants"];
+        put?: never;
+        /**
+         * Give an external user read-only access to entities until a date
+         * @description Doc 21 section 4.6 and flow 6.5. The grantee must be a user of kind EXTERNAL; the grant ends no later than the configured maximum after it starts (m1.external_grant.max_months, 12 by default and at most). A missing or past validFrom starts the grant now.
+         */
+        post: operations["grantExternalView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/external-grants/{grantId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End an active external grant now */
+        post: operations["revokeExternalView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -496,6 +534,36 @@ export interface components {
             status: "ACTIVE" | "RETIRED";
             /** @description This position is the primary till of its location */
             primary: boolean;
+        };
+        GrantExternalViewRequest: {
+            /** Format: uuid */
+            granteeUserId: string;
+            scopeEntityIds: string[];
+            /** Format: date-time */
+            validFrom?: string | null;
+            /** Format: date-time */
+            validUntil: string;
+            reason: string;
+        };
+        RevokeExternalViewRequest: {
+            reason: string;
+        };
+        ExternalGrantResponse: {
+            /** Format: uuid */
+            grantId: string;
+            /** Format: uuid */
+            granteeUserId: string;
+            scopeEntityIds: string[];
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validUntil: string;
+            reason: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "EXPIRED" | "REVOKED";
+        };
+        ExternalGrantList: {
+            items: components["schemas"]["ExternalGrantResponse"][];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1134,6 +1202,86 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Position retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listExternalGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every grant the caller's scope can see, latest end first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExternalGrantList"];
+                };
+            };
+        };
+    };
+    grantExternalView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantExternalViewRequest"];
+            };
+        };
+        responses: {
+            /** @description Grant issued */
+            201: {
+                headers: {
+                    /** @description Address of the register of grants */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExternalGrantResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    revokeExternalView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                grantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokeExternalViewRequest"];
+            };
+        };
+        responses: {
+            /** @description Grant revoked */
             204: {
                 headers: {
                     [name: string]: unknown;

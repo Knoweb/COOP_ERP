@@ -735,6 +735,106 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/security/external-grants:
+
+    get:
+      tags: [Grants]
+      operationId: listExternalGrants
+      summary: The Federation's register of external grants, active, expired and revoked
+      x-permission: gov.external.grant
+      x-scope: FEDERATION
+
+      responses:
+
+        '200':
+          description: Every grant the caller's scope can see, latest end first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalGrantList'
+
+    post:
+      tags: [Grants]
+      operationId: grantExternalView
+      summary: Give an external user read-only access to entities until a date
+      description: >
+        Doc 21 section 4.6 and flow 6.5. The grantee must be a user of kind EXTERNAL; the grant
+        ends no later than the configured maximum after it starts (m1.external_grant.max_months,
+        12 by default and at most). A missing or past validFrom starts the grant now.
+      x-permission: gov.external.grant
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantExternalViewRequest'
+
+      responses:
+
+        '201':
+          description: Grant issued
+          headers:
+            Location:
+              description: Address of the register of grants
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalGrantResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/external-grants/{grantId}/revoke:
+
+    post:
+      tags: [Grants]
+      operationId: revokeExternalView
+      summary: End an active external grant now
+      x-permission: gov.external.grant
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+
+        - in: path
+          name: grantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeExternalViewRequest'
+
+      responses:
+
+        '204':
+          description: Grant revoked
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -1228,6 +1328,79 @@ components:
         primary:
           type: boolean
           description: This position is the primary till of its location
+
+    GrantExternalViewRequest:
+      type: object
+      required: [granteeUserId, scopeEntityIds, validUntil, reason]
+      properties:
+        granteeUserId:
+          type: string
+          format: uuid
+        scopeEntityIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        validFrom:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    RevokeExternalViewRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    ExternalGrantResponse:
+      type: object
+      required: [grantId, granteeUserId, scopeEntityIds, validFrom, validUntil, reason, status]
+      properties:
+        grantId:
+          type: string
+          format: uuid
+        granteeUserId:
+          type: string
+          format: uuid
+        scopeEntityIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, REVOKED]
+
+    ExternalGrantList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalGrantResponse'
 
   parameters:
 
