@@ -57,12 +57,11 @@ abstract class SyncIntegrationTest extends PostgresIntegrationTest {
                 """
                 insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en, status,
                                             primary_till_position_id)
-                values (?, ?, 'K08S1', 'SHOP', 'Sync test shop', 'ACTIVE', ?),
+                values (?, ?, 'K08S1', 'SHOP', 'Sync test shop', 'ACTIVE', null),
                        (?, ?, 'K08S2', 'SHOP', 'Another shop', 'ACTIVE', null)
                 """,
                 SHOP,
                 ENTITY,
-                POSITION,
                 OTHER_SHOP,
                 ENTITY);
         db.update(
@@ -70,6 +69,7 @@ abstract class SyncIntegrationTest extends PostgresIntegrationTest {
                 POSITION,
                 SHOP,
                 ENTITY);
+        db.update("update party.location set primary_till_position_id = ? where location_id = ?", POSITION, SHOP);
         db.update(
                 """
                 insert into party.device (device_id, hardware_serial, device_kind, owner_entity_id,
@@ -106,6 +106,10 @@ abstract class SyncIntegrationTest extends PostgresIntegrationTest {
             db.update("delete from " + table + " where owner_entity_id in (?, ?)", ENTITY, OTHER_ENTITY);
         }
         db.update("delete from party.device where owner_entity_id in (?, ?)", ENTITY, OTHER_ENTITY);
+        db.update(
+                "update party.location set primary_till_position_id = null where owner_entity_id in (?, ?)",
+                ENTITY,
+                OTHER_ENTITY);
         db.update("delete from party.till_position where owner_entity_id in (?, ?)", ENTITY, OTHER_ENTITY);
         db.update("delete from party.location where owner_entity_id in (?, ?)", ENTITY, OTHER_ENTITY);
     }

@@ -9,6 +9,7 @@ import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.kernel.internal.sync.DeviceDirectory.DeviceRecord;
 import lk.coopfed.knoweb.kernel.sync.web.generated.ChangeEntry;
 import lk.coopfed.knoweb.kernel.sync.web.generated.ChangePage;
@@ -50,6 +51,7 @@ class SyncController implements SyncApi {
     private final SyncSettings settings;
     private final TillSigner signer;
     private final Attachments attachments;
+    private final SystemScope transactions;
     private final ObjectMapper json;
     private final HttpServletRequest request;
 
@@ -63,6 +65,7 @@ class SyncController implements SyncApi {
             SyncSettings settings,
             TillSigner signer,
             Attachments attachments,
+            SystemScope transactions,
             ObjectMapper json,
             HttpServletRequest request) {
         this.currentScope = currentScope;
@@ -74,6 +77,7 @@ class SyncController implements SyncApi {
         this.settings = settings;
         this.signer = signer;
         this.attachments = attachments;
+        this.transactions = transactions;
         this.json = json;
         this.request = request;
     }
@@ -213,12 +217,16 @@ class SyncController implements SyncApi {
     @Override
     public ResponseEntity<PresignResponse> presignAttachment(String idempotencyKey, PresignRequest presignRequest) {
         ScopeContext device = currentScope.get();
-        Attachments.PresignedUpload upload = attachments.presignUpload(
-                presignRequest.getDocumentId(),
-                presignRequest.getAttachmentId(),
-                presignRequest.getContentType(),
-                presignRequest.getSha256(),
-                device);
+        // The attachment service writes its pending row in a transaction under the caller's scope
+        // (K-09); the device's scope is applied to that transaction as to any handler's.
+        Attachments.PresignedUpload upload = transactions.inScope(
+                device,
+                () -> attachments.presignUpload(
+                        presignRequest.getDocumentId(),
+                        presignRequest.getAttachmentId(),
+                        presignRequest.getContentType(),
+                        presignRequest.getSha256(),
+                        device));
         return ResponseEntity.ok(new PresignResponse(
                 upload.attachmentId(), upload.url().toString(), upload.expiresAt(), upload.objectKey()));
     }
