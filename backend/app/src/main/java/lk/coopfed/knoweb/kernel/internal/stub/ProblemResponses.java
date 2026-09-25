@@ -26,19 +26,39 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProblemResponses {
 
-    private static final Map<String, HttpStatus> REQUEST_ERRORS = Map.of(
-            "scope.required", HttpStatus.BAD_REQUEST,
-            "scope.invalid", HttpStatus.BAD_REQUEST,
-            "idempotency.key_required", HttpStatus.BAD_REQUEST,
-            "request.invalid", HttpStatus.BAD_REQUEST,
-            "request.malformed", HttpStatus.BAD_REQUEST,
+    private static final Map<String, HttpStatus> REQUEST_ERRORS = Map.ofEntries(
+            Map.entry("scope.required", HttpStatus.BAD_REQUEST),
+            Map.entry("scope.invalid", HttpStatus.BAD_REQUEST),
+            Map.entry("idempotency.key_required", HttpStatus.BAD_REQUEST),
+            Map.entry("request.invalid", HttpStatus.BAD_REQUEST),
+            Map.entry("request.malformed", HttpStatus.BAD_REQUEST),
             // K-03b: a permission the role lacks is 403, not a broken business rule.
-            "permission.denied", HttpStatus.FORBIDDEN,
+            Map.entry("permission.denied", HttpStatus.FORBIDDEN),
             // K-02: a token the resource server refuses, and a second factor that is not fresh
             // enough for the action (19A section 2: step-up is 401 with the provider's address).
-            "token.invalid", HttpStatus.UNAUTHORIZED,
-            "auth.required", HttpStatus.UNAUTHORIZED,
-            "mfa.required", HttpStatus.UNAUTHORIZED);
+            Map.entry("token.invalid", HttpStatus.UNAUTHORIZED),
+            Map.entry("auth.required", HttpStatus.UNAUTHORIZED),
+            Map.entry("mfa.required", HttpStatus.UNAUTHORIZED),
+            // K-08: the sync contract's own answers (doc 32 sections 3.2, 3.3, 7 and 9). The
+            // device is refused 403 (suspended: with the signed revoke instruction), a batch that
+            // does not follow the cursor or meets another in flight is 409, an old application
+            // is 426, a batch over the limits 413.
+            Map.entry("sync.device_token_required", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_token_not_allowed", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_mismatch", HttpStatus.FORBIDDEN),
+            Map.entry("sync.location_mismatch", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_unknown", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_not_active", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_not_enrolled", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_suspended", HttpStatus.FORBIDDEN),
+            Map.entry("sync.device_retired", HttpStatus.FORBIDDEN),
+            Map.entry("sync.enrolment.code_invalid", HttpStatus.FORBIDDEN),
+            Map.entry("sync.sequence_gap", HttpStatus.CONFLICT),
+            Map.entry("sync.batch_in_flight", HttpStatus.CONFLICT),
+            Map.entry("sync.batch_inconsistent", HttpStatus.BAD_REQUEST),
+            Map.entry("sync.batch_too_large", HttpStatus.PAYLOAD_TOO_LARGE),
+            Map.entry("sync.app_below_floor", HttpStatus.UPGRADE_REQUIRED),
+            Map.entry("sync.snapshot.unavailable", HttpStatus.NOT_IMPLEMENTED));
 
     private final Messages messages;
 

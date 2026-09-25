@@ -65,3 +65,28 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: Notification could not be delivered after every attempt
+  # K-08: the sync gateway (doc 32 sections 3, 6, 7 and 8).
+  - code: DEVICE_ENROLMENT_CODE_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: One-time enrolment code issued for a device
+  - code: DEVICE_SYNC_ENROLLED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device enrolled for sync and given its credential
+  - code: SYNC_EVENT_QUARANTINED
+    severity: ALERT
+    offline_capturable: false
+    description_en: A till event could not be accepted and was quarantined
+  - code: SYNC_ANOMALY
+    severity: ALERT
+    offline_capturable: false
+    description_en: A device keeps sending batches that do not follow its cursor
+  - code: SYNC_CLOCK_DRIFT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till clock drifted beyond the review threshold
+  - code: SYNC_CURSOR_BEHIND
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Central holds less of a device than the device was acknowledged; resend requested

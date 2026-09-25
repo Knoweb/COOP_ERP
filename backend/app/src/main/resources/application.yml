@@ -78,15 +78,27 @@ coop-erp:
       issuer: ${OIDC_ISSUER:http://localhost:8085/realms/coop}
       jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8085/realms/coop/protocol/openid-connect/certs}
       step-up-url: ${OIDC_STEP_UP_URL:http://localhost:8085/realms/coop/protocol/openid-connect/auth}
+      # K-08: where an enrolled till exchanges its client credential for a device token (the
+      # public address: the till reaches the provider from the shop).
+      token-endpoint: ${OIDC_TOKEN_ENDPOINT:http://localhost:8085/realms/coop/protocol/openid-connect/token}
       # The provider's administration API, for M1's user management behind
-      # IdentityProviderClient: a confidential client of the realm holding manage-users and
-      # nothing else (19A section 2; ADR-18). The secret is a development value; a deployed
-      # environment sets its own.
+      # IdentityProviderClient and, since K-08, the tills' clients behind DeviceCredentials: a
+      # confidential client of the realm holding manage-users and manage-clients and nothing
+      # else (19A section 2; ADR-18). The secret is a development value; a deployed environment
+      # sets its own.
       admin:
         base-url: ${OIDC_ADMIN_URL:http://localhost:8085}
         realm: ${OIDC_REALM:coop}
         client-id: ${OIDC_ADMIN_CLIENT_ID:coop-erp-backend}
         client-secret: ${OIDC_ADMIN_CLIENT_SECRET:coop-erp-backend-dev}
+
+  # K-08: the key that signs what central sends a till (the revoke instruction now, snapshots
+  # later; doc 32 section 9): Ed25519, PKCS#8 and X.509 in base64, the same on every instance.
+  # Empty on a developer machine: each instance then makes a key of its own (and says so).
+  sync:
+    signing:
+      private-key: ${SYNC_SIGNING_PRIVATE_KEY:}
+      public-key: ${SYNC_SIGNING_PUBLIC_KEY:}
 
   # The object store of the attachments (19A section 9), behind the S3 protocol: any S3 service,
   # MinIO on a developer machine. The endpoint is what the backend reaches; the public endpoint

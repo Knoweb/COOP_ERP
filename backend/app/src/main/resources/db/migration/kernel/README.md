@@ -7,7 +7,7 @@ are reserved per lane before the lanes start.
 
 Below `V0010` are the baseline and what it still needed (`V0001` to `V0006`). Taken so far:
 `V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0050` (K-07
-documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log).
+documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`).
 
 The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
 19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.
@@ -17,7 +17,7 @@ The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section
 | `V0010`â€“`V0029` | A, security | K-01 scope, K-02 identity, K-03 permissions | the PARTY policy template and the masking-view convention (section 1); the idempotency table (section 3) |
 | `V0030`â€“`V0049` | B, ledgers and events | K-04 audit, K-05 events, K-10 notifications | `audit_event`, `audit_event_type` (section 4); `event_outbox`, `event_inbox`, `central_source_seq` (section 5); `notification_log` (section 10) |
 | `V0050`â€“`V0079` | C, configuration, documents and jobs | K-11 config, K-12 scheduling, K-13 clock, K-07 documents, K-09 attachments | `config_item`, `config_value` (section 11); `scheduled_job`, `job_run`, `shedlock` (section 12); `document_type`, `numbering_series`, `document`, `document_line`, `document_link`, `document_state_history`, `document_attachment` (section 7) |
-| `V0080` and up | D, language and sync | K-06 i18n, K-08 sync gateway | `message_catalogue` if the file catalogue is ever outgrown (section 6); `device_sync_cursor`, `sync_quarantine`, `snapshot_change_log` (section 8) |
+| `V0080` and up | D, language and sync | K-06 i18n, K-08 sync gateway | `message_catalogue` if the file catalogue is ever outgrown (section 6); `device_sync_cursor`, `sync_quarantine` and the change log (19A calls it `snapshot_change_log`; K-08 names it `change_log`, with `location_snapshot_version`, `sync_event`, `device_heartbeat` and `device_enrolment_code` beside it) (section 8) |
 
 Lane C is the widest range because it carries five tickets and the document base is seven
 tables. A lane that needs more numbers than its range holds takes the next free block and

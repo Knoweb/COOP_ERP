@@ -146,7 +146,7 @@ public class EventConsumerDispatcher {
 
         return new ScopeContext(
                 null,
-                null,
+                deviceOf(message),
                 message.ownerEntityId(),
                 List.of(active),
                 active,
@@ -155,6 +155,21 @@ public class EventConsumerDispatcher {
                 null,
                 Locale.ENGLISH,
                 message.correlationId());
+    }
+
+    /**
+     * K-08: an event a till uploaded has the device as its source (DeviceEventWriter); the
+     * consumer that applies it sees the device on its scope, as the audit of what it does must.
+     */
+    private static java.util.UUID deviceOf(OutboxMessage message) {
+        if (message.source() == null || "central".equals(message.source())) {
+            return null;
+        }
+        try {
+            return java.util.UUID.fromString(message.source());
+        } catch (IllegalArgumentException notADevice) {
+            return null;
+        }
     }
 
     private static String errorText(RuntimeException failure) {

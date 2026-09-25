@@ -24,7 +24,8 @@ import org.springframework.stereotype.Component;
  * <pre>
  *   uid      the platform's user id, when the provider carries it as an attribute; else
  *   sub      the provider's subject, which the dev realm issues as the platform's id
- *   dev      the device id, for a till
+ *   dev      the device id, for a till; with cls = DEVICE the whole scope comes from the
+ *            device (DeviceScopes: M1's device, its status, its shop) and uid/sub are ignored
  *   ent      the home entity
  *   scopes   every "entity" or "entity/location" pair the caller may act in; absent, the
  *            active role assignments of M1 (UserScopes) plus the home entity, entity-wide
@@ -57,13 +58,23 @@ public class JwtClaimsMapper {
     private static final Set<String> LANGUAGES = Set.of("en", "si", "ta");
 
     private final UserScopes userScopes;
+    private final DeviceScopes deviceScopes;
 
-    public JwtClaimsMapper(UserScopes userScopes) {
+    public JwtClaimsMapper(UserScopes userScopes, DeviceScopes deviceScopes) {
         this.userScopes = userScopes;
+        this.deviceScopes = deviceScopes;
     }
 
     public ScopeContext map(
             Jwt jwt, String activeEntity, String activeLocation, String correlationId, Locale requestLocale) {
+        if (policyClass(jwt) == PolicyClass.DEVICE) {
+            // A device token (K-08): the device is the principal, not a user. Its subject is the
+            // provider's service account of the device's client, nobody the platform knows; its
+            // scope is the device's shop from M1's records, checked for status on every call
+            // (DeviceAuth); the scope headers do not apply.
+            return deviceScopes.scopeOf(
+                    uuid(jwt, DEVICE), parseUuid(correlationId, Ids.next()), locale(jwt, requestLocale));
+        }
         UUID user = uuid(jwt, PLATFORM_USER);
         if (user == null) {
             user = uuid(jwt, SUBJECT);

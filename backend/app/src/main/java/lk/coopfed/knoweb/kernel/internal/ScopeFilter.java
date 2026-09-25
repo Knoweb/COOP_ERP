@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
@@ -54,6 +55,9 @@ public class ScopeFilter extends OncePerRequestFilter {
         try {
             scope = currentScope.get();
             validate(scope);
+            validatePrincipal(
+                    scope,
+                    request.getRequestURI().substring(request.getContextPath().length()));
         } catch (ProblemException e) {
             // A filter runs outside the DispatcherServlet, so no @ControllerAdvice sees this:
             // without the answer written here a wrong scope header is a 500, not a problem.
@@ -96,9 +100,38 @@ public class ScopeFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * K-08: which principal may call which path (doc 32 section 9; 19A section 2). The till's sync
+     * operations take a device token and nothing else, and a device token opens nothing but them:
+     * a till's credential is on a machine in a shop, and it must not reach the back office's API.
+     * Two sync operations are not the device's: an administrator issues the enrolment code (a user
+     * token), and the enrolment itself is called before the device holds any token.
+     */
+    static void validatePrincipal(ScopeContext scope, String path) {
+        boolean device = scope.policyClass() == PolicyClass.DEVICE;
+        if (isDeviceOperation(path)) {
+            if (!device) {
+                throw new ProblemException("sync.device_token_required");
+            }
+        } else if (device && !isEnrolment(path)) {
+            throw new ProblemException("sync.device_token_not_allowed");
+        }
+    }
+
+    private static final String SYNC = "/v1/sync/";
+
+    static boolean isDeviceOperation(String path) {
+        return path.startsWith(SYNC) && !isEnrolment(path) && !path.endsWith("/enrolment-codes");
+    }
+
+    private static boolean isEnrolment(String path) {
+        return path.startsWith(SYNC + "devices/") && path.endsWith("/enrol");
+    }
+
     private static void putMdc(ScopeContext scope) {
         put("correlationId", scope.correlationId());
         put("userId", scope.userId());
+        put("deviceId", scope.deviceId());
         put("entityId", scope.entityId());
         put("locationId", scope.locationId());
         put("scopeClass", scope.policyClass());
@@ -113,6 +146,7 @@ public class ScopeFilter extends OncePerRequestFilter {
     private static void clearMdc() {
         MDC.remove("correlationId");
         MDC.remove("userId");
+        MDC.remove("deviceId");
         MDC.remove("entityId");
         MDC.remove("locationId");
         MDC.remove("scopeClass");

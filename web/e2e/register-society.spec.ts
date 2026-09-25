@@ -53,7 +53,8 @@ test("the Federation view sees the register but is refused a registration by the
   await page.getByLabel(textOf(FED_ADMIN, "party.field.name_en")).fill("Not the Federation itself");
   await page.getByRole("button", { name: textOf(FED_ADMIN, "party.new.submit") }).click();
 
-  // fed-admin holds the permission (every one, until K-03) but its scope is FEDERATION_VIEW,
-  // not the Federation's own: the guard of the handler refuses, and the screen shows why.
-  await expect(page.getByRole("alert")).toHaveText(backendEnglish["m1.entity.federation_required"]);
+  // fed-admin's scope is FEDERATION_VIEW, a read-only class that resolves to no permission
+  // (K-03b), and the stack enforces permissions (K-02): the kernel refuses before the handler's
+  // own guard ("only the Federation") is reached, and the screen shows why.
+  await expect(page.getByRole("alert")).toHaveText(backendEnglish["permission.denied"]);
 });

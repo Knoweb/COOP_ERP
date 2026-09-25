@@ -1,0 +1,543 @@
+# OpenAPI slice of the till sync contract (doc 32; 19A section 8). The kernel serves it, not a
+# module: the interfaces are generated into lk.coopfed.knoweb.kernel.sync.web.generated
+# (backend/app/build.gradle.kts, sliceOwners) and implemented by kernel.internal.sync.
+#
+# What differs from a module's slice, and why:
+#   - Paths are /v1/sync/... where doc 32 writes /sync/v1/...: every slice versions its paths
+#     under /v1/ (doc 17; OpenApiSliceRulesTest), and the one security rule "everything under
+#     /v1 needs a token" then covers the till too.
+#   - Property names are snake_case, as doc 32 names them (batch_id, first_seq ...): this is the
+#     wire contract with a native Android application, written once and expensive to change.
+#   - The caller is a device, not a user. A device token carries cls = DEVICE and dev (the
+#     device id); the kernel checks the device's status in M1's party.device on every call and
+#     answers a SUSPENDED or RETIRED device 403 with a signed revoke instruction (doc 32
+#     section 9). A user token is refused on every device operation (403
+#     sync.device_token_required) and a device token everywhere else (403
+#     sync.device_token_not_allowed). So x-permission on a device operation is not a
+#     permission of the catalogue that a role could hold: "sync.device" names the device
+#     principal itself. The enrolment exchange is called before the device holds any token;
+#     its enrolment code is its credential ("sync.enrolment_code").
+#   - Mutating operations carry the Idempotency-Key like every other (the till sends the
+#     batch_id, or a fresh UUID); the effect is idempotent by database state as doc 32 S3
+#     requires, so any instance answers a resend the same way.
+#   - A request body may be gzip-compressed (Content-Encoding: gzip, doc 32 S6).
+# After changing this file run `make gen-clients` and commit web/src/generated/sync.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP Sync API
+  version: 0.1.0
+paths:
+  /v1/sync/devices/{device_id}/enrolment-codes:
+    post:
+      tags: [Sync]
+      operationId: issueEnrolmentCode
+      summary: Issue a one-time enrolment code for a device (an administrator, with a user token)
+      description: >
+        The code is shown once, to the administrator who hands it to the person installing the
+        till; it is stored only as a hash, expires after sync.enrolment_code.ttl (default 24
+        hours) and is spent by the first successful enrolment. Issuing a new code withdraws
+        any earlier code of the device that was not used. The device must be registered in M1
+        (party.device) in the caller's entity and be ENROLLED or ACTIVE. Codes this operation
+        can answer: 403 permission.denied, 401 mfa.required, 422
+        sync.enrolment.device_not_enrollable.
+      x-permission: sys.device.manage
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: The code, shown once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnrolmentCode' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/sync/devices/{device_id}/enrol:
+    post:
+      tags: [Sync]
+      operationId: enrolDevice
+      summary: The device presents its enrolment code once and receives its credential (doc 32 section 8)
+      description: >
+        Called without a token: the enrolment code is the credential of this one call. The
+        code must be the device's latest unused code, unexpired, and the hardware serial must
+        be the one M1 registered; any mismatch is 403 sync.enrolment.code_invalid, one code for
+        every reason so that a guess learns nothing. The device must be ACTIVE at a till
+        position (M1 assigns it); otherwise 422 sync.enrolment.device_not_assigned. The answer
+        carries the device credential (an OAuth2 client of the identity provider: the device
+        exchanges it for a device token at token_endpoint with the client-credentials grant),
+        the first device sequence to use, the numbering series the device holds, the snapshot
+        pointer and the key that signs what central sends the device. Enrolling again (a
+        re-installed application) rotates the credential and keeps the cursor.
+      x-permission: sync.enrolment_code
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnrolmentRequest' }
+      responses:
+        '200':
+          description: Enrolled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnrolmentResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/sync/devices/{device_id}/batches:
+    post:
+      tags: [Sync]
+      operationId: uploadBatch
+      summary: Upload a contiguous run of till events in device sequence order (doc 32 section 3)
+      description: >
+        One batch in flight per device. The answer is the acknowledgement: last_applied_seq is
+        authoritative, everything at or below it is durably at central. A batch that starts
+        at or below the cursor is a replay and is answered from state (DUPLICATE) without
+        applying anything twice; resending the same batch_id returns the same acknowledgement.
+        An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past
+        it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap
+        (params.expected_seq: resend from there), 409 sync.batch_in_flight
+        (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent
+        (the events are not first_seq..last_seq), 426 sync.app_below_floor, 403 for the device
+        (see the Refused response).
+      x-permission: sync.device
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncBatch' }
+      responses:
+        '200':
+          description: The acknowledgement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncAck' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/Refused' }
+        '426': { $ref: '#/components/responses/Refused' }
+  /v1/sync/devices/{device_id}/heartbeat:
+    post:
+      tags: [Sync]
+      operationId: heartbeat
+      summary: Report the device's health and learn the snapshot version and pending instructions (doc 32 section 6)
+      description: >
+        Every five minutes when online, on application start and after every batch. Central
+        records the fleet-health fields, returns the clock offset (server_time minus
+        device_clock) and asks the device to resend from its cursor when the device reports
+        more acknowledged than central holds (central restored from backup, doc 32 section 7).
+        A device below the application floor still reports its health; the answer carries a
+        FLOOR_NOTICE.
+      x-permission: sync.device
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Heartbeat' }
+      responses:
+        '200':
+          description: What central knows of the device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HeartbeatResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+  /v1/sync/locations/{location_id}/changes:
+    get:
+      tags: [Sync]
+      operationId: listChanges
+      summary: The change log of the device's location after a version (what changed, not the rows)
+      description: >
+        The per-location change log the snapshot delta is built from (doc 32 section 5.2): every
+        publication that changes the shop's snapshot recorded one row and bumped the location's
+        version. Read in version order, a page at a time. full_snapshot_required is true when
+        since is 0 or older than the change-log retention (sync.change_log.retention, doc 32
+        DR-4): the device then takes a full snapshot. The location must be the device's own
+        (403 sync.location_mismatch).
+      x-permission: sync.device
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - in: query
+          name: since
+          required: true
+          schema: { type: integer, format: int64, minimum: 0 }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      responses:
+        '200':
+          description: A page of the change log
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChangePage' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+  /v1/sync/locations/{location_id}/snapshot:
+    get:
+      tags: [Sync]
+      operationId: getSnapshot
+      summary: The snapshot delta since a version, or the pointer to the full snapshot (doc 32 section 5.2)
+      description: >
+        Per table, the upserted rows and the tombstones from since+1 to the current version,
+        with the rows as the owning modules' snapshot contributors give them; the pointer to
+        the latest full snapshot file when since is 0 or older than the change-log retention.
+        Not served yet: the snapshot builder and its contributors are the second part of K-08
+        and this answers 501 sync.snapshot.unavailable until then. The change log itself is
+        readable at /changes.
+      x-permission: sync.device
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - in: query
+          name: since
+          required: false
+          schema: { type: integer, format: int64, minimum: 0 }
+      responses:
+        '200':
+          description: The delta, or the pointer to the full snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SnapshotDelta' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '501': { $ref: '#/components/responses/Refused' }
+  /v1/sync/attachments/presign:
+    post:
+      tags: [Sync]
+      operationId: presignAttachment
+      summary: A pre-signed PUT for one attachment of a document the device uploaded (doc 32 section 4)
+      description: >
+        The document must already be at central (its bundle acknowledged); the bytes go straight
+        to object storage and the attachment stays PENDING until the verifier finds them with
+        the given hash. Codes (422): attachment.document_not_found,
+        attachment.content_type_invalid, attachment.hash_invalid.
+      x-permission: sync.device
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignRequest' }
+      responses:
+        '200':
+          description: Where to PUT the bytes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PresignResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+components:
+  parameters:
+    DeviceId:
+      in: path
+      name: device_id
+      required: true
+      description: The device; for a device operation, the dev claim of the token
+      schema: { type: string, format: uuid }
+    LocationId:
+      in: path
+      name: location_id
+      required: true
+      description: The shop; the device's own location
+      schema: { type: string, format: uuid }
+  responses:
+    Refused:
+      description: >
+        A problem document. 403 sync.device_token_required (a user token on a device operation),
+        sync.device_mismatch (the path names another device), sync.location_mismatch,
+        sync.device_unknown, sync.device_not_active, sync.device_not_enrolled (no enrolment
+        yet), sync.device_suspended and sync.device_retired (params.revoke is the signed revoke
+        instruction: the device wipes its caches and locks, doc 32 section 9),
+        sync.enrolment.code_invalid; 413 sync.batch_too_large; 426 sync.app_below_floor; 501
+        sync.snapshot.unavailable.
+      content:
+        application/problem+json:
+          schema: { $ref: 'common.yaml#/components/schemas/Problem' }
+    Conflict:
+      description: >
+        409 sync.sequence_gap with params.expected_seq, or sync.batch_in_flight with
+        params.in_flight_batch_id (doc 32 sections 3.2 and 7).
+      content:
+        application/problem+json:
+          schema: { $ref: 'common.yaml#/components/schemas/Problem' }
+  schemas:
+    EnrolmentCode:
+      type: object
+      required: [device_id, code, expires_at]
+      properties:
+        device_id: { type: string, format: uuid }
+        code:
+          type: string
+          description: Sixteen characters without the ambiguous ones, to be typed on the till once
+        expires_at: { type: string, format: date-time }
+    EnrolmentRequest:
+      type: object
+      required: [enrolment_code, hardware_serial, app_version]
+      properties:
+        enrolment_code: { type: string, minLength: 1, maxLength: 64 }
+        hardware_serial: { type: string, minLength: 1, maxLength: 64 }
+        app_version: { type: string, minLength: 1, maxLength: 20 }
+    EnrolmentResponse:
+      type: object
+      required: [device_id, owner_entity_id, location_id, till_position_id, primary_till, credential,
+                 next_device_seq, series, snapshot, signing_key]
+      properties:
+        device_id: { type: string, format: uuid }
+        owner_entity_id: { type: string, format: uuid }
+        location_id: { type: string, format: uuid }
+        till_position_id: { type: string, format: uuid }
+        position_no: { type: [integer, 'null'] }
+        primary_till:
+          type: boolean
+          description: Whether this device holds the location-scoped series (doc 32 section 2)
+        credential: { $ref: '#/components/schemas/DeviceCredential' }
+        next_device_seq:
+          type: integer
+          format: int64
+          description: The sequence of the next event the device writes; 1 at the first enrolment
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/SeriesAssignment' }
+        snapshot: { $ref: '#/components/schemas/SnapshotPointer' }
+        signing_key: { $ref: '#/components/schemas/SigningKey' }
+    DeviceCredential:
+      type: object
+      required: [client_id, client_secret, token_endpoint]
+      description: >
+        The device's OAuth2 client at the identity provider (doc 19 section 2.1). Kept in the
+        terminal keystore; exchanged for a device token with grant_type=client_credentials.
+      properties:
+        client_id: { type: string }
+        client_secret: { type: string }
+        token_endpoint: { type: string }
+    SeriesAssignment:
+      type: object
+      required: [series_id, doc_type_code, scope, prefix, next_number]
+      properties:
+        series_id: { type: string, format: uuid }
+        doc_type_code: { type: string }
+        scope: { type: string, enum: [LOCATION, TILL_POSITION] }
+        prefix: { type: string }
+        next_number:
+          type: integer
+          format: int64
+          description: The number the device issues next (doc 32 section 8)
+    SnapshotPointer:
+      type: object
+      required: [version, full_snapshot_required]
+      properties:
+        version: { type: integer, format: int64 }
+        full_snapshot_required: { type: boolean }
+    SigningKey:
+      type: object
+      required: [key_id, algorithm, public_key]
+      description: The key that signs revoke instructions and snapshots; the device keeps it to verify them
+      properties:
+        key_id: { type: string }
+        algorithm: { type: string, enum: [Ed25519] }
+        public_key: { type: string, description: 'X.509 SubjectPublicKeyInfo, base64' }
+    SyncBatch:
+      type: object
+      required: [batch_id, first_seq, last_seq, app_version, events]
+      properties:
+        batch_id: { type: string, format: uuid, description: 'UUIDv7; the same value on a retry' }
+        first_seq: { type: integer, format: int64, minimum: 1 }
+        last_seq: { type: integer, format: int64, minimum: 1 }
+        app_version: { type: string, minLength: 1, maxLength: 20 }
+        snapshot_version_in_use: { type: [integer, 'null'], format: int64 }
+        device_clock: { type: [string, 'null'], format: date-time }
+        device_uptime_s: { type: [integer, 'null'], format: int64 }
+        events:
+          type: array
+          minItems: 1
+          description: >
+            first_seq..last_seq in order, each a TillEvent. Deliberately not typed here: the
+            ingestor validates every event itself, so that one malformed event is quarantined
+            and the rest are applied (doc 32 S4) instead of the whole batch being refused.
+          items:
+            type: object
+            additionalProperties: true
+    TillEvent:
+      type: object
+      description: >
+        One till-owned fact in the envelope of doc 19 section 6.1. A document bundle
+        (receipt.issued/voided/refunded, grn.captured/confirmed, count.recorded,
+        writeoff.requested, repack.executed, transfer.issued) carries in payload the document
+        header (document) and its lines (lines), with doc 18's column names, and content_hash is
+        the SHA-256 of their canonical form (kernel ContentHash); central recomputes it.
+      required: [event_id, event_type, device_seq, occurred_at, payload]
+      properties:
+        event_id: { type: string, format: uuid, description: 'UUIDv7, unique' }
+        event_type: { type: string, description: 'Dotted and versioned: receipt.issued.v1' }
+        device_seq: { type: integer, format: int64, description: 'Dense per device across all kinds' }
+        occurred_at: { type: string, format: date-time, description: 'Device clock plus the offset central returned' }
+        occurred_local: { type: [string, 'null'], description: 'The local reading, yyyy-MM-ddTHH:mm:ss' }
+        actor_user_id: { type: [string, 'null'], format: uuid, description: The operator }
+        role_snapshot_version: { type: [integer, 'null'], format: int64 }
+        correlation_id: { type: [string, 'null'], format: uuid }
+        causation_id: { type: [string, 'null'], format: uuid }
+        aggregate_type: { type: [string, 'null'] }
+        aggregate_id: { type: [string, 'null'], format: uuid }
+        engine_version: { type: [string, 'null'] }
+        content_hash: { type: [string, 'null'], description: Required on a document bundle }
+        payload: { type: object, additionalProperties: true }
+    SyncAck:
+      type: object
+      required: [batch_id, last_applied_seq, outcomes, server_time, snapshot_version, instructions]
+      properties:
+        batch_id: { type: string, format: uuid }
+        last_applied_seq:
+          type: integer
+          format: int64
+          description: Authoritative; everything at or below it is durably at central
+        outcomes:
+          type: array
+          items: { $ref: '#/components/schemas/EventOutcome' }
+        server_time: { type: string, format: date-time }
+        clock_offset_ms:
+          type: [integer, 'null']
+          format: int64
+          description: server_time minus device_clock, when the batch carried device_clock
+        snapshot_version: { type: integer, format: int64 }
+        instructions:
+          type: array
+          items: { $ref: '#/components/schemas/Instruction' }
+    EventOutcome:
+      type: object
+      required: [device_seq, outcome]
+      properties:
+        device_seq: { type: integer, format: int64 }
+        event_id: { type: [string, 'null'], format: uuid }
+        outcome:
+          type: string
+          enum: [APPLIED, DUPLICATE, FLAGGED, QUARANTINED]
+          description: FLAGGED is the owning module's business-rule flag (doc 32 section 3.3 step 5)
+        codes: { type: array, items: { type: string } }
+        reason:
+          type: [string, 'null']
+          description: For QUARANTINED, SCHEMA, DUPLICATE_ID, HASH, TOO_LARGE or FORBIDDEN_FIELD
+    Instruction:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [REVOKE, FLOOR_NOTICE, RESEND_FROM, SERIES_HOLDER_CHANGE] }
+        from_seq: { type: [integer, 'null'], format: int64, description: 'RESEND_FROM: resend from this sequence' }
+        detail: { type: [string, 'null'] }
+        signed: { $ref: '#/components/schemas/SignedInstruction' }
+    SignedInstruction:
+      type: object
+      description: >
+        An instruction central signs (doc 32 section 9). The signature is Ed25519 over the text
+        "type=...\ndevice_id=...\nstatus=...\nissued_at=...\n" in UTF-8, with the key of the
+        enrolment answer.
+      required: [type, device_id, status, issued_at, key_id, signature]
+      properties:
+        type: { type: string }
+        device_id: { type: string, format: uuid }
+        status: { type: string }
+        issued_at: { type: string, format: date-time }
+        key_id: { type: string }
+        signature: { type: string, description: base64 }
+    Heartbeat:
+      type: object
+      required: [app_version]
+      properties:
+        app_version: { type: string, minLength: 1, maxLength: 20 }
+        snapshot_version: { type: [integer, 'null'], format: int64 }
+        pending_event_count: { type: [integer, 'null'], minimum: 0 }
+        oldest_pending_seq_age_s: { type: [integer, 'null'], format: int64, minimum: 0 }
+        last_acknowledged_seq:
+          type: [integer, 'null']
+          format: int64
+          minimum: 0
+          description: The highest sequence the device holds acknowledged (last_applied_seq as known)
+        battery_pct: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        storage_free_mb: { type: [integer, 'null'], format: int64, minimum: 0 }
+        peripherals:
+          type: [object, 'null']
+          additionalProperties: true
+          description: The peripheral self-test summary, as the till reports it
+        device_clock: { type: [string, 'null'], format: date-time }
+        device_uptime_s: { type: [integer, 'null'], format: int64, minimum: 0 }
+        open_session: { type: [boolean, 'null'] }
+    HeartbeatResponse:
+      type: object
+      required: [server_time, snapshot_version, last_applied_seq, urgent_change, instructions]
+      properties:
+        server_time: { type: string, format: date-time }
+        clock_offset_ms: { type: [integer, 'null'], format: int64 }
+        snapshot_version: { type: integer, format: int64 }
+        last_applied_seq: { type: integer, format: int64 }
+        urgent_change:
+          type: boolean
+          description: A change marked urgent (a control price, a revoked permission) waits; download now
+        instructions:
+          type: array
+          items: { $ref: '#/components/schemas/Instruction' }
+    ChangePage:
+      type: object
+      required: [location_id, since, current_version, full_snapshot_required, next_since, has_more, entries]
+      properties:
+        location_id: { type: string, format: uuid }
+        since: { type: integer, format: int64 }
+        current_version: { type: integer, format: int64 }
+        full_snapshot_required: { type: boolean }
+        next_since:
+          type: integer
+          format: int64
+          description: The since of the next page; the version of the last entry here
+        has_more: { type: boolean }
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/ChangeEntry' }
+    ChangeEntry:
+      type: object
+      required: [version, table, row_id, op, urgent, recorded_at]
+      properties:
+        version: { type: integer, format: int64 }
+        table: { type: string, description: 'The snapshot table: sku, price_list_line, operator ...' }
+        row_id: { type: string, format: uuid }
+        op: { type: string, enum: [UPSERT, DELETE] }
+        apply_from: { type: [string, 'null'], format: date, description: 'Held until this business date (doc 32 section 5.2)' }
+        urgent: { type: boolean }
+        recorded_at: { type: string, format: date-time }
+    SnapshotDelta:
+      type: object
+      required: [location_id, version, full_snapshot_required]
+      properties:
+        location_id: { type: string, format: uuid }
+        since: { type: [integer, 'null'], format: int64 }
+        version: { type: integer, format: int64 }
+        full_snapshot_required: { type: boolean }
+        full_snapshot_url: { type: [string, 'null'] }
+        tables:
+          type: object
+          additionalProperties: true
+          description: Per table, upserts and tombstones
+    PresignRequest:
+      type: object
+      required: [document_id, attachment_id, content_type, sha256]
+      properties:
+        document_id: { type: string, format: uuid }
+        attachment_id: { type: string, format: uuid }
+        content_type: { type: string, minLength: 1, maxLength: 100 }
+        sha256: { type: string, minLength: 64, maxLength: 64 }
+    PresignResponse:
+      type: object
+      required: [attachment_id, url, expires_at, object_key]
+      properties:
+        attachment_id: { type: string, format: uuid }
+        url: { type: string }
+        expires_at: { type: string, format: date-time }
+        object_key: { type: string }
