@@ -33,7 +33,11 @@ public class ProblemResponses {
             "request.invalid", HttpStatus.BAD_REQUEST,
             "request.malformed", HttpStatus.BAD_REQUEST,
             // K-03b: a permission the role lacks is 403, not a broken business rule.
-            "permission.denied", HttpStatus.FORBIDDEN);
+            "permission.denied", HttpStatus.FORBIDDEN,
+            // K-02: a token the resource server refuses, and a second factor that is not fresh
+            // enough for the action (19A section 2: step-up is 401 with the provider's address).
+            "token.invalid", HttpStatus.UNAUTHORIZED,
+            "mfa.required", HttpStatus.UNAUTHORIZED);
 
     private final Messages messages;
 
