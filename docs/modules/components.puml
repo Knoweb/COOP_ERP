@@ -17,9 +17,9 @@ Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApp
 }
 
 Rel(CoopErpApplication.CoopErpApplication.M3PricingRules, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.PlatformKernel, CoopErpApplication.CoopErpApplication.Engine, "depends on", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.Hellotemplatemodule, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
-Rel(CoopErpApplication.CoopErpApplication.PlatformKernel, CoopErpApplication.CoopErpApplication.Engine, "depends on", $techn="", $tags="", $link="")
 
 SHOW_LEGEND(true)
 @enduml
