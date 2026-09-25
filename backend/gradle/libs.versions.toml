@@ -38,6 +38,7 @@ postgresql = "42.7.12"             # Boot 3.5.16: 42.7.11. CVE-2026-54291 (HIGH)
 icu4j = "78.3"                     # K-06. The latest release.
 aws-sdk = "2.55.1"                 # K-09. The latest release of the AWS SDK v2 line.
 shedlock = "6.10.0"                # K-12. The latest of the 6 line, which is built against Spring Framework 6.2, the one Spring Boot 3.5 carries. ShedLock 7 is built against Spring Framework 7 (Spring Boot 4) and is held in .github/dependabot.yml until this repository moves.
+bouncycastle = "1.80"               # K-02. Spring Security's Argon2PasswordEncoder is a wrapper over Bouncy Castle's Argon2 (19A section 2: the till PIN hash); Spring Boot does not manage the library.
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
@@ -75,3 +76,4 @@ aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 aws-sdk-s3 = { module = "software.amazon.awssdk:s3", version.ref = "aws-sdk" }  # K-09. The S3 protocol, not a vendor: 19A section 9 asks for a provider-neutral client with path-style addressing, which is what MinIO needs and what the same code gives on any other S3 service. MinIO's own io.minio client would tie the kernel to MinIO, which AGENTS.md forbids for the broker and the identity provider for the same reason.
 shedlock-spring = { module = "net.javacrumbs.shedlock:shedlock-spring", version.ref = "shedlock" }  # K-12 job runner (19A section 12)
 shedlock-provider-jdbc-template = { module = "net.javacrumbs.shedlock:shedlock-provider-jdbc-template", version.ref = "shedlock" }  # K-12: the kernel.shedlock table, no second data store
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }  # K-02: the Argon2id implementation behind PinHasher

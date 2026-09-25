@@ -154,6 +154,12 @@ dependencies {
     implementation(platform(libs.aws.sdk.bom))
     implementation(libs.aws.sdk.s3)
 
+    // K-02: the resource server verifies the provider's tokens against its JWKS (19A section 2). The
+    // security configuration (kernel.internal.security.SecurityConfig) keeps the endpoints open that
+    // must stay open; the Argon2id of PinHasher runs on Bouncy Castle.
+    implementation(libs.spring.boot.starter.oauth2.resource.server)
+    implementation(libs.bouncycastle.bcprov)
+
     // K-06: ICU MessageFormat, NFC, collation-aware helpers and LATN digits (19A section 6).
     implementation(libs.icu4j)
 
