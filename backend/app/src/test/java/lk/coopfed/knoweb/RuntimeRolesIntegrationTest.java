@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -17,6 +18,10 @@ import org.springframework.test.context.ActiveProfiles;
  * today: only the web role serves the API.
  *
  * <p>Each nested class starts the application once under its role, against the same database.
+ * The two worker contexts are closed when their tests end: Spring would otherwise keep them
+ * for the rest of the run, with the outbox relay and the job scheduler polling the shared
+ * database every half second, and a relay of another test then found the advisory lock
+ * taken (the event backbone and relay lock tests failed now and then in full runs only).
  */
 class RuntimeRolesIntegrationTest {
 
@@ -42,6 +47,7 @@ class RuntimeRolesIntegrationTest {
 
     @Nested
     @ActiveProfiles("worker")
+    @DirtiesContext
     class WorkerRole extends PostgresIntegrationTest {
 
         @Autowired
@@ -70,6 +76,7 @@ class RuntimeRolesIntegrationTest {
 
     @Nested
     @ActiveProfiles({"web", "worker"})
+    @DirtiesContext
     class WebAndWorkerTogether extends PostgresIntegrationTest {
 
         @Autowired
