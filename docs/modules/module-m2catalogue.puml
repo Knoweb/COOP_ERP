@@ -1,0 +1,19 @@
+@startuml
+set separator none
+title M2 Catalogue & Batch
+
+top to bottom direction
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
+  Component(CoopErpApplication.CoopErpApplication.PlatformKernel, "Platform Kernel", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.M2CatalogueBatch, "M2 Catalogue & Batch", $techn="Module", $descr="", $tags="", $link="")
+}
+
+Rel(CoopErpApplication.CoopErpApplication.M2CatalogueBatch, CoopErpApplication.CoopErpApplication.PlatformKernel, "depends on", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+@enduml

@@ -1,0 +1,37 @@
+# The governed tags (22A section 3.1; doc 22 section 3.5): the Federation's vocabulary, owner
+# null, readable by every scope. Policies of M3 and M5 attach to governed tags only. core-range
+# marks the goods every shop can sell (doc 22 section 3.8). Loaded by M2SeedLoader on start: a
+# tag is inserted when its code is absent and never changed afterwards.
+tags:
+  - code: core-range
+    en: Core range
+    si: මූලික පරාසය
+    ta: அடிப்படை வரம்பு
+  - code: rice
+    en: Rice
+    si: සහල්
+    ta: அரிசி
+  - code: dairy
+    en: Dairy
+    si: කිරි නිෂ්පාදන
+    ta: பால் பொருட்கள்
+  - code: frozen
+    en: Frozen
+    si: ශීත කළ
+    ta: உறைந்தவை
+  - code: fresh-produce
+    en: Fresh produce
+    si: නැවුම් නිෂ්පාදන
+    ta: புதிய விளைபொருட்கள்
+  - code: dry-goods
+    en: Dry goods
+    si: වියළි භාණ්ඩ
+    ta: உலர் பொருட்கள்
+  - code: household
+    en: Household
+    si: ගෘහ භාණ්ඩ
+    ta: வீட்டுப் பொருட்கள்
+  - code: controlled-price
+    en: Controlled price
+    si: පාලිත මිල
+    ta: கட்டுப்படுத்தப்பட்ட விலை

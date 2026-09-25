@@ -1,0 +1,28 @@
+# Tax categories and their rates (22A section 3.1; doc 22 section 3.6: standard VAT only,
+# exempt and zero-rated as categories with a 0% rate row). Loaded by M2SeedLoader on start
+# with the Federation as owner (coop-erp.system.entity-id); a category is inserted when its
+# code is absent, a rate when no rate of the category overlaps it, and nothing is changed
+# afterwards. A new rate is published through PublishTaxRate (M2-03), never by editing this
+# file. "from" is the rate's effective_from, the apply_from of the publication.
+tax:
+  - code: STD
+    en: Standard VAT
+    si: සම්මත වැට්
+    ta: நிலையான வாட்
+    rates:
+      - percent: "18.00"
+        from: "2024-01-01"
+  - code: ZERO
+    en: Zero-rated
+    si: ශුන්‍ය අනුපාතික
+    ta: பூஜ்ஜிய விகிதம்
+    rates:
+      - percent: "0.00"
+        from: "2000-01-01"
+  - code: EXEMPT
+    en: Exempt
+    si: බදු නිදහස්
+    ta: வரி விலக்கு
+    rates:
+      - percent: "0.00"
+        from: "2000-01-01"
