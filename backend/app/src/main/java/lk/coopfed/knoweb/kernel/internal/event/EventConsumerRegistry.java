@@ -64,7 +64,9 @@ public class EventConsumerRegistry implements BeanPostProcessor {
 
     Optional<Registration> find(String consumer, String eventType) {
 
-        return Optional.ofNullable(registrations.get(new Key(consumer, eventType)));
+        Registration exact = registrations.get(new Key(consumer, eventType));
+        // A consumer of every type ("*") is handed the envelope and the payload (K-10 notifications).
+        return Optional.ofNullable(exact != null ? exact : registrations.get(new Key(consumer, "*")));
     }
 
     Map<String, java.util.Set<String>> bindings() {

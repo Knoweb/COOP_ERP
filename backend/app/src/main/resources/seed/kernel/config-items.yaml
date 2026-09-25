@@ -70,3 +70,36 @@ config_items:
     scope_kind: LOCATION
     change_permission: sys.config.manage
     till_visible: true
+  - key: notification.sms.quiet_hours
+    value_type: STRING
+    schema: { pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$|^$" }
+    description_en: The hours during which no SMS is sent, as HH:mm-HH:mm; empty for none
+    description_si: SMS නොයවන පැය, HH:mm-HH:mm ලෙස; නොමැති නම් හිස්
+    description_ta: SMS அனுப்பப்படாத நேரங்கள், HH:mm-HH:mm என; இல்லையெனில் வெற்று
+    default: "22:00-07:00"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+  - key: notification.sms.enabled
+    value_type: BOOLEAN
+    description_en: Whether SMS notifications are sent at all for this entity (the kill switch)
+    description_si: මෙම ආයතනය සඳහා SMS දැනුම්දීම් යවනවාද (නවත්වන ස්විචය)
+    description_ta: இந்த நிறுவனத்திற்கு SMS அறிவிப்புகள் அனுப்பப்படுமா (நிறுத்தும் சுவிட்ச்)
+    default: true
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+  - key: notification.email.enabled
+    value_type: BOOLEAN
+    description_en: Whether e-mail notifications are sent at all for this entity (the kill switch)
+    description_si: මෙම ආයතනය සඳහා විද්‍යුත් තැපැල් දැනුම්දීම් යවනවාද (නවත්වන ස්විචය)
+    description_ta: இந்த நிறுவனத்திற்கு மின்னஞ்சல் அறிவிப்புகள் அனுப்பப்படுமா (நிறுத்தும் சுவிட்ச்)
+    default: true
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+  - key: notification.in_app.enabled
+    value_type: BOOLEAN
+    description_en: Whether in-app notifications are raised at all for this entity (the kill switch)
+    description_si: මෙම ආයතනය සඳහා යෙදුම් තුළ දැනුම්දීම් නගනවාද (නවත්වන ස්විචය)
+    description_ta: இந்த நிறுவனத்திற்கு பயன்பாட்டினுள் அறிவிப்புகள் எழுப்பப்படுமா (நிறுத்தும் சுவிட்ச்)
+    default: true
+    scope_kind: ENTITY
+    change_permission: sys.config.manage

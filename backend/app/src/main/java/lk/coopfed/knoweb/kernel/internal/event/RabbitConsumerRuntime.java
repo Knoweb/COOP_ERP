@@ -83,7 +83,9 @@ public class RabbitConsumerRuntime {
 
             for (String eventType : binding.getValue()) {
 
-                admin.declareBinding(BindingBuilder.bind(queue).to(exchange).with(eventType));
+                // "*" is every type: the topic exchange spells that "#".
+                admin.declareBinding(
+                        BindingBuilder.bind(queue).to(exchange).with("*".equals(eventType) ? "#" : eventType));
             }
 
             SimpleMessageListenerContainer container = new SimpleMessageListenerContainer(connectionFactory);
