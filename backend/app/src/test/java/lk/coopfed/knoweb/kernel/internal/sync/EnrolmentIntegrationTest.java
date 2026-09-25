@@ -178,7 +178,7 @@ class EnrolmentIntegrationTest extends SyncIntegrationTest {
         ResponseEntity<JsonNode> foreign = post(
                 "/v1/sync/devices/" + DEVICE + "/enrolment-codes",
                 null,
-                TestIdentityProvider.headers(ADMIN, OTHER_ENTITY));
+                TestIdentityProvider.entityWideHeaders(ADMIN, OTHER_ENTITY));
         assertRefused(foreign, HttpStatus.UNPROCESSABLE_ENTITY, "sync.enrolment.device_not_enrollable");
 
         superuserJdbc()
@@ -208,7 +208,9 @@ class EnrolmentIntegrationTest extends SyncIntegrationTest {
 
     private ResponseEntity<JsonNode> issueCode() {
         return post(
-                "/v1/sync/devices/" + DEVICE + "/enrolment-codes", null, TestIdentityProvider.headers(ADMIN, ENTITY));
+                "/v1/sync/devices/" + DEVICE + "/enrolment-codes",
+                null,
+                TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY));
     }
 
     private ResponseEntity<JsonNode> enrol(String code, String serial) {

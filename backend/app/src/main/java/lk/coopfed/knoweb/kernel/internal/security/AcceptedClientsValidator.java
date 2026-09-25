@@ -30,13 +30,21 @@ final class AcceptedClientsValidator implements OAuth2TokenValidator<Jwt> {
     @Override
     public OAuth2TokenValidatorResult validate(Jwt token) {
         String party = token.getClaimAsString(AUTHORIZED_PARTY);
-        if (party != null && (acceptedClients.contains(party) || party.startsWith(devicePrefix))) {
-            return OAuth2TokenValidatorResult.success();
+        if (party != null) {
+            // The client the token was issued to decides alone: an audience naming the web
+            // client does not open the API to a token another client obtained.
+            return acceptedClients.contains(party) || party.startsWith(devicePrefix)
+                    ? OAuth2TokenValidatorResult.success()
+                    : refused();
         }
         List<String> audience = token.getAudience();
         if (audience != null && audience.stream().anyMatch(acceptedClients::contains)) {
             return OAuth2TokenValidatorResult.success();
         }
+        return refused();
+    }
+
+    private static OAuth2TokenValidatorResult refused() {
         return OAuth2TokenValidatorResult.failure(
                 new OAuth2Error("invalid_token", "The token was not issued to a client of this platform", null));
     }

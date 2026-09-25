@@ -180,6 +180,23 @@ class JwtClaimsMapperTest {
     }
 
     @Test
+    void onlyALocalOrTestIssuerIsADevelopmentIssuer() {
+        // password-reauth-counts with any other issuer is logged at ERROR when the mapper starts.
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://localhost:8085/realms/coop"))
+                .isTrue();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://127.0.0.1:8085/realms/coop"))
+                .isTrue();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://provider.test/realms/coop"))
+                .isTrue();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("https://id.coopfed.lk/realms/coop"))
+                .isFalse();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("https://localhost.evil.lk/realms/coop"))
+                .isFalse();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("")).isFalse();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer(null)).isFalse();
+    }
+
+    @Test
     void anExternalCallerWithoutAGrantsClaimGetsTheRecordedGrants() {
         Jwt external = jwt(Map.of("sub", USER.toString(), "cls", "EXTERNAL_TIMEBOXED"));
         assertThat(mapper.map(external, null, null, null, null).grantedEntities())

@@ -548,7 +548,7 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders headers(UUID asEntity) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(FED_ADMIN, asEntity));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(FED_ADMIN, asEntity));
         headers.set("X-Scope-Entity", asEntity.toString());
         return headers;
     }

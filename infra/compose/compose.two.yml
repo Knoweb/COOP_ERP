@@ -18,6 +18,10 @@ services:
       file: compose.yml
       service: backend
     ports: !reset []
+    # Inherited from the backend through extends; named here too so the two instances are seen
+    # to judge a step-up alike (the dev realm has no OTP; never outside development).
+    environment:
+      COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS: "true"
     depends_on:
       backend:
         condition: service_healthy

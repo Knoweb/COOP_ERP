@@ -194,7 +194,7 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(USER, MPCS));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(USER, MPCS));
         headers.set("X-Scope-Entity", MPCS.toString());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;

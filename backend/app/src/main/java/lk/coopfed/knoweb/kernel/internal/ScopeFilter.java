@@ -7,11 +7,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.security.LocationOwners;
 import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.security.SecurityProperties;
@@ -41,11 +45,14 @@ public class ScopeFilter extends OncePerRequestFilter {
     private final CurrentScope currentScope;
     private final ProblemResponses problems;
     private final ObjectMapper mapper;
+    private final LocationOwners locations;
 
-    public ScopeFilter(CurrentScope currentScope, ProblemResponses problems, ObjectMapper mapper) {
+    public ScopeFilter(
+            CurrentScope currentScope, ProblemResponses problems, ObjectMapper mapper, LocationOwners locations) {
         this.currentScope = currentScope;
         this.problems = problems;
         this.mapper = mapper;
+        this.locations = locations;
     }
 
     @Override
@@ -55,7 +62,7 @@ public class ScopeFilter extends OncePerRequestFilter {
         ScopeContext scope;
         try {
             scope = currentScope.get();
-            validate(scope);
+            validate(scope, locations::ownerOf);
             validatePrincipal(
                     scope,
                     request.getRequestURI().substring(request.getContextPath().length()));
@@ -87,7 +94,7 @@ public class ScopeFilter extends OncePerRequestFilter {
                 || path.equals(request.getContextPath() + "/error");
     }
 
-    private static void validate(ScopeContext scope) {
+    static void validate(ScopeContext scope, Function<UUID, Optional<UUID>> ownerOf) {
         if (scope == null) {
             throw new ProblemException("scope.invalid");
         }
@@ -96,7 +103,7 @@ public class ScopeFilter extends OncePerRequestFilter {
             throw new ProblemException("scope.required");
         }
 
-        if (scope.activeScope() != null && !holds(scope, scope.activeScope())) {
+        if (scope.activeScope() != null && !holds(scope, scope.activeScope(), ownerOf)) {
             throw new ProblemException("scope.invalid");
         }
     }
@@ -104,11 +111,19 @@ public class ScopeFilter extends OncePerRequestFilter {
     /**
      * A held scope, or a location of an entity the caller holds entity-wide: doc 19 section 3.1
      * expands an entity grant to every location, so the administrator of a society may act at
-     * any of its shops (a location of another entity shows nothing under row-level security).
+     * any of its shops, and only its own: the location must belong to that entity (M1's
+     * {@code party.location}), else an entity-wide holder could name another entity's shop, and
+     * the OWN write policies, which test the entity and the location apart, would let it write.
      */
-    static boolean holds(ScopeContext scope, Scope active) {
-        return scope.scopes().contains(active)
-                || (active.locationId() != null && scope.scopes().contains(new Scope(active.entityId(), null)));
+    static boolean holds(ScopeContext scope, Scope active, Function<UUID, Optional<UUID>> ownerOf) {
+        if (scope.scopes().contains(active)) {
+            return true;
+        }
+        return active.locationId() != null
+                && scope.scopes().contains(new Scope(active.entityId(), null))
+                && ownerOf.apply(active.locationId())
+                        .filter(owner -> owner.equals(active.entityId()))
+                        .isPresent();
     }
 
     /**

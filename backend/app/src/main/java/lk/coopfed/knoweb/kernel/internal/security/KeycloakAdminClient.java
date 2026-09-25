@@ -108,6 +108,12 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         return realmPath;
     }
 
+    /**
+     * Creates the login of a platform user. Every login created through the platform is of the
+     * OWN class ({@code cls = OWN}): M1's users are back-office and till users of an entity. A
+     * login of another class (a Federation viewer, an external reviewer) is not created here; it
+     * is set up in the provider by its administrator, and its class set there.
+     */
     @Override
     public String createUser(ScopeContext ctx, UUID userId, UUID homeEntityId, String username, Locale language) {
         assertInScope(ctx, homeEntityId);
@@ -181,6 +187,14 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         return new TemporaryPassword(value);
     }
 
+    /**
+     * Removes the user's OTP credentials and asks for a new one at the next sign-in. The
+     * required actions are read and then written back whole, so a {@link #setTemporaryPassword}
+     * for the same user running at the same moment can lose its UPDATE_PASSWORD between the read
+     * and the write (the provider has no add-one-action call). Accepted: both are an
+     * administrator's actions on one user, rarely concurrent, and repeating the reset restores
+     * the action; not serialised here.
+     */
     @Override
     public void resetTotp(ScopeContext ctx, String subjectId) {
         assertInScope(ctx, homeEntityOf(subjectId));
