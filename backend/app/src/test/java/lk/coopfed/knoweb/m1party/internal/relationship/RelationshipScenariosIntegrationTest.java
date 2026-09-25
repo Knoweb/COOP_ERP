@@ -38,6 +38,7 @@ import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipSide;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -529,9 +530,8 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
     private static HttpHeaders headers(UUID entity, String policyClass) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Dev-User", USER.toString());
+        headers.setBearerAuth(TestIdentityProvider.token(USER, entity, policyClass));
         headers.set("X-Scope-Entity", entity.toString());
-        headers.set("X-Dev-Scope-Class", policyClass);
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         return headers;
     }
