@@ -13,11 +13,9 @@
 --    row-level security policy"). So the definer is admitted the way the seed path is (kernel
 --    V0005, m1security V0006): a read policy TO app_seed, the migrator's group. The
 --    application connects as coop_app, which is not in that group, and sees nothing more.
-CREATE POLICY definer_read ON security.app_user
-    FOR SELECT TO app_seed USING (true);
-
-CREATE POLICY definer_read ON security.user_role
-    FOR SELECT TO app_seed USING (true);
+-- The two definer_read policies (app_user, user_role) this migration once created are
+-- created by V0010 (M1-08), which merged first; a merged migration is never edited, so this
+-- one simply relies on them.
 
 CREATE OR REPLACE FUNCTION security.username_taken(p_username text)
 RETURNS boolean
@@ -63,6 +61,20 @@ ALTER FUNCTION security.user_belongs_to_entity(uuid, uuid) RESET row_security;
 --    The same rule bounds an UPDATE; an INSERT keeps the entity test only, because a new user
 --    has no assignment yet (and user commands run in an entity-wide scope, M1-07).
 --    A merged migration is never edited: the V0001 policies are altered here.
+CREATE OR REPLACE FUNCTION security.user_has_any_assignment(p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, security
+AS $$
+    SELECT EXISTS (SELECT 1 FROM security.user_role WHERE user_id = p_user_id)
+$$;
+
+REVOKE ALL ON FUNCTION security.user_has_any_assignment(uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION security.user_has_any_assignment(uuid) TO app_rw;
+
 ALTER POLICY own_read ON security.app_user
     USING (
         kernel.scope_class() = 'OWN'
@@ -77,6 +89,13 @@ ALTER POLICY own_read ON security.app_user
                   AND (ur.scope_location_id IS NULL
                        OR ur.scope_location_id = kernel.scope_location())
             )
+            -- A user with no assignment yet is visible at every location of the entity: a
+            -- shop-scoped manager must see a new colleague to give the first assignment (M1-08,
+            -- "a caller at a location assigns there alone"). A sibling shop operator holds an
+            -- assignment elsewhere and stays hidden. Read as a definer: under the caller's own
+            -- policy on user_role an assignment at another shop is invisible and would count
+            -- as none.
+            OR NOT security.user_has_any_assignment(app_user.user_id)
         )
     );
 
@@ -94,6 +113,13 @@ ALTER POLICY own_update ON security.app_user
                   AND (ur.scope_location_id IS NULL
                        OR ur.scope_location_id = kernel.scope_location())
             )
+            -- A user with no assignment yet is visible at every location of the entity: a
+            -- shop-scoped manager must see a new colleague to give the first assignment (M1-08,
+            -- "a caller at a location assigns there alone"). A sibling shop operator holds an
+            -- assignment elsewhere and stays hidden. Read as a definer: under the caller's own
+            -- policy on user_role an assignment at another shop is invisible and would count
+            -- as none.
+            OR NOT security.user_has_any_assignment(app_user.user_id)
         )
     )
     WITH CHECK (

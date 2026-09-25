@@ -552,7 +552,9 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
         void seesItsShopsStaffAndTheEntityWideOnesButNoSiblingShop() {
             ScopeContext shopA = ScopeContext.dev(ADMIN, ENTITY, SHOP_A);
 
-            assertThat(visible(shopA)).containsExactlyInAnyOrder(atShopA, entityWide);
+            // The shop sees its own staff, the entity-wide ones and a colleague not yet placed
+            // anywhere (whom it may give a first assignment, M1-08); never a sibling shop's operator.
+            assertThat(visible(shopA)).containsExactlyInAnyOrder(atShopA, entityWide, unassigned);
             assertThat(queries.getUser(atShopB, shopA)).isEmpty();
             assertThat(visible(admin)).containsExactlyInAnyOrder(atShopA, atShopB, entityWide, unassigned);
             assertThat(visible(ScopeContext.dev(ADMIN, OTHER_ENTITY, null))).containsExactly(otherEntity);
