@@ -77,6 +77,21 @@ public final class TestIdentityProvider {
         return signed(KEY, user, homeEntity, policyClass, customise);
     }
 
+    /**
+     * A device token as the provider issues it to a till's client (K-08, KeycloakDeviceCredentials):
+     * the subject is the client's service account, the claims {@code dev} and {@code cls = DEVICE}.
+     */
+    public static String deviceToken(UUID deviceId) {
+        return signed(KEY, UUID.randomUUID(), null, "DEVICE", claims -> claims.claim("dev", deviceId.toString()));
+    }
+
+    /** Headers of a request from a till: its device token and nothing else. */
+    public static HttpHeaders deviceHeaders(UUID deviceId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(deviceToken(deviceId));
+        return headers;
+    }
+
     /** A token nobody should accept: signed by a key the JWKS does not carry. */
     public static String tokenFromAnotherKey(UUID user, UUID homeEntity) {
         return signed(OTHER_KEY, user, homeEntity, "OWN", claims -> {});

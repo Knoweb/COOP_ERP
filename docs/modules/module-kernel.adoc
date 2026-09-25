@@ -21,7 +21,10 @@
 * `l.c.k.k.api.PermissionResolver` (via `l.c.k.k.internal.security.JdbcPermissionResolver`)
 * `l.c.k.k.api.Sod` (via `l.c.k.k.internal.security.JdbcSod`)
 * `l.c.k.k.api.IdentityProviderClient` (via `l.c.k.k.internal.security.KeycloakAdminClient`)
+* `l.c.k.k.api.DeviceCredentials` (via `l.c.k.k.internal.security.KeycloakDeviceCredentials`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.security.TokenCurrentScope`)
+* `l.c.k.k.api.ChangeLog` (via `l.c.k.k.internal.sync.JdbcChangeLog`)
+* `l.c.k.k.api.SyncStatus` (via `l.c.k.k.internal.sync.JdbcSyncStatus`)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===

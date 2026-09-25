@@ -33,8 +33,9 @@ import org.springframework.web.client.RestClientException;
 /**
  * {@link IdentityProviderClient} over the provider's administration REST API (19A section 2,
  * "KeycloakAdminClient uses a service account limited to the users of the realm"). The
- * service account is a confidential client of the realm holding {@code manage-users} and
- * nothing else; its credentials are configuration, {@code coop-erp.security.oidc.admin.*}.
+ * service account is a confidential client of the realm holding {@code manage-users} and, since
+ * K-08, {@code manage-clients} for the tills' clients ({@link KeycloakDeviceCredentials}); its
+ * credentials are configuration, {@code coop-erp.security.oidc.admin.*}.
  *
  * <p>The API used is the plain administration REST API of the provider; no provider library
  * is on the class path, and the four calls (create a user, update a user, reset a password,
@@ -88,6 +89,15 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         this.jdbc = jdbc;
         this.system = system;
         this.clock = clock;
+    }
+
+    /** The administration API of the realm, for {@link KeycloakDeviceCredentials}, which shares the service account. */
+    RestClient rest() {
+        return rest;
+    }
+
+    String realmPath() {
+        return realmPath;
     }
 
     @Override
@@ -238,7 +248,7 @@ public class KeycloakAdminClient implements IdentityProviderClient {
 
     // ---- the provider ----
 
-    private void bearer(HttpHeaders headers) {
+    void bearer(HttpHeaders headers) {
         headers.setBearerAuth(serviceAccountToken());
     }
 
@@ -276,7 +286,7 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         }
     }
 
-    private <T> T call(java.util.function.Supplier<T> request) {
+    <T> T call(java.util.function.Supplier<T> request) {
         try {
             return request.get();
         } catch (RestClientException e) {

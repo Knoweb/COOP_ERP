@@ -191,7 +191,7 @@
       "username": "service-account-coop-erp-backend",
       "enabled": true,
       "serviceAccountClientId": "coop-erp-backend",
-      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users"] }
+      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users", "manage-clients", "view-clients", "query-clients"] }
     }
   ]
 }
