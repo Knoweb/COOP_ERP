@@ -20,8 +20,8 @@
 * `l.c.k.k.api.PinHasher` (via `l.c.k.k.internal.security.Argon2PinHasher`)
 * `l.c.k.k.api.PermissionResolver` (via `l.c.k.k.internal.security.JdbcPermissionResolver`)
 * `l.c.k.k.api.Sod` (via `l.c.k.k.internal.security.JdbcSod`)
+* `l.c.k.k.api.IdentityProviderClient` (via `l.c.k.k.internal.security.KeycloakAdminClient`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.security.TokenCurrentScope`)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
-* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===

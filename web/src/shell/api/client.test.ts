@@ -39,10 +39,25 @@ describe("the API client", () => {
     const headers = sent[0].headers;
     expect(headers.get("Authorization")).toBe("Bearer the-token");
     expect(headers.get("Accept-Language")).toBe("ta");
-    // Temporary until 19A K-02: the scope the token names, as the headers the 17A stub reads.
+    // The active scope: the entity the user acts in now (the server checks it against the token).
     expect(headers.get("X-Scope-Entity")).toBe(session.entityId);
-    expect(headers.get("X-Dev-Scope-Class")).toBe("OWN");
-    expect(headers.get("X-Dev-User")).toBe(session.userId);
+    expect(headers.get("X-Dev-User")).toBeNull();
+  });
+
+  it("sends the user for a fresh second factor when the server asks for one, and still reports the problem", async () => {
+    const stepUp = vi.fn();
+    const sent: Request[] = [];
+    const fetch = vi.fn(async (request: Request) => {
+      sent.push(request);
+      return json(401, { status: 401, code: "mfa.required", title: "Fresh second factor needed", params: { stepUpUrl: "http://idp/auth" } }, "application/problem+json");
+    });
+    const client = createClient<paths>({ baseUrl: "http://api.test", fetch });
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
+
+    const error = await client.GET("/v1/hello/greetings").catch((e: unknown) => e);
+
+    expect(stepUp).toHaveBeenCalledTimes(1);
+    expect((error as ApiProblem).problem.code).toBe("mfa.required");
   });
 
   it("refuses to send a mutating request without an Idempotency-Key", async () => {

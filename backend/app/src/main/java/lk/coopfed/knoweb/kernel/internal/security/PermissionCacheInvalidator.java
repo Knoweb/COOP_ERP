@@ -19,9 +19,11 @@ class PermissionCacheInvalidator {
     static final String CONSUMER = "kernel-permission-cache";
 
     private final JdbcPermissionResolver resolver;
+    private final JdbcUserScopes scopes;
 
-    PermissionCacheInvalidator(JdbcPermissionResolver resolver) {
+    PermissionCacheInvalidator(JdbcPermissionResolver resolver, JdbcUserScopes scopes) {
         this.resolver = resolver;
+        this.scopes = scopes;
     }
 
     @EventConsumer(
@@ -31,12 +33,15 @@ class PermissionCacheInvalidator {
         JsonNode user = payload.path("userId");
         if (user.isTextual()) {
             try {
-                resolver.invalidateUser(UUID.fromString(user.asText()));
+                UUID userId = UUID.fromString(user.asText());
+                resolver.invalidateUser(userId);
+                scopes.invalidateUser(userId);
                 return;
             } catch (IllegalArgumentException notAUuid) {
                 // fall through: empty everything
             }
         }
         resolver.invalidateAll();
+        scopes.invalidateAll();
     }
 }

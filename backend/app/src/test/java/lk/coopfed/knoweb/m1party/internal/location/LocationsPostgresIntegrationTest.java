@@ -43,6 +43,7 @@ import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.TillPositionView;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -598,7 +599,7 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theSliceRegistersAShopAndATillAndListsThem() {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", USER.toString());
+        headers.setBearerAuth(TestIdentityProvider.token(USER, MPCS));
         headers.set("X-Scope-Entity", MPCS.toString());
         headers.setContentType(MediaType.APPLICATION_JSON);
 

@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -208,7 +209,7 @@ class BulkRegisterIntegrationTest extends PostgresIntegrationTest {
 
     private ResponseEntity<JsonNode> upload(String csv, UUID asEntity) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", USER.toString());
+        headers.setBearerAuth(TestIdentityProvider.token(USER, asEntity));
         headers.set("X-Scope-Entity", asEntity.toString());
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);

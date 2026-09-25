@@ -1,14 +1,14 @@
 package lk.coopfed.knoweb.kernel.internal.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
-import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import lk.coopfed.knoweb.kernel.internal.stub.DevScopeContextProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -25,49 +25,29 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *
  * <pre>
  *   Authorization      Bearer token of the provider
- *   X-Scope-Entity     the entity to act in now (one of the token's scopes)
+ *   X-Scope-Entity     the entity to act in now (one of the caller's scopes)
  *   X-Scope-Location   the location within it
  *   X-Correlation-Id   groups everything one user action causes
  *   Accept-Language    en, si or ta, when the token names no language
  * </pre>
  *
- * <p><b>Until the second K-02 pull request:</b> a request that presents no token may still
- * name its user and scope in the 17A development headers (X-Dev-User, X-Dev-Scope-Class,
- * X-Scope-Entity, X-Scope-Location), while {@code coop-erp.security.dev-headers} is true. The
- * web client sends both, the token and the headers, and the token wins when it is there. The
- * module tests send the headers alone. The second pull request deletes the headers on both
- * sides, {@link DevScopeContextProvider} with them, and a request without a token then gets
- * no user and no scope: nothing to read and nothing to run.
+ * <p>A request without a token reaches this only where the security chain lets one through
+ * (nothing under {@code /v1}); it gets a context with no user and no scope: nothing to read,
+ * nothing to run.
  */
 @Component
 public class TokenCurrentScope implements CurrentScope {
-
-    private static final Logger log = LoggerFactory.getLogger(TokenCurrentScope.class);
 
     public static final String HEADER_ENTITY = "X-Scope-Entity";
     public static final String HEADER_LOCATION = "X-Scope-Location";
     public static final String HEADER_CORRELATION = "X-Correlation-Id";
 
-    static final String DEV_HEADER_USER = "X-Dev-User";
-    static final String DEV_HEADER_CLASS = "X-Dev-Scope-Class";
-
     static final String REQUEST_ATTRIBUTE = ScopeContext.class.getName();
 
     private final JwtClaimsMapper mapper;
-    private final DevScopeContextProvider devHeaders;
-    private final boolean devHeadersAccepted;
 
-    public TokenCurrentScope(
-            JwtClaimsMapper mapper,
-            DevScopeContextProvider devHeaders,
-            @Value("${coop-erp.security.dev-headers:false}") boolean devHeadersAccepted) {
+    public TokenCurrentScope(JwtClaimsMapper mapper) {
         this.mapper = mapper;
-        this.devHeaders = devHeaders;
-        this.devHeadersAccepted = devHeadersAccepted;
-        if (devHeadersAccepted) {
-            log.warn("A request without a bearer token may name its user in the X-Dev-User header"
-                    + " (coop-erp.security.dev-headers=true): development and tests only, never outside");
-        }
     }
 
     @Override
@@ -89,27 +69,33 @@ public class TokenCurrentScope implements CurrentScope {
     private ScopeContext resolve(HttpServletRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Locale requestLocale = request.getHeader("Accept-Language") == null ? null : request.getLocale();
+        String correlation = request.getHeader(HEADER_CORRELATION);
 
         if (authentication instanceof JwtAuthenticationToken token) {
             return mapper.map(
                     token.getToken(),
                     request.getHeader(HEADER_ENTITY),
                     request.getHeader(HEADER_LOCATION),
-                    request.getHeader(HEADER_CORRELATION),
+                    correlation,
                     requestLocale);
         }
 
+        UUID correlationId;
         try {
-            return devHeaders.fromHeaders(
-                    devHeadersAccepted ? request.getHeader(DEV_HEADER_USER) : null,
-                    request.getHeader(HEADER_ENTITY),
-                    request.getHeader(HEADER_LOCATION),
-                    devHeadersAccepted ? request.getHeader(DEV_HEADER_CLASS) : null,
-                    request.getHeader(HEADER_CORRELATION),
-                    requestLocale == null ? null : requestLocale.getLanguage());
-        } catch (IllegalArgumentException e) {
-            // A header that is not a UUID, or a policy class that does not exist.
-            throw new ProblemException("scope.invalid");
+            correlationId = correlation == null || correlation.isBlank() ? Ids.next() : UUID.fromString(correlation);
+        } catch (IllegalArgumentException notAUuid) {
+            correlationId = Ids.next();
         }
+        return new ScopeContext(
+                null,
+                null,
+                null,
+                List.of(),
+                null,
+                PolicyClass.NONE,
+                Set.of(),
+                null,
+                requestLocale == null ? Locale.ENGLISH : Locale.forLanguageTag(requestLocale.getLanguage()),
+                correlationId);
     }
 }
