@@ -65,6 +65,12 @@ coop-erp:
   system:
     entity-id: ${COOP_ERP_SYSTEM_ENTITY_ID:}
 
+  # K-03b resolves every command's permission from M1's roles; it refuses only when this is
+  # true. Off until K-02 puts the token's user behind a request: the development stub takes
+  # the user from a header, and the dev realm's users hold no roles in the security schema yet.
+  security:
+    enforce-permissions: ${COOP_ERP_ENFORCE_PERMISSIONS:false}
+
   # The object store of the attachments (19A section 9), behind the S3 protocol: any S3 service,
   # MinIO on a developer machine. The endpoint is what the backend reaches; the public endpoint
   # is what a browser or a till reaches with a pre-signed URL (the same one outside compose).
