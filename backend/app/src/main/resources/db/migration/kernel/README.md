@@ -7,7 +7,7 @@ are reserved per lane before the lanes start.
 
 Below `V0010` are the baseline and what it still needed (`V0001` to `V0006`). Taken so far:
 `V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0050` (K-07
-documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration).
+documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies).
 
 The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
 19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.
