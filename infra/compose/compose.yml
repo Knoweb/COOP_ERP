@@ -201,6 +201,12 @@ services:
       COOP_ERP_RELAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-coop_erp}
       COOP_ERP_RELAY_USER: ${RELAY_DB_USER:-coop_relay}
       COOP_ERP_RELAY_PASSWORD: ${RELAY_DB_PASSWORD:-coop_relay}
+      # K-02: the tokens carry the public address of the provider (KC_HOSTNAME below), the backend
+      # fetches the signing keys inside the compose network. Permissions are enforced here: the
+      # dev realm's users hold the roles of seed/m1security/users.dev.sql.
+      OIDC_ISSUER: http://localhost:8085/realms/coop
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/coop/protocol/openid-connect/certs
+      COOP_ERP_ENFORCE_PERMISSIONS: ${COOP_ERP_ENFORCE_PERMISSIONS:-true}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: ${RABBITMQ_USER:-coop}
