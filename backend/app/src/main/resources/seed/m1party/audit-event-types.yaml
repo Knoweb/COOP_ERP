@@ -73,27 +73,54 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Till position retired
-
+  - code: EXTERNAL_GRANT_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access granted to a regulator or auditor
+  - code: EXTERNAL_GRANT_REVOKED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access revoked
+  - code: EXTERNAL_GRANT_EXPIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access expired
+  - code: RELATIONSHIP_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship opened in draft
+  - code: RELATIONSHIP_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship activated
+  - code: RELATIONSHIP_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship terms amended from a date
+  - code: RELATIONSHIP_SUSPENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship suspended
+  - code: CREDIT_LIMIT_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Credit limit of a trading relationship changed
   - code: USER_CREATED
     severity: INFO
     offline_capturable: false
     description_en: User created and login opened at the identity provider
-
   - code: USER_UPDATED
     severity: INFO
     offline_capturable: false
     description_en: User details changed
-
   - code: USER_ACTIVATED
     severity: INFO
     offline_capturable: false
     description_en: User activated by the first credential or unlocked by a new one
-
   - code: USER_CREDENTIAL_RESET
     severity: INFO
     offline_capturable: false
     description_en: User credential reset (temporary password, second factor or till PIN)
-
   - code: USER_DEACTIVATED
     severity: INFO
     offline_capturable: false
