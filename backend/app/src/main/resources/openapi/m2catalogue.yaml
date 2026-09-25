@@ -1,0 +1,19 @@
+# OpenAPI slice of M2 Catalogue & Batch (22A section 5). M2-01 publishes the slice with no
+# operation yet: the operations arrive ticket by ticket, each with its handler, from M2-02 (the
+# SKU commands and the search and get queries) on, and the slice freezes as v1 at M2-11.
+#
+# Rules every operation added here obeys (AGENTS.md; hello.yaml is the worked example):
+#   - it names its permission in x-permission, the same string as its @CommandHandler; the
+#     codes are the cat.* permissions of seed/m1party/permissions.yaml
+#   - a mutating operation requires the Idempotency-Key header of common.yaml
+#   - the shape of a request is written in its schema; a business rule is a handler guard
+#   - it has a tag: Catalogue gives the generated Java interface CatalogueApi
+# After changing this file run `make gen-clients` and commit web/src/generated/m2catalogue.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP M2 Catalogue & Batch API
+  version: 0.1.0
+  description: >
+    Catalogue items (SKUs), units and conversions, barcodes, tags, tax categories and rates,
+    batches, images, suppliers, import and the steward's tools. Paths are under /v1/catalogue.
+paths: {}
