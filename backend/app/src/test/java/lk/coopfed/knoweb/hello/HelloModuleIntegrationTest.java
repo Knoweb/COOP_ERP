@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.hello.api.GreetingRegistered;
 import lk.coopfed.knoweb.hello.api.GreetingView;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,7 +84,10 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
     void withoutAScopeNothingIsVisible() {
         register(entityA, "Hello from A");
 
-        assertThat(list(new HttpHeaders()).getBody()).isEmpty();
+        // A signed-in caller of no class and no entity: the token is good, the scope shows nothing.
+        HttpHeaders nobody = new HttpHeaders();
+        nobody.setBearerAuth(TestIdentityProvider.token(UUID.fromString(REQUEST_USER.get()), null, "NONE"));
+        assertThat(list(nobody).getBody()).isEmpty();
     }
 
     @Test
@@ -92,7 +96,8 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
         register(entityB, "Hello from B");
 
         HttpHeaders fedView = scope(federation);
-        fedView.set("X-Dev-Scope-Class", "FEDERATION_VIEW");
+        fedView.setBearerAuth(
+                TestIdentityProvider.token(UUID.fromString(REQUEST_USER.get()), federation, "FEDERATION_VIEW"));
 
         assertThat(list(fedView).getBody()).hasSize(2);
     }
@@ -202,8 +207,14 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void registeringWithoutAScopeIsRefused() {
-        ResponseEntity<JsonNode> response =
-                post(new HttpHeaders(), UUID.randomUUID().toString(), Map.of("textEn", "Hello"));
+        // A caller of two scopes who did not say which one: the scope filter asks (K-02).
+        HttpHeaders undecided = new HttpHeaders();
+        undecided.setBearerAuth(TestIdentityProvider.token(
+                UUID.fromString(REQUEST_USER.get()),
+                entityA,
+                "OWN",
+                claims -> claims.claim("scopes", java.util.List.of(entityA.toString(), entityB.toString()))));
+        ResponseEntity<JsonNode> response = post(undecided, UUID.randomUUID().toString(), Map.of("textEn", "Hello"));
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "scope.required");
         assertThat(kernel.committedAudit()).isEmpty();
@@ -354,7 +365,7 @@ class HelloModuleIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders scope(UUID entity) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", REQUEST_USER.get());
+        headers.setBearerAuth(TestIdentityProvider.token(UUID.fromString(REQUEST_USER.get()), entity));
         headers.set("X-Scope-Entity", entity.toString());
         return headers;
     }

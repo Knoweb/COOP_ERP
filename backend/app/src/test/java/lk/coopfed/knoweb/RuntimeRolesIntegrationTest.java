@@ -15,7 +15,8 @@ import org.springframework.test.context.ActiveProfiles;
 /**
  * The done criterion of S0-02: the application starts under each of its three roles, with
  * health and metrics under all of them (17A section 4.1). And the one difference that exists
- * today: only the web role serves the API.
+ * today: only the web role serves the API (which, without a token, answers 401: it is there
+ * and asks for a sign-in; a worker answers 404: on that instance it does not exist).
  *
  * <p>Each nested class starts the application once under its role, against the same database.
  * The two worker contexts are closed when their tests end: Spring would otherwise keep them
@@ -40,7 +41,7 @@ class RuntimeRolesIntegrationTest {
         void isTheDefaultAndServesTheApi() {
             // Nobody set COOP_ERP_ROLE: application.yml makes "web" the active profile.
             assertThat(environment.getActiveProfiles()).containsExactly("web");
-            assertThat(http.getForEntity(API, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(http.getForEntity(API, String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
             assertHealthAndMetrics(http);
         }
     }
@@ -84,7 +85,7 @@ class RuntimeRolesIntegrationTest {
 
         @Test
         void serveTheApiAsTheLocalStackDoes() {
-            assertThat(http.getForEntity(API, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(http.getForEntity(API, String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }
 

@@ -28,6 +28,7 @@ import lk.coopfed.knoweb.m1party.api.ExternalGrantRevoked;
 import lk.coopfed.knoweb.m1party.query.ExternalGrantQueries;
 import lk.coopfed.knoweb.testsupport.KernelRecorder.AuditRecord;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -547,7 +548,7 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders headers(UUID asEntity) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", FED_ADMIN.toString());
+        headers.setBearerAuth(TestIdentityProvider.token(FED_ADMIN, asEntity));
         headers.set("X-Scope-Entity", asEntity.toString());
         return headers;
     }

@@ -11,14 +11,16 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 /**
- * A token the resource server refuses (bad signature, wrong issuer, expired, malformed) is
- * answered as every other refusal of this API: a problem document, here 401 {@code
- * token.invalid} (17A section 4.4), with the {@code WWW-Authenticate} header RFC 6750 asks for.
- * Without this, Spring Security answers an empty 401 that the web client cannot read.
+ * A request the resource server turns away is answered as every other refusal of this API: a
+ * problem document (17A section 4.4) with the {@code WWW-Authenticate} header RFC 6750 asks
+ * for. 401 {@code token.invalid} for a token it refuses (bad signature, wrong issuer, expired,
+ * malformed); 401 {@code auth.required} for a request that presents none. Without this,
+ * Spring Security answers an empty 401 that the web client cannot read.
  */
 @Component
 public class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -34,9 +36,12 @@ public class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException cause)
             throws IOException {
-        ProblemDetail problem = problems.toProblem(new ProblemException("token.invalid"), request.getLocale());
+        boolean refusedToken = cause instanceof InvalidBearerTokenException
+                || (cause.getCause() != null && cause.getCause() instanceof InvalidBearerTokenException);
+        String code = refusedToken ? "token.invalid" : "auth.required";
+        ProblemDetail problem = problems.toProblem(new ProblemException(code), request.getLocale());
         response.setStatus(problem.getStatus());
-        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\"");
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, refusedToken ? "Bearer error=\"invalid_token\"" : "Bearer");
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         mapper.writeValue(response.getWriter(), problem);
