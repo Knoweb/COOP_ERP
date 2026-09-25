@@ -92,6 +92,9 @@ public abstract class PostgresIntegrationTest {
         registry.add("coop-erp.relay.user", () -> RELAY_USER);
         registry.add("coop-erp.relay.password", () -> RELAY_PASSWORD);
         registry.add("management.health.rabbit.enabled", () -> "false");
+        // K-02: every request under /v1 carries a bearer token; the tests sign theirs here.
+        registry.add("coop-erp.security.oidc.issuer", () -> TestIdentityProvider.ISSUER);
+        registry.add("coop-erp.security.oidc.jwk-set-uri", TestIdentityProvider::jwkSetUri);
     }
 
     /**

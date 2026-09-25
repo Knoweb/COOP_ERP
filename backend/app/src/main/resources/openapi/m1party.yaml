@@ -834,6 +834,239 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/party/relationships:
+
+    get:
+      tags: [Relationships]
+      operationId: listRelationships
+      summary: The relationships in which the caller's entity is seller, buyer or either
+      description: >
+        Every row of every status, ordered by counterparty and effective date, so the history of
+        a pair reads in order (ListRelationships, 21A section 7). Row-level security decides
+        what the caller sees: its own relationships as seller or buyer; the Federation view
+        sees every relationship.
+      x-permission: prt.relationship.view
+
+      parameters:
+        - in: query
+          name: side
+          required: false
+          schema:
+            type: string
+            enum: [SELLER, BUYER]
+
+      responses:
+
+        '200':
+          description: The relationships, as rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelationshipResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Relationships]
+      operationId: openTradingRelationship
+      summary: Open a trading relationship in DRAFT, the caller's entity selling
+      description: >
+        The seller is the caller's entity. Codes: m1.relationship.seller_scope_required,
+        m1.relationship.self, m1.relationship.buyer_not_found, m1.relationship.party_not_trading,
+        m1.relationship.tier_not_allowed, m1.relationship.effective_range_invalid,
+        m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+      x-permission: prt.relationship.open
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenRelationshipRequest'
+
+      responses:
+
+        '201':
+          description: Relationship opened in DRAFT
+          headers:
+            Location:
+              description: Address of the new relationship
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/{relationshipId}:
+
+    get:
+      tags: [Relationships]
+      operationId: getRelationship
+      summary: One relationship row visible in the caller's scope
+      x-permission: prt.relationship.view
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: The relationship row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+
+        '404':
+          description: The relationship does not exist or is not visible to this scope
+
+  /v1/party/relationships/{relationshipId}/activate:
+
+    post:
+      tags: [Relationships]
+      operationId: activateRelationship
+      summary: Put a DRAFT relationship into force
+      description: >
+        Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_draft,
+        m1.relationship.price_list_required, m1.relationship.payment_terms_required,
+        m1.relationship.price_list_refused (M3's reason in params.reason),
+        m1.relationship.overlap.
+      x-permission: prt.relationship.activate
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Relationship activated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/{relationshipId}/amend:
+
+    post:
+      tags: [Relationships]
+      operationId: amendRelationshipTerms
+      summary: Amend the terms of an ACTIVE relationship from a date
+      description: >
+        Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE
+        row carries the new terms; the answer is the new row. A term left out keeps its current
+        value. A credit_limit change additionally requires bil.creditlimit.change with a fresh
+        second factor (mfa.required when stale). Codes: m1.relationship.not_found,
+        m1.relationship.not_active, m1.relationship.not_seller,
+        m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end,
+        m1.relationship.credit_limit_permission_required, mfa.required,
+        m1.relationship.reason_required, m1.relationship.terms_unchanged,
+        m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+      x-permission: prt.relationship.amend
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendTermsRequest'
+
+      responses:
+
+        '201':
+          description: The new row that carries the amended terms
+          headers:
+            Location:
+              description: Address of the new row
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/{relationshipId}/suspend:
+
+    post:
+      tags: [Relationships]
+      operationId: suspendRelationship
+      summary: Suspend an ACTIVE relationship; open documents are unaffected
+      description: >
+        Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_active,
+        m1.relationship.reason_required.
+      x-permission: prt.relationship.suspend
+      x-mfa: true
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipReasonRequest'
+
+      responses:
+
+        '204':
+          description: Relationship suspended
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/party/devices:
 
     get:
@@ -1098,6 +1331,7 @@ paths:
 
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
+
 
 
 
@@ -1668,6 +1902,182 @@ components:
           items:
             $ref: '#/components/schemas/ExternalGrantResponse'
 
+    OpenRelationshipRequest:
+      type: object
+      required: [buyerEntityId, effectiveFrom]
+      properties:
+        buyerEntityId:
+          type: string
+          format: uuid
+        priceListId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The seller's TRADE price list (M3); needed before activation
+        creditLimit:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 999999999999.99
+          description: Informative (ADR-12), in rupees
+        paymentTermsDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 365
+          description: Needed before activation
+        discrepancyWindowDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 90
+          description: Default 7
+        orderLockHoursBeforeEta:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 720
+          description: Default 24
+        allocationRule:
+          type:
+            - string
+            - 'null'
+          enum: [FCFS, PRO_RATA, QUOTA, null]
+          description: Default FCFS
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type:
+            - string
+            - 'null'
+          format: date
+          description: The last day; open-ended when left out
+
+    AmendTermsRequest:
+      type: object
+      required: [effectiveFrom, reasonCode]
+      properties:
+        effectiveFrom:
+          type: string
+          format: date
+          description: The first day of the new terms; after the current row's first day
+        priceListId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        creditLimit:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 999999999999.99
+        paymentTermsDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 365
+        discrepancyWindowDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 90
+        orderLockHoursBeforeEta:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 720
+        allocationRule:
+          type:
+            - string
+            - 'null'
+          enum: [FCFS, PRO_RATA, QUOTA, null]
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 60
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    RelationshipReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 60
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    RelationshipResponse:
+      type: object
+      required:
+        - relationshipId
+        - sellerEntityId
+        - buyerEntityId
+        - discrepancyWindowDays
+        - orderLockHoursBeforeEta
+        - allocationRule
+        - status
+        - effectiveFrom
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        priceListId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        creditLimit:
+          type:
+            - number
+            - 'null'
+        paymentTermsDays:
+          type:
+            - integer
+            - 'null'
+        discrepancyWindowDays:
+          type: integer
+        orderLockHoursBeforeEta:
+          type: integer
+        allocationRule:
+          type: string
+          enum: [FCFS, PRO_RATA, QUOTA]
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED]
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type:
+            - string
+            - 'null'
+          format: date
+
     EnrolDeviceRequest:
       type: object
       required: [hardwareSerial, deviceKind, locationId, appVersion, stagingReference]
@@ -1794,6 +2204,8 @@ components:
             - string
             - 'null'
           format: date-time
+
+  parameters:
 
   parameters:
 

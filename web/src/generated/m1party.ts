@@ -356,33 +356,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/party/devices": {
+    "/v1/party/relationships": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List the devices visible in the caller's scope, with the position each holds */
-        get: operations["listDevices"];
+        /**
+         * The relationships in which the caller's entity is seller, buyer or either
+         * @description Every row of every status, ordered by counterparty and effective date, so the history of a pair reads in order (ListRelationships, 21A section 7). Row-level security decides what the caller sees: its own relationships as seller or buyer; the Federation view sees every relationship.
+         */
+        get: operations["listRelationships"];
         put?: never;
-        /** Enrol a device at a location of the caller's entity, from its staging record */
-        post: operations["enrolDevice"];
+        /**
+         * Open a trading relationship in DRAFT, the caller's entity selling
+         * @description The seller is the caller's entity. Codes: m1.relationship.seller_scope_required, m1.relationship.self, m1.relationship.buyer_not_found, m1.relationship.party_not_trading, m1.relationship.tier_not_allowed, m1.relationship.effective_range_invalid, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         */
+        post: operations["openTradingRelationship"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/party/devices/{deviceId}": {
+    "/v1/party/relationships/{relationshipId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get one device visible in the caller's scope */
-        get: operations["getDevice"];
+        /** One relationship row visible in the caller's scope */
+        get: operations["getRelationship"];
         put?: never;
         post?: never;
         delete?: never;
@@ -391,7 +397,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/party/devices/{deviceId}/assign": {
+    "/v1/party/relationships/{relationshipId}/activate": {
         parameters: {
             query?: never;
             header?: never;
@@ -401,17 +407,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Assign a device to a till position; the position's counters move to it
-         * @description A position still held by a suspended device is taken over (the replacement of a faulty or stolen till): its counters move to the new device, which needs the old device's outbox drained, or outboxLossRecorded set by the administrator to record its loss.
+         * Put a DRAFT relationship into force
+         * @description Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_draft, m1.relationship.price_list_required, m1.relationship.payment_terms_required, m1.relationship.price_list_refused (M3's reason in params.reason), m1.relationship.overlap.
          */
-        post: operations["assignDeviceToPosition"];
+        post: operations["activateRelationship"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/party/devices/{deviceId}/suspend": {
+    "/v1/party/relationships/{relationshipId}/amend": {
         parameters: {
             query?: never;
             header?: never;
@@ -420,15 +426,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suspend an active device (lost, stolen, faulty); the till is revoked */
-        post: operations["suspendDevice"];
+        /**
+         * Amend the terms of an ACTIVE relationship from a date
+         * @description Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE row carries the new terms; the answer is the new row. A term left out keeps its current value. A credit_limit change additionally requires bil.creditlimit.change with a fresh second factor (mfa.required when stale). Codes: m1.relationship.not_found, m1.relationship.not_active, m1.relationship.not_seller, m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end, m1.relationship.credit_limit_permission_required, mfa.required, m1.relationship.reason_required, m1.relationship.terms_unchanged, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         */
+        post: operations["amendRelationshipTerms"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/party/devices/{deviceId}/reinstate": {
+    "/v1/party/relationships/{relationshipId}/suspend": {
         parameters: {
             query?: never;
             header?: never;
@@ -437,25 +446,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reinstate a suspended device once it is physically recovered */
-        post: operations["reinstateDevice"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/party/devices/{deviceId}/retire": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Retire an unassigned, wiped device for good; the till is revoked */
-        post: operations["retireDevice"];
+        /**
+         * Suspend an ACTIVE relationship; open documents are unaffected
+         * @description Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_active, m1.relationship.reason_required.
+         */
+        post: operations["suspendRelationship"];
         delete?: never;
         options?: never;
         head?: never;
@@ -671,60 +666,77 @@ export interface components {
         ExternalGrantList: {
             items: components["schemas"]["ExternalGrantResponse"][];
         };
-        EnrolDeviceRequest: {
-            hardwareSerial: string;
-            /** @enum {string} */
-            deviceKind: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE";
+        OpenRelationshipRequest: {
             /** Format: uuid */
-            locationId: string;
-            appVersion: components["schemas"]["AppVersion"];
-            /** @description The management agent's staging record that attests the device (doc 31) */
-            stagingReference: string;
-        };
-        AssignDeviceRequest: {
-            /** Format: uuid */
-            tillPositionId: string;
-            reasonCode: string;
-            reasonText?: string | null;
+            buyerEntityId: string;
             /**
-             * @description Set when the device giving the position up cannot be shown drained: its loss is recorded, and the numbers it took and never sent become a documented gap.
-             * @default false
+             * Format: uuid
+             * @description The seller's TRADE price list (M3); needed before activation
              */
-            outboxLossRecorded: boolean;
+            priceListId?: string | null;
+            /** @description Informative (ADR-12), in rupees */
+            creditLimit?: number | null;
+            /** @description Needed before activation */
+            paymentTermsDays?: number | null;
+            /** @description Default 7 */
+            discrepancyWindowDays?: number | null;
+            /** @description Default 24 */
+            orderLockHoursBeforeEta?: number | null;
+            /**
+             * @description Default FCFS
+             * @enum {string|null}
+             */
+            allocationRule?: "FCFS" | "PRO_RATA" | "QUOTA" | null;
+            /** Format: date */
+            effectiveFrom: string;
+            /**
+             * Format: date
+             * @description The last day; open-ended when left out
+             */
+            effectiveTo?: string | null;
         };
-        SuspendDeviceRequest: {
-            /** @enum {string} */
-            reasonCode: "LOST" | "STOLEN" | "FAULTY";
-            reasonText?: string | null;
-        };
-        DeviceReasonRequest: {
+        AmendTermsRequest: {
+            /**
+             * Format: date
+             * @description The first day of the new terms; after the current row's first day
+             */
+            effectiveFrom: string;
+            /** Format: uuid */
+            priceListId?: string | null;
+            creditLimit?: number | null;
+            paymentTermsDays?: number | null;
+            discrepancyWindowDays?: number | null;
+            orderLockHoursBeforeEta?: number | null;
+            /** @enum {string|null} */
+            allocationRule?: "FCFS" | "PRO_RATA" | "QUOTA" | null;
             reasonCode: string;
             reasonText?: string | null;
         };
-        /** @description A till release number, dot-separated whole numbers (doc 31) */
-        AppVersion: string;
-        DeviceResponse: {
+        RelationshipReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RelationshipResponse: {
             /** Format: uuid */
-            deviceId: string;
+            relationshipId: string;
             /** Format: uuid */
-            ownerEntityId: string;
+            sellerEntityId: string;
             /** Format: uuid */
-            locationId: string;
-            hardwareSerial: string;
+            buyerEntityId: string;
+            /** Format: uuid */
+            priceListId?: string | null;
+            creditLimit?: number | null;
+            paymentTermsDays?: number | null;
+            discrepancyWindowDays: number;
+            orderLockHoursBeforeEta: number;
             /** @enum {string} */
-            deviceKind: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE";
+            allocationRule: "FCFS" | "PRO_RATA" | "QUOTA";
             /** @enum {string} */
-            status: "ENROLLED" | "ACTIVE" | "SUSPENDED" | "RETIRED";
-            /** Format: uuid */
-            tillPositionId?: string | null;
-            positionNo?: number | null;
-            /** @description Whether the position it holds is its shop's primary till */
-            primaryTill: boolean;
-            appVersion?: string | null;
-            /** Format: date-time */
-            enrolledAt?: string | null;
-            /** Format: date-time */
-            lastSeenAt?: string | null;
+            status: "DRAFT" | "ACTIVE" | "SUSPENDED";
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string | null;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1453,11 +1465,10 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
-    listDevices: {
+    listRelationships: {
         parameters: {
             query?: {
-                locationId?: string;
-                status?: "ENROLLED" | "ACTIVE" | "SUSPENDED" | "RETIRED";
+                side?: "SELLER" | "BUYER";
             };
             header?: never;
             path?: never;
@@ -1465,19 +1476,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The devices, by location and serial */
+            /** @description The relationships, as rows */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceResponse"][];
+                    "application/json": components["schemas"]["RelationshipResponse"][];
                 };
             };
             400: components["responses"]["RequestProblem"];
         };
     };
-    enrolDevice: {
+    openTradingRelationship: {
         parameters: {
             query?: never;
             header: {
@@ -1489,46 +1500,46 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EnrolDeviceRequest"];
+                "application/json": components["schemas"]["OpenRelationshipRequest"];
             };
         };
         responses: {
-            /** @description Device enrolled */
+            /** @description Relationship opened in DRAFT */
             201: {
                 headers: {
-                    /** @description Address of the enrolled device */
+                    /** @description Address of the new relationship */
                     Location?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceResponse"];
+                    "application/json": components["schemas"]["RelationshipResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };
-    getDevice: {
+    getRelationship: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                deviceId: string;
+                relationshipId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Device */
+            /** @description The relationship row */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceResponse"];
+                    "application/json": components["schemas"]["RelationshipResponse"];
                 };
             };
-            /** @description Device does not exist or is not visible to this scope */
+            /** @description The relationship does not exist or is not visible to this scope */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1537,7 +1548,7 @@ export interface operations {
             };
         };
     };
-    assignDeviceToPosition: {
+    activateRelationship: {
         parameters: {
             query?: never;
             header: {
@@ -1545,30 +1556,57 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
-                deviceId: string;
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Relationship activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    amendRelationshipTerms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AssignDeviceRequest"];
+                "application/json": components["schemas"]["AmendTermsRequest"];
             };
         };
         responses: {
-            /** @description Device assigned */
-            200: {
+            /** @description The new row that carries the amended terms */
+            201: {
                 headers: {
+                    /** @description Address of the new row */
+                    Location?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceResponse"];
+                    "application/json": components["schemas"]["RelationshipResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };
-    suspendDevice: {
+    suspendRelationship: {
         parameters: {
             query?: never;
             header: {
@@ -1576,75 +1614,17 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
-                deviceId: string;
+                relationshipId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SuspendDeviceRequest"];
+                "application/json": components["schemas"]["RelationshipReasonRequest"];
             };
         };
         responses: {
-            /** @description Device suspended */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["RequestProblem"];
-            422: components["responses"]["RuleBroken"];
-        };
-    };
-    reinstateDevice: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                deviceId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeviceReasonRequest"];
-            };
-        };
-        responses: {
-            /** @description Device reinstated */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["RequestProblem"];
-            422: components["responses"]["RuleBroken"];
-        };
-    };
-    retireDevice: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                deviceId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeviceReasonRequest"];
-            };
-        };
-        responses: {
-            /** @description Device retired */
+            /** @description Relationship suspended */
             204: {
                 headers: {
                     [name: string]: unknown;

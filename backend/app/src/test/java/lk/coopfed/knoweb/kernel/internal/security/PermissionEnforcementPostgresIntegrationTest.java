@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,7 +95,7 @@ class PermissionEnforcementPostgresIntegrationTest extends PostgresIntegrationTe
 
     private ResponseEntity<JsonNode> register(String text) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", USER.toString());
+        headers.setBearerAuth(TestIdentityProvider.token(USER, ENTITY));
         headers.set("X-Scope-Entity", ENTITY.toString());
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         headers.setContentType(MediaType.APPLICATION_JSON);

@@ -70,11 +70,6 @@ coop-erp:
   # seed (seed/m1security/users.dev.sql); off in the module tests, which run as users of their own.
   security:
     enforce-permissions: ${COOP_ERP_ENFORCE_PERMISSIONS:false}
-    # K-02, first pull request: a request without a bearer token may still name its user and
-    # scope in the 17A development headers (X-Dev-User, X-Dev-Scope-Class). The module tests
-    # and the web client still send them; the second pull request deletes them on both sides
-    # and this switch with them. Never true outside a developer machine or CI.
-    dev-headers: ${COOP_ERP_DEV_HEADERS:true}
     # The OIDC provider (19A section 2), any one: the issuer its tokens carry (the public
     # address, the one the browser signed in at) and the JWKS the backend fetches the signing
     # keys from (inside compose, the provider's container address). The step-up address is
@@ -83,6 +78,15 @@ coop-erp:
       issuer: ${OIDC_ISSUER:http://localhost:8085/realms/coop}
       jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8085/realms/coop/protocol/openid-connect/certs}
       step-up-url: ${OIDC_STEP_UP_URL:http://localhost:8085/realms/coop/protocol/openid-connect/auth}
+      # The provider's administration API, for M1's user management behind
+      # IdentityProviderClient: a confidential client of the realm holding manage-users and
+      # nothing else (19A section 2; ADR-18). The secret is a development value; a deployed
+      # environment sets its own.
+      admin:
+        base-url: ${OIDC_ADMIN_URL:http://localhost:8085}
+        realm: ${OIDC_REALM:coop}
+        client-id: ${OIDC_ADMIN_CLIENT_ID:coop-erp-backend}
+        client-secret: ${OIDC_ADMIN_CLIENT_SECRET:coop-erp-backend-dev}
 
   # The object store of the attachments (19A section 9), behind the S3 protocol: any S3 service,
   # MinIO on a developer machine. The endpoint is what the backend reaches; the public endpoint
