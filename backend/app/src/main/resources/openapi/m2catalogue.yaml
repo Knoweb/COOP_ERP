@@ -1,19 +1,523 @@
-# OpenAPI slice of M2 Catalogue & Batch (22A section 5). M2-01 publishes the slice with no
-# operation yet: the operations arrive ticket by ticket, each with its handler, from M2-02 (the
-# SKU commands and the search and get queries) on, and the slice freezes as v1 at M2-11.
+# M2 Catalogue & Batch API slice.
 #
-# Rules every operation added here obeys (AGENTS.md; hello.yaml is the worked example):
-#   - it names its permission in x-permission, the same string as its @CommandHandler; the
-#     codes are the cat.* permissions of seed/m1party/permissions.yaml
-#   - a mutating operation requires the Idempotency-Key header of common.yaml
-#   - the shape of a request is written in its schema; a business rule is a handler guard
-#   - it has a tag: Catalogue gives the generated Java interface CatalogueApi
-# After changing this file run `make gen-clients` and commit web/src/generated/m2catalogue.ts.
+# Mutating operations use the kernel Idempotency-Key and x-permission contract.
+# Create/update/activate have two legitimate permission paths:
+#   ENTITY      -> cat.sku.create_local
+#   FEDERATION  -> cat.sku.create
+#
+# The kernel CommandInterceptor still authorizes the concrete handler that is
+# dispatched at runtime. x-permission-any-of documents that routing without
+# inventing a new permission code.
 openapi: 3.1.0
+
 info:
   title: COOP ERP M2 Catalogue & Batch API
   version: 0.1.0
   description: >
-    Catalogue items (SKUs), units and conversions, barcodes, tags, tax categories and rates,
-    batches, images, suppliers, import and the steward's tools. Paths are under /v1/catalogue.
-paths: {}
+    Catalogue SKU identity, lifecycle and search. Visibility of reads is governed
+    by catalogue RLS: SHARED is visible to authenticated scopes; LOCAL and DRAFT
+    remain owner-scoped, with Federation view according to the catalogue policies.
+
+paths:
+
+  /v1/catalogue/skus:
+
+    get:
+      tags: [Catalogue]
+      operationId: listSkus
+      summary: List or search SKUs visible in the current scope
+      x-permission: cat.sku.view
+      parameters:
+        - in: query
+          name: q
+          required: false
+          description: Search SKU code and English, Sinhala and Tamil names
+          schema:
+            type: string
+            maxLength: 200
+
+        - in: query
+          name: lang
+          required: false
+          description: Display/sort language
+          schema:
+            type: string
+            enum: [en, si, ta]
+            default: en
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [DRAFT, LOCAL, SHARED, INACTIVE]
+
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+
+      responses:
+        '200':
+          description: Visible SKU page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkuPageResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Catalogue]
+      operationId: createSku
+      summary: Create a SKU as DRAFT in the caller scope
+      x-permission: cat.sku.create_local
+      x-permission-any-of:
+        - cat.sku.create_local
+        - cat.sku.create
+      x-scope: ENTITY
+      x-scope-any-of:
+        - ENTITY
+        - FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkuDetailsRequest'
+
+      responses:
+        '201':
+          description: SKU created as DRAFT
+          headers:
+            Location:
+              description: Address of the created SKU
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkuResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}:
+
+    parameters:
+      - in: path
+        name: skuId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Catalogue]
+      operationId: getSku
+      summary: Get one SKU visible in the current scope
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: SKU
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkuResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: SKU is not visible or does not exist
+
+    patch:
+      tags: [Catalogue]
+      operationId: updateSku
+      summary: Update the mutable details of a SKU
+      description: >
+        Owner updates LOCAL/DRAFT records; Federation updates Federation-owned
+        records including SHARED. Changing base UOM or tracking flags is subject
+        to the inventory no-lots guard.
+      x-permission: cat.sku.create_local
+      x-permission-any-of:
+        - cat.sku.create_local
+        - cat.sku.create
+      x-scope: ENTITY
+      x-scope-any-of:
+        - ENTITY
+        - FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkuDetailsRequest'
+
+      responses:
+        '204':
+          description: SKU updated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/activate:
+
+    post:
+      tags: [Catalogue]
+      operationId: activateSku
+      summary: Activate a DRAFT SKU as LOCAL or SHARED
+      x-permission: cat.sku.create
+      x-permission-any-of:
+        - cat.sku.create_local
+        - cat.sku.create
+      x-scope: FEDERATION
+      x-scope-any-of:
+        - ENTITY
+        - FEDERATION
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateSkuRequest'
+
+      responses:
+        '204':
+          description: SKU activated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/deactivate:
+
+    post:
+      tags: [Catalogue]
+      operationId: deactivateSku
+      summary: Deactivate a LOCAL or SHARED SKU
+      x-permission: cat.sku.deactivate
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+
+      responses:
+        '204':
+          description: SKU deactivated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/reactivate:
+
+    post:
+      tags: [Catalogue]
+      operationId: reactivateSku
+      summary: Restore an INACTIVE SKU to its prior LOCAL or SHARED state
+      x-permission: cat.sku.deactivate
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+
+      responses:
+        '204':
+          description: SKU reactivated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+components:
+
+  schemas:
+
+    SkuDetailsRequest:
+      type: object
+      required:
+        - nameEn
+        - baseUomCode
+        - soldByWeight
+        - batchTracked
+        - expiryTracked
+        - hasPrintedMrp
+        - taxCategoryId
+        - multiMrpPolicy
+        - originKind
+
+      properties:
+
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 80
+
+        nameSi:
+          type: string
+          maxLength: 80
+
+        nameTa:
+          type: string
+          maxLength: 80
+
+        descriptionEn:
+          type: string
+
+        descriptionSi:
+          type: string
+
+        descriptionTa:
+          type: string
+
+        baseUomCode:
+          type: string
+          minLength: 1
+          maxLength: 10
+
+        soldByWeight:
+          type: boolean
+
+        batchTracked:
+          type: boolean
+
+        expiryTracked:
+          type: boolean
+
+        hasPrintedMrp:
+          type: boolean
+
+        expiryWarningDays:
+          type: integer
+          minimum: 0
+          maximum: 32767
+
+        taxCategoryId:
+          type: string
+          format: uuid
+
+        multiMrpPolicy:
+          type: string
+          enum:
+            - AUTO_LOWEST
+            - BARCODE_RESOLVED
+            - PICKER
+
+        originKind:
+          type: string
+          enum:
+            - PURCHASED
+            - REPACK_OUTPUT
+            - LOCAL_SOURCED
+
+        attributes:
+          type: object
+          additionalProperties: true
+
+
+    ActivateSkuRequest:
+      type: object
+      required: [target]
+      properties:
+        target:
+          type: string
+          enum:
+            - LOCAL
+            - SHARED
+
+
+    ReasonRequest:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          maxLength: 80
+
+        reasonText:
+          type: string
+          maxLength: 500
+
+
+    SkuResponse:
+      type: object
+      required:
+        - skuId
+        - skuCode
+        - ownerEntityId
+        - status
+        - nameEn
+        - baseUomCode
+        - soldByWeight
+        - batchTracked
+        - expiryTracked
+        - hasPrintedMrp
+        - taxCategoryId
+        - multiMrpPolicy
+        - originKind
+
+      properties:
+
+        skuId:
+          type: string
+          format: uuid
+
+        skuCode:
+          type: string
+
+        ownerEntityId:
+          type: string
+          format: uuid
+
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - LOCAL
+            - SHARED
+            - INACTIVE
+
+        nameEn:
+          type: string
+
+        nameSi:
+          type: string
+
+        nameTa:
+          type: string
+
+        descriptionEn:
+          type: string
+
+        descriptionSi:
+          type: string
+
+        descriptionTa:
+          type: string
+
+        baseUomCode:
+          type: string
+
+        soldByWeight:
+          type: boolean
+
+        batchTracked:
+          type: boolean
+
+        expiryTracked:
+          type: boolean
+
+        hasPrintedMrp:
+          type: boolean
+
+        expiryWarningDays:
+          type: integer
+
+        taxCategoryId:
+          type: string
+          format: uuid
+
+        multiMrpPolicy:
+          type: string
+
+        originKind:
+          type: string
+
+        attributes:
+          type: object
+          additionalProperties: true
+
+
+    SkuPageResponse:
+      type: object
+      required:
+        - items
+
+      properties:
+
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkuResponse'
+
+        nextOffset:
+          type: integer
+          minimum: 0

@@ -240,5 +240,18 @@
   "sync.location_mismatch": "A device may only read its own location",
   "sync.sequence_gap": "Events are missing before this batch; resend from the expected sequence",
   "sync.snapshot.unavailable": "Snapshots are not served yet",
-  "token.invalid": "Your sign-in is not valid or has expired; sign in again"
+  "token.invalid": "Your sign-in is not valid or has expired; sign in again",
+  "m2.sku.code_generation_failed": "A unique SKU code could not be generated",
+  "m2.sku.inactive": "An inactive SKU cannot be updated",
+  "m2.sku.shared_translations_required": "Shared SKUs require English, Sinhala and Tamil names",
+  "m2.sku.transition_invalid": "This SKU status transition is not allowed",
+  "m2.sku.prior_status_missing": "The SKU has no valid prior status to restore",
+  "m2.sku.weight_requires_kg": "A SKU sold by weight must use KG as its base unit",
+  "m2.sku.expiry_requires_batch": "Expiry tracking requires batch tracking",
+  "m2.sku.not_found": "The SKU was not found in the current scope",
+  "m2.sku.owner_mismatch": "The SKU belongs to a different owner entity",
+  "m2.sku.reason_required": "A reason is required for this SKU status change",
+  "m2.sku.base_uom_unknown": "The selected base unit is not defined",
+  "m2.sku.tax_category_unknown": "The selected tax category is not defined",
+  "m2.sku.attributes_too_large": "SKU attributes exceed the allowed size"
 }
