@@ -1,13 +1,12 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
+import java.util.Locale;
+import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
-
-import java.util.Locale;
-import java.util.Map;
 
 /**
  * Turns a {@link ProblemException} into an RFC 9457 problem document (17A section 4.4).
@@ -41,12 +40,15 @@ public class ProblemResponses {
     }
 
     public ProblemDetail toProblem(ProblemException e, Locale locale) {
-        HttpStatus status = REQUEST_ERRORS.getOrDefault(
-                e.messageId(),
-                HttpStatus.UNPROCESSABLE_ENTITY);
+        HttpStatus status = REQUEST_ERRORS.getOrDefault(e.messageId(), HttpStatus.UNPROCESSABLE_ENTITY);
 
         ProblemDetail problem = ProblemDetail.forStatus(status);
-        problem.setTitle(messages.t(e.messageId(), locale));
+        Messages.Text title = messages.text(e.messageId(), locale);
+        problem.setTitle(title.value());
+        if (title.fallback()) {
+            // Shown in English because the language lacks the text: the client marks it (doc 19 section 5.1).
+            problem.setProperty("fallback", true);
+        }
         problem.setProperty("code", e.messageId());
         problem.setProperty("params", e.parameters());
         return problem;
