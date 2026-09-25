@@ -207,7 +207,7 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
     }
 
     /** Empties every cached resolution of a key, on this instance. */
-    void invalidate(String key) {
+    public void invalidate(String key) {
         cache.asMap().keySet().removeIf(cached -> cached.key().equals(key));
     }
 

@@ -22,7 +22,10 @@ const TWO_INSTANCES = process.argv.includes("--two");
 const FEDERATION = "0190f000-0000-7000-8000-000000000001";
 const MPCS = "0190f000-0000-7000-8000-000000000002";
 const GREETINGS = `${BACKEND}/v1/hello/greetings`;
-const SMOKE_USER = crypto.randomUUID();
+// The MPCS administrator of the dev realm and seed/m1security/users.dev.sql: permissions are
+// enforced in the stack (K-03b), so the user that registers must hold a role there. Until the
+// second K-02 pull request the user may still be named in the X-Dev-User header.
+const SMOKE_USER = "0190f000-0000-7000-8000-0000000000a3";
 
 let failures = 0;
 
