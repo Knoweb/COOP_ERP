@@ -7,3 +7,5 @@ config:
     value: "500"
   - key: "m1.device.version_floor"
     value: "0"
+  - key: "m1.external_grant.max_months"
+    value: "12"

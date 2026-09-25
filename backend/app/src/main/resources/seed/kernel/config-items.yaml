@@ -50,6 +50,15 @@ config_items:
     default: "0"
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  - key: m1.external_grant.max_months
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 12 }
+    description_en: The longest an external grant to a regulator or auditor may run, in months
+    description_si: නියාමකයෙකුට හෝ විගණකයෙකුට දෙන බාහිර ප්‍රවේශ අවසරයක් පැවතිය හැකි උපරිම කාලය, මාස වලින්
+    description_ta: ஒழுங்குமுறையாளர் அல்லது தணிக்கையாளருக்கு வழங்கப்படும் வெளி அணுகல் அனுமதி நீடிக்கக்கூடிய அதிகபட்ச காலம், மாதங்களில்
+    default: 12
+    change_permission: gov.external.grant
+    sensitive: true
     module: m1party
   - key: trade.federation_direct.enabled
     value_type: BOOLEAN

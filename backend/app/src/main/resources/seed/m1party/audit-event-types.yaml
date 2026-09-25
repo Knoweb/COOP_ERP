@@ -24,36 +24,91 @@ audit_event_types:
     offline_capturable: false
     description_en: Responsible officer appointment
 
+  - code: LOCATION_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location registered
+
+  - code: LOCATION_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location details updated
+
+  - code: LOCATION_CONNECTIVITY_CONFIRMED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location connectivity specification confirmed
+
+  - code: LOCATION_ONBOARDING
+    severity: INFO
+    offline_capturable: false
+    description_en: Location onboarding started
+
+  - code: LOCATION_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location activated
+
+  - code: LOCATION_DORMANT
+    severity: INFO
+    offline_capturable: false
+    description_en: Location marked dormant
+
+  - code: LOCATION_REACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location reactivated
+
+  - code: LOCATION_PRIMARY_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Primary till of a shop changed
+
+  - code: POSITION_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till position registered
+
+  - code: POSITION_RETIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till position retired
+  - code: EXTERNAL_GRANT_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access granted to a regulator or auditor
+  - code: EXTERNAL_GRANT_REVOKED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access revoked
+  - code: EXTERNAL_GRANT_EXPIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access expired
   - code: DEVICE_ENROLLED
     severity: INFO
     offline_capturable: false
     description_en: Device enrolled at a location
-
   - code: DEVICE_ASSIGNED
     severity: INFO
     offline_capturable: false
     description_en: Device assigned to a free till position
-
   - code: DEVICE_POSITION_CHANGED
     severity: INFO
     offline_capturable: false
     description_en: Till position taken over by another device, counters transferred
-
   - code: DEVICE_OUTBOX_LOSS_RECORDED
     severity: ALERT
     offline_capturable: false
     description_en: Outbox of a replaced device recorded as lost; its unsent numbers are a documented gap
-
   - code: DEVICE_SUSPENDED
     severity: REVIEW
     offline_capturable: false
     description_en: Device suspended and revoked
-
   - code: DEVICE_REINSTATED
     severity: INFO
     offline_capturable: false
     description_en: Device reinstated after recovery
-
   - code: DEVICE_RETIRED
     severity: INFO
     offline_capturable: false
