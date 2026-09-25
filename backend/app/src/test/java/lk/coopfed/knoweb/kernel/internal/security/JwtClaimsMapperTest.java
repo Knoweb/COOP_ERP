@@ -39,7 +39,41 @@ class JwtClaimsMapperTest {
         }
     };
 
-    private final JwtClaimsMapper mapper = new JwtClaimsMapper(records);
+    /** M1's devices, as the tests need them: DEVICE is active at OTHER's SHOP. */
+    private final DeviceScopes devices = (deviceId, correlation, locale) -> {
+        if (!DEVICE.equals(deviceId)) {
+            throw new ProblemException("sync.device_unknown");
+        }
+        Scope shop = new Scope(OTHER, SHOP);
+        return new ScopeContext(
+                null, deviceId, OTHER, List.of(shop), shop, PolicyClass.DEVICE, Set.of(), null, locale, correlation);
+    };
+
+    private final JwtClaimsMapper mapper = new JwtClaimsMapper(records, devices);
+
+    @Test
+    void aDeviceTokenIsTheDeviceAndItsShopNotAUser() {
+        // A client-credentials token of the device's client: its subject is the provider's
+        // service account, nobody the platform knows; the scope headers do not apply.
+        Jwt jwt = jwt(Map.of("sub", USER.toString(), "dev", DEVICE.toString(), "cls", "DEVICE", "lang", "ta"));
+
+        ScopeContext scope = mapper.map(jwt, HOME.toString(), null, null, Locale.ENGLISH);
+
+        assertThat(scope.userId()).isNull();
+        assertThat(scope.deviceId()).isEqualTo(DEVICE);
+        assertThat(scope.policyClass()).isEqualTo(PolicyClass.DEVICE);
+        assertThat(scope.activeScope()).isEqualTo(new Scope(OTHER, SHOP));
+        assertThat(scope.lang()).isEqualTo("ta");
+    }
+
+    @Test
+    void aDeviceTokenForADeviceM1DoesNotKnowIsRefused() {
+        Jwt jwt = jwt(Map.of("sub", USER.toString(), "dev", UUID.randomUUID().toString(), "cls", "DEVICE"));
+
+        assertThatThrownBy(() -> mapper.map(jwt, null, null, null, null))
+                .isInstanceOf(ProblemException.class)
+                .hasMessage("sync.device_unknown");
+    }
 
     @Test
     void everyClaimOfTheTableLandsInTheContext() {

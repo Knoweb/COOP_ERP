@@ -68,7 +68,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * them (a position's RCT and CPR series, the shop's GRN series held by its primary till), so
  * this test does not depend on M1-05. The sync gateway's answer to "is this device drained" is
  * {@link TestBeans.SwitchableSyncStatus}: no device is drained unless a test says so, which is
- * what the kernel answers until K-08 (NoGatewaySyncStatus).
+ * what the kernel answers for a device that never reported to the sync gateway.
  */
 @Import(DevicesPostgresIntegrationTest.TestBeans.class)
 class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
@@ -877,6 +877,12 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
             @Override
             public boolean drained(UUID deviceId) {
                 return drained.contains(deviceId);
+            }
+
+            @Override
+            public java.util.Optional<DeviceSyncState> state(
+                    UUID deviceId, lk.coopfed.knoweb.kernel.api.ScopeContext ctx) {
+                return java.util.Optional.empty();
             }
         }
 

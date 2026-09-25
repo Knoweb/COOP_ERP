@@ -37,10 +37,16 @@ val generateOpenApi = tasks.register("generateOpenApi") {
     group = "build"
 }
 
+// A slice that is not a module's: the sync contract of doc 32 is served by the kernel (19A
+// section 8), so its interfaces go into the kernel's package. Generated under
+// lk.coopfed.knoweb.sync they would make "sync" an application module of its own, and the
+// kernel's controller would depend on it.
+val sliceOwners = mapOf("sync" to "kernel.sync")
+
 openApiSlices.forEach { slice ->
     val module = slice.nameWithoutExtension
     val output = layout.buildDirectory.dir("generated/openapi/$module")
-    val generated = "lk.coopfed.knoweb.$module.web.generated"
+    val generated = "lk.coopfed.knoweb.${sliceOwners[module] ?: module}.web.generated"
 
     val task = tasks.register<org.openapitools.generator.gradle.plugin.tasks.GenerateTask>("generateOpenApi_$module") {
         generatorName.set("spring")

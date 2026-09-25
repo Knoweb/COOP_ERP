@@ -40,6 +40,11 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests.requestMatchers(HttpMethod.OPTIONS, "/**")
                         .permitAll()
+                        // K-08: the till's enrolment is called before it holds any token; the
+                        // one-time enrolment code in the body is the credential of that call
+                        // (doc 32 section 8), checked by the enrolment service.
+                        .requestMatchers(HttpMethod.POST, "/v1/sync/devices/*/enrol")
+                        .permitAll()
                         .requestMatchers("/v1/**")
                         .authenticated()
                         .anyRequest()

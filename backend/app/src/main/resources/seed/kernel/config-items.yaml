@@ -176,6 +176,99 @@ config_items:
     default: true
     scope_kind: ENTITY
     change_permission: sys.config.manage
+  # K-08: the sync gateway (doc 32; 19A section 8). The batch limits and the chunk size are doc 32
+  # DR-1 and DR-5, the change-log retention DR-4: proposed values, to be settled after the load
+  # test (spike 5), so they are configuration and not constants.
+  - key: sync.batch.max_events
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 5000 }
+    description_en: The most events one till batch may carry (doc 32 DR-1)
+    description_si: එක් මුදල් ලේඛන කාණ්ඩයක් රැගෙන යා හැකි උපරිම සිදුවීම් ගණන
+    description_ta: ஒரு பணப்பெட்டித் தொகுப்பு கொண்டு செல்லக்கூடிய அதிகபட்ச நிகழ்வுகள்
+    default: 500
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.batch.max_bytes
+    value_type: INTEGER
+    schema: { minimum: 1024, maximum: 67108864 }
+    description_en: The largest till batch in bytes as sent, compressed (doc 32 DR-1)
+    description_si: සම්පීඩිතව යවන විශාලතම මුදල් ලේඛන කාණ්ඩය, බයිට් වලින්
+    description_ta: சுருக்கி அனுப்பப்படும் மிகப்பெரிய பணப்பெட்டித் தொகுப்பு, பைட்டுகளில்
+    default: 2097152
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.event.max_bytes
+    value_type: INTEGER
+    schema: { minimum: 1024, maximum: 16777216 }
+    description_en: The largest single till event in bytes; a larger one is quarantined
+    description_si: තනි මුදල් ලේඛන සිදුවීමක උපරිම ප්‍රමාණය බයිට් වලින්; විශාල එකක් නිරෝධායනය කෙරේ
+    description_ta: ஒரு பணப்பெட்டி நிகழ்வின் அதிகபட்ச அளவு பைட்டுகளில்; பெரியது தனிமைப்படுத்தப்படும்
+    default: 262144
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.ingest.chunk_size
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 1000 }
+    description_en: How many till events are applied per transaction; a crash costs at most one chunk (doc 32 DR-5)
+    description_si: එක් ගනුදෙනුවකදී යොදන මුදල් ලේඛන සිදුවීම් ගණන; බිඳවැටීමකින් නැතිවන්නේ එක් කොටසක් පමණි
+    description_ta: ஒரு பரிவர்த்தனையில் பயன்படுத்தப்படும் பணப்பெட்டி நிகழ்வுகள்; ஒரு செயலிழப்பு ஒரு பகுதியை மட்டுமே இழக்கும்
+    default: 50
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.batch.in_flight_timeout
+    value_type: DURATION
+    schema: { minimum: "PT10S", maximum: "PT1H" }
+    description_en: After how long a batch still marked in flight is taken to have died with its instance
+    description_si: ක්‍රියාත්මක යැයි සලකුණු කළ කාණ්ඩයක් එහි අවස්ථාව සමඟ නැවතුණු බව සලකන කාලය
+    description_ta: செயலில் எனக் குறிக்கப்பட்ட தொகுப்பு அதன் நிகழ்வுடன் நின்றுவிட்டதாகக் கருதப்படும் நேரம்
+    default: "PT2M"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.gap.anomaly_after
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 100 }
+    description_en: How many sequence gaps in a row from one device raise a sync anomaly
+    description_si: එක් උපාංගයකින් අනුපිළිවෙළින් කොපමණ අනුක්‍රම හිඩැස් සමමුහුර්ත විෂමතාවක් මතු කරයිද
+    description_ta: ஒரு சாதனத்திலிருந்து தொடர்ச்சியாக எத்தனை வரிசை இடைவெளிகள் ஒத்திசைவு முரண்பாட்டை எழுப்பும்
+    default: 3
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.app_version_floor
+    value_type: STRING
+    schema: { pattern: "^[0-9]+(\\.[0-9]+){0,3}$" }
+    description_en: The oldest till application version that may upload (doc 31); older ones are asked to update
+    description_si: උඩුගත කළ හැකි පැරණිතම මුදල් ලේඛන යෙදුම් අනුවාදය; පැරණි ඒවා යාවත්කාලීන කිරීමට ඉල්ලනු ලැබේ
+    description_ta: பதிவேற்றக்கூடிய பழமையான பணப்பெட்டி பயன்பாட்டுப் பதிப்பு; பழையவை புதுப்பிக்கக் கேட்கப்படும்
+    default: "0.0.0"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.clock_drift.review_after
+    value_type: DURATION
+    schema: { minimum: "PT1M", maximum: "PT24H" }
+    description_en: How far a till clock may drift before a review record is raised; it never blocks
+    description_si: සමාලෝචන වාර්තාවක් මතු කිරීමට පෙර මුදල් ලේඛන ඔරලෝසුවක් අපගමනය විය හැකි ප්‍රමාණය
+    description_ta: மதிப்பாய்வுப் பதிவு எழுப்பப்படும் முன் பணப்பெட்டிக் கடிகாரம் விலகக்கூடிய அளவு
+    default: "PT10M"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.change_log.retention
+    value_type: DURATION
+    schema: { minimum: "PT24H", maximum: "PT8760H" }
+    description_en: How far back a till may ask for a snapshot delta; older takes a full snapshot (doc 32 DR-4)
+    description_si: මුදල් ලේඛනයකට ස්නැප්ෂොට් වෙනස ඉල්ලිය හැකි කාලය; ඊට පැරණි නම් සම්පූර්ණ ස්නැප්ෂොට් එකක් ගනී
+    description_ta: பணப்பெட்டி ஸ்னாப்ஷாட் மாற்றத்தைக் கேட்கக்கூடிய காலம்; அதற்கு முந்தையது முழு ஸ்னாப்ஷாட் எடுக்கும்
+    default: "PT720H"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.enrolment_code.ttl
+    value_type: DURATION
+    schema: { minimum: "PT5M", maximum: "PT168H" }
+    description_en: How long a device enrolment code stays valid
+    description_si: උපාංග ලියාපදිංචි කේතයක් වලංගු වන කාලය
+    description_ta: சாதனப் பதிவுக் குறியீடு செல்லுபடியாகும் காலம்
+    default: "PT24H"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   - key: m1.device.version_floor
     value_type: STRING
     schema: { pattern: "^[0-9]{1,5}(\\.[0-9]{1,5}){0,3}$", max_length: 20 }
