@@ -3,7 +3,8 @@
 |Base package
 |`lk.coopfed.knoweb.kernel`
 |Spring components
-|* `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)
+|* `l.c.k.k.api.Attachments` (via `l.c.k.k.internal.attachment.AttachmentService`)
+* `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)
 * `l.c.k.k.api.BusinessDate`, `l.c.k.k.api.DayClose` (via `l.c.k.k.internal.businessdate.LocationBusinessDates`)
 * `l.c.k.k.api.ConfigRegistry`, `l.c.k.k.api.ConfigSeeder` (via `l.c.k.k.internal.config.JdbcConfigRegistry`)
 * `l.c.k.k.api.DocumentLinks` (via `l.c.k.k.internal.document.DocumentLinksImpl`)

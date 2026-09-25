@@ -47,3 +47,16 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Configuration value changed
+  # K-09: attachments.
+  - code: ATTACHMENT_PRESIGNED
+    severity: INFO
+    offline_capturable: true
+    description_en: Upload of an attachment was authorised
+  - code: ATTACHMENT_COMPLETED
+    severity: INFO
+    offline_capturable: false
+    description_en: Attachment upload verified
+  - code: ATTACHMENT_FAILED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Attachment upload missing or its hash did not match
