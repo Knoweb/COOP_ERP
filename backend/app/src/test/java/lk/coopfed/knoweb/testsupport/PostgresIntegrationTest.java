@@ -68,7 +68,13 @@ public abstract class PostgresIntegrationTest {
             .withEnv("APP_DB_PASSWORD", APP_USER)
             .withEnv("RELAY_DB_USER", RELAY_USER)
             .withEnv("RELAY_DB_PASSWORD", RELAY_PASSWORD)
-            .withCopyFileToContainer(MountableFile.forHostPath(ROLE_SCRIPT), "/docker-entrypoint-initdb.d/01-roles.sh");
+            .withCopyFileToContainer(MountableFile.forHostPath(ROLE_SCRIPT), "/docker-entrypoint-initdb.d/01-roles.sh")
+            // One container serves every test class of a run, and Spring keeps one application
+            // context per distinct configuration (a @DynamicPropertySource of its own makes one),
+            // each holding its pool of ten. At the default hundred slots a full run filled the
+            // server and the last contexts failed to start with "remaining connection slots are
+            // reserved". A test database, not a sizing decision.
+            .withCommand("postgres", "-c", "max_connections=400");
 
     static {
         POSTGRES.start();

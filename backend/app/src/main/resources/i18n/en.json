@@ -78,6 +78,9 @@
   "m1.relationship.terms_unchanged": "The amendment changes none of the terms",
   "m1.relationship.tier_not_allowed": "These two entities may not trade with each other: the Federation sells to distributors and distributors sell to societies",
   "mfa.required": "This action needs a fresh second factor; sign in again with it",
+  "notification.channel_unknown": "No adapter is registered for this notification channel",
+  "notification.recipient_required": "A notification needs a recipient",
+  "permission.denied": "Your role does not allow this action",
   "pricing.price_list.duplicate": "This greeting is already registered",
   "pricing.price_list.text_required": "Enter the greeting in English",
   "pricing.register": "Register greeting",
@@ -100,5 +103,7 @@
   "series.owner_mismatch": "A series can only be registered by the entity that owns it",
   "series.prefix_too_long": "The series prefix is longer than 24 characters",
   "series.scope_invalid": "The series scope does not fit the document type or the ids given",
-  "series.type_unknown": "The document type of the series is not in the registry"
+  "series.type_unknown": "The document type of the series is not in the registry",
+  "sod.same_person": "The person who made the request cannot approve it",
+  "token.invalid": "Your sign-in is not valid or has expired; sign in again"
 }

@@ -12,7 +12,7 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
 import org.slf4j.MDC;
-import org.springframework.boot.web.servlet.filter.OrderedFilter;
+import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
@@ -24,15 +24,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Resolves the request scope once, validates the selected active scope and exposes
  * the principal/scope identifiers through MDC for structured logging.
  *
- * K-02 replaces the development CurrentScope source with token-backed resolution;
- * this filter remains the request/session boundary.
+ * K-02: the scope comes from the verified token (TokenCurrentScope); this filter remains the
+ * request boundary that validates the choice of active scope.
  */
 @Component
 @Profile("web")
-// After Spring's RequestContextFilter (REQUEST_WRAPPER_FILTER_MAX_ORDER - 105): CurrentScope reads
-// the request through RequestContextHolder, which that filter fills. Ordered before it, this
-// filter found no request and every call to the API answered 500.
-@Order(OrderedFilter.REQUEST_WRAPPER_FILTER_MAX_ORDER - 100)
+// After Spring Security's chain (-100), which verifies the bearer token and fills the security
+// context this filter's CurrentScope reads; and so also after Spring's RequestContextFilter,
+// which fills the RequestContextHolder. Ordered before either, this filter found no request
+// or no token and every call to the API answered 500 or ran as nobody.
+@Order(SecurityProperties.DEFAULT_FILTER_ORDER + 10)
 public class ScopeFilter extends OncePerRequestFilter {
 
     private final CurrentScope currentScope;

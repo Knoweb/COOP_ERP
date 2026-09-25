@@ -65,6 +65,25 @@ coop-erp:
   system:
     entity-id: ${COOP_ERP_SYSTEM_ENTITY_ID:}
 
+  # K-03b resolves every command's permission from M1's roles; it refuses only when this is
+  # true. Off by default: on in compose, where the dev realm's users hold the roles of the dev
+  # seed (seed/m1security/users.dev.sql); off in the module tests, which run as users of their own.
+  security:
+    enforce-permissions: ${COOP_ERP_ENFORCE_PERMISSIONS:false}
+    # K-02, first pull request: a request without a bearer token may still name its user and
+    # scope in the 17A development headers (X-Dev-User, X-Dev-Scope-Class). The module tests
+    # and the web client still send them; the second pull request deletes them on both sides
+    # and this switch with them. Never true outside a developer machine or CI.
+    dev-headers: ${COOP_ERP_DEV_HEADERS:true}
+    # The OIDC provider (19A section 2), any one: the issuer its tokens carry (the public
+    # address, the one the browser signed in at) and the JWKS the backend fetches the signing
+    # keys from (inside compose, the provider's container address). The step-up address is
+    # where the web shell sends a user whose second factor is not fresh enough (mfa.required).
+    oidc:
+      issuer: ${OIDC_ISSUER:http://localhost:8085/realms/coop}
+      jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8085/realms/coop/protocol/openid-connect/certs}
+      step-up-url: ${OIDC_STEP_UP_URL:http://localhost:8085/realms/coop/protocol/openid-connect/auth}
+
   # The object store of the attachments (19A section 9), behind the S3 protocol: any S3 service,
   # MinIO on a developer machine. The endpoint is what the backend reaches; the public endpoint
   # is what a browser or a till reaches with a pre-signed URL (the same one outside compose).
@@ -98,8 +117,8 @@ coop-erp:
 
 # Health and metrics (17A S0-02), under every role. /actuator/health/liveness and /readiness
 # are what an orchestrator probes; /actuator/prometheus is what a metrics server scrapes.
-# They are not protected yet: 19A K-02 brings authentication, and doc 35 decides whether the
-# management port is published at all.
+# They need no token (kernel.internal.security.SecurityConfig): an orchestrator probes them
+# without one, and doc 35 decides whether the management port is published at all.
 # The RabbitMQ health indicator is on in the worker role only (application-worker.yml): the
 # other roles never talk to the broker, so its absence must not turn their health DOWN.
 management:

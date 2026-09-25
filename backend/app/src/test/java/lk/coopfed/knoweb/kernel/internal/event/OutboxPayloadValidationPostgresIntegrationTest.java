@@ -60,13 +60,15 @@ class OutboxPayloadValidationPostgresIntegrationTest extends PostgresIntegration
     }
 
     @Test
-    void entityScopedNonOwnClassCanStillWriteItsEvent() {
-
+    void entityScopedNonOwnClassCannotWriteAnEvent() {
+        // A PARTY, FEDERATION_VIEW or EXTERNAL caller has a scope entity too and writes nothing
+        // through it (doc 18 section 3.7; CR-17A-3): the outbox insert policy tests the class.
         UUID entity = UUID.randomUUID();
 
-        publish(entity, "PARTY", new SafeEvent(UUID.randomUUID(), entity, "ACTIVE"));
+        assertThatThrownBy(() -> publish(entity, "PARTY", new SafeEvent(UUID.randomUUID(), entity, "ACTIVE")))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
 
-        assertThat(outboxCount()).isEqualTo(1);
+        assertThat(outboxCount()).isZero();
     }
 
     private void publish(UUID entity, String policyClass, DomainEvent event) {
