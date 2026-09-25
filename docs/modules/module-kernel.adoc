@@ -5,6 +5,7 @@
 |Spring components
 |* `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)
 * `l.c.k.k.api.BusinessDate`, `l.c.k.k.api.DayClose` (via `l.c.k.k.internal.businessdate.LocationBusinessDates`)
+* `l.c.k.k.api.ConfigRegistry`, `l.c.k.k.api.ConfigSeeder` (via `l.c.k.k.internal.config.JdbcConfigRegistry`)
 * `l.c.k.k.api.DocumentLinks` (via `l.c.k.k.internal.document.DocumentLinksImpl`)
 * `l.c.k.k.api.DocumentIssuance` (via `l.c.k.k.internal.document.IssuanceProtocol`)
 * `l.c.k.k.api.DocumentBaseRepository` (via `l.c.k.k.internal.document.JdbcDocumentBaseRepository`)
@@ -14,7 +15,6 @@
 * `l.c.k.k.api.IdempotencyStore` (via `l.c.k.k.internal.idempotency.JdbcIdempotencyStore`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.stub.DevCurrentScope`)
 * `l.c.k.k.api.Messages` (via `l.c.k.k.internal.stub.JsonMessages`)
-* `l.c.k.k.api.ConfigRegistry`, `l.c.k.k.api.ConfigSeeder` (via `l.c.k.k.internal.stub.SeedConfigRegistry`)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 * `org.springframework.boot.context.event.ApplicationReadyEvent` 
