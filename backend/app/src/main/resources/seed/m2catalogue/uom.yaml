@@ -1,0 +1,55 @@
+# Units of measure: the Federation-governed vocabulary (22A section 3.1; doc 22 section 3.2).
+# An entity cannot add a unit. Loaded into catalogue.uom by M2SeedLoader on start: a row is
+# inserted when its code is absent and never changed afterwards (21A section 3.3: "upsert by
+# key; never changes rows an entity has edited"). weight: true for the units a scale reads.
+uom:
+  - code: EA
+    en: Each
+    si: එකක්
+    ta: ஒன்று
+    weight: false
+  - code: KG
+    en: Kilogram
+    si: කිලෝග්‍රෑම්
+    ta: கிலோகிராம்
+    weight: true
+  - code: G
+    en: Gram
+    si: ග්‍රෑම්
+    ta: கிராம்
+    weight: true
+  - code: L
+    en: Litre
+    si: ලීටර්
+    ta: லிட்டர்
+    weight: false
+  - code: ML
+    en: Millilitre
+    si: මිලිලීටර්
+    ta: மில்லிலிட்டர்
+    weight: false
+  - code: CASE
+    en: Case
+    si: කාටනය
+    ta: அட்டைப்பெட்டி
+    weight: false
+  - code: PKT
+    en: Packet
+    si: පැකට්ටුව
+    ta: பொட்டலம்
+    weight: false
+  - code: BAG
+    en: Bag
+    si: බෑගය
+    ta: பை
+    weight: false
+  - code: BOX
+    en: Box
+    si: පෙට්ටිය
+    ta: பெட்டி
+    weight: false
+  - code: DOZ
+    en: Dozen
+    si: ඩසන
+    ta: டஜன்
+    weight: false

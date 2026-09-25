@@ -21,6 +21,10 @@ include::module-hello.adoc[]
 plantuml::module-m1party.puml[,,format=svg]
 include::module-m1party.adoc[]
 
+== M2 Catalogue & Batch
+plantuml::module-m2catalogue.puml[,,format=svg]
+include::module-m2catalogue.adoc[]
+
 == M3 Pricing & Rules
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]
