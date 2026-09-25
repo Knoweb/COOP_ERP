@@ -41,15 +41,6 @@ config_items:
     scope_kind: FEDERATION
     change_permission: gov.entity.register
     module: m1party
-  - key: m1.device.version_floor
-    value_type: STRING
-    schema: { pattern: "^[0-9]{1,5}(\\.[0-9]{1,5}){0,3}$", max_length: 20 }
-    description_en: The lowest till release a device may run to be assigned to a till position
-    description_si: මුදල් ලේඛන ස්ථානයකට පැවරීමට උපාංගයක තිබිය යුතු අවම නිකුතුව
-    description_ta: பணப்பெட்டி நிலைக்கு ஒதுக்கப்பட ஒரு சாதனத்தில் இருக்க வேண்டிய குறைந்தபட்ச வெளியீடு
-    default: "0"
-    scope_kind: FEDERATION
-    change_permission: sys.config.manage
   - key: m1.external_grant.max_months
     value_type: INTEGER
     schema: { minimum: 1, maximum: 12 }
@@ -57,6 +48,7 @@ config_items:
     description_si: නියාමකයෙකුට හෝ විගණකයෙකුට දෙන බාහිර ප්‍රවේශ අවසරයක් පැවතිය හැකි උපරිම කාලය, මාස වලින්
     description_ta: ஒழுங்குமுறையாளர் அல்லது தணிக்கையாளருக்கு வழங்கப்படும் வெளி அணுகல் அனுமதி நீடிக்கக்கூடிய அதிகபட்ச காலம், மாதங்களில்
     default: 12
+    scope_kind: FEDERATION
     change_permission: gov.external.grant
     sensitive: true
     module: m1party
@@ -121,4 +113,13 @@ config_items:
     description_ta: இந்த நிறுவனத்திற்கு பயன்பாட்டினுள் அறிவிப்புகள் எழுப்பப்படுமா (நிறுத்தும் சுவிட்ச்)
     default: true
     scope_kind: ENTITY
+    change_permission: sys.config.manage
+  - key: m1.device.version_floor
+    value_type: STRING
+    schema: { pattern: "^[0-9]{1,5}(\\.[0-9]{1,5}){0,3}$", max_length: 20 }
+    description_en: The lowest till release a device may run to be assigned to a till position
+    description_si: මුදල් ලේඛන ස්ථානයකට පැවරීමට උපාංගයක තිබිය යුතු අවම නිකුතුව
+    description_ta: பணப்பெட்டி நிலைக்கு ஒதுக்கப்பட ஒரு சாதனத்தில் இருக்க வேண்டிய குறைந்தபட்ச வெளியீடு
+    default: "0"
+    scope_kind: FEDERATION
     change_permission: sys.config.manage
