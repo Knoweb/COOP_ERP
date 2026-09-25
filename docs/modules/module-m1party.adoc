@@ -10,6 +10,7 @@
 * `l.c.k.m.query.PartyQueries` (via `l.c.k.m.internal.queries.PartyQueriesImpl`)
 * `l.c.k.m.query.RelationshipQueries` (via `l.c.k.m.internal.queries.RelationshipQueriesImpl`)
 * `l.c.k.m.query.SecurityQueries` (via `l.c.k.m.internal.queries.SecurityQueriesImpl`)
+* `l.c.k.m.query.UserQueries` (via `l.c.k.m.internal.queries.UserQueriesImpl`)
 |Bean references
 |* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
@@ -20,6 +21,9 @@
 * `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
 * `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 * `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
+* `l.c.k.k.api.IdentityProviderClient` (in Platform Kernel)
+* `l.c.k.k.api.PinHasher` (in Platform Kernel)
+* `l.c.k.k.api.Notifications` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
