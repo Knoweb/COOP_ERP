@@ -23,3 +23,18 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Responsible officer appointment
+
+  - code: EXTERNAL_GRANT_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access granted to a regulator or auditor
+
+  - code: EXTERNAL_GRANT_REVOKED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access revoked
+
+  - code: EXTERNAL_GRANT_EXPIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: External read-only access expired

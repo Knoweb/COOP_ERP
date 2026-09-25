@@ -20,4 +20,9 @@ public class FederationCallers {
     public void require(ScopeContext scope) {
         FederationCaller.require(scope, repository);
     }
+
+    /** The same guard, refusing with the given message id. */
+    public void require(ScopeContext scope, String problem) {
+        FederationCaller.require(scope, repository, problem);
+    }
 }

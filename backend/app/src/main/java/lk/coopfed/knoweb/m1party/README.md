@@ -20,4 +20,10 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 
 ## Deviations from the implementation guide
 
-None yet.
+External grants (M1-09, package `internal/grant`):
+
+- **Revoke has its own path.** 21A section 5 lists only `POST` and `GET /v1/security/external-grants`; RevokeExternalView is `POST /v1/security/external-grants/{grantId}/revoke`, like the entity status commands.
+- **Expiry is a command.** Doc 21 section 4.6 has ACTIVE to EXPIRED "by the clock"; only a command handler writes, so the job `external-grant-expiry` sends `ExpireExternalGrant` for each ended grant. Its permission is `gov.external.grant` (the system acts for the Federation, which owns the grant); no request carries it, so the kernel checks none.
+- **A grant cannot start in the past**: a missing or past `validFrom` is now. The twelve months (doc 21 DR-4, doc 10 L-07) are the configuration item `m1.external_grant.max_months`, which may shorten them and never lengthen them past the table's CHECK constraint.
+- **The grantee reads its own grants** through the policy `grantee_read` on `app.user_id` (m1security V0009): that is how `ExternalGrantQueries.activeGrantedEntities` resolves an external user's entities before the user has a scope.
+- **What an external caller reads here**: `security.role`, `role_permission`, `user_role` and `sod_pair` of the granted entities. Not `security.app_user` (it carries `pin_hash`), and nothing in `party` until an m1party migration adds `ext_view` there.
