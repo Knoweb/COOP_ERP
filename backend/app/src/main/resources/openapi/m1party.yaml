@@ -1648,6 +1648,270 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/security/users:
+
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List the users the caller's scope may see
+      description: >
+        An entity-wide scope sees every user of its entity; a shop-scoped one the users that
+        work at that shop (an assignment there or an entity-wide one), never a sibling shop's
+        operators. Never a PIN or its hash.
+      x-permission: gov.user.view
+      parameters:
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, ACTIVE, LOCKED, DEACTIVATED]
+
+        - in: query
+          name: userKind
+          required: false
+          schema:
+            type: string
+            enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+
+      responses:
+
+        '200':
+          description: User page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a user of the caller's entity and its login at the identity provider
+      description: >
+        The user starts PENDING with no credential; issue the first one with reset-credential.
+        422 codes: m1.user.entity_scope_required, m1.user.home_entity_out_of_scope,
+        m1.user.kind_invalid, m1.user.external_federation_only, m1.user.language_invalid,
+        m1.user.username_invalid, m1.user.username_taken, m1.user.display_name_required,
+        m1.user.succeeds_invalid, identity.username_taken, identity.unavailable.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+
+      responses:
+
+        '201':
+          description: User created
+          headers:
+            Location:
+              description: Address of the created user
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users/{userId}:
+
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get one user visible in the caller's scope
+      x-permission: gov.user.view
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+        '404':
+          description: User does not exist or is not visible to this scope
+
+    put:
+      tags: [Users]
+      operationId: updateUser
+      summary: Change a user's name shown, language and kind
+      description: >
+        422 codes: m1.user.not_found, m1.user.deactivated, m1.user.display_name_required,
+        m1.user.language_invalid, m1.user.kind_invalid, m1.user.kind_change_invalid.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+
+      responses:
+
+        '200':
+          description: User changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users/{userId}/reset-credential:
+
+    post:
+      tags: [Users]
+      operationId: resetCredential
+      summary: Issue a temporary password, reset the second factor, or set the till PIN
+      description: >
+        PASSWORD answers the one-time password in temporaryPassword (delivery RETURNED) unless
+        a notification rule delivered it (NOTIFIED); a replay of the same request does not
+        repeat it. PIN needs pin, checked against the entity's PIN policy. A PENDING or LOCKED
+        user becomes ACTIVE with a new password or PIN.
+        422 codes: m1.user.not_found, m1.user.deactivated, m1.user.credential_invalid,
+        m1.user.password_not_applicable, m1.user.no_login, m1.user.pin_not_applicable,
+        m1.user.pin_required, m1.user.pin_digits_only, m1.user.pin_length, m1.user.pin_reused,
+        identity.scope, identity.unavailable.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetCredentialRequest'
+
+      responses:
+
+        '200':
+          description: Credential issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialResetResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users/{userId}/deactivate:
+
+    post:
+      tags: [Users]
+      operationId: deactivateUser
+      summary: Deactivate a user for good, disable the login and end its sessions
+      description: >
+        422 codes: m1.user.not_found, m1.user.deactivated, m1.user.reason_required,
+        m1.user.last_user_manager, m1.user.responsible_officer, identity.scope,
+        identity.unavailable.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserReasonRequest'
+
+      responses:
+
+        '204':
+          description: User deactivated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 
 
 
@@ -2801,6 +3065,155 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SodPairResponse'
+
+    CreateUserRequest:
+      type: object
+      required: [username, displayName, language, userKind]
+      properties:
+        homeEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The caller's entity when left out; no other entity is accepted
+        username:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$'
+          description: The sign-in name, unique in the federation; stored in lower case
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        language:
+          type: string
+          enum: [en, si, ta]
+        userKind:
+          type: string
+          enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+        succeedsUserId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: A deactivated user of the same entity this one succeeds (returning staff)
+
+    UpdateUserRequest:
+      type: object
+      required: [displayName, language, userKind]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        language:
+          type: string
+          enum: [en, si, ta]
+        userKind:
+          type: string
+          enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+
+    ResetCredentialRequest:
+      type: object
+      required: [credential]
+      properties:
+        credential:
+          type: string
+          enum: [PASSWORD, SECOND_FACTOR, PIN]
+        pin:
+          type:
+            - string
+            - 'null'
+          pattern: '^[0-9]{4,6}$'
+          description: The new till PIN, with credential PIN only; the entity's policy may narrow the length
+
+    UserReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    CredentialResetResponse:
+      type: object
+      required: [userId, credential, status, delivery]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        credential:
+          type: string
+          enum: [PASSWORD, SECOND_FACTOR, PIN]
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, LOCKED, DEACTIVATED]
+        delivery:
+          type: string
+          enum: [NOTIFIED, RETURNED, NONE]
+          description: >
+            RETURNED - the temporary password is in this response, this once; NOTIFIED - a
+            notification rule delivered it; NONE - nothing to deliver
+        temporaryPassword:
+          type:
+            - string
+            - 'null'
+          description: Only with delivery RETURNED; shown once, never stored by the platform
+
+    UserResponse:
+      type: object
+      required: [userId, homeEntityId, username, displayName, language, userKind, status, pinSet]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        homeEntityId:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: string
+        language:
+          type: string
+          enum: [en, si, ta]
+        userKind:
+          type: string
+          enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, LOCKED, DEACTIVATED]
+        pinSet:
+          type: boolean
+        pinChangedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        succeedsUserId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+
+    UserPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+          format: uuid
 
   parameters:
 

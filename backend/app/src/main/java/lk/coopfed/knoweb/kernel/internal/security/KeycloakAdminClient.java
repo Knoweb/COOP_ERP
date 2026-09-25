@@ -24,6 +24,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
@@ -67,6 +70,7 @@ public class KeycloakAdminClient implements IdentityProviderClient {
     private final String clientSecret;
     private final JdbcTemplate jdbc;
     private final SystemScope system;
+    private final TransactionTemplate ownTransaction;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
@@ -80,6 +84,7 @@ public class KeycloakAdminClient implements IdentityProviderClient {
             @Value("${coop-erp.security.oidc.admin.client-secret}") String clientSecret,
             JdbcTemplate jdbc,
             SystemScope system,
+            PlatformTransactionManager transactions,
             Clock clock) {
         this.rest = RestClient.builder().baseUrl(baseUrl).build();
         this.realmPath = "/admin/realms/" + realm;
@@ -87,6 +92,9 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         this.clientSecret = clientSecret;
         this.jdbc = jdbc;
         this.system = system;
+        this.ownTransaction = new TransactionTemplate(transactions);
+        this.ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.ownTransaction.setReadOnly(true);
         this.clock = clock;
     }
 
@@ -226,14 +234,21 @@ public class KeycloakAdminClient implements IdentityProviderClient {
         }
     }
 
+    /**
+     * Read in a transaction of its own (M1-07). The caller is usually a command handler whose
+     * transaction has the caller's scope on its connection; running the federation-wide read in
+     * that transaction would leave the connection in the viewer's scope for the rest of the
+     * handler, and its audit record and event would then be refused by row-level security.
+     * The target user is always a committed row by the time a login is disabled or reset.
+     */
     private UUID homeEntityOf(String subjectId) {
-        List<UUID> found = system.inScope(
+        List<UUID> found = ownTransaction.execute(status -> system.inScope(
                 SystemScope.federationView(),
                 () -> jdbc.query(
                         "select home_entity_id from security.app_user where provider_subject = ?",
                         (rs, n) -> rs.getObject(1, UUID.class),
-                        subjectId));
-        return found.isEmpty() ? null : found.getFirst();
+                        subjectId)));
+        return found == null || found.isEmpty() ? null : found.getFirst();
     }
 
     // ---- the provider ----

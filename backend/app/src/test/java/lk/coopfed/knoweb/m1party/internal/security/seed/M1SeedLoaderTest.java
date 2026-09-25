@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
     // The catalogue of M1 (25 with the locations, grants and relationships) and the 11 of M2 appended by M2-01.
-    private static final int PERMISSIONS = 38;
+    private static final int PERMISSIONS = 39;
     private static final int ROLE_TEMPLATES = 3;
     private static final int SOD_PAIRS = 2;
 

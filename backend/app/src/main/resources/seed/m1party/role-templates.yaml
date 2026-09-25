@@ -18,6 +18,7 @@ templates:
     role_class: "OWN"
     permissions:
       - "gov.user.manage"
+      - "gov.user.view"
       - "gov.role.manage"
       - "prt.relationship.manage"
       - "prt.relationship.view"

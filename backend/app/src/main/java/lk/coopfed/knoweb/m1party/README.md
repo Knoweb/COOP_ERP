@@ -27,6 +27,17 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 - **SetPrimaryTill** moves the counters of the shop's location series to the device at the new primary till, through `NumberingService.holderChange`; with no device there yet (devices are M1-06) nothing moves, and the event says `holderDeviceId: null`. It also registers the shop's location series where they are missing (idempotent), so a shop from a seed gets them.
 - Every command needs an OWN scope; RegisterLocation needs it entity-wide. Row-level security decides everything else: a shop-scoped caller reads, changes and adds positions to its own shop only.
 
+## Users and credentials (M1-07)
+
+`internal/user`: `CreateUser`, `UpdateUser`, `ResetCredential`, `DeactivateUser`, all `gov.user.manage` with MFA, all in an entity-wide OWN scope (a shop-scoped session is refused with `m1.user.entity_scope_required`). Paths under `/v1/security/users` in `openapi/m1party.yaml`; `gov.user.view` reads them.
+
+- **The provider** is reached only through `kernel.api.IdentityProviderClient`. CreateUser writes the row PENDING, then creates the login (the platform's user id is its `uid`), then stores the subject on `provider_subject`. DeactivateUser disables the login and ends its sessions.
+- **Credentials**: `ResetCredential` with `credential` PASSWORD (a one-time password from the provider), SECOND_FACTOR (the provider forgets the TOTP) or PIN (the till PIN). A PENDING or LOCKED user becomes ACTIVE with a new password or PIN (`user.activated.v1`). The temporary password goes out by a notification when M9 holds an ACTIVE rule under the key `user.temporary_password` whose audience resolves (`TemporaryPasswordDelivery`); otherwise it is answered once (`delivery: RETURNED`), marked `@JsonIgnore` so the idempotency store never keeps it, and a replay answers without it.
+- **PIN policy** (`PinPolicy`, doc 19 section 2.1 and DR-5): digits only, `security.pin.length_min`/`length_max` (4 to 6, the entity may narrow, never widen), none of the last `security.pin.history_depth` (3). Argon2id through `kernel.api.PinHasher`; `pin_history` keeps the last hashes, newest first. `security.pin.lockout_attempts` and `lockout_duration` are till-visible configuration: the till counts attempts, not the backend.
+- **Deactivation guards**, in order: in scope; not already deactivated; a reason; not the last holder of `gov.user.manage` entity-wide (as ActivateEntity counts them); not the entity's responsible officer. The PIN hash is cleared; assignments are kept.
+- **Row-level security** (`m1security/V0012`): a shop-scoped session reads the users with an assignment at its shop or an entity-wide one, never a sibling shop's operators; an entity-wide session reads all the entity's users.
+- **Events** carry the user's id twice (`appUserId` for the outbox's aggregate id, `userId` for consumers such as the kernel's permission cache) and never a credential.
+
 ## Deviations from the implementation guide
 
 - **Permissions (M1-05).** 21A section 3.3's `prt.location.register`, `prt.location.activate` and `prt.location.primary` (MFA) are added to the catalogue beside the older `prt.location.manage`/`.view`, whose removal is `CR-21A-1` item 1's. UpdateLocation uses `prt.location.register` (21A names no update code); StartOnboarding, MarkDormant, Reactivate and ConfirmLocationConnectivity use `prt.location.activate` (doc 21 names `prt.location.onboard` and `.dormant`, which 21A's catalogue does not have).
@@ -89,3 +100,6 @@ Template drift (doc 19 DR-4, "notify and offer diff"; assumes doc 10 E-04): a cl
 - **Two guards beyond 21A's table, both from doc 19 section 3.2**: AssignRole checks that the grantor holds every permission of the role (assigning is granting), and a ROLE-mode pair is checked per person across their roles as well as per role.
 - **Limits**: the catalogue has no `limits_schema` yet, so today no permission takes limits (`m1.role.limits_not_accepted`). The schema reader understands a small subset of JSON Schema (`properties` with `type`, `minimum`, `maximum`; `required`; nothing else admitted); there is no JSON Schema library in the version catalogue.
 - **No template notification is sent**: the marker and the diff are there; a notification on `role.changed.v1` of a template is a K-10 rule for M9 to write.
+- **M1-07, user events** carry `appUserId` beside `userId` (the outbox skips `userId` when it looks for the aggregate id). `user.updated.v1` is added for the change of details, which 21A does not list.
+- **M1-07, activation**: doc 21 section 4.4 activates a user on "first credential set (provider callback)"; there is no callback, so the platform activates when it issues the first password or PIN.
+- **M1-07, deactivation** also refuses the entity's responsible officer (doc 21 DR-1); "no open till session" waits for M6's query, as in M1-05.
