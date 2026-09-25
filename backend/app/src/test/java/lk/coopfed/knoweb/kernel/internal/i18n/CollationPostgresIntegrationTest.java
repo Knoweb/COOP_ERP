@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.TextNormaliser;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -65,7 +66,7 @@ class CollationPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(Normalizer.isNormalized(decomposed, Normalizer.Form.NFC)).isFalse();
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Dev-User", UUID.randomUUID().toString());
+        headers.setBearerAuth(TestIdentityProvider.token(UUID.randomUUID(), ENTITY));
         headers.set("X-Scope-Entity", ENTITY.toString());
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         headers.setContentType(MediaType.APPLICATION_JSON);

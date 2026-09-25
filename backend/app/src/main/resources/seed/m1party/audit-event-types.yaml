@@ -85,3 +85,23 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: External read-only access expired
+  - code: RELATIONSHIP_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship opened in draft
+  - code: RELATIONSHIP_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship activated
+  - code: RELATIONSHIP_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship terms amended from a date
+  - code: RELATIONSHIP_SUSPENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship suspended
+  - code: CREDIT_LIMIT_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Credit limit of a trading relationship changed

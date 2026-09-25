@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -23,8 +24,22 @@ class JwtClaimsMapperTest {
     private static final UUID HOME = UUID.fromString("0190a500-0000-7000-8000-000000000001");
     private static final UUID OTHER = UUID.fromString("0190a500-0000-7000-8000-000000000002");
     private static final UUID SHOP = UUID.fromString("0190a500-0000-7000-8000-000000000101");
+    private static final UUID GRANTED = UUID.fromString("0190a500-0000-7000-8000-000000000003");
 
-    private final JwtClaimsMapper mapper = new JwtClaimsMapper();
+    /** M1's records, as the tests need them: the user holds a role at OTHER's shop and a grant on GRANTED. */
+    private final UserScopes records = new UserScopes() {
+        @Override
+        public Set<Scope> scopesOf(UUID userId) {
+            return USER.equals(userId) ? Set.of(new Scope(OTHER, SHOP)) : Set.of();
+        }
+
+        @Override
+        public Set<UUID> grantsOf(UUID userId) {
+            return USER.equals(userId) ? Set.of(GRANTED) : Set.of();
+        }
+    };
+
+    private final JwtClaimsMapper mapper = new JwtClaimsMapper(records);
 
     @Test
     void everyClaimOfTheTableLandsInTheContext() {
@@ -54,32 +69,44 @@ class JwtClaimsMapperTest {
     }
 
     @Test
-    void withoutAScopesClaimTheHomeEntityIsTheOnlyScopeAndTheActiveOne() {
+    void thePlatformUserIdWinsOverTheProviderSubject() {
+        Jwt jwt = jwt(Map.of("sub", "f3b1c0de-0000-4000-8000-000000000099", "uid", USER.toString()));
+        assertThat(mapper.map(jwt, null, null, null, null).userId()).isEqualTo(USER);
+    }
+
+    @Test
+    void withoutAScopesClaimTheRecordsAndTheHomeEntityAreTheScopes() {
         Jwt jwt = jwt(Map.of("sub", USER.toString(), "ent", HOME.toString(), "cls", "OWN"));
 
         ScopeContext scope = mapper.map(jwt, null, null, null, null);
 
+        assertThat(scope.scopes()).containsExactly(new Scope(HOME, null), new Scope(OTHER, SHOP));
+        // Two scopes and no header: the caller must choose (scope.required at the filter).
+        assertThat(scope.hasActiveScope()).isFalse();
+        assertThat(mapper.map(jwt, OTHER.toString(), SHOP.toString(), null, null)
+                        .activeScope())
+                .isEqualTo(new Scope(OTHER, SHOP));
+    }
+
+    @Test
+    void aUserWithNoRecordsHasTheHomeEntityAloneAndItIsActive() {
+        UUID stranger = UUID.fromString("0190a500-0000-7000-8000-000000000011");
+        Jwt jwt = jwt(Map.of("sub", stranger.toString(), "ent", HOME.toString(), "cls", "OWN"));
+
+        ScopeContext scope = mapper.map(jwt, null, null, null, null);
+
         assertThat(scope.scopes()).containsExactly(new Scope(HOME, null));
-        assertThat(scope.activeScope()).isEqualTo(new Scope(HOME, null));
         assertThat(scope.entityId()).isEqualTo(HOME);
     }
 
     @Test
-    void theHeaderChoosesAmongSeveralScopesAndNoHeaderChoosesNone() {
-        Jwt jwt = jwt(Map.of(
-                "sub",
-                USER.toString(),
-                "ent",
-                HOME.toString(),
-                "scopes",
-                List.of(HOME.toString(), OTHER.toString()),
-                "cls",
-                "OWN"));
-
-        assertThat(mapper.map(jwt, OTHER.toString(), null, null, null).activeScope())
-                .isEqualTo(new Scope(OTHER, null));
-        // The scope filter then asks the caller to choose (scope.required).
-        assertThat(mapper.map(jwt, null, null, null, null).hasActiveScope()).isFalse();
+    void anExternalCallerWithoutAGrantsClaimGetsTheRecordedGrants() {
+        Jwt external = jwt(Map.of("sub", USER.toString(), "cls", "EXTERNAL_TIMEBOXED"));
+        assertThat(mapper.map(external, null, null, null, null).grantedEntities())
+                .containsExactly(GRANTED);
+        // Any other class carries no grants, whatever the records say.
+        Jwt own = jwt(Map.of("sub", USER.toString(), "ent", HOME.toString(), "cls", "OWN"));
+        assertThat(mapper.map(own, null, null, null, null).grantedEntities()).isEmpty();
     }
 
     @Test

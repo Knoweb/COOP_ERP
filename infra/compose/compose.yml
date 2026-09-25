@@ -206,6 +206,7 @@ services:
       # dev realm's users hold the roles of seed/m1security/users.dev.sql.
       OIDC_ISSUER: http://localhost:8085/realms/coop
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/coop/protocol/openid-connect/certs
+      OIDC_ADMIN_URL: http://keycloak:8080
       COOP_ERP_ENFORCE_PERMISSIONS: ${COOP_ERP_ENFORCE_PERMISSIONS:-true}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"

@@ -10,6 +10,7 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.EntityUpdated;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,9 +78,8 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
 
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        headers.set("X-Dev-User", CALLER_USER_ID.toString());
-        headers.set("X-Dev-Entity", ENTITY_ID.toString());
-        headers.set("X-Dev-Scope-Class", "OWN");
+        headers.setBearerAuth(TestIdentityProvider.token(CALLER_USER_ID, ENTITY_ID));
+        headers.set("X-Scope-Entity", ENTITY_ID.toString());
 
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
 
