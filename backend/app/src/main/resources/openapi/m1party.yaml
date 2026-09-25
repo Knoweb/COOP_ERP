@@ -1332,6 +1332,323 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/security/roles:
+
+    get:
+      tags: [Roles]
+      operationId: listRoles
+      summary: The entity's roles and the federation templates, each with its permissions
+      x-permission: gov.role.manage
+      responses:
+        '200':
+          description: Roles, the entity's first and the templates last
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleList'
+
+    post:
+      tags: [Roles]
+      operationId: createRole
+      summary: Create a role for the entity, from a template or from scratch
+      description: >
+        The owner is the caller's entity (or no entity, for a template the Federation authors).
+        Rules (422): m1.role.entity_scope_required, m1.role.federation_required,
+        m1.role.name_required, m1.role.name_taken, m1.role.template_not_found,
+        m1.role.class_invalid, m1.role.class_not_permitted, m1.role.permission_unknown,
+        m1.role.permission_not_held, m1.role.permission_federation_only, m1.role.sod_conflict,
+        m1.role.limits_not_accepted, m1.role.limits_invalid.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Role created
+          headers:
+            Location:
+              description: Address of the new role
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles/{roleId}:
+
+    get:
+      tags: [Roles]
+      operationId: getRole
+      summary: One role visible to the caller
+      x-permission: gov.role.manage
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '404':
+          description: The role does not exist or is not visible to this scope
+
+  /v1/security/roles/{roleId}/permissions:
+
+    put:
+      tags: [Roles]
+      operationId: amendRole
+      summary: Replace the permissions of a role and raise its version
+      description: >
+        The whole set is sent; what is not in it is taken away. Rules (422): as createRole, and
+        m1.role.not_found, m1.role.not_owner, m1.role.retired, m1.role.last_user_manager,
+        m1.role.no_template.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendRoleRequest'
+      responses:
+        '200':
+          description: The role as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles/{roleId}/retire:
+
+    post:
+      tags: [Roles]
+      operationId: retireRole
+      summary: Retire a role nobody holds
+      description: Rules (422) m1.role.not_found, m1.role.not_owner, m1.role.retired, m1.role.has_assignments.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Role retired
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles/{roleId}/diff:
+
+    get:
+      tags: [Roles]
+      operationId: getRoleDiff
+      summary: What a cloned role and the current version of its template disagree on
+      description: >
+        Doc 19 DR-4, "notify and offer diff": the template is never pushed into the clone; the
+        administrator reads this and amends the role (adoptTemplateVersion) if they agree.
+      x-permission: gov.role.manage
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The diff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDiffResponse'
+        '404':
+          description: The role is not visible, or was not cloned from a template
+
+  /v1/security/assignments:
+
+    get:
+      tags: [Assignments]
+      operationId: listAssignments
+      summary: The role assignments at the caller's entity, of one user or of everybody
+      x-permission: gov.role.manage
+      parameters:
+        - in: query
+          name: userId
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentList'
+
+    post:
+      tags: [Assignments]
+      operationId: assignRole
+      summary: Give a user a role at the caller's entity, entity-wide or at one location
+      description: >
+        Rules (422): m1.role.entity_scope_required, m1.role.not_found, m1.role.retired,
+        m1.assignment.role_not_in_scope, m1.assignment.outside_caller_scope,
+        m1.assignment.location_not_in_entity, m1.assignment.user_not_in_scope,
+        m1.assignment.user_deactivated, m1.assignment.class_not_permitted, m1.assignment.exists,
+        m1.role.permission_not_held, m1.assignment.sod_conflict.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRoleRequest'
+      responses:
+        '204':
+          description: Role assigned
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/assignments/revoke:
+
+    post:
+      tags: [Assignments]
+      operationId: revokeRole
+      summary: Take a role assignment away
+      description: >
+        21A section 5 writes this as DELETE /v1/security/assignments. It is a POST with a body
+        because the kernel's idempotency check compares the path and the body of a repeated
+        request, not its query string, and a DELETE body is poorly supported by clients.
+        Rules (422): m1.role.entity_scope_required, m1.assignment.outside_caller_scope,
+        m1.assignment.not_found, m1.assignment.last_user_manager.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeRoleRequest'
+      responses:
+        '204':
+          description: Assignment removed
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/sod-pairs:
+
+    get:
+      tags: [SodPairs]
+      operationId: listSodPairs
+      summary: The separation-of-duties pairs in force for the caller's entity
+      x-permission: gov.role.manage
+      responses:
+        '200':
+          description: The federation defaults and the entity's own pairs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SodPairList'
+
+    put:
+      tags: [SodPairs]
+      operationId: setSodPair
+      summary: Add a pair for the entity or raise one to ROLE mode
+      description: >
+        Rules (422): m1.role.entity_scope_required, m1.sod.mode_invalid, m1.sod.same_permission,
+        m1.sod.permission_unknown, m1.sod.cannot_lower, m1.sod.unchanged, m1.sod.existing_conflict.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetSodPairRequest'
+      responses:
+        '200':
+          description: The entity's pair as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SodPairResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/sod-pairs/{sodPairId}:
+
+    delete:
+      tags: [SodPairs]
+      operationId: removeSodPair
+      summary: Remove a pair the entity added itself
+      description: Rules (422) m1.role.entity_scope_required, m1.sod.not_found, m1.sod.not_owner.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - in: path
+          name: sodPairId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Pair removed
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 
 
 
@@ -2204,6 +2521,286 @@ components:
             - string
             - 'null'
           format: date-time
+
+    RolePermissionItem:
+      type: object
+      required: [permissionCode]
+      properties:
+        permissionCode:
+          type: string
+          minLength: 1
+          maxLength: 64
+        limits:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+          description: Values checked against the permission's limits_schema in the catalogue
+
+    CreateRoleRequest:
+      type: object
+      required: [nameEn]
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameSi:
+          type:
+            - string
+            - 'null'
+          maxLength: 100
+        nameTa:
+          type:
+            - string
+            - 'null'
+          maxLength: 100
+        templateRoleId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The template to clone; leave out for a role from scratch
+        permissions:
+          type:
+            - array
+            - 'null'
+          description: >
+            The role's permissions. Left out when cloning, the template's set is taken as it is;
+            left out for a role from scratch, the role starts with none.
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+        asTemplate:
+          type: boolean
+          default: false
+          description: The Federation authors a template (no owning entity)
+        roleClass:
+          type:
+            - string
+            - 'null'
+          enum:
+            - OWN
+            - FEDERATION_VIEW
+            - EXTERNAL_TIMEBOXED
+            - null
+
+    AmendRoleRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+        adoptTemplateVersion:
+          type: boolean
+          default: false
+          description: The administrator has read the template diff and takes the template's current version as seen
+
+    RoleResponse:
+      type: object
+      required: [roleId, nameEn, template, roleClass, templateUpdated, version, status, permissions]
+      properties:
+        roleId:
+          type: string
+          format: uuid
+        ownerEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        nameEn:
+          type: string
+        nameSi:
+          type:
+            - string
+            - 'null'
+        nameTa:
+          type:
+            - string
+            - 'null'
+        template:
+          type: boolean
+        roleClass:
+          type: string
+          enum: [OWN, FEDERATION_VIEW, EXTERNAL_TIMEBOXED]
+        templateRoleId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        templateVersionSeen:
+          type:
+            - integer
+            - 'null'
+        templateVersion:
+          type:
+            - integer
+            - 'null'
+        templateUpdated:
+          type: boolean
+          description: The template has a newer version than the one this role last took
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, RETIRED]
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+
+    RoleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleResponse'
+
+    RoleDiffResponse:
+      type: object
+      required: [roleId, templateRoleId, templateVersion, templateUpdated, onlyInTemplate, onlyInRole, limitsDiffer]
+      properties:
+        roleId:
+          type: string
+          format: uuid
+        templateRoleId:
+          type: string
+          format: uuid
+        templateVersionSeen:
+          type:
+            - integer
+            - 'null'
+        templateVersion:
+          type: integer
+        templateUpdated:
+          type: boolean
+        onlyInTemplate:
+          type: array
+          items:
+            type: string
+        onlyInRole:
+          type: array
+          items:
+            type: string
+        limitsDiffer:
+          type: array
+          items:
+            type: string
+
+    AssignRoleRequest:
+      type: object
+      required: [userId, roleId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleId:
+          type: string
+          format: uuid
+        scopeLocationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The location the role applies at; leave out for the whole entity
+
+    RevokeRoleRequest:
+      type: object
+      required: [userId, roleId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleId:
+          type: string
+          format: uuid
+        scopeLocationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        reason:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    AssignmentResponse:
+      type: object
+      required: [userId, roleId, scopeEntityId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleId:
+          type: string
+          format: uuid
+        scopeEntityId:
+          type: string
+          format: uuid
+        scopeLocationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+
+    AssignmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignmentResponse'
+
+    SetSodPairRequest:
+      type: object
+      required: [permissionA, permissionB, mode]
+      properties:
+        permissionA:
+          type: string
+          minLength: 1
+          maxLength: 64
+        permissionB:
+          type: string
+          minLength: 1
+          maxLength: 64
+        mode:
+          type: string
+          enum: [INSTANCE, ROLE]
+
+    SodPairResponse:
+      type: object
+      required: [sodPairId, permissionA, permissionB, mode]
+      properties:
+        sodPairId:
+          type: string
+          format: uuid
+        permissionA:
+          type: string
+        permissionB:
+          type: string
+        mode:
+          type: string
+          enum: [INSTANCE, ROLE]
+        ownerEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Null for a federation default
+
+    SodPairList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SodPairResponse'
 
   parameters:
 

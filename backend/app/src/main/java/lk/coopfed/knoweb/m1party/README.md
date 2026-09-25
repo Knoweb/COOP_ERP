@@ -66,3 +66,26 @@ External grants (M1-09, package `internal/grant`):
 - **The revoke** is its own event, `device.revoked.v1`, published on suspension and on retirement; `device.reinstated.v1` lifts it.
 - **Version floor** is the configuration item `m1.device.version_floor` (federation-wide, default "0").
 - **Enrolment** is by the owning entity in its own scope, with the staging reference in the command and the audit record; the Federation staging table of doc 31 and the device credential (K-02, K-08) are not here.
+## Roles, assignments and separation-of-duties pairs (M1-08)
+
+| Where | What |
+|---|---|
+| `api/` | Commands `CreateRole`, `AmendRole`, `RetireRole`, `AssignRole`, `RevokeRole`, `SetSodPair`, `RemoveSodPair` and the value `RolePermission` (a code and its limits); events `role.changed.v1` (`RoleChanged`), `role.assigned.v1`, `role.revoked.v1` (they carry `userId`, which is what the kernel's permission cache reads to forget that user) and `sod_pair.changed.v1`. |
+| `query/SecurityQueries` | `listRoles`, `getRole`, `getRoleDiff` (the template drift diff), `listSodPairs`, `listAssignments`; implemented in `internal/queries/SecurityQueriesImpl`, read under the caller's row-level security. |
+| `internal/security/role/` | One handler per command (all `gov.role.manage`, MFA); `RoleGuards` (the guards they share, in 21A's order); `RoleRules` (the guardrails as plain functions, so the property tests can run them thousands of times); `SecurityRecords` (the reads). |
+| `web/` | `RolesController`, `AssignmentsController`, `SodPairsController`. |
+| `db/migration/m1security/V0010` | The three DELETEs M1 performs, the Federation's template policies, `security.role_assignment_count`. |
+
+The guardrails, as the handlers apply them: roles are authored entity-wide in the OWN class; nobody grants a permission they do not hold, on a role or by assigning one (doc 19 section 3.2); FEDERATION-scope permissions only in federation-owned roles (templates and the Federation's own roles); no role, and no person through two roles, holds both halves of a pair in ROLE mode; limits are checked against the permission's `limits_schema`; an entity never loses its last holder of `gov.user.manage` (by revoke or by amending the role); a role is retired only when nobody holds it; an entity adds pairs and raises them to ROLE mode, never lowers a federation default, and cannot raise a pair while a role or a person already holds both.
+
+Template drift (doc 19 DR-4, "notify and offer diff"; assumes doc 10 E-04): a clone keeps `template_role_id` and `template_version_seen`; when the Federation amends the template its version rises, the clone's `templateUpdated` marker shows and `GET /v1/security/roles/{roleId}/diff` lists what the two disagree on. Nothing is pushed into the clone: the administrator amends the role with `adoptTemplateVersion` once they agree.
+
+## Deviations from the implementation guide
+
+- **RevokeRole is `POST /v1/security/assignments/revoke`**, not `DELETE /v1/security/assignments` (21A section 5): the kernel's idempotency check hashes the path and the body, not the query string, so a DELETE with the assignment in the query would replay one revoke for another under a reused key, and a DELETE body is poorly supported by clients.
+- **Operations 21A does not list** were added because the commands of section 6 need a door: `GET /v1/security/roles/{roleId}`, `PUT .../permissions` (AmendRole), `POST .../retire`, `GET /v1/security/assignments`, and `/v1/security/sod-pairs` (list, set, remove). All carry `gov.role.manage`.
+- **Three tables app_rw may delete from** (`user_role`, `role_permission`, `sod_pair`), named in `SchemaRulesIntegrationTest.DELETE_BY_DESIGN`: 21A makes revoke a delete and AmendRole a set replace; 17A section 6.2 says "no DELETE anywhere". The two documents disagree; the guide's procedure is followed for these three tables only.
+- **FEDERATION-scope permissions in the Federation's own roles**: the 21A pseudocode admits them in templates only; doc 21 section 3.5 says "federation-owned roles". The Federation's own roles are federation-owned, and without them its staff could hold `gov.entity.register` only through a template.
+- **Two guards beyond 21A's table, both from doc 19 section 3.2**: AssignRole checks that the grantor holds every permission of the role (assigning is granting), and a ROLE-mode pair is checked per person across their roles as well as per role.
+- **Limits**: the catalogue has no `limits_schema` yet, so today no permission takes limits (`m1.role.limits_not_accepted`). The schema reader understands a small subset of JSON Schema (`properties` with `type`, `minimum`, `maximum`; `required`; nothing else admitted); there is no JSON Schema library in the version catalogue.
+- **No template notification is sent**: the marker and the diff are there; a notification on `role.changed.v1` of a template is a K-10 rule for M9 to write.

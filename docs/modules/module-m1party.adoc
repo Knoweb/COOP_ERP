@@ -9,6 +9,7 @@
 * `l.c.k.m.query.DeviceQueries` (via `l.c.k.m.internal.queries.DeviceQueriesImpl`)
 * `l.c.k.m.query.PartyQueries` (via `l.c.k.m.internal.queries.PartyQueriesImpl`)
 * `l.c.k.m.query.RelationshipQueries` (via `l.c.k.m.internal.queries.RelationshipQueriesImpl`)
+* `l.c.k.m.query.SecurityQueries` (via `l.c.k.m.internal.queries.SecurityQueriesImpl`)
 |Bean references
 |* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
@@ -17,6 +18,7 @@
 * `l.c.k.k.api.NumberingService` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
 * `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
+* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 * `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
