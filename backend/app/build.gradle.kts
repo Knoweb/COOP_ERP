@@ -154,6 +154,9 @@ dependencies {
     implementation(platform(libs.aws.sdk.bom))
     implementation(libs.aws.sdk.s3)
 
+    // K-06: ICU MessageFormat, NFC, collation-aware helpers and LATN digits (19A section 6).
+    implementation(libs.icu4j)
+
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.flywaydb:flyway-core")
