@@ -127,6 +127,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/relationships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The relationships in which the caller's entity is seller, buyer or either
+         * @description Every row of every status, ordered by counterparty and effective date, so the history of a pair reads in order (ListRelationships, 21A section 7). Row-level security decides what the caller sees: its own relationships as seller or buyer; the Federation view sees every relationship.
+         */
+        get: operations["listRelationships"];
+        put?: never;
+        /**
+         * Open a trading relationship in DRAFT, the caller's entity selling
+         * @description The seller is the caller's entity. Codes: m1.relationship.seller_scope_required, m1.relationship.self, m1.relationship.buyer_not_found, m1.relationship.party_not_trading, m1.relationship.tier_not_allowed, m1.relationship.effective_range_invalid, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         */
+        post: operations["openTradingRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One relationship row visible in the caller's scope */
+        get: operations["getRelationship"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put a DRAFT relationship into force
+         * @description Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_draft, m1.relationship.price_list_required, m1.relationship.payment_terms_required, m1.relationship.price_list_refused (M3's reason in params.reason), m1.relationship.overlap.
+         */
+        post: operations["activateRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Amend the terms of an ACTIVE relationship from a date
+         * @description Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE row carries the new terms; the answer is the new row. A term left out keeps its current value. A credit_limit change additionally requires bil.creditlimit.change with a fresh second factor (mfa.required when stale). Codes: m1.relationship.not_found, m1.relationship.not_active, m1.relationship.not_seller, m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end, m1.relationship.credit_limit_permission_required, mfa.required, m1.relationship.reason_required, m1.relationship.terms_unchanged, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         */
+        post: operations["amendRelationshipTerms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend an ACTIVE relationship; open documents are unaffected
+         * @description Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_active, m1.relationship.reason_required.
+         */
+        post: operations["suspendRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -205,6 +306,78 @@ export interface components {
             field: string;
             /** @description A message id from the bulk.* catalogue */
             code: string;
+        };
+        OpenRelationshipRequest: {
+            /** Format: uuid */
+            buyerEntityId: string;
+            /**
+             * Format: uuid
+             * @description The seller's TRADE price list (M3); needed before activation
+             */
+            priceListId?: string | null;
+            /** @description Informative (ADR-12), in rupees */
+            creditLimit?: number | null;
+            /** @description Needed before activation */
+            paymentTermsDays?: number | null;
+            /** @description Default 7 */
+            discrepancyWindowDays?: number | null;
+            /** @description Default 24 */
+            orderLockHoursBeforeEta?: number | null;
+            /**
+             * @description Default FCFS
+             * @enum {string|null}
+             */
+            allocationRule?: "FCFS" | "PRO_RATA" | "QUOTA" | null;
+            /** Format: date */
+            effectiveFrom: string;
+            /**
+             * Format: date
+             * @description The last day; open-ended when left out
+             */
+            effectiveTo?: string | null;
+        };
+        AmendTermsRequest: {
+            /**
+             * Format: date
+             * @description The first day of the new terms; after the current row's first day
+             */
+            effectiveFrom: string;
+            /** Format: uuid */
+            priceListId?: string | null;
+            creditLimit?: number | null;
+            paymentTermsDays?: number | null;
+            discrepancyWindowDays?: number | null;
+            orderLockHoursBeforeEta?: number | null;
+            /** @enum {string|null} */
+            allocationRule?: "FCFS" | "PRO_RATA" | "QUOTA" | null;
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RelationshipReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RelationshipResponse: {
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            priceListId?: string | null;
+            creditLimit?: number | null;
+            paymentTermsDays?: number | null;
+            discrepancyWindowDays: number;
+            orderLockHoursBeforeEta: number;
+            /** @enum {string} */
+            allocationRule: "FCFS" | "PRO_RATA" | "QUOTA";
+            /** @enum {string} */
+            status: "DRAFT" | "ACTIVE" | "SUSPENDED";
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string | null;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -496,6 +669,176 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BulkValidationReport"];
                 };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRelationships: {
+        parameters: {
+            query?: {
+                side?: "SELLER" | "BUYER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The relationships, as rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    openTradingRelationship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenRelationshipRequest"];
+            };
+        };
+        responses: {
+            /** @description Relationship opened in DRAFT */
+            201: {
+                headers: {
+                    /** @description Address of the new relationship */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getRelationship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The relationship row */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"];
+                };
+            };
+            /** @description The relationship does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    activateRelationship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Relationship activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    amendRelationshipTerms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendTermsRequest"];
+            };
+        };
+        responses: {
+            /** @description The new row that carries the amended terms */
+            201: {
+                headers: {
+                    /** @description Address of the new row */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    suspendRelationship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationshipReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Relationship suspended */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
