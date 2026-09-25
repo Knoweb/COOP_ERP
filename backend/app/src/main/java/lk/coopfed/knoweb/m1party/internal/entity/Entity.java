@@ -158,8 +158,17 @@ public class Entity implements Persistable<UUID> {
         return entityType;
     }
 
-    String status() {
+    public String status() {
         return status;
+    }
+
+    /** True when the entity may register locations (doc 21 section 4.3: owner ACTIVE or ONBOARDING). */
+    public boolean isTrading() {
+        return STATUS_ACTIVE.equals(status) || STATUS_ONBOARDING.equals(status);
+    }
+
+    public String defaultLanguage() {
+        return defaultLanguage;
     }
 
     public Map<String, Object> auditState() {
