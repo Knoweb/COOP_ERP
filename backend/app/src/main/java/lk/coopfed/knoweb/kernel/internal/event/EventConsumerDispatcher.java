@@ -66,7 +66,9 @@ public class EventConsumerDispatcher {
                 applyScope(scope);
 
                 return inbox.applyOnce(
-                        consumer, message.eventId(), () -> registration.invoke(message.payload(), scope, mapper));
+                        consumer,
+                        message.eventId(),
+                        () -> registration.invoke(payloadFor(registration, message), scope, mapper));
             });
 
             return Boolean.TRUE.equals(applied) ? DeliveryResult.APPLIED : DeliveryResult.DUPLICATE;
@@ -96,6 +98,28 @@ public class EventConsumerDispatcher {
             deadLetter.send(consumer, message, attempt, error);
 
             return DeliveryResult.DEAD_LETTERED;
+        }
+    }
+
+    /**
+     * A consumer of one type gets the payload; a consumer of every type ("*", the notification
+     * dispatcher of K-10) gets the envelope with the payload inside, because the type and the
+     * event id are what it matches on.
+     */
+    private String payloadFor(EventConsumerRegistry.Registration registration, OutboxMessage message) {
+        if (!"*".equals(registration.eventType())) {
+            return message.payload();
+        }
+        try {
+            com.fasterxml.jackson.databind.node.ObjectNode envelope = mapper.createObjectNode();
+            envelope.put("eventType", message.eventType());
+            envelope.put("eventId", message.eventId().toString());
+            envelope.put("ownerEntityId", message.ownerEntityId().toString());
+            envelope.put("occurredAt", message.occurredAt().toString());
+            envelope.set("payload", mapper.readTree(message.payload()));
+            return mapper.writeValueAsString(envelope);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Event payload is not JSON: " + message.eventId(), e);
         }
     }
 

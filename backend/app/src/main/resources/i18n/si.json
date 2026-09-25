@@ -58,6 +58,8 @@
   "m1.entity.type_invalid": "වලංගු ආයතන වර්ගයක් තෝරන්න",
   "m1.entity.vat_required": "ආයතනය සක්‍රිය කිරීමට පෙර VAT ලියාපදිංචි අංකය ඇතුළත් කරන්න",
   "mfa.required": "මෙම ක්‍රියාවට නැවුම් දෙවන සාධකයක් අවශ්‍යයි; එය සමඟ නැවත පිවිසෙන්න",
+  "notification.channel_unknown": "මෙම දැනුම්දීම් නාලිකාව සඳහා ඇඩප්ටරයක් ලියාපදිංචි කර නැත",
+  "notification.recipient_required": "දැනුම්දීමකට ලබන්නෙකු අවශ්‍යයි",
   "pricing.price_list.duplicate": "මෙම සුබපැතුම දැනටමත් ලියාපදිංචි කර ඇත",
   "pricing.price_list.text_required": "සුබපැතුම ඉංග්‍රීසියෙන් ඇතුළත් කරන්න",
   "pricing.register": "සුබපැතුම ලියාපදිංචි කරන්න",
