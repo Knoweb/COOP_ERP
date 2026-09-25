@@ -17,18 +17,21 @@ final class FederationCaller {
 
     /** Returns the calling Federation entity, or refuses with {@code m1.entity.federation_required}. */
     static Entity require(ScopeContext scope, EntityRepository repository) {
+        return require(scope, repository, "m1.entity.federation_required");
+    }
+
+    /** The same guard, refusing with the given message id: the grant commands say what they grant. */
+    static Entity require(ScopeContext scope, EntityRepository repository, String problem) {
         if (scope == null
                 || !scope.hasActiveScope()
                 || scope.entityId() == null
                 || scope.locationId() != null
                 || scope.policyClass() != PolicyClass.OWN) {
-            throw new ProblemException("m1.entity.federation_required");
+            throw new ProblemException(problem);
         }
-        Entity caller = repository
-                .findById(scope.entityId())
-                .orElseThrow(() -> new ProblemException("m1.entity.federation_required"));
+        Entity caller = repository.findById(scope.entityId()).orElseThrow(() -> new ProblemException(problem));
         if (!caller.isFederation()) {
-            throw new ProblemException("m1.entity.federation_required");
+            throw new ProblemException(problem);
         }
         return caller;
     }
