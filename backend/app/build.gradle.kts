@@ -146,6 +146,9 @@ dependencies {
     implementation(libs.shedlock.spring)
     implementation(libs.shedlock.provider.jdbc.template)
 
+    // K-11: the per-instance configuration cache (19A section 11).
+    implementation(libs.caffeine)
+
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.flywaydb:flyway-core")

@@ -1,0 +1,72 @@
+# The configuration register (doc 19 section 8; 19A section 11): every item the platform and
+# its modules may configure, with its type, its default, the finest scope it may be set at and
+# who may change it. Upserted into kernel.config_item on every start by ConfigItemSeedLoader
+# as the migrator; values are never written from here. A module's seed/<module>/config.yaml
+# gives defaults for its own keys through ConfigSeeder and, for a key not registered here, a
+# plain ENTITY-scoped string item under that module's name.
+#
+#   value_type        STRING | INTEGER | DECIMAL | BOOLEAN | DURATION (ISO 8601, PT10M) | JSON
+#   schema            what a value must satisfy: minimum, maximum (numbers and durations),
+#                     enum (strings), pattern (strings), max_length (strings)
+#   scope_kind        FEDERATION (one value for all), ENTITY, LOCATION (finest)
+#   change_permission the permission that may set it (checked when K-03b resolves permissions)
+#   sensitive         a change needs a fresh MFA (doc 19 section 8)
+#   till_visible      part of the shop snapshot (doc 32 section 5.1)
+config_items:
+  - key: business.timezone
+    value_type: STRING
+    schema: { pattern: "^[A-Za-z_]+/[A-Za-z_]+$" }
+    description_en: The business time zone of the federation
+    description_si: සම්මේලනයේ ව්‍යාපාරික වේලා කලාපය
+    description_ta: கூட்டமைப்பின் வணிக நேர மண்டலம்
+    default: "Asia/Colombo"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: business_date.cutoff_time
+    value_type: STRING
+    schema: { pattern: "^[0-2][0-9]:[0-5][0-9]$" }
+    description_en: The time of day after which a location that has not closed its day is closed for it
+    description_si: දිනය වසා නොමැති ස්ථානයක් වෙනුවෙන් එය වසන දවසේ වේලාව
+    description_ta: நாளை மூடாத இடத்திற்குப் பதிலாக அது மூடப்படும் நேரம்
+    default: "02:30"
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+  - key: m1.bulk.max_rows
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 5000 }
+    description_en: The most societies one CSV file may register at once
+    description_si: එක් CSV ගොනුවකින් වරකට ලියාපදිංචි කළ හැකි උපරිම සමිති ගණන
+    description_ta: ஒரு CSV கோப்பு ஒரே நேரத்தில் பதிவு செய்யக்கூடிய அதிகபட்ச சங்கங்கள்
+    default: 500
+    scope_kind: FEDERATION
+    change_permission: gov.entity.register
+    module: m1party
+  - key: trade.federation_direct.enabled
+    value_type: BOOLEAN
+    description_en: Whether societies may trade directly with the Federation
+    description_si: සමිතිවලට සම්මේලනය සමඟ සෘජුව වෙළඳාම් කළ හැකිද
+    description_ta: சங்கங்கள் கூட்டமைப்புடன் நேரடியாக வர்த்தகம் செய்யலாமா
+    default: false
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m1party
+  - key: security.policy.mfa_enabled
+    value_type: BOOLEAN
+    description_en: Whether a second factor is required for the actions that ask for one
+    description_si: ඉල්ලන ක්‍රියා සඳහා දෙවන සාධකයක් අවශ්‍යද
+    description_ta: கேட்கும் செயல்களுக்கு இரண்டாம் காரணி தேவையா
+    default: true
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: true
+    module: m1party
+  - key: till.idle_lock
+    value_type: DURATION
+    schema: { minimum: "PT30S", maximum: "PT1H" }
+    description_en: How long a till may stand idle before it locks
+    description_si: මුදල් ලේඛනයක් අගුලු දැමීමට පෙර නිකම් තිබිය හැකි කාලය
+    description_ta: பணப்பெட்டி பூட்டப்படும் முன் செயலற்று இருக்கக்கூடிய நேரம்
+    default: "PT5M"
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+    till_visible: true

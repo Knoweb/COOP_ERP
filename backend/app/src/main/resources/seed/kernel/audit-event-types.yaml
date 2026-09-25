@@ -42,3 +42,8 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Location closed its business day
+  # K-11: the configuration register.
+  - code: CONFIG_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Configuration value changed

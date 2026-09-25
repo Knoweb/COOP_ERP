@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Locale;
-import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.internal.KernelClockConfig;
 import org.junit.jupiter.api.Test;
@@ -22,8 +21,7 @@ class KernelWiringTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withBean(ObjectMapper.class)
-            .withUserConfiguration(
-                    KernelClockConfig.class, JsonMessages.class, SeedConfigRegistry.class, DevStubsGuard.class)
+            .withUserConfiguration(KernelClockConfig.class, JsonMessages.class, DevStubsGuard.class)
             .withPropertyValues("coop-erp.business-timezone=Asia/Colombo");
 
     @Test
@@ -33,8 +31,6 @@ class KernelWiringTest {
             assertThat(context.getBean(Clock.class).getZone()).isEqualTo(ZoneOffset.UTC);
             assertThat(context.getBean(Messages.class).t("scope.required", Locale.ENGLISH))
                     .isEqualTo("Select the entity you are working for");
-            assertThat(context.getBean(ConfigRegistry.class).get("business.timezone", null))
-                    .contains("Asia/Colombo");
         });
     }
 
