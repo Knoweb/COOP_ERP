@@ -149,6 +149,11 @@ dependencies {
     // K-11: the per-instance configuration cache (19A section 11).
     implementation(libs.caffeine)
 
+    // K-09: attachments behind the S3 protocol, provider-neutral (19A section 9). One BOM, so the
+    // SDK modules cannot drift apart.
+    implementation(platform(libs.aws.sdk.bom))
+    implementation(libs.aws.sdk.s3)
+
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.flywaydb:flyway-core")

@@ -65,6 +65,20 @@ coop-erp:
   system:
     entity-id: ${COOP_ERP_SYSTEM_ENTITY_ID:}
 
+  # The object store of the attachments (19A section 9), behind the S3 protocol: any S3 service,
+  # MinIO on a developer machine. The endpoint is what the backend reaches; the public endpoint
+  # is what a browser or a till reaches with a pre-signed URL (the same one outside compose).
+  object-store:
+    endpoint: ${OBJECT_STORE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${OBJECT_STORE_PUBLIC_ENDPOINT:${OBJECT_STORE_ENDPOINT:http://localhost:9000}}
+    region: ${OBJECT_STORE_REGION:us-east-1}
+    access-key: ${OBJECT_STORE_ACCESS_KEY:coopminio}
+    secret-key: ${OBJECT_STORE_SECRET_KEY:coopminio-dev}
+    attachments-bucket: ${OBJECT_STORE_ATTACHMENTS_BUCKET:attachments}
+    presign-minutes: 15
+    # A PENDING attachment nobody uploaded within this time is FAILED by the verifier.
+    upload-window-hours: 24
+
   # Browser origins allowed to call /v1/** (the Vite dev server). Comma-separated; never "*".
   web:
     allowed-origins: ${WEB_ALLOWED_ORIGINS:http://localhost:5173}

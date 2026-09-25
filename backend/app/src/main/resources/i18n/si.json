@@ -1,4 +1,7 @@
 {
+  "attachment.content_type_invalid": "ගොනු වර්ගය ඇමිණිය හැකි එකක් නොවේ",
+  "attachment.document_not_found": "ඇමුණුම සඳහා ලේඛනය සොයාගත නොහැක",
+  "attachment.hash_invalid": "ගොනු හෑෂය ෂඩ්දශමය අක්ෂර 64 ක් විය යුතුය",
   "bulk.file.empty": "ගොනුවේ ලියාපදිංචි කිරීමට පේළි නොමැත",
   "bulk.file.header_invalid": "ගොනුවේ අවශ්‍ය තීරුවක් නොමැත: {0}",
   "bulk.file.too_many_rows": "ගොනුවේ පේළි {0} ක් ඇත; එකවර ලියාපදිංචි කළ හැක්කේ උපරිම {1} ක් පමණි",
