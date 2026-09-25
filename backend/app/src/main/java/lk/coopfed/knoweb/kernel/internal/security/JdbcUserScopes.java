@@ -90,7 +90,8 @@ public class JdbcUserScopes implements UserScopes {
                     """
                     select unnest(scope_entity_ids) as entity_id
                       from security.external_grant
-                     where user_id = ?
+                     where grantee_user_id = ?
+                       and status = 'ACTIVE'
                        and valid_from <= now()
                        and valid_until > now()
                     """,
