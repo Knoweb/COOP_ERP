@@ -1,11 +1,10 @@
 package lk.coopfed.knoweb.m2catalogue.internal.barcode;
 
+import java.util.Optional;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeResolution;
 import lk.coopfed.knoweb.m2catalogue.query.LookupByBarcode;
 import org.springframework.stereotype.Component;
-
-import java.util.Optional;
 
 @Component
 class LookupByBarcodeImpl implements LookupByBarcode {
@@ -18,8 +17,13 @@ class LookupByBarcodeImpl implements LookupByBarcode {
 
     @Override
     public Optional<BarcodeResolution> resolve(String barcodeString, ScopeContext scope) {
-        Optional<Barcode> found = repository.findByBarcodeAndSymbologyAndStatus(barcodeString, Barcode.SYMBOLOGY_FACTORY, Barcode.STATUS_ACTIVE)
-            .or(() -> repository.findByBarcodeAndSymbologyAndOwnerEntityIdAndStatus(barcodeString, Barcode.SYMBOLOGY_INTERNAL, scope.activeScope().entityId(), Barcode.STATUS_ACTIVE));
+        Optional<Barcode> found = repository
+                .findByBarcodeAndSymbologyAndStatus(barcodeString, Barcode.SYMBOLOGY_FACTORY, Barcode.STATUS_ACTIVE)
+                .or(() -> repository.findByBarcodeAndSymbologyAndOwnerEntityIdAndStatus(
+                        barcodeString,
+                        Barcode.SYMBOLOGY_INTERNAL,
+                        scope.activeScope().entityId(),
+                        Barcode.STATUS_ACTIVE));
 
         if (found.isPresent()) {
             Barcode b = found.get();
@@ -28,8 +32,9 @@ class LookupByBarcodeImpl implements LookupByBarcode {
 
         if (barcodeString.startsWith("01") && barcodeString.length() > 16) {
             String gtin = barcodeString.substring(2, 16);
-            
-            Optional<Barcode> gtinBarcode = repository.findByBarcodeAndSymbologyAndStatus(gtin, Barcode.SYMBOLOGY_FACTORY, Barcode.STATUS_ACTIVE);
+
+            Optional<Barcode> gtinBarcode = repository.findByBarcodeAndSymbologyAndStatus(
+                    gtin, Barcode.SYMBOLOGY_FACTORY, Barcode.STATUS_ACTIVE);
             if (gtinBarcode.isPresent()) {
                 Barcode b = gtinBarcode.get();
                 // Extended GS1 parsing (lot and expiry) would lookup the exact batch here.

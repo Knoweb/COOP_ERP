@@ -1,5 +1,8 @@
 package lk.coopfed.knoweb.m2catalogue.internal.barcode;
 
+import java.time.Clock;
+import java.util.Map;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
@@ -13,12 +16,6 @@ import lk.coopfed.knoweb.m2catalogue.api.RegisterBarcode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-
 @Service
 @CommandHandler(permission = "cat.barcode.register")
 class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
@@ -31,7 +28,12 @@ class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
     private final EventPublisher events;
     private final Clock clock;
 
-    RegisterBarcodeHandler(BarcodeRepository repository, BatchSkuQueries batchQueries, AuditFacade audit, EventPublisher events, Clock clock) {
+    RegisterBarcodeHandler(
+            BarcodeRepository repository,
+            BatchSkuQueries batchQueries,
+            AuditFacade audit,
+            EventPublisher events,
+            Clock clock) {
         this.repository = repository;
         this.batchQueries = batchQueries;
         this.audit = audit;
@@ -42,17 +44,25 @@ class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
     @Override
     @Transactional
     public UUID handle(RegisterBarcode command, ScopeContext scope) {
-        UUID ownerId = Barcode.SYMBOLOGY_INTERNAL.equals(command.symbology()) ? scope.activeScope().entityId() : null;
+        UUID ownerId = Barcode.SYMBOLOGY_INTERNAL.equals(command.symbology())
+                ? scope.activeScope().entityId()
+                : null;
 
         if (Barcode.SYMBOLOGY_FACTORY.equals(command.symbology())) {
-            repository.findByBarcodeAndSymbologyAndStatus(command.barcode(), command.symbology(), Barcode.STATUS_ACTIVE)
+            repository
+                    .findByBarcodeAndSymbologyAndStatus(command.barcode(), command.symbology(), Barcode.STATUS_ACTIVE)
                     .ifPresent(existing -> {
-                        throw new ProblemException("request.field.invalid", Map.of("reason", "FACTORY barcode already exists"));
+                        throw new ProblemException(
+                                "request.field.invalid", Map.of("reason", "FACTORY barcode already exists"));
                     });
         } else if (Barcode.SYMBOLOGY_INTERNAL.equals(command.symbology())) {
-            repository.findByBarcodeAndSymbologyAndOwnerEntityIdAndStatus(command.barcode(), command.symbology(), ownerId, Barcode.STATUS_ACTIVE)
+            repository
+                    .findByBarcodeAndSymbologyAndOwnerEntityIdAndStatus(
+                            command.barcode(), command.symbology(), ownerId, Barcode.STATUS_ACTIVE)
                     .ifPresent(existing -> {
-                        throw new ProblemException("request.field.invalid", Map.of("reason", "INTERNAL barcode already exists for this owner"));
+                        throw new ProblemException(
+                                "request.field.invalid",
+                                Map.of("reason", "INTERNAL barcode already exists for this owner"));
                     });
         } else {
             throw new ProblemException("request.field.invalid", Map.of("reason", "Unsupported symbology"));
@@ -60,20 +70,14 @@ class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
 
         if (command.batchId() != null) {
             if (!batchQueries.isBatchOfSku(command.batchId(), command.skuId())) {
-                throw new ProblemException("request.field.invalid", Map.of("reason", "Batch does not belong to the SKU"));
+                throw new ProblemException(
+                        "request.field.invalid", Map.of("reason", "Batch does not belong to the SKU"));
             }
         }
 
         UUID id = Ids.next();
         Barcode barcode = new Barcode(
-                id,
-                command.barcode(),
-                command.symbology(),
-                command.skuId(),
-                command.uom(),
-                command.batchId(),
-                ownerId
-        );
+                id, command.barcode(), command.symbology(), command.skuId(), command.uom(), command.batchId(), ownerId);
         repository.save(barcode);
 
         Subject subject = Subject.of("barcode", id);
@@ -83,8 +87,7 @@ class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
                 "skuId", command.skuId(),
                 "uom", command.uom(),
                 "batchId", command.batchId() != null ? command.batchId() : "null",
-                "ownerId", ownerId != null ? ownerId : "null"
-        );
+                "ownerId", ownerId != null ? ownerId : "null");
 
         audit.record(AUDIT_REGISTERED, subject, null, after, scope);
 
@@ -96,8 +99,7 @@ class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
                 command.uom(),
                 command.batchId(),
                 ownerId,
-                clock.instant()
-        ));
+                clock.instant()));
 
         return id;
     }

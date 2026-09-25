@@ -7,17 +7,16 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
-import org.springframework.data.domain.Persistable;
-
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @Table(schema = "catalogue", name = "barcode")
 public class Barcode implements Persistable<UUID> {
     public static final String STATUS_ACTIVE = "ACTIVE";
     public static final String STATUS_RETIRED = "RETIRED";
-    
+
     public static final String SYMBOLOGY_FACTORY = "FACTORY";
     public static final String SYMBOLOGY_INTERNAL = "INTERNAL";
 
@@ -53,7 +52,8 @@ public class Barcode implements Persistable<UUID> {
 
     protected Barcode() {}
 
-    public Barcode(UUID id, String barcode, String symbology, UUID skuId, String uom, UUID batchId, UUID ownerEntityId) {
+    public Barcode(
+            UUID id, String barcode, String symbology, UUID skuId, String uom, UUID batchId, UUID ownerEntityId) {
         this.id = id;
         this.barcode = barcode;
         this.symbology = symbology;

@@ -4,10 +4,4 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
-public record DefineConversion(
-        UUID skuId,
-        String fromUom,
-        String toUom,
-        BigDecimal factor,
-        LocalDate validFrom
-) {}
+public record DefineConversion(UUID skuId, String fromUom, String toUom, BigDecimal factor, LocalDate validFrom) {}

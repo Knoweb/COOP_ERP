@@ -1,5 +1,8 @@
 package lk.coopfed.knoweb.m2catalogue.internal.barcode;
 
+import java.time.Clock;
+import java.util.Map;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
@@ -11,11 +14,6 @@ import lk.coopfed.knoweb.m2catalogue.api.BarcodeRetired;
 import lk.coopfed.knoweb.m2catalogue.api.RetireBarcode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Service
 @CommandHandler(permission = "cat.barcode.retire")
@@ -38,28 +36,34 @@ class RetireBarcodeHandler implements Handles<RetireBarcode, UUID> {
     @Override
     @Transactional
     public UUID handle(RetireBarcode command, ScopeContext scope) {
-        Barcode barcode = repository.findById(command.barcodeId())
-                .orElseThrow(() -> new ProblemException("request.field.invalid", Map.of("reason", "Barcode not found")));
+        Barcode barcode = repository
+                .findById(command.barcodeId())
+                .orElseThrow(
+                        () -> new ProblemException("request.field.invalid", Map.of("reason", "Barcode not found")));
 
         if (!Barcode.STATUS_ACTIVE.equals(barcode.getStatus())) {
-            throw new ProblemException("request.field.invalid", Map.of("reason", "Only an ACTIVE barcode can be retired"));
+            throw new ProblemException(
+                    "request.field.invalid", Map.of("reason", "Only an ACTIVE barcode can be retired"));
         }
 
-        if (Barcode.SYMBOLOGY_INTERNAL.equals(barcode.getSymbology()) && !barcode.getOwnerEntityId().equals(scope.activeScope().entityId())) {
-            throw new ProblemException("request.forbidden", Map.of("reason", "You cannot retire another entity's internal barcode"));
+        if (Barcode.SYMBOLOGY_INTERNAL.equals(barcode.getSymbology())
+                && !barcode.getOwnerEntityId().equals(scope.activeScope().entityId())) {
+            throw new ProblemException(
+                    "request.forbidden", Map.of("reason", "You cannot retire another entity's internal barcode"));
         }
 
         barcode.retire();
         repository.save(barcode);
 
         Subject subject = Subject.of("barcode", barcode.getId());
-        audit.record(AUDIT_RETIRED, subject, null, Map.of("status", Barcode.STATUS_RETIRED, "reason", command.reason()), scope);
+        audit.record(
+                AUDIT_RETIRED,
+                subject,
+                null,
+                Map.of("status", Barcode.STATUS_RETIRED, "reason", command.reason()),
+                scope);
 
-        events.publish(new BarcodeRetired(
-                barcode.getId(),
-                command.reason(),
-                clock.instant()
-        ));
+        events.publish(new BarcodeRetired(barcode.getId(), command.reason(), clock.instant()));
 
         return barcode.getId();
     }
