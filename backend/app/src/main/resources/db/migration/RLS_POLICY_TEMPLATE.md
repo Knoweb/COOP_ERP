@@ -1,11 +1,16 @@
 # The row-level security policy template
 
 The five classes of doc 18 §3.7, as SQL to copy into a module migration (17A §6.3, completed by
-19A K-01). `RlsMatrixIntegrationTest` proves every row of the matrix below against this exact
-text, so a policy that departs from it is a decision to write down, not a habit.
+19A K-01). `RlsMatrixIntegrationTest` reads the SQL block below from this file and proves every row of
+the matrix against it; it then runs the same matrix against every real table that has an
+`owner_entity_id` column, and a table that departs from the template is listed in the test's
+`EXCEPTIONS` with the reason. A departure is a decision to write down, not a habit.
 
 Every operational table has: `ENABLE` and `FORCE ROW LEVEL SECURITY`; `own_read` and
-`own_write`; `fed_view`; `ext_view`. A table with a counterparty (a document: seller and
+`own_write`; `own_update` if the table grants `UPDATE` to `app_rw`, and `own_delete` if it
+grants `DELETE` (a table that grants neither is append-only and needs neither; under `FORCE`,
+a granted `UPDATE` or `DELETE` with no policy silently changes zero rows); `fed_view`;
+`ext_view`. A table with a counterparty (a document: seller and
 buyer) has `party_read` as well. Nothing else, and never a policy that trusts a session
 variable other than the four the kernel sets (`kernel.scope_entity()`,
 `kernel.scope_location()`, `kernel.scope_class()`, `kernel.granted_entities()`): any code can
@@ -28,24 +33,44 @@ CREATE POLICY own_read ON <schema>.<table> FOR SELECT TO app_rw
 CREATE POLICY own_write ON <schema>.<table> FOR INSERT TO app_rw
     WITH CHECK (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
 
+-- UPDATE and DELETE, where the table grants them: the rows own_read shows, and (WITH CHECK)
+-- an update cannot hand a row to another entity. Every clause carries the class test.
+CREATE POLICY own_update ON <schema>.<table> FOR UPDATE TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))
+    WITH CHECK (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+
+CREATE POLICY own_delete ON <schema>.<table> FOR DELETE TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+
 -- PARTY, on tables with a counterparty column only: the seller reads the buyer's side of the
 -- document and the buyer the seller's. What a PARTY caller may see of the row is decided by
 -- the masking view it reads through (trading.v_document_party, M4: no cost, margin or internal
 -- notes), never by this policy, which decides which rows. OWN is admitted here too, so a
--- caller in OWN scope reads its documents through the same view. The location line keeps a
--- shop-scoped user to its shop's documents (doc 18: a shop sees nothing of a sibling shop);
--- 19A section 1 leaves it out (CR-17A-3).
+-- caller in OWN scope reads its documents through the same view. The location line applies
+-- on the owner's side only: it keeps a shop-scoped user to its shop's own documents (doc 18:
+-- a shop sees nothing of a sibling shop), while location_id is the owner's location and says
+-- nothing about the counterparty's, so a shop-scoped counterparty still sees the documents it
+-- is the buyer of (19A section 1 leaves the location out altogether; CR-17A-3).
 CREATE POLICY party_read ON <schema>.<table> FOR SELECT TO app_rw
     USING (kernel.scope_class() IN ('OWN', 'PARTY')
-           AND (owner_entity_id = kernel.scope_entity()
-                OR counterparty_entity_id = kernel.scope_entity())
-           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+           AND ((owner_entity_id = kernel.scope_entity()
+                 AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))
+                OR counterparty_entity_id = kernel.scope_entity()));
 
 -- FEDERATION_VIEW: everything, read only.
 CREATE POLICY fed_view ON <schema>.<table> FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'FEDERATION_VIEW');
 
--- EXTERNAL_TIMEBOXED: a regulator or auditor reads the entities of its grant, read only.
+-- EXTERNAL_TIMEBOXED: a regulator or auditor reads the entities of its grant, read only. The
+-- time box is not in the policy: kernel.granted_entities() is what the scope customizer set,
+-- and it sets only the entities of the caller's grants that are ACTIVE and inside
+-- [valid_from, valid_until) now (JdbcUserScopes, from security.external_grant). An expired or
+-- revoked grant gives an empty array, which reads nothing; ExternalGrantsIntegrationTest
+-- (scenario65TheRegulatorGrantLifecycle, anExpiredOrEmptyGrantReadsNothing) proves it.
 CREATE POLICY ext_view ON <schema>.<table> FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED'
            AND owner_entity_id = ANY (kernel.granted_entities()));
@@ -55,12 +80,12 @@ What the matrix guarantees, and the test proves:
 
 | Class | Reads | Writes |
 |---|---|---|
-| OWN, entity-wide | rows owned by the scope entity, and rows where it is the counterparty | rows owned by the scope entity |
-| OWN, at a location | the entity's rows at that location | the same |
-| PARTY | rows where the scope entity is owner or counterparty | nothing |
+| OWN, entity-wide | rows owned by the scope entity, and rows where it is the counterparty | inserts, updates and deletes rows owned by the scope entity; never moves one to another owner |
+| OWN, at a location | the entity's rows at that location, and rows where it is the counterparty | updates and deletes the entity's rows at that location |
+| PARTY | rows it owns (at its location, if it has one), and rows where it is the counterparty | nothing |
 | FEDERATION_VIEW | every row | nothing |
 | EXTERNAL_TIMEBOXED | rows owned by a granted entity; nothing with an empty grant | nothing |
-| NONE, or a transaction that forgot the scope | nothing | nothing |
+| NONE (even with a scope entity and a grant naming it), or a transaction that forgot the scope | nothing | nothing |
 
 Three cases the template does not cover, and what does:
 
