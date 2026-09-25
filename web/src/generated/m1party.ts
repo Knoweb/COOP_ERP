@@ -127,6 +127,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the locations visible in the caller's scope */
+        get: operations["listLocations"];
+        put?: never;
+        /**
+         * Register a location of the caller's entity in PLANNED status
+         * @description The owner is the caller's entity, which must be ACTIVE or ONBOARDING, and the caller acts entity-wide. A SHOP gets its location numbering series at once (GRN, WOF, CNT, RPK, XFR); a warehouse or an office numbers from the entity's series.
+         */
+        post: operations["registerLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one location visible in the caller's scope */
+        get: operations["getLocation"];
+        /**
+         * Replace the descriptive facts of a location (names, address, language, hours, size band)
+         * @description The code and the type are not changed here: the code is part of every document number of the location, and the type decides which series it has.
+         */
+        put: operations["updateLocation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/connectivity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that the location meets the connectivity specification
+         * @description A fact, not a toggle (21A section 8): the audit record says who confirmed it and when.
+         */
+        post: operations["confirmLocationConnectivity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/start-onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a PLANNED location to ONBOARDING */
+        post: operations["startLocationOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate an ONBOARDING location
+         * @description The connectivity gate must be met; a SHOP also needs a primary till and at least one operator (a till user assigned at the shop).
+         */
+        post: operations["activateLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/mark-dormant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close an ACTIVE location for trading (DORMANT), with a reason */
+        post: operations["markLocationDormant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring a DORMANT location back to ACTIVE */
+        post: operations["reactivateLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/primary-till": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Name the till position that holds the shop's location series
+         * @description The position must be an ACTIVE position of this location. When a device is assigned to it, the counters of the location series move to that device (the kernel records series.holder_changed.v1).
+         */
+        put: operations["setPrimaryTill"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the till positions of a location, retired ones included */
+        get: operations["listTillPositions"];
+        put?: never;
+        /**
+         * Register a till position at a shop and its till numbering series
+         * @description The location must be a SHOP and the number unused there, retired positions included. The position gets the series of every till-numbered document type (RCT, CPR).
+         */
+        post: operations["registerTillPosition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/till-positions/{tillPositionId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire a till position for good and close its series */
+        post: operations["retireTillPosition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/security/external-grants": {
         parameters: {
             query?: never;
@@ -169,36 +360,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        GrantExternalViewRequest: {
-            /** Format: uuid */
-            granteeUserId: string;
-            scopeEntityIds: string[];
-            /** Format: date-time */
-            validFrom?: string | null;
-            /** Format: date-time */
-            validUntil: string;
-            reason: string;
-        };
-        RevokeExternalViewRequest: {
-            reason: string;
-        };
-        ExternalGrantResponse: {
-            /** Format: uuid */
-            grantId: string;
-            /** Format: uuid */
-            granteeUserId: string;
-            scopeEntityIds: string[];
-            /** Format: date-time */
-            validFrom: string;
-            /** Format: date-time */
-            validUntil: string;
-            reason: string;
-            /** @enum {string} */
-            status: "ACTIVE" | "EXPIRED" | "REVOKED";
-        };
-        ExternalGrantList: {
-            items: components["schemas"]["ExternalGrantResponse"][];
-        };
         RegisterEntityRequest: {
             entityCode: string;
             /** @enum {string} */
@@ -274,6 +435,136 @@ export interface components {
             /** @description A message id from the bulk.* catalogue */
             code: string;
         };
+        /** @description The hours of one day of the week; a day not listed is a closed day */
+        TradingDay: {
+            /** @enum {string} */
+            day: "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+            /** @description Local time HH:mm */
+            opens: string;
+            /** @description Local time HH:mm, after opens */
+            closes: string;
+        };
+        RegisterLocationRequest: {
+            /** @description Unique within the entity; part of every document number of the location */
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "WAREHOUSE" | "SHOP" | "OFFICE";
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /**
+             * @description The till and receipt language; the entity's default language when not given
+             * @enum {string|null}
+             */
+            language?: "en" | "si" | "ta" | null;
+            tradingHours?: components["schemas"]["TradingDay"][] | null;
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+        };
+        UpdateLocationRequest: {
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /** @enum {string|null} */
+            language?: "en" | "si" | "ta" | null;
+            tradingHours?: components["schemas"]["TradingDay"][] | null;
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+        };
+        ReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        SetPrimaryTillRequest: {
+            /** Format: uuid */
+            tillPositionId: string;
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RegisterTillPositionRequest: {
+            /** @description The till number at the shop (T1, T2 ...); never reused, retired positions included */
+            positionNo: number;
+        };
+        LocationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "WAREHOUSE" | "SHOP" | "OFFICE";
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /** @enum {string|null} */
+            language?: "en" | "si" | "ta" | null;
+            tradingHours?: components["schemas"]["TradingDay"][];
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+            connectivitySpecMet: boolean;
+            /** Format: uuid */
+            primaryTillPositionId?: string | null;
+            /** @enum {string} */
+            status: "PLANNED" | "ONBOARDING" | "ACTIVE" | "DORMANT";
+        };
+        LocationPage: {
+            items: components["schemas"]["LocationResponse"][];
+            /** Format: uuid */
+            nextCursor?: string | null;
+        };
+        TillPositionResponse: {
+            /** Format: uuid */
+            tillPositionId: string;
+            /** Format: uuid */
+            locationId: string;
+            positionNo: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "RETIRED";
+            /** @description This position is the primary till of its location */
+            primary: boolean;
+        };
+        GrantExternalViewRequest: {
+            /** Format: uuid */
+            granteeUserId: string;
+            scopeEntityIds: string[];
+            /** Format: date-time */
+            validFrom?: string | null;
+            /** Format: date-time */
+            validUntil: string;
+            reason: string;
+        };
+        RevokeExternalViewRequest: {
+            reason: string;
+        };
+        ExternalGrantResponse: {
+            /** Format: uuid */
+            grantId: string;
+            /** Format: uuid */
+            granteeUserId: string;
+            scopeEntityIds: string[];
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validUntil: string;
+            reason: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "EXPIRED" | "REVOKED";
+        };
+        ExternalGrantList: {
+            items: components["schemas"]["ExternalGrantResponse"][];
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -320,6 +611,7 @@ export interface components {
         };
     };
     parameters: {
+        LocationId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -564,6 +856,357 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BulkValidationReport"];
                 };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listLocations: {
+        parameters: {
+            query?: {
+                status?: "PLANNED" | "ONBOARDING" | "ACTIVE" | "DORMANT";
+                locationType?: "WAREHOUSE" | "SHOP" | "OFFICE";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationPage"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    registerLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Location registered */
+            201: {
+                headers: {
+                    /** @description Address of the registered location */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            /** @description Location does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Location updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    confirmLocationConnectivity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connectivity confirmed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    startLocationOnboarding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location onboarding */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    activateLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    markLocationDormant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Location dormant */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reactivateLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location active again */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    setPrimaryTill: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPrimaryTillRequest"];
+            };
+        };
+        responses: {
+            /** @description Primary till set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTillPositions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The positions, by number */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillPositionResponse"][];
+                };
+            };
+        };
+    };
+    registerTillPosition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterTillPositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Position registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillPositionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireTillPosition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tillPositionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Position retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
