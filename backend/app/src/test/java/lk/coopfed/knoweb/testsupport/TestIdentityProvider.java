@@ -14,6 +14,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.http.HttpHeaders;
@@ -122,9 +123,17 @@ public final class TestIdentityProvider {
                     .issueTime(Date.from(Instant.now().minusSeconds(5)))
                     .expirationTime(Date.from(Instant.now().plusSeconds(300)))
                     .claim("cls", policyClass)
-                    .claim("lang", "en");
+                    .claim("lang", "en")
+                    // Issued to the web client, as the resource server demands (AcceptedClientsValidator).
+                    .claim("azp", "DEVICE".equals(policyClass) ? "device-" + user : "coop-erp-web");
             if (homeEntity != null) {
                 claims.claim("ent", homeEntity.toString());
+                if ("OWN".equals(policyClass)) {
+                    // What the provider mapper of 19A section 2 would put in: the entity, entity-wide,
+                    // as the caller's scope. A test that wants the scopes resolved from M1's
+                    // assignments passes no home entity.
+                    claims.claim("scopes", List.of(homeEntity.toString()));
+                }
             }
             customise.accept(claims);
             SignedJWT jwt = new SignedJWT(

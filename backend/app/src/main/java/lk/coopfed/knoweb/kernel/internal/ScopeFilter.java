@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.stub.ProblemResponses;
 import org.slf4j.MDC;
@@ -95,9 +96,19 @@ public class ScopeFilter extends OncePerRequestFilter {
             throw new ProblemException("scope.required");
         }
 
-        if (scope.activeScope() != null && !scope.scopes().contains(scope.activeScope())) {
+        if (scope.activeScope() != null && !holds(scope, scope.activeScope())) {
             throw new ProblemException("scope.invalid");
         }
+    }
+
+    /**
+     * A held scope, or a location of an entity the caller holds entity-wide: doc 19 section 3.1
+     * expands an entity grant to every location, so the administrator of a society may act at
+     * any of its shops (a location of another entity shows nothing under row-level security).
+     */
+    static boolean holds(ScopeContext scope, Scope active) {
+        return scope.scopes().contains(active)
+                || (active.locationId() != null && scope.scopes().contains(new Scope(active.entityId(), null)));
     }
 
     /**

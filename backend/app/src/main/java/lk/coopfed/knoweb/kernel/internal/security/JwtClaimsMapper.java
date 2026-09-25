@@ -13,6 +13,8 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
@@ -22,25 +24,30 @@ import org.springframework.stereotype.Component;
  * may act; the request names, in its headers, where they act now.
  *
  * <pre>
- *   uid      the platform's user id, when the provider carries it as an attribute; else
- *   sub      the provider's subject, which the dev realm issues as the platform's id
- *   dev      the device id, for a till; with cls = DEVICE the whole scope comes from the
- *            device (DeviceScopes: M1's device, its status, its shop) and uid/sub are ignored
- *   ent      the home entity
- *   scopes   every "entity" or "entity/location" pair the caller may act in; absent, the
- *            active role assignments of M1 (UserScopes) plus the home entity, entity-wide
- *   cls      the policy class; absent or unknown, NONE, and row-level security shows nothing
- *   grants   the entities an EXTERNAL_TIMEBOXED caller may read; absent, M1's active grants
- *   mfa_at   when the second factor was last presented, epoch seconds
- *   lang     en, si or ta; absent, the request's Accept-Language; absent too, English
- *   roles    the role ids and rv the catalogue version: the permission resolver reads M1
- *            directly (K-03b), so they are not carried here
+ *   uid       the platform's user id, when the provider carries it as an attribute; else
+ *   sub       the provider's subject, which the dev realm issues as the platform's id
+ *   dev       the device id, for a till; with cls = DEVICE the whole scope comes from the
+ *             device (DeviceScopes: M1's device, its status, its shop) and uid/sub are ignored
+ *   ent       the home entity
+ *   scopes    every "entity" or "entity/location" pair the caller may act in; absent, the
+ *             active role assignments of M1 (UserScopes) and nothing else for the OWN class:
+ *             a user with no assignment acts nowhere (doc 19 section 3.1, the assignments are
+ *             the scope). A read-only class (FEDERATION_VIEW, EXTERNAL_TIMEBOXED) acts from its
+ *             home entity, whose rows its policies do not depend on.
+ *   cls       the policy class; absent or unknown, NONE, and row-level security shows nothing
+ *   grants    the entities an EXTERNAL_TIMEBOXED caller may read; absent, M1's active grants
+ *   mfa_at    when the second factor was last presented, epoch seconds; absent, auth_time when
+ *             the token's acr (or amr) says a second factor was used, or, where the platform
+ *             accepts a fresh password sign-in as the step-up (development), auth_time itself
+ *   lang      en, si or ta; absent, the request's Accept-Language; absent too, English
+ *   roles     the role ids and rv the catalogue version: the permission resolver reads M1
+ *             directly (K-03b), so they are not carried here
  * </pre>
  *
  * The active scope is the X-Scope-Entity and X-Scope-Location headers, or the only scope when
  * there is one. A header naming a scope the caller does not hold is refused by the scope
- * filter ({@code scope.invalid}), and a caller with several scopes and no header is asked to
- * choose ({@code scope.required}).
+ * filter ({@code scope.invalid}; an entity-wide holder may name any location of the entity),
+ * and a caller with several scopes and no header is asked to choose ({@code scope.required}).
  */
 @Component
 public class JwtClaimsMapper {
@@ -53,16 +60,33 @@ public class JwtClaimsMapper {
     static final String POLICY_CLASS = "cls";
     static final String GRANTS = "grants";
     static final String MFA_AT = "mfa_at";
+    static final String AUTH_TIME = "auth_time";
+    static final String ACR = "acr";
+    static final String AMR = "amr";
     static final String LANGUAGE = "lang";
 
     private static final Set<String> LANGUAGES = Set.of("en", "si", "ta");
 
     private final UserScopes userScopes;
     private final DeviceScopes deviceScopes;
+    private final Set<String> secondFactorAcr;
+    private final boolean passwordReauthCounts;
 
-    public JwtClaimsMapper(UserScopes userScopes, DeviceScopes deviceScopes) {
+    @Autowired
+    public JwtClaimsMapper(
+            UserScopes userScopes,
+            DeviceScopes deviceScopes,
+            @Value("${coop-erp.security.mfa.acr-values:2,loa2,mfa,otp}") List<String> secondFactorAcr,
+            @Value("${coop-erp.security.mfa.password-reauth-counts:false}") boolean passwordReauthCounts) {
         this.userScopes = userScopes;
         this.deviceScopes = deviceScopes;
+        this.secondFactorAcr = Set.copyOf(secondFactorAcr);
+        this.passwordReauthCounts = passwordReauthCounts;
+    }
+
+    /** The production rule: only an acr or amr that names a second factor counts. */
+    JwtClaimsMapper(UserScopes userScopes, DeviceScopes deviceScopes) {
+        this(userScopes, deviceScopes, List.of("2", "loa2", "mfa", "otp"), false);
     }
 
     public ScopeContext map(
@@ -85,7 +109,7 @@ public class JwtClaimsMapper {
         UUID device = uuid(jwt, DEVICE);
         UUID homeEntity = uuid(jwt, HOME_ENTITY);
         PolicyClass policyClass = policyClass(jwt);
-        List<Scope> scopes = scopes(jwt, user, homeEntity);
+        List<Scope> scopes = scopes(jwt, user, homeEntity, policyClass);
         Scope active = active(activeEntity, activeLocation);
 
         return new ScopeContext(
@@ -101,7 +125,7 @@ public class JwtClaimsMapper {
                 parseUuid(correlationId, Ids.next()));
     }
 
-    private List<Scope> scopes(Jwt jwt, UUID user, UUID homeEntity) {
+    private List<Scope> scopes(Jwt jwt, UUID user, UUID homeEntity, PolicyClass policyClass) {
         List<String> claim = jwt.getClaimAsStringList(SCOPES);
         if (claim != null) {
             List<Scope> scopes = new ArrayList<>();
@@ -115,15 +139,12 @@ public class JwtClaimsMapper {
             }
             return scopes;
         }
-        // The platform's records, then the home entity: a user with no assignment yet still
-        // reads what the OWN class of the home entity shows, and no command runs without a
-        // permission (K-03b).
-        Set<Scope> resolved = new LinkedHashSet<>();
-        if (homeEntity != null) {
-            resolved.add(new Scope(homeEntity, null));
+        if (policyClass == PolicyClass.OWN) {
+            // The assignments and nothing else: a home entity is where a user belongs, not where
+            // they may act. A cashier of one shop reads that shop, never the whole society.
+            return List.copyOf(new LinkedHashSet<>(userScopes.scopesOf(user)));
         }
-        resolved.addAll(userScopes.scopesOf(user));
-        return List.copyOf(resolved);
+        return homeEntity == null ? List.of() : List.of(new Scope(homeEntity, null));
     }
 
     private static Scope active(String entity, String location) {
@@ -161,8 +182,35 @@ public class JwtClaimsMapper {
         return grants;
     }
 
-    private static Instant mfaAt(Jwt jwt) {
-        Object value = jwt.getClaim(MFA_AT);
+    /**
+     * When the second factor was last presented. The explicit claim first; else the standard
+     * {@code auth_time}, which is when the user last authenticated at the provider, counted only
+     * when the token says that authentication used a second factor ({@code acr} at a level the
+     * platform lists, or {@code amr} naming one), or when the platform accepts a fresh password
+     * sign-in as the step-up (a development realm without OTP; never outside it).
+     */
+    Instant mfaAt(Jwt jwt) {
+        Instant explicit = instantClaim(jwt.getClaim(MFA_AT));
+        if (explicit != null) {
+            return explicit;
+        }
+        Instant authTime = instantClaim(jwt.getClaim(AUTH_TIME));
+        if (authTime == null) {
+            return null;
+        }
+        return usedSecondFactor(jwt) || passwordReauthCounts ? authTime : null;
+    }
+
+    private boolean usedSecondFactor(Jwt jwt) {
+        String acr = jwt.getClaimAsString(ACR);
+        if (acr != null && secondFactorAcr.contains(acr.trim().toLowerCase(Locale.ROOT))) {
+            return true;
+        }
+        List<String> amr = jwt.getClaimAsStringList(AMR);
+        return amr != null && amr.stream().anyMatch(m -> secondFactorAcr.contains(m.toLowerCase(Locale.ROOT)));
+    }
+
+    private static Instant instantClaim(Object value) {
         if (value instanceof Number seconds) {
             return Instant.ofEpochSecond(seconds.longValue());
         }

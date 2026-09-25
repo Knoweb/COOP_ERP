@@ -208,6 +208,8 @@ services:
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/coop/protocol/openid-connect/certs
       OIDC_ADMIN_URL: http://keycloak:8080
       COOP_ERP_ENFORCE_PERMISSIONS: ${COOP_ERP_ENFORCE_PERMISSIONS:-true}
+      # The dev realm has no OTP: a fresh password sign-in is the step-up here (never outside).
+      COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS: "true"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: ${RABBITMQ_USER:-coop}
