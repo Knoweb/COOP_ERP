@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.Locale;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.internal.KernelClockConfig;
+import lk.coopfed.knoweb.kernel.internal.i18n.IcuMessages;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -21,7 +22,7 @@ class KernelWiringTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withBean(ObjectMapper.class)
-            .withUserConfiguration(KernelClockConfig.class, JsonMessages.class, DevStubsGuard.class)
+            .withUserConfiguration(KernelClockConfig.class, IcuMessages.class, DevStubsGuard.class)
             .withPropertyValues("coop-erp.business-timezone=Asia/Colombo");
 
     @Test

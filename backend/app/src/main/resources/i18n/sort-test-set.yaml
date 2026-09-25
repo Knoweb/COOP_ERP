@@ -1,0 +1,38 @@
+# The curated test set of doc 19 section 5.4: Sinhala and Tamil names with a known correct
+# order under the ICU collations of the baseline, and pairs of spellings that are the same
+# name once normalised to NFC. Run on every build (CollationPostgresIntegrationTest): the
+# collations sort the names as listed, and the equivalent spellings sort together.
+#
+# The lists are short and are meant to grow with the catalogue steward's findings: a name that
+# once sorted wrongly, or a spelling that once matched nothing, goes in here with its correct
+# place, so that it never regresses.
+sinhala_in_order:
+  - අනුරාධපුර
+  - කුරුණෑගල
+  - කොළඹ
+  - ගාල්ල
+  - නුවර
+  - මාතර
+  - රත්නපුර
+  - හම්බන්තොට
+tamil_in_order:
+  - அனுராதபுரம்
+  - கண்டி
+  - காலி
+  - கொழும்பு
+  - மாத்தறை
+  - யாழ்ப்பாணம்
+  - வவுனியா
+english_in_order:
+  - Anuradhapura
+  - Colombo
+  - Galle
+  - Kandy
+  - Matara
+equivalent_spellings:
+  # A composed and a decomposed form of the same Latin name.
+  - ["Café", "Café"]
+  # Sinhala vowel sign O written as the combined U+0DDC versus kombuva U+0DD9 and aela-pilla U+0DCF.
+  - ["කො", "කො"]
+  # Tamil vowel sign O written as the combined U+0BCA versus U+0BC6 U+0BBE.
+  - ["கொ", "கொ"]
