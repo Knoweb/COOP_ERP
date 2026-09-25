@@ -737,10 +737,12 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         superuserJdbc()
                 .update(
                         "insert into party.device (device_id, hardware_serial, device_kind, owner_entity_id,"
-                                + " current_till_position_id, status) values (?, ?, 'POS_TERMINAL', ?, ?, 'ACTIVE')",
+                                + " current_till_position_id, status, location_id) values (?, ?, 'POS_TERMINAL', ?, ?, 'ACTIVE',"
+                                + " (select location_id from party.till_position where till_position_id = ?))",
                         DEVICE,
                         "SERIAL-" + tillPosition,
                         MPCS,
+                        tillPosition,
                         tillPosition);
     }
 

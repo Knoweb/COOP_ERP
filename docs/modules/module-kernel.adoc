@@ -22,6 +22,7 @@
 * `l.c.k.k.api.Sod` (via `l.c.k.k.internal.security.JdbcSod`)
 * `l.c.k.k.api.IdentityProviderClient` (via `l.c.k.k.internal.security.KeycloakAdminClient`)
 * `l.c.k.k.api.CurrentScope` (via `l.c.k.k.internal.security.TokenCurrentScope`)
+* `l.c.k.k.api.SyncStatus` (via `l.c.k.k.internal.sync.NoGatewaySyncStatus`)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===

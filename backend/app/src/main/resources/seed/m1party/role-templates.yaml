@@ -35,3 +35,5 @@ templates:
       - "prt.position.manage"
       - "sys.device.manage"
       - "sys.device.view"
+      - "sys.device.enrol"
+      - "sys.device.suspend"
