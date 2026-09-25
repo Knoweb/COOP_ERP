@@ -20,4 +20,12 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 
 ## Deviations from the implementation guide
 
-None yet.
+### Devices (M1-06)
+
+- **Package.** The device aggregate and its handlers are in `internal/device`, not in `internal/location` beside Location and TillPosition as 21A section 4 lists them. They read positions and locations through `DevicePlaces` (plain SQL under the caller's row-level security) and write only `party.device`.
+- **A device has a location** (`party.device.location_id`, `m1party/V0009`): 21A gives it none, and without one its policies could not keep a shop-scoped user to its own shop's devices. A device is enrolled at a location and is assigned only to a position of that location.
+- **A suspended device keeps its position** until a replacement is assigned there ("keeps position for return", 21A section 6). The replacement of flow 6.6 is therefore an assignment to a position held by a SUSPENDED device; that device is the "previous device" of the 21A pseudocode, read from the database rather than sent in the request. A position held by an ACTIVE device is occupied.
+- **Drained or loss recorded.** The drained check asks `kernel.api.SyncStatus`, which answers "not drained" for every device until the sync gateway (K-08) exists, so a replacement needs `outboxLossRecorded` until then. Recording the loss writes a `DEVICE_OUTBOX_LOSS_RECORDED` ALERT and sets `outboxLossRecorded` on `device.position_changed.v1` for the gateway's sequence reset.
+- **The revoke** is its own event, `device.revoked.v1`, published on suspension and on retirement; `device.reinstated.v1` lifts it.
+- **Version floor** is the configuration item `m1.device.version_floor` (federation-wide, default "0").
+- **Enrolment** is by the owning entity in its own scope, with the staging reference in the command and the audit record; the Federation staging table of doc 31 and the device credential (K-02, K-08) are not here.

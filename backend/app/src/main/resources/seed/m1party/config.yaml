@@ -5,3 +5,5 @@ config:
     value: "true"
   - key: "m1.bulk.max_rows"
     value: "500"
+  - key: "m1.device.version_floor"
+    value: "0"

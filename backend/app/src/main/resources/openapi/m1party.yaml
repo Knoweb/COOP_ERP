@@ -330,6 +330,277 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/party/devices:
+
+    get:
+      tags: [Devices]
+      operationId: listDevices
+      summary: List the devices visible in the caller's scope, with the position each holds
+      x-permission: sys.device.view
+
+      parameters:
+
+        - in: query
+          name: locationId
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [ENROLLED, ACTIVE, SUSPENDED, RETIRED]
+
+      responses:
+
+        '200':
+          description: The devices, by location and serial
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+
+    post:
+      tags: [Devices]
+      operationId: enrolDevice
+      summary: Enrol a device at a location of the caller's entity, from its staging record
+      x-permission: sys.device.enrol
+      x-mfa: true
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrolDeviceRequest'
+
+      responses:
+
+        '201':
+          description: Device enrolled
+          headers:
+            Location:
+              description: Address of the enrolled device
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/devices/{deviceId}:
+
+    get:
+      tags: [Devices]
+      operationId: getDevice
+      summary: Get one device visible in the caller's scope
+      x-permission: sys.device.view
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: Device
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+
+        '404':
+          description: Device does not exist or is not visible to this scope
+
+
+  /v1/party/devices/{deviceId}/assign:
+
+    post:
+      tags: [Devices]
+      operationId: assignDeviceToPosition
+      summary: Assign a device to a till position; the position's counters move to it
+      description: >
+        A position still held by a suspended device is taken over (the replacement of a faulty
+        or stolen till): its counters move to the new device, which needs the old device's
+        outbox drained, or outboxLossRecorded set by the administrator to record its loss.
+      x-permission: sys.device.enrol
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignDeviceRequest'
+
+      responses:
+
+        '200':
+          description: Device assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/devices/{deviceId}/suspend:
+
+    post:
+      tags: [Devices]
+      operationId: suspendDevice
+      summary: Suspend an active device (lost, stolen, faulty); the till is revoked
+      x-permission: sys.device.suspend
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuspendDeviceRequest'
+
+      responses:
+
+        '204':
+          description: Device suspended
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/devices/{deviceId}/reinstate:
+
+    post:
+      tags: [Devices]
+      operationId: reinstateDevice
+      summary: Reinstate a suspended device once it is physically recovered
+      x-permission: sys.device.suspend
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceReasonRequest'
+
+      responses:
+
+        '204':
+          description: Device reinstated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/devices/{deviceId}/retire:
+
+    post:
+      tags: [Devices]
+      operationId: retireDevice
+      summary: Retire an unassigned, wiped device for good; the till is revoked
+      x-permission: sys.device.suspend
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceReasonRequest'
+
+      responses:
+
+        '204':
+          description: Device retired
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -600,3 +871,130 @@ components:
         code:
           type: string
           description: A message id from the bulk.* catalogue
+
+    EnrolDeviceRequest:
+      type: object
+      required: [hardwareSerial, deviceKind, locationId, appVersion, stagingReference]
+      properties:
+        hardwareSerial:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]*$'
+        deviceKind:
+          type: string
+          enum: [POS_TERMINAL, WORKSTATION, DRIVER_MOBILE]
+        locationId:
+          type: string
+          format: uuid
+        appVersion:
+          $ref: '#/components/schemas/AppVersion'
+        stagingReference:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: The management agent's staging record that attests the device (doc 31)
+
+    AssignDeviceRequest:
+      type: object
+      required: [tillPositionId, reasonCode]
+      properties:
+        tillPositionId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+        outboxLossRecorded:
+          type: boolean
+          default: false
+          description: >
+            Set when the device giving the position up cannot be shown drained: its loss is
+            recorded, and the numbers it took and never sent become a documented gap.
+
+    SuspendDeviceRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          enum: [LOST, STOLEN, FAULTY]
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    DeviceReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    AppVersion:
+      type: string
+      pattern: '^[0-9]{1,5}(\.[0-9]{1,5}){0,3}$'
+      maxLength: 20
+      description: A till release number, dot-separated whole numbers (doc 31)
+
+    DeviceResponse:
+      type: object
+      required: [deviceId, ownerEntityId, locationId, hardwareSerial, deviceKind, status, primaryTill]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        ownerEntityId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        hardwareSerial:
+          type: string
+        deviceKind:
+          type: string
+          enum: [POS_TERMINAL, WORKSTATION, DRIVER_MOBILE]
+        status:
+          type: string
+          enum: [ENROLLED, ACTIVE, SUSPENDED, RETIRED]
+        tillPositionId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        positionNo:
+          type:
+            - integer
+            - 'null'
+        primaryTill:
+          type: boolean
+          description: Whether the position it holds is its shop's primary till
+        appVersion:
+          type:
+            - string
+            - 'null'
+        enrolledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        lastSeenAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
