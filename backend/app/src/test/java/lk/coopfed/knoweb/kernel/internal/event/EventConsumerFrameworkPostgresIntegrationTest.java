@@ -139,6 +139,110 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
     }
 
     @Test
+    void aTypeNobodyConsumesIsPoisonNotARetry() throws Exception {
+
+        EventConsumerDispatcher dispatcher = dispatcher(new TestProjection(), new CapturingBroker());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> dispatcher.deliver("nobody", message(1, UUID.randomUUID()), 1))
+                .isInstanceOf(PoisonMessageException.class);
+    }
+
+    @Test
+    void anEnvelopeWithoutAnOwnerEntityIsPoisonNotARetry() throws Exception {
+
+        TestProjection projection = new TestProjection();
+
+        EventConsumerDispatcher dispatcher = dispatcher(projection, new CapturingBroker());
+
+        OutboxMessage good = message(1, UUID.randomUUID());
+
+        OutboxMessage ownerless = new OutboxMessage(
+                good.eventId(),
+                good.eventType(),
+                good.occurredAt(),
+                good.source(),
+                good.sourceSeq(),
+                null,
+                null,
+                good.aggregateType(),
+                good.aggregateId(),
+                good.correlationId(),
+                null,
+                null,
+                null,
+                good.payload());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dispatcher.deliver("test.projection", ownerless, 1))
+                .isInstanceOf(PoisonMessageException.class);
+
+        assertThat(projection.applied.get()).isZero();
+    }
+
+    @Test
+    void aClaimIsVisibleToTheScopeOfItsEventOnly() throws Exception {
+
+        EventConsumerDispatcher dispatcher = dispatcher(new TestProjection(), new CapturingBroker());
+
+        OutboxMessage message = message(1, UUID.randomUUID());
+
+        dispatcher.deliver("test.projection", message, 1);
+
+        assertThat(inboxRowsVisibleTo(message.ownerEntityId())).isEqualTo(1);
+
+        assertThat(inboxRowsVisibleTo(UUID.randomUUID())).isZero();
+    }
+
+    private int inboxRowsVisibleTo(UUID entity) {
+
+        Integer count = new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+                .execute(status -> {
+                    jdbc.queryForList(
+                            "SELECT set_config('app.scope_entity_id', ?, true),"
+                                    + " set_config('app.scope_class', 'OWN', true)",
+                            entity.toString());
+                    return jdbc.queryForObject(
+                            "SELECT count(*) FROM kernel.event_inbox WHERE consumer = 'test.projection'",
+                            Integer.class);
+                });
+
+        return count == null ? 0 : count;
+    }
+
+    @Test
+    void replayPagesThroughTheArchive() throws Exception {
+
+        for (long seq = 1; seq <= 5; seq++) {
+            insertArchive(message(seq, UUID.randomUUID()));
+        }
+
+        TestProjection projection = new TestProjection();
+
+        CapturingBroker broker = new CapturingBroker();
+
+        broker.dispatcher = dispatcher(projection, broker);
+
+        HikariDataSource relayDataSource =
+                OutboxRelay.openDataSource(POSTGRES.getJdbcUrl(), "coop_relay", "coop_relay", 2);
+
+        try {
+
+            EventConsumerRegistry registry = new EventConsumerRegistry();
+            registry.register(projection);
+
+            Replayer replayer = new Replayer(relayDataSource, broker, registry, true);
+            replayer.pageSize = 2;
+
+            assertThat(replayer.replay("test.projection", 2)).isEqualTo(4);
+
+        } finally {
+            relayDataSource.close();
+        }
+
+        assertThat(projection.applied.get()).isEqualTo(4);
+    }
+
+    @Test
     void replayRebuildsProjectionFromArchive() throws Exception {
 
         UUID first = UUID.randomUUID();

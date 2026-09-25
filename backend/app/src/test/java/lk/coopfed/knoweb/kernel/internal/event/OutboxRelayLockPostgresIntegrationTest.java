@@ -105,7 +105,57 @@ class OutboxRelayLockPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(2);
     }
 
+    @Test
+    void aSecondRelayTakesTheNextSourceWhenTheFirstIsHeld() throws Exception {
+
+        insert("central", 1, UUID.randomUUID());
+
+        String device = UUID.randomUUID().toString();
+
+        insert(device, 1, UUID.randomUUID());
+
+        List<String> published = new CopyOnWriteArrayList<>();
+
+        BrokerAdapter broker = message -> published.add(message.source());
+
+        HikariDataSource dataSource = OutboxRelay.openDataSource(POSTGRES.getJdbcUrl(), "coop_relay", "coop_relay", 2);
+
+        OutboxRelay relay = new OutboxRelay(dataSource, 500, broker);
+
+        // Another relay instance holds "central" for the length of its transaction.
+        try (java.sql.Connection holder =
+                java.sql.DriverManager.getConnection(POSTGRES.getJdbcUrl(), "coop_relay", "coop_relay")) {
+
+            holder.setAutoCommit(false);
+
+            try (java.sql.Statement statement = holder.createStatement()) {
+                statement.execute("SELECT pg_advisory_xact_lock(hashtextextended('outbox-relay:central', 0))");
+            }
+
+            assertThat(relay.relayOnce()).isEqualTo(1);
+
+            assertThat(published).containsExactly(device);
+
+            holder.rollback();
+
+        } finally {
+            relay.close();
+        }
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "SELECT published_at IS NOT NULL FROM kernel.event_outbox WHERE source = ?",
+                                Boolean.class,
+                                device))
+                .isTrue();
+    }
+
     private static void insert(long sourceSeq, UUID aggregateId) {
+
+        insert("central", sourceSeq, aggregateId);
+    }
+
+    private static void insert(String source, long sourceSeq, UUID aggregateId) {
 
         superuserJdbc()
                 .update(
@@ -126,7 +176,7 @@ class OutboxRelayLockPostgresIntegrationTest extends PostgresIntegrationTest {
                             ?,
                             'hello.greeting.registered.v1',
                             now(),
-                            'central',
+                            ?,
                             ?,
                             ?,
                             'greeting',
@@ -136,6 +186,7 @@ class OutboxRelayLockPostgresIntegrationTest extends PostgresIntegrationTest {
                         )
                         """,
                         UUID.randomUUID(),
+                        source,
                         sourceSeq,
                         UUID.randomUUID(),
                         aggregateId,
