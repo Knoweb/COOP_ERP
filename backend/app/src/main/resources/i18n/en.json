@@ -253,5 +253,7 @@
   "m2.sku.reason_required": "A reason is required for this SKU status change",
   "m2.sku.base_uom_unknown": "The selected base unit is not defined",
   "m2.sku.tax_category_unknown": "The selected tax category is not defined",
-  "m2.sku.attributes_too_large": "SKU attributes exceed the allowed size"
+  "m2.sku.attributes_too_large": "SKU attributes exceed the allowed size",
+  "m2.sku.federation_only": "Only the Federation may create, activate or change a shared SKU",
+  "m2.sku.has_lots": "The base unit and the batch and expiry tracking of a SKU cannot change once stock lots exist"
 }

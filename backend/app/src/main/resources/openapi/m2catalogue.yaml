@@ -1,13 +1,14 @@
 # M2 Catalogue & Batch API slice.
 #
 # Mutating operations use the kernel Idempotency-Key and x-permission contract.
-# Create/update/activate have two legitimate permission paths:
-#   ENTITY      -> cat.sku.create_local
-#   FEDERATION  -> cat.sku.create
-#
-# The kernel CommandInterceptor still authorizes the concrete handler that is
-# dispatched at runtime. x-permission-any-of documents that routing without
-# inventing a new permission code.
+# Update and activate have two paths, chosen by the SKU and never by the caller's
+# permissions (SkuCommandRouter):
+#   DRAFT or LOCAL  -> cat.sku.create_local
+#   SHARED          -> cat.sku.create, and the caller must be the Federation
+# Create always makes a DRAFT, so it has one handler (cat.sku.create_local); the
+# path is chosen when the draft is activated (body.target). The kernel
+# CommandInterceptor authorizes the handler that runs; x-permission-any-of
+# documents the routing without inventing a new permission code.
 openapi: 3.1.0
 
 info:
@@ -58,6 +59,7 @@ paths:
           schema:
             type: integer
             minimum: 0
+            maximum: 10000
             default: 0
 
         - in: query
@@ -87,7 +89,6 @@ paths:
       x-permission: cat.sku.create_local
       x-permission-any-of:
         - cat.sku.create_local
-        - cat.sku.create
       x-scope: ENTITY
       x-scope-any-of:
         - ENTITY
@@ -151,7 +152,11 @@ paths:
           $ref: 'common.yaml#/components/responses/RequestProblem'
 
         '404':
-          description: SKU is not visible or does not exist
+          description: m2.sku.not_found, the SKU is not visible or does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
 
     patch:
       tags: [Catalogue]

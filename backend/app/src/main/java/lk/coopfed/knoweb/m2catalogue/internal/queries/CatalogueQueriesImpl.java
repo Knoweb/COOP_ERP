@@ -104,25 +104,48 @@ class CatalogueQueriesImpl implements CatalogueQueries {
             params.add(filter.status().strip().toUpperCase());
         }
 
-        if (search && filter.query() != null && !filter.query().isBlank()) {
-            String pattern = "%" + filter.query().strip() + "%";
+        boolean searching = search && filter.query() != null && !filter.query().isBlank();
+        String query = searching ? filter.query().strip() : null;
+
+        if (searching) {
+            // 22A section 7: the three names by trigram, or a prefix of the code. The name columns
+            // stay bare so that their gin_trgm_ops indexes apply (a null name simply does not
+            // match), and the user's text is escaped so that % and _ are letters, not wildcards.
+            String escaped = escapeLike(query);
+            String contains = "%" + escaped + "%";
             sql.append(
                     """
                      and (
-                         sku_code ilike ?
-                         or short_name_en ilike ?
-                         or coalesce(short_name_si, '') ilike ?
-                         or coalesce(short_name_ta, '') ilike ?
+                         sku_code like ? escape '\\'
+                         or short_name_en ilike ? escape '\\'
+                         or short_name_si ilike ? escape '\\'
+                         or short_name_ta ilike ? escape '\\'
                      )
                     """);
-            params.add(pattern);
-            params.add(pattern);
-            params.add(pattern);
-            params.add(pattern);
+            params.add(escaped.toUpperCase() + "%");
+            params.add(contains);
+            params.add(contains);
+            params.add(contains);
         }
 
         sql.append(" order by ");
         sql.append(displayColumn);
+
+        if (searching) {
+            // Then the closest match first among equal names (22A section 7: collation, then similarity).
+            sql.append(
+                    """
+                    , greatest(
+                          kernel.similarity(short_name_en, ?),
+                          coalesce(kernel.similarity(short_name_si, ?), 0),
+                          coalesce(kernel.similarity(short_name_ta, ?), 0)
+                      ) desc
+                    """);
+            params.add(query);
+            params.add(query);
+            params.add(query);
+        }
+
         sql.append(", sku_code, sku_id limit ? offset ?");
 
         params.add(fetchLimit);
@@ -133,7 +156,14 @@ class CatalogueQueriesImpl implements CatalogueQueries {
         boolean hasMore = rows.size() > limit;
         List<SkuView> items = hasMore ? List.copyOf(rows.subList(0, limit)) : List.copyOf(rows);
 
-        return new SkuPage(items, hasMore ? offset + limit : null);
+        boolean nextWithinCap = offset + limit <= SkuFilter.MAX_OFFSET;
+
+        return new SkuPage(items, hasMore && nextWithinCap ? offset + limit : null);
+    }
+
+    /** Makes the backslash, % and _ of the user's text literal in a LIKE pattern with escape '\'. */
+    static String escapeLike(String text) {
+        return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static String displayColumn(String language) {

@@ -299,12 +299,14 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
-            /** @description SKU is not visible or does not exist */
+            /** @description m2.sku.not_found, the SKU is not visible or does not exist */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

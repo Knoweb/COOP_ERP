@@ -57,6 +57,12 @@ public class UpdateLocalSkuHandler implements Handles<UpdateSku, UUID> {
 
         Sku sku = SkuGuards.requireOwned(repository, command.skuId(), scope);
 
+        // A SHARED SKU is edited on the shared path only (UpdateSharedSkuHandler and its
+        // Federation guard); the router sends it there, and this holds for any other caller.
+        if (Sku.SHARED.equals(sku.status())) {
+            throw new ProblemException(FederationCaller.FEDERATION_ONLY);
+        }
+
         validateSharedTranslations(sku, details);
         validateInventoryIdentityChange(sku, details);
 
@@ -80,7 +86,7 @@ public class UpdateLocalSkuHandler implements Handles<UpdateSku, UUID> {
                         || sku.expiryTracked() != details.expiryTracked();
 
         if (changed && inventory.hasAnyLot(sku.getId())) {
-            throw new ProblemException("request.invalid");
+            throw new ProblemException("m2.sku.has_lots", Map.of("skuId", sku.getId()));
         }
     }
 
