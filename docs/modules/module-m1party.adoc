@@ -7,11 +7,14 @@
 
 * `l.c.k.m.query.ExternalGrantQueries` (via `l.c.k.m.internal.grant.ExternalGrantQueriesImpl`)
 * `l.c.k.m.query.PartyQueries` (via `l.c.k.m.internal.queries.PartyQueriesImpl`)
+* `l.c.k.m.query.RelationshipQueries` (via `l.c.k.m.internal.queries.RelationshipQueriesImpl`)
 |Bean references
 |* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.NumberingService` (in Platform Kernel)
+* `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
 * `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to

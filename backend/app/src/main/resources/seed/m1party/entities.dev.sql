@@ -4,6 +4,8 @@
 --
 --   0190f000-0000-7000-8000-000000000001  the Federation  (users fed-admin, fed-officer)
 --   0190f000-0000-7000-8000-000000000002  an MPCS         (users mpcs-admin and cashier)
+--   0190f000-0000-7000-8000-000000000003  a distributor   (M1-04: the seller in the middle of
+--                                         the chain; relationships.dev.sql trades through it)
 --
 -- The Federation row is what lets the society register work on a developer machine: every
 -- lifecycle command (register, activate, suspend, reinstate) is the Federation's to give, and
@@ -20,5 +22,8 @@ VALUES
      'REG-FED-DEV', 'VAT-FED-DEV', 'Colombo', 1, 'en', 'ACTIVE'),
     ('0190f000-0000-7000-8000-000000000002', 'M001', 'MPCS',
      'Development MPCS', 'සංවර්ධන විවිධ සේවා සමුපකාර සමිතිය', 'மேம்பாட்டு பல்நோக்கு கூட்டுறவுச் சங்கம்',
-     'REG-M001', 'VAT-M001', 'Gampaha', 1, 'si', 'ACTIVE')
+     'REG-M001', 'VAT-M001', 'Gampaha', 1, 'si', 'ACTIVE'),
+    ('0190f000-0000-7000-8000-000000000003', 'D001', 'DISTRIBUTOR',
+     'Development Distributors', 'සංවර්ධන බෙදාහරින්නෝ', 'மேம்பாட்டு விநியோகஸ்தர்கள்',
+     'REG-D001', 'VAT-D001', 'Gampaha', 1, 'en', 'ACTIVE')
 ON CONFLICT (entity_id) DO NOTHING;

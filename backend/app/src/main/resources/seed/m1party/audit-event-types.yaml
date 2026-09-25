@@ -24,17 +24,84 @@ audit_event_types:
     offline_capturable: false
     description_en: Responsible officer appointment
 
+  - code: LOCATION_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location registered
+
+  - code: LOCATION_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location details updated
+
+  - code: LOCATION_CONNECTIVITY_CONFIRMED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location connectivity specification confirmed
+
+  - code: LOCATION_ONBOARDING
+    severity: INFO
+    offline_capturable: false
+    description_en: Location onboarding started
+
+  - code: LOCATION_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location activated
+
+  - code: LOCATION_DORMANT
+    severity: INFO
+    offline_capturable: false
+    description_en: Location marked dormant
+
+  - code: LOCATION_REACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location reactivated
+
+  - code: LOCATION_PRIMARY_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Primary till of a shop changed
+
+  - code: POSITION_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till position registered
+
+  - code: POSITION_RETIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till position retired
   - code: EXTERNAL_GRANT_ISSUED
     severity: INFO
     offline_capturable: false
     description_en: External read-only access granted to a regulator or auditor
-
   - code: EXTERNAL_GRANT_REVOKED
     severity: INFO
     offline_capturable: false
     description_en: External read-only access revoked
-
   - code: EXTERNAL_GRANT_EXPIRED
     severity: INFO
     offline_capturable: false
     description_en: External read-only access expired
+  - code: RELATIONSHIP_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship opened in draft
+  - code: RELATIONSHIP_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship activated
+  - code: RELATIONSHIP_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship terms amended from a date
+  - code: RELATIONSHIP_SUSPENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Trading relationship suspended
+  - code: CREDIT_LIMIT_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: Credit limit of a trading relationship changed
