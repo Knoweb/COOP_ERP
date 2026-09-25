@@ -31,7 +31,9 @@ public class ProblemResponses {
             "scope.invalid", HttpStatus.BAD_REQUEST,
             "idempotency.key_required", HttpStatus.BAD_REQUEST,
             "request.invalid", HttpStatus.BAD_REQUEST,
-            "request.malformed", HttpStatus.BAD_REQUEST);
+            "request.malformed", HttpStatus.BAD_REQUEST,
+            // K-03b: a permission the role lacks is 403, not a broken business rule.
+            "permission.denied", HttpStatus.FORBIDDEN);
 
     private final Messages messages;
 

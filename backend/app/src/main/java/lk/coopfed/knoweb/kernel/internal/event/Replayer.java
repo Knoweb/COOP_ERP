@@ -74,7 +74,7 @@ public class Replayer {
                         FROM kernel.event_outbox
                         WHERE source = 'central'
                           AND source_seq >= ?
-                          AND event_type = ANY (?)
+                          AND (? OR event_type = ANY (?))
                         ORDER BY source_seq
                         """,
                 (rs, rowNum) -> new OutboxMessage(
@@ -93,6 +93,7 @@ public class Replayer {
                         rs.getString("engine_version"),
                         rs.getString("payload")),
                 fromSeq,
+                types.contains("*"),
                 types.toArray(String[]::new));
 
         for (OutboxMessage message : messages) {

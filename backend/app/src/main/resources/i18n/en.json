@@ -78,6 +78,9 @@
   "m1.position.not_in_location": "The till position does not belong to this location",
   "m1.position.number_duplicate": "This till number is already used at the shop",
   "mfa.required": "This action needs a fresh second factor; sign in again with it",
+  "notification.channel_unknown": "No adapter is registered for this notification channel",
+  "notification.recipient_required": "A notification needs a recipient",
+  "permission.denied": "Your role does not allow this action",
   "pricing.price_list.duplicate": "This greeting is already registered",
   "pricing.price_list.text_required": "Enter the greeting in English",
   "pricing.register": "Register greeting",
@@ -100,5 +103,6 @@
   "series.owner_mismatch": "A series can only be registered by the entity that owns it",
   "series.prefix_too_long": "The series prefix is longer than 24 characters",
   "series.scope_invalid": "The series scope does not fit the document type or the ids given",
-  "series.type_unknown": "The document type of the series is not in the registry"
+  "series.type_unknown": "The document type of the series is not in the registry",
+  "sod.same_person": "The person who made the request cannot approve it"
 }
