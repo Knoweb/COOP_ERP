@@ -98,6 +98,8 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
     @MockBean
     private TradePriceListCheck priceLists;
 
+    private static final UUID CREDIT_ROLE = UUID.fromString("00000000-0000-0000-0000-00000000e201");
+
     @BeforeEach
     void theChainExists() {
         clean();
@@ -106,6 +108,28 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         insertEntity(admin, DISTRIBUTOR, "D01", "DISTRIBUTOR", "ACTIVE");
         insertEntity(admin, SOCIETY, "M01", "MPCS", "ONBOARDING");
         insertEntity(admin, OTHER_SOCIETY, "M02", "MPCS", "ACTIVE");
+        // The seller's user holds bil.creditlimit.change at the distributor (K-03b resolves it from M1's tables).
+        admin.update(
+                "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
+                        + " values (?, ?, ?, 'Relationship test user', 'BACK_OFFICE', 'ACTIVE')",
+                USER,
+                DISTRIBUTOR,
+                "u-" + USER);
+        admin.update(
+                "insert into security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)"
+                        + " values (?, ?, 'Credit controller', false, 'OWN', 'ACTIVE')",
+                CREDIT_ROLE,
+                DISTRIBUTOR);
+        admin.update(
+                "insert into security.role_permission (role_id, permission_code) values (?, 'bil.creditlimit.change')",
+                CREDIT_ROLE);
+        admin.update(
+                "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id) values (?, ?, ?, null)",
+                USER,
+                CREDIT_ROLE,
+                DISTRIBUTOR);
+        // The kernel caches a resolution ten minutes; the role is in place before the first one
+        // of this user, whose id is this class's own, so nothing stale is ever cached.
         when(priceLists.refusal(any(), any(), any())).thenReturn(Optional.empty());
         when(priceLists.refusal(eq(UNPUBLISHED_LIST), any(), any()))
                 .thenReturn(Optional.of("prc.price_list.not_published"));
@@ -114,6 +138,10 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void clean() {
+        superuserJdbc().execute("delete from security.user_role where user_id = '" + USER + "'");
+        superuserJdbc().execute("delete from security.role_permission where role_id = '" + CREDIT_ROLE + "'");
+        superuserJdbc().execute("delete from security.role where role_id = '" + CREDIT_ROLE + "'");
+        superuserJdbc().execute("delete from security.app_user where user_id = '" + USER + "'");
         superuserJdbc()
                 .execute("truncate table party.entity_relationship, party.entity_party_directory,"
                         + " party.federation_identity, party.entity cascade");
@@ -434,12 +462,13 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         assertThat(asBuyer.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(asBuyer.getBody()).hasSize(1);
 
-        // The development scope carries no second factor, so a limit change asks for one.
+        // The request carries no second factor, so a limit change asks for one: 401 with the
+        // step-up address (19A section 2, K-02).
         ResponseEntity<Map> limit = post(
                 "/v1/party/relationships/" + id + "/amend",
                 Map.of("effectiveFrom", "2026-07-01", "creditLimit", 5000000, "reasonCode", "RENEGOTIATED"),
                 DISTRIBUTOR);
-        assertThat(limit.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(limit.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(limit.getBody()).containsEntry("code", "mfa.required");
 
         ResponseEntity<Map> terms = post(

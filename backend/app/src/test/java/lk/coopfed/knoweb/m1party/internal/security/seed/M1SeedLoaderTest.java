@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
-    private static final int PERMISSIONS = 22;
+    private static final int PERMISSIONS = 25;
     private static final int ROLE_TEMPLATES = 3;
     private static final int SOD_PAIRS = 2;
 
