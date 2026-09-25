@@ -23,7 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       Without it every tenant reads every row of that table, and no other test notices,
  *       because a test of module A does not look at the tables of module B;</li>
  *   <li>the application role {@code app_rw} may not DELETE or TRUNCATE anywhere, and may not
- *       create objects (AGENTS.md; 17A section 6.2: "no DELETE anywhere for app_rw").</li>
+ *       create objects (AGENTS.md; 17A section 6.2: "no DELETE anywhere for app_rw"), with the
+ *       three exceptions of {@link #DELETE_BY_DESIGN};</li>
  * </ul>
  *
  * A table every tenant may read (a reference table) still needs a policy; it says so
@@ -44,6 +45,17 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
             "customers",
             "reporting",
             "integration");
+
+    /**
+     * The only tables app_rw may delete from, each named by its implementation guide and each
+     * delete made by a command handler that audits it and publishes an event (m1security
+     * V0010): a role assignment is revoked by deleting it (21A section 6, RevokeRole: "the one
+     * DELETE M1 performs; audited"), a role's permission set is replaced (AmendRole), and an
+     * entity removes a separation-of-duties pair it added itself. None is a document, a ledger
+     * or an audit row. Adding a table here is a design decision, not a fix for a red test.
+     */
+    static final Set<String> DELETE_BY_DESIGN =
+            Set.of("security.user_role", "security.role_permission", "security.sod_pair");
 
     @Test
     void theSchemasAreTheTwelveOfTheDesign() {
@@ -133,7 +145,7 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
                                 + " migration); for a table every tenant may read, say so:"
                                 + " CREATE POLICY everyone_reads ON " + table + " FOR SELECT TO app_rw USING (true);");
                     }
-                    if (row.getBoolean("may_delete")) {
+                    if (row.getBoolean("may_delete") && !DELETE_BY_DESIGN.contains(table)) {
                         problems.add(table + ": app_rw may DELETE. Nothing is deleted in this system: a correction"
                                 + " is a new, linked row (AGENTS.md). Remove the grant.");
                     }

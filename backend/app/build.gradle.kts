@@ -77,6 +77,10 @@ openApiSlices.forEach { slice ->
         importMappings.set(mapOf("java.time.OffsetDateTime" to "java.time.Instant"))
         // common.yaml is referenced by the slices, so a change to it must regenerate them too.
         inputs.file(openApiDir.file("common.yaml"))
+        // The slice is given to the generator as a URI (inputSpec), which the plugin does not track
+        // as a file: without this line a changed slice left the task UP-TO-DATE and the old
+        // interfaces in place, and the controller of a new operation failed to compile.
+        inputs.file(slice)
     }
 
     generateOpenApi { dependsOn(task) }

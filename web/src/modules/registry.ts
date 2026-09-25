@@ -9,11 +9,13 @@ import type { ModuleDefinition } from "../shell/modules/ModuleDefinition";
 import { helloModule } from "./hello/module";
 import { pricingModule } from "./m3pricing/module";
 import { partyModule } from "./m1party/module";
+import { catalogueModule } from "./m2catalogue/module";
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export const MODULES: ModuleDefinition[] = [
   helloModule,
   pricingModule,
   partyModule,
+  catalogueModule,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];

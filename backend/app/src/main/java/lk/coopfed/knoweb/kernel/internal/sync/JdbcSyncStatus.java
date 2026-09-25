@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** {@link SyncStatus} on the cursor and the last heartbeat, read under the caller's scope. */
+/** {@link SyncStatus} on the cursor and the last heartbeat, read under the caller's scope. Replaces M1-06's NoGatewaySyncStatus. */
 @Component
 public class JdbcSyncStatus implements SyncStatus {
 
@@ -45,9 +45,14 @@ public class JdbcSyncStatus implements SyncStatus {
         return found.isEmpty() ? Optional.empty() : Optional.of(found.getFirst());
     }
 
+    /**
+     * Not transactional of its own: it reads in the caller's transaction under the scope the caller
+     * already set (M1's AssignDeviceToPosition), and a transactional method without a scope
+     * argument would reset that scope to NONE for the rest of the caller's transaction. Outside a
+     * transaction nothing is visible and the answer is false, the safe side.
+     */
     @Override
-    @Transactional(readOnly = true)
-    public boolean drained(UUID deviceId, ScopeContext ctx) {
+    public boolean drained(UUID deviceId) {
         Boolean drained = jdbc.queryForObject(
                 """
                 select exists (

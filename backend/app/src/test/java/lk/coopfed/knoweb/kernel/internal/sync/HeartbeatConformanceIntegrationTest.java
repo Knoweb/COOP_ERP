@@ -27,6 +27,9 @@ import org.springframework.http.ResponseEntity;
 class HeartbeatConformanceIntegrationTest extends SyncIntegrationTest {
 
     @Autowired
+    SystemScope systemScope;
+
+    @Autowired
     SyncStatus syncStatus;
 
     @Test
@@ -64,7 +67,7 @@ class HeartbeatConformanceIntegrationTest extends SyncIntegrationTest {
         SyncStatus.DeviceSyncState state = syncStatus.state(DEVICE, admin).orElseThrow();
         assertThat(state.lastSeenAt()).isNotNull();
         assertThat(state.pendingEventCount()).isEqualTo(12);
-        assertThat(syncStatus.drained(DEVICE, admin)).isFalse();
+        assertThat(systemScope.inScope(admin, () -> syncStatus.drained(DEVICE))).isFalse();
         assertThat(syncStatus.state(DEVICE, SystemScope.own(OTHER_ENTITY, null)))
                 .isEmpty();
     }
@@ -76,7 +79,8 @@ class HeartbeatConformanceIntegrationTest extends SyncIntegrationTest {
         report.put("pending_event_count", 0);
         heartbeat(report);
 
-        assertThat(syncStatus.drained(DEVICE, SystemScope.own(ENTITY, null))).isTrue();
+        assertThat(systemScope.inScope(SystemScope.own(ENTITY, null), () -> syncStatus.drained(DEVICE)))
+                .isTrue();
     }
 
     @Test

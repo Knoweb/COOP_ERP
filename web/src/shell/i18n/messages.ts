@@ -8,6 +8,7 @@
 import helloMessages from "../../modules/hello/hello.messages.json" with { type: "json" };
 import pricingMessages from "../../modules/m3pricing/pricing.messages.json" with { type: "json" };
 import partyMessages from "../../modules/m1party/party.messages.json" with { type: "json" };
+import catalogueMessages from "../../modules/m2catalogue/catalogue.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
@@ -201,6 +202,7 @@ const MODULE_CATALOGUES: Catalogue[] = [
   helloMessages,
   pricingMessages,
   partyMessages,
+  catalogueMessages,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];
 

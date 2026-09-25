@@ -5,15 +5,19 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * What central knows of a device's sync (doc 32 sections 2 and 6), for the modules that manage
- * devices. M1 asks {@link #drained} before it moves a till position to a new device (21A section
- * 6, AssignDeviceToPosition: "old device outbox drained (kernel SyncStatus.drained(oldDevice))"),
- * and shows {@link DeviceSyncState#lastSeenAt()} in its device list ("join last_seen from the
- * device row (heartbeat updates it through the kernel)"): the heartbeat is recorded in the
- * kernel's own table, never in M1's.
+ * What central knows of a till's outbox (doc 32 sections 2, 6 and 8). The sync gateway (19A K-08)
+ * keeps one cursor per device, {@code device_sync_cursor}: the last sequence number it applied
+ * and acknowledged; and the device's last heartbeat, {@code device_heartbeat}: what it said it
+ * still had to send. A device is drained when everything it has issued has reached central and
+ * been acknowledged, so the numbers it took from its lane's series are all accounted for.
  *
- * <p>Both read under the caller's scope: a caller who cannot see the device's entity learns
- * nothing.
+ * <p>M1 asks {@link #drained} before a position's counters move to another device (21A section
+ * 6.1, AssignDeviceToPosition: "old device outbox drained (kernel SyncStatus.drained(oldDevice))
+ * or loss recorded"). A device that cannot be shown drained blocks the transfer until an
+ * administrator records the loss, which makes the series gap documented and never hidden (doc
+ * 21 flow 6.6). M1 shows {@link DeviceSyncState#lastSeenAt()} in its device list ("join
+ * last_seen from the device row (heartbeat updates it through the kernel)"): the heartbeat is
+ * recorded in the kernel's own table, never in M1's.
  */
 public interface SyncStatus {
 
@@ -34,12 +38,18 @@ public interface SyncStatus {
             Integer pendingEventCount,
             Long snapshotVersion) {}
 
-    /** The device's state, or empty when it never enrolled for sync or the caller cannot see it. */
+    /**
+     * The device's state, read under the caller's scope; empty when it never enrolled for sync
+     * or the caller cannot see its entity.
+     */
     Optional<DeviceSyncState> state(UUID deviceId, ScopeContext ctx);
 
     /**
-     * Whether everything the device wrote is at central: its last heartbeat reported nothing
-     * pending, and nothing acknowledged beyond what central holds. False when unknown.
+     * Whether every event the device has emitted has been applied and acknowledged at central:
+     * its last heartbeat reported nothing pending, no batch of it is in flight, and it holds
+     * nothing acknowledged beyond what central holds. An answer of false is also the answer when
+     * central cannot tell (no cursor, no heartbeat): the safe side of a counter transfer is to
+     * ask for the loss to be recorded. Read in the caller's transaction, under its scope.
      */
-    boolean drained(UUID deviceId, ScopeContext ctx);
+    boolean drained(UUID deviceId);
 }

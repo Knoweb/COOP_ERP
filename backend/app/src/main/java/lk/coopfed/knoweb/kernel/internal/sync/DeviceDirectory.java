@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * The devices of M1 as the sync gateway needs them: status, entity, till position and location
  * (M1's {@code party.device}, {@code party.till_position}, {@code party.location}, as
- * {@code m1party/V0001} defines them). Read as the federation-wide viewer, because the device's
+ * {@code m1party/V0001}, {@code V0005} and {@code V0009} define them). Read as the federation-wide viewer, because the device's
  * scope is what is being resolved; never written: the devices are M1's (21A section 6).
  *
  * <p>Cached per instance, as 19A section 2 asks ("DeviceAuth validates status ACTIVE against M1
@@ -33,7 +33,7 @@ class DeviceDirectory {
      *
      * @param status         ENROLLED, ACTIVE, SUSPENDED or RETIRED (M1)
      * @param tillPositionId the position it is assigned to; null when unassigned
-     * @param locationId     the position's shop; null when unassigned
+     * @param locationId     the position's shop; the device's own location (M1-06) when unassigned
      * @param primaryTill    the position is its shop's primary till (holds the location series)
      */
     record DeviceRecord(
@@ -91,7 +91,7 @@ class DeviceDirectory {
                 () -> jdbc.query(
                         """
                         select d.device_id, d.owner_entity_id, d.status, d.hardware_serial,
-                               d.current_till_position_id, p.location_id, p.position_no,
+                               d.current_till_position_id, coalesce(p.location_id, d.location_id) as location_id, p.position_no,
                                coalesce(l.primary_till_position_id = d.current_till_position_id, false) as primary_till
                           from party.device d
                           left join party.till_position p on p.till_position_id = d.current_till_position_id

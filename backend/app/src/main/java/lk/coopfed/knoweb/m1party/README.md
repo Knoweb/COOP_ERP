@@ -18,6 +18,88 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 8. **The event type** is `party.registered.v1`. Use the names of your guide.
 9. **Screens: tokens only.** In `web/src/modules/m1party` write no hex colour and no px, rem or em literal: every colour, distance and font size is a token of `web/src/design/tokens.css` (`var(--space-2)`, `var(--color-alert-text)`), and `pnpm test` fails on a literal (`web/src/design/moduleStyle.test.ts`). Show an amount of money with `<MoneyDisplay amount={...} />` and a document state with `<StateChip />` (`web/src/shell/components`); never format or add up money in a screen, totals come from the server. Open `/_design` in the running client to see what exists.
 
+## Locations and till positions (M1-05)
+
+`internal/location`: `Location` and `TillPosition` (JPA), one handler per command, `LocationGuards` (the shared guards), `LocationFacts` (reads the device at a position and whether a shop has an operator), `SeriesHooks` (every call to the kernel's `NumberingService`), `TradingHours` (the JSON of `trading_hours`). Controller `web/LocationsController`, tag `Locations` of the slice.
+
+- A **shop** gets its LOCATION series (GRN, WOF, CNT, RPK, XFR) when it is registered; a warehouse or an office gets none and numbers from the entity's series. Which types are per location or per till is read from the kernel's document type registry, never listed in M1.
+- A **till position** gets its TILL_POSITION series (RCT, CPR) in the same transaction as the row (the "done when" of M1-05). Retiring it closes them; a closed series is never reopened and a position number is never reused.
+- **SetPrimaryTill** moves the counters of the shop's location series to the device at the new primary till, through `NumberingService.holderChange`; with no device there yet (devices are M1-06) nothing moves, and the event says `holderDeviceId: null`. It also registers the shop's location series where they are missing (idempotent), so a shop from a seed gets them.
+- Every command needs an OWN scope; RegisterLocation needs it entity-wide. Row-level security decides everything else: a shop-scoped caller reads, changes and adds positions to its own shop only.
+
+## Users and credentials (M1-07)
+
+`internal/user`: `CreateUser`, `UpdateUser`, `ResetCredential`, `DeactivateUser`, all `gov.user.manage` with MFA, all in an entity-wide OWN scope (a shop-scoped session is refused with `m1.user.entity_scope_required`). Paths under `/v1/security/users` in `openapi/m1party.yaml`; `gov.user.view` reads them.
+
+- **The provider** is reached only through `kernel.api.IdentityProviderClient`. CreateUser writes the row PENDING, then creates the login (the platform's user id is its `uid`), then stores the subject on `provider_subject`. DeactivateUser disables the login and ends its sessions.
+- **Credentials**: `ResetCredential` with `credential` PASSWORD (a one-time password from the provider), SECOND_FACTOR (the provider forgets the TOTP) or PIN (the till PIN). A PENDING or LOCKED user becomes ACTIVE with a new password or PIN (`user.activated.v1`). The temporary password goes out by a notification when M9 holds an ACTIVE rule under the key `user.temporary_password` whose audience resolves (`TemporaryPasswordDelivery`); otherwise it is answered once (`delivery: RETURNED`), marked `@JsonIgnore` so the idempotency store never keeps it, and a replay answers without it.
+- **PIN policy** (`PinPolicy`, doc 19 section 2.1 and DR-5): digits only, `security.pin.length_min`/`length_max` (4 to 6, the entity may narrow, never widen), none of the last `security.pin.history_depth` (3). Argon2id through `kernel.api.PinHasher`; `pin_history` keeps the last hashes, newest first. `security.pin.lockout_attempts` and `lockout_duration` are till-visible configuration: the till counts attempts, not the backend.
+- **Deactivation guards**, in order: in scope; not already deactivated; a reason; not the last holder of `gov.user.manage` entity-wide (as ActivateEntity counts them); not the entity's responsible officer. The PIN hash is cleared; assignments are kept.
+- **Row-level security** (`m1security/V0012`): a shop-scoped session reads the users with an assignment at its shop or an entity-wide one, never a sibling shop's operators; an entity-wide session reads all the entity's users.
+- **Events** carry the user's id twice (`appUserId` for the outbox's aggregate id, `userId` for consumers such as the kernel's permission cache) and never a credential.
+
 ## Deviations from the implementation guide
 
-None yet.
+- **Permissions (M1-05).** 21A section 3.3's `prt.location.register`, `prt.location.activate` and `prt.location.primary` (MFA) are added to the catalogue beside the older `prt.location.manage`/`.view`, whose removal is `CR-21A-1` item 1's. UpdateLocation uses `prt.location.register` (21A names no update code); StartOnboarding, MarkDormant, Reactivate and ConfirmLocationConnectivity use `prt.location.activate` (doc 21 names `prt.location.onboard` and `.dormant`, which 21A's catalogue does not have).
+- **Commands 21A does not list by name:** UpdateLocation (the facts of doc 21 section 7: hours, language, size band) and ConfirmLocationConnectivity (the gate of doc 21 section 3.3, "a fact, not a toggle"), both published as `location.updated.v1`, an event doc 21 section 5.3 does not list.
+- **Guards added:** RetireTillPosition refuses the shop's primary till (`m1.position.is_primary`); SetPrimaryTill refuses the position that is already primary (`m1.location.primary_unchanged`). **Guards waiting:** "no open till session" (MarkDormant, RetireTillPosition) waits for M6's query; "device staged" (StartOnboarding, doc 21) waits for M1-06 and doc 31.
+External grants (M1-09, package `internal/grant`):
+
+- **Revoke has its own path.** 21A section 5 lists only `POST` and `GET /v1/security/external-grants`; RevokeExternalView is `POST /v1/security/external-grants/{grantId}/revoke`, like the entity status commands.
+- **Expiry is a command.** Doc 21 section 4.6 has ACTIVE to EXPIRED "by the clock"; only a command handler writes, so the job `external-grant-expiry` sends `ExpireExternalGrant` for each ended grant. Its permission is `gov.external.grant` (the system acts for the Federation, which owns the grant); no request carries it, so the kernel checks none.
+- **A grant cannot start in the past**: a missing or past `validFrom` is now. The twelve months (doc 21 DR-4, doc 10 L-07) are the configuration item `m1.external_grant.max_months`, which may shorten them and never lengthen them past the table's CHECK constraint.
+- **The grantee reads its own grants** through the policy `grantee_read` on `app.user_id` (m1security V0009): that is how `ExternalGrantQueries.activeGrantedEntities` resolves an external user's entities before the user has a scope.
+- **What an external caller reads here**: `security.role`, `role_permission`, `user_role` and `sod_pair` of the granted entities. Not `security.app_user` (it carries `pin_hash`), and nothing in `party` until an m1party migration adds `ext_view` there.
+## Trading relationships (M1-04)
+
+`internal/relationship`: the aggregate `Relationship` (one row of `party.entity_relationship`), its four handlers and the rules they share. Read the handlers in this order: `OpenTradingRelationshipHandler` (DRAFT), `ActivateRelationshipHandler` (ACTIVE), `AmendRelationshipTermsHandler` (21A section 6.1: close the current row the day before, open the next), `SuspendRelationshipHandler`.
+
+- **Effective dating.** A row's terms never change once it is ACTIVE. An amendment closes the current row (`effective_to = effectiveFrom - 1 day`, the only update an ACTIVE row ever gets besides its status) and inserts the next row. The history of a pair is its rows ordered by `effective_from`; `RelationshipAmended` links each new row to the one it replaced.
+- **One ACTIVE row per pair per date** (A-I3) is the exclusion constraint of `V0001`. The handlers check first (`RelationshipRules.requireNoOverlap`) so the refusal can name the row in the way, and translate the constraint's error (SQLSTATE 23P01) into the same `m1.relationship.overlap` when two clerks race.
+- **Who may do what.** The seller, in its own entity-wide OWN scope, does everything; the buyer reads (policy `party_read`, in OWN or PARTY scope) and changes nothing. The seller cannot read the buyer's entity row, so the opening guards ask `party.trading_standing(entity)` (`V0007`) for the two facts they need: type and status.
+- **Tier rule.** Federation to distributor, distributor to society; Federation to society only when `trade.federation_direct.enabled` is true (doc 10 F-03, default off).
+- **Credit limit.** A change of the limit also needs `bil.creditlimit.change` and a second factor younger than `m1.relationship.credit_limit_mfa_max_age` (PT10M). Both are guards in the handler, because they apply only when the limit changes.
+- **M3's price-list check** is the interface `api.TradePriceListCheck`: M1 publishes the question, M3 will answer it (M3 depends on M1, not the other way round). Until then `AcceptingPriceListCheck` accepts every list and says so at WARN; delete it in the pull request that gives M3's implementation.
+- **Published queries.** `query.RelationshipQueries`: `lookupRelationship(seller, buyer, date)` for M3 and M4, `getRelationship`, `listRelationships(side)`.
+
+## Deviations from the implementation guide
+
+- **422, not 409, for an overlapping relationship** (21A section 5 shows 409): the kernel answers every broken business rule with 422 and a code (`CR-21A-1` item 3).
+- **Message ids carry the module prefix** (`m1.relationship.overlap`, 21A writes `relationship.overlap`), as every M1 id does.
+- **The credit-limit permission is a handler guard, not `requiresAlso`** (21A section 6): it applies only when the limit changes. Until K-03b puts a `PermissionResolver` on the server the permission part is skipped, as every permission is today; the second-factor part is enforced now.
+- **Permission codes by verb** (`prt.relationship.open`, `.activate`, `.amend`, `.suspend`; `bil.creditlimit.change`) as 21A section 3.3 names them; the coarse `prt.relationship.manage` stays in the catalogue unused until the catalogue freeze (`CR-21A-1` item 1).
+### Devices (M1-06)
+
+- **Package.** The device aggregate and its handlers are in `internal/device`, not in `internal/location` beside Location and TillPosition as 21A section 4 lists them. They read positions and locations through `DevicePlaces` (plain SQL under the caller's row-level security) and write only `party.device`.
+- **A device has a location** (`party.device.location_id`, `m1party/V0009`): 21A gives it none, and without one its policies could not keep a shop-scoped user to its own shop's devices. A device is enrolled at a location and is assigned only to a position of that location.
+- **A suspended device keeps its position** until a replacement is assigned there ("keeps position for return", 21A section 6). The replacement of flow 6.6 is therefore an assignment to a position held by a SUSPENDED device; that device is the "previous device" of the 21A pseudocode, read from the database rather than sent in the request. A position held by an ACTIVE device is occupied.
+- **Drained or loss recorded.** The drained check asks `kernel.api.SyncStatus`, which since K-08 reads the gateway's cursor and the device's last heartbeat: drained when the last heartbeat reported nothing pending, no batch is in flight and central holds everything the device holds acknowledged; a device that never synced or never reported is not drained, so its replacement needs `outboxLossRecorded`. Recording the loss writes a `DEVICE_OUTBOX_LOSS_RECORDED` ALERT and sets `outboxLossRecorded` on `device.position_changed.v1` for the gateway's sequence reset.
+- **The revoke** is its own event, `device.revoked.v1`, published on suspension and on retirement; `device.reinstated.v1` lifts it.
+- **Version floor** is the configuration item `m1.device.version_floor` (federation-wide, default "0").
+- **Enrolment** is by the owning entity in its own scope, with the staging reference in the command and the audit record; the Federation staging table of doc 31 and the device credential (K-02, K-08) are not here.
+## Roles, assignments and separation-of-duties pairs (M1-08)
+
+| Where | What |
+|---|---|
+| `api/` | Commands `CreateRole`, `AmendRole`, `RetireRole`, `AssignRole`, `RevokeRole`, `SetSodPair`, `RemoveSodPair` and the value `RolePermission` (a code and its limits); events `role.changed.v1` (`RoleChanged`), `role.assigned.v1`, `role.revoked.v1` (they carry `userId`, which is what the kernel's permission cache reads to forget that user) and `sod_pair.changed.v1`. |
+| `query/SecurityQueries` | `listRoles`, `getRole`, `getRoleDiff` (the template drift diff), `listSodPairs`, `listAssignments`; implemented in `internal/queries/SecurityQueriesImpl`, read under the caller's row-level security. |
+| `internal/security/role/` | One handler per command (all `gov.role.manage`, MFA); `RoleGuards` (the guards they share, in 21A's order); `RoleRules` (the guardrails as plain functions, so the property tests can run them thousands of times); `SecurityRecords` (the reads). |
+| `web/` | `RolesController`, `AssignmentsController`, `SodPairsController`. |
+| `db/migration/m1security/V0010` | The three DELETEs M1 performs, the Federation's template policies, `security.role_assignment_count`. |
+
+The guardrails, as the handlers apply them: roles are authored entity-wide in the OWN class; nobody grants a permission they do not hold, on a role or by assigning one (doc 19 section 3.2); FEDERATION-scope permissions only in federation-owned roles (templates and the Federation's own roles); no role, and no person through two roles, holds both halves of a pair in ROLE mode; limits are checked against the permission's `limits_schema`; an entity never loses its last holder of `gov.user.manage` (by revoke or by amending the role); a role is retired only when nobody holds it; an entity adds pairs and raises them to ROLE mode, never lowers a federation default, and cannot raise a pair while a role or a person already holds both.
+
+Template drift (doc 19 DR-4, "notify and offer diff"; assumes doc 10 E-04): a clone keeps `template_role_id` and `template_version_seen`; when the Federation amends the template its version rises, the clone's `templateUpdated` marker shows and `GET /v1/security/roles/{roleId}/diff` lists what the two disagree on. Nothing is pushed into the clone: the administrator amends the role with `adoptTemplateVersion` once they agree.
+
+## Deviations from the implementation guide
+
+- **RevokeRole is `POST /v1/security/assignments/revoke`**, not `DELETE /v1/security/assignments` (21A section 5): the kernel's idempotency check hashes the path and the body, not the query string, so a DELETE with the assignment in the query would replay one revoke for another under a reused key, and a DELETE body is poorly supported by clients.
+- **Operations 21A does not list** were added because the commands of section 6 need a door: `GET /v1/security/roles/{roleId}`, `PUT .../permissions` (AmendRole), `POST .../retire`, `GET /v1/security/assignments`, and `/v1/security/sod-pairs` (list, set, remove). All carry `gov.role.manage`.
+- **Three tables app_rw may delete from** (`user_role`, `role_permission`, `sod_pair`), named in `SchemaRulesIntegrationTest.DELETE_BY_DESIGN`: 21A makes revoke a delete and AmendRole a set replace; 17A section 6.2 says "no DELETE anywhere". The two documents disagree; the guide's procedure is followed for these three tables only.
+- **FEDERATION-scope permissions in the Federation's own roles**: the 21A pseudocode admits them in templates only; doc 21 section 3.5 says "federation-owned roles". The Federation's own roles are federation-owned, and without them its staff could hold `gov.entity.register` only through a template.
+- **Two guards beyond 21A's table, both from doc 19 section 3.2**: AssignRole checks that the grantor holds every permission of the role (assigning is granting), and a ROLE-mode pair is checked per person across their roles as well as per role.
+- **Limits**: the catalogue has no `limits_schema` yet, so today no permission takes limits (`m1.role.limits_not_accepted`). The schema reader understands a small subset of JSON Schema (`properties` with `type`, `minimum`, `maximum`; `required`; nothing else admitted); there is no JSON Schema library in the version catalogue.
+- **No template notification is sent**: the marker and the diff are there; a notification on `role.changed.v1` of a template is a K-10 rule for M9 to write.
+- **M1-07, user events** carry `appUserId` beside `userId` (the outbox skips `userId` when it looks for the aggregate id). `user.updated.v1` is added for the change of details, which 21A does not list.
+- **M1-07, activation**: doc 21 section 4.4 activates a user on "first credential set (provider callback)"; there is no callback, so the platform activates when it issues the first password or PIN.
+- **M1-07, deactivation** also refuses the entity's responsible officer (doc 21 DR-1); "no open till session" waits for M6's query, as in M1-05.

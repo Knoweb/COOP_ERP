@@ -330,6 +330,1592 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+
+
+  /v1/party/locations:
+
+    get:
+      tags: [Locations]
+      operationId: listLocations
+      summary: List the locations visible in the caller's scope
+      x-permission: prt.location.view
+      parameters:
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PLANNED, ONBOARDING, ACTIVE, DORMANT]
+
+        - in: query
+          name: locationType
+          required: false
+          schema:
+            type: string
+            enum: [WAREHOUSE, SHOP, OFFICE]
+
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+
+      responses:
+
+        '200':
+          description: Location page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationPage'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Locations]
+      operationId: registerLocation
+      summary: Register a location of the caller's entity in PLANNED status
+      description: >
+        The owner is the caller's entity, which must be ACTIVE or ONBOARDING, and the caller acts
+        entity-wide. A SHOP gets its location numbering series at once (GRN, WOF, CNT, RPK, XFR);
+        a warehouse or an office numbers from the entity's series.
+      x-permission: prt.location.register
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterLocationRequest'
+
+      responses:
+
+        '201':
+          description: Location registered
+          headers:
+            Location:
+              description: Address of the registered location
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}:
+
+    get:
+      tags: [Locations]
+      operationId: getLocation
+      summary: Get one location visible in the caller's scope
+      x-permission: prt.location.view
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+
+      responses:
+
+        '200':
+          description: Location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+
+        '404':
+          description: Location does not exist or is not visible to this scope
+
+    put:
+      tags: [Locations]
+      operationId: updateLocation
+      summary: Replace the descriptive facts of a location (names, address, language, hours, size band)
+      description: >
+        The code and the type are not changed here: the code is part of every document number of
+        the location, and the type decides which series it has.
+      x-permission: prt.location.register
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+
+      responses:
+
+        '204':
+          description: Location updated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/connectivity:
+
+    post:
+      tags: [Locations]
+      operationId: confirmLocationConnectivity
+      summary: Record that the location meets the connectivity specification
+      description: >
+        A fact, not a toggle (21A section 8): the audit record says who confirmed it and when.
+      x-permission: prt.location.activate
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Connectivity confirmed
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/start-onboarding:
+
+    post:
+      tags: [Locations]
+      operationId: startLocationOnboarding
+      summary: Move a PLANNED location to ONBOARDING
+      x-permission: prt.location.activate
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Location onboarding
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/activate:
+
+    post:
+      tags: [Locations]
+      operationId: activateLocation
+      summary: Activate an ONBOARDING location
+      description: >
+        The connectivity gate must be met; a SHOP also needs a primary till and at least one
+        operator (a till user assigned at the shop).
+      x-permission: prt.location.activate
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Location activated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/mark-dormant:
+
+    post:
+      tags: [Locations]
+      operationId: markLocationDormant
+      summary: Close an ACTIVE location for trading (DORMANT), with a reason
+      x-permission: prt.location.activate
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+
+      responses:
+
+        '204':
+          description: Location dormant
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/reactivate:
+
+    post:
+      tags: [Locations]
+      operationId: reactivateLocation
+      summary: Bring a DORMANT location back to ACTIVE
+      x-permission: prt.location.activate
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Location active again
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/primary-till:
+
+    put:
+      tags: [Locations]
+      operationId: setPrimaryTill
+      summary: Name the till position that holds the shop's location series
+      description: >
+        The position must be an ACTIVE position of this location. When a device is assigned to
+        it, the counters of the location series move to that device (the kernel records
+        series.holder_changed.v1).
+      x-permission: prt.location.primary
+      x-mfa: true
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPrimaryTillRequest'
+
+      responses:
+
+        '204':
+          description: Primary till set
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/locations/{locationId}/positions:
+
+    get:
+      tags: [Locations]
+      operationId: listTillPositions
+      summary: List the till positions of a location, retired ones included
+      x-permission: prt.location.view
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+
+      responses:
+
+        '200':
+          description: The positions, by number
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TillPositionResponse'
+
+    post:
+      tags: [Locations]
+      operationId: registerTillPosition
+      summary: Register a till position at a shop and its till numbering series
+      description: >
+        The location must be a SHOP and the number unused there, retired positions included. The
+        position gets the series of every till-numbered document type (RCT, CPR).
+      x-permission: prt.position.manage
+
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterTillPositionRequest'
+
+      responses:
+
+        '201':
+          description: Position registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TillPositionResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/party/till-positions/{tillPositionId}/retire:
+
+    post:
+      tags: [Locations]
+      operationId: retireTillPosition
+      summary: Retire a till position for good and close its series
+      x-permission: prt.position.manage
+
+      parameters:
+
+        - in: path
+          name: tillPositionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Position retired
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/external-grants:
+
+    get:
+      tags: [Grants]
+      operationId: listExternalGrants
+      summary: The Federation's register of external grants, active, expired and revoked
+      x-permission: gov.external.grant
+      x-scope: FEDERATION
+
+      responses:
+
+        '200':
+          description: Every grant the caller's scope can see, latest end first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalGrantList'
+
+    post:
+      tags: [Grants]
+      operationId: grantExternalView
+      summary: Give an external user read-only access to entities until a date
+      description: >
+        Doc 21 section 4.6 and flow 6.5. The grantee must be a user of kind EXTERNAL; the grant
+        ends no later than the configured maximum after it starts (m1.external_grant.max_months,
+        12 by default and at most). A missing or past validFrom starts the grant now.
+      x-permission: gov.external.grant
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantExternalViewRequest'
+
+      responses:
+
+        '201':
+          description: Grant issued
+          headers:
+            Location:
+              description: Address of the register of grants
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalGrantResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/external-grants/{grantId}/revoke:
+
+    post:
+      tags: [Grants]
+      operationId: revokeExternalView
+      summary: End an active external grant now
+      x-permission: gov.external.grant
+      x-mfa: true
+      x-scope: FEDERATION
+
+      parameters:
+
+        - in: path
+          name: grantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeExternalViewRequest'
+
+      responses:
+
+        '204':
+          description: Grant revoked
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships:
+
+    get:
+      tags: [Relationships]
+      operationId: listRelationships
+      summary: The relationships in which the caller's entity is seller, buyer or either
+      description: >
+        Every row of every status, ordered by counterparty and effective date, so the history of
+        a pair reads in order (ListRelationships, 21A section 7). Row-level security decides
+        what the caller sees: its own relationships as seller or buyer; the Federation view
+        sees every relationship.
+      x-permission: prt.relationship.view
+
+      parameters:
+        - in: query
+          name: side
+          required: false
+          schema:
+            type: string
+            enum: [SELLER, BUYER]
+
+      responses:
+
+        '200':
+          description: The relationships, as rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RelationshipResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Relationships]
+      operationId: openTradingRelationship
+      summary: Open a trading relationship in DRAFT, the caller's entity selling
+      description: >
+        The seller is the caller's entity. Codes: m1.relationship.seller_scope_required,
+        m1.relationship.self, m1.relationship.buyer_not_found, m1.relationship.party_not_trading,
+        m1.relationship.tier_not_allowed, m1.relationship.effective_range_invalid,
+        m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+      x-permission: prt.relationship.open
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenRelationshipRequest'
+
+      responses:
+
+        '201':
+          description: Relationship opened in DRAFT
+          headers:
+            Location:
+              description: Address of the new relationship
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/{relationshipId}:
+
+    get:
+      tags: [Relationships]
+      operationId: getRelationship
+      summary: One relationship row visible in the caller's scope
+      x-permission: prt.relationship.view
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: The relationship row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+
+        '404':
+          description: The relationship does not exist or is not visible to this scope
+
+  /v1/party/relationships/{relationshipId}/activate:
+
+    post:
+      tags: [Relationships]
+      operationId: activateRelationship
+      summary: Put a DRAFT relationship into force
+      description: >
+        Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_draft,
+        m1.relationship.price_list_required, m1.relationship.payment_terms_required,
+        m1.relationship.price_list_refused (M3's reason in params.reason),
+        m1.relationship.overlap.
+      x-permission: prt.relationship.activate
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+
+        '204':
+          description: Relationship activated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/{relationshipId}/amend:
+
+    post:
+      tags: [Relationships]
+      operationId: amendRelationshipTerms
+      summary: Amend the terms of an ACTIVE relationship from a date
+      description: >
+        Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE
+        row carries the new terms; the answer is the new row. A term left out keeps its current
+        value. A credit_limit change additionally requires bil.creditlimit.change with a fresh
+        second factor (mfa.required when stale). Codes: m1.relationship.not_found,
+        m1.relationship.not_active, m1.relationship.not_seller,
+        m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end,
+        m1.relationship.credit_limit_permission_required, mfa.required,
+        m1.relationship.reason_required, m1.relationship.terms_unchanged,
+        m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+      x-permission: prt.relationship.amend
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendTermsRequest'
+
+      responses:
+
+        '201':
+          description: The new row that carries the amended terms
+          headers:
+            Location:
+              description: Address of the new row
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/relationships/{relationshipId}/suspend:
+
+    post:
+      tags: [Relationships]
+      operationId: suspendRelationship
+      summary: Suspend an ACTIVE relationship; open documents are unaffected
+      description: >
+        Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_active,
+        m1.relationship.reason_required.
+      x-permission: prt.relationship.suspend
+      x-mfa: true
+
+      parameters:
+        - in: path
+          name: relationshipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelationshipReasonRequest'
+
+      responses:
+
+        '204':
+          description: Relationship suspended
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/devices:
+
+    get:
+      tags: [Devices]
+      operationId: listDevices
+      summary: List the devices visible in the caller's scope, with the position each holds
+      x-permission: sys.device.view
+
+      parameters:
+
+        - in: query
+          name: locationId
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [ENROLLED, ACTIVE, SUSPENDED, RETIRED]
+
+      responses:
+
+        '200':
+          description: The devices, by location and serial
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+
+    post:
+      tags: [Devices]
+      operationId: enrolDevice
+      summary: Enrol a device at a location of the caller's entity, from its staging record
+      x-permission: sys.device.enrol
+      x-mfa: true
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrolDeviceRequest'
+
+      responses:
+
+        '201':
+          description: Device enrolled
+          headers:
+            Location:
+              description: Address of the enrolled device
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/devices/{deviceId}:
+
+    get:
+      tags: [Devices]
+      operationId: getDevice
+      summary: Get one device visible in the caller's scope
+      x-permission: sys.device.view
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: Device
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+
+        '404':
+          description: Device does not exist or is not visible to this scope
+
+  /v1/party/devices/{deviceId}/assign:
+
+    post:
+      tags: [Devices]
+      operationId: assignDeviceToPosition
+      summary: Assign a device to a till position; the position's counters move to it
+      description: >
+        A position still held by a suspended device is taken over (the replacement of a faulty
+        or stolen till): its counters move to the new device, which needs the old device's
+        outbox drained, or outboxLossRecorded set by the administrator to record its loss.
+      x-permission: sys.device.enrol
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignDeviceRequest'
+
+      responses:
+
+        '200':
+          description: Device assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/devices/{deviceId}/suspend:
+
+    post:
+      tags: [Devices]
+      operationId: suspendDevice
+      summary: Suspend an active device (lost, stolen, faulty); the till is revoked
+      x-permission: sys.device.suspend
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuspendDeviceRequest'
+
+      responses:
+
+        '204':
+          description: Device suspended
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/devices/{deviceId}/reinstate:
+
+    post:
+      tags: [Devices]
+      operationId: reinstateDevice
+      summary: Reinstate a suspended device once it is physically recovered
+      x-permission: sys.device.suspend
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceReasonRequest'
+
+      responses:
+
+        '204':
+          description: Device reinstated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/party/devices/{deviceId}/retire:
+
+    post:
+      tags: [Devices]
+      operationId: retireDevice
+      summary: Retire an unassigned, wiped device for good; the till is revoked
+      x-permission: sys.device.suspend
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceReasonRequest'
+
+      responses:
+
+        '204':
+          description: Device retired
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles:
+
+    get:
+      tags: [Roles]
+      operationId: listRoles
+      summary: The entity's roles and the federation templates, each with its permissions
+      x-permission: gov.role.manage
+      responses:
+        '200':
+          description: Roles, the entity's first and the templates last
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleList'
+
+    post:
+      tags: [Roles]
+      operationId: createRole
+      summary: Create a role for the entity, from a template or from scratch
+      description: >
+        The owner is the caller's entity (or no entity, for a template the Federation authors).
+        Rules (422): m1.role.entity_scope_required, m1.role.federation_required,
+        m1.role.name_required, m1.role.name_taken, m1.role.template_not_found,
+        m1.role.class_invalid, m1.role.class_not_permitted, m1.role.permission_unknown,
+        m1.role.permission_not_held, m1.role.permission_federation_only, m1.role.sod_conflict,
+        m1.role.limits_not_accepted, m1.role.limits_invalid.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Role created
+          headers:
+            Location:
+              description: Address of the new role
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles/{roleId}:
+
+    get:
+      tags: [Roles]
+      operationId: getRole
+      summary: One role visible to the caller
+      x-permission: gov.role.manage
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '404':
+          description: The role does not exist or is not visible to this scope
+
+  /v1/security/roles/{roleId}/permissions:
+
+    put:
+      tags: [Roles]
+      operationId: amendRole
+      summary: Replace the permissions of a role and raise its version
+      description: >
+        The whole set is sent; what is not in it is taken away. Rules (422): as createRole, and
+        m1.role.not_found, m1.role.not_owner, m1.role.retired, m1.role.last_user_manager,
+        m1.role.no_template.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendRoleRequest'
+      responses:
+        '200':
+          description: The role as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles/{roleId}/retire:
+
+    post:
+      tags: [Roles]
+      operationId: retireRole
+      summary: Retire a role nobody holds
+      description: Rules (422) m1.role.not_found, m1.role.not_owner, m1.role.retired, m1.role.has_assignments.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Role retired
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/roles/{roleId}/diff:
+
+    get:
+      tags: [Roles]
+      operationId: getRoleDiff
+      summary: What a cloned role and the current version of its template disagree on
+      description: >
+        Doc 19 DR-4, "notify and offer diff": the template is never pushed into the clone; the
+        administrator reads this and amends the role (adoptTemplateVersion) if they agree.
+      x-permission: gov.role.manage
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The diff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDiffResponse'
+        '404':
+          description: The role is not visible, or was not cloned from a template
+
+  /v1/security/assignments:
+
+    get:
+      tags: [Assignments]
+      operationId: listAssignments
+      summary: The role assignments at the caller's entity, of one user or of everybody
+      x-permission: gov.role.manage
+      parameters:
+        - in: query
+          name: userId
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentList'
+
+    post:
+      tags: [Assignments]
+      operationId: assignRole
+      summary: Give a user a role at the caller's entity, entity-wide or at one location
+      description: >
+        Rules (422): m1.role.entity_scope_required, m1.role.not_found, m1.role.retired,
+        m1.assignment.role_not_in_scope, m1.assignment.outside_caller_scope,
+        m1.assignment.location_not_in_entity, m1.assignment.user_not_in_scope,
+        m1.assignment.user_deactivated, m1.assignment.class_not_permitted, m1.assignment.exists,
+        m1.role.permission_not_held, m1.assignment.sod_conflict.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRoleRequest'
+      responses:
+        '204':
+          description: Role assigned
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/assignments/revoke:
+
+    post:
+      tags: [Assignments]
+      operationId: revokeRole
+      summary: Take a role assignment away
+      description: >
+        21A section 5 writes this as DELETE /v1/security/assignments. It is a POST with a body
+        because the kernel's idempotency check compares the path and the body of a repeated
+        request, not its query string, and a DELETE body is poorly supported by clients.
+        Rules (422): m1.role.entity_scope_required, m1.assignment.outside_caller_scope,
+        m1.assignment.not_found, m1.assignment.last_user_manager.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeRoleRequest'
+      responses:
+        '204':
+          description: Assignment removed
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/sod-pairs:
+
+    get:
+      tags: [SodPairs]
+      operationId: listSodPairs
+      summary: The separation-of-duties pairs in force for the caller's entity
+      x-permission: gov.role.manage
+      responses:
+        '200':
+          description: The federation defaults and the entity's own pairs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SodPairList'
+
+    put:
+      tags: [SodPairs]
+      operationId: setSodPair
+      summary: Add a pair for the entity or raise one to ROLE mode
+      description: >
+        Rules (422): m1.role.entity_scope_required, m1.sod.mode_invalid, m1.sod.same_permission,
+        m1.sod.permission_unknown, m1.sod.cannot_lower, m1.sod.unchanged, m1.sod.existing_conflict.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetSodPairRequest'
+      responses:
+        '200':
+          description: The entity's pair as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SodPairResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/sod-pairs/{sodPairId}:
+
+    delete:
+      tags: [SodPairs]
+      operationId: removeSodPair
+      summary: Remove a pair the entity added itself
+      description: Rules (422) m1.role.entity_scope_required, m1.sod.not_found, m1.sod.not_owner.
+      x-permission: gov.role.manage
+      x-mfa: true
+      parameters:
+        - in: path
+          name: sodPairId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Pair removed
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users:
+
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List the users the caller's scope may see
+      description: >
+        An entity-wide scope sees every user of its entity; a shop-scoped one the users that
+        work at that shop (an assignment there or an entity-wide one), never a sibling shop's
+        operators. Never a PIN or its hash.
+      x-permission: gov.user.view
+      parameters:
+
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, ACTIVE, LOCKED, DEACTIVATED]
+
+        - in: query
+          name: userKind
+          required: false
+          schema:
+            type: string
+            enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+
+      responses:
+
+        '200':
+          description: User page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a user of the caller's entity and its login at the identity provider
+      description: >
+        The user starts PENDING with no credential; issue the first one with reset-credential.
+        422 codes: m1.user.entity_scope_required, m1.user.home_entity_out_of_scope,
+        m1.user.kind_invalid, m1.user.external_federation_only, m1.user.language_invalid,
+        m1.user.username_invalid, m1.user.username_taken, m1.user.display_name_required,
+        m1.user.succeeds_invalid, identity.username_taken, identity.unavailable.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+
+      responses:
+
+        '201':
+          description: User created
+          headers:
+            Location:
+              description: Address of the created user
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users/{userId}:
+
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get one user visible in the caller's scope
+      x-permission: gov.user.view
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+        '404':
+          description: User does not exist or is not visible to this scope
+
+    put:
+      tags: [Users]
+      operationId: updateUser
+      summary: Change a user's name shown, language and kind
+      description: >
+        422 codes: m1.user.not_found, m1.user.deactivated, m1.user.display_name_required,
+        m1.user.language_invalid, m1.user.kind_invalid, m1.user.kind_change_invalid.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+
+      responses:
+
+        '200':
+          description: User changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users/{userId}/reset-credential:
+
+    post:
+      tags: [Users]
+      operationId: resetCredential
+      summary: Issue a temporary password, reset the second factor, or set the till PIN
+      description: >
+        PASSWORD answers the one-time password in temporaryPassword (delivery RETURNED) unless
+        a notification rule delivered it (NOTIFIED); a replay of the same request does not
+        repeat it. PIN needs pin, checked against the entity's PIN policy. A PENDING or LOCKED
+        user becomes ACTIVE with a new password or PIN.
+        422 codes: m1.user.not_found, m1.user.deactivated, m1.user.credential_invalid,
+        m1.user.password_not_applicable, m1.user.no_login, m1.user.pin_not_applicable,
+        m1.user.pin_required, m1.user.pin_digits_only, m1.user.pin_length, m1.user.pin_reused,
+        identity.scope, identity.unavailable.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetCredentialRequest'
+
+      responses:
+
+        '200':
+          description: Credential issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialResetResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/security/users/{userId}/deactivate:
+
+    post:
+      tags: [Users]
+      operationId: deactivateUser
+      summary: Deactivate a user for good, disable the login and end its sessions
+      description: >
+        422 codes: m1.user.not_found, m1.user.deactivated, m1.user.reason_required,
+        m1.user.last_user_manager, m1.user.responsible_officer, identity.scope,
+        identity.unavailable.
+      x-permission: gov.user.manage
+      x-mfa: true
+
+      parameters:
+
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserReasonRequest'
+
+      responses:
+
+        '204':
+          description: User deactivated
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+
+
+
+
 components:
 
   schemas:
@@ -600,3 +2186,1041 @@ components:
         code:
           type: string
           description: A message id from the bulk.* catalogue
+
+    TradingDay:
+      type: object
+      description: The hours of one day of the week; a day not listed is a closed day
+      required: [day, opens, closes]
+      properties:
+        day:
+          type: string
+          enum: [MON, TUE, WED, THU, FRI, SAT, SUN]
+        opens:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Local time HH:mm
+        closes:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Local time HH:mm, after opens
+
+    RegisterLocationRequest:
+      type: object
+      required: [locationCode, locationType, nameEn]
+      properties:
+        locationCode:
+          type: string
+          minLength: 1
+          maxLength: 12
+          pattern: '^[A-Za-z0-9][A-Za-z0-9-]*$'
+          description: Unique within the entity; part of every document number of the location
+        locationType:
+          type: string
+          enum: [WAREHOUSE, SHOP, OFFICE]
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 200
+        nameSi:
+          type: [string, 'null']
+          maxLength: 200
+        nameTa:
+          type: [string, 'null']
+          maxLength: 200
+        address:
+          type: [string, 'null']
+          maxLength: 500
+        district:
+          type: [string, 'null']
+          maxLength: 40
+        geoLat:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+        geoLng:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+        language:
+          type: [string, 'null']
+          enum: [en, si, ta, null]
+          description: The till and receipt language; the entity's default language when not given
+        tradingHours:
+          type: [array, 'null']
+          maxItems: 7
+          items:
+            $ref: '#/components/schemas/TradingDay'
+        sizeBand:
+          type: [string, 'null']
+          enum: [S, M, L, null]
+
+    UpdateLocationRequest:
+      type: object
+      required: [nameEn]
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 200
+        nameSi:
+          type: [string, 'null']
+          maxLength: 200
+        nameTa:
+          type: [string, 'null']
+          maxLength: 200
+        address:
+          type: [string, 'null']
+          maxLength: 500
+        district:
+          type: [string, 'null']
+          maxLength: 40
+        geoLat:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+        geoLng:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+        language:
+          type: [string, 'null']
+          enum: [en, si, ta, null]
+        tradingHours:
+          type: [array, 'null']
+          maxItems: 7
+          items:
+            $ref: '#/components/schemas/TradingDay'
+        sizeBand:
+          type: [string, 'null']
+          enum: [S, M, L, null]
+
+    ReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type: [string, 'null']
+          maxLength: 500
+
+    SetPrimaryTillRequest:
+      type: object
+      required: [tillPositionId, reasonCode]
+      properties:
+        tillPositionId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type: [string, 'null']
+          maxLength: 500
+
+    RegisterTillPositionRequest:
+      type: object
+      required: [positionNo]
+      properties:
+        positionNo:
+          type: integer
+          minimum: 1
+          maximum: 99
+          description: The till number at the shop (T1, T2 ...); never reused, retired positions included
+
+    LocationResponse:
+      type: object
+      required: [locationId, ownerEntityId, locationCode, locationType, nameEn, connectivitySpecMet, status]
+      properties:
+        locationId:
+          type: string
+          format: uuid
+        ownerEntityId:
+          type: string
+          format: uuid
+        locationCode:
+          type: string
+        locationType:
+          type: string
+          enum: [WAREHOUSE, SHOP, OFFICE]
+        nameEn:
+          type: string
+        nameSi:
+          type: [string, 'null']
+        nameTa:
+          type: [string, 'null']
+        address:
+          type: [string, 'null']
+        district:
+          type: [string, 'null']
+        geoLat:
+          type: [number, 'null']
+        geoLng:
+          type: [number, 'null']
+        language:
+          type: [string, 'null']
+          enum: [en, si, ta, null]
+        tradingHours:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradingDay'
+        sizeBand:
+          type: [string, 'null']
+          enum: [S, M, L, null]
+        connectivitySpecMet:
+          type: boolean
+        primaryTillPositionId:
+          type: [string, 'null']
+          format: uuid
+        status:
+          type: string
+          enum: [PLANNED, ONBOARDING, ACTIVE, DORMANT]
+
+    LocationPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationResponse'
+        nextCursor:
+          type: [string, 'null']
+          format: uuid
+
+    TillPositionResponse:
+      type: object
+      required: [tillPositionId, locationId, positionNo, status, primary]
+      properties:
+        tillPositionId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        positionNo:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, RETIRED]
+        primary:
+          type: boolean
+          description: This position is the primary till of its location
+
+    GrantExternalViewRequest:
+      type: object
+      required: [granteeUserId, scopeEntityIds, validUntil, reason]
+      properties:
+        granteeUserId:
+          type: string
+          format: uuid
+        scopeEntityIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        validFrom:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    RevokeExternalViewRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    ExternalGrantResponse:
+      type: object
+      required: [grantId, granteeUserId, scopeEntityIds, validFrom, validUntil, reason, status]
+      properties:
+        grantId:
+          type: string
+          format: uuid
+        granteeUserId:
+          type: string
+          format: uuid
+        scopeEntityIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, REVOKED]
+
+    ExternalGrantList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalGrantResponse'
+
+    OpenRelationshipRequest:
+      type: object
+      required: [buyerEntityId, effectiveFrom]
+      properties:
+        buyerEntityId:
+          type: string
+          format: uuid
+        priceListId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The seller's TRADE price list (M3); needed before activation
+        creditLimit:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 999999999999.99
+          description: Informative (ADR-12), in rupees
+        paymentTermsDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 365
+          description: Needed before activation
+        discrepancyWindowDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 90
+          description: Default 7
+        orderLockHoursBeforeEta:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 720
+          description: Default 24
+        allocationRule:
+          type:
+            - string
+            - 'null'
+          enum: [FCFS, PRO_RATA, QUOTA, null]
+          description: Default FCFS
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type:
+            - string
+            - 'null'
+          format: date
+          description: The last day; open-ended when left out
+
+    AmendTermsRequest:
+      type: object
+      required: [effectiveFrom, reasonCode]
+      properties:
+        effectiveFrom:
+          type: string
+          format: date
+          description: The first day of the new terms; after the current row's first day
+        priceListId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        creditLimit:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+          maximum: 999999999999.99
+        paymentTermsDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 365
+        discrepancyWindowDays:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 90
+        orderLockHoursBeforeEta:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 720
+        allocationRule:
+          type:
+            - string
+            - 'null'
+          enum: [FCFS, PRO_RATA, QUOTA, null]
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 60
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    RelationshipReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 60
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    RelationshipResponse:
+      type: object
+      required:
+        - relationshipId
+        - sellerEntityId
+        - buyerEntityId
+        - discrepancyWindowDays
+        - orderLockHoursBeforeEta
+        - allocationRule
+        - status
+        - effectiveFrom
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        priceListId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        creditLimit:
+          type:
+            - number
+            - 'null'
+        paymentTermsDays:
+          type:
+            - integer
+            - 'null'
+        discrepancyWindowDays:
+          type: integer
+        orderLockHoursBeforeEta:
+          type: integer
+        allocationRule:
+          type: string
+          enum: [FCFS, PRO_RATA, QUOTA]
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED]
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type:
+            - string
+            - 'null'
+          format: date
+
+    EnrolDeviceRequest:
+      type: object
+      required: [hardwareSerial, deviceKind, locationId, appVersion, stagingReference]
+      properties:
+        hardwareSerial:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]*$'
+        deviceKind:
+          type: string
+          enum: [POS_TERMINAL, WORKSTATION, DRIVER_MOBILE]
+        locationId:
+          type: string
+          format: uuid
+        appVersion:
+          $ref: '#/components/schemas/AppVersion'
+        stagingReference:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: The management agent's staging record that attests the device (doc 31)
+
+    AssignDeviceRequest:
+      type: object
+      required: [tillPositionId, reasonCode]
+      properties:
+        tillPositionId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+        outboxLossRecorded:
+          type: boolean
+          default: false
+          description: >
+            Set when the device giving the position up cannot be shown drained: its loss is
+            recorded, and the numbers it took and never sent become a documented gap.
+
+    SuspendDeviceRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          enum: [LOST, STOLEN, FAULTY]
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    DeviceReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    AppVersion:
+      type: string
+      pattern: '^[0-9]{1,5}(\.[0-9]{1,5}){0,3}$'
+      maxLength: 20
+      description: A till release number, dot-separated whole numbers (doc 31)
+
+    DeviceResponse:
+      type: object
+      required: [deviceId, ownerEntityId, locationId, hardwareSerial, deviceKind, status, primaryTill]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        ownerEntityId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        hardwareSerial:
+          type: string
+        deviceKind:
+          type: string
+          enum: [POS_TERMINAL, WORKSTATION, DRIVER_MOBILE]
+        status:
+          type: string
+          enum: [ENROLLED, ACTIVE, SUSPENDED, RETIRED]
+        tillPositionId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        positionNo:
+          type:
+            - integer
+            - 'null'
+        primaryTill:
+          type: boolean
+          description: Whether the position it holds is its shop's primary till
+        appVersion:
+          type:
+            - string
+            - 'null'
+        enrolledAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        lastSeenAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+
+    RolePermissionItem:
+      type: object
+      required: [permissionCode]
+      properties:
+        permissionCode:
+          type: string
+          minLength: 1
+          maxLength: 64
+        limits:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+          description: Values checked against the permission's limits_schema in the catalogue
+
+    CreateRoleRequest:
+      type: object
+      required: [nameEn]
+      properties:
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameSi:
+          type:
+            - string
+            - 'null'
+          maxLength: 100
+        nameTa:
+          type:
+            - string
+            - 'null'
+          maxLength: 100
+        templateRoleId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The template to clone; leave out for a role from scratch
+        permissions:
+          type:
+            - array
+            - 'null'
+          description: >
+            The role's permissions. Left out when cloning, the template's set is taken as it is;
+            left out for a role from scratch, the role starts with none.
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+        asTemplate:
+          type: boolean
+          default: false
+          description: The Federation authors a template (no owning entity)
+        roleClass:
+          type:
+            - string
+            - 'null'
+          enum:
+            - OWN
+            - FEDERATION_VIEW
+            - EXTERNAL_TIMEBOXED
+            - null
+
+    AmendRoleRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+        adoptTemplateVersion:
+          type: boolean
+          default: false
+          description: The administrator has read the template diff and takes the template's current version as seen
+
+    RoleResponse:
+      type: object
+      required: [roleId, nameEn, template, roleClass, templateUpdated, version, status, permissions]
+      properties:
+        roleId:
+          type: string
+          format: uuid
+        ownerEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        nameEn:
+          type: string
+        nameSi:
+          type:
+            - string
+            - 'null'
+        nameTa:
+          type:
+            - string
+            - 'null'
+        template:
+          type: boolean
+        roleClass:
+          type: string
+          enum: [OWN, FEDERATION_VIEW, EXTERNAL_TIMEBOXED]
+        templateRoleId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        templateVersionSeen:
+          type:
+            - integer
+            - 'null'
+        templateVersion:
+          type:
+            - integer
+            - 'null'
+        templateUpdated:
+          type: boolean
+          description: The template has a newer version than the one this role last took
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, RETIRED]
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+
+    RoleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleResponse'
+
+    RoleDiffResponse:
+      type: object
+      required: [roleId, templateRoleId, templateVersion, templateUpdated, onlyInTemplate, onlyInRole, limitsDiffer]
+      properties:
+        roleId:
+          type: string
+          format: uuid
+        templateRoleId:
+          type: string
+          format: uuid
+        templateVersionSeen:
+          type:
+            - integer
+            - 'null'
+        templateVersion:
+          type: integer
+        templateUpdated:
+          type: boolean
+        onlyInTemplate:
+          type: array
+          items:
+            type: string
+        onlyInRole:
+          type: array
+          items:
+            type: string
+        limitsDiffer:
+          type: array
+          items:
+            type: string
+
+    AssignRoleRequest:
+      type: object
+      required: [userId, roleId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleId:
+          type: string
+          format: uuid
+        scopeLocationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The location the role applies at; leave out for the whole entity
+
+    RevokeRoleRequest:
+      type: object
+      required: [userId, roleId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleId:
+          type: string
+          format: uuid
+        scopeLocationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        reason:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    AssignmentResponse:
+      type: object
+      required: [userId, roleId, scopeEntityId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleId:
+          type: string
+          format: uuid
+        scopeEntityId:
+          type: string
+          format: uuid
+        scopeLocationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+
+    AssignmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignmentResponse'
+
+    SetSodPairRequest:
+      type: object
+      required: [permissionA, permissionB, mode]
+      properties:
+        permissionA:
+          type: string
+          minLength: 1
+          maxLength: 64
+        permissionB:
+          type: string
+          minLength: 1
+          maxLength: 64
+        mode:
+          type: string
+          enum: [INSTANCE, ROLE]
+
+    SodPairResponse:
+      type: object
+      required: [sodPairId, permissionA, permissionB, mode]
+      properties:
+        sodPairId:
+          type: string
+          format: uuid
+        permissionA:
+          type: string
+        permissionB:
+          type: string
+        mode:
+          type: string
+          enum: [INSTANCE, ROLE]
+        ownerEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Null for a federation default
+
+    SodPairList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SodPairResponse'
+
+    CreateUserRequest:
+      type: object
+      required: [username, displayName, language, userKind]
+      properties:
+        homeEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The caller's entity when left out; no other entity is accepted
+        username:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$'
+          description: The sign-in name, unique in the federation; stored in lower case
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        language:
+          type: string
+          enum: [en, si, ta]
+        userKind:
+          type: string
+          enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+        succeedsUserId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: A deactivated user of the same entity this one succeeds (returning staff)
+
+    UpdateUserRequest:
+      type: object
+      required: [displayName, language, userKind]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        language:
+          type: string
+          enum: [en, si, ta]
+        userKind:
+          type: string
+          enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+
+    ResetCredentialRequest:
+      type: object
+      required: [credential]
+      properties:
+        credential:
+          type: string
+          enum: [PASSWORD, SECOND_FACTOR, PIN]
+        pin:
+          type:
+            - string
+            - 'null'
+          pattern: '^[0-9]{4,6}$'
+          description: The new till PIN, with credential PIN only; the entity's policy may narrow the length
+
+    UserReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type:
+            - string
+            - 'null'
+          maxLength: 500
+
+    CredentialResetResponse:
+      type: object
+      required: [userId, credential, status, delivery]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        credential:
+          type: string
+          enum: [PASSWORD, SECOND_FACTOR, PIN]
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, LOCKED, DEACTIVATED]
+        delivery:
+          type: string
+          enum: [NOTIFIED, RETURNED, NONE]
+          description: >
+            RETURNED - the temporary password is in this response, this once; NOTIFIED - a
+            notification rule delivered it; NONE - nothing to deliver
+        temporaryPassword:
+          type:
+            - string
+            - 'null'
+          description: Only with delivery RETURNED; shown once, never stored by the platform
+
+    UserResponse:
+      type: object
+      required: [userId, homeEntityId, username, displayName, language, userKind, status, pinSet]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        homeEntityId:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: string
+        language:
+          type: string
+          enum: [en, si, ta]
+        userKind:
+          type: string
+          enum: [BACK_OFFICE, TILL, BOTH, EXTERNAL]
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, LOCKED, DEACTIVATED]
+        pinSet:
+          type: boolean
+        pinChangedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        succeedsUserId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+
+    UserPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+          format: uuid
+
+  parameters:
+
+    LocationId:
+      in: path
+      name: locationId
+      required: true
+      schema:
+        type: string
+        format: uuid

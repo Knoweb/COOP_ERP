@@ -127,6 +127,707 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/party/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the locations visible in the caller's scope */
+        get: operations["listLocations"];
+        put?: never;
+        /**
+         * Register a location of the caller's entity in PLANNED status
+         * @description The owner is the caller's entity, which must be ACTIVE or ONBOARDING, and the caller acts entity-wide. A SHOP gets its location numbering series at once (GRN, WOF, CNT, RPK, XFR); a warehouse or an office numbers from the entity's series.
+         */
+        post: operations["registerLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one location visible in the caller's scope */
+        get: operations["getLocation"];
+        /**
+         * Replace the descriptive facts of a location (names, address, language, hours, size band)
+         * @description The code and the type are not changed here: the code is part of every document number of the location, and the type decides which series it has.
+         */
+        put: operations["updateLocation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/connectivity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that the location meets the connectivity specification
+         * @description A fact, not a toggle (21A section 8): the audit record says who confirmed it and when.
+         */
+        post: operations["confirmLocationConnectivity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/start-onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a PLANNED location to ONBOARDING */
+        post: operations["startLocationOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate an ONBOARDING location
+         * @description The connectivity gate must be met; a SHOP also needs a primary till and at least one operator (a till user assigned at the shop).
+         */
+        post: operations["activateLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/mark-dormant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close an ACTIVE location for trading (DORMANT), with a reason */
+        post: operations["markLocationDormant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring a DORMANT location back to ACTIVE */
+        post: operations["reactivateLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/primary-till": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Name the till position that holds the shop's location series
+         * @description The position must be an ACTIVE position of this location. When a device is assigned to it, the counters of the location series move to that device (the kernel records series.holder_changed.v1).
+         */
+        put: operations["setPrimaryTill"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/locations/{locationId}/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the till positions of a location, retired ones included */
+        get: operations["listTillPositions"];
+        put?: never;
+        /**
+         * Register a till position at a shop and its till numbering series
+         * @description The location must be a SHOP and the number unused there, retired positions included. The position gets the series of every till-numbered document type (RCT, CPR).
+         */
+        post: operations["registerTillPosition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/till-positions/{tillPositionId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire a till position for good and close its series */
+        post: operations["retireTillPosition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/external-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Federation's register of external grants, active, expired and revoked */
+        get: operations["listExternalGrants"];
+        put?: never;
+        /**
+         * Give an external user read-only access to entities until a date
+         * @description Doc 21 section 4.6 and flow 6.5. The grantee must be a user of kind EXTERNAL; the grant ends no later than the configured maximum after it starts (m1.external_grant.max_months, 12 by default and at most). A missing or past validFrom starts the grant now.
+         */
+        post: operations["grantExternalView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/external-grants/{grantId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End an active external grant now */
+        post: operations["revokeExternalView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The relationships in which the caller's entity is seller, buyer or either
+         * @description Every row of every status, ordered by counterparty and effective date, so the history of a pair reads in order (ListRelationships, 21A section 7). Row-level security decides what the caller sees: its own relationships as seller or buyer; the Federation view sees every relationship.
+         */
+        get: operations["listRelationships"];
+        put?: never;
+        /**
+         * Open a trading relationship in DRAFT, the caller's entity selling
+         * @description The seller is the caller's entity. Codes: m1.relationship.seller_scope_required, m1.relationship.self, m1.relationship.buyer_not_found, m1.relationship.party_not_trading, m1.relationship.tier_not_allowed, m1.relationship.effective_range_invalid, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         */
+        post: operations["openTradingRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One relationship row visible in the caller's scope */
+        get: operations["getRelationship"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put a DRAFT relationship into force
+         * @description Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_draft, m1.relationship.price_list_required, m1.relationship.payment_terms_required, m1.relationship.price_list_refused (M3's reason in params.reason), m1.relationship.overlap.
+         */
+        post: operations["activateRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Amend the terms of an ACTIVE relationship from a date
+         * @description Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE row carries the new terms; the answer is the new row. A term left out keeps its current value. A credit_limit change additionally requires bil.creditlimit.change with a fresh second factor (mfa.required when stale). Codes: m1.relationship.not_found, m1.relationship.not_active, m1.relationship.not_seller, m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end, m1.relationship.credit_limit_permission_required, mfa.required, m1.relationship.reason_required, m1.relationship.terms_unchanged, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         */
+        post: operations["amendRelationshipTerms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/relationships/{relationshipId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend an ACTIVE relationship; open documents are unaffected
+         * @description Codes: m1.relationship.not_found, m1.relationship.not_seller, m1.relationship.not_active, m1.relationship.reason_required.
+         */
+        post: operations["suspendRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the devices visible in the caller's scope, with the position each holds */
+        get: operations["listDevices"];
+        put?: never;
+        /** Enrol a device at a location of the caller's entity, from its staging record */
+        post: operations["enrolDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one device visible in the caller's scope */
+        get: operations["getDevice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign a device to a till position; the position's counters move to it
+         * @description A position still held by a suspended device is taken over (the replacement of a faulty or stolen till): its counters move to the new device, which needs the old device's outbox drained, or outboxLossRecorded set by the administrator to record its loss.
+         */
+        post: operations["assignDeviceToPosition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend an active device (lost, stolen, faulty); the till is revoked */
+        post: operations["suspendDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reinstate a suspended device once it is physically recovered */
+        post: operations["reinstateDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/party/devices/{deviceId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire an unassigned, wiped device for good; the till is revoked */
+        post: operations["retireDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entity's roles and the federation templates, each with its permissions */
+        get: operations["listRoles"];
+        put?: never;
+        /**
+         * Create a role for the entity, from a template or from scratch
+         * @description The owner is the caller's entity (or no entity, for a template the Federation authors). Rules (422): m1.role.entity_scope_required, m1.role.federation_required, m1.role.name_required, m1.role.name_taken, m1.role.template_not_found, m1.role.class_invalid, m1.role.class_not_permitted, m1.role.permission_unknown, m1.role.permission_not_held, m1.role.permission_federation_only, m1.role.sod_conflict, m1.role.limits_not_accepted, m1.role.limits_invalid.
+         */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/roles/{roleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One role visible to the caller */
+        get: operations["getRole"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/roles/{roleId}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the permissions of a role and raise its version
+         * @description The whole set is sent; what is not in it is taken away. Rules (422): as createRole, and m1.role.not_found, m1.role.not_owner, m1.role.retired, m1.role.last_user_manager, m1.role.no_template.
+         */
+        put: operations["amendRole"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/roles/{roleId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire a role nobody holds
+         * @description Rules (422) m1.role.not_found, m1.role.not_owner, m1.role.retired, m1.role.has_assignments.
+         */
+        post: operations["retireRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/roles/{roleId}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a cloned role and the current version of its template disagree on
+         * @description Doc 19 DR-4, "notify and offer diff": the template is never pushed into the clone; the administrator reads this and amends the role (adoptTemplateVersion) if they agree.
+         */
+        get: operations["getRoleDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The role assignments at the caller's entity, of one user or of everybody */
+        get: operations["listAssignments"];
+        put?: never;
+        /**
+         * Give a user a role at the caller's entity, entity-wide or at one location
+         * @description Rules (422): m1.role.entity_scope_required, m1.role.not_found, m1.role.retired, m1.assignment.role_not_in_scope, m1.assignment.outside_caller_scope, m1.assignment.location_not_in_entity, m1.assignment.user_not_in_scope, m1.assignment.user_deactivated, m1.assignment.class_not_permitted, m1.assignment.exists, m1.role.permission_not_held, m1.assignment.sod_conflict.
+         */
+        post: operations["assignRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/assignments/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take a role assignment away
+         * @description 21A section 5 writes this as DELETE /v1/security/assignments. It is a POST with a body because the kernel's idempotency check compares the path and the body of a repeated request, not its query string, and a DELETE body is poorly supported by clients. Rules (422): m1.role.entity_scope_required, m1.assignment.outside_caller_scope, m1.assignment.not_found, m1.assignment.last_user_manager.
+         */
+        post: operations["revokeRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/sod-pairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The separation-of-duties pairs in force for the caller's entity */
+        get: operations["listSodPairs"];
+        /**
+         * Add a pair for the entity or raise one to ROLE mode
+         * @description Rules (422): m1.role.entity_scope_required, m1.sod.mode_invalid, m1.sod.same_permission, m1.sod.permission_unknown, m1.sod.cannot_lower, m1.sod.unchanged, m1.sod.existing_conflict.
+         */
+        put: operations["setSodPair"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/sod-pairs/{sodPairId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a pair the entity added itself
+         * @description Rules (422) m1.role.entity_scope_required, m1.sod.not_found, m1.sod.not_owner.
+         */
+        delete: operations["removeSodPair"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the users the caller's scope may see
+         * @description An entity-wide scope sees every user of its entity; a shop-scoped one the users that work at that shop (an assignment there or an entity-wide one), never a sibling shop's operators. Never a PIN or its hash.
+         */
+        get: operations["listUsers"];
+        put?: never;
+        /**
+         * Create a user of the caller's entity and its login at the identity provider
+         * @description The user starts PENDING with no credential; issue the first one with reset-credential. 422 codes: m1.user.entity_scope_required, m1.user.home_entity_out_of_scope, m1.user.kind_invalid, m1.user.external_federation_only, m1.user.language_invalid, m1.user.username_invalid, m1.user.username_taken, m1.user.display_name_required, m1.user.succeeds_invalid, identity.username_taken, identity.unavailable.
+         */
+        post: operations["createUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one user visible in the caller's scope */
+        get: operations["getUser"];
+        /**
+         * Change a user's name shown, language and kind
+         * @description 422 codes: m1.user.not_found, m1.user.deactivated, m1.user.display_name_required, m1.user.language_invalid, m1.user.kind_invalid, m1.user.kind_change_invalid.
+         */
+        put: operations["updateUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users/{userId}/reset-credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a temporary password, reset the second factor, or set the till PIN
+         * @description PASSWORD answers the one-time password in temporaryPassword (delivery RETURNED) unless a notification rule delivered it (NOTIFIED); a replay of the same request does not repeat it. PIN needs pin, checked against the entity's PIN policy. A PENDING or LOCKED user becomes ACTIVE with a new password or PIN. 422 codes: m1.user.not_found, m1.user.deactivated, m1.user.credential_invalid, m1.user.password_not_applicable, m1.user.no_login, m1.user.pin_not_applicable, m1.user.pin_required, m1.user.pin_digits_only, m1.user.pin_length, m1.user.pin_reused, identity.scope, identity.unavailable.
+         */
+        post: operations["resetCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security/users/{userId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate a user for good, disable the login and end its sessions
+         * @description 422 codes: m1.user.not_found, m1.user.deactivated, m1.user.reason_required, m1.user.last_user_manager, m1.user.responsible_officer, identity.scope, identity.unavailable.
+         */
+        post: operations["deactivateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -206,6 +907,464 @@ export interface components {
             /** @description A message id from the bulk.* catalogue */
             code: string;
         };
+        /** @description The hours of one day of the week; a day not listed is a closed day */
+        TradingDay: {
+            /** @enum {string} */
+            day: "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+            /** @description Local time HH:mm */
+            opens: string;
+            /** @description Local time HH:mm, after opens */
+            closes: string;
+        };
+        RegisterLocationRequest: {
+            /** @description Unique within the entity; part of every document number of the location */
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "WAREHOUSE" | "SHOP" | "OFFICE";
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /**
+             * @description The till and receipt language; the entity's default language when not given
+             * @enum {string|null}
+             */
+            language?: "en" | "si" | "ta" | null;
+            tradingHours?: components["schemas"]["TradingDay"][] | null;
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+        };
+        UpdateLocationRequest: {
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /** @enum {string|null} */
+            language?: "en" | "si" | "ta" | null;
+            tradingHours?: components["schemas"]["TradingDay"][] | null;
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+        };
+        ReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        SetPrimaryTillRequest: {
+            /** Format: uuid */
+            tillPositionId: string;
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RegisterTillPositionRequest: {
+            /** @description The till number at the shop (T1, T2 ...); never reused, retired positions included */
+            positionNo: number;
+        };
+        LocationResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            locationCode: string;
+            /** @enum {string} */
+            locationType: "WAREHOUSE" | "SHOP" | "OFFICE";
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            address?: string | null;
+            district?: string | null;
+            geoLat?: number | null;
+            geoLng?: number | null;
+            /** @enum {string|null} */
+            language?: "en" | "si" | "ta" | null;
+            tradingHours?: components["schemas"]["TradingDay"][];
+            /** @enum {string|null} */
+            sizeBand?: "S" | "M" | "L" | null;
+            connectivitySpecMet: boolean;
+            /** Format: uuid */
+            primaryTillPositionId?: string | null;
+            /** @enum {string} */
+            status: "PLANNED" | "ONBOARDING" | "ACTIVE" | "DORMANT";
+        };
+        LocationPage: {
+            items: components["schemas"]["LocationResponse"][];
+            /** Format: uuid */
+            nextCursor?: string | null;
+        };
+        TillPositionResponse: {
+            /** Format: uuid */
+            tillPositionId: string;
+            /** Format: uuid */
+            locationId: string;
+            positionNo: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "RETIRED";
+            /** @description This position is the primary till of its location */
+            primary: boolean;
+        };
+        GrantExternalViewRequest: {
+            /** Format: uuid */
+            granteeUserId: string;
+            scopeEntityIds: string[];
+            /** Format: date-time */
+            validFrom?: string | null;
+            /** Format: date-time */
+            validUntil: string;
+            reason: string;
+        };
+        RevokeExternalViewRequest: {
+            reason: string;
+        };
+        ExternalGrantResponse: {
+            /** Format: uuid */
+            grantId: string;
+            /** Format: uuid */
+            granteeUserId: string;
+            scopeEntityIds: string[];
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validUntil: string;
+            reason: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "EXPIRED" | "REVOKED";
+        };
+        ExternalGrantList: {
+            items: components["schemas"]["ExternalGrantResponse"][];
+        };
+        OpenRelationshipRequest: {
+            /** Format: uuid */
+            buyerEntityId: string;
+            /**
+             * Format: uuid
+             * @description The seller's TRADE price list (M3); needed before activation
+             */
+            priceListId?: string | null;
+            /** @description Informative (ADR-12), in rupees */
+            creditLimit?: number | null;
+            /** @description Needed before activation */
+            paymentTermsDays?: number | null;
+            /** @description Default 7 */
+            discrepancyWindowDays?: number | null;
+            /** @description Default 24 */
+            orderLockHoursBeforeEta?: number | null;
+            /**
+             * @description Default FCFS
+             * @enum {string|null}
+             */
+            allocationRule?: "FCFS" | "PRO_RATA" | "QUOTA" | null;
+            /** Format: date */
+            effectiveFrom: string;
+            /**
+             * Format: date
+             * @description The last day; open-ended when left out
+             */
+            effectiveTo?: string | null;
+        };
+        AmendTermsRequest: {
+            /**
+             * Format: date
+             * @description The first day of the new terms; after the current row's first day
+             */
+            effectiveFrom: string;
+            /** Format: uuid */
+            priceListId?: string | null;
+            creditLimit?: number | null;
+            paymentTermsDays?: number | null;
+            discrepancyWindowDays?: number | null;
+            orderLockHoursBeforeEta?: number | null;
+            /** @enum {string|null} */
+            allocationRule?: "FCFS" | "PRO_RATA" | "QUOTA" | null;
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RelationshipReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        RelationshipResponse: {
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            priceListId?: string | null;
+            creditLimit?: number | null;
+            paymentTermsDays?: number | null;
+            discrepancyWindowDays: number;
+            orderLockHoursBeforeEta: number;
+            /** @enum {string} */
+            allocationRule: "FCFS" | "PRO_RATA" | "QUOTA";
+            /** @enum {string} */
+            status: "DRAFT" | "ACTIVE" | "SUSPENDED";
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+        };
+        EnrolDeviceRequest: {
+            hardwareSerial: string;
+            /** @enum {string} */
+            deviceKind: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE";
+            /** Format: uuid */
+            locationId: string;
+            appVersion: components["schemas"]["AppVersion"];
+            /** @description The management agent's staging record that attests the device (doc 31) */
+            stagingReference: string;
+        };
+        AssignDeviceRequest: {
+            /** Format: uuid */
+            tillPositionId: string;
+            reasonCode: string;
+            reasonText?: string | null;
+            /**
+             * @description Set when the device giving the position up cannot be shown drained: its loss is recorded, and the numbers it took and never sent become a documented gap.
+             * @default false
+             */
+            outboxLossRecorded: boolean;
+        };
+        SuspendDeviceRequest: {
+            /** @enum {string} */
+            reasonCode: "LOST" | "STOLEN" | "FAULTY";
+            reasonText?: string | null;
+        };
+        DeviceReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        /** @description A till release number, dot-separated whole numbers (doc 31) */
+        AppVersion: string;
+        DeviceResponse: {
+            /** Format: uuid */
+            deviceId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            locationId: string;
+            hardwareSerial: string;
+            /** @enum {string} */
+            deviceKind: "POS_TERMINAL" | "WORKSTATION" | "DRIVER_MOBILE";
+            /** @enum {string} */
+            status: "ENROLLED" | "ACTIVE" | "SUSPENDED" | "RETIRED";
+            /** Format: uuid */
+            tillPositionId?: string | null;
+            positionNo?: number | null;
+            /** @description Whether the position it holds is its shop's primary till */
+            primaryTill: boolean;
+            appVersion?: string | null;
+            /** Format: date-time */
+            enrolledAt?: string | null;
+            /** Format: date-time */
+            lastSeenAt?: string | null;
+        };
+        RolePermissionItem: {
+            permissionCode: string;
+            /** @description Values checked against the permission's limits_schema in the catalogue */
+            limits?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        CreateRoleRequest: {
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            /**
+             * Format: uuid
+             * @description The template to clone; leave out for a role from scratch
+             */
+            templateRoleId?: string | null;
+            /** @description The role's permissions. Left out when cloning, the template's set is taken as it is; left out for a role from scratch, the role starts with none. */
+            permissions?: components["schemas"]["RolePermissionItem"][] | null;
+            /**
+             * @description The Federation authors a template (no owning entity)
+             * @default false
+             */
+            asTemplate: boolean;
+            /** @enum {string|null} */
+            roleClass?: "OWN" | "FEDERATION_VIEW" | "EXTERNAL_TIMEBOXED" | null;
+        };
+        AmendRoleRequest: {
+            permissions: components["schemas"]["RolePermissionItem"][];
+            /**
+             * @description The administrator has read the template diff and takes the template's current version as seen
+             * @default false
+             */
+            adoptTemplateVersion: boolean;
+        };
+        RoleResponse: {
+            /** Format: uuid */
+            roleId: string;
+            /** Format: uuid */
+            ownerEntityId?: string | null;
+            nameEn: string;
+            nameSi?: string | null;
+            nameTa?: string | null;
+            template: boolean;
+            /** @enum {string} */
+            roleClass: "OWN" | "FEDERATION_VIEW" | "EXTERNAL_TIMEBOXED";
+            /** Format: uuid */
+            templateRoleId?: string | null;
+            templateVersionSeen?: number | null;
+            templateVersion?: number | null;
+            /** @description The template has a newer version than the one this role last took */
+            templateUpdated: boolean;
+            version: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "RETIRED";
+            permissions: components["schemas"]["RolePermissionItem"][];
+        };
+        RoleList: {
+            items: components["schemas"]["RoleResponse"][];
+        };
+        RoleDiffResponse: {
+            /** Format: uuid */
+            roleId: string;
+            /** Format: uuid */
+            templateRoleId: string;
+            templateVersionSeen?: number | null;
+            templateVersion: number;
+            templateUpdated: boolean;
+            onlyInTemplate: string[];
+            onlyInRole: string[];
+            limitsDiffer: string[];
+        };
+        AssignRoleRequest: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            roleId: string;
+            /**
+             * Format: uuid
+             * @description The location the role applies at; leave out for the whole entity
+             */
+            scopeLocationId?: string | null;
+        };
+        RevokeRoleRequest: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            roleId: string;
+            /** Format: uuid */
+            scopeLocationId?: string | null;
+            reason?: string | null;
+        };
+        AssignmentResponse: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            roleId: string;
+            /** Format: uuid */
+            scopeEntityId: string;
+            /** Format: uuid */
+            scopeLocationId?: string | null;
+        };
+        AssignmentList: {
+            items: components["schemas"]["AssignmentResponse"][];
+        };
+        SetSodPairRequest: {
+            permissionA: string;
+            permissionB: string;
+            /** @enum {string} */
+            mode: "INSTANCE" | "ROLE";
+        };
+        SodPairResponse: {
+            /** Format: uuid */
+            sodPairId: string;
+            permissionA: string;
+            permissionB: string;
+            /** @enum {string} */
+            mode: "INSTANCE" | "ROLE";
+            /**
+             * Format: uuid
+             * @description Null for a federation default
+             */
+            ownerEntityId?: string | null;
+        };
+        SodPairList: {
+            items: components["schemas"]["SodPairResponse"][];
+        };
+        CreateUserRequest: {
+            /**
+             * Format: uuid
+             * @description The caller's entity when left out; no other entity is accepted
+             */
+            homeEntityId?: string | null;
+            /** @description The sign-in name, unique in the federation; stored in lower case */
+            username: string;
+            displayName: string;
+            /** @enum {string} */
+            language: "en" | "si" | "ta";
+            /** @enum {string} */
+            userKind: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+            /**
+             * Format: uuid
+             * @description A deactivated user of the same entity this one succeeds (returning staff)
+             */
+            succeedsUserId?: string | null;
+        };
+        UpdateUserRequest: {
+            displayName: string;
+            /** @enum {string} */
+            language: "en" | "si" | "ta";
+            /** @enum {string} */
+            userKind: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+        };
+        ResetCredentialRequest: {
+            /** @enum {string} */
+            credential: "PASSWORD" | "SECOND_FACTOR" | "PIN";
+            /** @description The new till PIN, with credential PIN only; the entity's policy may narrow the length */
+            pin?: string | null;
+        };
+        UserReasonRequest: {
+            reasonCode: string;
+            reasonText?: string | null;
+        };
+        CredentialResetResponse: {
+            /** Format: uuid */
+            userId: string;
+            /** @enum {string} */
+            credential: "PASSWORD" | "SECOND_FACTOR" | "PIN";
+            /** @enum {string} */
+            status: "PENDING" | "ACTIVE" | "LOCKED" | "DEACTIVATED";
+            /**
+             * @description RETURNED - the temporary password is in this response, this once; NOTIFIED - a notification rule delivered it; NONE - nothing to deliver
+             * @enum {string}
+             */
+            delivery: "NOTIFIED" | "RETURNED" | "NONE";
+            /** @description Only with delivery RETURNED; shown once, never stored by the platform */
+            temporaryPassword?: string | null;
+        };
+        UserResponse: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            homeEntityId: string;
+            username: string;
+            displayName: string;
+            /** @enum {string} */
+            language: "en" | "si" | "ta";
+            /** @enum {string} */
+            userKind: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+            /** @enum {string} */
+            status: "PENDING" | "ACTIVE" | "LOCKED" | "DEACTIVATED";
+            pinSet: boolean;
+            /** Format: date-time */
+            pinChangedAt?: string | null;
+            /** Format: uuid */
+            succeedsUserId?: string | null;
+        };
+        UserPage: {
+            items: components["schemas"]["UserResponse"][];
+            /** Format: uuid */
+            nextCursor?: string | null;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -252,6 +1411,7 @@ export interface components {
         };
     };
     parameters: {
+        LocationId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -496,6 +1656,1301 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BulkValidationReport"];
                 };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listLocations: {
+        parameters: {
+            query?: {
+                status?: "PLANNED" | "ONBOARDING" | "ACTIVE" | "DORMANT";
+                locationType?: "WAREHOUSE" | "SHOP" | "OFFICE";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationPage"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    registerLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Location registered */
+            201: {
+                headers: {
+                    /** @description Address of the registered location */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            /** @description Location does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Location updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    confirmLocationConnectivity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connectivity confirmed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    startLocationOnboarding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location onboarding */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    activateLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    markLocationDormant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Location dormant */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reactivateLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Location active again */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    setPrimaryTill: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPrimaryTillRequest"];
+            };
+        };
+        responses: {
+            /** @description Primary till set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTillPositions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The positions, by number */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillPositionResponse"][];
+                };
+            };
+        };
+    };
+    registerTillPosition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                locationId: components["parameters"]["LocationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterTillPositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Position registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TillPositionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireTillPosition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tillPositionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Position retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listExternalGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every grant the caller's scope can see, latest end first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExternalGrantList"];
+                };
+            };
+        };
+    };
+    grantExternalView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantExternalViewRequest"];
+            };
+        };
+        responses: {
+            /** @description Grant issued */
+            201: {
+                headers: {
+                    /** @description Address of the register of grants */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExternalGrantResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    revokeExternalView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                grantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokeExternalViewRequest"];
+            };
+        };
+        responses: {
+            /** @description Grant revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRelationships: {
+        parameters: {
+            query?: {
+                side?: "SELLER" | "BUYER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The relationships, as rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    openTradingRelationship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenRelationshipRequest"];
+            };
+        };
+        responses: {
+            /** @description Relationship opened in DRAFT */
+            201: {
+                headers: {
+                    /** @description Address of the new relationship */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getRelationship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The relationship row */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"];
+                };
+            };
+            /** @description The relationship does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    activateRelationship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Relationship activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    amendRelationshipTerms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendTermsRequest"];
+            };
+        };
+        responses: {
+            /** @description The new row that carries the amended terms */
+            201: {
+                headers: {
+                    /** @description Address of the new row */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    suspendRelationship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                relationshipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationshipReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Relationship suspended */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDevices: {
+        parameters: {
+            query?: {
+                locationId?: string;
+                status?: "ENROLLED" | "ACTIVE" | "SUSPENDED" | "RETIRED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The devices, by location and serial */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    enrolDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Device enrolled */
+            201: {
+                headers: {
+                    /** @description Address of the enrolled device */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Device */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            /** @description Device does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    assignDeviceToPosition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Device assigned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    suspendDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Device suspended */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reinstateDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Device reinstated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Device retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roles, the entity's first and the templates last */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleList"];
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role created */
+            201: {
+                headers: {
+                    /** @description Address of the new role */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            /** @description The role does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    amendRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                roleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description The role as it now is */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                roleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Role retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getRoleDiff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The diff */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDiffResponse"];
+                };
+            };
+            /** @description The role is not visible, or was not cloned from a template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAssignments: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assignments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentList"];
+                };
+            };
+        };
+    };
+    assignRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role assigned */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    revokeRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokeRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Assignment removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listSodPairs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The federation defaults and the entity's own pairs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SodPairList"];
+                };
+            };
+        };
+    };
+    setSodPair: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSodPairRequest"];
+            };
+        };
+        responses: {
+            /** @description The entity's pair as it now is */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SodPairResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    removeSodPair: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sodPairId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pair removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "ACTIVE" | "LOCKED" | "DEACTIVATED";
+                userKind?: "BACK_OFFICE" | "TILL" | "BOTH" | "EXTERNAL";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPage"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    createUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description User created */
+            201: {
+                headers: {
+                    /** @description Address of the created user */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description User does not exist or is not visible to this scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description User changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    resetCredential: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Credential issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialResetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    deactivateUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description User deactivated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];

@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
  * device keeps its credential: it must still reach central to be told, with the signed revoke,
  * that it is suspended (doc 19 section 2.1).
  *
- * <p>M1's device events are being written (M1-06) while this is: every UUID field of the payload
+ * <p>M1's device events (M1-06) name the device in a field ending in "DeviceId"
+ * (enrolledDeviceId, suspendedDeviceId, revokedDeviceId, previousDeviceId ...): every UUID field of the payload
  * whose name ends in "deviceId" (deviceId, previousDeviceId, enrolledDeviceId ...) is emptied,
  * and a payload with none empties the whole cache. The expiry of {@link DeviceDirectory} bounds
  * the staleness where the consumer runtime does not run.
@@ -45,6 +46,7 @@ class DeviceCacheInvalidator {
                 "device.position_changed.v1",
                 "device.suspended.v1",
                 "device.reinstated.v1",
+                "device.revoked.v1",
                 "device.retired.v1",
                 "location.primary_changed.v1"
             },

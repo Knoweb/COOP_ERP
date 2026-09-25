@@ -181,7 +181,10 @@ class EnrolmentIntegrationTest extends SyncIntegrationTest {
                 TestIdentityProvider.headers(ADMIN, OTHER_ENTITY));
         assertRefused(foreign, HttpStatus.UNPROCESSABLE_ENTITY, "sync.enrolment.device_not_enrollable");
 
-        superuserJdbc().update("update party.device set status = 'RETIRED' where device_id = ?", DEVICE);
+        superuserJdbc()
+                .update(
+                        "update party.device set status = 'RETIRED', current_till_position_id = null where device_id = ?",
+                        DEVICE);
         assertRefused(issueCode(), HttpStatus.UNPROCESSABLE_ENTITY, "sync.enrolment.device_not_enrollable");
         assertThat(superuserJdbc()
                         .queryForObject(

@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * What every sync test stands on: a shop of an MPCS with one till position and one device in M1's
- * tables (written here as the superuser: the fixture M1-06 will create through its handlers), the
+ * tables (written here as the superuser, the state M1-06's handlers leave), the
  * device enrolled for sync (its cursor), and a till that speaks the contract of doc 32 over HTTP
  * with a device token: {@link #upload}, {@link #heartbeat}, {@link #event}. Each test class of
  * the conformance suite of doc 32 section 11 extends it.
@@ -73,13 +73,14 @@ abstract class SyncIntegrationTest extends PostgresIntegrationTest {
         db.update(
                 """
                 insert into party.device (device_id, hardware_serial, device_kind, owner_entity_id,
-                                          current_till_position_id, status, enrolled_at)
-                values (?, ?, 'POS_TERMINAL', ?, ?, 'ACTIVE', now())
+                                          current_till_position_id, status, enrolled_at, location_id)
+                values (?, ?, 'POS_TERMINAL', ?, ?, 'ACTIVE', now(), ?)
                 """,
                 DEVICE,
                 SERIAL,
                 ENTITY,
-                POSITION);
+                POSITION,
+                SHOP);
         db.update("insert into kernel.device_sync_cursor (device_id, owner_entity_id) values (?, ?)", DEVICE, ENTITY);
         directory.invalidateAll();
     }

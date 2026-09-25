@@ -140,7 +140,10 @@ class DeviceAuthConformanceIntegrationTest extends SyncIntegrationTest {
 
     @Test
     void aRetiredDeviceIsRevokedToo() {
-        superuserJdbc().update("update party.device set status = 'RETIRED' where device_id = ?", DEVICE);
+        superuserJdbc()
+                .update(
+                        "update party.device set status = 'RETIRED', current_till_position_id = null where device_id = ?",
+                        DEVICE);
         directory.invalidate(DEVICE);
 
         ResponseEntity<JsonNode> refused = heartbeatOf(DEVICE);
