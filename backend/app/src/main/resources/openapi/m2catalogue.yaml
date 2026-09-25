@@ -308,6 +308,118 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/conversions:
+
+    post:
+      tags: [Catalogue]
+      operationId: defineConversion
+      summary: Define a conversion
+      x-permission: cat.conversion.define
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineConversionRequest'
+      responses:
+        '204':
+          description: Conversion defined
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/barcodes:
+
+    post:
+      tags: [Catalogue]
+      operationId: registerBarcode
+      summary: Register a barcode
+      x-permission: cat.barcode.register
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterBarcodeRequest'
+      responses:
+        '201':
+          description: Barcode registered
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/barcodes/{barcodeId}/retire:
+
+    post:
+      tags: [Catalogue]
+      operationId: retireBarcode
+      summary: Retire a barcode
+      x-permission: cat.barcode.retire
+      x-scope: ENTITY
+      parameters:
+        - in: path
+          name: barcodeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetireBarcodeRequest'
+      responses:
+        '204':
+          description: Barcode retired
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/barcodes/{barcodeId}/link-batch:
+
+    post:
+      tags: [Catalogue]
+      operationId: linkBarcodeToBatch
+      summary: Link a barcode to a batch
+      x-permission: cat.barcode.link
+      x-scope: ENTITY
+      parameters:
+        - in: path
+          name: barcodeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkBarcodeToBatchRequest'
+      responses:
+        '204':
+          description: Barcode linked to batch
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -521,3 +633,64 @@ components:
         nextOffset:
           type: integer
           minimum: 0
+
+
+    DefineConversionRequest:
+      type: object
+      required:
+        - skuId
+        - fromUom
+        - toUom
+        - factor
+        - validFrom
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        fromUom:
+          type: string
+        toUom:
+          type: string
+        factor:
+          type: number
+        validFrom:
+          type: string
+          format: date
+
+    RegisterBarcodeRequest:
+      type: object
+      required:
+        - barcode
+        - symbology
+        - skuId
+        - uom
+      properties:
+        barcode:
+          type: string
+        symbology:
+          type: string
+        skuId:
+          type: string
+          format: uuid
+        uom:
+          type: string
+        batchId:
+          type: string
+          format: uuid
+
+    RetireBarcodeRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    LinkBarcodeToBatchRequest:
+      type: object
+      required:
+        - batchId
+      properties:
+        batchId:
+          type: string
+          format: uuid
