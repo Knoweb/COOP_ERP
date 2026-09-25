@@ -58,6 +58,8 @@
   "m1.entity.type_invalid": "Select a valid entity type",
   "m1.entity.vat_required": "Enter the VAT registration number before activating the entity",
   "mfa.required": "This action needs a fresh second factor; sign in again with it",
+  "notification.channel_unknown": "No adapter is registered for this notification channel",
+  "notification.recipient_required": "A notification needs a recipient",
   "pricing.price_list.duplicate": "This greeting is already registered",
   "pricing.price_list.text_required": "Enter the greeting in English",
   "pricing.register": "Register greeting",
