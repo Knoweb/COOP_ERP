@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.kernel.internal.security;
 
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,10 +64,16 @@ public class SecurityConfig {
     @Bean
     JwtDecoder jwtDecoder(
             @Value("${coop-erp.security.oidc.issuer}") String issuer,
-            @Value("${coop-erp.security.oidc.jwk-set-uri}") String jwkSetUri) {
+            @Value("${coop-erp.security.oidc.jwk-set-uri}") String jwkSetUri,
+            @Value("${coop-erp.security.oidc.accepted-clients:coop-erp-web}") List<String> acceptedClients,
+            @Value("${coop-erp.security.oidc.device-client-prefix:device-}") String deviceClientPrefix) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-        OAuth2TokenValidator<Jwt> validator =
-                new DelegatingOAuth2TokenValidator<>(new JwtTimestampValidator(), new JwtIssuerValidator(issuer));
+        // The times, the issuer, and the client the token was issued to: a token of another
+        // client of the realm (the provider's own admin-cli, a service account) is refused.
+        OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
+                new JwtTimestampValidator(),
+                new JwtIssuerValidator(issuer),
+                new AcceptedClientsValidator(acceptedClients, deviceClientPrefix));
         decoder.setJwtValidator(validator);
         return decoder;
     }

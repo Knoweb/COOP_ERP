@@ -117,8 +117,13 @@ public class KeycloakAdminClient implements IdentityProviderClient {
                 "enabled",
                 true,
                 "attributes",
+                // What the realm's token mappers read: uid and the home entity and class the
+                // claims mapper needs (ent, cls); without them a new login's tokens carried no
+                // class and the user could read and run nothing.
                 Map.of(
                         "uid", List.of(userId.toString()),
+                        "ent", List.of(homeEntityId.toString()),
+                        "cls", List.of(PolicyClass.OWN.name()),
                         "locale", List.of(language == null ? "en" : language.getLanguage())),
                 "requiredActions",
                 List.of("UPDATE_PASSWORD"));
@@ -196,11 +201,25 @@ public class KeycloakAdminClient implements IdentityProviderClient {
                 }
             }
         }
+        // The required actions are replaced as a whole by the provider: the ones pending
+        // (UPDATE_PASSWORD after a reset) are kept, CONFIGURE_TOTP is added.
+        JsonNode user = call(() -> rest.get()
+                .uri(realmPath + "/users/{id}", subjectId)
+                .headers(this::bearer)
+                .retrieve()
+                .body(JsonNode.class));
+        java.util.LinkedHashSet<String> actions = new java.util.LinkedHashSet<>();
+        if (user != null && user.path("requiredActions").isArray()) {
+            for (JsonNode action : user.path("requiredActions")) {
+                actions.add(action.asText());
+            }
+        }
+        actions.add("CONFIGURE_TOTP");
         call(() -> rest.put()
                 .uri(realmPath + "/users/{id}", subjectId)
                 .headers(this::bearer)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("requiredActions", List.of("CONFIGURE_TOTP")))
+                .body(Map.of("requiredActions", List.copyOf(actions)))
                 .retrieve()
                 .toBodilessEntity());
     }
@@ -240,6 +259,12 @@ public class KeycloakAdminClient implements IdentityProviderClient {
                 || ctx.policyClass() != PolicyClass.OWN
                 || homeEntity == null
                 || !homeEntity.equals(ctx.entityId())) {
+            throw new ProblemException("identity.scope");
+        }
+        if (ctx.locationId() != null) {
+            // User management is the entity's, entity-wide (21A section 6; M1-07 refuses a shop
+            // session too): a manager acting at one shop must not reset or disable the
+            // administrators of the entity, whose assignments are entity-wide.
             throw new ProblemException("identity.scope");
         }
     }

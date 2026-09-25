@@ -78,6 +78,10 @@ coop-erp:
       issuer: ${OIDC_ISSUER:http://localhost:8085/realms/coop}
       jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8085/realms/coop/protocol/openid-connect/certs}
       step-up-url: ${OIDC_STEP_UP_URL:http://localhost:8085/realms/coop/protocol/openid-connect/auth}
+      # The clients a token may have been issued to (its azp or an audience): the web client, and
+      # the tills' clients by their prefix. A token of any other client of the realm is refused.
+      accepted-clients: ${OIDC_ACCEPTED_CLIENTS:coop-erp-web}
+      device-client-prefix: device-
       # K-08: where an enrolled till exchanges its client credential for a device token (the
       # public address: the till reaches the provider from the shop).
       token-endpoint: ${OIDC_TOKEN_ENDPOINT:http://localhost:8085/realms/coop/protocol/openid-connect/token}
@@ -91,6 +95,14 @@ coop-erp:
         realm: ${OIDC_REALM:coop}
         client-id: ${OIDC_ADMIN_CLIENT_ID:coop-erp-backend}
         client-secret: ${OIDC_ADMIN_CLIENT_SECRET:coop-erp-backend-dev}
+    # The second factor (doc 19 section 2.2). A token says when the user last authenticated
+    # (auth_time); it counts as the second factor when the token's acr or amr names one of
+    # these, or, on a developer stack whose realm has no OTP, when password-reauth-counts is
+    # true: a fresh password sign-in then satisfies the step-up. Never true outside development.
+    # The freshness window itself is the register's security.mfa.freshness.
+    mfa:
+      acr-values: ${COOP_ERP_MFA_ACR_VALUES:2,loa2,mfa,otp}
+      password-reauth-counts: ${COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS:false}
 
   # K-08: the key that signs what central sends a till (the revoke instruction now, snapshots
   # later; doc 32 section 9): Ed25519, PKCS#8 and X.509 in base64, the same on every instance.

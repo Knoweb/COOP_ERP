@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
  * {@link UserScopes} over M1's tables, read as the federation-wide viewer (the
  * {@code fed_view} policy of the security schema): the caller's scope is what is being
  * resolved, so the caller's own row policy cannot be the one that reads it. Cached per
- * instance for ten minutes, like the permission cache, and emptied by the same events
- * ({@link PermissionCacheInvalidator}).
+ * instance for a minute, like the permission cache, and emptied by the same events and the
+ * grant events ({@link PermissionCacheInvalidator}).
  *
  * <p>19A section 2 puts these claims into the token through "a provider mapper that reads
  * M1's user_role through a small kernel endpoint at token issue time". The provider we run
@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class JdbcUserScopes implements UserScopes {
 
-    static final Duration TTL = Duration.ofMinutes(10);
+    static final Duration TTL = Duration.ofMinutes(1);
 
     private final JdbcTemplate jdbc;
     private final SystemScope system;

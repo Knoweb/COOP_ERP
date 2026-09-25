@@ -74,7 +74,8 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
                 "delete from security.role_permission where role_id in ('" + ENTITY_ROLE + "', '" + SHOP_ROLE + "')");
         admin.execute("delete from security.role where role_id in ('" + ENTITY_ROLE + "', '" + SHOP_ROLE + "')");
         admin.execute("delete from security.app_user where user_id in ('" + ADMIN + "', '" + CASHIER + "')");
-        admin.execute("delete from security.sod_pair where sod_pair_id = '0190a300-0000-7000-8000-000000000301'");
+        admin.execute(
+                "delete from security.sod_pair where sod_pair_id in ('0190a300-0000-7000-8000-000000000301', '0190a300-0000-7000-8000-000000000302')");
     }
 
     @BeforeEach
@@ -203,6 +204,23 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
                 .isFalse();
         assertThat(inScope(ADMIN, ENTITY, null, () -> resolver.requiresMfa("no.such.permission")))
                 .isFalse();
+    }
+
+    @Test
+    void aRolePairRefusesTheSamePersonAsWell() {
+        // Doc 19 section 3.2: ROLE mode is the stricter one; it forbids the same person on one
+        // document as INSTANCE does, and M1 adds the rule on the roles.
+        superuserJdbc()
+                .update(
+                        "insert into security.sod_pair (sod_pair_id, permission_a, permission_b, mode, owner_entity_id)"
+                                + " values ('0190a300-0000-7000-8000-000000000302', 'prt.location.view', 'sys.device.view', 'ROLE', ?)",
+                        ENTITY);
+        assertThatThrownBy(() -> inScope(ADMIN, ENTITY, null, () -> {
+                    sod.assertDistinct(scope(ADMIN, ENTITY, null), "sys.device.view", "prt.location.view", ADMIN);
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("sod.same_person");
     }
 
     @Test

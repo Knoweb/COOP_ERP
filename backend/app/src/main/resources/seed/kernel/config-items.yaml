@@ -13,6 +13,16 @@
 #   sensitive         a change needs a fresh MFA (doc 19 section 8)
 #   till_visible      part of the shop snapshot (doc 32 section 5.1)
 config_items:
+  - key: security.mfa.freshness
+    value_type: DURATION
+    schema: { minimum: PT1M, maximum: PT24H }
+    description_en: How recently the second factor must have been presented for an action that asks for one
+    description_si: දෙවන සාධකයක් අවශ්‍ය ක්‍රියාවකට එය ඉදිරිපත් කර තිබිය යුතු මෑත කාලය
+    description_ta: இரண்டாம் காரணி தேவைப்படும் செயலுக்கு அது எவ்வளவு சமீபத்தில் வழங்கப்பட்டிருக்க வேண்டும்
+    default: "PT12H"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: true
   - key: business.timezone
     value_type: STRING
     schema: { pattern: "^[A-Za-z_]+/[A-Za-z_]+$" }

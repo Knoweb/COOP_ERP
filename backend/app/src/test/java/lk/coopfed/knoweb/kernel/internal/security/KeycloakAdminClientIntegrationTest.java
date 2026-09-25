@@ -74,6 +74,7 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
     void theWholeLifeOfALoginAndTheScopeRuleAroundIt() {
         ScopeContext admin = SystemScope.own(ENTITY, null);
         ScopeContext elsewhere = SystemScope.own(OTHER_ENTITY, null);
+        ScopeContext atAShop = SystemScope.own(ENTITY, UUID.fromString("0190a700-0000-7000-8000-000000000101"));
 
         // Creating outside the user's home entity is refused before the provider hears of it.
         assertThatThrownBy(() -> provider.createUser(elsewhere, userId, ENTITY, username, Locale.forLanguageTag("si")))
@@ -87,6 +88,9 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
         assertThat(created.path("enabled").asBoolean()).isTrue();
         assertThat(created.path("attributes").path("uid").get(0).asText()).isEqualTo(userId.toString());
         assertThat(created.path("attributes").path("locale").get(0).asText()).isEqualTo("si");
+        // What the realm's token mappers read: without these a new login's tokens carried no class.
+        assertThat(created.path("attributes").path("ent").get(0).asText()).isEqualTo(ENTITY.toString());
+        assertThat(created.path("attributes").path("cls").get(0).asText()).isEqualTo("OWN");
 
         // The same name twice is the provider's conflict, said in the platform's words.
         assertThatThrownBy(() -> provider.createUser(admin, UUID.randomUUID(), ENTITY, username, Locale.ENGLISH))
@@ -107,6 +111,10 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> provider.setTemporaryPassword(elsewhere, subject))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("identity.scope");
+        // A manager acting at one shop manages nobody's login: user management is entity-wide.
+        assertThatThrownBy(() -> provider.setTemporaryPassword(atAShop, subject))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("identity.scope");
 
         IdentityProviderClient.TemporaryPassword password = provider.setTemporaryPassword(admin, subject);
         assertThat(password.value()).hasSize(12);
@@ -115,8 +123,10 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
                 .contains("UPDATE_PASSWORD");
 
         provider.resetTotp(admin, subject);
-        assertThat(userAtTheProvider(subject).path("requiredActions").toString())
-                .contains("CONFIGURE_TOTP");
+        String actions = userAtTheProvider(subject).path("requiredActions").toString();
+        assertThat(actions).contains("CONFIGURE_TOTP");
+        // The pending password change survives the second-factor reset.
+        assertThat(actions).contains("UPDATE_PASSWORD");
 
         provider.revokeSessions(admin, subject);
 

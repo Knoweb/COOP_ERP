@@ -151,6 +151,35 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
     }
 
     @Test
+    void aTokenOfAnotherClientOfTheRealmIsRefused() {
+        // The provider's own admin-cli, a service account: not a client of this platform.
+        ResponseEntity<JsonNode> response =
+                register(headers -> headers.setBearerAuth(token(USER, c -> c.claim("azp", "admin-cli"))));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody().get("code").asText()).isEqualTo("token.invalid");
+    }
+
+    @Test
+    void anEntityWideHolderMayActAtALocationOfTheEntity() {
+        // Doc 19 section 3.1: an entity grant is expanded to every location; the shell may send one.
+        UUID shop = UUID.fromString("0190a600-0000-7000-8000-000000000101");
+        ResponseEntity<JsonNode> response = register(headers -> {
+            headers.setBearerAuth(token(USER, c -> {}));
+            headers.set("X-Scope-Location", shop.toString());
+        });
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        // A location of an entity the caller does not hold is still refused.
+        ResponseEntity<JsonNode> elsewhere = register(headers -> {
+            headers.setBearerAuth(token(USER, c -> {}));
+            headers.set("X-Scope-Entity", UUID.randomUUID().toString());
+            headers.set("X-Scope-Location", shop.toString());
+        });
+        assertThat(elsewhere.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(elsewhere.getBody().get("code").asText()).isEqualTo("scope.invalid");
+    }
+
+    @Test
     void aTokenThatIsNotAJwtIsRefusedTheSameWay() {
         ResponseEntity<JsonNode> response = register(headers -> headers.setBearerAuth("not.a.token"));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

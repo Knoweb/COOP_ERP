@@ -17,8 +17,10 @@ import lk.coopfed.knoweb.engine.Envelope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
@@ -30,11 +32,13 @@ public class OutboxWriter implements EventPublisher {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final ObjectProvider<PublishedEventListener> listeners;
 
-    public OutboxWriter(JdbcTemplate jdbc, ObjectMapper mapper) {
+    public OutboxWriter(JdbcTemplate jdbc, ObjectMapper mapper, ObjectProvider<PublishedEventListener> listeners) {
 
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.listeners = listeners;
     }
 
     @Override
@@ -151,6 +155,15 @@ public class OutboxWriter implements EventPublisher {
                 correlationId,
                 actorUserId,
                 payloadJson);
+
+        // The caches of this instance learn of the change when it is real, not before: a
+        // rollback must not leave a warmed cache of a state that never existed.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                listeners.forEach(listener -> listener.published(type, payload));
+            }
+        });
     }
 
     static String typeOf(DomainEvent event) {

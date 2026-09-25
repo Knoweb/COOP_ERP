@@ -11,7 +11,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 class OutboxWriterContractTest {
 
-    private final OutboxWriter writer = new OutboxWriter(mock(JdbcTemplate.class), new ObjectMapper());
+    private final OutboxWriter writer = new OutboxWriter(
+            mock(JdbcTemplate.class),
+            new ObjectMapper(),
+            new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                    .getBeanProvider(PublishedEventListener.class));
 
     @Test
     void nullEventIsRefused() {
