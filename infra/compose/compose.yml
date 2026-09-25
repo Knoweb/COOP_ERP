@@ -185,6 +185,7 @@ services:
     pull_policy: never          # a local image: never look for it in a registry
     environment:
       COOP_ERP_ROLE: web,worker
+      COOP_ERP_SYSTEM_ENTITY_ID: 0190f000-0000-7000-8000-000000000001
       SPRING_PROFILES_ACTIVE: web,worker
       # prepareThreshold=0: server-side prepared statements do not survive transaction pooling.
       DB_URL: jdbc:postgresql://pgbouncer:6432/${POSTGRES_DB:-coop_erp}?prepareThreshold=0

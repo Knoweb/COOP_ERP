@@ -31,6 +31,7 @@
   "hello.title": "வாழ்த்துகள்",
   "idempotency.key_required": "கோரிக்கையில் Idempotency-Key தலைப்பு இல்லை",
   "idempotency.request_mismatch": "இந்த Idempotency-Key ஏற்கனவே வேறு கோரிக்கைக்குப் பயன்படுத்தப்பட்டுள்ளது",
+  "location.not_in_scope": "இடம் உங்கள் வரம்பில் இல்லை",
   "m1.entity.admin_required": "நிறுவனத்தைச் செயல்படுத்தும் முன் பயனர் மேலாண்மை அனுமதி உள்ள குறைந்தது ஒரு செயலில் உள்ள பயனரை ஒதுக்கவும்",
   "m1.entity.code_duplicate": "இந்த நிறுவனக் குறியீடு ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது",
   "m1.entity.code_invalid": "செல்லுபடியாகும் நிறுவனக் குறியீட்டை உள்ளிடவும்",

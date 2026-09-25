@@ -59,6 +59,12 @@ coop-erp:
   role: ${COOP_ERP_ROLE:web}
   business-timezone: Asia/Colombo
 
+  # The entity the platform itself acts as when no request is behind the work: a scheduled job
+  # that must leave an audit record (a timed-out run, a numbering gap) records it in the OWN
+  # scope of this entity, the Federation. Empty means: log only, audit nothing (19A section 12).
+  system:
+    entity-id: ${COOP_ERP_SYSTEM_ENTITY_ID:}
+
   # Browser origins allowed to call /v1/** (the Vite dev server). Comma-separated; never "*".
   web:
     allowed-origins: ${WEB_ALLOWED_ORIGINS:http://localhost:5173}

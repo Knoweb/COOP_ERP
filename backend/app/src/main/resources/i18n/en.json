@@ -31,6 +31,7 @@
   "hello.title": "Greetings",
   "idempotency.key_required": "The request has no Idempotency-Key header",
   "idempotency.request_mismatch": "This Idempotency-Key was already used for a different request",
+  "location.not_in_scope": "The location is not in your scope",
   "m1.entity.admin_required": "Assign at least one active user with user management permission before activating the entity",
   "m1.entity.code_duplicate": "This entity code is already registered",
   "m1.entity.code_invalid": "Enter a valid entity code",

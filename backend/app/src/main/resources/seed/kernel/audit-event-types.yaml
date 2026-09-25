@@ -29,3 +29,16 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A numbering series is not dense
+  # K-12 and K-13: scheduled jobs and the business day.
+  - code: JOB_TIMED_OUT
+    severity: ALERT
+    offline_capturable: false
+    description_en: Scheduled job exceeded its maximum runtime and was interrupted
+  - code: JOB_FAILED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Scheduled job run failed
+  - code: DAY_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: Location closed its business day

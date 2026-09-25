@@ -5,13 +5,13 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lk.coopfed.knoweb.kernel.api.ScheduledJob;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.support.JdbcTransactionManager;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -55,7 +55,12 @@ public class IdempotencyPartitionJob implements ApplicationRunner {
         maintain();
     }
 
-    @Scheduled(cron = "${coop-erp.idempotency.partition-cron:0 5 0 * * *}", zone = "UTC")
+    /** Hourly (19A section 12, "idempotency-expiry"): the day partitions ahead exist, the expired ones are gone. */
+    @ScheduledJob(
+            name = "idempotency-expiry",
+            cron = "${coop-erp.idempotency.partition-cron:0 5 * * * *}",
+            lockTimeout = "PT20M",
+            maxRuntime = "PT10M")
     public void scheduledMaintenance() {
         maintain();
     }
