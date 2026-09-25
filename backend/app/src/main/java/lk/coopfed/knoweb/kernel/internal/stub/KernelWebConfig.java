@@ -1,5 +1,7 @@
 package lk.coopfed.knoweb.kernel.internal.stub;
 
+import java.util.List;
+import lk.coopfed.knoweb.kernel.internal.security.TokenCurrentScope;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -8,8 +10,6 @@ import org.springframework.core.Ordered;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-
-import java.util.List;
 
 /**
  * Web wiring every module inherits, so that no controller configures it again: cross-origin
@@ -30,14 +30,13 @@ public class KernelWebConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Location", DevCurrentScope.HEADER_CORRELATION));
+        config.setExposedHeaders(List.of("Location", TokenCurrentScope.HEADER_CORRELATION));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/v1/**", config);
 
-        FilterRegistrationBean<CorsFilter> registration =
-                new FilterRegistrationBean<>(new CorsFilter(source));
+        FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(new CorsFilter(source));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }
