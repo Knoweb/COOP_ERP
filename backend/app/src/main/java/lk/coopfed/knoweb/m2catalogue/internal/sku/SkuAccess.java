@@ -27,9 +27,8 @@ public class SkuAccess {
     }
 
     /**
-     * The SKU when the caller can see it: its own, or a SHARED one (the shared_read policy). An
-     * INTERNAL barcode is an entity's own sticker on any item it sells (doc 22 section 3.3), so
-     * it needs the item visible, not owned.
+     * The SKU when the caller can see it: its own, or a SHARED one (the shared_read policy). Retire and
+     * Link read the caller's own barcode row of a SKU it can see; registering needs the SKU owned.
      */
     public SkuIdentity requireVisible(UUID skuId, ScopeContext scope) {
         SkuGuards.requireEntityWideScope(scope);

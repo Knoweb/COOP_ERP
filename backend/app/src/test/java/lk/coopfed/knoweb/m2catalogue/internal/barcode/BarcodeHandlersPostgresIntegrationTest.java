@@ -135,7 +135,7 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aFactoryCodeIsTheSkuOwnersAndAnInternalCodeIsAnyEntitysOnAnItemItSells() {
+    void aFactoryCodeAndAnInternalCodeAreTheSkuOwnersOnly() {
         // A society cannot put a factory code on the Federation's SHARED item.
         refused(
                 () -> register.handle(new RegisterBarcode(sharedSku, EAN, "EAN13", "EA", null), own(MPCS_A)),
@@ -146,8 +146,15 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 "m2.sku.not_found");
         assertThat(kernel.committedAudit()).isEmpty();
 
-        // Its own INTERNAL sticker on the SHARED item is its own row.
-        register.handle(new RegisterBarcode(sharedSku, "2000001", "INTERNAL", "EA", null), own(MPCS_A));
+        // Nor an INTERNAL sticker on the Federation's SHARED item (22A section 6, V0003 own_write).
+        refused(
+                () -> register.handle(new RegisterBarcode(sharedSku, "2000001", "INTERNAL", "EA", null), own(MPCS_A)),
+                "m2.sku.owner_mismatch");
+        assertThat(row("2000001", "INTERNAL", MPCS_A)).isEmpty();
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        // Its own INTERNAL sticker on its own item is its own row.
+        register.handle(new RegisterBarcode(localSkuOfA, "2000001", "INTERNAL", "EA", null), own(MPCS_A));
         assertThat(row("2000001", "INTERNAL", MPCS_A)).isPresent();
 
         // Another society uses the same INTERNAL code for another item: unique per owner (B-I2).
@@ -268,23 +275,23 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void onlyTheRowsOwnerRetiresItAndAReasonIsRequired() {
         register.handle(new RegisterBarcode(sharedSku, EAN, "EAN13", "EA", null), own(FEDERATION));
-        register.handle(new RegisterBarcode(sharedSku, "2000001", "INTERNAL", "EA", null), own(MPCS_A));
+        register.handle(new RegisterBarcode(localSkuOfA, "2000001", "INTERNAL", "EA", null), own(MPCS_A));
         kernel.reset();
 
         // A society sees the Federation's factory row (shared_read) but it is not its own.
         refused(
                 () -> retire.handle(new RetireBarcode(sharedSku, EAN, "EAN13", "X", null), own(MPCS_A)),
                 "m2.barcode.not_found");
-        // Another society cannot retire A's INTERNAL sticker.
+        // Another society cannot retire A's INTERNAL sticker: it cannot even see A's LOCAL item.
         refused(
-                () -> retire.handle(new RetireBarcode(sharedSku, "2000001", "INTERNAL", "X", null), own(MPCS_B)),
-                "m2.barcode.not_found");
+                () -> retire.handle(new RetireBarcode(localSkuOfA, "2000001", "INTERNAL", "X", null), own(MPCS_B)),
+                "m2.sku.not_found");
         // The code must belong to the SKU named.
         refused(
-                () -> retire.handle(new RetireBarcode(localSkuOfA, "2000001", "INTERNAL", "X", null), own(MPCS_A)),
+                () -> retire.handle(new RetireBarcode(sharedSku, "2000001", "INTERNAL", "X", null), own(MPCS_A)),
                 "m2.barcode.not_found");
         refused(
-                () -> retire.handle(new RetireBarcode(sharedSku, "2000001", "INTERNAL", null, " "), own(MPCS_A)),
+                () -> retire.handle(new RetireBarcode(localSkuOfA, "2000001", "INTERNAL", null, " "), own(MPCS_A)),
                 "m2.barcode.reason_required");
 
         assertThat(row(EAN, "EAN13", FEDERATION).get().get("status")).isEqualTo("ACTIVE");
@@ -292,7 +299,7 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
 
-        retire.handle(new RetireBarcode(sharedSku, "2000001", "INTERNAL", null, "Sticker withdrawn"), own(MPCS_A));
+        retire.handle(new RetireBarcode(localSkuOfA, "2000001", "INTERNAL", null, "Sticker withdrawn"), own(MPCS_A));
         assertThat(row("2000001", "INTERNAL", MPCS_A).get().get("status")).isEqualTo("RETIRED");
     }
 
@@ -423,12 +430,12 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void anInternalCodeResolvesInItsOwnersScopeOnly() {
-        register.handle(new RegisterBarcode(sharedSku, "2000001", "INTERNAL", "EA", null), own(MPCS_A));
+        register.handle(new RegisterBarcode(localSkuOfA, "2000001", "INTERNAL", "EA", null), own(MPCS_A));
         register.handle(new RegisterBarcode(localSkuOfB, "2000001", "INTERNAL", "EA", null), own(MPCS_B));
 
         assertThat(queries.lookupByBarcode(lookup("2000001", null, null, null, null), own(MPCS_A)))
                 .get()
-                .satisfies(result -> assertThat(result.skuId()).isEqualTo(sharedSku));
+                .satisfies(result -> assertThat(result.skuId()).isEqualTo(localSkuOfA));
         assertThat(queries.lookupByBarcode(lookup("2000001", null, null, null, null), own(MPCS_B)))
                 .get()
                 .satisfies(result -> {
@@ -437,7 +444,7 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                     assertThat(result.fallbackSi()).isTrue();
                     assertThat(result.fallbackTa()).isTrue();
                 });
-        // The Federation has no sticker 2000001: the societies' rows on its SHARED item do not count.
+        // The Federation has no sticker 2000001: the societies' rows do not count.
         assertThat(queries.lookupByBarcode(lookup("2000001", null, null, null, null), own(FEDERATION)))
                 .isEmpty();
     }

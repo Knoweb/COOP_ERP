@@ -23,14 +23,16 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * RegisterBarcode (22A section 6): sku active; symbology valid; check digit valid for EAN/UPC;
  * uniqueness per rule (B-I2: a factory code once federation-wide, an INTERNAL code once per
- * owner); INTERNAL only on a SKU the caller sells. Mutation: insert the registry row with the
+ * owner); INTERNAL only for own SKUs. Mutation: insert the registry row with the
  * caller as owner.
  *
  * <p>Whose row it is (doc 22 section 4.2: "owner of SKU; any entity for INTERNAL on its own
- * SKUs"): a factory code belongs to the item, so only the SKU's owner registers it; an INTERNAL
- * code is the entity's own sticker or weigh label (doc 22 section 3.3, GS1 prefixes 20 to 29)
- * on an item it sells, its own or a SHARED one, and is unique within that entity only. Either
- * way the row's owner is the caller, which is what the own_write policy admits.
+ * SKUs"; 22A section 6: "INTERNAL only for own SKUs"): a factory code belongs to the item, so
+ * only the SKU's owner registers it; an INTERNAL code is the entity's own sticker or weigh label
+ * (doc 22 section 3.3, GS1 prefixes 20 to 29) on a SKU it owns, unique within that entity only.
+ * Either way the row's owner is the caller and the SKU is the caller's, which the own_write
+ * policy of V0003 admits (it would also admit a factory code on a SHARED SKU by anyone; the
+ * guard is stricter). A sticker on another entity's SHARED item would need a change request.
  */
 @Service
 @CommandHandler(permission = "cat.barcode.manage")
@@ -67,8 +69,7 @@ public class RegisterBarcodeHandler implements Handles<RegisterBarcode, UUID> {
         String symbology = BarcodeGuards.requiredSymbology(command.symbology());
         boolean internal = BarcodeGuards.INTERNAL.equals(symbology);
 
-        SkuIdentity sku =
-                internal ? skus.requireVisible(command.skuId(), scope) : skus.requireOwned(command.skuId(), scope);
+        SkuIdentity sku = skus.requireOwned(command.skuId(), scope);
 
         if (!sku.active()) {
             throw new ProblemException("m2.barcode.sku_not_active", Map.of("skuId", sku.skuId()));

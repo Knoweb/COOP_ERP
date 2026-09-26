@@ -369,8 +369,8 @@ paths:
 
   # The barcode registry (22A section 5; doc 22 sections 3.3 and 4.2). A row is keyed by
   # (barcode, symbology, owner): a factory code belongs to the SKU's owner and is unique
-  # federation-wide; an INTERNAL code is the caller's own sticker on an item it sells, its own
-  # or a SHARED one, and is unique within the caller's entity.
+  # federation-wide; an INTERNAL code is the caller's own sticker on a SKU it owns (22A section 6,
+  # "INTERNAL only for own SKUs") and is unique within the caller's entity.
   /v1/catalogue/skus/{skuId}/barcodes:
 
     post:
