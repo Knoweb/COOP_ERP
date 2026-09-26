@@ -19,7 +19,10 @@ import org.springframework.stereotype.Component;
  * The density check of C-I2 (19A section 7, GapCheckJob): every series holds exactly the
  * numbers it has handed out. A rolled-back issuance hands out none (the counter rolls back
  * with it), so every hole is a finding, and doc 18 says a gap is "an anomaly, never silently
- * absorbed".
+ * absorbed". A series is measured against the larger of its counter and its highest stored
+ * number, so a series whose documents arrive through ingestion (the counter stays at 1) is
+ * checked too. The density of (source, source_seq) that 19A names beside doc_number waits for
+ * the ingestion of K-08 part 2, which writes those columns.
  *
  * <p>{@link #findGaps} reads under the caller's scope. The nightly job reads as a
  * federation-wide viewer, so it sees every series, and records each gap as a
