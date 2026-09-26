@@ -35,7 +35,7 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     void cleanCatalogue() {
         JdbcTemplate admin = superuserJdbc();
 
-        admin.execute("truncate table catalogue.sku cascade");
+        admin.execute("truncate table catalogue.sku, catalogue.supplier cascade");
 
         admin.update(
                 """
@@ -63,7 +63,7 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void removeTestTaxCategory() {
         JdbcTemplate admin = superuserJdbc();
-        admin.execute("truncate table catalogue.sku cascade");
+        admin.execute("truncate table catalogue.sku, catalogue.supplier cascade");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
@@ -299,6 +299,116 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit())
                 .extracting(record -> record.eventType())
                 .containsOnlyOnce("CONVERSION_DEFINED", "BARCODE_REGISTERED", "BARCODE_LINKED", "BARCODE_RETIRED");
+    }
+
+    @Test
+    void suppliersAndBatchesFollowTheGeneratedContract() {
+        HttpHeaders headers = headers();
+
+        // POST /suppliers, GET /suppliers
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> supplier = http.exchange(
+                "/v1/catalogue/suppliers",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("name", "HTTP Dairy"), headers),
+                JsonNode.class);
+        assertThat(supplier.getStatusCode())
+                .as(String.valueOf(supplier.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(supplier.getBody().get("status").asText()).isEqualTo("ACTIVE");
+        String supplierId = supplier.getBody().get("supplierId").asText();
+
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> taken = http.exchange(
+                "/v1/catalogue/suppliers",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("name", "HTTP Dairy"), headers),
+                JsonNode.class);
+        assertThat(taken.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(taken.getBody().get("code").asText()).isEqualTo("m2.supplier.name_taken");
+
+        ResponseEntity<JsonNode> list =
+                http.exchange("/v1/catalogue/suppliers", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(list.getBody()).hasSize(1);
+        assertThat(list.getBody().get(0).get("name").asText()).isEqualTo("HTTP Dairy");
+
+        // A batch as M4's GRN confirmation would register it (no operation of its own).
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        String skuId = http.exchange(
+                        "/v1/catalogue/skus",
+                        HttpMethod.POST,
+                        new HttpEntity<>(skuBody("HTTP ghee", null, null), headers),
+                        JsonNode.class)
+                .getBody()
+                .get("skuId")
+                .asText();
+        UUID batchId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.batch (batch_id, sku_id, supplier_id, batch_no, printed_mrp, owner_entity_id)"
+                                + " values (?, ?, ?, 'H7', 980.00, ?)",
+                        batchId,
+                        UUID.fromString(skuId),
+                        UUID.fromString(supplierId),
+                        MPCS);
+        kernel.reset();
+
+        // GET /batches?skuId=, GET /batches/{batchId}
+        ResponseEntity<JsonNode> batches = http.exchange(
+                "/v1/catalogue/batches?skuId=" + skuId, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(batches.getStatusCode())
+                .as(String.valueOf(batches.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(batches.getBody()).hasSize(1);
+        assertThat(batches.getBody().get(0).get("batchNo").asText()).isEqualTo("H7");
+
+        ResponseEntity<JsonNode> one = http.exchange(
+                "/v1/catalogue/batches/" + batchId, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(one.getBody().get("printedMrp").decimalValue()).isEqualByComparingTo("980.00");
+        assertThat(one.getBody().get("supplierId").asText()).isEqualTo(supplierId);
+
+        ResponseEntity<JsonNode> missing = http.exchange(
+                "/v1/catalogue/batches/" + UUID.randomUUID(),
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(missing.getBody().get("code").asText()).isEqualTo("m2.batch.not_found");
+
+        // POST /batches/{batchId}/correct: the society holds no lot (M5 not built), the Federation may.
+        Map<String, Object> correction = Map.of("printedMrp", 1080.00, "reasonCode", "MISKEYED");
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> refused = http.exchange(
+                "/v1/catalogue/batches/" + batchId + "/correct",
+                HttpMethod.POST,
+                new HttpEntity<>(correction, headers),
+                JsonNode.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getBody().get("code").asText()).isEqualTo("m2.batch.not_holder");
+
+        HttpHeaders federation = headers();
+        federation.setBearerAuth(TestIdentityProvider.entityWideToken(USER, TEST_FEDERATION));
+        federation.set("X-Scope-Entity", TEST_FEDERATION.toString());
+        federation.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> corrected = http.exchange(
+                "/v1/catalogue/batches/" + batchId + "/correct",
+                HttpMethod.POST,
+                new HttpEntity<>(correction, federation),
+                JsonNode.class);
+        assertThat(corrected.getStatusCode())
+                .as(String.valueOf(corrected.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(corrected.getBody().get("correctsBatchId").asText()).isEqualTo(batchId.toString());
+        assertThat(corrected.getBody().get("printedMrp").decimalValue()).isEqualByComparingTo("1080.00");
+        assertThat(corrected.getBody().get("status").asText()).isEqualTo("REGISTERED");
+
+        ResponseEntity<JsonNode> old = http.exchange(
+                "/v1/catalogue/batches/" + batchId, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(old.getBody().get("status").asText()).isEqualTo("SUPERSEDED");
+
+        assertThat(kernel.committedAudit())
+                .extracting(record -> record.eventType())
+                .containsOnlyOnce("BATCH_CORRECTED");
     }
 
     @Test

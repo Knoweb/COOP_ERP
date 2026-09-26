@@ -41,8 +41,11 @@ for (const file of fs.readdirSync(SLICES).filter((f) => f.endsWith(".yaml"))) {
 for (const file of walk(JAVA_ROOT).filter((f) => f.endsWith(".java"))) {
   const source = fs.readFileSync(file, "utf8");
   const module = path.relative(JAVA_ROOT, file).split(path.sep)[0];
+  // An internal command (permission = CommandHandler.INTERNAL) has no operation of its own:
+  // another module's handler calls it inside a command that carries the x-permission.
   for (const match of source.matchAll(/@CommandHandler\s*\([^)]*?permission\s*=\s*"([^"]*)"/g)) {
     const permission = match[1];
+    if (permission === "internal") continue;
     const where = path.relative(process.cwd(), file).split(path.sep).join("/");
     if (permission.startsWith(PLACEHOLDER)) {
       problems.push(`${where}: permission "${permission}" is a scaffold placeholder; use the code from the module's guide`);

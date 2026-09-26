@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * Federation and the shared path is refused.
  */
 @Component
-class FederationCaller {
+public class FederationCaller {
 
     static final String FEDERATION_ONLY = "m2.sku.federation_only";
 
@@ -31,7 +31,12 @@ class FederationCaller {
                 : Optional.of(UUID.fromString(federationEntityId.strip()));
     }
 
-    void require(ScopeContext scope) {
+    /** The caller's entity is the Federation (any OWN scope; the batch guards ask this). */
+    public boolean isFederation(ScopeContext scope) {
+        return scope != null && federation.isPresent() && federation.get().equals(scope.entityId());
+    }
+
+    public void require(ScopeContext scope) {
         SkuGuards.requireEntityWideScope(scope);
 
         if (federation.isEmpty() || !federation.get().equals(scope.entityId())) {
