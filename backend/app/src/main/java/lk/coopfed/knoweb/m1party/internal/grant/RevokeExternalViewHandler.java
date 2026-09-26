@@ -26,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@code m1.grant.not_found}); it is ACTIVE and its window has not already passed
  * ({@code m1.grant.not_active}: an ended grant expires, it is not revoked); a reason
  * ({@code m1.grant.reason_required}). The row keeps its window; the status is what ends it, at
- * once, because {@code activeGrantedEntities} reads the status on every resolution.
+ * once: the kernel reads the status on every resolution ({@code JdbcUserScopes}) and the event
+ * empties the entry it cached.
  */
 @Service
 @CommandHandler(permission = "gov.external.grant", requiresMfa = true)

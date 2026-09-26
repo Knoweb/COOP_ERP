@@ -17,6 +17,8 @@ import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries.AudienceKind;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries.NotificationRule;
 import lk.coopfed.knoweb.kernel.api.Notifications;
+import lk.coopfed.knoweb.kernel.api.Notifications.Delivery;
+import lk.coopfed.knoweb.kernel.api.Notifications.Outcome;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -56,6 +58,8 @@ class TemporaryPasswordDeliveryTest {
         when(admins.resolve(ENTITY, null, "entity-admin", List.of("SMS")))
                 .thenReturn(List.of(
                         new Recipient("SMS", "+94770000001", "si"), new Recipient("SMS", "+94770000002", "ta")));
+        when(notifications.send(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new Delivery(UUID.randomUUID(), Outcome.SENT));
         TemporaryPasswordDelivery delivery =
                 new TemporaryPasswordDelivery(provider(rules), List.of(admins), notifications);
 
@@ -71,6 +75,31 @@ class TemporaryPasswordDeliveryTest {
                         eq(scope));
         verify(notifications)
                 .send(eq("SMS"), eq("+94770000002"), eq("ta"), eq("tpl-temp-password"), any(), any(), eq(scope));
+    }
+
+    @Test
+    void aSendThatReachesNobodyIsNotADelivery() {
+        when(rules.activeRules(TemporaryPasswordDelivery.RULE_KEY, ENTITY))
+                .thenReturn(List.of(rule(AudienceKind.ROLE_AT_OWNER)));
+        when(admins.kind()).thenReturn(AudienceKind.ROLE_AT_OWNER);
+        when(admins.resolve(ENTITY, null, "entity-admin", List.of("SMS")))
+                .thenReturn(List.of(
+                        new Recipient("SMS", "+94770000001", "si"), new Recipient("SMS", "+94770000002", "ta")));
+        // The kernel suppressed one (a repeat inside the hour) and queued the other for a retry:
+        // nobody has the password yet, so the caller must hand it over itself.
+        when(notifications.send(any(), eq("+94770000001"), any(), any(), any(), any(), any()))
+                .thenReturn(new Delivery(UUID.randomUUID(), Outcome.SUPPRESSED));
+        when(notifications.send(any(), eq("+94770000002"), any(), any(), any(), any(), any()))
+                .thenReturn(new Delivery(UUID.randomUUID(), Outcome.QUEUED));
+        TemporaryPasswordDelivery delivery =
+                new TemporaryPasswordDelivery(provider(rules), List.of(admins), notifications);
+
+        assertThat(delivery.deliver(ENTITY, "clerk", "Secret12", scope)).isFalse();
+
+        // One of two reached is enough: the password is with somebody who can hand it over.
+        when(notifications.send(any(), eq("+94770000002"), any(), any(), any(), any(), any()))
+                .thenReturn(new Delivery(UUID.randomUUID(), Outcome.SENT));
+        assertThat(delivery.deliver(ENTITY, "clerk", "Secret12", scope)).isTrue();
     }
 
     @Test

@@ -26,6 +26,12 @@ import org.springframework.stereotype.Component;
  * telephone or e-mail of its users (doc 21 section 9.3), so an EXPLICIT audience has nobody to
  * name and is skipped. Without M9, or without a rule, or with a rule whose audience resolves
  * to nobody, nothing is sent and the caller returns the password once in the command's result.
+ *
+ * <p>The same when the kernel sends to nobody: a send may be suppressed (a repeat inside the
+ * hour, quiet hours, an opt-out, the kill switch) or fail and be queued for a retry, and the
+ * provider has already replaced the password. So this reports delivered only when at least one
+ * recipient was really reached ({@link Notifications.Delivery#reached()}); otherwise the caller
+ * hands the password over itself, and nobody is locked out by a password that went nowhere.
  */
 @Component
 class TemporaryPasswordDelivery {
@@ -45,7 +51,7 @@ class TemporaryPasswordDelivery {
         this.notifications = notifications;
     }
 
-    /** True when the password went out to at least one recipient of a rule. */
+    /** True when the password reached at least one recipient of a rule. */
     boolean deliver(UUID homeEntityId, String username, String temporaryPassword, ScopeContext scope) {
         NotificationRuleQueries queries = rules.getIfAvailable();
         if (queries == null) {
@@ -58,8 +64,9 @@ class TemporaryPasswordDelivery {
             }
             // One key for this reset: a retry of the same notification is the kernel's, not a new send.
             UUID dedupKey = Ids.next();
+            boolean reached = false;
             for (NotificationAudience.Recipient recipient : recipients) {
-                notifications.send(
+                Notifications.Delivery delivery = notifications.send(
                         recipient.channel(),
                         recipient.recipient(),
                         recipient.language(),
@@ -67,8 +74,9 @@ class TemporaryPasswordDelivery {
                         Map.of("username", username, "temporaryPassword", temporaryPassword),
                         dedupKey,
                         scope);
+                reached = reached || delivery.reached();
             }
-            return true;
+            return reached;
         }
         return false;
     }

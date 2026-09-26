@@ -15,6 +15,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.SetSodPair;
 import lk.coopfed.knoweb.m1party.api.SodPairChanged;
+import lk.coopfed.knoweb.m1party.internal.security.EntityLock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +35,21 @@ class SetSodPairHandler implements Handles<SetSodPair, UUID> {
 
     private final RoleGuards guards;
     private final SecurityRecords records;
+    private final EntityLock lock;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     SetSodPairHandler(
-            RoleGuards guards, SecurityRecords records, JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+            RoleGuards guards,
+            SecurityRecords records,
+            EntityLock lock,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
         this.guards = guards;
         this.records = records;
+        this.lock = lock;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -52,6 +60,9 @@ class SetSodPairHandler implements Handles<SetSodPair, UUID> {
     public UUID handle(SetSodPair command, ScopeContext scope) {
         guards.requireEntityWide(scope);
         UUID entityId = scope.entityId();
+        // Raising to ROLE mode checks that nobody holds both halves and then writes the pair; an
+        // assignment running at the same time must wait, or both pass. One command of the entity at a time.
+        lock.lock(entityId);
 
         String mode = command.mode();
         if (!RoleRules.INSTANCE.equals(mode) && !RoleRules.ROLE.equals(mode)) {

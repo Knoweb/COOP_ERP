@@ -24,9 +24,10 @@ public interface Notifications {
      * @param arguments   the placeholders of the template
      * @param dedupKey    a stable id for the thing notified (an event id, a document id): the same
      *                    key, recipient and template inside an hour sends once
-     * @return the notification id, whatever happened to it: the log says
+     * @return the notification id and what became of it, so that a caller who must know whether
+     *         anybody was reached (a one-time password) does not have to guess: the log says the rest
      */
-    UUID send(
+    Delivery send(
             String channel,
             String recipient,
             String language,
@@ -34,4 +35,24 @@ public interface Notifications {
             Map<String, Object> arguments,
             UUID dedupKey,
             ScopeContext ctx);
+
+    /** What became of a direct send inside the caller's transaction. */
+    enum Outcome {
+        /** The channel accepted it: the recipient was reached. */
+        SENT,
+        /** The first attempt failed; the kernel retries on this instance. Nobody has it yet. */
+        QUEUED,
+        /** Not sent, by a suppression: a repeat inside the hour, quiet hours, an opt-out or the kill switch. */
+        SUPPRESSED,
+        /** Every attempt failed. */
+        FAILED
+    }
+
+    record Delivery(UUID notificationId, Outcome outcome) {
+
+        /** Only a SENT notification reached somebody. */
+        public boolean reached() {
+            return outcome == Outcome.SENT;
+        }
+    }
 }

@@ -66,16 +66,20 @@ class SecurityQueriesImpl implements SecurityQueries {
         }
         List<RoleRow> rows = jdbc.query(
                 ROLE_SELECT + " order by r.is_template, lower(r.name_en), r.role_id", (rs, i) -> roleRow(rs));
+        // One query for every role's permissions, not one per role: a society lists its roles
+        // and the templates in two round trips whatever their number.
+        Map<UUID, Map<String, Map<String, Object>>> permissions =
+                permissionsOf(rows.stream().map(RoleRow::roleId).toList());
         List<RoleView> views = new ArrayList<>();
         for (RoleRow row : rows) {
-            views.add(view(row));
+            views.add(view(row, permissions.getOrDefault(row.roleId(), Map.of())));
         }
         return views;
     }
 
     @Override
     public Optional<RoleView> getRole(UUID roleId, ScopeContext scope) {
-        return row(roleId, scope).map(this::view);
+        return row(roleId, scope).map(row -> view(row, permissions(row.roleId())));
     }
 
     @Override
@@ -178,10 +182,9 @@ class SecurityQueriesImpl implements SecurityQueries {
                 rs.getString("status"));
     }
 
-    private RoleView view(RoleRow row) {
+    private RoleView view(RoleRow row, Map<String, Map<String, Object>> permissionsOfRole) {
         List<RolePermissionView> permissions = new ArrayList<>();
-        for (Map.Entry<String, Map<String, Object>> p :
-                permissions(row.roleId()).entrySet()) {
+        for (Map.Entry<String, Map<String, Object>> p : permissionsOfRole.entrySet()) {
             permissions.add(new RolePermissionView(p.getKey(), p.getValue()));
         }
         return new RoleView(
@@ -205,6 +208,23 @@ class SecurityQueriesImpl implements SecurityQueries {
     private static boolean updated(RoleRow row) {
         return row.templateVersion() != null
                 && (row.templateVersionSeen() == null || row.templateVersion() > row.templateVersionSeen());
+    }
+
+    /** The permissions of these roles, by role, each sorted by code; a role with none is absent. */
+    private Map<UUID, Map<String, Map<String, Object>>> permissionsOf(List<UUID> roleIds) {
+        Map<UUID, Map<String, Map<String, Object>>> found = new HashMap<>();
+        if (roleIds.isEmpty()) {
+            return found;
+        }
+        jdbc.query(
+                "select role_id, permission_code, limits::text as limits from security.role_permission"
+                        + " where role_id = any(?)",
+                rs -> {
+                    found.computeIfAbsent(rs.getObject("role_id", UUID.class), id -> new TreeMap<>())
+                            .put(rs.getString("permission_code"), limits(rs.getString("limits")));
+                },
+                (Object) roleIds.toArray(new UUID[0]));
+        return found;
     }
 
     private Map<String, Map<String, Object>> permissions(UUID roleId) {

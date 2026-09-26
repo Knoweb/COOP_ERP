@@ -38,7 +38,8 @@ import org.springframework.stereotype.Component;
  *             the scope). A read-only class (FEDERATION_VIEW, EXTERNAL_TIMEBOXED) acts from its
  *             home entity, whose rows its policies do not depend on.
  *   cls       the policy class; absent or unknown, NONE, and row-level security shows nothing
- *   grants    the entities an EXTERNAL_TIMEBOXED caller may read; absent, M1's active grants
+ *   grants    the entities an EXTERNAL_TIMEBOXED caller may read, never more than M1's active
+ *             grants say now; absent, those grants
  *   mfa_at    when the second factor was last presented, epoch seconds; absent, auth_time when
  *             the token's acr (or amr) says a second factor was used, or, where the platform
  *             accepts a fresh password sign-in as the step-up (development), auth_time itself
@@ -212,15 +213,24 @@ public class JwtClaimsMapper {
         }
     }
 
+    /**
+     * Only an EXTERNAL_TIMEBOXED caller has granted entities, and only those M1's register gives
+     * it now: a token is issued for its lifetime, a grant is revoked at once (doc 21 section
+     * 6.5), so a {@code grants} claim narrows what the records say and never widens it.
+     */
     private Set<UUID> grants(Jwt jwt, UUID user, PolicyClass policyClass) {
+        if (policyClass != PolicyClass.EXTERNAL_TIMEBOXED) {
+            return Set.of();
+        }
+        Set<UUID> recorded = userScopes.grantsOf(user);
         List<String> claim = jwt.getClaimAsStringList(GRANTS);
         if (claim == null) {
-            return policyClass == PolicyClass.EXTERNAL_TIMEBOXED ? userScopes.grantsOf(user) : Set.of();
+            return recorded;
         }
         Set<UUID> grants = new HashSet<>();
         for (String text : claim) {
             UUID entity = parseUuid(text, null);
-            if (entity != null) {
+            if (entity != null && recorded.contains(entity)) {
                 grants.add(entity);
             }
         }

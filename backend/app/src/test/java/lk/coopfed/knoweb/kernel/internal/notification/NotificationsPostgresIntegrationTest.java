@@ -105,10 +105,13 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDirectSendIsRenderedInTheRecipientsLanguageAndLoggedWithoutTheNumber() {
-        UUID id = inScope(
+        Notifications.Delivery delivery = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "si", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.SENT);
+        assertThat(delivery.reached()).isTrue();
 
         assertThat(sms.sent).hasSize(1);
         assertThat(sms.sent.get(0).recipient()).isEqualTo("0771234567");
@@ -149,10 +152,13 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(sms.sent).hasSize(1);
 
         // A different event, same template and person inside the hour: de-duplicated, logged as such.
-        UUID other = inScope(
+        Notifications.Delivery repeat = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID other = repeat.notificationId();
+        assertThat(repeat.outcome()).isEqualTo(Notifications.Outcome.SUPPRESSED);
+        assertThat(repeat.reached()).isFalse();
         assertThat(sms.sent).hasSize(1);
         assertThat(superuserJdbc()
                         .queryForMap(
@@ -168,10 +174,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
             config.set("notification.sms.enabled", ConfigScope.entity(ENTITY), "false", scope(ENTITY), "test");
             return null;
         });
-        UUID off = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID off = inScope(ENTITY, () -> notifications
+                .send("SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
+                .notificationId());
         assertThat(sms.sent).isEmpty();
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -187,10 +192,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                     "notification.sms.quiet_hours", ConfigScope.entity(ENTITY), "00:00-23:59", scope(ENTITY), "test");
             return null;
         });
-        UUID quiet = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID quiet = inScope(ENTITY, () -> notifications
+                .send("SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
+                .notificationId());
         assertThat(sms.sent).isEmpty();
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -203,10 +207,14 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aFailingProviderIsRetriedBySweepAndGivenUpWithAnAlert() {
         sms.failNext = 5;
-        UUID id = inScope(
+        Notifications.Delivery delivery = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        // A retry is not a delivery: the caller of a one-time password must not count on it.
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
+        assertThat(delivery.reached()).isFalse();
 
         assertThat(status(id)).isEqualTo("QUEUED");
         assertThat(attempts(id)).isEqualTo(1);

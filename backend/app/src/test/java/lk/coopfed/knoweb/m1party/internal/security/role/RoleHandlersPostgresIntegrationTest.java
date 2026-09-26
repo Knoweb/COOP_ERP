@@ -3,10 +3,16 @@ package lk.coopfed.knoweb.m1party.internal.security.role;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -467,6 +473,50 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
+        void aTemplateHeldOutsideTheFederationKeepsUserManageAndTakesNoFederationCode() {
+            UUID adminTemplate = fx.role(null, "gov.user.manage", "prt.location.view");
+            fx.assign(clerk, adminTemplate, mpcs, null);
+
+            // Dropping gov.user.manage would take the society's last user manager away.
+            assertThatThrownBy(() -> amendRole.handle(
+                            new AmendRole(adminTemplate, perms("prt.location.view"), false), asFederation()))
+                    .isInstanceOf(ProblemException.class)
+                    .satisfies(e -> {
+                        assertThat(((ProblemException) e).messageId())
+                                .isEqualTo("m1.role.template_held_outside_federation");
+                        assertThat(((ProblemException) e).parameters())
+                                .containsEntry("permissions", "gov.user.manage")
+                                .containsEntry("assignments", 1L);
+                    });
+            // Adding a FEDERATION-scope code would hand it to every society administrator.
+            refused(
+                    () -> amendRole.handle(
+                            new AmendRole(
+                                    adminTemplate,
+                                    perms("gov.user.manage", "prt.location.view", "gov.entity.view"),
+                                    false),
+                            asFederation()),
+                    "m1.role.template_held_outside_federation");
+            // Any other change to the template is the Federation's to make.
+            amendRole.handle(
+                    new AmendRole(adminTemplate, perms("gov.user.manage", "sys.device.view"), false), asFederation());
+            assertThat(fx.permissionsOf(adminTemplate)).containsExactly("gov.user.manage", "sys.device.view");
+        }
+
+        @Test
+        void aTemplateHeldByTheFederationAloneOrByNobodyChangesFreely() {
+            UUID adminTemplate = fx.role(null, "gov.user.manage", "prt.location.view");
+            fx.assign(federationAdmin, adminTemplate, federation, null);
+            UUID departed = fx.user(mpcs, "DEACTIVATED");
+            fx.assign(departed, adminTemplate, mpcs, null);
+
+            amendRole.handle(
+                    new AmendRole(adminTemplate, perms("prt.location.view", "gov.entity.view"), false), asFederation());
+
+            assertThat(fx.permissionsOf(adminTemplate)).containsExactly("gov.entity.view", "prt.location.view");
+        }
+
+        @Test
         void adoptingATemplateVersionNeedsATemplate() {
             UUID roleId = fx.role(mpcs, "prt.location.view");
             refused(
@@ -640,6 +690,25 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
+        void aHalfHeldAtAnotherShopCountsForAShopScopedGrantor() {
+            // The clerk holds one half of a ROLE pair at the second shop, which a manager scoped
+            // to the first shop cannot see under own_read; the entity-wide count still sees it.
+            fx.pair(mpcs, "prt.location.view", "prt.position.manage", "ROLE");
+            fx.assign(clerk, fx.role(mpcs, "prt.location.view"), mpcs, secondShop);
+            // An entity-wide role of no consequence makes the clerk visible at the first shop
+            // (m1security V0012: a shop sees its own staff and the entity-wide ones).
+            fx.assign(clerk, fx.role(mpcs, "prt.relationship.view"), mpcs, null);
+            UUID manager = fx.user(mpcs);
+            fx.assign(manager, fx.role(mpcs, "gov.role.manage", "prt.position.manage"), mpcs, shop);
+            UUID otherHalf = fx.role(mpcs, "prt.position.manage");
+
+            refused(
+                    () -> assignRole.handle(
+                            new AssignRole(clerk, otherHalf, shop), ScopeContext.dev(manager, mpcs, shop)),
+                    "m1.assignment.sod_conflict");
+        }
+
+        @Test
         void aPersonDoesNotComeToHoldBothHalvesOfARolePair() {
             fx.assign(clerk, fx.role(mpcs, "prt.location.view"), mpcs, null);
             fx.pair(mpcs, "prt.location.view", "prt.position.manage", "ROLE");
@@ -696,6 +765,47 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
+        void twoRevocationsAtOnceLeaveOneUserManager() throws Exception {
+            // Two administrators revoke each other's administrator role at the same moment. Each
+            // would count two holders under READ COMMITTED; the per-entity lock makes the second
+            // wait and count one. Exactly one revocation goes through, whichever it is.
+            UUID deputy = fx.user(mpcs);
+            fx.assign(deputy, adminRole, mpcs, null);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            CountDownLatch start = new CountDownLatch(1);
+            try {
+                List<Future<String>> outcomes = new ArrayList<>();
+                for (UUID[] pair : List.of(new UUID[] {admin, deputy}, new UUID[] {deputy, admin})) {
+                    outcomes.add(pool.submit(() -> {
+                        start.await();
+                        try {
+                            revokeRole.handle(
+                                    new RevokeRole(pair[1], adminRole, null, null),
+                                    ScopeContext.dev(pair[0], mpcs, null));
+                            return "revoked";
+                        } catch (ProblemException e) {
+                            return e.messageId();
+                        }
+                    }));
+                }
+                start.countDown();
+                List<String> results = new ArrayList<>();
+                for (Future<String> outcome : outcomes) {
+                    results.add(outcome.get(30, TimeUnit.SECONDS));
+                }
+                assertThat(results).containsExactlyInAnyOrder("revoked", "m1.assignment.last_user_manager");
+            } finally {
+                pool.shutdownNow();
+            }
+            assertThat(superuserJdbc()
+                            .queryForObject(
+                                    "select count(*) from security.user_role where role_id = ?",
+                                    Integer.class,
+                                    adminRole))
+                    .isEqualTo(1);
+        }
+
+        @Test
         void theLastUserManagerIsKeptAndASecondOneMayGo() {
             refused(
                     () -> revokeRole.handle(new RevokeRole(admin, adminRole, null, null), asAdmin()),
@@ -749,6 +859,20 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             refused(
                     () -> setSodPair.handle(new SetSodPair("gov.role.manage", "gov.user.manage", "ROLE"), asAdmin()),
                     "m1.sod.existing_conflict");
+        }
+
+        @Test
+        void raisingIgnoresADeactivatedHolderOfBoth() {
+            UUID departed = fx.user(mpcs, "DEACTIVATED");
+            fx.assign(departed, fx.role(mpcs, "prt.relationship.view"), mpcs, null);
+            fx.assign(departed, fx.role(mpcs, "prt.location.view"), mpcs, null);
+
+            UUID pairId =
+                    setSodPair.handle(new SetSodPair("prt.relationship.view", "prt.location.view", "ROLE"), asAdmin());
+
+            assertThat(kernel.committedEvents())
+                    .containsExactly(
+                            new SodPairChanged(pairId, "prt.location.view", "prt.relationship.view", "ROLE", false));
         }
 
         @Test

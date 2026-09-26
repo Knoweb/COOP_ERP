@@ -227,14 +227,19 @@ class SecurityRecords {
         return count != null && count > 0;
     }
 
-    /** Every assignment at the entity the caller can see, of one user or (null) of everybody. */
+    /**
+     * Every assignment at the entity the caller can see, of one user or (null) of everybody,
+     * leaving out the users who are DEACTIVATED: their rows are kept for history (21A section 6,
+     * DeactivateUser) and hold nothing.
+     */
     List<Assignment> assignmentsAt(UUID entityId, UUID userId) {
         return jdbc.query(
                 """
-                select user_id, role_id, scope_entity_id, scope_location_id
-                  from security.user_role
-                 where scope_entity_id = ?
-                   and (cast(? as uuid) is null or user_id = ?)
+                select ur.user_id, ur.role_id, ur.scope_entity_id, ur.scope_location_id
+                  from security.user_role ur
+                  join security.app_user u on u.user_id = ur.user_id and u.status <> 'DEACTIVATED'
+                 where ur.scope_entity_id = ?
+                   and (cast(? as uuid) is null or ur.user_id = ?)
                 """,
                 (rs, i) -> new Assignment(
                         rs.getObject("user_id", UUID.class),
@@ -280,6 +285,18 @@ class SecurityRecords {
         return byUser;
     }
 
+    /**
+     * What a user holds at the entity through every ACTIVE role assigned there, entity-wide or at
+     * any location, leaving out one role (the one being changed): the whole entity, whatever the
+     * caller's own scope shows (m1security V0013, {@code security.user_permissions_at}). A
+     * location-scoped caller sees only its location's assignments under own_read, and a person
+     * holding one half of a ROLE pair at another shop must still be refused the other half.
+     */
+    Set<String> permissionsAt(UUID entityId, UUID userId, UUID leavingOutRoleId) {
+        return new HashSet<>(jdbc.queryForList(
+                "select security.user_permissions_at(?, ?, ?)", String.class, userId, entityId, leavingOutRoleId));
+    }
+
     /** How many users of the entity still hold the role, counting across entities for a template. */
     long assignmentCount(UUID roleId) {
         Long count = jdbc.queryForObject("select security.role_assignment_count(?)", Long.class, roleId);
@@ -287,15 +304,27 @@ class SecurityRecords {
     }
 
     /**
-     * The entity-wide assignments at the entity through which a user who is not DEACTIVATED holds
-     * {@code gov.user.manage}: the same fact ActivateEntity asks for (m1security V0003).
+     * How many assignments of a template belong to users outside the Federation (m1security
+     * V0013): the people an amendment of the template reaches without any guard on them.
+     */
+    long templateAssignmentsOutsideFederation(UUID roleId) {
+        Long count =
+                jdbc.queryForObject("select security.template_assignments_outside_federation(?)", Long.class, roleId);
+        return count == null ? 0 : count;
+    }
+
+    /**
+     * The entity-wide assignments at the entity through which an ACTIVE user holds
+     * {@code gov.user.manage}. ACTIVE only: the permission resolver grants nothing to a PENDING
+     * or LOCKED user, so such a holder is not a manager who can act, and counting one would let
+     * the last one who can be taken away.
      */
     List<Assignment> userManagerHoldings(UUID entityId) {
         return jdbc.query(
                 """
                 select ur.user_id, ur.role_id, ur.scope_entity_id, ur.scope_location_id
                   from security.user_role ur
-                  join security.app_user u on u.user_id = ur.user_id and u.status <> 'DEACTIVATED'
+                  join security.app_user u on u.user_id = ur.user_id and u.status = 'ACTIVE'
                   join security.role r on r.role_id = ur.role_id and r.status = 'ACTIVE'
                   join security.role_permission rp on rp.role_id = r.role_id and rp.permission_code = ?
                  where ur.scope_entity_id = ?
@@ -328,12 +357,13 @@ class SecurityRecords {
                 b);
     }
 
-    /** The users who hold both codes at the entity, through one role or several. */
+    /** The users who hold both codes at the entity, through one role or several; a DEACTIVATED user holds nothing. */
     List<UUID> usersHoldingBoth(UUID entityId, String a, String b) {
         return jdbc.queryForList(
                 """
                 select ur.user_id
                   from security.user_role ur
+                  join security.app_user u on u.user_id = ur.user_id and u.status <> 'DEACTIVATED'
                   join security.role r on r.role_id = ur.role_id and r.status = 'ACTIVE'
                   join security.role_permission rp on rp.role_id = r.role_id
                  where ur.scope_entity_id = ?

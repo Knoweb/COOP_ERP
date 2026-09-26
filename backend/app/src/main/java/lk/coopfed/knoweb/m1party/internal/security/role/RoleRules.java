@@ -127,6 +127,11 @@ final class RoleRules {
      */
     static Optional<String> limitsProblem(Map<String, Object> limits, JsonNode schema) {
         if (limits == null) {
+            // No limits given (an empty object arrives as null too): fine unless the schema
+            // requires one, else an approval permission could be granted without its ceiling.
+            for (JsonNode required : schema == null ? List.<JsonNode>of() : schema.path("required")) {
+                return Optional.of(required.asText());
+            }
             return Optional.empty();
         }
         JsonNode properties = schema == null ? null : schema.path("properties");

@@ -96,7 +96,8 @@ class JwtClaimsMapperTest {
         assertThat(scope.scopes()).containsExactly(new Scope(HOME, null), new Scope(OTHER, SHOP));
         assertThat(scope.activeScope()).isEqualTo(new Scope(OTHER, SHOP));
         assertThat(scope.policyClass()).isEqualTo(PolicyClass.OWN);
-        assertThat(scope.grantedEntities()).containsExactly(OTHER);
+        // An OWN caller has no granted entities, whatever the token says.
+        assertThat(scope.grantedEntities()).isEmpty();
         assertThat(scope.mfaAt()).isEqualTo(Instant.ofEpochSecond(1_800_000_000L));
         assertThat(scope.lang()).isEqualTo("si");
         assertThat(scope.correlationId()).isNotNull();
@@ -194,6 +195,20 @@ class JwtClaimsMapperTest {
                 .isFalse();
         assertThat(JwtClaimsMapper.isDevelopmentIssuer("")).isFalse();
         assertThat(JwtClaimsMapper.isDevelopmentIssuer(null)).isFalse();
+    }
+
+    @Test
+    void aGrantsClaimNarrowsTheRecordedGrantsAndNeverWidensThem() {
+        Jwt wider = jwt(Map.of(
+                "sub",
+                USER.toString(),
+                "cls",
+                "EXTERNAL_TIMEBOXED",
+                "grants",
+                List.of(GRANTED.toString(), OTHER.toString())));
+        assertThat(mapper.map(wider, null, null, null, null).grantedEntities()).containsExactly(GRANTED);
+        Jwt none = jwt(Map.of("sub", USER.toString(), "cls", "EXTERNAL_TIMEBOXED", "grants", List.of()));
+        assertThat(mapper.map(none, null, null, null, null).grantedEntities()).isEmpty();
     }
 
     @Test
