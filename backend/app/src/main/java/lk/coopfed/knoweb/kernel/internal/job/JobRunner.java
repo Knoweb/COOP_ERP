@@ -4,6 +4,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.JobExecution;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -25,6 +27,7 @@ import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.SimpleLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +36,10 @@ import org.springframework.stereotype.Component;
  * instance holds its lock; records the run; interrupts it past its maximum runtime and marks
  * the run TIMEOUT with an ALERT; marks a failure FAILED with a REVIEW record and, for a
  * critical job, tries once more at once. The lock outlives the run ({@code lockTimeout}), so
- * a run that dies with its instance is not overlapped before the lock expires.
+ * a run that dies with its instance, or one that timed out and may still be inside a blocking
+ * call, is not overlapped before the lock expires; a run that ended holds it a little longer
+ * ({@code jobs.lock.at_least_for}) so that a second instance's slightly later clock does not
+ * run the same schedule again.
  *
  * <p>The audit records need a scope; they are written in the system scope when
  * {@code coop-erp.system.entity-id} is set and only logged otherwise.
@@ -45,6 +51,11 @@ public class JobRunner {
 
     static final String AUDIT_TIMED_OUT = "JOB_TIMED_OUT";
     static final String AUDIT_FAILED = "JOB_FAILED";
+
+    /** The register's item (seed/kernel/config-items.yaml) and its value when the register is not up yet. */
+    static final String LOCK_AT_LEAST_FOR = "jobs.lock.at_least_for";
+
+    static final Duration DEFAULT_LOCK_AT_LEAST_FOR = Duration.ofSeconds(5);
 
     public enum Outcome {
         SUCCESS,
@@ -61,6 +72,7 @@ public class JobRunner {
     private final AuditFacade audit;
     private final SystemScope system;
     private final Clock clock;
+    private final ObjectProvider<ConfigRegistry> config;
     private final String instance;
     private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
         Thread thread = new Thread(runnable, "scheduled-job");
@@ -74,13 +86,15 @@ public class JobRunner {
             JdbcTemplate jdbc,
             AuditFacade audit,
             SystemScope system,
-            Clock clock) {
+            Clock clock,
+            ObjectProvider<ConfigRegistry> config) {
         this.registry = registry;
         this.locks = locks;
         this.jdbc = jdbc;
         this.audit = audit;
         this.system = system;
         this.clock = clock;
+        this.config = config;
         this.instance = instanceName();
     }
 
@@ -101,12 +115,18 @@ public class JobRunner {
         }
 
         Optional<SimpleLock> lock = locks.lock(
-                new LockConfiguration(clock.instant(), "job:" + name, job.lockTimeout(), java.time.Duration.ZERO));
+                new LockConfiguration(clock.instant(), "job:" + name, job.lockTimeout(), lockAtLeastFor(job)));
 
         if (lock.isEmpty()) {
             log.debug("Scheduled job {} is running on another instance", name);
             return Outcome.SKIPPED_LOCKED;
         }
+
+        // A run that timed out is cancelled, but its thread may still be inside a database or
+        // socket call, which ignores the interrupt. Releasing the lock then would let the next
+        // firing overlap the run doc 19 section 9 says is "never overlapped"; the lock is left
+        // to expire at lockTimeout instead (review of 26 Sep).
+        boolean release = true;
 
         try {
             Outcome outcome = runOnce(job);
@@ -116,10 +136,39 @@ public class JobRunner {
                 outcome = runOnce(job);
             }
 
+            if (outcome == Outcome.TIMEOUT) {
+                release = false;
+            }
+
             return outcome;
         } finally {
-            lock.get().unlock();
+            if (release) {
+                lock.get().unlock();
+            } else {
+                log.warn(
+                        "Scheduled job {} keeps its lock until it expires ({}) after the timeout",
+                        name,
+                        job.lockTimeout());
+            }
         }
+    }
+
+    /**
+     * How long the lock is held after the run ends, so that a second instance firing the same
+     * schedule a moment later (clocks drift) skips instead of running it again. From the
+     * register, federation-wide; never longer than the lock itself.
+     */
+    private Duration lockAtLeastFor(JobDefinition job) {
+        ConfigRegistry registry = config.getIfAvailable();
+        Duration atLeast = registry == null
+                ? DEFAULT_LOCK_AT_LEAST_FOR
+                : registry.getDuration(LOCK_AT_LEAST_FOR, null, DEFAULT_LOCK_AT_LEAST_FOR);
+
+        if (atLeast.isNegative()) {
+            return Duration.ZERO;
+        }
+
+        return atLeast.compareTo(job.lockTimeout()) > 0 ? job.lockTimeout() : atLeast;
     }
 
     private Outcome runOnce(JobDefinition job) {

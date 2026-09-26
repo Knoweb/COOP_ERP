@@ -27,7 +27,12 @@ import java.lang.annotation.Target;
  * <p>Exactly one of {@link #cron()} (Spring's six-field expression, in the business time
  * zone) and {@link #continuous()} (run again {@link #fixedDelay()} after the last run ended).
  * Durations are ISO 8601 ({@code PT10M}); the lock must outlive the run, so
- * {@code lockTimeout > maxRuntime}.
+ * {@code lockTimeout > maxRuntime}, and a {@link #critical()} job is retried once under the same
+ * lock, so for it {@code lockTimeout > 2 * maxRuntime}. A run that exceeds {@code maxRuntime}
+ * keeps its lock until {@code lockTimeout}: the interrupted body may still be inside a database
+ * or socket call, and the next firing must not overlap it. After a run ends the lock is held
+ * for the register's {@code jobs.lock.at_least_for} (five seconds by default), so a second
+ * instance whose clock fires the same schedule a moment later skips instead of running it again.
  */
 @Documented
 @Target(ElementType.METHOD)
