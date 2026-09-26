@@ -201,9 +201,13 @@ gen-clients:
 # diagrams in docs/modules (from ArchitectureTests). This target regenerates both and fails
 # when git then sees a difference, which means somebody changed a slice or a module
 # dependency and did not commit what it generates. The pipeline runs it on every push.
+# ARCH_TESTS is the Gradle call that runs the documenter (ArchitectureTests writes docs/modules).
+# The pipeline passes ARCH_TESTS=:app:test: right after `make test` that task is up to date and
+# Gradle skips it, instead of starting a filtered run of the architecture tests a second time.
+ARCH_TESTS ?= :app:test --tests "*ArchitectureTests*"
 check-generated:
 	sh tools/gen-clients.sh
-	cd backend && ./gradlew :app:test --tests "*ArchitectureTests*"
+	cd backend && ./gradlew $(ARCH_TESTS)
 	@# The documenter writes the Rel lines of components.puml in an order that differs from run
 	@# to run, so the file looked changed in every pull request. Sorting them makes the check
 	@# compare content, not luck.
@@ -235,6 +239,13 @@ new-module:
 # clean working tree first and never touches uncommitted work. If a step fails, the
 # scaffolded module is left in place for you to look at; `git reset --hard && git clean -fd`
 # removes it.
+# SCAFFOLD_TESTS: only what the copy can break, which is its own tests, the architecture and
+# slice rules, and the integration tests that check every module's schema, grants and
+# policies. The nightly pipeline runs the whole suite on the copy: SCAFFOLD_TESTS="$(SCAFFOLD_ALL)".
+SCAFFOLD_TESTS ?= :app:test --tests "*ArchitectureTests*" --tests "*OpenApiSliceRulesTest*" \
+	:app:integrationTest --tests "lk.coopfed.knoweb.m9integration.*" --tests "*SchemaRulesIntegrationTest*" \
+	--tests "*OwnPoliciesTestTheClassIntegrationTest*" --tests "*RuntimeRolesIntegrationTest*"
+SCAFFOLD_ALL = :app:test :app:integrationTest
 test-scaffold:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "make test-scaffold needs a clean working tree (commit or stash first)." >&2; exit 1; \
@@ -248,7 +259,7 @@ test-scaffold:
 	@echo "--- replace them, as the developer does in step 1 of the module README"
 	grep -rl "todo\.integration\.webhook\." backend/app/src web/src | xargs sed -i "s/todo\.integration\.webhook\./int.webhook./g"
 	node tools/check-permissions.mjs
-	cd backend && ./gradlew :app:test :app:integrationTest
+	cd backend && ./gradlew $(SCAFFOLD_TESTS)
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 	cd web && pnpm install --frozen-lockfile && pnpm build && pnpm test

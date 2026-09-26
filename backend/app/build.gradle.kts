@@ -298,5 +298,10 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     // A time bug that depends on the default zone then shows up here, not in production:
     // the first hello migration stored instants five and a half hours off only under this zone.
     systemProperty("user.timezone", "Asia/Colombo")
+    // The forks share the classes. Each starts its own PostgreSQL container (the static one of
+    // PostgresIntegrationTest is per JVM), and every other container maps a random port, so
+    // the forks share no state. Two on a laptop; the pipeline sets one, because two forks on
+    // the two-core runner were slower than one (COOP_ERP_INTEGRATION_FORKS).
+    maxParallelForks = (System.getenv("COOP_ERP_INTEGRATION_FORKS") ?: "2").toInt()
     shouldRunAfter(tasks.test)
 }
