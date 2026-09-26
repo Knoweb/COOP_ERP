@@ -44,7 +44,10 @@ class OutboxWriterForbiddenFieldsTest {
                 "secret",
                 "dob",
                 "dateOfBirth",
-                "birthDate"
+                "birthDate",
+                "pinCode",
+                "tokenId",
+                "customer_name"
             })
     void aFieldThatNamesPersonalOrSecretDataIsRefused(String field) {
         assertThat(OutboxWriter.isForbiddenField(field)).as(field).isTrue();
@@ -66,7 +69,17 @@ class OutboxWriterForbiddenFieldsTest {
                 "occurredAt",
                 "locationId",
                 "reasonCode",
-                "engineVersion"
+                "engineVersion",
+                "addressId",
+                "cityCode",
+                "customerId",
+                "emailTemplateCode",
+                "productName",
+                "uomName",
+                "nameEn",
+                "nameSi",
+                "nameTa",
+                "name_en"
             })
     void anIdentifierThatMerelyContainsAForbiddenWordIsNotRefused(String field) {
         assertThat(OutboxWriter.isForbiddenField(field)).as(field).isFalse();

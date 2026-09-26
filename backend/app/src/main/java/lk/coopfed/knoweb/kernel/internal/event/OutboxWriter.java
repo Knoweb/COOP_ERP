@@ -8,7 +8,9 @@ import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -17,6 +19,8 @@ import lk.coopfed.knoweb.engine.Envelope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -25,6 +29,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Component
 public class OutboxWriter implements EventPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(OutboxWriter.class);
 
     private static final Pattern EVENT_TYPE = Pattern.compile("[a-z0-9_]+(\\.[a-z0-9_]+)+\\.v[0-9]+");
 
@@ -158,12 +164,56 @@ public class OutboxWriter implements EventPublisher {
 
         // The caches of this instance learn of the change when it is real, not before: a
         // rollback must not leave a warmed cache of a state that never existed.
+        publishedInThisTransaction().add(new Published(type, payload));
+    }
+
+    private record Published(String type, JsonNode payload) {}
+
+    /**
+     * One synchronisation per transaction, however many events it publishes: the events of this
+     * transaction are kept as a transaction resource and handed to the listeners after commit.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Published> publishedInThisTransaction() {
+
+        Object existing = TransactionSynchronizationManager.getResource(this);
+
+        if (existing != null) {
+            return (List<Published>) existing;
+        }
+
+        List<Published> published = new ArrayList<>();
+
+        TransactionSynchronizationManager.bindResource(this, published);
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                listeners.forEach(listener -> listener.published(type, payload));
+                for (Published event : published) {
+                    listeners.forEach(listener -> notifyListener(listener, event));
+                }
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                TransactionSynchronizationManager.unbindResourceIfPossible(OutboxWriter.this);
             }
         });
+
+        return published;
+    }
+
+    /** The transaction is committed: a listener that fails must not fail the caller or the others. */
+    private static void notifyListener(PublishedEventListener listener, Published event) {
+        try {
+            listener.published(event.type(), event.payload());
+        } catch (RuntimeException failure) {
+            log.warn(
+                    "Published-event listener {} failed on {}",
+                    listener.getClass().getName(),
+                    event.type(),
+                    failure);
+        }
     }
 
     static String typeOf(DomainEvent event) {
@@ -298,9 +348,33 @@ public class OutboxWriter implements EventPublisher {
             "dateofbirth",
             "birthday");
 
+    /**
+     * The display names of catalogue things that doc 18 lets an event carry (they name a product
+     * or a unit, never a person), compared with case and underscores removed.
+     */
+    static final Set<String> ALLOWED_FIELDS = Set.of("nameen", "namesi", "nameta", "uomname", "productname");
+
+    /** Words that stay refused even at the head of an identifier: a PIN code is still a PIN. */
+    private static final Set<String> SECRET_WORDS =
+            Set.of("pin", "otp", "password", "token", "secret", "credential", "nic", "passport");
+
     static boolean isForbiddenField(String key) {
         String[] words =
                 key.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase().split("[^a-z0-9]+");
+        if (ALLOWED_FIELDS.contains(String.join("", words))) {
+            return false;
+        }
+        // An identifier or a code refers to a row, it does not carry the value (addressId,
+        // cityCode), unless its head is a secret (pinCode, tokenId).
+        String last = words.length == 0 ? "" : words[words.length - 1];
+        if (words.length > 1 && ("id".equals(last) || "code".equals(last))) {
+            for (String word : words) {
+                if (SECRET_WORDS.contains(word)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         for (String word : words) {
             if (FORBIDDEN_WORDS.contains(word)) {
                 return true;
@@ -326,14 +400,7 @@ public class OutboxWriter implements EventPublisher {
 
                 Map.Entry<String, JsonNode> field = fields.next();
 
-                String normalised = field.getKey().replaceAll("[^A-Za-z]", "").toLowerCase();
-
-                if (normalised.startsWith("name")
-                        || normalised.contains("phone")
-                        || normalised.contains("nic")
-                        || normalised.contains("password")
-                        || normalised.contains("pin")
-                        || normalised.contains("token")) {
+                if (isForbiddenField(field.getKey())) {
 
                     throw new IllegalArgumentException(
                             "Domain event " + eventType + " payload contains forbidden field " + field.getKey());

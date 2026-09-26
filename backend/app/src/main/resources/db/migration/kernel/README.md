@@ -119,5 +119,8 @@ with the event type as routing key. Each `@EventConsumer` gets a durable quorum
 queue with single-active-consumer enabled. Consumers claim
 `kernel.event_inbox (consumer, event_id)` in the same transaction as their
 handler; duplicate delivery is therefore harmless. The third failed delivery
-records an ALERT audit event and sends the message to `domain.dlq`.
+records an ALERT audit event and sends the message to `domain.dlq`; a poison
+message goes there at once, and each consumer queue dead-letters to it after
+`x-delivery-limit` redeliveries. Claims are scoped to the event's owner entity
+(`V0032`).
 `Replayer` can republish archived events directly to one consumer queue.

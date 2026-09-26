@@ -60,6 +60,96 @@ class OutboxPayloadValidationPostgresIntegrationTest extends PostgresIntegration
     }
 
     @Test
+    void theWordListRefusesPersonalDataThatTheOldSubstringCheckLetThrough() {
+
+        UUID entity = UUID.randomUUID();
+
+        assertThatThrownBy(() -> publish(entity, "OWN", new CustomerEvent(UUID.randomUUID(), entity, "A Person")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("forbidden field customerName");
+
+        assertThat(outboxCount()).isZero();
+    }
+
+    @Test
+    void aForbiddenFieldInsideANestedObjectOrAnArrayIsRefused() {
+
+        UUID entity = UUID.randomUUID();
+
+        assertThatThrownBy(() -> publish(
+                        entity,
+                        "OWN",
+                        new NestedEvent(
+                                UUID.randomUUID(),
+                                entity,
+                                new Contact("a@b.lk"),
+                                java.util.List.of(new Contact("c@d.lk")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("forbidden field email");
+
+        assertThat(outboxCount()).isZero();
+    }
+
+    @Test
+    void identifiersCodesAndCatalogueDisplayNamesArePublished() {
+
+        UUID entity = UUID.randomUUID();
+
+        publish(
+                entity,
+                "OWN",
+                new CatalogueEvent(
+                        UUID.randomUUID(),
+                        entity,
+                        UUID.randomUUID(),
+                        "COL-01",
+                        UUID.randomUUID(),
+                        "Rice 5 kg",
+                        "Kilogram",
+                        "Rice",
+                        "Haal",
+                        "Arisi"));
+
+        assertThat(outboxCount()).isEqualTo(1);
+    }
+
+    @Test
+    void aFailingListenerDoesNotStopTheOthersAndOneSynchronisationServesTheTransaction() {
+
+        UUID entity = UUID.randomUUID();
+        java.util.List<String> heard = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        org.springframework.beans.factory.support.StaticListableBeanFactory listeners =
+                new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        listeners.addBean("failing", (PublishedEventListener) (type, payload) -> {
+            throw new IllegalStateException("listener failure");
+        });
+        listeners.addBean("hearing", (PublishedEventListener) (type, payload) -> heard.add(type));
+
+        OutboxWriter writer = new OutboxWriter(
+                jdbc,
+                new com.fasterxml.jackson.databind.ObjectMapper(),
+                listeners.getBeanProvider(PublishedEventListener.class));
+
+        int[] synchronisations = new int[2];
+
+        inScope(entity, "OWN", () -> {
+            int before = org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .size();
+            writer.publish(new SafeEvent(UUID.randomUUID(), entity, "ACTIVE"));
+            writer.publish(new SafeEvent(UUID.randomUUID(), entity, "ACTIVE"));
+            synchronisations[0] = before;
+            synchronisations[1] =
+                    org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                            .size();
+        });
+
+        assertThat(synchronisations[1] - synchronisations[0]).isEqualTo(1);
+        assertThat(heard).containsExactly(SafeEvent.TYPE, SafeEvent.TYPE);
+        assertThat(outboxCount()).isEqualTo(2);
+    }
+
+    @Test
     void entityScopedNonOwnClassCannotWriteAnEvent() {
         // A PARTY, FEDERATION_VIEW or EXTERNAL caller has a scope entity too and writes nothing
         // through it (doc 18 section 3.7; CR-17A-3): the outbox insert policy tests the class.
@@ -72,6 +162,11 @@ class OutboxPayloadValidationPostgresIntegrationTest extends PostgresIntegration
     }
 
     private void publish(UUID entity, String policyClass, DomainEvent event) {
+
+        inScope(entity, policyClass, () -> events.publish(event));
+    }
+
+    private void inScope(UUID entity, String policyClass, Runnable work) {
 
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
@@ -115,7 +210,7 @@ class OutboxPayloadValidationPostgresIntegrationTest extends PostgresIntegration
                     entity.toString(),
                     policyClass);
 
-            events.publish(event);
+            work.run();
         });
     }
 
@@ -139,6 +234,35 @@ class OutboxPayloadValidationPostgresIntegrationTest extends PostgresIntegration
             implements DomainEvent {
 
         public static final String TYPE = "test.thing.personal_data.v1";
+    }
+
+    private record CustomerEvent(UUID thingId, UUID ownerEntityId, String customerName) implements DomainEvent {
+
+        public static final String TYPE = "test.thing.customer.v1";
+    }
+
+    private record Contact(String email) {}
+
+    private record NestedEvent(UUID thingId, UUID ownerEntityId, Contact primary, java.util.List<Contact> others)
+            implements DomainEvent {
+
+        public static final String TYPE = "test.thing.nested.v1";
+    }
+
+    private record CatalogueEvent(
+            UUID thingId,
+            UUID ownerEntityId,
+            UUID addressId,
+            String cityCode,
+            UUID technicianId,
+            String productName,
+            String uomName,
+            String nameEn,
+            String nameSi,
+            String nameTa)
+            implements DomainEvent {
+
+        public static final String TYPE = "test.thing.catalogue.v1";
     }
 
     private record SafeEvent(UUID thingId, UUID ownerEntityId, String status) implements DomainEvent {
