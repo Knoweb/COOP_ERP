@@ -24,8 +24,11 @@ public interface Notifications {
      * @param arguments   the placeholders of the template
      * @param dedupKey    a stable id for the thing notified (an event id, a document id): the same
      *                    key, recipient and template inside an hour sends once
-     * @return the notification id and what became of it, so that a caller who must know whether
-     *         anybody was reached (a one-time password) does not have to guess: the log says the rest
+     * @return the notification id and what was decided for it inside the caller's transaction.
+     *         The provider is called only after that transaction commits, so a direct send never
+     *         reports SENT at call time: QUEUED means logged for sending once the caller commits
+     *         (a provider failure after that is the retry sweep's), SUPPRESSED that it will not be
+     *         sent. 19A section 10 says send "returns the notification id"; see docs/PROGRESS.md.
      */
     Delivery send(
             String channel,
@@ -36,23 +39,26 @@ public interface Notifications {
             UUID dedupKey,
             ScopeContext ctx);
 
-    /** What became of a direct send inside the caller's transaction. */
+    /** What was decided for a direct send inside the caller's transaction. */
     enum Outcome {
-        /** The channel accepted it: the recipient was reached. */
+        /** The channel accepted it (the log's status; a direct send reports QUEUED at call time). */
         SENT,
-        /** The first attempt failed; the kernel retries on this instance. Nobody has it yet. */
+        /** Logged for sending: the provider is called after the caller commits, retried by the sweep. */
         QUEUED,
         /** Not sent, by a suppression: a repeat inside the hour, quiet hours, an opt-out or the kill switch. */
         SUPPRESSED,
-        /** Every attempt failed. */
+        /** Nothing could be sent: every attempt failed, or nothing was logged for sending. */
         FAILED
     }
 
     record Delivery(UUID notificationId, Outcome outcome) {
 
-        /** Only a SENT notification reached somebody. */
-        public boolean reached() {
-            return outcome == Outcome.SENT;
+        /**
+         * True when the notification is sent or will be sent once the caller commits. A queued
+         * send can still fail at the provider; the retry sweep handles that.
+         */
+        public boolean accepted() {
+            return outcome == Outcome.SENT || outcome == Outcome.QUEUED;
         }
     }
 }

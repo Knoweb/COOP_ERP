@@ -28,10 +28,13 @@ import org.springframework.stereotype.Component;
  * to nobody, nothing is sent and the caller returns the password once in the command's result.
  *
  * <p>The same when the kernel sends to nobody: a send may be suppressed (a repeat inside the
- * hour, quiet hours, an opt-out, the kill switch) or fail and be queued for a retry, and the
- * provider has already replaced the password. So this reports delivered only when at least one
- * recipient was really reached ({@link Notifications.Delivery#reached()}); otherwise the caller
- * hands the password over itself, and nobody is locked out by a password that went nowhere.
+ * hour, quiet hours, an opt-out, the kill switch), and the provider has already replaced the
+ * password. The kernel calls the SMS or e-mail provider only after this transaction commits, so
+ * this reports delivered when at least one resolved recipient's send was accepted, SENT or
+ * QUEUED ({@link Notifications.Delivery#accepted()}); otherwise the caller hands the password
+ * over itself, and nobody is locked out by a password that went nowhere. A queued send that
+ * later fails at the provider is retried by the kernel's sweep; if it never arrives the user
+ * asks for another reset (docs/PROGRESS.md, deviations).
  */
 @Component
 class TemporaryPasswordDelivery {
@@ -51,7 +54,7 @@ class TemporaryPasswordDelivery {
         this.notifications = notifications;
     }
 
-    /** True when the password reached at least one recipient of a rule. */
+    /** True when the send to at least one recipient of a rule was accepted (SENT or QUEUED). */
     boolean deliver(UUID homeEntityId, String username, String temporaryPassword, ScopeContext scope) {
         NotificationRuleQueries queries = rules.getIfAvailable();
         if (queries == null) {
@@ -64,7 +67,7 @@ class TemporaryPasswordDelivery {
             }
             // One key for this reset: a retry of the same notification is the kernel's, not a new send.
             UUID dedupKey = Ids.next();
-            boolean reached = false;
+            boolean accepted = false;
             for (NotificationAudience.Recipient recipient : recipients) {
                 Notifications.Delivery delivery = notifications.send(
                         recipient.channel(),
@@ -74,9 +77,9 @@ class TemporaryPasswordDelivery {
                         Map.of("username", username, "temporaryPassword", temporaryPassword),
                         dedupKey,
                         scope);
-                reached = reached || delivery.reached();
+                accepted = accepted || delivery.accepted();
             }
-            return reached;
+            return accepted;
         }
         return false;
     }

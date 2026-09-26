@@ -116,8 +116,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> notifications.send(
                         "SMS", "0771234567", "si", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
         UUID id = delivery.notificationId();
-        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.SENT);
-        assertThat(delivery.reached()).isTrue();
+        // Decided inside the transaction: logged for sending; the provider is called after commit.
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
+        assertThat(delivery.accepted()).isTrue();
 
         assertThat(sms.sent).hasSize(1);
         assertThat(sms.sent.get(0).recipient()).isEqualTo("0771234567");
@@ -222,9 +223,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> notifications.send(
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
         UUID id = delivery.notificationId();
-        // A retry is not a delivery: the caller of a one-time password must not count on it.
+        // At call time the send is only logged; the failure happens after commit and is the sweep's.
         assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
-        assertThat(delivery.reached()).isFalse();
+        assertThat(delivery.accepted()).isTrue();
 
         assertThat(status(id)).isEqualTo("QUEUED");
         assertThat(attempts(id)).isEqualTo(1);
