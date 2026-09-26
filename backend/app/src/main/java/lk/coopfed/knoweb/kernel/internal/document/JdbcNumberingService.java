@@ -147,6 +147,34 @@ class JdbcNumberingService implements NumberingService {
     }
 
     @Override
+    public void releaseHolder(Collection<UUID> seriesIds, ScopeContext ctx) {
+        requireTransaction("releaseHolder");
+
+        for (UUID seriesId : seriesIds) {
+            Series series = findById(seriesId).orElseThrow(() -> new ProblemException("series.not_found"));
+
+            if ("CLOSED".equals(series.status())) {
+                throw new ProblemException("series.closed", Map.of("prefix", series.prefix()));
+            }
+
+            if (series.holderDeviceId() == null) {
+                continue;
+            }
+
+            jdbc.update("update kernel.numbering_series set holder_device_id = null where series_id = ?", seriesId);
+
+            audit.record(
+                    AUDIT_HOLDER_CHANGED,
+                    Subject.of("numbering_series", seriesId),
+                    Map.of("holderDeviceId", series.holderDeviceId().toString()),
+                    Map.of("holderDeviceId", "null"),
+                    ctx);
+
+            events.publish(new SeriesHolderChanged(seriesId, series.holderDeviceId(), null, ctx.entityId()));
+        }
+    }
+
+    @Override
     public void closeSeries(UUID seriesId, ScopeContext ctx) {
         requireTransaction("closeSeries");
 

@@ -63,6 +63,10 @@ final class RelationshipRules {
         }
     }
 
+    /**
+     * The row as the caller may read it, unlocked: a buyer reads it and is then told
+     * {@code not_seller}. A handler that changes the row locks it next, {@link #lockedForSeller}.
+     */
     static Relationship found(RelationshipRepository repository, UUID relationshipId) {
         if (relationshipId == null) {
             throw new ProblemException("request.field.required", Map.of("field", "relationshipId"));
@@ -71,6 +75,36 @@ final class RelationshipRules {
                 .findById(relationshipId)
                 .orElseThrow(() ->
                         new ProblemException("m1.relationship.not_found", Map.of("relationshipId", relationshipId)));
+    }
+
+    /**
+     * The seller's guard and then the lock ({@link RelationshipLocking#lockForUpdate}): the
+     * status and the closing date the guards read next are the ones committed now, and two
+     * commands on the same row run one after the other (the review of M1-04).
+     */
+    static Relationship lockedForSeller(RelationshipRepository repository, ScopeContext scope, Relationship row) {
+        requireSeller(scope, row);
+        return repository.lockForUpdate(row);
+    }
+
+    /**
+     * The row is the latest ACTIVE row of its pair: no earlier amendment has put a row after it.
+     * An amendment of an earlier row would copy that row's closing date onto the new terms, so
+     * the change would stop the day the later row starts and the later row would keep the old
+     * terms (the review of M1-04). Amend the latest row instead.
+     */
+    static void requireLatest(RelationshipRepository repository, Relationship relationship) {
+        List<Relationship> later = repository.activeStartingAfter(
+                relationship.sellerEntityId(), relationship.buyerEntityId(), relationship.effectiveFrom());
+        if (!later.isEmpty()) {
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("relationshipId", relationship.getId());
+            params.put("latestRelationshipId", later.get(later.size() - 1).getId());
+            params.put(
+                    "latestEffectiveFrom",
+                    later.get(later.size() - 1).effectiveFrom().toString());
+            throw new ProblemException("m1.relationship.not_latest", params);
+        }
     }
 
     static void requireReason(String reasonCode) {

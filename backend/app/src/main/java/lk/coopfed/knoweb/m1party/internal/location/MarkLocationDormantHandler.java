@@ -47,6 +47,9 @@ class MarkLocationDormantHandler implements Handles<MarkLocationDormant, UUID> {
 
         Map<String, Object> before = location.auditState();
         location.moveTo(Location.STATUS_DORMANT);
+        // Reactivate asks for the connectivity gate again (doc 21 section 4.3): the fact is
+        // cleared here, so that the gate is a real check and not the record of months ago.
+        location.clearConnectivity();
         locations.saveAndFlush(location);
 
         audit.record(
