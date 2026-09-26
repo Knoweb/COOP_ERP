@@ -243,7 +243,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "kernel.notification_pending",
-                    "own_* only (kernel V0058): the recipient of a queued notification in clear, held until it"
+                    "own_* only (kernel V0059): the recipient of a queued notification in clear, held until it"
                             + " is settled; the sweep reads it in the owner's scope, nobody else at all",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
             // The ENTITY series and the entity's location-less documents are the whole entity's:

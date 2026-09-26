@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
  * <p>A row is settled only after its pre-signed PUT has expired (review of 26 September):
  * until then the same URL could replace the bytes after the hash was checked, and the
  * content hash and the approval that read it would no longer describe the stored object.
- * Once settled, the row never changes (kernel V0057), and no new URL is issued for it.
+ * Once settled, the row never changes (kernel V0058), and no new URL is issued for it.
  *
  * <p>Reads as a federation-wide viewer, at most {@code attachment.verify.batch_size} rows per
  * run; writes each row in the OWN scope of the document's entity, one transaction per row
