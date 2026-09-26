@@ -78,40 +78,33 @@ public class ConfigItemSeedLoader implements ApplicationRunner {
         log.info("Registered {} configuration item(s) in kernel.config_item", count[0]);
     }
 
-    /** A module's key/value defaults: registered items get the default, unknown keys become string items. */
+    /**
+     * A module's key/value defaults: a registered item gets the default, in its type and within
+     * its schema. A key the register does not know fails the start: it used to become an untyped
+     * ENTITY-scoped string item, not sensitive, that {@code set()} then accepted any text for
+     * without a second factor, while the module parsed the value as a duration or a number (a
+     * value of "10m" for a duration was a 500 on every command that read it, and "P3650D" set
+     * without MFA switched a freshness check off). Every key a module ships is typed and bounded
+     * in seed/kernel/config-items.yaml first.
+     */
     void registerModuleDefaults(Map<String, String> defaults) {
         transaction.executeWithoutResult(status -> defaults.forEach((key, value) -> {
-            Integer known = jdbc.sql("select count(*) from kernel.config_item where key = :key")
+            List<ConfigItem> items = jdbc.sql(ConfigItem.SELECT + " where key = :key")
                     .param("key", key)
-                    .query(Integer.class)
-                    .single();
+                    .query(ConfigItem.mapper(json))
+                    .list();
 
-            if (known > 0) {
-                ConfigItem item = jdbc.sql(ConfigItem.SELECT + " where key = :key")
-                        .param("key", key)
-                        .query(ConfigItem.mapper(json))
-                        .single();
-                JsonNode parsed = ConfigValues.parse(item, value, json);
-                jdbc.sql("update kernel.config_item set default_value = cast(:value as jsonb) where key = :key")
-                        .param("value", parsed.toString())
-                        .param("key", key)
-                        .update();
-            } else {
-                String module = key.contains(".") ? key.substring(0, key.indexOf('.')) : "kernel";
-                jdbc.sql(
-                                """
-                                insert into kernel.config_item (
-                                    key, value_type, schema, description_en, default_value, scope_kind,
-                                    change_permission, module
-                                ) values (:key, 'STRING', '{}'::jsonb, :description, cast(:value as jsonb), 'ENTITY',
-                                          'sys.config.manage', :module)
-                                """)
-                        .param("key", key)
-                        .param("description", "Setting " + key + " of module " + module)
-                        .param("value", json.getNodeFactory().textNode(value).toString())
-                        .param("module", module)
-                        .update();
+            if (items.isEmpty()) {
+                throw new IllegalStateException("Configuration key " + key
+                        + " is not registered in seed/kernel/config-items.yaml: a module's default needs a typed,"
+                        + " bounded item there before it can be seeded");
             }
+
+            JsonNode parsed = ConfigValues.parse(items.getFirst(), value, json);
+            jdbc.sql("update kernel.config_item set default_value = cast(:value as jsonb) where key = :key")
+                    .param("value", parsed.toString())
+                    .param("key", key)
+                    .update();
         }));
     }
 

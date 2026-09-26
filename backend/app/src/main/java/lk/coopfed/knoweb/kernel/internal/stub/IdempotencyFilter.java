@@ -14,34 +14,84 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.internal.IdempotencyRequestAttributes;
-import org.springframework.core.Ordered;
+import lk.coopfed.knoweb.kernel.internal.security.JwtClaimsMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * Every mutating call under {@code /v1} carries an {@code Idempotency-Key} (19A section 3); the
+ * key and a hash of the request (method, path and body) are kept on the request for the
+ * command interceptor, which stores them in {@code kernel.idempotency_key} and answers a replay
+ * from the stored result, or refuses the same key with another request.
+ *
+ * <p>The hash is an HMAC-SHA256 under a server secret ({@code coop-erp.idempotency.hash-secret}),
+ * not a plain digest: a request body can carry a low-entropy secret (a 4-to-6-digit PIN in a
+ * PIN reset), and a plain digest of it in the table or a backup would give the PIN back in at
+ * most a million tries. With the secret the stored hash tells nothing. The secret has no
+ * default outside development (an issuer on localhost or a .test host, as
+ * {@link JwtClaimsMapper#isDevelopmentIssuer}); a deployed environment sets its own, and every
+ * instance the same one, since the hash of a replay is compared with the stored one.
+ *
+ * <p>After the security chain, like the gzip filter before it: the body is read into memory
+ * for the hash, and a body nobody has authenticated is not read at all.
+ */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 10)
+@Order(SecurityProperties.DEFAULT_FILTER_ORDER + 5)
 public class IdempotencyFilter extends OncePerRequestFilter {
 
     static final String HEADER_KEY = "Idempotency-Key";
 
     private static final Set<String> MUTATING = Set.of("POST", "PUT", "PATCH", "DELETE");
 
+    private static final String HMAC = "HmacSHA256";
+
+    /** Development only: what a developer's stack hashes with when nothing is configured. */
+    static final String DEVELOPMENT_SECRET = "coop-erp-idempotency-dev";
+
+    private static final Logger log = LoggerFactory.getLogger(IdempotencyFilter.class);
+
     private final ProblemResponses problems;
     private final ObjectMapper mapper;
+    private final byte[] secret;
 
-    public IdempotencyFilter(ProblemResponses problems, ObjectMapper mapper) {
+    public IdempotencyFilter(
+            ProblemResponses problems,
+            ObjectMapper mapper,
+            @Value("${coop-erp.idempotency.hash-secret:}") String secret,
+            @Value("${coop-erp.security.oidc.issuer:}") String issuer) {
         this.problems = problems;
         this.mapper = mapper;
+        this.secret = secretOrDevelopment(secret, issuer).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The configured secret; on a development stack a fixed one with a warning; else the start fails. */
+    static String secretOrDevelopment(String configured, String issuer) {
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        if (JwtClaimsMapper.isDevelopmentIssuer(issuer)) {
+            log.warn("coop-erp.idempotency.hash-secret is not set; using the development secret"
+                    + " (the issuer is a development one). Set COOP_ERP_IDEMPOTENCY_SECRET outside development.");
+            return DEVELOPMENT_SECRET;
+        }
+        throw new IllegalStateException("coop-erp.idempotency.hash-secret must be set outside development:"
+                + " the request hashes of the idempotency store are keyed with it");
     }
 
     @Override
@@ -71,14 +121,14 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             // Spring would then answer "Required part is not present". So the hash is taken from
             // the parts (name, size, bytes, in order) and the request goes on as it is.
             request.setAttribute(IdempotencyRequestAttributes.KEY, key);
-            request.setAttribute(IdempotencyRequestAttributes.REQUEST_HASH, sha256(prefix, partsOf(request)));
+            request.setAttribute(IdempotencyRequestAttributes.REQUEST_HASH, hash(prefix, partsOf(request)));
             chain.doFilter(request, response);
             return;
         }
 
         byte[] body = request.getInputStream().readAllBytes();
 
-        String requestHash = sha256(prefix, body);
+        String requestHash = hash(prefix, body);
 
         request.setAttribute(IdempotencyRequestAttributes.KEY, key);
 
@@ -114,17 +164,24 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         mapper.writeValue(response.getWriter(), problem);
     }
 
-    private static String sha256(String prefix, byte[] body) {
+    private String hash(String prefix, byte[] body) {
+        return hmac(secret, prefix, body);
+    }
+
+    /** HMAC-SHA256 of the prefix and the body under the secret, as 64 hex characters (the column's check). */
+    static String hmac(byte[] secret, String prefix, byte[] body) {
 
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            Mac mac = Mac.getInstance(HMAC);
 
-            digest.update(prefix.getBytes(StandardCharsets.UTF_8));
+            mac.init(new SecretKeySpec(secret, HMAC));
 
-            return HexFormat.of().formatHex(digest.digest(body));
+            mac.update(prefix.getBytes(StandardCharsets.UTF_8));
 
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is part of every JDK", e);
+            return HexFormat.of().formatHex(mac.doFinal(body));
+
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new IllegalStateException("HmacSHA256 is part of every JDK", e);
         }
     }
 
