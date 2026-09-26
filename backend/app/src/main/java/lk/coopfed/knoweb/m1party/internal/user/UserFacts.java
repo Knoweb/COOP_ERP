@@ -15,7 +15,11 @@ class UserFacts {
     /** The permission whose last holder an entity must keep (21A section 6, Grant.lastAdminGuard). */
     static final String USER_MANAGE = "gov.user.manage";
 
-    /** An entity-wide assignment of an active role that carries gov.user.manage, as ActivateEntity counts them. */
+    /**
+     * An entity-wide assignment of an active role that carries gov.user.manage, held by an
+     * ACTIVE user. Only ACTIVE: the permission resolver grants nothing to a PENDING or LOCKED
+     * user, so such a holder cannot act as a manager and must not count as one.
+     */
     private static final String USER_MANAGERS =
             """
             select count(distinct u.user_id)
@@ -24,7 +28,7 @@ class UserFacts {
               join security.role r on r.role_id = ur.role_id and r.status = 'ACTIVE'
               join security.role_permission rp on rp.role_id = r.role_id
              where u.home_entity_id = ?
-               and u.status <> 'DEACTIVATED'
+               and u.status = 'ACTIVE'
                and ur.scope_entity_id = ?
                and ur.scope_location_id is null
                and rp.permission_code = ?
@@ -60,7 +64,7 @@ class UserFacts {
                 jdbc.queryForObject(HOLDS_USER_MANAGE, Boolean.class, userId, entityId, USER_MANAGE));
     }
 
-    /** Whether another user of the entity, not deactivated, holds gov.user.manage entity-wide. */
+    /** Whether another ACTIVE user of the entity holds gov.user.manage entity-wide. */
     boolean anotherUserManagerExists(UUID userId, UUID entityId) {
         Integer others = jdbc.queryForObject(USER_MANAGERS, Integer.class, entityId, entityId, USER_MANAGE, userId);
         return others != null && others > 0;

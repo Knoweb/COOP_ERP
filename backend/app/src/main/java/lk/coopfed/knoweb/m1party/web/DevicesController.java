@@ -2,9 +2,13 @@ package lk.coopfed.knoweb.m1party.web;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.PermissionResolver;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.AssignDeviceToPosition;
 import lk.coopfed.knoweb.m1party.api.EnrolDevice;
@@ -20,12 +24,15 @@ import lk.coopfed.knoweb.m1party.web.generated.DeviceResponse;
 import lk.coopfed.knoweb.m1party.web.generated.DevicesApi;
 import lk.coopfed.knoweb.m1party.web.generated.EnrolDeviceRequest;
 import lk.coopfed.knoweb.m1party.web.generated.SuspendDeviceRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 /** The asset register's operations (21A section 5, /v1/party/devices; M1-06). */
 @RestController
 class DevicesController implements DevicesApi {
+
+    private static final String VIEW = "sys.device.view";
 
     private final Handles<EnrolDevice, UUID> enrolDevice;
     private final Handles<AssignDeviceToPosition, UUID> assignDevice;
@@ -34,6 +41,8 @@ class DevicesController implements DevicesApi {
     private final Handles<RetireDevice, UUID> retireDevice;
     private final DeviceQueries queries;
     private final CurrentScope currentScope;
+    private final PermissionResolver permissions;
+    private final boolean enforcePermissions;
 
     DevicesController(
             Handles<EnrolDevice, UUID> enrolDevice,
@@ -42,7 +51,9 @@ class DevicesController implements DevicesApi {
             Handles<ReinstateDevice, UUID> reinstateDevice,
             Handles<RetireDevice, UUID> retireDevice,
             DeviceQueries queries,
-            CurrentScope currentScope) {
+            CurrentScope currentScope,
+            PermissionResolver permissions,
+            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
         this.enrolDevice = enrolDevice;
         this.assignDevice = assignDevice;
         this.suspendDevice = suspendDevice;
@@ -50,6 +61,8 @@ class DevicesController implements DevicesApi {
         this.retireDevice = retireDevice;
         this.queries = queries;
         this.currentScope = currentScope;
+        this.permissions = permissions;
+        this.enforcePermissions = enforcePermissions;
     }
 
     @Override
@@ -107,7 +120,9 @@ class DevicesController implements DevicesApi {
 
     @Override
     public ResponseEntity<DeviceResponse> getDevice(UUID deviceId) {
-        return queries.getDevice(deviceId, currentScope.get())
+        ScopeContext scope = currentScope.get();
+        requireView(scope);
+        return queries.getDevice(deviceId, scope)
                 .map(DevicesController::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -115,11 +130,27 @@ class DevicesController implements DevicesApi {
 
     @Override
     public ResponseEntity<List<DeviceResponse>> listDevices(UUID locationId, String status) {
-        List<DeviceResponse> devices =
-                queries.listDevices(new DeviceFilter(locationId, status), currentScope.get()).stream()
-                        .map(DevicesController::toResponse)
-                        .toList();
+        ScopeContext scope = currentScope.get();
+        requireView(scope);
+        List<DeviceResponse> devices = queries.listDevices(new DeviceFilter(locationId, status), scope).stream()
+                .map(DevicesController::toResponse)
+                .toList();
         return ResponseEntity.ok(devices);
+    }
+
+    /**
+     * The reads declare x-permission sys.device.view, and no command interceptor runs for a read, so the
+     * controller checks it (the pattern of M2's CatalogueController): for the OWN class (the
+     * read-only classes resolve no permission; row-level security is what limits them), and only
+     * when enforcement is on, as for commands (coop-erp.security.enforce-permissions).
+     */
+    private void requireView(ScopeContext scope) {
+        if (!enforcePermissions || scope == null || scope.policyClass() != PolicyClass.OWN) {
+            return;
+        }
+        if (!permissions.allows(scope, VIEW)) {
+            throw new ProblemException("permission.denied", Map.of("permission", VIEW));
+        }
     }
 
     private static DeviceResponse toResponse(DeviceView view) {

@@ -133,6 +133,9 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
         provider.disableUser(admin, subject);
         assertThat(userAtTheProvider(subject).path("enabled").asBoolean()).isFalse();
 
+        provider.enableUser(admin, subject);
+        assertThat(userAtTheProvider(subject).path("enabled").asBoolean()).isTrue();
+
         db.execute("delete from security.app_user where user_id = '" + userId + "'");
     }
 

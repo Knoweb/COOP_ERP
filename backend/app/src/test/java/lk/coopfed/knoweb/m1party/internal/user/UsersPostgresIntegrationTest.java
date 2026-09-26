@@ -255,6 +255,33 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aKindThatLosesTheBackOfficeDisablesTheLoginAndRegainingItEnablesIt() {
+        UUID userId = insertUser(ENTITY, "manager.till", "BOTH", "ACTIVE", "subject-manager");
+
+        updateUser.handle(new UpdateUser(userId, "Manager", "en", "TILL"), admin);
+
+        // Till only now: the login is closed and every session ended, as a deactivation does it.
+        assertThat(provider.methodsFor("subject-manager")).containsExactly("disableUser", "revokeSessions");
+        assertThat(kernel.committedAudit()).singleElement().satisfies(record -> {
+            assertThat(record.eventType()).isEqualTo("USER_UPDATED");
+            assertThat((Map<String, Object>) record.after()).containsEntry("userKind", "TILL");
+        });
+        assertThat(kernel.committedEvents()).containsExactly(new UserUpdated(userId, userId, ENTITY, "TILL", "ACTIVE"));
+
+        provider.reset();
+        kernel.reset();
+        updateUser.handle(new UpdateUser(userId, "Manager", "en", "BACK_OFFICE"), admin);
+
+        // Back in the office: the same login, enabled again, with the credentials it had.
+        assertThat(provider.methodsFor("subject-manager")).containsExactly("enableUser");
+
+        // A change that keeps the back office touches no login.
+        provider.reset();
+        updateUser.handle(new UpdateUser(userId, "Manager", "si", "BOTH"), admin);
+        assertThat(provider.calls).isEmpty();
+    }
+
+    @Test
     void updateUserGuards() {
         UUID external = insertUser(ENTITY, "an.auditor", "EXTERNAL", "ACTIVE");
         UUID gone = insertUser(ENTITY, "gone.away", "TILL", "DEACTIVATED");
@@ -495,6 +522,26 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
         refused(
                 "m1.user.last_user_manager",
                 () -> deactivateUser.handle(new DeactivateUser(secondAdmin, "LEFT_EMPLOYMENT", null), admin));
+    }
+
+    @Test
+    void aPendingHolderOfUserManageIsNotAManagerWhoCanAct() {
+        // The resolver grants nothing to a PENDING user, so the one ACTIVE manager is the last one.
+        UUID onlyAdmin = insertUser(ENTITY, "acting.admin", "BACK_OFFICE", "ACTIVE");
+        grantUserManage(onlyAdmin);
+        UUID pending = insertUser(ENTITY, "pending.admin", "BACK_OFFICE", "PENDING");
+        grantUserManage(pending);
+
+        refused(
+                "m1.user.last_user_manager",
+                () -> deactivateUser.handle(new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), admin));
+
+        superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", pending);
+        deactivateUser.handle(new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), admin);
+        assertThat(queries.getUser(onlyAdmin, admin))
+                .get()
+                .extracting(UserView::status)
+                .isEqualTo("DEACTIVATED");
     }
 
     @Test

@@ -13,8 +13,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * {@link JdbcUserScopes} over M1's tables: the scopes are the active assignments, the grants
- * are the ACTIVE, current rows of {@code external_grant} keyed by the grantee, and the cache
- * empties on demand.
+ * are the ACTIVE, current rows of {@code external_grant} of an ACTIVE grantee, the cache
+ * empties on demand, and a grant entry lives no longer than the earliest end in it.
  */
 class JdbcUserScopesPostgresIntegrationTest extends PostgresIntegrationTest {
 
@@ -83,6 +83,35 @@ class JdbcUserScopesPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(scopes.grantsOf(USER)).containsExactly(GRANTED);
         assertThat(scopes.scopesOf(UUID.randomUUID())).isEmpty();
         assertThat(scopes.grantsOf(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void aDeactivatedGranteeAndAGrantNotYetOpenResolveNothing() {
+        superuserJdbc().update("update security.app_user set status = 'DEACTIVATED' where user_id = ?", USER);
+        scopes.invalidateUser(USER);
+        assertThat(scopes.grantsOf(USER)).isEmpty();
+
+        superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", USER);
+        superuserJdbc()
+                .update(
+                        "update security.external_grant set valid_from = now() + interval '1 hour' where grantee_user_id = ? and status = 'ACTIVE'",
+                        USER);
+        scopes.invalidateUser(USER);
+        assertThat(scopes.grantsOf(USER)).isEmpty();
+    }
+
+    @Test
+    void aGrantEntryLivesNoLongerThanTheEarliestEndInIt() throws InterruptedException {
+        superuserJdbc()
+                .update(
+                        "update security.external_grant set valid_until = now() + interval '2 seconds' where grantee_user_id = ? and status = 'ACTIVE'",
+                        USER);
+        scopes.invalidateUser(USER);
+        assertThat(scopes.grantsOf(USER)).containsExactly(GRANTED);
+
+        // Well inside the minute the cache would otherwise keep it: the entry ends with the grant.
+        Thread.sleep(2_500);
+        assertThat(scopes.grantsOf(USER)).isEmpty();
     }
 
     @Test
