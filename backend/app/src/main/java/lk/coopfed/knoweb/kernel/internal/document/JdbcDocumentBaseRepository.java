@@ -8,8 +8,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
 import lk.coopfed.knoweb.kernel.api.DocumentLinkRecord;
@@ -18,6 +20,8 @@ import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.DocumentStateHistoryRecord;
 import lk.coopfed.knoweb.kernel.api.LinkType;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.Subject;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -25,10 +29,15 @@ import org.springframework.stereotype.Component;
 
 /**
  * The document base on {@code kernel.document} and its rows (doc 18 part C; 19A section 7),
- * replacing the 17A in-memory stub. Headers are immutable once issued except for status:
- * this class refuses such a save with {@code document.immutable}, and the database trigger
- * refuses it again for anybody who bypasses this class. Lines, links and history are
- * insert-only, by grant and by trigger.
+ * replacing the 17A in-memory stub. Headers are immutable once issued except for status, and
+ * the status changes only through {@link #addStateTransition}: {@link #save} refuses anything
+ * else with {@code document.immutable}, and the database trigger refuses it again for anybody
+ * who bypasses this class. Lines, links and history are insert-only, by grant and by trigger,
+ * and no line joins an issued document (the trigger and the policy of V0055).
+ *
+ * <p>Only the issuance protocol numbers a document: {@link #save} refuses a record that
+ * carries a number, an issuance time or a hash ({@code document.issued_fields_reserved}), and
+ * the protocol writes those through the package-private {@link #writeIssued}.
  *
  * <p>Runs in the caller's transaction and scope: row-level security decides what a caller
  * sees and may write, so a document of another entity is simply not found.
@@ -115,34 +124,53 @@ class JdbcDocumentBaseRepository implements DocumentBaseRepository {
                     rs.getString("reason_code"),
                     rs.getString("reason_text"));
 
-    private final JdbcTemplate jdbc;
+    static final String AUDIT_STATUS_CHANGED = "DOCUMENT_STATUS_CHANGED";
 
-    JdbcDocumentBaseRepository(JdbcTemplate jdbc) {
+    private final JdbcTemplate jdbc;
+    private final AuditFacade audit;
+
+    JdbcDocumentBaseRepository(JdbcTemplate jdbc, AuditFacade audit) {
         this.jdbc = jdbc;
+        this.audit = audit;
     }
 
     @Override
     public DocumentRecord save(DocumentRecord document) {
         Optional<DocumentRecord> existing = findById(document.id());
 
+        if (existing.isPresent() && existing.get().isIssued()) {
+            throw new ProblemException("document.immutable");
+        }
+
+        if (carriesIssuedFields(document)) {
+            throw new ProblemException("document.issued_fields_reserved");
+        }
+
         if (existing.isEmpty()) {
             insertHeader(document);
             return document;
         }
 
-        DocumentRecord stored = existing.get();
-
-        if (stored.isIssued()) {
-            if (!stored.withStatus(document.status()).equals(document)) {
-                throw new ProblemException("document.immutable");
-            }
-            jdbc.update(
-                    "update kernel.document set status = ? where document_id = ?", document.status(), document.id());
-            return document;
-        }
-
         updateDraft(document);
         return document;
+    }
+
+    /** What only the issuance protocol sets (doc 18 section 5.5): a caller's record never carries them. */
+    private static boolean carriesIssuedFields(DocumentRecord d) {
+        return d.seriesId() != null
+                || d.docNumber() != null
+                || d.docNumberDisplay() != null
+                || d.issuedAt() != null
+                || d.issuedLocal() != null
+                || d.contentHash() != null;
+    }
+
+    /**
+     * The issuance protocol's write: the stored draft becomes the issued header. Package-private
+     * so that no module issues a document around the protocol.
+     */
+    void writeIssued(DocumentRecord issued) {
+        updateDraft(issued);
     }
 
     @Override
@@ -196,12 +224,60 @@ class JdbcDocumentBaseRepository implements DocumentBaseRepository {
                     link.createdAt() == null ? null : Timestamp.from(link.createdAt()),
                     link.createdBy());
         } catch (DataIntegrityViolationException e) {
+            // The partial unique index of V0055: a second REVERSES of the same original, however
+            // close in time the two came.
+            if (String.valueOf(e.getMessage()).contains("document_link_reverses_once_idx")) {
+                throw new ProblemException("document.link.reversed_already");
+            }
             throw new ProblemException("document.link.exists");
         }
     }
 
     @Override
-    public void addStateTransition(DocumentStateHistoryRecord transition) {
+    public void lockForLinking(UUID documentId) {
+        // A transaction-scoped advisory lock keyed by the document. A correction of a document
+        // the caller does not own (a DISPUTES of the seller's invoice) cannot take a row lock on
+        // it, because a row lock needs the UPDATE policy, so the lock is by key instead. It is
+        // released with the transaction.
+        jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?, 0))", documentId.toString());
+    }
+
+    @Override
+    public void addStateTransition(DocumentStateHistoryRecord transition, ScopeContext ctx) {
+        if (transition.fromStatus() == null
+                || transition.toStatus() == null
+                || transition.fromStatus().equals(transition.toStatus())) {
+            throw new ProblemException("document.status_conflict");
+        }
+
+        // Compare-and-set: the header moves only from the status the caller saw. A transition
+        // that raced this one, or a stale view of the document, changes no row and is refused,
+        // so two acceptances of one document cannot both succeed.
+        int moved = jdbc.update(
+                "update kernel.document set status = ? where document_id = ? and status = ?",
+                transition.toStatus(),
+                transition.documentId(),
+                transition.fromStatus());
+
+        if (moved != 1) {
+            throw new ProblemException(
+                    "document.status_conflict",
+                    Map.of("fromStatus", transition.fromStatus(), "toStatus", transition.toStatus()));
+        }
+
+        insertHistory(transition);
+
+        audit.record(
+                AUDIT_STATUS_CHANGED,
+                Subject.of("document", transition.documentId()),
+                Map.of("status", transition.fromStatus()),
+                Map.of("status", transition.toStatus(), "reasonCode", String.valueOf(transition.reasonCode())),
+                ctx,
+                transition.reasonText());
+    }
+
+    /** The history row alone; the issuance protocol writes its DRAFT to ISSUED row through here. */
+    void insertHistory(DocumentStateHistoryRecord transition) {
         jdbc.update(
                 """
                 insert into kernel.document_state_history (
@@ -219,17 +295,23 @@ class JdbcDocumentBaseRepository implements DocumentBaseRepository {
                 transition.deviceId(),
                 transition.reasonCode(),
                 transition.reasonText());
-
-        jdbc.update(
-                "update kernel.document set status = ? where document_id = ?",
-                transition.toStatus(),
-                transition.documentId());
     }
 
     @Override
     public Optional<DocumentRecord> findById(UUID id) {
         return jdbc
                 .query("select " + HEADER_COLUMNS + " from kernel.document where document_id = ?", HEADER, id)
+                .stream()
+                .findFirst();
+    }
+
+    @Override
+    public Optional<DocumentRecord> findByIdForUpdate(UUID id) {
+        return jdbc
+                .query(
+                        "select " + HEADER_COLUMNS + " from kernel.document where document_id = ? for update",
+                        HEADER,
+                        id)
                 .stream()
                 .findFirst();
     }

@@ -48,6 +48,17 @@ spring:
   flyway:
     enabled: false
 
+  # The broker, reached by every role: the worker publishes the outbox and runs the consumer
+  # queues (19A K-05, application-worker.yml), and every instance holds its own cache fan-out
+  # queue (coop-erp.rabbit.cache-fanout below). The defaults are the local stack's.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:coop}
+    password: ${RABBITMQ_PASSWORD:coop}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
   modulith:
     events:
       republish-outstanding-events-on-restart: false
@@ -112,6 +123,24 @@ coop-erp:
       private-key: ${SYNC_SIGNING_PRIVATE_KEY:}
       public-key: ${SYNC_SIGNING_PUBLIC_KEY:}
 
+  # K-03a: the request hash of the idempotency store is an HMAC under this secret, the same on
+  # every instance, so that a stored hash tells nothing about a body that carried a PIN. No
+  # default outside development: empty, the backend starts only against a development issuer
+  # (localhost, *.localhost, *.test) with a fixed development secret, and refuses otherwise.
+  # Changing it makes a key first used before the change answer request_mismatch when it is
+  # replayed after; the retention (retention-hours, 24) bounds that window.
+  idempotency:
+    hash-secret: ${COOP_ERP_IDEMPOTENCY_SECRET:}
+
+  # The per-instance cache fan-out (doc 19 section 8, 19A section 3): every instance, in every
+  # role, holds an exclusive queue on the domain exchange for the events that empty its
+  # permission, configuration and device caches, beside the worker's consumer queues. Off only
+  # in the test contexts, which have no broker; an instance that cannot reach the broker serves
+  # its caches to their expiry and tries again every minute.
+  rabbit:
+    cache-fanout:
+      enabled: ${COOP_ERP_CACHE_FANOUT:true}
+
   # The object store of the attachments (19A section 9), behind the S3 protocol: any S3 service,
   # MinIO on a developer machine. The endpoint is what the backend reaches; the public endpoint
   # is what a browser or a till reaches with a pre-signed URL (the same one outside compose).
@@ -154,7 +183,8 @@ coop-erp:
 # They need no token (kernel.internal.security.SecurityConfig): an orchestrator probes them
 # without one, and doc 35 decides whether the management port is published at all.
 # The RabbitMQ health indicator is on in the worker role only (application-worker.yml): the
-# other roles never talk to the broker, so its absence must not turn their health DOWN.
+# other roles reach the broker for their cache fan-out alone, which the cache expiry covers,
+# so its absence must not turn their health DOWN.
 management:
   health:
     rabbit:

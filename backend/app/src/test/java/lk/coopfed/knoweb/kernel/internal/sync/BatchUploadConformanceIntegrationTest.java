@@ -189,6 +189,55 @@ class BatchUploadConformanceIntegrationTest extends SyncIntegrationTest {
     }
 
     @Test
+    void aCompressedBodyOverTheBatchLimitIsRefusedBeforeItIsInflated() throws IOException {
+        // Three megabytes that do not compress (random), against DR-1's two megabytes as sent:
+        // the read stops one byte past the limit, and nothing is inflated.
+        byte[] incompressible = new byte[3 * 1024 * 1024];
+        new java.util.Random(8).nextBytes(incompressible);
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(compressed)) {
+            gzip.write(incompressible);
+        }
+        HttpHeaders headers = TestIdentityProvider.deviceHeaders(DEVICE);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Content-Encoding", "gzip");
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        ResponseEntity<JsonNode> response = http.exchange(
+                "/v1/sync/devices/" + DEVICE + "/batches",
+                HttpMethod.POST,
+                new HttpEntity<>(compressed.toByteArray(), headers),
+                JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody().path("code").asText()).isEqualTo("sync.batch_too_large");
+        assertThat(cursor()).isZero();
+    }
+
+    @Test
+    void aCompressedBodyWithoutATokenIsNotInflatedEither() throws IOException {
+        // The security chain answers before the gzip filter: an anonymous client makes the server
+        // read nothing.
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(compressed)) {
+            gzip.write(json.writeValueAsBytes(batch(Ids.next(), 1, events(1, 1))));
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Content-Encoding", "gzip");
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        ResponseEntity<JsonNode> response = http.exchange(
+                "/v1/sync/devices/" + DEVICE + "/batches",
+                HttpMethod.POST,
+                new HttpEntity<>(compressed.toByteArray(), headers),
+                JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(cursor()).isZero();
+    }
+
+    @Test
     void aBatchOfADeviceNeverEnrolledForSyncIsRefused() {
         superuserJdbc().update("delete from kernel.device_sync_cursor where device_id = ?", DEVICE);
 
