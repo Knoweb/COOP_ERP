@@ -23,6 +23,24 @@ export function useFormatInstant() {
     });
 }
 
+// What a calendar date from the API looks like (an OpenAPI `format: date`): 2026-09-25.
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Returns a function that formats a CALENDAR DATE from the API (2026-09-25, no time, no zone)
+ * as a date in the user's language, and nothing more. A calendar date is not an instant: it
+ * was signed, born or due on that day everywhere, so no time zone may move it. It is read as
+ * a day and formatted in UTC, so that 2026-09-25 prints as 25 Sep 2026 and never as a time
+ * nobody recorded (useFormatInstant read it as UTC midnight and printed 5:30 AM in Colombo;
+ * the review of 26 September). A text that is not a calendar date is returned as it came,
+ * so a wrong field shows what the server sent instead of "Invalid Date".
+ */
+export function useFormatDate() {
+  const intl = useIntl();
+  return (date: string) =>
+    CALENDAR_DATE.test(date) ? intl.formatDate(`${date}T00:00:00Z`, { dateStyle: "medium", timeZone: "UTC" }) : date;
+}
+
 /** An amount ready to be shown: the digits without a sign ("1,234.00"), and whether it is below zero. */
 export type MoneyDigits = { digits: string; negative: boolean };
 
