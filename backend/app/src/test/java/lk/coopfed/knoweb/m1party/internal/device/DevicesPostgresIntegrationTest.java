@@ -4,12 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
@@ -128,6 +135,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.execute("truncate table party.device, party.till_position, party.location, party.entity_relationship,"
                 + " party.entity_party_directory, party.federation_identity, party.entity cascade");
         sync.drained.clear();
+        sync.versions.clear();
 
         insertEntity(admin, MPCS, "M960");
         insertEntity(admin, OTHER, "M961");
@@ -329,6 +337,10 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(record.subject().type()).isEqualTo("till_position");
             assertThat(record.subject().id()).isEqualTo(P1);
             assertThat(((Map<?, ?>) record.after()).get("deviceIds")).isEqualTo(List.of(old));
+            assertThat((List<?>) ((Map<?, ?>) record.after()).get("seriesIds"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(UUID.class))
+                    .as("the series of the position the lost device gives up")
+                    .containsExactlyInAnyOrder(RCT_P1, CPR_P1, GRN_SHOP1);
         });
         assertThat(audit("SERIES_HOLDER_CHANGED")).hasSize(3);
         assertThat(events(DevicePositionChanged.class)).singleElement().satisfies(event -> {
@@ -393,8 +405,114 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(event.previousDeviceId()).isNull();
             assertThat(event.previousTillPositionId()).isEqualTo(P2);
             assertThat(event.outboxLossRecorded()).isFalse();
+            assertThat(event.seriesMoved()).containsExactlyInAnyOrder(RCT_P1, CPR_P1, GRN_SHOP1);
         });
         assertThat(audit("DEVICE_POSITION_CHANGED")).hasSize(1);
+        // The lane it left keeps no holder until a device is assigned there (the review of M1-06).
+        assertThat(holders(RCT_P1, CPR_P1, GRN_SHOP1)).containsOnly(device);
+        assertThat(holders(RCT_P2)).containsOnlyNulls();
+        assertThat(audit("SERIES_HOLDER_CHANGED")).hasSize(4);
+        assertThat(events(SeriesHolderChanged.class))
+                .filteredOn(event -> event.seriesId().equals(RCT_P2))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.previousDeviceId()).isEqualTo(device);
+                    assertThat(event.deviceId()).isNull();
+                });
+    }
+
+    @Test
+    void anUndrainedDeviceThatMovesRecordsTheLossAgainstTheLaneItLeaves() {
+        // The device at the primary till P1 moves to P2 with its outbox not drained: the numbers
+        // it never sent were taken from P1's series and the shop's, not from P2's, and the
+        // documented gap names those (the review of M1-06).
+        UUID device = enrol("SN-0001", SHOP1);
+        assignDevice.handle(assign(device, P1), own(MPCS));
+        kernel.reset();
+
+        assignDevice.handle(new AssignDeviceToPosition(device, P2, "MOVE", "moved to lane 2", true), own(MPCS));
+
+        assertThat(deviceRow(device)).containsEntry("current_till_position_id", P2);
+        assertThat(holders(RCT_P2)).containsOnly(device);
+        assertThat(holders(RCT_P1, CPR_P1, GRN_SHOP1)).containsOnlyNulls();
+        assertThat(audit("DEVICE_OUTBOX_LOSS_RECORDED")).singleElement().satisfies(record -> {
+            assertThat(record.subject().id()).isEqualTo(P2);
+            assertThat(((Map<?, ?>) record.after()).get("deviceIds")).isEqualTo(List.of(device));
+            assertThat((List<?>) ((Map<?, ?>) record.after()).get("seriesIds"))
+                    .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(UUID.class))
+                    .containsExactlyInAnyOrder(RCT_P1, CPR_P1, GRN_SHOP1);
+            List<?> losses = (List<?>) ((Map<?, ?>) record.after()).get("losses");
+            assertThat(losses).singleElement().satisfies(loss -> {
+                assertThat(((Map<?, ?>) loss).get("deviceId")).isEqualTo(device);
+                assertThat(((Map<?, ?>) loss).get("tillPositionId")).isEqualTo(P1);
+            });
+        });
+        assertThat(events(DevicePositionChanged.class)).singleElement().satisfies(event -> {
+            assertThat(event.outboxLossRecorded()).isTrue();
+            assertThat(event.seriesMoved()).containsExactly(RCT_P2);
+        });
+    }
+
+    @Test
+    void theVersionFloorIsComparedWithTheReleaseTheTillLastReported() {
+        // The heartbeat writes the kernel's tables, never M1's row (K-08): a till staged at 1.2.9
+        // and updated over the air to 2.0.0 is assignable once the floor is 1.3; one enrolled at
+        // 1.4.0 that reports 1.0.0 is not (the review of M1-06).
+        // A shop made for this test: the register's cache holds no earlier floor for its scope.
+        UUID floorShop = UUID.randomUUID();
+        UUID floorPosition = UUID.randomUUID();
+        insertShop(superuserJdbc(), floorShop, MPCS, "F" + floorShop.toString().substring(0, 6));
+        insertPosition(superuserJdbc(), floorPosition, floorShop, MPCS, 1, "ACTIVE");
+        UUID updated = enrolDevice.handle(
+                new EnrolDevice("SN-UPDATED", "POS_TERMINAL", floorShop, "1.2.9", "STG-UPDATED"), own(MPCS));
+        UUID downgraded = enrolDevice.handle(
+                new EnrolDevice("SN-DOWNGRADED", "POS_TERMINAL", floorShop, "1.4.0", "STG-DOWNGRADED"), own(MPCS));
+        sync.versions.put(updated, "2.0.0");
+        sync.versions.put(downgraded, "1.0.0");
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, value, reason) values (?, '\"1.3\"'::jsonb, 'test')",
+                        FLOOR_KEY);
+        kernel.reset();
+
+        assertThatThrownBy(() -> assignDevice.handle(assign(downgraded, floorPosition), atShop(MPCS, floorShop)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> {
+                    assertThat(e.messageId()).isEqualTo("m1.device.below_floor");
+                    assertThat(e.parameters()).containsEntry("appVersion", "1.0.0");
+                });
+        assertThat(assignDevice.handle(assign(updated, floorPosition), atShop(MPCS, floorShop)))
+                .isEqualTo(updated);
+        assertThat(deviceRow(updated)).containsEntry("current_till_position_id", floorPosition);
+    }
+
+    @Test
+    void anAssignmentWaitsForTheLockAnotherTransactionHoldsOnThePosition() throws Exception {
+        // Another transaction holds the position row (as a second assignment to it, or its
+        // retirement, would): this one blocks until it ends, so the two never pass each other.
+        UUID device = enrol("SN-0001", SHOP1);
+        kernel.reset();
+
+        try (Connection other = superuserJdbc().getDataSource().getConnection()) {
+            other.setAutoCommit(false);
+            try (PreparedStatement lock = other.prepareStatement(
+                    "select till_position_id from party.till_position where till_position_id = ? for update")) {
+                lock.setObject(1, P2);
+                lock.execute();
+            }
+            ExecutorService thread = Executors.newSingleThreadExecutor();
+            try {
+                Future<?> assignment = thread.submit(() -> assignDevice.handle(assign(device, P2), own(MPCS)));
+                assertThatThrownBy(() -> assignment.get(700, TimeUnit.MILLISECONDS))
+                        .as("the assignment waits for the lock")
+                        .isInstanceOf(TimeoutException.class);
+                assertThat(deviceRow(device)).containsEntry("status", "ENROLLED");
+                other.commit();
+                assignment.get(30, TimeUnit.SECONDS);
+            } finally {
+                thread.shutdownNow();
+            }
+        }
+        assertThat(deviceRow(device)).containsEntry("current_till_position_id", P2);
     }
 
     @Test
@@ -869,10 +987,14 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
     @TestConfiguration(proxyBeanMethods = false)
     static class TestBeans {
 
-        /** The sync gateway's answer, set by the test: no device is drained unless listed. */
+        /**
+         * The sync gateway's answer, set by the test: no device is drained unless listed, and a
+         * device has reported a release only when the test says which.
+         */
         static class SwitchableSyncStatus implements SyncStatus {
 
             final Set<UUID> drained = ConcurrentHashMap.newKeySet();
+            final Map<UUID, String> versions = new ConcurrentHashMap<>();
 
             @Override
             public boolean drained(UUID deviceId) {
@@ -880,9 +1002,9 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
             }
 
             @Override
-            public java.util.Optional<DeviceSyncState> state(
-                    UUID deviceId, lk.coopfed.knoweb.kernel.api.ScopeContext ctx) {
-                return java.util.Optional.empty();
+            public java.util.Optional<DeviceSyncState> state(UUID deviceId, ScopeContext ctx) {
+                return java.util.Optional.ofNullable(versions.get(deviceId))
+                        .map(version -> new DeviceSyncState(deviceId, null, version, 0L, null, null));
             }
         }
 

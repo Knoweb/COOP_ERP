@@ -55,7 +55,14 @@ class RetireTillPositionHandler implements Handles<RetireTillPosition, UUID> {
     public UUID handle(RetireTillPosition command, ScopeContext scope) {
 
         LocationGuards.requireOwnScope(scope);
-        TillPosition position = LocationGuards.position(positions, command.tillPositionId());
+        // The position is read once to learn its location, then the location row is locked and
+        // the position after it (the order every location handler keeps), so that this and a
+        // SetPrimaryTill of the same shop run one after the other: the is_primary guard below
+        // reads a primary till nobody is changing at the same time.
+        UUID locationId =
+                LocationGuards.position(positions, command.tillPositionId()).locationId();
+        Location location = LocationGuards.lockedLocation(locations, locationId);
+        TillPosition position = LocationGuards.lockedPosition(positions, command.tillPositionId());
         if (!position.isActive()) {
             throw new ProblemException("m1.position.not_active", Map.of("tillPositionId", position.getId()));
         }
@@ -63,7 +70,6 @@ class RetireTillPositionHandler implements Handles<RetireTillPosition, UUID> {
         if (facts.deviceAt(position.getId()).isPresent()) {
             throw new ProblemException("m1.position.device_assigned", Map.of("tillPositionId", position.getId()));
         }
-        Location location = LocationGuards.location(locations, position.locationId());
         if (position.getId().equals(location.primaryTillPositionId())) {
             throw new ProblemException("m1.position.is_primary", Map.of("tillPositionId", position.getId()));
         }
