@@ -219,6 +219,22 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "shared_read (M2-01): a batch is global identity, not owned; every class but NONE reads it",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "catalogue.batch_key",
+                    "shared_read (m2catalogue V0003): the identity of a batch, read like the batch",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
+                    "catalogue.sku_uom_conversion",
+                    "own_write (m2catalogue V0003) follows the parent SKU's owner; the matrix's made-up row has no SKU",
+                    RlsMatrixIntegrationTest::childRowsFollowTheirParent),
+            new Departure(
+                    "catalogue.sku_barcode",
+                    "own_write (m2catalogue V0003) follows the parent SKU's owner; the matrix's made-up row has no SKU",
+                    RlsMatrixIntegrationTest::childRowsFollowTheirParent),
+            new Departure(
+                    "catalogue.sku_tag",
+                    "own_write (m2catalogue V0003) follows the parent SKU's owner; the matrix's made-up row has no SKU",
+                    RlsMatrixIntegrationTest::childRowsFollowTheirParent),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
@@ -278,6 +294,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         && !check.scope().is("NONE")
                 ? VISIBLE
                 : null;
+    }
+
+    /** An insert is admitted only when the caller owns the parent SKU; a made-up row has none. */
+    private static String childRowsFollowTheirParent(Check check) {
+        return check.op() == Op.INSERT && check.scope().is("OWN") ? REFUSED : null;
     }
 
     private static String onlyTheOwnerReads(Check check) {

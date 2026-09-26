@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import org.slf4j.Logger;
@@ -37,18 +36,25 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>The tax categories and rates belong to the Federation, which publishes later rates in its
  * own scope (cat.tax.publish), so a seeded row carries the Federation as its owner:
  * {@code coop-erp.system.entity-id}, the entity the platform acts as (the local stack sets it to
- * the development Federation). When it is not set, the categories and rates are left out and a
- * warning says so; the units and tags, which have no owner, are loaded regardless.
+ * the development Federation, the test base class to a test one). Without it the categories
+ * cannot be seeded, and every SKU cites a category ({@code sku.tax_category_id NOT NULL}), so an
+ * instance without a Federation does not start: the constructor refuses it (review of 26
+ * September 2026; until then the tax rows were skipped with a warning and the first
+ * registration failed instead).
  */
 @Component
 public class M2SeedLoader {
 
     private static final Logger log = LoggerFactory.getLogger(M2SeedLoader.class);
 
+    static final String FEDERATION_REQUIRED =
+            "M2 cannot seed the tax categories: coop-erp.system.entity-id (COOP_ERP_SYSTEM_ENTITY_ID),"
+                    + " the entity that owns them, is not set";
+
     private final JdbcClient jdbc;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper mapper;
-    private final Optional<UUID> federation;
+    private final UUID federation;
 
     private final Resource uomResource = new ClassPathResource("seed/m2catalogue/uom.yaml");
     private final Resource taxResource = new ClassPathResource("seed/m2catalogue/tax.yaml");
@@ -65,9 +71,10 @@ public class M2SeedLoader {
         this.jdbc = JdbcClient.create(migrator);
         this.transactionTemplate = new TransactionTemplate(new JdbcTransactionManager(migrator));
         this.mapper = mapper;
-        this.federation = federationEntityId == null || federationEntityId.isBlank()
-                ? Optional.empty()
-                : Optional.of(UUID.fromString(federationEntityId));
+        if (federationEntityId == null || federationEntityId.isBlank()) {
+            throw new IllegalStateException(FEDERATION_REQUIRED);
+        }
+        this.federation = UUID.fromString(federationEntityId.strip());
     }
 
     /**
@@ -126,11 +133,7 @@ public class M2SeedLoader {
     }
 
     private int loadTax() {
-        if (federation.isEmpty()) {
-            log.warn("Tax categories and rates not seeded: coop-erp.system.entity-id (the Federation) is not set");
-            return 0;
-        }
-        UUID owner = federation.get();
+        UUID owner = federation;
         int inserted = 0;
         for (TaxSeed category : read(taxResource, "tax", TaxSeed.class)) {
             inserted += jdbc.sql(
