@@ -92,8 +92,14 @@ public class HeartbeatService {
     @Transactional
     public Answer record(ScopeContext device, Report report) {
         UUID deviceId = device.deviceId();
+        // Read without a lock: the till heartbeats after every batch and every five minutes, on
+        // a connection of its own, so a heartbeat overlaps the next batch's claim. The claim takes
+        // the cursor FOR UPDATE NOWAIT and answers 409 sync.batch_in_flight when the row is
+        // locked; a heartbeat holding the lock for its whole transaction made that a false
+        // conflict with no batch in flight. Only the resend_from update below needs the row, and
+        // it is guarded by the sequence it was decided on.
         List<Map<String, Object>> cursors = jdbc.queryForList(
-                "select last_applied_seq, resend_from_seq from kernel.device_sync_cursor where device_id = ? for update",
+                "select last_applied_seq, resend_from_seq from kernel.device_sync_cursor where device_id = ?",
                 deviceId);
         if (cursors.isEmpty()) {
             throw new ProblemException("sync.device_not_enrolled");
@@ -159,23 +165,38 @@ public class HeartbeatService {
         List<Ack.Instruction> instructions = new ArrayList<>();
         if (report.lastAcknowledgedSeq() != null && report.lastAcknowledgedSeq() > lastApplied) {
             long from = lastApplied + 1;
+            boolean decided = true;
             if (resendFrom == null || resendFrom != from) {
-                jdbc.update(
-                        "update kernel.device_sync_cursor set resend_from_seq = ? where device_id = ?", from, deviceId);
-                Map<String, Object> after = new LinkedHashMap<>();
-                after.put("lastAppliedSeq", lastApplied);
-                after.put("deviceAcknowledgedSeq", report.lastAcknowledgedSeq());
-                after.put("resendFromSeq", from);
-                audit.record(
-                        AUDIT_CURSOR_BEHIND,
-                        Subject.of("device", deviceId),
-                        null,
-                        after,
-                        device,
-                        "Central holds less than the device was acknowledged");
-                events.publish(new SyncAnomaly(Ids.next(), deviceId, "CURSOR_BEHIND", from, null));
+                // Conditional on the sequence read above: a batch that moved the cursor meanwhile
+                // wins, nothing is recorded, and the next heartbeat decides again from the new
+                // cursor.
+                decided = jdbc.update(
+                                """
+                                update kernel.device_sync_cursor set resend_from_seq = ?
+                                 where device_id = ? and last_applied_seq = ?
+                                """,
+                                from,
+                                deviceId,
+                                lastApplied)
+                        > 0;
+                if (decided) {
+                    Map<String, Object> after = new LinkedHashMap<>();
+                    after.put("lastAppliedSeq", lastApplied);
+                    after.put("deviceAcknowledgedSeq", report.lastAcknowledgedSeq());
+                    after.put("resendFromSeq", from);
+                    audit.record(
+                            AUDIT_CURSOR_BEHIND,
+                            Subject.of("device", deviceId),
+                            null,
+                            after,
+                            device,
+                            "Central holds less than the device was acknowledged");
+                    events.publish(new SyncAnomaly(Ids.next(), deviceId, "CURSOR_BEHIND", from, null));
+                }
             }
-            resendFrom = from;
+            if (decided) {
+                resendFrom = from;
+            }
         }
         if (resendFrom != null) {
             instructions.add(Ack.Instruction.resendFrom(resendFrom));

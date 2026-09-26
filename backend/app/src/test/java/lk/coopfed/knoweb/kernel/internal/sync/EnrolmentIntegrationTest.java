@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,8 +19,11 @@ import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -195,6 +199,40 @@ class EnrolmentIntegrationTest extends SyncIntegrationTest {
     }
 
     @Test
+    void aRetryWithTheSameIdempotencyKeyIsAnsweredAgainAndAnotherKeyLearnsNothing() {
+        String code = issueCode().getBody().path("code").asText();
+        String key = UUID.randomUUID().toString();
+
+        // The network dropped after central committed: the till holds nothing and retries.
+        ResponseEntity<JsonNode> first = enrolWithKey(code, SERIAL, key);
+        ResponseEntity<JsonNode> retry = enrolWithKey(code, SERIAL, key);
+
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(retry.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(retry.getBody().path("next_device_seq").asLong()).isEqualTo(1);
+        assertThat(retry.getBody().path("credential").path("client_id").asText())
+                .isEqualTo("device-" + DEVICE);
+        // The first credential was never delivered: the retry is issued one of its own.
+        verify(credentials, times(2)).issue(eq(DEVICE), eq(ENTITY));
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .filteredOn("DEVICE_SYNC_ENROLLED"::equals)
+                .hasSize(2);
+
+        // Another key with the spent code is a guess, and the answer is the one for every guess.
+        assertRefused(
+                enrolWithKey(code, SERIAL, UUID.randomUUID().toString()),
+                HttpStatus.FORBIDDEN,
+                "sync.enrolment.code_invalid");
+        // A retry with the right key but another serial, too.
+        assertRefused(enrolWithKey(code, "SN-SOMEONE-ELSE", key), HttpStatus.FORBIDDEN, "sync.enrolment.code_invalid");
+
+        // A new code ends the retry window of the old one.
+        issueCode();
+        assertRefused(enrolWithKey(code, SERIAL, key), HttpStatus.FORBIDDEN, "sync.enrolment.code_invalid");
+    }
+
+    @Test
     void enrollingAgainRotatesTheCredentialAndKeepsTheSequence() {
         enrol(issueCode().getBody().path("code").asText(), SERIAL);
         upload(Ids.next(), 1, events(1, 7));
@@ -219,11 +257,27 @@ class EnrolmentIntegrationTest extends SyncIntegrationTest {
 
     /** Without a token: the enrolment code is the credential of this one call. */
     private ResponseEntity<JsonNode> enrolAs(UUID device, String code, String serial) {
+        return post("/v1/sync/devices/" + device + "/enrol", enrolment(code, serial), new HttpHeaders());
+    }
+
+    /** The same, with the Idempotency-Key the till chose, for a retry. */
+    private ResponseEntity<JsonNode> enrolWithKey(String code, String serial, String key) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Idempotency-Key", key);
+        return http.exchange(
+                "/v1/sync/devices/" + DEVICE + "/enrol",
+                HttpMethod.POST,
+                new HttpEntity<>(enrolment(code, serial), headers),
+                JsonNode.class);
+    }
+
+    private ObjectNode enrolment(String code, String serial) {
         ObjectNode request = json.createObjectNode();
         request.put("enrolment_code", code);
         request.put("hardware_serial", serial);
         request.put("app_version", "1.0.0");
-        return post("/v1/sync/devices/" + device + "/enrol", request, new HttpHeaders());
+        return request;
     }
 
     private static void assertRefused(ResponseEntity<JsonNode> response, HttpStatus status, String code) {

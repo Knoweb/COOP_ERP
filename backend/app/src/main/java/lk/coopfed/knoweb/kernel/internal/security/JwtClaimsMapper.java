@@ -114,7 +114,7 @@ public class JwtClaimsMapper {
     }
 
     /** An issuer on this machine or on a development host name (localhost, *.localhost, *.test). */
-    static boolean isDevelopmentIssuer(String issuer) {
+    public static boolean isDevelopmentIssuer(String issuer) {
         if (issuer == null || issuer.isBlank()) {
             return false;
         }
