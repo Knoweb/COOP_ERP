@@ -3,7 +3,9 @@ package lk.coopfed.knoweb.kernel.internal.sync;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
@@ -27,6 +29,9 @@ import lk.coopfed.knoweb.kernel.sync.web.generated.SeriesAssignment;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SigningKey;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SnapshotDelta;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SnapshotPointer;
+import lk.coopfed.knoweb.kernel.sync.web.generated.SnapshotRow;
+import lk.coopfed.knoweb.kernel.sync.web.generated.SnapshotTable;
+import lk.coopfed.knoweb.kernel.sync.web.generated.SnapshotTombstone;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SyncAck;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SyncApi;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SyncBatch;
@@ -48,6 +53,8 @@ class SyncController implements SyncApi {
     private final BatchIngestor ingestor;
     private final HeartbeatService heartbeats;
     private final ChangeLogReader changeLog;
+    private final SnapshotBuilder snapshots;
+    private final SyncRateLimiter rateLimiter;
     private final SyncSettings settings;
     private final TillSigner signer;
     private final Attachments attachments;
@@ -62,6 +69,8 @@ class SyncController implements SyncApi {
             BatchIngestor ingestor,
             HeartbeatService heartbeats,
             ChangeLogReader changeLog,
+            SnapshotBuilder snapshots,
+            SyncRateLimiter rateLimiter,
             SyncSettings settings,
             TillSigner signer,
             Attachments attachments,
@@ -74,6 +83,8 @@ class SyncController implements SyncApi {
         this.ingestor = ingestor;
         this.heartbeats = heartbeats;
         this.changeLog = changeLog;
+        this.snapshots = snapshots;
+        this.rateLimiter = rateLimiter;
         this.settings = settings;
         this.signer = signer;
         this.attachments = attachments;
@@ -133,18 +144,23 @@ class SyncController implements SyncApi {
         List<JsonNode> events = syncBatch.getEvents().stream()
                 .map(event -> (JsonNode) json.valueToTree(event))
                 .toList();
-        Ack ack = ingestor.ingest(
-                device,
-                record,
-                new BatchIngestor.BatchInput(
-                        syncBatch.getBatchId(),
-                        syncBatch.getFirstSeq(),
-                        syncBatch.getLastSeq(),
-                        syncBatch.getAppVersion(),
-                        syncBatch.getSnapshotVersionInUse(),
-                        syncBatch.getDeviceClock(),
-                        events,
-                        wireBytes()));
+        long bytes = wireBytes();
+        Ack ack;
+        // 429 sync.rate_limited before anything is read or written (doc 32 section 9).
+        try (SyncRateLimiter.Permit permit = rateLimiter.admit(device, deviceId, bytes)) {
+            ack = ingestor.ingest(
+                    device,
+                    record,
+                    new BatchIngestor.BatchInput(
+                            syncBatch.getBatchId(),
+                            syncBatch.getFirstSeq(),
+                            syncBatch.getLastSeq(),
+                            syncBatch.getAppVersion(),
+                            syncBatch.getSnapshotVersionInUse(),
+                            syncBatch.getDeviceClock(),
+                            events,
+                            bytes));
+        }
         SyncAck body = new SyncAck(
                         ack.batchId(),
                         ack.lastAppliedSeq(),
@@ -210,9 +226,32 @@ class SyncController implements SyncApi {
 
     @Override
     public ResponseEntity<SnapshotDelta> getSnapshot(UUID locationId, Long since) {
-        locationScope(locationId);
-        // The snapshot builder and its contributors are the second part of K-08.
-        throw new ProblemException("sync.snapshot.unavailable");
+        ScopeContext device = locationScope(locationId);
+        SnapshotBuilder.Snapshot snapshot =
+                snapshots.build(device, since == null ? 0 : since, settings.changeLogRetention(device));
+        Map<String, SnapshotTable> tables = new LinkedHashMap<>();
+        snapshot.tables().forEach((name, table) -> tables.put(name, snapshotTable(table)));
+        SnapshotDelta body = new SnapshotDelta(
+                        snapshot.locationId(),
+                        snapshot.version(),
+                        snapshot.full(),
+                        snapshot.urgent(),
+                        tables,
+                        snapshot.manifest(),
+                        snapshot.signature(),
+                        snapshot.keyId())
+                .since(snapshot.since());
+        return ResponseEntity.ok(body);
+    }
+
+    private static SnapshotTable snapshotTable(SnapshotManifest.Table table) {
+        List<SnapshotRow> upserts = table.upserts().stream()
+                .map(row -> new SnapshotRow(row.rowId(), row.data()).applyFrom(row.applyFrom()))
+                .toList();
+        List<SnapshotTombstone> tombstones = table.tombstones().stream()
+                .map(gone -> new SnapshotTombstone(gone.rowId()).applyFrom(gone.applyFrom()))
+                .toList();
+        return new SnapshotTable(upserts, tombstones);
     }
 
     @Override

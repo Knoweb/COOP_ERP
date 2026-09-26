@@ -113,6 +113,14 @@ A batch is global identity: one physical batch is held in turn by the Federation
 
 **Until M5**: `NoInventoryLotQuery.holdsLotOf` answers false, so only the Federation corrects a batch. The pull request that adds M5's implementation deletes the stub. The "M5 stub consumes `batch.corrected`" of the plan is `BatchHandlersPostgresIntegrationTest.aLotHolderThatDidNotRegisterTheBatchCorrectsItsExpiry`: the published event, read back from JSON, re-points a stub's lots.
 
+## Snapshot contributor (K-08 part 2; the contributor half of M2-09)
+
+`internal/snapshot/CatalogueSnapshotContributor` implements the kernel's `SnapshotContributor` (19A section 8; 22A section 7.3). The kernel's snapshot builder calls it in the device's scope, in one read-only, repeatable-read transaction.
+
+- Table `sku`, row id = SKU id: the item as the till sells it, with `conversions` (in force today or later, factors as text), `barcodes` (ACTIVE only) and `tags` inside the row. Which SKUs: until `location_assortment` exists (M2-09), every LOCAL SKU of the shop's entity and every SHARED one, which is what row-level security shows the device; a DRAFT or INACTIVE SKU is left out, so the till receives a tombstone.
+- Table `tax_category`, row id = category id, with its `rates` in force or scheduled (rates as text).
+- **Still M2-09's**: the assortment and its change-log producers (`ChangeLog.append` for the shops of an assortment change, an upsert of `sku` for a change to its barcodes, conversions or tags). `batch` is named by M5's lot contributor (22A: "ids supplied by M5") and is not served yet.
+
 ## What the next tickets build on
 
 - **M2-02 SKU aggregate**: `catalogue.sku` with its indexes and policies; the units and tax categories a SKU cites are seeded; `SKU_*` audit codes are in place; permissions `cat.sku.create`, `cat.sku.create_local`, `cat.sku.deactivate`. Adds the first operations to the slice and the first `api` records.
@@ -145,3 +153,4 @@ Every difference between the schema as migrated (V0001 to V0004) and 22A section
 17. RegisterBatch carries `@CommandHandler(permission = CommandHandler.INTERNAL)`, a kernel addition raised as `docs/change-requests/CR-19A-6.md`: it has no operation (22A section 5 lists none) and its permission is the caller's (doc 22 section 4.1).
 18. CorrectBatchMrp and CorrectBatchExpiry (22A section 6) are one command and one operation, `correctBatch` (22A section 5 names one), taking either value or both.
 19. RegisterBatch refuses a DRAFT SKU as well as an INACTIVE one: 22A section 6 writes "sku not INACTIVE", doc 22 section 4.1 "SKU active"; a draft cannot be received.
+20. The snapshot tables are `sku` and `tax_category` where 22A section 7.3 lists nine (`sku_uom_conversion`, `sku_barcode`, `sku_image`, `tag`, `sku_tag`, `tax_rate`, `batch` as well): the change log names a row by a UUID, and conversions, barcodes, tag assignments and rates have none of their own, so they travel inside the row of their SKU or category, as 22A section 7.2's "so the till receives the whole item" intends. `tag` (keyed by code) is not served: a SKU row carries its tag codes.

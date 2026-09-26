@@ -101,8 +101,10 @@ paths:
         it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap
         (params.expected_seq: resend from there), 409 sync.batch_in_flight
         (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent
-        (the events are not first_seq..last_seq), 426 sync.app_below_floor, 403 for the device
-        (see the Refused response).
+        (the events are not first_seq..last_seq), 426 sync.app_below_floor, 429
+        sync.rate_limited (params.retry_after in seconds: the device's batches per minute or
+        bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403
+        for the device (see the Refused response).
       x-permission: sync.device
       parameters:
         - $ref: '#/components/parameters/DeviceId'
@@ -123,6 +125,7 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/Refused' }
         '426': { $ref: '#/components/responses/Refused' }
+        '429': { $ref: '#/components/responses/Refused' }
   /v1/sync/devices/{device_id}/heartbeat:
     post:
       tags: [Sync]
@@ -190,11 +193,16 @@ paths:
       summary: The snapshot delta since a version, or the pointer to the full snapshot (doc 32 section 5.2)
       description: >
         Per table, the upserted rows and the tombstones from since+1 to the current version,
-        with the rows as the owning modules' snapshot contributors give them; the pointer to
-        the latest full snapshot file when since is 0 or older than the change-log retention.
-        Not served yet: the snapshot builder and its contributors are the second part of K-08
-        and this answers 501 sync.snapshot.unavailable until then. The change log itself is
-        readable at /changes.
+        with the rows as the owning modules' snapshot contributors give them. When since is 0
+        or absent, ahead of central, or older than the change-log retention
+        (sync.change_log.retention, doc 32 DR-4), the answer is the full snapshot instead:
+        full_snapshot_required is true and tables holds every row of every snapshot table, to
+        replace what the device holds. Either answer is one version, read at one point in time,
+        and is applied whole (doc 32 S5): the device stages it, checks the signed manifest and
+        each table's hash, and swaps it in with the version in one local transaction. A row
+        with apply_from later than the shop's business date is held until that day's open.
+        The change log itself is readable at /changes. The location must be the device's own
+        (403 sync.location_mismatch).
       x-permission: sync.device
       parameters:
         - $ref: '#/components/parameters/LocationId'
@@ -208,8 +216,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SnapshotDelta' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '403': { $ref: '#/components/responses/Refused' }
-        '501': { $ref: '#/components/responses/Refused' }
   /v1/sync/attachments/presign:
     post:
       tags: [Sync]
@@ -259,8 +267,8 @@ components:
         sync.device_unknown, sync.device_not_active, sync.device_not_enrolled (no enrolment
         yet), sync.device_suspended and sync.device_retired (params.revoke is the signed revoke
         instruction: the device wipes its caches and locks, doc 32 section 9),
-        sync.enrolment.code_invalid; 413 sync.batch_too_large; 426 sync.app_below_floor; 501
-        sync.snapshot.unavailable.
+        sync.enrolment.code_invalid; 413 sync.batch_too_large; 426 sync.app_below_floor; 429
+        sync.rate_limited with params.retry_after (seconds).
       content:
         application/problem+json:
           schema: { $ref: 'common.yaml#/components/schemas/Problem' }
@@ -514,17 +522,65 @@ components:
         recorded_at: { type: string, format: date-time }
     SnapshotDelta:
       type: object
-      required: [location_id, version, full_snapshot_required]
+      required: [location_id, version, full_snapshot_required, urgent, tables, manifest, signature, key_id]
       properties:
         location_id: { type: string, format: uuid }
         since: { type: [integer, 'null'], format: int64 }
         version: { type: integer, format: int64 }
-        full_snapshot_required: { type: boolean }
-        full_snapshot_url: { type: [string, 'null'] }
+        full_snapshot_required:
+          type: boolean
+          description: True when tables is the full snapshot, which replaces every table the device holds
+        full_snapshot_url:
+          type: [string, 'null']
+          description: >
+            Reserved for the pre-built full snapshot file in object storage (doc 32 section 5.2);
+            null while the full snapshot is served in tables.
+        urgent:
+          type: boolean
+          description: A change in this delta was marked urgent (a control price, a permission revoked)
         tables:
           type: object
+          description: Per snapshot table (sku, operator, location ...), the upserts and the tombstones
+          additionalProperties: { $ref: '#/components/schemas/SnapshotTable' }
+        manifest:
+          type: string
+          description: >
+            The manifest as signed, JSON text with sorted keys: location_id, since, version, full,
+            and per table the number of upserts and tombstones and the table's sha256. The hash
+            of a table is SHA-256 (hex) over its lines joined by a newline, the upserts sorted by the text of
+            row_id then the tombstones likewise: "U <row_id> <apply_from or -> <data>"
+            with data as JSON with keys sorted at every level and no whitespace, and
+            "D <row_id> <apply_from or ->".
+        signature:
+          type: string
+          description: Ed25519 signature (base64) over the UTF-8 bytes of manifest, by the key of the enrolment answer
+        key_id: { type: string }
+    SnapshotTable:
+      type: object
+      required: [upserts, tombstones]
+      properties:
+        upserts:
+          type: array
+          items: { $ref: '#/components/schemas/SnapshotRow' }
+        tombstones:
+          type: array
+          items: { $ref: '#/components/schemas/SnapshotTombstone' }
+    SnapshotRow:
+      type: object
+      required: [row_id, data]
+      properties:
+        row_id: { type: string, format: uuid }
+        apply_from: { type: [string, 'null'], format: date, description: 'Held until this business date (doc 32 section 5.2)' }
+        data:
+          type: object
           additionalProperties: true
-          description: Per table, upserts and tombstones
+          description: The row as its module gives it; decimals are text
+    SnapshotTombstone:
+      type: object
+      required: [row_id]
+      properties:
+        row_id: { type: string, format: uuid }
+        apply_from: { type: [string, 'null'], format: date }
     PresignRequest:
       type: object
       required: [document_id, attachment_id, content_type, sha256]

@@ -63,4 +63,19 @@ class SyncSettings {
     Duration enrolmentCodeTtl(ScopeContext scope) {
         return config.getDuration("sync.enrolment_code.ttl", scope, Duration.ofHours(24));
     }
+
+    /** Doc 32 section 9, per device: the batches a device may send in a minute. */
+    int batchesPerMinute(ScopeContext scope) {
+        return Math.max(1, config.getInt("sync.rate.batches_per_minute", scope, 20));
+    }
+
+    /** Doc 32 section 9, per device: the bytes (as sent) a device may send in an hour. */
+    long bytesPerHour(ScopeContext scope) {
+        return Math.max(1, config.getInt("sync.rate.bytes_per_hour", scope, 16 * 1024 * 1024));
+    }
+
+    /** Doc 32 section 9, global: the batches one instance ingests at the same time. */
+    int maxConcurrentBatches(ScopeContext scope) {
+        return Math.max(1, config.getInt("sync.ingest.max_concurrent", scope, 32));
+    }
 }

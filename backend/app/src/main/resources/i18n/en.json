@@ -250,7 +250,7 @@
   "sync.enrolment.device_not_enrollable": "This device cannot be given an enrolment code in its current status",
   "sync.location_mismatch": "A device may only read its own location",
   "sync.sequence_gap": "Events are missing before this batch; resend from the expected sequence",
-  "sync.snapshot.unavailable": "Snapshots are not served yet",
+  "sync.rate_limited": "Central is busy or this till has sent too much at once; it will try again shortly",
   "token.invalid": "Your sign-in is not valid or has expired; sign in again",
   "m2.sku.code_generation_failed": "A unique SKU code could not be generated",
   "m2.sku.inactive": "An inactive SKU cannot be updated",
