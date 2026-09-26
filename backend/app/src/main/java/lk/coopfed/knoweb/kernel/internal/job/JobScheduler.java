@@ -5,6 +5,7 @@ import java.time.ZoneId;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
@@ -37,6 +38,7 @@ class JobScheduler {
     private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
     private final ZoneId zone;
 
+    @Autowired
     JobScheduler(JobRegistry registry, JobRunner runner, @Value("${coop-erp.business-timezone}") String zone) {
         this(registry, runner::run, zone);
     }
