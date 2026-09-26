@@ -64,7 +64,10 @@ public class ChangeLogReader {
                 location);
         long current = versions.isEmpty() ? 0 : versions.getFirst();
 
-        boolean full = since == 0 || since > current;
+        // A device with no version takes a full snapshot, unless the shop has none either: a
+        // till enrolled before anything was published to its shop has nothing to download, and
+        // "full snapshot required" would send it to an endpoint with nothing to serve.
+        boolean full = (since == 0 && current > 0) || since > current;
         if (!full && since < current) {
             Timestamp oldestNeeded = jdbc.queryForObject(
                     "select min(recorded_at) from kernel.change_log where location_id = ? and version > ?",

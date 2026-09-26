@@ -2,8 +2,8 @@
 # its modules may configure, with its type, its default, the finest scope it may be set at and
 # who may change it. Upserted into kernel.config_item on every start by ConfigItemSeedLoader
 # as the migrator; values are never written from here. A module's seed/<module>/config.yaml
-# gives defaults for its own keys through ConfigSeeder and, for a key not registered here, a
-# plain ENTITY-scoped string item under that module's name.
+# gives defaults for its own keys through ConfigSeeder; every such key must be an item here
+# (typed, bounded, with its scope and permission), or the start fails.
 #
 #   value_type        STRING | INTEGER | DECIMAL | BOOLEAN | DURATION (ISO 8601, PT10M) | JSON
 #   schema            what a value must satisfy: minimum, maximum (numbers and durations),
@@ -81,9 +81,22 @@ config_items:
     change_permission: sys.config.manage
     sensitive: true
     module: m1party
+  - key: m1.relationship.credit_limit_mfa_max_age
+    value_type: DURATION
+    schema: { minimum: "PT1M", maximum: "PT12H" }
+    description_en: How recently the second factor must have been presented to change a credit limit
+    description_si: ණය සීමාවක් වෙනස් කිරීමට දෙවන සාධකය ඉදිරිපත් කර තිබිය යුතු මෑත කාලය
+    description_ta: கடன் வரம்பை மாற்ற இரண்டாம் காரணி எவ்வளவு சமீபத்தில் வழங்கப்பட்டிருக்க வேண்டும்
+    default: "PT10M"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: true
+    module: m1party
   # The till PIN policy (doc 19 section 2.1 and DR-5; doc 21 section 7): 4 to 6 digits as the
   # entity sets, 5 attempts then a 15-minute lockout, none of the last 3 again. M1 checks length
-  # and reuse when a PIN is set (M1-07); the till enforces the lockout from its snapshot.
+  # and reuse when a PIN is set (M1-07); the till enforces the lockout from its snapshot. The
+  # bounds let an entity tighten the policy and never weaken it: doc 19 accepts a PIN, a
+  # low-entropy credential, only because of the 5-attempt, 15-minute limit and the history.
   - key: security.pin.length_min
     value_type: INTEGER
     schema: { minimum: 4, maximum: 6 }
@@ -110,7 +123,7 @@ config_items:
     module: m1party
   - key: security.pin.lockout_attempts
     value_type: INTEGER
-    schema: { minimum: 3, maximum: 10 }
+    schema: { minimum: 3, maximum: 5 }
     description_en: How many wrong PINs in a row lock an operator out of the till
     description_si: මුදල් ලේඛනයෙන් ක්‍රියාකරුවෙකු අගුලු දැමීමට පෙර ඉඩ දෙන වැරදි PIN උත්සාහ ගණන
     description_ta: பணப்பெட்டியிலிருந்து இயக்குநரைப் பூட்டுவதற்கு முன் அனுமதிக்கப்படும் தவறான PIN முயற்சிகள்
@@ -122,7 +135,7 @@ config_items:
     module: m1party
   - key: security.pin.lockout_duration
     value_type: DURATION
-    schema: { minimum: "PT1M", maximum: "PT24H" }
+    schema: { minimum: "PT15M", maximum: "PT24H" }
     description_en: How long a till operator stays locked out after too many wrong PINs
     description_si: වැරදි PIN උත්සාහ වැඩි වූ පසු මුදල් ලේඛන ක්‍රියාකරුවෙකු අගුලු දමා තබන කාලය
     description_ta: அதிகமான தவறான PIN முயற்சிகளுக்குப் பின் பணப்பெட்டி இயக்குநர் பூட்டப்பட்டிருக்கும் நேரம்
@@ -134,7 +147,7 @@ config_items:
     module: m1party
   - key: security.pin.history_depth
     value_type: INTEGER
-    schema: { minimum: 1, maximum: 10 }
+    schema: { minimum: 3, maximum: 10 }
     description_en: How many of a user's last PINs, the current one included, a new PIN must differ from
     description_si: නව PIN අංකයක් වෙනස් විය යුතු, වත්මන් එකද ඇතුළුව, පරිශීලකයාගේ අවසන් PIN අංක ගණන
     description_ta: புதிய PIN வேறுபட வேண்டிய, தற்போதையது உட்பட, பயனரின் கடைசி PIN எண்களின் எண்ணிக்கை
@@ -291,7 +304,7 @@ config_items:
     change_permission: sys.config.manage
   - key: sync.clock_drift.review_after
     value_type: DURATION
-    schema: { minimum: "PT1M", maximum: "PT24H" }
+    schema: { minimum: "PT15M", maximum: "PT24H" }
     description_en: How far a till clock may drift before a review record is raised; it never blocks
     description_si: සමාලෝචන වාර්තාවක් මතු කිරීමට පෙර මුදල් ලේඛන ඔරලෝසුවක් අපගමනය විය හැකි ප්‍රමාණය
     description_ta: மதிப்பாய்வுப் பதிவு எழுப்பப்படும் முன் பணப்பெட்டிக் கடிகாரம் விலகக்கூடிய அளவு

@@ -40,7 +40,7 @@ paths:
         (party.device) in the caller's entity and be ENROLLED or ACTIVE. Codes this operation
         can answer: 403 permission.denied, 401 mfa.required, 422
         sync.enrolment.device_not_enrollable.
-      x-permission: sys.device.manage
+      x-permission: sys.device.enrol
       parameters:
         - $ref: '#/components/parameters/DeviceId'
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'

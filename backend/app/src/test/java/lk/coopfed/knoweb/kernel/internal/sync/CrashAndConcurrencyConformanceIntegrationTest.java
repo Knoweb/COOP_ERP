@@ -1,17 +1,25 @@
 package lk.coopfed.knoweb.kernel.internal.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.Scope;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
@@ -117,5 +125,48 @@ class CrashAndConcurrencyConformanceIntegrationTest extends SyncIntegrationTest 
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(cursor()).isEqualTo(2);
+    }
+
+    @Test
+    void completingABatchWhoseClaimWasTakenOverIsTheInFlightConflictNotAnError() {
+        // A slow ingestion outlived the in-flight timeout and a resend on another instance took
+        // the cursor; the first then finishes its last chunk and calls complete().
+        UUID takenOverBy = Ids.next();
+        UUID slow = Ids.next();
+        superuserJdbc()
+                .update(
+                        "update kernel.device_sync_cursor set in_flight_batch_id = ?, in_flight_since = now() where device_id = ?",
+                        takenOverBy,
+                        DEVICE);
+        ScopeContext device = deviceScope();
+
+        assertThatThrownBy(() -> systemScope.inScope(
+                        device, () -> transactions.complete(device, slow, 1, 1, new Ack.Stored(1, List.of()), 1, 0, 0)))
+                .isInstanceOf(IngestTransactions.ClaimLost.class)
+                .satisfies(lost ->
+                        assertThat(((IngestTransactions.ClaimLost) lost).holder).isEqualTo(takenOverBy));
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Autowired
+    IngestTransactions transactions;
+
+    @Autowired
+    SystemScope systemScope;
+
+    /** The device's own scope, as the token gives it. */
+    private static ScopeContext deviceScope() {
+        Scope scope = new Scope(ENTITY, SHOP);
+        return new ScopeContext(
+                null,
+                DEVICE,
+                ENTITY,
+                List.of(scope),
+                scope,
+                PolicyClass.DEVICE,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                Ids.next());
     }
 }

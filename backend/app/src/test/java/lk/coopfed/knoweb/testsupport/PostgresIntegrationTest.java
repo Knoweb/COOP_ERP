@@ -94,6 +94,8 @@ public abstract class PostgresIntegrationTest {
         registry.add("management.health.rabbit.enabled", () -> "false");
         // K-06 (19A section 6): a message id no catalogue has throws in tests, logs in production.
         registry.add("coop-erp.i18n.strict-missing-ids", () -> "true");
+        // No broker in the test stack: the cache fan-out queue is not declared (the caches expire).
+        registry.add("coop-erp.rabbit.cache-fanout.enabled", () -> "false");
         // K-02: every request under /v1 carries a bearer token; the tests sign theirs here.
         registry.add("coop-erp.security.oidc.issuer", () -> TestIdentityProvider.ISSUER);
         registry.add("coop-erp.security.oidc.jwk-set-uri", TestIdentityProvider::jwkSetUri);
