@@ -41,6 +41,15 @@ config_items:
     default: "02:30"
     scope_kind: LOCATION
     change_permission: sys.config.manage
+  - key: jobs.lock.at_least_for
+    value_type: DURATION
+    schema: { minimum: PT0S, maximum: PT5M }
+    description_en: How long a scheduled job keeps its lock after a run ends, so a second instance firing the same schedule a moment later skips it
+    description_si: ධාවනයක් අවසන් වූ පසු කාලසටහන්ගත කාර්යයක් සිය අගුල තබා ගන්නා කාලය, මොහොතකට පසු එම කාලසටහන ක්‍රියාත්මක කරන දෙවන අවස්ථාවක් එය මඟ හරින පරිදි
+    description_ta: ஓட்டம் முடிந்த பின் திட்டமிடப்பட்ட பணி தன் பூட்டை வைத்திருக்கும் நேரம், சற்று பின்னர் அதே அட்டவணையை இயக்கும் இரண்டாவது நிகழ்வு அதைத் தவிர்க்கும் வகையில்
+    default: "PT5S"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   - key: m1.bulk.max_rows
     value_type: INTEGER
     schema: { minimum: 1, maximum: 5000 }
