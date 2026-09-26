@@ -254,6 +254,58 @@ test(
 );
 
 test(
+  "dynamic SQL is read through its string literals",
+  () => {
+    // The one the review wrote to prove the gap: a scratch migration writing security.app_user
+    // through EXECUTE format(...) passed the check.
+    one(
+      catalogue(`
+        DO $$
+        BEGIN
+            EXECUTE format('UPDATE security.app_user SET status = %L', 'DISABLED');
+        END
+        $$;
+      `),
+      /:4: dynamic SQL \(EXECUTE\) touches schema "security"; m2catalogue owns catalogue/
+    );
+
+    // A statement whose literals name no schema hides what it touches (%s), and is refused.
+    one(
+      catalogue(`
+        DO $$
+        BEGIN
+            EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', target);
+        END
+        $$;
+      `),
+      /dynamic SQL \(EXECUTE\) names no schema the check can read; write catalogue\.%I inside the string/
+    );
+
+    // The module's own schema, a kernel function called in the policy text, a trigger's
+    // EXECUTE FUNCTION and GRANT EXECUTE all pass.
+    assert.deepEqual(
+      catalogue(`
+        CREATE OR REPLACE FUNCTION catalogue.ensure(name text)
+        RETURNS void LANGUAGE plpgsql AS $$
+        BEGIN
+            EXECUTE format('CREATE TABLE IF NOT EXISTS catalogue.%I (LIKE catalogue.batch)', name);
+            EXECUTE format('CREATE POLICY own_read ON catalogue.%I FOR SELECT TO app_rw USING ('
+                           || 'owner_entity_id = kernel.scope_entity())', name);
+            EXECUTE 'ALTER TABLE catalogue.' || quote_ident(name) || ' FORCE ROW LEVEL SECURITY';
+        END;
+        $$;
+
+        CREATE TRIGGER t BEFORE INSERT ON catalogue.batch
+            FOR EACH ROW EXECUTE FUNCTION catalogue.keep_one();
+
+        GRANT EXECUTE ON FUNCTION catalogue.ensure(text) TO app_rw;
+      `),
+      []
+    );
+  }
+);
+
+test(
   "comments are not statements",
   () => {
     assert.deepEqual(

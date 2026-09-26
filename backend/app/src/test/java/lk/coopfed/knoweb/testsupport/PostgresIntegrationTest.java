@@ -32,7 +32,13 @@ import org.testcontainers.utility.MountableFile;
  * <p>The tag keeps these tests out of {@code make test}; {@code make test-int} runs them.
  */
 @Tag("integration")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// The entity the platform acts as (the Federation), which the local stack sets through
+// COOP_ERP_SYSTEM_ENTITY_ID: M2's seed loader refuses to start without one. An inline property
+// ranks below a @DynamicPropertySource, so a test class that needs a Federation of its own
+// registers the same key there and wins.
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "coop-erp.system.entity-id=" + PostgresIntegrationTest.TEST_FEDERATION_ID)
 @Import({KernelRecorder.class, KernelRecording.class})
 public abstract class PostgresIntegrationTest {
 
@@ -41,6 +47,11 @@ public abstract class PostgresIntegrationTest {
     private static final String APP_USER = "coop_app";
     private static final String RELAY_USER = "coop_relay";
     private static final String RELAY_PASSWORD = "coop_relay";
+
+    /** The Federation of the test context, unless a test class configures its own. */
+    protected static final String TEST_FEDERATION_ID = "0190e000-0000-7000-8000-00000000f0f0";
+
+    protected static final java.util.UUID TEST_FEDERATION = java.util.UUID.fromString(TEST_FEDERATION_ID);
 
     /** Relative to backend/app, the working directory of the Gradle test task. */
     private static final String ROLE_SCRIPT = "../../infra/compose/postgres/init/01-roles.sh";

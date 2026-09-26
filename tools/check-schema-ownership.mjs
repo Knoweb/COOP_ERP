@@ -178,9 +178,9 @@ export function problemsOfMigration(
       );
     }
 
-    // Same statement but with a bare object name.
+    // Same statement but with a bare object name (a keyword of IF NOT EXISTS is not one).
     const bare = new RegExp(
-      `${prefix}${NAME}(?!\\s*\\.)(?![a-z0-9_"])`,
+      `${prefix}(?!(?:IF|NOT|EXISTS)\\b)${NAME}(?!\\s*\\.)(?![a-z0-9_"])`,
       "gim"
     );
 
@@ -222,7 +222,84 @@ export function problemsOfMigration(
     }
   }
 
+  // Dynamic SQL. A string handed to EXECUTE (plpgsql) runs as SQL, and the patterns above
+  // cannot read it: a module could write another schema through format('UPDATE %s ...').
+  // So every schema a dynamic statement names in its string literals must be the module's
+  // own, and a dynamic statement whose literals name no schema at all is refused: written
+  // as catalogue.%I the check can read it, written as %s it cannot. A qualified function
+  // call (kernel.scope_entity()) touches nothing, as above. GRANT EXECUTE, and the EXECUTE
+  // FUNCTION or PROCEDURE of a trigger, are not dynamic SQL.
+  const dynamic = /\bEXECUTE\b(?!\s+(?:ON|FUNCTION|PROCEDURE)\b)/gi;
+
+  while ((match = dynamic.exec(sql)) !== null) {
+    const schemas = schemasInLiterals(
+      statementFrom(sql, match.index)
+    );
+
+    if (schemas.length === 0) {
+      problems.push(
+        `${where(match.index)}: dynamic SQL (EXECUTE) names no schema the check can read; ` +
+        `write ${allowed[0] ?? "<schema>"}.%I inside the string`
+      );
+    }
+
+    for (const schema of new Set(schemas)) {
+      foreign(schema, match.index, "dynamic SQL (EXECUTE) touches");
+    }
+  }
+
   return problems;
+}
+
+/**
+ * The text of one statement: from the index to the first semicolon outside a string literal.
+ */
+function statementFrom(sql, index) {
+  let inString = false;
+
+  for (let i = index; i < sql.length; i++) {
+    const c = sql[i];
+
+    if (c === "'") {
+      inString = !inString;
+    } else if (c === ";" && !inString) {
+      return sql.slice(index, i);
+    }
+  }
+
+  return sql.slice(index);
+}
+
+/**
+ * Every schema named as <schema>.<object> or <schema>.%I inside the string literals of a
+ * statement (also a literal that ends with the dot, to be concatenated with a quoted name).
+ * A function call (<schema>.<name>(...)) is left out, and so is a name inside a nested
+ * literal (''app.user_id'' is a session setting, not a table).
+ */
+function schemasInLiterals(statement) {
+  const schemas = [];
+
+  for (const literal of statement.matchAll(/'((?:[^']|'')*)'/g)) {
+    const text = literal[1];
+
+    const qualified =
+      /(?<!['.\w])([a-z_][a-z0-9_]*)\s*\.\s*(?:%I|$|"[a-z_][a-z0-9_]*"|[a-z_][a-z0-9_]*\b)(\s*\()?/gi;
+
+    for (const found of text.matchAll(qualified)) {
+      const call = found[2] !== undefined;
+
+      // kernel.scope_entity() in a policy text is a call; DROP FUNCTION security.f(uuid)
+      // names the function as an object.
+      const object =
+        /\b(?:FUNCTION|PROCEDURE)\s*$/i.test(text.slice(0, found.index));
+
+      if (!call || object) {
+        schemas.push(found[1].toLowerCase());
+      }
+    }
+  }
+
+  return schemas;
 }
 
 /**

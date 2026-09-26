@@ -58,7 +58,31 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                 localSkuOfA,
                 MPCS_A);
         admin.update(
-                "insert into catalogue.tag (tag_code, name_en, governed, owner_entity_id) values ('t-local-a', 'Mine', false, ?)",
+                "insert into catalogue.tag (tag_code, name_en, governed, owner_entity_id)"
+                        + " values ('t-local-a', 'Mine', false, ?), ('t-local-a2', 'Mine too', false, ?)",
+                MPCS_A,
+                MPCS_A);
+        // V0003: what an entity wrote on the Federation's SHARED item stays its own, except a
+        // factory barcode, which everyone may read; the Federation's own rows are everyone's.
+        admin.update(
+                "insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id)"
+                        + " values ('0001', 'INTERNAL', ?, 'EA', ?), ('4791234567913', 'EAN13', ?, 'EA', ?)",
+                sharedSku,
+                MPCS_A,
+                sharedSku,
+                MPCS_A);
+        admin.update(
+                "insert into catalogue.sku_uom_conversion (sku_id, uom_code, factor_to_base, effective_from, owner_entity_id)"
+                        + " values (?, 'CASE', 24, date '2026-01-01', ?), (?, 'DOZ', 12, date '2026-01-01', ?)",
+                sharedSku,
+                FEDERATION,
+                sharedSku,
+                MPCS_A);
+        admin.update(
+                "insert into catalogue.sku_tag (sku_id, tag_code, owner_entity_id) values (?, 'core-range', ?), (?, 't-local-a', ?)",
+                sharedSku,
+                FEDERATION,
+                sharedSku,
                 MPCS_A);
         admin.update(
                 "insert into catalogue.batch (batch_id, sku_id, batch_no, printed_mrp, owner_entity_id)"
@@ -81,9 +105,8 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void clean() {
         JdbcTemplate admin = superuserJdbc();
-        admin.execute(
-                "truncate catalogue.batch, catalogue.sku_tag, catalogue.sku_barcode, catalogue.sku_uom_conversion,"
-                        + " catalogue.sku");
+        admin.execute("truncate catalogue.batch, catalogue.batch_key, catalogue.sku_tag, catalogue.sku_barcode,"
+                + " catalogue.sku_uom_conversion, catalogue.sku");
         admin.update("delete from catalogue.tag where tag_code like 't-%'");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
@@ -125,7 +148,117 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
         List<String> seenByB = inScope(
                 MPCS_B, "OWN", () -> jdbc.queryForList("select barcode from catalogue.sku_barcode", String.class));
 
-        assertThat(seenByB).containsExactly("4791234567890");
+        // The Federation's code and A's factory code on the SHARED item; not A's INTERNAL code
+        // 0001 (unique per owner only: B may have its own 0001), not the code of A's LOCAL item.
+        assertThat(seenByB).containsExactlyInAnyOrder("4791234567890", "4791234567913");
+        List<String> seenByA = inScope(
+                MPCS_A, "OWN", () -> jdbc.queryForList("select barcode from catalogue.sku_barcode", String.class));
+        assertThat(seenByA).containsExactlyInAnyOrder("4791234567890", "4791234567906", "0001", "4791234567913");
+    }
+
+    @Test
+    void theConversionsAndTagsOfASharedItemAreReadByEveryoneOnlyWhereItsOwnerWroteThem() {
+        List<String> conversionsForB = inScope(
+                MPCS_B,
+                "OWN",
+                () -> jdbc.queryForList("select uom_code from catalogue.sku_uom_conversion", String.class));
+        List<String> tagsForB =
+                inScope(MPCS_B, "OWN", () -> jdbc.queryForList("select tag_code from catalogue.sku_tag", String.class));
+
+        assertThat(conversionsForB).as("the Federation's CASE, not A's DOZ").containsExactly("CASE");
+        assertThat(tagsForB)
+                .as("the Federation's governed tag, not A's local tag")
+                .containsExactly("core-range");
+        assertThat(inScope(
+                        MPCS_A, "OWN", () -> jdbc.queryForList("select tag_code from catalogue.sku_tag", String.class)))
+                .containsExactlyInAnyOrder("core-range", "t-local-a");
+    }
+
+    @Test
+    void aChildRowMayBeWrittenOnlyOnAnItemTheCallerOwns() {
+        // V0003: own_write on the child tables asks who owns the parent SKU.
+        assertThat(inScope(MPCS_A, "OWN", () -> insertConversion(localSkuOfA, MPCS_A)))
+                .isEqualTo(1);
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertConversion(sharedSku, MPCS_A)))
+                .as("a conversion on the Federation's SHARED item")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertConversion(localSkuOfB, MPCS_A)))
+                .as("a conversion on B's LOCAL item")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void anEntityRegistersAFactoryBarcodeOnASharedItemButKeepsInternalCodesToItsOwnItems() {
+        // 22A section 6, RegisterBarcode: "INTERNAL only for own SKUs".
+        assertThat(inScope(MPCS_B, "OWN", () -> insertBarcode("4791234567920", "EAN13", sharedSku, MPCS_B)))
+                .isEqualTo(1);
+        assertThat(inScope(MPCS_B, "OWN", () -> insertBarcode("0002", "INTERNAL", localSkuOfB, MPCS_B)))
+                .isEqualTo(1);
+        assertThatThrownBy(() -> inScope(MPCS_B, "OWN", () -> insertBarcode("0003", "INTERNAL", sharedSku, MPCS_B)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() ->
+                        inScope(MPCS_B, "OWN", () -> insertBarcode("4791234567937", "EAN13", localSkuOfA, MPCS_B)))
+                .as("a factory code on another entity's LOCAL item")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void anEntityTagsASharedItemWithItsOwnLocalTagsOnly() {
+        // 22A section 6, TagSku: "governed tags on SHARED only by F"; doc 22 section 3.5, local
+        // tags are the entity's own merchandising.
+        assertThat(inScope(MPCS_A, "OWN", () -> insertTag(localSkuOfA, "core-range", MPCS_A)))
+                .as("a governed tag on its own LOCAL item")
+                .isEqualTo(1);
+        assertThat(inScope(MPCS_A, "OWN", () -> insertTag(sharedSku, "t-local-a2", MPCS_A)))
+                .as("its own local tag on the SHARED item")
+                .isEqualTo(1);
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertTag(sharedSku, "rice", MPCS_A)))
+                .as("a governed tag on the SHARED item")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertTag(localSkuOfB, "t-local-a2", MPCS_A)))
+                .as("a local tag on B's LOCAL item")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void theSameBatchCannotBeRegisteredTwiceAndACorrectionKeepsItsIdentity() {
+        // V0003: catalogue.batch_key, one identity per (sku, supplier, batch_no), whatever the
+        // partition and whoever registers it.
+        assertThatThrownBy(
+                        () -> inScope(MPCS_B, "OWN", () -> insertBatch(Ids.next(), sharedSku, "B2411A", null, MPCS_B)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("batch_key_identity_uq");
+
+        UUID replacement = Ids.next();
+        UUID pointedAt = inScope(MPCS_A, "OWN", () -> {
+            insertBatch(replacement, sharedSku, "B2411A", batchOfA, MPCS_A);
+            return jdbc.queryForObject(
+                    "select batch_id from catalogue.batch_key where sku_id = ? and batch_no = 'B2411A'",
+                    UUID.class,
+                    sharedSku);
+        });
+        assertThat(pointedAt).isEqualTo(replacement);
+
+        // Another entity correcting A's batch changes no identity row, so the correction is refused
+        // (M2-05 settles the lot holder's correction, 22A section 6).
+        assertThatThrownBy(() ->
+                        inScope(MPCS_B, "OWN", () -> insertBatch(Ids.next(), sharedSku, "B2411A", batchOfA, MPCS_B)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("cannot change");
     }
 
     @Test
@@ -242,6 +375,43 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                 "කිරිපිටි 400g",
                 "பால் மா 400g",
                 TAX_CATEGORY);
+    }
+
+    private int insertConversion(UUID skuId, UUID owner) {
+        return jdbc.update(
+                "insert into catalogue.sku_uom_conversion (sku_id, uom_code, factor_to_base, effective_from, owner_entity_id)"
+                        + " values (?, 'PKT', 6, date '2026-06-01', ?)",
+                skuId,
+                owner);
+    }
+
+    private int insertBarcode(String barcode, String symbology, UUID skuId, UUID owner) {
+        return jdbc.update(
+                "insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id)"
+                        + " values (?, ?, ?, 'EA', ?)",
+                barcode,
+                symbology,
+                skuId,
+                owner);
+    }
+
+    private int insertTag(UUID skuId, String tagCode, UUID owner) {
+        return jdbc.update(
+                "insert into catalogue.sku_tag (sku_id, tag_code, owner_entity_id) values (?, ?, ?)",
+                skuId,
+                tagCode,
+                owner);
+    }
+
+    private int insertBatch(UUID batchId, UUID skuId, String batchNo, UUID corrects, UUID owner) {
+        return jdbc.update(
+                "insert into catalogue.batch (batch_id, sku_id, batch_no, printed_mrp, corrects_batch_id, owner_entity_id)"
+                        + " values (?, ?, ?, 1080.00, ?, ?)",
+                batchId,
+                skuId,
+                batchNo,
+                corrects,
+                owner);
     }
 
     /** Runs the work in a transaction with the scope set as the kernel sets it; always rolled back. */
