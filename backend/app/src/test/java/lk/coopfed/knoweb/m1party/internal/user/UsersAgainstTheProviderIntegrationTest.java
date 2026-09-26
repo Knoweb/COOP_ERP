@@ -137,7 +137,7 @@ class UsersAgainstTheProviderIntegrationTest extends PostgresIntegrationTest {
     // ---- the platform's API, as the entity's administrator ----
 
     private <T> ResponseEntity<T> post(String url, Map<String, Object> body, Class<T> type) {
-        HttpHeaders headers = TestIdentityProvider.headers(ADMIN, ENTITY);
+        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY);
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         return http.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), type);

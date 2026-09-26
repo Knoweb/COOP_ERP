@@ -20,13 +20,14 @@ import org.springframework.stereotype.Component;
  * own row-level security, inside the handler's transaction, so a user sees no assignment
  * that is not theirs at that entity.
  *
- * <p>Cached per instance under (user, entity, location) for ten minutes and emptied by the
- * role and user events ({@link PermissionCacheInvalidator}).
+ * <p>Cached per instance under (user, entity, location) for a minute; the instance that made
+ * a change empties its own entries when the change commits, the others when the role and user
+ * events reach them or the minute passes ({@link PermissionCacheInvalidator}).
  */
 @Component
 class JdbcPermissionResolver implements PermissionResolver {
 
-    static final Duration CACHE_TTL = Duration.ofMinutes(10);
+    static final Duration CACHE_TTL = Duration.ofMinutes(1);
 
     private final JdbcTemplate jdbc;
     private final Cache<Key, Set<String>> cache = Caffeine.newBuilder()

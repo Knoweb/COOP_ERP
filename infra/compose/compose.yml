@@ -208,6 +208,8 @@ services:
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/coop/protocol/openid-connect/certs
       OIDC_ADMIN_URL: http://keycloak:8080
       COOP_ERP_ENFORCE_PERMISSIONS: ${COOP_ERP_ENFORCE_PERMISSIONS:-true}
+      # The dev realm has no OTP: a fresh password sign-in is the step-up here (never outside).
+      COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS: "true"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: ${RABBITMQ_USER:-coop}
@@ -262,6 +264,10 @@ services:
       VITE_API_BASE: http://localhost:8080
       VITE_OIDC_AUTHORITY: http://localhost:8085/realms/coop
       VITE_OIDC_CLIENT_ID: coop-erp-web
+      # The step-up asks the realm for no acr: this realm has no OTP, and a fresh password
+      # sign-in counts here (COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS on the backend). A realm
+      # with a second factor names its context, e.g. "mfa" (web/src/shell/auth/oidc.ts).
+      VITE_OIDC_STEP_UP_ACR_VALUES: ""
       CHOKIDAR_USEPOLLING: "true"   # file events do not cross a Windows or macOS bind mount
       CI: "true"                    # pnpm must never prompt inside a container
     ports:

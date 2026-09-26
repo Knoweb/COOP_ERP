@@ -40,3 +40,17 @@ templates:
       - "sys.device.enrol"
       - "sys.device.suspend"
       - "cat.sku.view"
+      - "cat.sku.create_local"
+      - "cat.sku.deactivate"
+  # The Federation's catalogue team (22A section 3.1): the shared path (cat.sku.create with the
+  # guard FederationCaller of M2), promotion, and its own drafts and deactivations. Assigned at
+  # the Federation entity; cat.sku.create and cat.sku.promote are FEDERATION-scope permissions.
+  - role_id: "01998a4c-7d20-7b3e-9a61-4f2c8e5d1b07"
+    name_en: "Federation Catalogue Steward"
+    role_class: "OWN"
+    permissions:
+      - "cat.sku.view"
+      - "cat.sku.create_local"
+      - "cat.sku.create"
+      - "cat.sku.promote"
+      - "cat.sku.deactivate"

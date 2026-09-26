@@ -18,6 +18,7 @@
   "config.value_invalid": "The value does not fit the setting",
   "document.counterparty_required": "This document type needs a counterparty",
   "document.immutable": "An issued document cannot be changed; correct it with a new document",
+  "document.issued_fields_reserved": "A document is numbered and issued only through the issuance protocol",
   "document.link.amount_not_allowed": "This kind of link carries no amount",
   "document.link.amount_required": "This kind of link carries an amount greater than zero",
   "document.link.drafts_only": "Only a draft can supersede a draft",
@@ -30,7 +31,9 @@
   "document.not_draft": "Only a draft can be issued",
   "document.not_found": "The document could not be found",
   "document.owner_mismatch": "A document can only be issued by the entity that owns it",
+  "document.series_device_held": "This document is numbered by the till that holds its series, not centrally",
   "document.series_missing": "No numbering series is registered for this document type here",
+  "document.status_conflict": "The document is no longer in the status this change starts from",
   "document.type_unknown": "The document type is not in the registry",
   "document.type_unowned": "No module owns this document type yet",
   "hello.greeting.duplicate": "This greeting is already registered",
@@ -254,5 +257,7 @@
   "m2.sku.reason_required": "A reason is required for this SKU status change",
   "m2.sku.base_uom_unknown": "The selected base unit is not defined",
   "m2.sku.tax_category_unknown": "The selected tax category is not defined",
-  "m2.sku.attributes_too_large": "SKU attributes exceed the allowed size"
+  "m2.sku.attributes_too_large": "SKU attributes exceed the allowed size",
+  "m2.sku.federation_only": "Only the Federation may create, activate or change a shared SKU",
+  "m2.sku.has_lots": "The base unit and the batch and expiry tracking of a SKU cannot change once stock lots exist"
 }

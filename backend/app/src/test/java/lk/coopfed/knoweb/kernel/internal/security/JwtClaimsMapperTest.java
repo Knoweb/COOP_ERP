@@ -109,28 +109,91 @@ class JwtClaimsMapperTest {
     }
 
     @Test
-    void withoutAScopesClaimTheRecordsAndTheHomeEntityAreTheScopes() {
+    void withoutAScopesClaimTheAssignmentsAreTheScopesAndNothingElse() {
         Jwt jwt = jwt(Map.of("sub", USER.toString(), "ent", HOME.toString(), "cls", "OWN"));
 
         ScopeContext scope = mapper.map(jwt, null, null, null, null);
 
-        assertThat(scope.scopes()).containsExactly(new Scope(HOME, null), new Scope(OTHER, SHOP));
-        // Two scopes and no header: the caller must choose (scope.required at the filter).
-        assertThat(scope.hasActiveScope()).isFalse();
-        assertThat(mapper.map(jwt, OTHER.toString(), SHOP.toString(), null, null)
-                        .activeScope())
-                .isEqualTo(new Scope(OTHER, SHOP));
+        // The home entity is where the user belongs, not where they may act: the shop only.
+        assertThat(scope.scopes()).containsExactly(new Scope(OTHER, SHOP));
+        assertThat(scope.activeScope()).isEqualTo(new Scope(OTHER, SHOP));
+        assertThat(scope.homeEntityId()).isEqualTo(HOME);
     }
 
     @Test
-    void aUserWithNoRecordsHasTheHomeEntityAloneAndItIsActive() {
+    void anOwnUserWithNoAssignmentActsNowhere() {
         UUID stranger = UUID.fromString("0190a500-0000-7000-8000-000000000011");
         Jwt jwt = jwt(Map.of("sub", stranger.toString(), "ent", HOME.toString(), "cls", "OWN"));
 
         ScopeContext scope = mapper.map(jwt, null, null, null, null);
 
+        assertThat(scope.scopes()).isEmpty();
+        assertThat(scope.hasActiveScope()).isFalse();
+    }
+
+    @Test
+    void aReadOnlyClassActsFromItsHomeEntity() {
+        Jwt jwt = jwt(Map.of("sub", USER.toString(), "ent", HOME.toString(), "cls", "FEDERATION_VIEW"));
+
+        ScopeContext scope = mapper.map(jwt, null, null, null, null);
+
         assertThat(scope.scopes()).containsExactly(new Scope(HOME, null));
-        assertThat(scope.entityId()).isEqualTo(HOME);
+        assertThat(scope.policyClass()).isEqualTo(PolicyClass.FEDERATION_VIEW);
+    }
+
+    @Test
+    void theSecondFactorIsTheExplicitClaimOrAnAuthenticationThatUsedOne() {
+        long at = 1_800_000_000L;
+        assertThat(mapper.map(jwt(Map.of("sub", USER.toString(), "mfa_at", at)), null, null, null, null)
+                        .mfaAt())
+                .isEqualTo(Instant.ofEpochSecond(at));
+        // auth_time counts when acr (or amr) says a second factor was used ...
+        assertThat(mapper.map(
+                                jwt(Map.of("sub", USER.toString(), "auth_time", at, "acr", "loa2")),
+                                null,
+                                null,
+                                null,
+                                null)
+                        .mfaAt())
+                .isEqualTo(Instant.ofEpochSecond(at));
+        assertThat(mapper.map(
+                                jwt(Map.of("sub", USER.toString(), "auth_time", at, "amr", List.of("pwd", "otp"))),
+                                null,
+                                null,
+                                null,
+                                null)
+                        .mfaAt())
+                .isEqualTo(Instant.ofEpochSecond(at));
+        // ... and not for a password alone.
+        assertThat(mapper.map(jwt(Map.of("sub", USER.toString(), "auth_time", at, "acr", "1")), null, null, null, null)
+                        .mfaAt())
+                .isNull();
+        assertThat(mapper.map(jwt(Map.of("sub", USER.toString(), "auth_time", at)), null, null, null, null)
+                        .mfaAt())
+                .isNull();
+        // A development realm without OTP: a fresh password sign-in is the step-up.
+        JwtClaimsMapper development = new JwtClaimsMapper(records, devices, List.of("loa2"), true);
+        assertThat(development
+                        .map(jwt(Map.of("sub", USER.toString(), "auth_time", at)), null, null, null, null)
+                        .mfaAt())
+                .isEqualTo(Instant.ofEpochSecond(at));
+    }
+
+    @Test
+    void onlyALocalOrTestIssuerIsADevelopmentIssuer() {
+        // password-reauth-counts with any other issuer is logged at ERROR when the mapper starts.
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://localhost:8085/realms/coop"))
+                .isTrue();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://127.0.0.1:8085/realms/coop"))
+                .isTrue();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://provider.test/realms/coop"))
+                .isTrue();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("https://id.coopfed.lk/realms/coop"))
+                .isFalse();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("https://localhost.evil.lk/realms/coop"))
+                .isFalse();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer("")).isFalse();
+        assertThat(JwtClaimsMapper.isDevelopmentIssuer(null)).isFalse();
     }
 
     @Test

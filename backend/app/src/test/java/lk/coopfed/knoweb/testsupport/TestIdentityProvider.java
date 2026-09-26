@@ -14,6 +14,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.http.HttpHeaders;
@@ -92,6 +93,34 @@ public final class TestIdentityProvider {
         return headers;
     }
 
+    /**
+     * An explicit opt-in: the token carries a {@code scopes} claim naming the entity entity-wide,
+     * the claim a provider mapper could issue. Pass it as the customiser of {@link #token}.
+     */
+    public static Consumer<JWTClaimsSet.Builder> entityWide(UUID entity) {
+        return claims -> claims.claim("scopes", List.of(entity.toString()));
+    }
+
+    /**
+     * The explicit opt-in for a suite whose users have no assignment in M1: an OWN token that
+     * names the entity entity-wide in its scopes claim. Other classes carry no claim.
+     */
+    public static String entityWideToken(UUID user, UUID entity) {
+        return entityWideToken(user, entity, "OWN");
+    }
+
+    public static String entityWideToken(UUID user, UUID entity, String policyClass) {
+        return token(user, entity, policyClass, "OWN".equals(policyClass) ? entityWide(entity) : claims -> {});
+    }
+
+    /** {@link #headers(UUID, UUID)} with the opt-in token of {@link #entityWideToken(UUID, UUID)}. */
+    public static HttpHeaders entityWideHeaders(UUID user, UUID entity) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(entityWideToken(user, entity));
+        headers.set("X-Scope-Entity", entity.toString());
+        return headers;
+    }
+
     /** A token nobody should accept: signed by a key the JWKS does not carry. */
     public static String tokenFromAnotherKey(UUID user, UUID homeEntity) {
         return signed(OTHER_KEY, user, homeEntity, "OWN", claims -> {});
@@ -122,8 +151,14 @@ public final class TestIdentityProvider {
                     .issueTime(Date.from(Instant.now().minusSeconds(5)))
                     .expirationTime(Date.from(Instant.now().plusSeconds(300)))
                     .claim("cls", policyClass)
-                    .claim("lang", "en");
+                    .claim("lang", "en")
+                    // Issued to the web client, as the resource server demands (AcceptedClientsValidator).
+                    .claim("azp", "DEVICE".equals(policyClass) ? "device-" + user : "coop-erp-web");
             if (homeEntity != null) {
+                // Where the user belongs, not where they may act: no scopes claim, so the
+                // application resolves the scopes from M1's assignments (UserScopes), as it does
+                // for a token of the provider we run. A test seeds the assignment it needs
+                // (PostgresIntegrationTest#assign), or opts in to the claim with entityWide.
                 claims.claim("ent", homeEntity.toString());
             }
             customise.accept(claims);

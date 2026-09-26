@@ -179,6 +179,36 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aRepeatedCreateWithTheSameKeyAnswersTheFirstSkuAndCreatesNothingMore() {
+        HttpHeaders headers = headers();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(skuBody("Replayed milk", null, null), headers);
+
+        ResponseEntity<JsonNode> first = http.exchange("/v1/catalogue/skus", HttpMethod.POST, request, JsonNode.class);
+        ResponseEntity<JsonNode> again = http.exchange("/v1/catalogue/skus", HttpMethod.POST, request, JsonNode.class);
+
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(again.getBody().get("skuId").asText())
+                .isEqualTo(first.getBody().get("skuId").asText());
+        assertThat(superuserJdbc().queryForObject("select count(*) from catalogue.sku", Integer.class))
+                .isEqualTo(1);
+        assertThat(kernel.committedAudit())
+                .extracting(record -> record.eventType())
+                .containsOnlyOnce("SKU_CREATED");
+    }
+
+    @Test
+    void aSkuThatIsNotThereIsANotFoundProblem() {
+        ResponseEntity<JsonNode> missing = http.exchange(
+                "/v1/catalogue/skus/" + UUID.randomUUID(), HttpMethod.GET, new HttpEntity<>(headers()), JsonNode.class);
+
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(missing.getBody().get("code").asText()).isEqualTo("m2.sku.not_found");
+        assertThat(missing.getBody().get("title").asText()).isNotBlank();
+    }
+
+    @Test
     void mutationWithoutIdempotencyKeyIsRejectedByTheHttpContract() {
         HttpHeaders headers = headers();
         headers.remove("Idempotency-Key");
@@ -194,7 +224,7 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(USER, MPCS));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(USER, MPCS));
         headers.set("X-Scope-Entity", MPCS.toString());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;

@@ -209,7 +209,7 @@ class BulkRegisterIntegrationTest extends PostgresIntegrationTest {
 
     private ResponseEntity<JsonNode> upload(String csv, UUID asEntity) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(USER, asEntity));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(USER, asEntity));
         headers.set("X-Scope-Entity", asEntity.toString());
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);

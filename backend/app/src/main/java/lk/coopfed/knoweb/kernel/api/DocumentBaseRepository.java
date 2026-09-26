@@ -13,25 +13,48 @@ import java.util.UUID;
 public interface DocumentBaseRepository {
 
     /**
-     * Inserts a draft, or updates the status of an issued document.
+     * Inserts or updates a draft. An issued document is never saved: its status changes
+     * through {@link #addStateTransition} and nothing else changes at all. A number, an
+     * issuance time or a hash on the record is refused too: only the issuance protocol
+     * ({@link DocumentIssuance}) sets them.
      *
-     * @throws ProblemException {@code document.immutable} when anything but the status
-     *                          of an issued document would change
+     * @throws ProblemException {@code document.immutable} for an issued document,
+     *                          {@code document.issued_fields_reserved} for a record that
+     *                          carries what issuance sets
      */
     DocumentRecord save(DocumentRecord document);
 
-    /** Appends lines to a document. Lines are never updated. */
-    void saveLines(
-            UUID documentId,
-            List<DocumentLineRecord> lines);
+    /**
+     * Appends lines to a draft. Lines are never updated, and none joins an issued document
+     * (the database refuses it with {@code document.immutable}).
+     */
+    void saveLines(UUID documentId, List<DocumentLineRecord> lines);
 
     /** Appends a typed link from a correcting document to its original. */
     void addLink(DocumentLinkRecord link);
 
-    /** Appends a state transition; the header's status follows it. */
-    void addStateTransition(DocumentStateHistoryRecord transition);
+    /**
+     * Locks an original for the rest of the transaction before its corrections are summed, so
+     * two concurrent settlements of one invoice see each other. {@link DocumentLinks} takes it;
+     * a module that reads the open balance before it decides takes it too.
+     */
+    void lockForLinking(UUID documentId);
+
+    /**
+     * Moves the document from {@code fromStatus} to {@code toStatus}, appends the history row
+     * and records the audit event {@code DOCUMENT_STATUS_CHANGED}, in the caller's transaction.
+     * The move is compare-and-set: it happens only when the document is still in
+     * {@code fromStatus}.
+     *
+     * @throws ProblemException {@code document.status_conflict} when the document is not in
+     *                          {@code fromStatus}, or the transition names no change
+     */
+    void addStateTransition(DocumentStateHistoryRecord transition, ScopeContext ctx);
 
     Optional<DocumentRecord> findById(UUID id);
+
+    /** The header, locked for the rest of the transaction; the issuance protocol takes it before it reads the lines. */
+    Optional<DocumentRecord> findByIdForUpdate(UUID id);
 
     List<DocumentLineRecord> findLines(UUID documentId);
 

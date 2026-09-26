@@ -45,7 +45,7 @@ function guarded(route: RouteObject, module: ModuleDefinition): RouteObject {
 }
 
 /** The navigation entries this user may see, in the order of the registry. */
-export function navItemsFor(modules: ModuleDefinition[], session: Pick<Session, "roles">): NavItem[] {
+export function navItemsFor(modules: ModuleDefinition[], session: Pick<Session, "roles" | "policyClass">): NavItem[] {
   return modules
     .filter((module) => hasAnyPermission(session, module.requiredPermissions))
     .flatMap((module) => module.navItems);

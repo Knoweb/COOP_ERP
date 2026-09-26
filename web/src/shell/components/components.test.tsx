@@ -163,9 +163,17 @@ describe("DocumentHeader", () => {
     expect(screen.getByText("District").nextSibling?.textContent).toBe("Gampaha");
   });
 
-  it("shows a dash for a fact with no value, so that 'not set' is not mistaken for 'not loaded'", () => {
+  it("shows a dash for a fact with no value, so that 'not set' is not mistaken for 'not loaded', and says 'Not set' to a screen reader", () => {
     renderIn("en", <DocumentHeader code="M042" title="Gampaha MPCS" facts={[{ label: "VAT number" }]} />);
-    expect(screen.getByText("VAT number").nextSibling?.textContent).toBe("—");
+    const value = screen.getByText("VAT number").nextSibling as HTMLElement;
+    // The dash is for the eye only; the words are for the ear only (as MoneyDisplay does).
+    expect(value.querySelector('[aria-hidden="true"]')?.textContent).toBe("—");
+    expect(value.querySelector(".visually-hidden")?.textContent).toBe("Not set");
+  });
+
+  it("says 'not set' in the user's language", () => {
+    renderIn("ta", <DocumentHeader code="M042" title="Gampaha MPCS" facts={[{ label: "VAT" }]} />);
+    expect(screen.getByText("அமைக்கப்படவில்லை")).toBeTruthy();
   });
 
   it("puts what it is given as children inside the header, where an ApprovalBar goes", () => {
@@ -249,8 +257,24 @@ describe("ReasonCapture", () => {
   it("gives null, not an empty string, when no text was written", () => {
     const confirmed: [string, string | null][] = [];
     renderIn("en", <ReasonCapture title="Why?" codes={codes} onConfirm={(code, text) => confirmed.push([code, text])} onCancel={() => {}} />);
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "COMPLIANCE" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(confirmed).toEqual([["COMPLIANCE", null]]);
+  });
+
+  it("starts with no reason chosen, and confirms nothing until one is: the reason is the clerk's, not the list's", () => {
+    const confirmed: [string, string | null][] = [];
+    renderIn("en", <ReasonCapture title="Why?" codes={codes} onConfirm={(code, text) => confirmed.push([code, text])} onCancel={() => {}} />);
+
+    const select = screen.getByLabelText("Reason") as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect(select.required).toBe(true);
+    expect(screen.getByRole("option", { name: "Choose a reason …" })).toBeTruthy();
+    const confirm = screen.getByRole("button", { name: "Confirm" }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+
+    fireEvent.submit(select.closest("form")!);
+    expect(confirmed).toEqual([]);
   });
 
   it("cancels without confirming", () => {

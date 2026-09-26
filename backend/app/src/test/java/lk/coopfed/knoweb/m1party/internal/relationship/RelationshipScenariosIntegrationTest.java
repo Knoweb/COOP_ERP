@@ -530,7 +530,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
     private static HttpHeaders headers(UUID entity, String policyClass) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(TestIdentityProvider.token(USER, entity, policyClass));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(USER, entity, policyClass));
         headers.set("X-Scope-Entity", entity.toString());
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         return headers;

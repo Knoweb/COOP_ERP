@@ -6,7 +6,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +22,11 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
+import lk.coopfed.knoweb.kernel.internal.security.StepUp;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -49,14 +50,14 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
     static final Duration CACHE_TTL = Duration.ofSeconds(30);
 
     /** How fresh a second factor must be for a sensitive item (doc 19 section 8; K-02 refines it). */
-    static final Duration MFA_FRESHNESS = Duration.ofMinutes(10);
-
     private final JdbcTemplate jdbc;
+
     private final ObjectMapper json;
     private final AuditFacade audit;
     private final EventPublisher events;
     private final SystemScope system;
     private final Clock clock;
+    private final StepUp stepUp;
     private final ConfigItemSeedLoader seeds;
     private final String businessTimezone;
 
@@ -72,6 +73,7 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
             EventPublisher events,
             SystemScope system,
             Clock clock,
+            StepUp stepUp,
             ConfigItemSeedLoader seeds,
             @Value("${coop-erp.business-timezone}") String businessTimezone) {
         this.jdbc = jdbc;
@@ -80,6 +82,7 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
         this.events = events;
         this.system = system;
         this.clock = clock;
+        this.stepUp = stepUp;
         this.seeds = seeds;
         this.businessTimezone = businessTimezone;
     }
@@ -163,11 +166,8 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
             throw new ProblemException("config.owner_mismatch", Map.of("key", key));
         }
 
-        if (item.sensitive()) {
-            Instant freshEnough = clock.instant().minus(MFA_FRESHNESS);
-            if (ctx.mfaAt() == null || ctx.mfaAt().isBefore(freshEnough)) {
-                throw new ProblemException("mfa.required", Map.of("key", key));
-            }
+        if (item.sensitive() && !stepUp.isFresh(ctx)) {
+            throw new ProblemException("mfa.required", Map.of("key", key));
         }
 
         JsonNode parsed = ConfigValues.parse(item, value, json);
@@ -186,7 +186,14 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
                 ctx.userId(),
                 reason);
 
-        invalidate(key);
+        // This instance's cache empties when the value is real: before the commit a concurrent
+        // reader would cache the old value again, and a rollback would leave the new one cached.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                invalidate(key);
+            }
+        });
 
         UUID changeId = Ids.next();
 

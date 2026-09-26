@@ -114,9 +114,12 @@ class RevokeStopsThePermissionPostgresIntegrationTest extends PostgresIntegratio
 
         revokeRole.handle(new RevokeRole(clerk, shopRole, shop, "moved"), asAdmin);
         assertThat(kernel.committedEvents()).endsWith(new RoleRevoked(shopRole, clerk, mpcs, shop));
+        // The instance that revoked empties its own cache when the revoke commits (the kernel's
+        // PublishedEventListener): the permission is gone here at once. The other instances
+        // hear it through the event below.
         assertThat(inScope(clerkAtShop, () -> resolver.allows(clerkAtShop, "sys.device.view")))
-                .as("cached: the resolver has not heard of the revoke yet")
-                .isTrue();
+                .as("on the revoking instance the permission is gone at once")
+                .isFalse();
 
         OutboxMessage revoked = outboxRow(RoleRevoked.TYPE, shopRole);
         JsonNode payload = mapper.readTree(revoked.payload());

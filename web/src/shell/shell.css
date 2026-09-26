@@ -460,3 +460,12 @@ button:disabled {
   display: flex;
   gap: var(--target-gap);
 }
+
+/* ---- The line under the header after a step-up (shell/auth/StepUpReplay.tsx) ------------- */
+
+.step-up-replay {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-subtle);
+}

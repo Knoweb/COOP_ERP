@@ -631,7 +631,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theSliceEnrolsAssignsListsAndSuspendsADevice() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(USER, MPCS));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(USER, MPCS));
         headers.set("X-Scope-Entity", MPCS.toString());
         headers.setContentType(MediaType.APPLICATION_JSON);
 

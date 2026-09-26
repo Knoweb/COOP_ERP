@@ -2,14 +2,13 @@ package lk.coopfed.knoweb.kernel.internal;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Clock;
-import java.time.Duration;
 import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
 import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.security.StepUp;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -32,13 +31,10 @@ public class CommandInterceptor {
 
     private static final int COMMAND_SUCCESS = 200;
 
-    /** How fresh a second factor must be for a permission that asks for one (doc 19 DR-7 refines it). */
-    static final Duration MFA_FRESHNESS = Duration.ofMinutes(10);
-
     private final IdempotencyStore idempotency;
     private final ObjectMapper mapper;
     private final PermissionResolver permissions;
-    private final Clock clock;
+    private final StepUp stepUp;
     private final boolean enforcePermissions;
     private final String stepUpUrl;
 
@@ -46,13 +42,13 @@ public class CommandInterceptor {
             IdempotencyStore idempotency,
             ObjectMapper mapper,
             PermissionResolver permissions,
-            Clock clock,
+            StepUp stepUp,
             @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions,
             @Value("${coop-erp.security.oidc.step-up-url:}") String stepUpUrl) {
         this.idempotency = idempotency;
         this.mapper = mapper;
         this.permissions = permissions;
-        this.clock = clock;
+        this.stepUp = stepUp;
         this.enforcePermissions = enforcePermissions;
         this.stepUpUrl = stepUpUrl;
         if (!enforcePermissions) {
@@ -64,14 +60,22 @@ public class CommandInterceptor {
     @Around("@within(lk.coopfed.knoweb.kernel.api.CommandHandler)")
     public Object intercept(ProceedingJoinPoint call) throws Throwable {
 
+        ScopeContext scope = findScope(call.getArgs());
+
+        // 19A section 3, in this order: permission -> MFA -> idempotency -> handler. The permission
+        // check comes first for every caller that names a user, over HTTP or not: a consumer or a
+        // job that runs a command as a user is held to the user's roles like a request.
+        if (scope != null && scope.userId() != null) {
+            checkPermission(call, scope);
+        }
+
         RequestData request = currentRequest();
 
         if (request == null) {
             // K-03a covers commands that arrive over HTTP. A command from a sync batch, a job or a
-            // consumer has no request and is NOT protected yet; said out loud here so that the gap
-            // is visible in the log and not discovered by a double-applied fact. K-08 (sync) and
-            // K-12 (jobs) give those callers their own keys. K-03b adds the permission and MFA
-            // checks before this point (19A section 3: permission -> MFA -> idempotency -> handler).
+            // consumer has no request and no idempotency key of its own yet; said out loud here so
+            // that the gap is visible in the log and not discovered by a double-applied fact. K-08
+            // (sync) and K-12 (jobs) give those callers their own keys.
             log.warn(
                     "{} ran outside an HTTP request: no idempotency check (K-03a covers HTTP only)",
                     call.getSignature().getDeclaringType().getSimpleName());
@@ -83,8 +87,6 @@ public class CommandInterceptor {
             throw new IllegalStateException("CommandInterceptor ran outside the handler transaction");
         }
 
-        ScopeContext scope = findScope(call.getArgs());
-
         if (scope == null) {
             throw new IllegalStateException("A command handler takes the ScopeContext of the request");
         }
@@ -93,9 +95,6 @@ public class CommandInterceptor {
             // attribute it to, and no idempotency key that could be a user's (K-03a).
             throw new ProblemException("scope.required");
         }
-
-        // 19A section 3, in this order: permission -> MFA -> idempotency -> handler.
-        checkPermission(call, scope);
 
         IdempotencyStore.Key key = new IdempotencyStore.Key(request.key(), scope.userId(), request.requestHash());
 
@@ -129,9 +128,7 @@ public class CommandInterceptor {
         }
 
         boolean allowed = permissions.allows(scope, permission);
-        boolean mfaFresh = !permissions.requiresMfa(permission)
-                || (scope.mfaAt() != null
-                        && !scope.mfaAt().isBefore(clock.instant().minus(MFA_FRESHNESS)));
+        boolean mfaFresh = !permissions.requiresMfa(permission) || stepUp.isFresh(scope);
 
         if (!enforcePermissions) {
             if (!allowed || !mfaFresh) {

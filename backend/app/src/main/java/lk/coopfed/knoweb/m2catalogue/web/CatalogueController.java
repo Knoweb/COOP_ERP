@@ -1,8 +1,12 @@
 package lk.coopfed.knoweb.m2catalogue.web;
 
 import java.net.URI;
+import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.PermissionResolver;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
 import lk.coopfed.knoweb.m2catalogue.api.DeactivateSku;
@@ -20,20 +24,32 @@ import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuPageResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 class CatalogueController implements CatalogueApi {
 
+    private static final String VIEW = "cat.sku.view";
+
     private final SkuCommandRouter commands;
     private final CatalogueQueries queries;
     private final CurrentScope currentScope;
+    private final PermissionResolver permissions;
+    private final boolean enforcePermissions;
 
-    CatalogueController(SkuCommandRouter commands, CatalogueQueries queries, CurrentScope currentScope) {
+    CatalogueController(
+            SkuCommandRouter commands,
+            CatalogueQueries queries,
+            CurrentScope currentScope,
+            PermissionResolver permissions,
+            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
         this.commands = commands;
         this.queries = queries;
         this.currentScope = currentScope;
+        this.permissions = permissions;
+        this.enforcePermissions = enforcePermissions;
     }
 
     @Override
@@ -43,8 +59,10 @@ class CatalogueController implements CatalogueApi {
 
         UUID skuId = commands.create(new CreateSku(details(request)), scope);
 
+        // The owner always sees its own draft; if it does not, the answer is the same problem a
+        // read gives, not an untranslated server error.
         SkuView created = queries.getSku(skuId, scope)
-                .orElseThrow(() -> new IllegalStateException("Created SKU is not visible in its owner scope"));
+                .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", skuId)));
 
         return ResponseEntity.created(URI.create("/v1/catalogue/skus/" + skuId)).body(toResponse(created));
     }
@@ -54,6 +72,7 @@ class CatalogueController implements CatalogueApi {
             String q, String lang, String status, Integer offset, Integer limit) {
 
         ScopeContext scope = currentScope.get();
+        requireView(scope);
 
         SkuFilter filter = new SkuFilter(status, q, lang, offset, limit);
 
@@ -69,10 +88,28 @@ class CatalogueController implements CatalogueApi {
 
     @Override
     public ResponseEntity<SkuResponse> getSku(UUID skuId) {
-        return queries.getSku(skuId, currentScope.get())
+        ScopeContext scope = currentScope.get();
+        requireView(scope);
+
+        return queries.getSku(skuId, scope)
                 .map(CatalogueController::toResponse)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", skuId)));
+    }
+
+    /**
+     * The reads declare x-permission cat.sku.view, and no command interceptor runs for a read, so
+     * the controller checks it: for the OWN class (the read-only classes resolve no permission;
+     * row-level security is what limits them), and only when enforcement is on, as for commands
+     * (coop-erp.security.enforce-permissions).
+     */
+    private void requireView(ScopeContext scope) {
+        if (!enforcePermissions || scope == null || scope.policyClass() != PolicyClass.OWN) {
+            return;
+        }
+        if (!permissions.allows(scope, VIEW)) {
+            throw new ProblemException("permission.denied", Map.of("permission", VIEW));
+        }
     }
 
     @Override

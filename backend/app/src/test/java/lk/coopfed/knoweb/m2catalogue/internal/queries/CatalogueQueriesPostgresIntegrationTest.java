@@ -17,7 +17,6 @@ import lk.coopfed.knoweb.m2catalogue.api.SkuDetails;
 import lk.coopfed.knoweb.m2catalogue.internal.sku.ActivateLocalSkuHandler;
 import lk.coopfed.knoweb.m2catalogue.internal.sku.ActivateSharedSkuHandler;
 import lk.coopfed.knoweb.m2catalogue.internal.sku.CreateLocalSkuHandler;
-import lk.coopfed.knoweb.m2catalogue.internal.sku.CreateSharedSkuHandler;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
@@ -28,6 +27,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
@@ -47,9 +48,6 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
     CreateLocalSkuHandler createLocal;
 
     @Autowired
-    CreateSharedSkuHandler createShared;
-
-    @Autowired
     ActivateLocalSkuHandler activateLocal;
 
     @Autowired
@@ -57,6 +55,12 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     CatalogueQueries queries;
+
+    // The shared path is the Federation's (FederationCaller), which the platform names here.
+    @DynamicPropertySource
+    static void federation(DynamicPropertyRegistry registry) {
+        registry.add("coop-erp.system.entity-id", FEDERATION::toString);
+    }
 
     @BeforeEach
     void cleanCatalogue() {
@@ -128,7 +132,7 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aSharedSkuIsReadableByAnotherEntity() {
-        UUID shared = createShared.handle(
+        UUID shared = createLocal.handle(
                 new CreateSku(details(
                         "Ceylon milk powder 400g",
                         "ලංකා කිරිපිටි 400g",
@@ -152,7 +156,7 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void searchFindsCodeAndAllThreeNames() {
-        UUID shared = createShared.handle(
+        UUID shared = createLocal.handle(
                 new CreateSku(details("Milk powder 400g", "කිරිපිටි 400g", "பால் மா 400g", Map.of())), own(FEDERATION));
 
         activateShared.handle(new ActivateSharedSku(shared), own(FEDERATION));
@@ -163,6 +167,64 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
         assertSearch("කිරි", "si", MPCS, shared);
         assertSearch("பால்", "ta", MPCS, shared);
         assertSearch(view.skuCode(), "en", MPCS, shared);
+    }
+
+    @Test
+    void percentAndUnderscoreInTheQueryAreLettersNotWildcards() {
+        UUID percent = createLocal.handle(new CreateSku(details("Soap 50% extra", null, null, Map.of())), own(MPCS));
+        UUID plain = createLocal.handle(new CreateSku(details("Soap 500 extra", null, null, Map.of())), own(MPCS));
+        UUID underscore = createLocal.handle(new CreateSku(details("Tea_bags", null, null, Map.of())), own(MPCS));
+        UUID space = createLocal.handle(new CreateSku(details("Tea bags", null, null, Map.of())), own(MPCS));
+        UUID backslash = createLocal.handle(new CreateSku(details("Rice \\ red", null, null, Map.of())), own(MPCS));
+
+        assertThat(search("50%", MPCS)).containsExactly(percent).doesNotContain(plain);
+        assertThat(search("a_b", MPCS)).containsExactly(underscore).doesNotContain(space);
+        assertThat(search("%", MPCS)).containsExactly(percent);
+        assertThat(search("\\", MPCS)).containsExactly(backslash);
+    }
+
+    @Test
+    void theCodeMatchesByPrefixOnly() {
+        UUID sku = createLocal.handle(new CreateSku(details("Coconut oil", null, null, Map.of())), own(MPCS));
+        String code = queries.getSku(sku, own(MPCS)).orElseThrow().skuCode();
+
+        assertThat(search(code.substring(0, 7).toLowerCase(Locale.ROOT), MPCS)).containsExactly(sku);
+        assertThat(search(code.substring(5), MPCS)).isEmpty();
+    }
+
+    @Test
+    void theClosestNameComesFirstAmongEqualNames() {
+        // The same Sinhala name, so the Sinhala display order ties; the English names differ, and
+        // the one the query matches exactly must come first whatever the codes are.
+        for (int round = 0; round < 3; round++) {
+            superuserJdbc().execute("truncate table catalogue.sku cascade");
+
+            UUID loose = createLocal.handle(
+                    new CreateSku(details("Sugar packet one kilo", "සීනි", null, Map.of())), own(MPCS));
+            UUID exact = createLocal.handle(new CreateSku(details("Sugar", "සීනි", null, Map.of())), own(MPCS));
+
+            assertThat(queries.searchSku(new SkuFilter(null, "Sugar", "si", 0, 50), own(MPCS))
+                            .items())
+                    .extracting(SkuView::skuId)
+                    .containsExactly(exact, loose);
+        }
+    }
+
+    @Test
+    void theOffsetIsCappedAndThePageAtTheCapHasNoNext() {
+        createLocal.handle(new CreateSku(details("Only one", null, null, Map.of())), own(MPCS));
+
+        SkuFilter deep = new SkuFilter(null, null, "en", Integer.MAX_VALUE, 50);
+
+        assertThat(deep.normalizedOffset()).isEqualTo(SkuFilter.MAX_OFFSET);
+        assertThat(queries.listSkus(deep, own(MPCS)).items()).isEmpty();
+        assertThat(queries.listSkus(deep, own(MPCS)).nextOffset()).isNull();
+    }
+
+    private List<UUID> search(String text, UUID entity) {
+        return queries.searchSku(new SkuFilter(null, text, "en", 0, 50), own(entity)).items().stream()
+                .map(SkuView::skuId)
+                .toList();
     }
 
     @Test

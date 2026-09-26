@@ -24,6 +24,7 @@ public class UpdateSharedSkuHandler implements Handles<UpdateSku, UUID> {
 
     private final SkuRepository repository;
     private final SkuRules rules;
+    private final FederationCaller federation;
     private final InventoryLotQuery inventory;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -31,11 +32,13 @@ public class UpdateSharedSkuHandler implements Handles<UpdateSku, UUID> {
     UpdateSharedSkuHandler(
             SkuRepository repository,
             SkuRules rules,
+            FederationCaller federation,
             InventoryLotQuery inventory,
             AuditFacade audit,
             EventPublisher events) {
         this.repository = repository;
         this.rules = rules;
+        this.federation = federation;
         this.inventory = inventory;
         this.audit = audit;
         this.events = events;
@@ -51,6 +54,8 @@ public class UpdateSharedSkuHandler implements Handles<UpdateSku, UUID> {
         if (command == null) {
             throw new ProblemException("request.invalid");
         }
+
+        federation.require(scope);
 
         SkuDetails details = command.details();
         rules.validate(details);
@@ -80,7 +85,7 @@ public class UpdateSharedSkuHandler implements Handles<UpdateSku, UUID> {
                         || sku.expiryTracked() != details.expiryTracked();
 
         if (changed && inventory.hasAnyLot(sku.getId())) {
-            throw new ProblemException("request.invalid");
+            throw new ProblemException("m2.sku.has_lots", Map.of("skuId", sku.getId()));
         }
     }
 

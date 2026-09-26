@@ -14,6 +14,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.EntityFilter;
 import lk.coopfed.knoweb.m1party.query.EntityView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,6 +123,39 @@ class PartyQueriesImplTest {
         assertThat(result.vatRegistrationNo()).isEqualTo("VAT-301");
 
         assertThat(result.status()).isEqualTo("ONBOARDING");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void searchGoesToTheServerWithTheWildcardsEscaped() {
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        queries.listEntities(new EntityFilter(null, null, " 50%_a\\b ", null, 20), scope(PolicyClass.OWN));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> params = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), params.capture());
+
+        assertThat(sql.getValue()).contains("entity_code like ? escape '\\'");
+        assertThat(sql.getValue()).contains("legal_name_ta ilike ? escape '\\'");
+        // The code by prefix in upper case, each name by part; then the fetch limit (limit + 1).
+        assertThat(params.getValue())
+                .containsExactly("50\\%\\_A\\\\B%", "%50\\%\\_a\\\\b%", "%50\\%\\_a\\\\b%", "%50\\%\\_a\\\\b%", 21);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aTradingPartnerSearchesTheDirectoryByNameOnly() {
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        queries.listEntities(new EntityFilter(null, null, "Gampaha", null, 20), scope(PolicyClass.PARTY));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), any(Object[].class));
+
+        assertThat(sql.getValue()).contains("party.entity_party_directory");
+        assertThat(sql.getValue()).contains("legal_name_en ilike ?");
+        assertThat(sql.getValue()).doesNotContain("entity_code");
     }
 
     @Test

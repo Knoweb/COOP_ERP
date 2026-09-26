@@ -66,7 +66,7 @@ class CollationPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(Normalizer.isNormalized(decomposed, Normalizer.Form.NFC)).isFalse();
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(UUID.randomUUID(), ENTITY));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(UUID.randomUUID(), ENTITY));
         headers.set("X-Scope-Entity", ENTITY.toString());
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         headers.setContentType(MediaType.APPLICATION_JSON);

@@ -23,6 +23,7 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.kernel.internal.security.StepUp;
 import lk.coopfed.knoweb.kernel.internal.sync.DeviceDirectory.DeviceRecord;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,9 +46,6 @@ public class EnrolmentStore {
     /** The permission of the catalogue that lets an administrator enrol and suspend devices (M1). */
     static final String PERMISSION = "sys.device.manage";
 
-    /** How fresh a second factor must be for a permission that asks for one (as CommandInterceptor). */
-    static final Duration MFA_FRESHNESS = Duration.ofMinutes(10);
-
     /** What the device receives. */
     record Enrolled(
             DeviceRecord device,
@@ -65,6 +63,7 @@ public class EnrolmentStore {
     private final PermissionResolver permissions;
     private final DeviceCredentials credentials;
     private final Clock clock;
+    private final StepUp stepUp;
     private final boolean enforcePermissions;
 
     EnrolmentStore(
@@ -74,6 +73,7 @@ public class EnrolmentStore {
             PermissionResolver permissions,
             DeviceCredentials credentials,
             Clock clock,
+            StepUp stepUp,
             @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
         this.jdbc = jdbc;
         this.audit = audit;
@@ -81,6 +81,7 @@ public class EnrolmentStore {
         this.permissions = permissions;
         this.credentials = credentials;
         this.clock = clock;
+        this.stepUp = stepUp;
         this.enforcePermissions = enforcePermissions;
     }
 
@@ -255,8 +256,7 @@ public class EnrolmentStore {
         if (!permissions.allows(ctx, PERMISSION)) {
             throw new ProblemException("permission.denied", Map.of("permission", PERMISSION));
         }
-        if (permissions.requiresMfa(PERMISSION)
-                && (ctx.mfaAt() == null || ctx.mfaAt().isBefore(clock.instant().minus(MFA_FRESHNESS)))) {
+        if (permissions.requiresMfa(PERMISSION) && !stepUp.isFresh(ctx)) {
             throw new ProblemException("mfa.required", Map.of("permission", PERMISSION));
         }
     }

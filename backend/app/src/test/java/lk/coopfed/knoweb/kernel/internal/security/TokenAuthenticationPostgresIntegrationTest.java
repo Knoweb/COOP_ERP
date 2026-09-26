@@ -41,6 +41,10 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
     private static final UUID USER = UUID.fromString("0190a600-0000-7000-8000-000000000010");
     private static final UUID STRANGER = UUID.fromString("0190a600-0000-7000-8000-000000000011");
     private static final UUID ROLE = UUID.fromString("0190a600-0000-7000-8000-000000000201");
+    private static final UUID SHOP_USER = UUID.fromString("0190a600-0000-7000-8000-000000000012");
+    private static final UUID OTHER_ENTITY = UUID.fromString("0190a600-0000-7000-8000-000000000002");
+    private static final UUID SHOP = UUID.fromString("0190a600-0000-7000-8000-000000000101");
+    private static final UUID OTHER_SHOP = UUID.fromString("0190a600-0000-7000-8000-000000000102");
 
     @DynamicPropertySource
     static void enforce(DynamicPropertyRegistry registry) {
@@ -64,7 +68,7 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
                 "insert into security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)"
                         + " values ('hello.greeting.register', 'hello', 'Register a greeting', false, false, 'ENTITY')"
                         + " on conflict (permission_code) do nothing");
-        for (UUID user : new UUID[] {USER, STRANGER}) {
+        for (UUID user : new UUID[] {USER, STRANGER, SHOP_USER}) {
             admin.update(
                     "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
                             + " values (?, ?, ?, 'Token test user', 'BACK_OFFICE', 'ACTIVE')",
@@ -85,6 +89,20 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
                 USER,
                 ROLE,
                 ENTITY);
+        admin.update(
+                "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id) values (?, ?, ?, ?)",
+                SHOP_USER,
+                ROLE,
+                ENTITY,
+                SHOP);
+        admin.update(
+                "insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en)"
+                        + " values (?, ?, 'TKN-S1', 'SHOP', 'Token test shop'),"
+                        + " (?, ?, 'TKN-S2', 'SHOP', 'Another entity shop')",
+                SHOP,
+                ENTITY,
+                OTHER_SHOP,
+                OTHER_ENTITY);
         resolver.invalidateAll();
         userScopes.invalidateAll();
     }
@@ -99,10 +117,13 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
     }
 
     private static void clean(JdbcTemplate admin) {
-        admin.execute("delete from security.user_role where user_id in ('" + USER + "', '" + STRANGER + "')");
+        admin.execute("delete from security.user_role where user_id in ('" + USER + "', '" + STRANGER + "', '"
+                + SHOP_USER + "')");
         admin.execute("delete from security.role_permission where role_id = '" + ROLE + "'");
         admin.execute("delete from security.role where role_id = '" + ROLE + "'");
-        admin.execute("delete from security.app_user where user_id in ('" + USER + "', '" + STRANGER + "')");
+        admin.execute("delete from security.app_user where user_id in ('" + USER + "', '" + STRANGER + "', '"
+                + SHOP_USER + "')");
+        admin.execute("delete from party.location where location_id in ('" + SHOP + "', '" + OTHER_SHOP + "')");
     }
 
     @Test
@@ -110,7 +131,10 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
         ResponseEntity<JsonNode> allowed = register(headers -> headers.setBearerAuth(token(USER, c -> {})));
         assertThat(allowed.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
-        ResponseEntity<JsonNode> refused = register(headers -> headers.setBearerAuth(token(STRANGER, c -> {})));
+        // The stranger's token names the entity entity-wide (the opt-in claim), so the scope is
+        // valid and it is the permission check that refuses.
+        ResponseEntity<JsonNode> refused =
+                register(headers -> headers.setBearerAuth(token(STRANGER, TestIdentityProvider.entityWide(ENTITY))));
         assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(refused.getBody().get("code").asText()).isEqualTo("permission.denied");
     }
@@ -148,6 +172,75 @@ class TokenAuthenticationPostgresIntegrationTest extends PostgresIntegrationTest
                 register(headers -> headers.setBearerAuth(token(USER, c -> c.issuer("http://elsewhere.test"))));
         assertThat(elsewhere.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(elsewhere.getBody().get("code").asText()).isEqualTo("token.invalid");
+    }
+
+    @Test
+    void aTokenOfAnotherClientOfTheRealmIsRefused() {
+        // The provider's own admin-cli, a service account: not a client of this platform.
+        ResponseEntity<JsonNode> response =
+                register(headers -> headers.setBearerAuth(token(USER, c -> c.claim("azp", "admin-cli"))));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody().get("code").asText()).isEqualTo("token.invalid");
+    }
+
+    @Test
+    void anEntityWideHolderMayActAtALocationOfTheEntity() {
+        // Doc 19 section 3.1: an entity grant is expanded to every location; the shell may send one.
+        ResponseEntity<JsonNode> response = register(headers -> {
+            headers.setBearerAuth(token(USER, c -> {}));
+            headers.set("X-Scope-Location", SHOP.toString());
+        });
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        // A location of an entity the caller does not hold is still refused.
+        ResponseEntity<JsonNode> elsewhere = register(headers -> {
+            headers.setBearerAuth(token(USER, c -> {}));
+            headers.set("X-Scope-Entity", OTHER_ENTITY.toString());
+            headers.set("X-Scope-Location", OTHER_SHOP.toString());
+        });
+        assertThat(elsewhere.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(elsewhere.getBody().get("code").asText()).isEqualTo("scope.invalid");
+    }
+
+    @Test
+    void aShopOnlyUserActsAtTheShopAndIsRefusedEntityWideAndAtAnotherShop() {
+        // No scopes claim: the scopes are resolved from M1's assignment (UserScopes), one shop.
+        ResponseEntity<JsonNode> atTheShop = register(headers -> {
+            headers.setBearerAuth(token(SHOP_USER, c -> {}));
+            headers.set("X-Scope-Location", SHOP.toString());
+        });
+        assertThat(atTheShop.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<JsonNode> entityWide = register(headers -> headers.setBearerAuth(token(SHOP_USER, c -> {})));
+        assertThat(entityWide.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(entityWide.getBody().get("code").asText()).isEqualTo("scope.invalid");
+
+        ResponseEntity<JsonNode> anotherShop = register(headers -> {
+            headers.setBearerAuth(token(SHOP_USER, c -> {}));
+            headers.set("X-Scope-Location", OTHER_SHOP.toString());
+        });
+        assertThat(anotherShop.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(anotherShop.getBody().get("code").asText()).isEqualTo("scope.invalid");
+    }
+
+    @Test
+    void anEntityWideHolderMayNotNameAnotherEntitysShopUnderItsOwnEntity() {
+        // The entity header is the caller's own; the location is another entity's shop.
+        ResponseEntity<JsonNode> response = register(headers -> {
+            headers.setBearerAuth(token(USER, c -> {}));
+            headers.set("X-Scope-Entity", ENTITY.toString());
+            headers.set("X-Scope-Location", OTHER_SHOP.toString());
+        });
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code").asText()).isEqualTo("scope.invalid");
+
+        // A location that does not exist is refused the same way.
+        ResponseEntity<JsonNode> unknown = register(headers -> {
+            headers.setBearerAuth(token(USER, c -> {}));
+            headers.set("X-Scope-Location", UUID.randomUUID().toString());
+        });
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(unknown.getBody().get("code").asText()).isEqualTo("scope.invalid");
     }
 
     @Test
