@@ -217,6 +217,15 @@ config_items:
     default: 200
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  - key: notification.rules.cache_seconds
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 3600 }
+    description_en: How long the notification dispatcher keeps the active rules of an event type before reading them again (0 reads every time)
+    description_si: දැනුම්දීම් යවන්නා සිද්ධි වර්ගයක ක්‍රියාකාරී නීති නැවත කියවීමට පෙර තබා ගන්නා කාලය තත්පර වලින් (0 නම් සෑම විටම කියවයි)
+    description_ta: அறிவிப்பு அனுப்புநர் ஒரு நிகழ்வு வகையின் செயலில் உள்ள விதிகளை மீண்டும் படிக்கும் முன் வைத்திருக்கும் நேரம் வினாடிகளில் (0 என்றால் ஒவ்வொரு முறையும் படிக்கும்)
+    default: 60
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   # K-09: attachments (19A section 9; doc 32 section 4: images of about 300 KB, at most 1600 px).
   - key: attachment.max_bytes
     value_type: INTEGER
