@@ -81,6 +81,10 @@ openApiSlices.forEach { slice ->
         // as a file: without this line a changed slice left the task UP-TO-DATE and the old
         // interfaces in place, and the controller of a new operation failed to compile.
         inputs.file(slice)
+        // An operation removed from the slice must take its generated Java with it: without
+        // this the old *Api.java stayed in build/generated on a developer's machine and kept
+        // compiling against a contract the slice no longer has (review of 26 September 2026).
+        cleanupOutput.set(true)
     }
 
     generateOpenApi { dependsOn(task) }

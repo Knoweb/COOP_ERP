@@ -1,16 +1,27 @@
 # gitleaks (the pipeline's secret scan, ci.yml job secret-scan) runs with its default rules plus
 # what is allowed here. Every entry says why; a real secret is rotated, never allowed.
+#
+# The allowlist belongs to the one rule it exempts: a top-level [allowlist] applied to every
+# rule, and its seed path exempted every seed file from every rule, a password in a seed
+# included (review of 26 September 2026). A rule given here with only its id and an allowlist
+# extends the default rule of that id. (The top-level `[[allowlists]]` with `targetRules` that
+# the review named is silently ignored by v8.28.0 when the default rules are extended, verified
+# over the whole history; this form does what it meant.)
 
 [extend]
 useDefault = true
 
-[allowlist]
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
 description = "False positives of the generic-api-key rule"
-# Seed files carry configuration item names and values, permission codes and role templates,
-# committed reference data by design; a password never lives there (they come from the
-# environment). A line such as `key: "m1.bulk.max_rows"` is a configuration key's name.
+# The seed YAML catalogues carry configuration item names and values, permission codes and role
+# templates, committed reference data by design; a password never lives there (they come from
+# the environment). A line such as `key: "m1.bulk.max_rows"` is a configuration key's name.
+# Only the YAML catalogues, not the *.dev.sql seeds, which carry nothing the rule misreads.
 paths = [
-  '''backend/app/src/main/resources/seed/.*''',
+  '''backend/app/src/main/resources/seed/[a-z0-9]+/[a-z-]+\.yaml''',
 ]
 # A configuration item's name in Java (MAX_ROWS_... = "m1.bulk.max_rows"), in a commit of
 # 24 September 2026 that named the constant *_KEY: the rule reads "key" beside a string as a
