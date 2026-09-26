@@ -2,12 +2,16 @@ package lk.coopfed.knoweb.kernel.internal.notification;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.NotificationAudience;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries;
@@ -43,15 +47,32 @@ class NotificationDispatcher {
     private final Map<AudienceKind, NotificationAudience> audiences = new HashMap<>();
     private final NotificationService service;
     private final ObjectMapper json;
+    private final ConfigRegistry config;
+    private final Clock clock;
+
+    /** M9 publishes it when a rule is created, changed, activated or retired. */
+    static final String RULE_CHANGED = "notification_rule.changed.v1";
+
+    static final String CACHE_SECONDS = "notification.rules.cache_seconds";
+
+    private record RuleKey(String eventType, UUID entityId) {}
+
+    private record CachedRules(List<NotificationRule> rules, Instant loadedAt) {}
+
+    private final Map<RuleKey, CachedRules> cache = new ConcurrentHashMap<>();
 
     NotificationDispatcher(
             ObjectProvider<NotificationRuleQueries> rules,
             List<NotificationAudience> audienceBeans,
             NotificationService service,
-            ObjectMapper json) {
+            ObjectMapper json,
+            ConfigRegistry config,
+            Clock clock) {
         this.rules = rules;
         this.service = service;
         this.json = json;
+        this.config = config;
+        this.clock = clock;
         audienceBeans.forEach(bean -> audiences.put(bean.kind(), bean));
     }
 
@@ -73,7 +94,12 @@ class NotificationDispatcher {
         JsonNode body = payload.path("payload");
         UUID counterparty = uuid(body.path("counterpartyEntityId").asText(null));
 
-        for (NotificationRule rule : queries.activeRules(eventType, scope.entityId())) {
+        if (RULE_CHANGED.equals(eventType)) {
+            // 19A section 10: the cache of active rules is invalidated by M9's change event.
+            cache.clear();
+        }
+
+        for (NotificationRule rule : activeRules(queries, eventType, scope)) {
             if (!predicateHolds(rule.predicate(), body)) {
                 continue;
             }
@@ -102,6 +128,32 @@ class NotificationDispatcher {
                 }
             }
         }
+    }
+
+    /**
+     * The active rules of an event type for the event's entity, cached (19A section 10). The
+     * change event reaches one instance of the competing consumers only, so every entry also
+     * expires after {@code notification.rules.cache_seconds}: that bounds how long another
+     * instance matches against a rule M9 has changed.
+     */
+    private List<NotificationRule> activeRules(NotificationRuleQueries queries, String eventType, ScopeContext scope) {
+        Instant now = clock.instant();
+        long seconds = config.getInt(CACHE_SECONDS, scope, 60);
+        RuleKey key = new RuleKey(eventType, scope.entityId());
+        CachedRules cached = cache.get(key);
+        if (cached != null && cached.loadedAt().plusSeconds(seconds).isAfter(now)) {
+            return cached.rules();
+        }
+        List<NotificationRule> loaded = List.copyOf(queries.activeRules(eventType, scope.entityId()));
+        if (seconds > 0) {
+            cache.put(key, new CachedRules(loaded, now));
+        }
+        return loaded;
+    }
+
+    /** Forgets every cached rule (the change event, and tests). */
+    void invalidateRules() {
+        cache.clear();
     }
 
     private List<NotificationAudience.Recipient> audience(
