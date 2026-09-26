@@ -226,6 +226,7 @@ class SyncController implements SyncApi {
                         presignRequest.getDocumentId(),
                         presignRequest.getAttachmentId(),
                         presignRequest.getContentType(),
+                        presignRequest.getContentLength(),
                         presignRequest.getSha256(),
                         device));
         return ResponseEntity.ok(new PresignResponse(

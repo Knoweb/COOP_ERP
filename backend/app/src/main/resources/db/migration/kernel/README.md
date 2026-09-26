@@ -6,8 +6,8 @@ are built in four lanes (`docs/PLAN_TO_M2.md`, Part B, wave 2) and two lanes tha
 are reserved per lane before the lanes start.
 
 Below `V0010` are the baseline and what it still needed (`V0001` to `V0006`). Taken so far:
-`V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0050` (K-07
-documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0055` (K-07 review: no line joins an issued document, REVERSES once by index, the ENTITY series in a shop scope, `party_read` per the template, the gap check against the highest number), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`).
+`V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0032` (K-05, scoped inbox claims), `V0050` (K-07
+documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0055` (K-07 review: no line joins an issued document, REVERSES once by index, the ENTITY series in a shop scope, `party_read` per the template, the gap check against the highest number), `V0058` (K-09 review, attachment status transitions), `V0059` (K-10 review, `notification_pending`; lane C because it references `notification_log`), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`).
 
 The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
 19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.

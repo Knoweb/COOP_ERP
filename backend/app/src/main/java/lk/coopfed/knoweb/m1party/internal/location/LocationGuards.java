@@ -54,6 +54,26 @@ final class LocationGuards {
                         "m1.position.not_found", Map.of("tillPositionId", String.valueOf(tillPositionId))));
     }
 
+    /**
+     * The location, locked until the transaction ends: for a handler that changes the location
+     * or one of its positions, so that two such commands on one shop run one after the other
+     * (the review of M1-05: SetPrimaryTill and RetireTillPosition passed each other).
+     */
+    static Location lockedLocation(LocationRepository locations, UUID locationId) {
+        return locations
+                .findByIdForUpdate(locationId)
+                .orElseThrow(() -> new ProblemException(
+                        "m1.location.not_found", Map.of("locationId", String.valueOf(locationId))));
+    }
+
+    /** The position, locked until the transaction ends; taken after the location's lock. */
+    static TillPosition lockedPosition(TillPositionRepository positions, UUID tillPositionId) {
+        return positions
+                .findByIdForUpdate(tillPositionId)
+                .orElseThrow(() -> new ProblemException(
+                        "m1.position.not_found", Map.of("tillPositionId", String.valueOf(tillPositionId))));
+    }
+
     /** Refuses a move the state machine of doc 21 section 4.3 does not have. */
     static void requireStatus(Location location, String expected, String target) {
         if (!expected.equals(location.status())) {

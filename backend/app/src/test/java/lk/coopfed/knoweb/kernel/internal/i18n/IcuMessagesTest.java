@@ -49,16 +49,59 @@ class IcuMessagesTest {
     @Test
     void pluralsAndNamedArgumentsWorkAndDigitsStayWesternInSinhalaAndTamil() {
         IcuMessages real = new IcuMessages(mapper);
-        // A message written for this test through the fixture folder would need three files;
-        // the plural form is exercised on an inline catalogue instead.
-        IcuMessages inline = new IcuMessages(mapper, "i18n-fixtures/plural/");
-        assertThat(inline.t("a.items", Locale.forLanguageTag("si"), Map.of("count", 1)))
-                .isEqualTo("අයිතම 1");
-        assertThat(inline.t("a.items", Locale.forLanguageTag("ta"), Map.of("count", 1234)))
-                .isEqualTo("1,234 பொருட்கள்");
-        assertThat(inline.t("a.items", Locale.ENGLISH, Map.of("count", 1))).isEqualTo("1 item");
-        assertThat(inline.t("a.items", Locale.ENGLISH, Map.of("count", 2))).isEqualTo("2 items");
+        IcuMessages plural = new IcuMessages(mapper, "i18n-fixtures/plural/");
+        Locale si = Locale.forLanguageTag("si");
+        Locale ta = Locale.forLanguageTag("ta");
+
+        // The plural rules of each language (CLDR): Sinhala counts 0 and 1 as "one", Tamil and
+        // English 1 alone; the digits are Western in every language (DR-6).
+        assertThat(plural.t("a.items", si, Map.of("count", 0))).isEqualTo("අයිතමය 0");
+        assertThat(plural.t("a.items", si, Map.of("count", 1))).isEqualTo("අයිතමය 1");
+        assertThat(plural.t("a.items", si, Map.of("count", 2))).isEqualTo("අයිතම 2");
+        assertThat(plural.t("a.items", si, Map.of("count", 1234))).isEqualTo("අයිතම 1,234");
+        assertThat(plural.t("a.items", ta, Map.of("count", 0))).isEqualTo("0 பொருட்கள்");
+        assertThat(plural.t("a.items", ta, Map.of("count", 1))).isEqualTo("1 பொருள்");
+        assertThat(plural.t("a.items", ta, Map.of("count", 2))).isEqualTo("2 பொருட்கள்");
+        assertThat(plural.t("a.items", ta, Map.of("count", 1234))).isEqualTo("1,234 பொருட்கள்");
+        assertThat(plural.t("a.items", Locale.ENGLISH, Map.of("count", 0))).isEqualTo("0 items");
+        assertThat(plural.t("a.items", Locale.ENGLISH, Map.of("count", 1))).isEqualTo("1 item");
+        assertThat(plural.t("a.items", Locale.ENGLISH, Map.of("count", 2))).isEqualTo("2 items");
+        assertThat(plural.t("a.items", Locale.ENGLISH, Map.of("count", 1234))).isEqualTo("1,234 items");
+
+        // A select form in each language.
+        assertThat(plural.t("a.who", si, Map.of("gender", "female"))).isEqualTo("ඇය අත්සන් කළා");
+        assertThat(plural.t("a.who", ta, Map.of("gender", "other"))).isEqualTo("அவர்கள் கையொப்பமிட்டார்");
+        assertThat(plural.t("a.who", Locale.ENGLISH, Map.of("gender", "male"))).isEqualTo("He signed");
+
+        // A plural id only English has: the English form, its plural rule, and the mark.
+        assertThat(plural.text("a.only_english_plural", si, Map.of("count", 1)))
+                .isEqualTo(new Messages.Text("1 receipt", true));
+        assertThat(plural.text("a.only_english_plural", ta, Map.of("count", 3)))
+                .isEqualTo(new Messages.Text("3 receipts", true));
+
         assertThat(real.t("scope.required", Locale.ENGLISH)).isEqualTo("Select the entity you are working for");
+    }
+
+    @Test
+    void theSameIdFormattedTwiceComesFromOneCachedFormatAndStaysRight() {
+        IcuMessages plural = new IcuMessages(mapper, "i18n-fixtures/plural/");
+        // The format is parsed once per language and id and cloned per call, so a second call
+        // with other arguments is not answered with the first call's text.
+        assertThat(plural.t("a.items", Locale.ENGLISH, Map.of("count", 1))).isEqualTo("1 item");
+        assertThat(plural.t("a.items", Locale.ENGLISH, Map.of("count", 5))).isEqualTo("5 items");
+        assertThat(plural.t("a.items", Locale.forLanguageTag("ta"), Map.of("count", 1)))
+                .isEqualTo("1 பொருள்");
+    }
+
+    @Test
+    void inStrictModeAnIdNoLanguageHasThrows() {
+        IcuMessages strict = new IcuMessages(mapper, "i18n-fixtures/partial/", true);
+        assertThatThrownBy(() -> strict.text("a.unknown", Locale.ENGLISH))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("a.unknown");
+        // A missing translation is still a fallback, not a missing id.
+        assertThat(strict.text("a.only_english", Locale.forLanguageTag("si")))
+                .isEqualTo(new Messages.Text("English only", true));
     }
 
     @Test

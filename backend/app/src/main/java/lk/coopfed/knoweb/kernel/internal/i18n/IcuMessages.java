@@ -11,10 +11,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -27,11 +29,14 @@ import org.springframework.stereotype.Component;
  * <p>ICU adds what the stub lacked: plural and select forms ({@code {count, plural, one {# item}
  * other {# items}}}) and named arguments; positional arguments still work, so no catalogue
  * changed. Numbers inside a message are written with Western Arabic digits in every language
- * (DR-6): the format is built for the language with the LATN numbering system.
+ * (DR-6): the format is built for the language with the LATN numbering system, once per
+ * language and id, and cloned per call (a MessageFormat is not thread-safe).
  *
  * <p>Fallback is said, not hidden: {@link Messages.Text#fallback()} is true when the text came
- * from English because the requested language lacks the id. An id no language has is
- * returned as the id and logged; the build check makes that impossible for ids in the code.
+ * from English because the requested language lacks the id. An id no language has is a
+ * build error ({@code tools/check-i18n.mjs}); at run time it is returned as the id and logged,
+ * and in the test profile ({@code coop-erp.i18n.strict-missing-ids}) it throws, as 19A
+ * section 6 asks, so a test never passes on an id that would show as itself.
  */
 @Component
 public class IcuMessages implements Messages {
@@ -42,15 +47,28 @@ public class IcuMessages implements Messages {
     private static final String FALLBACK = "en";
 
     private final Map<String, Map<String, String>> catalogues = new LinkedHashMap<>();
+    private final Map<String, MessageFormat> formats = new ConcurrentHashMap<>();
+    private final boolean strictMissingIds;
 
     /** The constructor Spring uses. With two constructors it has to be told which. */
     @Autowired
-    public IcuMessages(ObjectMapper mapper) {
-        this(mapper, "i18n/");
+    public IcuMessages(
+            ObjectMapper mapper, @Value("${coop-erp.i18n.strict-missing-ids:false}") boolean strictMissingIds) {
+        this(mapper, "i18n/", strictMissingIds);
     }
 
-    /** For tests: catalogues from another folder of the class path. */
+    /** The real catalogues, lenient about a missing id: what a unit test without a context makes. */
+    public IcuMessages(ObjectMapper mapper) {
+        this(mapper, "i18n/", false);
+    }
+
+    /** For tests: catalogues from another folder of the class path, lenient about a missing id. */
     IcuMessages(ObjectMapper mapper, String folder) {
+        this(mapper, folder, false);
+    }
+
+    IcuMessages(ObjectMapper mapper, String folder, boolean strictMissingIds) {
+        this.strictMissingIds = strictMissingIds;
         for (String language : LANGUAGES) {
             catalogues.put(language, load(mapper, folder + language + ".json"));
         }
@@ -69,14 +87,21 @@ public class IcuMessages implements Messages {
             template = catalogues.get(FALLBACK).get(id);
             fallback = template != null && known;
             if (template == null) {
+                if (strictMissingIds) {
+                    throw new IllegalStateException("Message id " + id + " is in no catalogue");
+                }
                 log.error("Message id {} is in no catalogue; the id is shown instead", id);
                 return new Text(id, true);
             }
         }
 
         // The language of the text, for plural rules; LATN digits whatever it is (DR-6).
-        ULocale forText = ULocale.forLanguageTag((fallback || !known ? FALLBACK : language) + "-LK-u-nu-latn");
-        MessageFormat format = new MessageFormat(template, forText);
+        String forText = fallback || !known ? FALLBACK : language;
+        String pattern = template;
+        MessageFormat format = (MessageFormat) formats.computeIfAbsent(
+                        forText + ":" + id,
+                        key -> new MessageFormat(pattern, ULocale.forLanguageTag(forText + "-LK-u-nu-latn")))
+                .clone();
         // Named arguments come as one Map; positional ones as the array (the catalogues use {0}).
         String value = args != null && args.length == 1 && args[0] instanceof java.util.Map<?, ?> named
                 ? format.format(named)
