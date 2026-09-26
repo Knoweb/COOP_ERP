@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m2catalogue.internal.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -15,10 +16,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The M2 seed loader: the done criterion of M2-01, "migrations and seeds apply". The start of
- * the test context ran it once already, without a Federation (the test context does not set
- * {@code coop-erp.system.entity-id}), so the units and tags are in place and the tax rows are
- * not; the tax cases run a loader of their own that knows the Federation. The counts are the
- * rows of the three YAML files under seed/m2catalogue; change them together with the files.
+ * the test context ran it once already, as the test Federation ({@code coop-erp.system.entity-id}
+ * of {@code PostgresIntegrationTest}), so the units, the tags and the tax rows are in place;
+ * the tax cases remove the tax rows first and run a loader of their own that names a Federation
+ * of its own. The counts are the rows of the three YAML files under seed/m2catalogue; change
+ * them together with the files.
  */
 class M2SeedLoaderTest extends PostgresIntegrationTest {
 
@@ -68,9 +70,21 @@ class M2SeedLoaderTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void withoutAFederationTheTaxRowsAreLeftOutAndNothingElseChanges() {
-        assertThat(startUpLoader.loadSeeds()).isZero();
-        assertThat(count(superuserJdbc(), "catalogue.tax_category")).isZero();
+    void withoutAFederationTheLoaderRefusesToStart() {
+        // Review of 26 September: an instance that cannot seed the tax categories does not
+        // start, instead of skipping them and failing on the first SKU.
+        assertThatThrownBy(() -> new M2SeedLoader(mapper, url, user, password, ""))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COOP_ERP_SYSTEM_ENTITY_ID");
+        assertThatThrownBy(() -> new M2SeedLoader(mapper, url, user, password, null))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void theStartUpLoaderSeedsTheTaxRowsAsTheTestFederation() {
+        assertThat(startUpLoader.loadSeeds()).isEqualTo(TAX_CATEGORIES + TAX_RATES);
+        assertThat(count(superuserJdbc(), "catalogue.tax_category where owner_entity_id = '" + TEST_FEDERATION + "'"))
+                .isEqualTo(TAX_CATEGORIES);
     }
 
     @Test
