@@ -235,6 +235,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_write (m2catalogue V0003) follows the parent SKU's owner; the matrix's made-up row has no SKU",
                     RlsMatrixIntegrationTest::childRowsFollowTheirParent),
             new Departure(
+                    "catalogue.supplier",
+                    "authenticated_read (m2catalogue V0004): a batch is global and carries its supplier;"
+                            + " supplier names are business names",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),

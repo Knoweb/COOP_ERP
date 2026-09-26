@@ -41,8 +41,10 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("sku_barcode", with("own_update", "shared_read")),
             Map.entry("tag", with("own_update", "governed_read", "seed_reference")),
             Map.entry("sku_tag", with("shared_read")),
-            Map.entry("batch", with("own_update", "shared_read")),
-            Map.entry("batch_key", with("own_update", "shared_read")));
+            // V0004 (M2-05): the correction policies that admit the trigger batch_correction.
+            Map.entry("batch", with("own_update", "shared_read", "correction_read", "correction_supersede")),
+            Map.entry("batch_key", with("own_update", "shared_read", "correction_read", "correction_repoint")),
+            Map.entry("supplier", with("authenticated_read")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
@@ -169,6 +171,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(may(db, "batch_key", "UPDATE")).isFalse();
         assertThat(mayUpdateColumn(db, "batch_key", "batch_id")).isTrue();
         assertThat(mayUpdateColumn(db, "batch_key", "batch_no")).isFalse();
+        // V0004: a supplier is registered, never changed by the application (22A section 6).
+        assertThat(may(db, "supplier", "INSERT")).isTrue();
+        assertThat(may(db, "supplier", "UPDATE")).isFalse();
     }
 
     @Test

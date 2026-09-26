@@ -282,5 +282,19 @@
   "m2.barcode.batch_mismatch": "The batch does not belong to this item",
   "m2.barcode.not_found": "The barcode is not registered for this item in the current scope",
   "m2.barcode.not_active": "The barcode is already retired",
-  "m2.barcode.reason_required": "A reason is required to retire a barcode"
+  "m2.barcode.reason_required": "A reason is required to retire a barcode",
+  "m2.batch.not_found": "The batch was not found",
+  "m2.batch.sku_not_active": "A batch can only be registered for an active item",
+  "m2.batch.batch_no_too_long": "The batch number is longer than 40 characters",
+  "m2.batch.mrp_required": "This item carries a printed MRP: the batch needs one",
+  "m2.batch.mrp_invalid": "The printed MRP must be greater than zero",
+  "m2.batch.expiry_required": "This item is expiry-tracked: the batch needs an expiry date",
+  "m2.batch.dates_invalid": "The expiry date cannot be before the manufacture date",
+  "m2.batch.superseded": "This batch was already corrected; correct its replacement instead",
+  "m2.batch.not_holder": "Only the Federation or an entity holding stock of this batch may correct it",
+  "m2.batch.reason_required": "A reason is required to correct a batch",
+  "m2.batch.correction_unchanged": "The correction changes neither the printed MRP nor the expiry date",
+  "m2.supplier.not_found": "The supplier was not found",
+  "m2.supplier.not_active": "The supplier is not active",
+  "m2.supplier.name_taken": "A supplier with this name is already registered"
 }
