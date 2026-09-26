@@ -71,6 +71,11 @@ class DocumentLinksImpl implements DocumentLinks {
             throw new ProblemException("document.link.amount_not_allowed", Map.of("linkType", type.name()));
         }
 
+        // The original is locked before its links are read, so two corrections of it in flight
+        // at once see each other: the second waits, then reads the first's link. REVERSES is
+        // held at most once by the partial unique index as well (V0055).
+        documents.lockForLinking(toDocumentId);
+
         List<DocumentLinkRecord> existing = documents.findLinks(toDocumentId);
 
         switch (type) {
