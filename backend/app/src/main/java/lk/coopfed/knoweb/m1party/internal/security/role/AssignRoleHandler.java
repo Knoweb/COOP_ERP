@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.AssignRole;
 import lk.coopfed.knoweb.m1party.api.RoleAssigned;
+import lk.coopfed.knoweb.m1party.internal.security.EntityLock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,14 +36,21 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
 
     private final RoleGuards guards;
     private final SecurityRecords records;
+    private final EntityLock lock;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     AssignRoleHandler(
-            RoleGuards guards, SecurityRecords records, JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+            RoleGuards guards,
+            SecurityRecords records,
+            EntityLock lock,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
         this.guards = guards;
         this.records = records;
+        this.lock = lock;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -53,6 +61,9 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
     public UUID handle(AssignRole command, ScopeContext scope) {
         guards.requireOwnScope(scope);
         UUID entityId = scope.entityId();
+        // The per-person pair check reads what the user holds and then writes: one command of
+        // the entity at a time, or two assignments could each pass and together give both halves.
+        lock.lock(entityId);
 
         SecurityRecords.RoleRow role = guards.role(command.roleId());
         boolean ownRole = entityId.equals(role.ownerEntityId());
@@ -92,8 +103,9 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
         Set<String> rolePermissions = records.permissionsOf(role.roleId()).keySet();
         guards.withinGrantor(scope, rolePermissions);
 
-        List<String> wouldHold = new ArrayList<>(
-                records.holdingsAt(entityId, List.of(user.userId()), null).get(user.userId()));
+        // What the user holds anywhere in the entity, not only where this caller may see
+        // (m1security V0013): a half held at another shop still counts.
+        List<String> wouldHold = new ArrayList<>(records.permissionsAt(entityId, user.userId(), null));
         wouldHold.addAll(rolePermissions);
         guards.roleModeConflict(wouldHold, entityId, "m1.assignment.sod_conflict", user.userId());
 

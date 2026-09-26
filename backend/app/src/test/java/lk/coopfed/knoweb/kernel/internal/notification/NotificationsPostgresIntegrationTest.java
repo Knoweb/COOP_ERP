@@ -41,6 +41,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * switch; fallback language; a failing provider is retried by the sweep and given up with
  * an ALERT; the dispatcher matches an event against a rule and its explicit audience; the
  * log holds a hash and a length, never the number or the body.
+ *
+ * <p>The review of 26 September added: the send runs after the commit and the retry is served
+ * from what is held in {@code notification_pending}, so any instance can retry; a retry checks
+ * the kill switch again; the hourly de-duplication compares the dedup key too; a recipient the
+ * dispatcher cannot serve does not stop the others; a sweep claims each row.
  */
 @Import(NotificationsPostgresIntegrationTest.TestBeans.class)
 class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
@@ -85,6 +90,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void clean() {
         JdbcTemplate admin = superuserJdbc();
+        admin.execute("delete from kernel.notification_pending");
         admin.execute("delete from kernel.notification_log");
         admin.execute("delete from kernel.event_inbox");
         admin.execute("delete from kernel.config_value");
@@ -105,10 +111,14 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDirectSendIsRenderedInTheRecipientsLanguageAndLoggedWithoutTheNumber() {
-        UUID id = inScope(
+        Notifications.Delivery delivery = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "si", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        // Decided inside the transaction: logged for sending; the provider is called after commit.
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
+        assertThat(delivery.accepted()).isTrue();
 
         assertThat(sms.sent).hasSize(1);
         assertThat(sms.sent.get(0).recipient()).isEqualTo("0771234567");
@@ -148,12 +158,19 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), event, scope(ENTITY)));
         assertThat(sms.sent).hasSize(1);
 
-        // A different event, same template and person inside the hour: de-duplicated, logged as such.
-        UUID other = inScope(
+        // Another thing (another dedup key), same template and person inside the hour: sent. Two
+        // deliveries 20 minutes apart are two alerts, not a duplicate (review of 26 September).
+        inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
-        assertThat(sms.sent).hasSize(1);
+        assertThat(sms.sent).hasSize(2);
+
+        // The same thing under another rule (so the unique key does not catch it): de-duplicated
+        // inside the hour, logged as such.
+        UUID other = inScope(ENTITY, () -> ((NotificationService) notifications)
+                .deliver(RULE, event, "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), scope(ENTITY)));
+        assertThat(sms.sent).hasSize(2);
         assertThat(superuserJdbc()
                         .queryForMap(
                                 "select status, suppressed_reason from kernel.notification_log where notification_id = ?",
@@ -168,10 +185,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
             config.set("notification.sms.enabled", ConfigScope.entity(ENTITY), "false", scope(ENTITY), "test");
             return null;
         });
-        UUID off = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID off = inScope(ENTITY, () -> notifications
+                .send("SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
+                .notificationId());
         assertThat(sms.sent).isEmpty();
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -187,10 +203,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                     "notification.sms.quiet_hours", ConfigScope.entity(ENTITY), "00:00-23:59", scope(ENTITY), "test");
             return null;
         });
-        UUID quiet = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID quiet = inScope(ENTITY, () -> notifications
+                .send("SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
+                .notificationId());
         assertThat(sms.sent).isEmpty();
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -203,10 +218,14 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aFailingProviderIsRetriedBySweepAndGivenUpWithAnAlert() {
         sms.failNext = 5;
-        UUID id = inScope(
+        Notifications.Delivery delivery = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        // At call time the send is only logged; the failure happens after commit and is the sweep's.
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
+        assertThat(delivery.accepted()).isTrue();
 
         assertThat(status(id)).isEqualTo("QUEUED");
         assertThat(attempts(id)).isEqualTo(1);
@@ -228,6 +247,132 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 Long.class))
                 .isEqualTo(1L);
         assertThat(sweep.retryDue()).isZero();
+        // Given up: nothing of the recipient is kept.
+        assertThat(heldRecipient(id)).isNull();
+    }
+
+    @Test
+    void aRetryIsServedFromWhatIsHeldBesideTheLogAndClearedOnceSent() {
+        sms.failNext = 1;
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        assertThat(status(id)).isEqualTo("QUEUED");
+        // While QUEUED the recipient is held in clear beside the log (never in the log), for any instance.
+        assertThat(heldRecipient(id)).isEqualTo("0771234567");
+
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(id)).isEqualTo("SENT");
+        assertThat(attempts(id)).isEqualTo(2);
+        assertThat(sms.sent).hasSize(1);
+        assertThat(sms.sent.get(0).recipient()).isEqualTo("0771234567");
+        assertThat(heldRecipient(id)).isNull();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select cleared_at is not null from kernel.notification_pending where notification_id = ?",
+                                Boolean.class,
+                                id))
+                .isTrue();
+    }
+
+    @Test
+    void aRetryChecksTheKillSwitchAgain() {
+        sms.failNext = 1;
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        assertThat(status(id)).isEqualTo("QUEUED");
+
+        // The entity switches SMS off between the first attempt and the retry (19A section 10).
+        inScope(ENTITY, () -> {
+            config.set("notification.sms.enabled", ConfigScope.entity(ENTITY), "false", scope(ENTITY), "test");
+            return null;
+        });
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(sms.sent).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select status, suppressed_reason from kernel.notification_log where notification_id = ?",
+                                id))
+                .containsEntry("status", "SUPPRESSED")
+                .containsEntry("suppressed_reason", "KILL_SWITCH");
+        assertThat(heldRecipient(id)).isNull();
+    }
+
+    @Test
+    void aSweepClaimsEachRowSoARowAnotherSweepHoldsIsLeftAlone() {
+        sms.failNext = 1;
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        makeDue(id);
+
+        // Another sweep claimed the row a moment ago: its next attempt is in the future, so this
+        // sweep finds nothing due, and the attempt count is not touched.
+        superuserJdbc()
+                .update(
+                        "update kernel.notification_log set next_attempt_at = now() + interval '10 minutes'"
+                                + " where notification_id = ?",
+                        id);
+        assertThat(sweep.retryDue()).isZero();
+        assertThat(attempts(id)).isEqualTo(1);
+        assertThat(sms.sent).isEmpty();
+    }
+
+    @Test
+    void aRecipientTheDispatcherCannotServeDoesNotStopTheOthers() {
+        // A rule that sends on SMS and EMAIL where only the SMS adapter is deployed: the SMS
+        // goes out once, the EMAIL is skipped, and nothing throws into the consumer (which would
+        // roll back the SMS row and redeliver the event, sending the SMS again and again).
+        rules.rules.add(new NotificationRuleQueries.NotificationRule(
+                RULE,
+                null,
+                "hello.greeting.registered.v1",
+                null,
+                "greeting-registered",
+                NotificationRuleQueries.AudienceKind.EXPLICIT,
+                "notify",
+                List.of("SMS", "EMAIL"),
+                100));
+        String envelope = "{\"eventType\":\"hello.greeting.registered.v1\",\"eventId\":\"" + Ids.next() + "\","
+                + "\"ownerEntityId\":\"" + ENTITY + "\",\"payload\":{\"notify\":\"0771111111\",\"textEn\":\"Hi\"}}";
+        inScope(ENTITY, () -> {
+            try {
+                dispatcher.onEvent(json.readTree(envelope), scope(ENTITY));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
+        assertThat(sms.sent).extracting(NotificationChannel.Outgoing::recipient).containsExactly("0771111111");
+        assertThat(superuserJdbc().queryForObject("select count(*) from kernel.notification_log", Long.class))
+                .isEqualTo(1L);
     }
 
     @Test
@@ -308,6 +453,14 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         return superuserJdbc()
                 .queryForObject(
                         "select status from kernel.notification_log where notification_id = ?", String.class, id);
+    }
+
+    private String heldRecipient(UUID id) {
+        return superuserJdbc()
+                .queryForObject(
+                        "select recipient from kernel.notification_pending where notification_id = ?",
+                        String.class,
+                        id);
     }
 
     private int attempts(UUID id) {

@@ -12,6 +12,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.DeactivateUser;
 import lk.coopfed.knoweb.m1party.api.UserDeactivated;
+import lk.coopfed.knoweb.m1party.internal.security.EntityLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,7 @@ class DeactivateUserHandler implements Handles<DeactivateUser, UUID> {
 
     private final AppUserRepository users;
     private final UserFacts facts;
+    private final EntityLock lock;
     private final IdentityProviderClient provider;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -43,11 +45,13 @@ class DeactivateUserHandler implements Handles<DeactivateUser, UUID> {
     DeactivateUserHandler(
             AppUserRepository users,
             UserFacts facts,
+            EntityLock lock,
             IdentityProviderClient provider,
             AuditFacade audit,
             EventPublisher events) {
         this.users = users;
         this.facts = facts;
+        this.lock = lock;
         this.provider = provider;
         this.audit = audit;
         this.events = events;
@@ -71,6 +75,9 @@ class DeactivateUserHandler implements Handles<DeactivateUser, UUID> {
         }
 
         UUID entityId = user.homeEntityId();
+        // The last-manager guard counts and then writes: two deactivations at once could each see
+        // the other manager and both commit. One security command of the entity at a time.
+        lock.lock(entityId);
         if (facts.holdsUserManage(user.getId(), entityId) && !facts.anotherUserManagerExists(user.getId(), entityId)) {
             throw new ProblemException("m1.user.last_user_manager", Map.of("userId", user.getId()));
         }

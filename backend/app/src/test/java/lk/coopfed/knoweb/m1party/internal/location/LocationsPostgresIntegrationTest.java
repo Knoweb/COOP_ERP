@@ -4,11 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
@@ -72,6 +79,7 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID OPERATOR = UUID.fromString("0190e500-0000-7000-8000-000000000011");
     private static final UUID ROLE = UUID.fromString("0190e500-0000-7000-8000-000000000012");
     private static final UUID DEVICE = UUID.fromString("0190e500-0000-7000-8000-000000000020");
+    private static final UUID OTHER_DEVICE = UUID.fromString("0190e500-0000-7000-8000-000000000021");
 
     private static final List<TradingDay> WEEKDAYS =
             List.of(new TradingDay("MON", "08:00", "20:00"), new TradingDay("TUE", "08:00", "20:00"));
@@ -304,7 +312,10 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         setPrimaryTill.handle(new SetPrimaryTill(shop, till, "OPENING", null), own(MPCS));
         refused(() -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)), "m1.location.operator_required");
 
-        insertOperator(shop);
+        // A till user with no PIN yet cannot open the till, so is no operator (the review of M1-05).
+        insertOperator(shop, "PENDING");
+        refused(() -> activateLocation.handle(new ActivateLocation(shop), own(MPCS)), "m1.location.operator_required");
+        superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", OPERATOR);
         kernel.reset();
         activateLocation.handle(new ActivateLocation(shop), own(MPCS));
         assertThat(status(shop)).isEqualTo("ACTIVE");
@@ -321,6 +332,18 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(audit("LOCATION_DORMANT")).singleElement().satisfies(record -> assertThat(record.reason())
                 .isEqualTo("SEASONAL: closed for the monsoon"));
         assertThat(events(LocationDormant.class)).containsExactly(new LocationDormant(shop, MPCS, "SHOP", "SEASONAL"));
+        assertThat(((Map<?, ?>) audit("LOCATION_DORMANT").get(0).after()).get("connectivitySpecMet"))
+                .as("going dormant clears the connectivity gate (doc 21 section 4.3, Reactivate)")
+                .isEqualTo(false);
+
+        // Reactivate asks for the gate again: refused until connectivity is confirmed anew.
+        kernel.reset();
+        refused(
+                () -> reactivateLocation.handle(new ReactivateLocation(shop), own(MPCS)),
+                "m1.location.connectivity_not_met");
+        assertThat(status(shop)).isEqualTo("DORMANT");
+        assertThat(kernel.committedAudit()).isEmpty();
+        confirmConnectivity.handle(new ConfirmLocationConnectivity(shop), own(MPCS));
 
         kernel.reset();
         reactivateLocation.handle(new ReactivateLocation(shop), own(MPCS));
@@ -423,6 +446,126 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(events(SeriesHolderChanged.class)).isEmpty();
         assertThat(events(LocationPrimaryChanged.class))
                 .containsExactly(new LocationPrimaryChanged(shop, MPCS, null, till, null));
+        assertThat(queries.listTillPositions(shop, own(MPCS)))
+                .containsExactly(new TillPositionView(till, shop, 1, "ACTIVE", true));
+    }
+
+    @Test
+    void namingAPrimaryTillHeldByASuspendedDeviceLeavesTheCountersAlone() {
+        // A suspended device keeps its position until a replacement takes it (M1-06); the shop's
+        // counters must not name a revoked device as holder (the review of M1-05).
+        UUID shop = registerShop("S01");
+        UUID till = registerPosition.handle(new RegisterTillPosition(shop, 1), own(MPCS));
+        insertDevice(DEVICE, till, "SUSPENDED");
+        kernel.reset();
+
+        setPrimaryTill.handle(new SetPrimaryTill(shop, till, "OPENING", null), own(MPCS));
+
+        assertThat(holdersOfLocationSeries(shop)).hasSize(5).containsOnlyNulls();
+        assertThat(events(SeriesHolderChanged.class)).isEmpty();
+        assertThat(events(LocationPrimaryChanged.class))
+                .containsExactly(new LocationPrimaryChanged(shop, MPCS, null, till, null));
+    }
+
+    @Test
+    void movingThePrimaryTillAwayFromAnUndrainedDeviceNeedsTheLossRecorded() {
+        // T1's device holds the shop's counters and has not shown itself drained (nothing
+        // reported to the sync gateway): the counters move to T2's device only with the loss
+        // recorded, as AssignDeviceToPosition asks before any counter moves (21A section 6.1).
+        UUID shop = registerShop("S01");
+        UUID t1 = registerPosition.handle(new RegisterTillPosition(shop, 1), own(MPCS));
+        UUID t2 = registerPosition.handle(new RegisterTillPosition(shop, 2), own(MPCS));
+        insertDevice(DEVICE, t1, "ACTIVE");
+        insertDevice(OTHER_DEVICE, t2, "ACTIVE");
+        setPrimaryTill.handle(new SetPrimaryTill(shop, t1, "OPENING", null), own(MPCS));
+        assertThat(holdersOfLocationSeries(shop)).containsOnly(DEVICE);
+        kernel.reset();
+
+        refused(
+                () -> setPrimaryTill.handle(new SetPrimaryTill(shop, t2, "MOVE", null), own(MPCS)),
+                "m1.device.outbox_not_drained");
+        assertThat(holdersOfLocationSeries(shop)).containsOnly(DEVICE);
+        assertThat(queries.listTillPositions(shop, own(MPCS)))
+                .filteredOn(TillPositionView::primary)
+                .extracting(TillPositionView::tillPositionId)
+                .containsExactly(t1);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        setPrimaryTill.handle(new SetPrimaryTill(shop, t2, "MOVE", "T1 died", true), own(MPCS));
+
+        assertThat(holdersOfLocationSeries(shop)).hasSize(5).containsOnly(OTHER_DEVICE);
+        assertThat(audit("DEVICE_OUTBOX_LOSS_RECORDED")).singleElement().satisfies(record -> {
+            assertThat(record.subject().type()).isEqualTo("till_position");
+            assertThat(record.subject().id())
+                    .as("the lane the lost numbers belong to")
+                    .isEqualTo(t1);
+            assertThat(record.reason()).isEqualTo("MOVE: T1 died");
+            assertThat(((Map<?, ?>) record.after()).get("deviceIds")).isEqualTo(List.of(DEVICE));
+            assertThat((List<?>) ((Map<?, ?>) record.after()).get("seriesIds")).hasSize(5);
+        });
+        assertThat(events(SeriesHolderChanged.class)).hasSize(5).allSatisfy(event -> {
+            assertThat(event.previousDeviceId()).isEqualTo(DEVICE);
+            assertThat(event.deviceId()).isEqualTo(OTHER_DEVICE);
+        });
+        assertThat(events(LocationPrimaryChanged.class))
+                .containsExactly(new LocationPrimaryChanged(shop, MPCS, t1, t2, OTHER_DEVICE));
+    }
+
+    @Test
+    void aClosedLocationSeriesSurfacesAsTheKernelsProblem() {
+        UUID shop = registerShop("S01");
+        UUID till = registerPosition.handle(new RegisterTillPosition(shop, 1), own(MPCS));
+        insertDevice(DEVICE, till, "ACTIVE");
+        superuserJdbc()
+                .update(
+                        "update kernel.numbering_series set status = 'CLOSED' where location_id = ?"
+                                + " and till_position_id is null and doc_type_code = 'GRN'",
+                        shop);
+        kernel.reset();
+
+        refused(
+                () -> setPrimaryTill.handle(new SetPrimaryTill(shop, till, "OPENING", null), own(MPCS)),
+                "series.closed");
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select primary_till_position_id from party.location where location_id = ?",
+                                UUID.class,
+                                shop))
+                .isNull();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void namingThePrimaryTillWaitsForTheLockAnotherTransactionHoldsOnTheShop() throws Exception {
+        // Another transaction holds the location row (as RetireTillPosition does): the primary
+        // change blocks until it ends, so the two never pass each other (the review of M1-05).
+        UUID shop = registerShop("S01");
+        UUID till = registerPosition.handle(new RegisterTillPosition(shop, 1), own(MPCS));
+        kernel.reset();
+
+        try (Connection other = superuserJdbc().getDataSource().getConnection()) {
+            other.setAutoCommit(false);
+            try (PreparedStatement lock =
+                    other.prepareStatement("select location_id from party.location where location_id = ? for update")) {
+                lock.setObject(1, shop);
+                lock.execute();
+            }
+            ExecutorService thread = Executors.newSingleThreadExecutor();
+            try {
+                Future<?> change = thread.submit(
+                        () -> setPrimaryTill.handle(new SetPrimaryTill(shop, till, "OPENING", null), own(MPCS)));
+                assertThatThrownBy(() -> change.get(700, TimeUnit.MILLISECONDS))
+                        .as("the change waits for the lock")
+                        .isInstanceOf(TimeoutException.class);
+                other.commit();
+                change.get(30, TimeUnit.SECONDS);
+            } finally {
+                thread.shutdownNow();
+            }
+        }
         assertThat(queries.listTillPositions(shop, own(MPCS)))
                 .containsExactly(new TillPositionView(till, shop, 1, "ACTIVE", true));
     }
@@ -623,7 +766,8 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(created.getBody().get("tradingHours").get(0).get("closes").asText())
                 .isEqualTo("18:00");
 
-        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        String tillKey = UUID.randomUUID().toString();
+        headers.set("Idempotency-Key", tillKey);
         ResponseEntity<JsonNode> till = http.exchange(
                 "/v1/party/locations/" + locationId + "/positions",
                 HttpMethod.POST,
@@ -631,6 +775,28 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 JsonNode.class);
         assertThat(till.getStatusCode()).as(String.valueOf(till.getBody())).isEqualTo(HttpStatus.CREATED);
         assertThat(till.getBody().get("primary").asBoolean()).isFalse();
+
+        // The same key again answers the same position and registers no second one and no
+        // second pair of series (the replay of the kernel's idempotency store).
+        ResponseEntity<JsonNode> replay = http.exchange(
+                "/v1/party/locations/" + locationId + "/positions",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("positionNo", 1), headers),
+                JsonNode.class);
+        assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(replay.getBody().get("tillPositionId"))
+                .isEqualTo(till.getBody().get("tillPositionId"));
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from party.till_position where location_id = ?::uuid",
+                                Integer.class,
+                                locationId))
+                .isEqualTo(1);
+        assertThat(seriesPrefixes(
+                        UUID.fromString(locationId),
+                        UUID.fromString(till.getBody().get("tillPositionId").asText())))
+                .hasSize(2);
+        assertThat(audit("POSITION_REGISTERED")).hasSize(1);
 
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         ResponseEntity<JsonNode> badCode = http.exchange(
@@ -732,28 +898,43 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 status);
     }
 
-    /** A device at the position, as M1-06's AssignDeviceToPosition will leave it. */
+    /** A device at the position, as M1-06's AssignDeviceToPosition (or SuspendDevice) leaves it. */
     private static void insertDevice(UUID tillPosition) {
+        insertDevice(DEVICE, tillPosition, "ACTIVE");
+    }
+
+    private static void insertDevice(UUID device, UUID tillPosition, String status) {
         superuserJdbc()
                 .update(
                         "insert into party.device (device_id, hardware_serial, device_kind, owner_entity_id,"
-                                + " current_till_position_id, status, location_id) values (?, ?, 'POS_TERMINAL', ?, ?, 'ACTIVE',"
+                                + " current_till_position_id, status, location_id) values (?, ?, 'POS_TERMINAL', ?, ?, ?,"
                                 + " (select location_id from party.till_position where till_position_id = ?))",
-                        DEVICE,
+                        device,
                         "SERIAL-" + tillPosition,
                         MPCS,
                         tillPosition,
+                        status,
                         tillPosition);
     }
 
+    private static List<UUID> holdersOfLocationSeries(UUID shop) {
+        return superuserJdbc()
+                .queryForList(
+                        "select holder_device_id from kernel.numbering_series"
+                                + " where location_id = ? and till_position_id is null",
+                        UUID.class,
+                        shop);
+    }
+
     /** A till user with a role assignment at the shop: what ActivateLocation counts as an operator. */
-    private static void insertOperator(UUID shop) {
+    private static void insertOperator(UUID shop, String status) {
         JdbcTemplate admin = superuserJdbc();
         admin.update(
                 "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
-                        + " values (?, ?, 'm1-05-cashier', 'Cashier', 'TILL', 'ACTIVE')",
+                        + " values (?, ?, 'm1-05-cashier', 'Cashier', 'TILL', ?)",
                 OPERATOR,
-                MPCS);
+                MPCS,
+                status);
         admin.update(
                 "insert into security.role (role_id, owner_entity_id, name_en) values (?, ?, 'M1-05 cashier')",
                 ROLE,

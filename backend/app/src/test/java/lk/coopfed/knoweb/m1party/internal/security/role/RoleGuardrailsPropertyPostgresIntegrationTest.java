@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -237,7 +236,6 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         Random random = new Random(SEED);
         int accepted = 0;
         int refused = 0;
-        int knownGap = 0;
         for (int attempt = 0; attempt < 250; attempt++) {
             Grantor grantor = grantors.get(random.nextInt(grantors.size()));
             UUID user = users.get(random.nextInt(users.size()));
@@ -267,35 +265,9 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
                 answered = e.messageId();
             }
 
-            if (!Objects.equals(expected, answered)
-                    && "m1.assignment.sod_conflict".equals(expected)
-                    && answered == null
-                    && grantor.location() != null
-                    && expectedRefusal(
-                                    grantor,
-                                    user,
-                                    role,
-                                    location,
-                                    ownerOfRole,
-                                    ownerOfLocation,
-                                    homeOf,
-                                    permissionsOf,
-                                    heldBy,
-                                    first,
-                                    pair,
-                                    false)
-                            == null) {
-                // The one difference tolerated: the per-person ROLE check of AssignRole reads the
-                // user's assignments under the caller's row-level security, which hides a shop
-                // manager's view of the sibling shops (m1security V0008), so the other half of a
-                // pair held at another shop is not seen (review of 26 September 2026,
-                // AssignRoleHandler, "compute holdings entity-wide"). The model above says what
-                // doc 19 section 3.2 wants; this branch goes when that fix lands, and the
-                // assertion below then expects the refusal.
-                knownGap++;
-            } else {
-                assertThat(answered).as(at + ": the model's answer").isEqualTo(expected);
-            }
+            // Holdings are counted entity-wide (m1security V0013): the other half of a pair held at
+            // a sibling shop is seen by a shop-scoped grantor too, so the model is followed exactly.
+            assertThat(answered).as(at + ": the model's answer").isEqualTo(expected);
 
             if (answered != null) {
                 refused++;
@@ -331,7 +303,6 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         }
         assertThat(accepted).as("assignments made").isGreaterThan(5);
         assertThat(refused).as("assignments refused").isGreaterThan(20);
-        assertThat(knownGap).as("cases the tolerated gap absorbed").isLessThan(accepted);
     }
 
     /**

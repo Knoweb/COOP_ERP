@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.RevokeRole;
 import lk.coopfed.knoweb.m1party.api.RoleRevoked;
+import lk.coopfed.knoweb.m1party.internal.security.EntityLock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,14 +33,21 @@ class RevokeRoleHandler implements Handles<RevokeRole, UUID> {
 
     private final RoleGuards guards;
     private final SecurityRecords records;
+    private final EntityLock lock;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     RevokeRoleHandler(
-            RoleGuards guards, SecurityRecords records, JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+            RoleGuards guards,
+            SecurityRecords records,
+            EntityLock lock,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
         this.guards = guards;
         this.records = records;
+        this.lock = lock;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -50,6 +58,9 @@ class RevokeRoleHandler implements Handles<RevokeRole, UUID> {
     public UUID handle(RevokeRole command, ScopeContext scope) {
         guards.requireOwnScope(scope);
         UUID entityId = scope.entityId();
+        // The last-user-manager guard counts and then deletes: two revocations at once could each
+        // count two holders and together leave none. One command of the entity at a time.
+        lock.lock(entityId);
 
         if (scope.locationId() != null && !Objects.equals(scope.locationId(), command.scopeLocationId())) {
             throw new ProblemException(

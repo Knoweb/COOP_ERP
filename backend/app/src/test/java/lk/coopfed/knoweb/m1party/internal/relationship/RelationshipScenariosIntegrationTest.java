@@ -8,10 +8,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -19,6 +22,12 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -364,6 +373,168 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
                 .isEmpty();
     }
 
+    // ---- the review of M1-04: several rows, concurrency, a shop-scoped caller --------------------
+
+    @Test
+    void suspendingOneRowSuspendsTheLaterRowsOfThePairToo() {
+        // R1 [Apr, end of this month] and R2 [next month, open] after an amendment dated next month.
+        LocalDate nextMonth = LocalDate.now(clock).plusMonths(1).withDayOfMonth(1);
+        UUID r1 = activeRelationship(APRIL);
+        UUID r2 = amend.handle(
+                new AmendRelationshipTerms(r1, nextMonth, null, null, 45, null, null, null, "TERMS", null),
+                own(DISTRIBUTOR));
+        kernel.reset();
+
+        suspend.handle(new SuspendRelationship(r1, "OVERDUE", null), own(DISTRIBUTOR));
+
+        assertThat(status(r1)).isEqualTo("SUSPENDED");
+        assertThat(status(r2)).as("trading does not come back next month").isEqualTo("SUSPENDED");
+        assertThat(kernel.committedAudit())
+                .extracting(a -> a.eventType() + " " + a.subject().id())
+                .containsExactly("RELATIONSHIP_SUSPENDED " + r1, "RELATIONSHIP_SUSPENDED " + r2);
+        assertThat(kernel.committedEvents()).hasSize(2).allSatisfy(e -> assertThat(e)
+                .isInstanceOf(RelationshipSuspended.class));
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, nextMonth, own(SOCIETY)))
+                .isEmpty();
+    }
+
+    @Test
+    void aRowALaterRowHasReplacedIsAmendedOnTheLatestRowOnly() {
+        LocalDate nextMonth = LocalDate.now(clock).plusMonths(1).withDayOfMonth(1);
+        UUID r1 = activeRelationship(APRIL);
+        UUID r2 = amend.handle(
+                new AmendRelationshipTerms(r1, nextMonth, null, null, 45, null, null, null, "TERMS", null),
+                own(DISTRIBUTOR));
+        Map<String, Object> r1Before = row(r1);
+        kernel.reset();
+
+        assertThatThrownBy(() -> amend.handle(
+                        new AmendRelationshipTerms(
+                                r1, LocalDate.now(clock), null, null, 60, null, null, null, "FIX", null),
+                        own(DISTRIBUTOR)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> {
+                    assertThat(e.messageId()).isEqualTo("m1.relationship.not_latest");
+                    assertThat(e.parameters()).containsEntry("latestRelationshipId", r2);
+                });
+        assertThat(row(r1)).isEqualTo(r1Before);
+        assertThat(count()).isEqualTo(2);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        // The latest row takes the correction.
+        UUID r3 = amend.handle(
+                new AmendRelationshipTerms(r2, nextMonth.plusDays(1), null, null, 60, null, null, null, "FIX", null),
+                own(DISTRIBUTOR));
+        assertThat(row(r2).get("effective_to").toString()).isEqualTo(nextMonth.toString());
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, nextMonth.plusDays(1), own(DISTRIBUTOR)))
+                .hasValueSatisfying(r -> assertThat(r.relationshipId()).isEqualTo(r3));
+    }
+
+    @Test
+    void twoActivationsOfThePairAtOnceLetExactlyOneThrough() throws Exception {
+        UUID first = open.handle(openTo(SOCIETY, PRICE_LIST, APRIL, null), own(DISTRIBUTOR));
+        UUID second = open.handle(openTo(SOCIETY, PRICE_LIST, JULY, null), own(DISTRIBUTOR));
+        kernel.reset();
+
+        // Both pass the pre-check (neither row is ACTIVE when they read), so the exclusion
+        // constraint refuses the second, and the refusal is the same problem as the pre-check's.
+        CyclicBarrier together = new CyclicBarrier(2);
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<String>> outcomes = new ArrayList<>();
+            for (UUID id : List.of(first, second)) {
+                outcomes.add(threads.submit(() -> {
+                    together.await(10, TimeUnit.SECONDS);
+                    try {
+                        activate.handle(new ActivateRelationship(id), own(DISTRIBUTOR));
+                        return "ACTIVATED";
+                    } catch (ProblemException refused) {
+                        return refused.messageId();
+                    }
+                }));
+            }
+            List<String> results = new ArrayList<>();
+            for (Future<String> outcome : outcomes) {
+                results.add(outcome.get(30, TimeUnit.SECONDS));
+            }
+            assertThat(results).containsExactlyInAnyOrder("ACTIVATED", "m1.relationship.overlap");
+        } finally {
+            threads.shutdownNow();
+        }
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from party.entity_relationship where status = 'ACTIVE'",
+                                Integer.class))
+                .isEqualTo(1);
+        assertThat(kernel.committedAudit()).hasSize(1);
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOf(RelationshipActivated.class);
+    }
+
+    @Test
+    void aSuspensionWaitsForTheLockAnotherTransactionHoldsOnTheRow() throws Exception {
+        UUID id = activeRelationship(APRIL);
+        kernel.reset();
+
+        // Another transaction holds the row (as an Amend would, RelationshipRules.found): the
+        // suspension blocks until it ends, instead of writing over what that transaction wrote.
+        try (Connection other = superuserJdbc().getDataSource().getConnection()) {
+            other.setAutoCommit(false);
+            try (PreparedStatement lock = other.prepareStatement(
+                    "select relationship_id from party.entity_relationship where relationship_id = ? for update")) {
+                lock.setObject(1, id);
+                lock.execute();
+            }
+            ExecutorService thread = Executors.newSingleThreadExecutor();
+            try {
+                Future<?> suspension = thread.submit(
+                        () -> suspend.handle(new SuspendRelationship(id, "OVERDUE", null), own(DISTRIBUTOR)));
+                assertThatThrownBy(() -> suspension.get(700, TimeUnit.MILLISECONDS))
+                        .as("the suspension waits for the lock")
+                        .isInstanceOf(TimeoutException.class);
+                assertThat(status(id)).isEqualTo("ACTIVE");
+                other.commit();
+                suspension.get(30, TimeUnit.SECONDS);
+            } finally {
+                thread.shutdownNow();
+            }
+        }
+        assertThat(status(id)).isEqualTo("SUSPENDED");
+    }
+
+    @Test
+    void aCallerScopedToOneShopReadsThePairsRowsAndChangesNone() {
+        UUID id = activeRelationship(APRIL);
+        UUID sellersShop = UUID.randomUUID();
+        UUID buyersShop = UUID.randomUUID();
+        kernel.reset();
+
+        // The table has no location column, so the template's location line is left out
+        // (m1party V0007): a shop-scoped OWN caller of either side reads the row ...
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, JULY, atShop(DISTRIBUTOR, sellersShop)))
+                .hasValueSatisfying(r -> assertThat(r.relationshipId()).isEqualTo(id));
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, JULY, atShop(SOCIETY, buyersShop)))
+                .hasValueSatisfying(r -> assertThat(r.relationshipId()).isEqualTo(id));
+        assertThat(queries.listRelationships(RelationshipSide.SELLER, atShop(DISTRIBUTOR, sellersShop)))
+                .extracting(RelationshipView::relationshipId)
+                .containsExactly(id);
+
+        // ... and the handlers refuse it every change: a relationship is the entity's, not a shop's.
+        assertThatThrownBy(() ->
+                        open.handle(openTo(OTHER_SOCIETY, PRICE_LIST, APRIL, null), atShop(DISTRIBUTOR, sellersShop)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
+                        .isEqualTo("m1.relationship.seller_scope_required"));
+        assertThatThrownBy(() -> amend.handle(raiseLimit(id, "1.00", JULY, "X"), atShop(DISTRIBUTOR, sellersShop)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m1.relationship.not_seller"));
+        assertThatThrownBy(
+                        () -> suspend.handle(new SuspendRelationship(id, "X", null), atShop(DISTRIBUTOR, sellersShop)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m1.relationship.not_seller"));
+        assertThat(status(id)).isEqualTo("ACTIVE");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
     /**
      * 21A section 9: "random effective ranges never violate the exclusion constraint". Random
      * opens, activations and amendments on one pair: whatever the order and the dates, every
@@ -538,6 +709,13 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
 
     private static ScopeContext own(UUID entity) {
         return scope(entity, PolicyClass.OWN, null);
+    }
+
+    /** An OWN scope at one shop of the entity: a shop manager's. */
+    private static ScopeContext atShop(UUID entity, UUID shop) {
+        Scope active = new Scope(entity, shop);
+        return new ScopeContext(
+                USER, null, entity, List.of(active), active, PolicyClass.OWN, Set.of(), null, Locale.ENGLISH, null);
     }
 
     private static ScopeContext party(UUID entity) {
