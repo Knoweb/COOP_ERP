@@ -232,6 +232,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "a grant is the Federation's row; the grantee reads its own through grantee_read (M1-09),"
                             + " not through ext_view on the entities it names",
                     RlsMatrixIntegrationTest::externalReadsNothing),
+            new Departure(
+                    "kernel.event_inbox",
+                    "own_* only (kernel V0032): a consumer's claims are the worker's own bookkeeping in the"
+                            + " entity's scope, not a register the federation or a grantee views",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(K-07 follow-up, CR-17A-3): party_read still applies the location line to both
             // sides, so a shop-scoped counterparty does not see the documents it is a side of.
@@ -260,6 +265,14 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         && !check.scope().forgot()
                         && !check.scope().is("NONE")
                 ? VISIBLE
+                : null;
+    }
+
+    private static String onlyTheOwnerReads(Check check) {
+        return check.op() == Op.SELECT
+                        && (check.scope().is("EXTERNAL_TIMEBOXED")
+                                || check.scope().is("FEDERATION_VIEW"))
+                ? HIDDEN
                 : null;
     }
 
