@@ -199,6 +199,43 @@ config_items:
     default: true
     scope_kind: ENTITY
     change_permission: sys.config.manage
+  - key: notification.retry.batch_size
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 10000 }
+    description_en: The most due notifications one run of the retry sweep attempts (the rest wait for the next run)
+    description_si: නැවත උත්සාහ කිරීමේ එක් ධාවනයක් උත්සාහ කරන උපරිම දැනුම්දීම් ගණන (ඉතිරිය ඊළඟ ධාවනයට බලා සිටී)
+    description_ta: மீள்முயற்சி ஓட்டம் ஒன்று முயற்சிக்கும் அதிகபட்ச அறிவிப்புகள் (மீதி அடுத்த ஓட்டத்திற்குக் காத்திருக்கும்)
+    default: 200
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  # K-09: attachments (19A section 9; doc 32 section 4: images of about 300 KB, at most 1600 px).
+  - key: attachment.max_bytes
+    value_type: INTEGER
+    schema: { minimum: 1024, maximum: 104857600 }
+    description_en: The largest file that may be attached to a document, in bytes
+    description_si: ලේඛනයකට ඇමිණිය හැකි විශාලතම ගොනුව, බයිට් වලින්
+    description_ta: ஆவணத்துடன் இணைக்கக்கூடிய மிகப்பெரிய கோப்பு, பைட்டுகளில்
+    default: 5242880
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: attachment.content_types
+    value_type: STRING
+    schema: { pattern: "^[a-z]+/[a-z0-9.+-]+(,[a-z]+/[a-z0-9.+-]+)*$" }
+    description_en: The file types that may be attached, comma-separated (images are shown inline, anything else is downloaded)
+    description_si: ඇමිණිය හැකි ගොනු වර්ග, කොමාවෙන් වෙන් කර (රූප පෙන්වයි, අනෙක් සියල්ල බාගත වේ)
+    description_ta: இணைக்கக்கூடிய கோப்பு வகைகள், காற்புள்ளியால் பிரிக்கப்பட்டவை (படங்கள் காட்டப்படும், மற்றவை பதிவிறக்கப்படும்)
+    default: "image/jpeg,image/png,image/webp,application/pdf"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: attachment.verify.batch_size
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 10000 }
+    description_en: The most pending attachments one run of the verifier checks (the rest wait for the next run)
+    description_si: සත්‍යාපකයේ එක් ධාවනයක් පරීක්ෂා කරන උපරිම අපේක්ෂිත ඇමුණුම් ගණන (ඉතිරිය ඊළඟ ධාවනයට බලා සිටී)
+    description_ta: சரிபார்ப்பி ஓட்டம் ஒன்று சோதிக்கும் அதிகபட்ச நிலுவை இணைப்புகள் (மீதி அடுத்த ஓட்டத்திற்குக் காத்திருக்கும்)
+    default: 500
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   # K-08: the sync gateway (doc 32; 19A section 8). The batch limits and the chunk size are doc 32
   # DR-1 and DR-5, the change-log retention DR-4: proposed values, to be settled after the load
   # test (spike 5), so they are configuration and not constants.

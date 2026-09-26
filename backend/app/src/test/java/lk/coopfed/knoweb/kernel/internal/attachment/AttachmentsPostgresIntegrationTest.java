@@ -46,6 +46,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * writes PENDING under the document's policies; the verifier completes an uploaded object,
  * fails a wrong hash and an object that never came, and leaves a fresh PENDING one alone; a
  * download URL comes only for a COMPLETE attachment of a document the caller can read.
+ *
+ * <p>The review of 26 September added: nothing settles while the pre-signed PUT is still
+ * valid, and a settled row never changes; asking again for the same attachment renews the URL
+ * of a PENDING row and is refused for a settled one or another document's; the size and the
+ * type are limited by the register; a counterparty is told it does not own the document; a
+ * read URL of anything but an image is a download.
  */
 @Import(AttachmentsPostgresIntegrationTest.MemoryStore.class)
 class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
@@ -114,8 +120,8 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void presignRecordsAPendingAttachmentOnTheCallersOwnDocument() {
-        PresignedUpload upload =
-                inScope(OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", null, scope(OWNER)));
+        PresignedUpload upload = inScope(
+                OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", null, null, scope(OWNER)));
 
         assertThat(upload.objectKey())
                 .isEqualTo("attachments/" + OWNER + "/" + documentId + "/" + upload.attachmentId());
@@ -133,18 +139,21 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
     void aStrangerCannotAttachAndTheCounterpartyCannotEither() {
         assertThatThrownBy(() -> inScope(
                         UUID.fromString("0190a900-0000-7000-8000-000000000003"),
-                        () -> attachments.presignUpload(documentId, null, "image/jpeg", null, scope(STRANGER))))
+                        () -> attachments.presignUpload(documentId, null, "image/jpeg", null, null, scope(STRANGER))))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("attachment.document_not_found");
 
-        // The counterparty reads the document (party_read) but may not write its rows.
+        // The counterparty reads the document (party_read) but does not own it: said so, before
+        // the row's policy would refuse the insert with a bare database error.
         assertThatThrownBy(() -> inScope(
                         STRANGER,
-                        () -> attachments.presignUpload(documentId, null, "image/jpeg", null, scope(STRANGER))))
-                .isInstanceOf(DataAccessException.class);
+                        () -> attachments.presignUpload(documentId, null, "image/jpeg", null, null, scope(STRANGER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.document_not_owned");
 
         assertThatThrownBy(() -> inScope(
-                        OWNER, () -> attachments.presignUpload(documentId, null, "not a type", null, scope(OWNER))))
+                        OWNER,
+                        () -> attachments.presignUpload(documentId, null, "not a type", null, null, scope(OWNER))))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("attachment.content_type_invalid");
     }
@@ -154,8 +163,8 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
         byte[] bytes = "a photograph".getBytes(StandardCharsets.UTF_8);
         String hash = sha256(bytes);
 
-        PresignedUpload upload =
-                inScope(OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", hash, scope(OWNER)));
+        PresignedUpload upload = inScope(
+                OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", null, hash, scope(OWNER)));
         kernel.reset();
 
         // Nothing uploaded yet, and it is fresh: it stays PENDING.
@@ -164,6 +173,13 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .contains("PENDING");
 
         store.objects.put(upload.objectKey(), bytes);
+        // Uploaded, but the pre-signed PUT is still valid: the bytes could still be replaced,
+        // so nothing settles yet.
+        assertThat(verifier.verifyPending()).isZero();
+        assertThat(inScope(OWNER, () -> attachments.status(upload.attachmentId())))
+                .contains("PENDING");
+
+        windowOver(upload.attachmentId());
         assertThat(verifier.verifyPending()).isEqualTo(1);
 
         assertThat(inScope(OWNER, () -> attachments.status(upload.attachmentId())))
@@ -186,6 +202,127 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                         UUID.fromString("0190a900-0000-7000-8000-000000000003"),
                         () -> attachments.presignDownload(upload.attachmentId(), scope(STRANGER))))
                 .isEmpty();
+        // An image is rendered; the URL carries no download disposition.
+        assertThat(inScope(OWNER, () -> attachments.presignDownload(upload.attachmentId(), scope(OWNER)))
+                        .orElseThrow()
+                        .toString())
+                .doesNotContain("disposition=attachment");
+
+        // Settled: a second run finds nothing, and nobody, not even the owner, changes the row.
+        kernel.reset();
+        assertThat(verifier.verifyPending()).isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> jdbc.update(
+                                "update kernel.document_attachment set status = 'FAILED' where attachment_id = ?",
+                                upload.attachmentId())))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("attachment.immutable");
+        // And no new URL is issued for it.
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> attachments.presignUpload(
+                                documentId, upload.attachmentId(), "image/jpeg", null, hash, scope(OWNER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.not_pending");
+    }
+
+    @Test
+    void askingAgainForTheSameAttachmentRenewsTheUrlOfThePendingRow() {
+        UUID attachmentId = Ids.next();
+        PresignedUpload first = inScope(
+                OWNER,
+                () -> attachments.presignUpload(documentId, attachmentId, "image/jpeg", 12L, null, scope(OWNER)));
+        superuserJdbc()
+                .update(
+                        "update kernel.document_attachment set upload_expires_at = now() - interval '1 minute'"
+                                + " where attachment_id = ?",
+                        attachmentId);
+
+        // The till lost its connection and asks again with the same id (doc 32 section 4): the
+        // same row, the same key, a fresh window; still one PENDING row and no duplicate key.
+        PresignedUpload again = inScope(
+                OWNER,
+                () -> attachments.presignUpload(documentId, attachmentId, "image/jpeg", 12L, null, scope(OWNER)));
+        assertThat(again.attachmentId()).isEqualTo(attachmentId);
+        assertThat(again.objectKey()).isEqualTo(first.objectKey());
+        assertThat(again.expiresAt()).isAfter(first.expiresAt().minusSeconds(1));
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.document_attachment where document_id = ?",
+                                Long.class,
+                                documentId))
+                .isEqualTo(1L);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select upload_expires_at > now() from kernel.document_attachment where attachment_id = ?",
+                                Boolean.class,
+                                attachmentId))
+                .isTrue();
+        assertThat(kernel.committedAudit())
+                .extracting(r -> r.eventType())
+                .containsExactly("ATTACHMENT_PRESIGNED", "ATTACHMENT_PRESIGNED");
+
+        // The same id on another document of the owner is refused.
+        UUID otherDocument = Ids.next();
+        inScope(OWNER, () -> documents.save(draft(otherDocument)));
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> attachments.presignUpload(
+                                otherDocument, attachmentId, "image/jpeg", null, null, scope(OWNER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.document_mismatch");
+    }
+
+    @Test
+    void theSizeAndTheTypeAreLimitedByTheRegister() {
+        // The declared size is checked at presign (and signed into the URL) ...
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> attachments.presignUpload(
+                                documentId, null, "image/jpeg", 6L * 1024 * 1024, null, scope(OWNER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.too_large");
+        assertThat(inScope(
+                                OWNER,
+                                () -> attachments.presignUpload(
+                                        documentId, null, "image/jpeg", 300L * 1024, null, scope(OWNER)))
+                        .url()
+                        .toString())
+                .contains("length=307200");
+
+        // ... and the stored size by the verifier, before the object is read.
+        PresignedUpload big = inScope(
+                OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", null, null, scope(OWNER)));
+        kernel.reset();
+        store.objects.put(big.objectKey(), new byte[6 * 1024 * 1024]);
+        windowOver(big.attachmentId());
+        assertThat(verifier.verifyPending()).isEqualTo(1);
+        assertThat(inScope(OWNER, () -> attachments.status(big.attachmentId()))).contains("FAILED");
+
+        // A type the register does not list is refused; a well-formed one that is listed passes.
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> attachments.presignUpload(documentId, null, "text/html", null, null, scope(OWNER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.content_type_not_allowed");
+    }
+
+    @Test
+    void anythingButAnImageIsDownloadedNotRendered() {
+        byte[] bytes = "%PDF-1.4".getBytes(StandardCharsets.UTF_8);
+        PresignedUpload pdf = inScope(
+                OWNER,
+                () -> attachments.presignUpload(
+                        documentId, null, "application/pdf", null, sha256(bytes), scope(OWNER)));
+        store.objects.put(pdf.objectKey(), bytes);
+        windowOver(pdf.attachmentId());
+        assertThat(verifier.verifyPending()).isEqualTo(1);
+        assertThat(inScope(OWNER, () -> attachments.presignDownload(pdf.attachmentId(), scope(OWNER)))
+                        .orElseThrow()
+                        .toString())
+                .contains("disposition=attachment");
     }
 
     @Test
@@ -196,16 +333,19 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                         documentId,
                         null,
                         "image/jpeg",
+                        null,
                         sha256("what was announced".getBytes(StandardCharsets.UTF_8)),
                         scope(OWNER)));
-        PresignedUpload never =
-                inScope(OWNER, () -> attachments.presignUpload(documentId, null, "image/png", null, scope(OWNER)));
+        PresignedUpload never = inScope(
+                OWNER, () -> attachments.presignUpload(documentId, null, "image/png", null, null, scope(OWNER)));
         kernel.reset();
 
         store.objects.put(wrong.objectKey(), "what arrived".getBytes(StandardCharsets.UTF_8));
+        windowOver(wrong.attachmentId());
         superuserJdbc()
                 .update(
-                        "update kernel.document_attachment set captured_at = now() - interval '2 days' where attachment_id = ?",
+                        "update kernel.document_attachment set captured_at = now() - interval '2 days',"
+                                + " upload_expires_at = now() - interval '2 days' where attachment_id = ?",
                         never.attachmentId());
 
         assertThat(verifier.verifyPending()).isEqualTo(2);
@@ -223,9 +363,47 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void anAnnouncedHashIsCheckedForShape() {
         assertThatThrownBy(() -> inScope(
-                        OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", "abc", scope(OWNER))))
+                        OWNER,
+                        () -> attachments.presignUpload(documentId, null, "image/jpeg", null, "abc", scope(OWNER))))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("attachment.hash_invalid");
+    }
+
+    /** The pre-signed PUT of the attachment has expired: the verifier may settle it. */
+    private void windowOver(UUID attachmentId) {
+        superuserJdbc()
+                .update(
+                        "update kernel.document_attachment set upload_expires_at = now() - interval '1 minute'"
+                                + " where attachment_id = ?",
+                        attachmentId);
+    }
+
+    private static DocumentRecord draft(UUID id) {
+        return new DocumentRecord(
+                id,
+                "ORD",
+                null,
+                null,
+                null,
+                OWNER,
+                STRANGER,
+                null,
+                null,
+                null,
+                "DRAFT",
+                null,
+                null,
+                null,
+                USER,
+                "LKR",
+                null,
+                null,
+                null,
+                null,
+                null,
+                DocumentOrigin.ONLINE,
+                null,
+                null);
     }
 
     private static String sha256(byte[] bytes) {
@@ -277,13 +455,15 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Override
-        public URI presignPut(String key, String contentType, Duration validFor) {
-            return URI.create("memory://put/" + key + "?type=" + contentType);
+        public URI presignPut(String key, String contentType, Long contentLength, Duration validFor) {
+            return URI.create("memory://put/" + key + "?type=" + contentType
+                    + (contentLength == null ? "" : "&length=" + contentLength));
         }
 
         @Override
-        public URI presignGet(String key, Duration validFor) {
-            return URI.create("memory://get/" + key);
+        public URI presignGet(String key, String contentType, Duration validFor) {
+            boolean image = contentType != null && contentType.startsWith("image/");
+            return URI.create("memory://get/" + key + (image ? "" : "?disposition=attachment"));
         }
 
         @Override

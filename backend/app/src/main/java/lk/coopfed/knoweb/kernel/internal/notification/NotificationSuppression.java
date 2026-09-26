@@ -5,6 +5,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,8 +36,22 @@ class NotificationSuppression {
         this.zone = ZoneId.of(zone);
     }
 
-    /** The reason to suppress, or empty to send. */
-    Optional<String> reasonToSuppress(String channel, String recipientHash, String templateId, ScopeContext ctx) {
+    /**
+     * The reason to suppress, or empty to send. Checked when the notification is queued and
+     * again before every attempt (19A section 10), so a kill switch thrown or quiet hours
+     * begun between the first attempt and a retry still hold.
+     *
+     * @param dedupKey        what is notified (an event id, a document id): the identity the
+     *                        hourly de-duplication compares, with the recipient and the template
+     * @param notificationId  this notification's own row, which is never its own duplicate
+     */
+    Optional<String> reasonToSuppress(
+            String channel,
+            String recipientHash,
+            String templateId,
+            UUID dedupKey,
+            UUID notificationId,
+            ScopeContext ctx) {
         String key = channel.toLowerCase(Locale.ROOT);
 
         if (!config.getBoolean("notification." + key + ".enabled", ctx, true)) {
@@ -47,7 +62,7 @@ class NotificationSuppression {
             return Optional.of("QUIET_HOURS");
         }
 
-        if (log.sentWithinLastHour(recipientHash, templateId)) {
+        if (log.sentWithinLastHour(recipientHash, templateId, dedupKey, notificationId)) {
             return Optional.of("DUPLICATE_WITHIN_HOUR");
         }
 

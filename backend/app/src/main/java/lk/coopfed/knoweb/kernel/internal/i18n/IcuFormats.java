@@ -36,16 +36,14 @@ class IcuFormats implements Formats {
         return format(amount.setScale(2, RoundingMode.HALF_UP), "#,##0.00");
     }
 
+    /**
+     * {@code Rs 1,234.00} in every language (doc 19 section 5.1, "currency rendered `Rs
+     * 1,234.00`", beside the Western digits of DR-6): a receipt, a tax document and the screen
+     * show one figure. The earlier {@code රු.} and {@code ரூ.} were the formatter's own idea.
+     */
     @Override
     public String moneyWithCurrency(BigDecimal amount, Locale locale) {
-        String language = locale == null ? "en" : locale.getLanguage();
-        String word =
-                switch (language) {
-                    case "si" -> "රු.";
-                    case "ta" -> "ரூ.";
-                    default -> "Rs";
-                };
-        return word + " " + money(amount, locale);
+        return "Rs " + money(amount, locale);
     }
 
     @Override

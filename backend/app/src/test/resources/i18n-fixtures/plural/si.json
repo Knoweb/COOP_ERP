@@ -1,3 +1,4 @@
 {
-  "a.items": "අයිතම {count, number}"
+  "a.items": "{count, plural, one {අයිතමය #} other {අයිතම #}}",
+  "a.who": "{gender, select, female {ඇය} male {ඔහු} other {ඔවුන්}} අත්සන් කළා"
 }

@@ -81,7 +81,7 @@ class S3ObjectStoreIntegrationTest {
 
         assertThat(store.head(key)).isEmpty();
 
-        URI put = store.presignPut(key, "text/plain", Duration.ofMinutes(5));
+        URI put = store.presignPut(key, "text/plain", (long) bytes.length, Duration.ofMinutes(5));
         HttpClient http = HttpClient.newHttpClient();
         HttpResponse<Void> uploaded = http.send(
                 HttpRequest.newBuilder(put)
@@ -91,15 +91,27 @@ class S3ObjectStoreIntegrationTest {
                 HttpResponse.BodyHandlers.discarding());
         assertThat(uploaded.statusCode()).isEqualTo(200);
 
+        // The length is part of the signature: a PUT of other bytes with the same URL is refused.
+        HttpResponse<Void> other = http.send(
+                HttpRequest.newBuilder(put)
+                        .header("Content-Type", "text/plain")
+                        .PUT(HttpRequest.BodyPublishers.ofByteArray(
+                                "evidence, longer".getBytes(StandardCharsets.UTF_8)))
+                        .build(),
+                HttpResponse.BodyHandlers.discarding());
+        assertThat(other.statusCode()).isEqualTo(403);
+
         assertThat(store.head(key)).contains((long) bytes.length);
         assertThat(store.sha256Hex(key)).isEqualTo(expected);
 
         HttpResponse<String> read = http.send(
-                HttpRequest.newBuilder(store.presignGet(key, Duration.ofMinutes(5)))
+                HttpRequest.newBuilder(store.presignGet(key, "text/plain", Duration.ofMinutes(5)))
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(read.statusCode()).isEqualTo(200);
         assertThat(read.body()).isEqualTo("evidence");
+        // Not an image: the store is told to serve it as a download.
+        assertThat(read.headers().firstValue("Content-Disposition")).contains("attachment");
     }
 }

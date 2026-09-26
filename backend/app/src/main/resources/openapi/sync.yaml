@@ -532,6 +532,11 @@ components:
         document_id: { type: string, format: uuid }
         attachment_id: { type: string, format: uuid }
         content_type: { type: string, minLength: 1, maxLength: 100 }
+        content_length:
+          type: integer
+          format: int64
+          minimum: 1
+          description: The exact size in bytes, when known; signed into the URL so the store takes no other size
         sha256: { type: string, minLength: 64, maxLength: 64 }
     PresignResponse:
       type: object

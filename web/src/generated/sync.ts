@@ -428,6 +428,11 @@ export interface components {
             /** Format: uuid */
             attachment_id: string;
             content_type: string;
+            /**
+             * Format: int64
+             * @description The exact size in bytes, when known; signed into the URL so the store takes no other size
+             */
+            content_length?: number;
             sha256: string;
         };
         PresignResponse: {

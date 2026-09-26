@@ -6,9 +6,11 @@
 // What it checks:
 //   - every id is in all three files, and no text is empty
 //   - every id the Java code answers with is in the catalogue: the first argument of
-//     new ProblemException(...) and of messages.t(...). Before this, an id that was in none of
-//     the three files passed, and the user saw "party.entity.duplicate" as the message
-//   - the three texts of an id carry the same placeholders ({0}, {1} ...)
+//     new ProblemException(...), of messages.t(...) and of messages.text(...). Before this, an
+//     id that was in none of the three files passed, and the user saw "party.entity.duplicate"
+//     as the message
+//   - the three texts of an id name the same arguments: positional ({0}, {1} ...) and named
+//     ({count}, {name} ...), the ones inside a plural or select included
 //   - no text contains the ASCII apostrophe ('). In a message format the apostrophe is the
 //     quote character: "Don't use {0}" prints "Dont use {0}" and the value never appears.
 //     Write the typographic apostrophe (’) instead; it is also the correct character.
@@ -36,8 +38,76 @@ export function readCatalogues(i18nDir) {
   }));
 }
 
+/**
+ * The arguments an ICU message names, positional ({0}) and named ({count}), including the ones
+ * inside the branches of a plural or select ({count, plural, one {# item of {name}} ...}); the
+ * `#` of a plural branch is the argument itself, not another one. Sorted and unique, so the
+ * three texts of an id can be compared as sets.
+ */
+export function argumentNames(text) {
+  const names = new Set();
+  walk(String(text), 0, names);
+  return [...names].sort();
+}
+
+/** Reads one message (or one branch of a plural/select) from `from`; returns the index after it. */
+function walk(text, from, names) {
+  let i = from;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === "}") {
+      return i + 1;
+    }
+    if (ch !== "{") {
+      i++;
+      continue;
+    }
+    // An argument: {name} or {name, type} or {name, type, style or branches}.
+    const close = text.indexOf("}", i);
+    const comma = text.indexOf(",", i);
+    const nameEnd = comma !== -1 && (close === -1 || comma < close) ? comma : close;
+    if (nameEnd === -1) {
+      return text.length;
+    }
+    const name = text.slice(i + 1, nameEnd).trim();
+    if (name !== "") {
+      names.add(name);
+    }
+    if (nameEnd === close) {
+      i = close + 1;
+      continue;
+    }
+    const typeEnd = [text.indexOf(",", nameEnd + 1), text.indexOf("}", nameEnd + 1)]
+      .filter((at) => at !== -1)
+      .sort((a, b) => a - b)[0];
+    const type = text.slice(nameEnd + 1, typeEnd).trim();
+    if (["plural", "select", "selectordinal"].includes(type)) {
+      // Branches: key {message} key {message} ... up to the closing brace of the argument.
+      let j = typeEnd + 1;
+      while (j < text.length && text[j] !== "}") {
+        if (text[j] === "{") {
+          j = walk(text, j + 1, names);
+        } else {
+          j++;
+        }
+      }
+      i = j + 1;
+    } else {
+      // A number, date or custom style: skip to the argument's closing brace.
+      let depth = 0;
+      let j = i;
+      for (; j < text.length; j++) {
+        if (text[j] === "{") depth++;
+        if (text[j] === "}" && --depth === 0) break;
+      }
+      i = j + 1;
+    }
+  }
+  return i;
+}
+
 function placeholders(text) {
-  return [...new Set(String(text).match(/\{\d+/g) ?? [])].sort().join(" ").replaceAll("{", "");
+  return argumentNames(text).join(" ");
 }
 
 /** Problems inside the three catalogue files themselves. */
@@ -80,7 +150,7 @@ export function problemsOfCatalogues(catalogues) {
       .map((language) => [language, placeholders(catalogues[language][id])]);
     if (new Set(used.map(([, found]) => found)).size > 1) {
       problems.push(
-        `${id}: the three texts do not use the same placeholders: ` +
+        `${id}: the three texts do not name the same arguments: ` +
         used.map(([language, found]) => `${language} {${found || "none"}}`).join(", ")
       );
     }
@@ -96,8 +166,8 @@ function javaFiles(dir) {
 }
 
 /**
- * The message ids one Java source answers with: the first argument of new ProblemException(
- * and of .t( when it is a string literal, or a String constant declared in the same file.
+ * The message ids one Java source answers with: the first argument of new ProblemException(,
+ * of .t( and of .text( when it is a string literal, or a String constant declared in the same file.
  * Anything else (an id passed in from elsewhere) cannot be followed here and is left to tests.
  */
 export function messageIdsUsedIn(javaSource) {
@@ -106,7 +176,7 @@ export function messageIdsUsedIn(javaSource) {
     [...source.matchAll(/\bString\s+([A-Z][A-Z0-9_]*)\s*=\s*"([^"]+)"/g)].map((match) => [match[1], match[2]])
   );
   const ids = [];
-  for (const match of source.matchAll(/(?:new\s+ProblemException|\.t)\s*\(\s*(?:"([^"]+)"|([A-Z][A-Z0-9_]*)\b)/g)) {
+  for (const match of source.matchAll(/(?:new\s+ProblemException|\.t|\.text)\s*\(\s*(?:"([^"]+)"|([A-Z][A-Z0-9_]*)\b)/g)) {
     const id = match[1] ?? constants[match[2]];
     if (id) {
       ids.push({ id, line: source.slice(0, match.index).split("\n").length });

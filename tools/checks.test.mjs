@@ -589,7 +589,36 @@ test(
           }
         )
       ),
-      /a\.b: the three texts do not use the same placeholders: en \{0 1\}, si \{0 1\}, ta \{0\}/
+      /a\.b: the three texts do not name the same arguments: en \{0 1\}, si \{0 1\}, ta \{0\}/
+    );
+  }
+);
+
+test(
+  "a translation that names another ICU argument, inside a plural too, is refused",
+  () => {
+    // The Tamil text renamed the argument: {count} became {n}, which MessageFormat leaves
+    // unfilled. Found inside the plural branches, not only at the top level.
+    one(
+      problemsOfCatalogues(
+        texts(
+          { "a.b": "{count, plural, one {# item for {name}} other {# items for {name}}}" },
+          { "a.b": "{count, plural, one {අයිතමය # {name}} other {අයිතම # {name}}}" },
+          { "a.b": "{n, plural, one {# பொருள் {name}} other {# பொருட்கள் {name}}}" }
+        )
+      ),
+      /a\.b: the three texts do not name the same arguments: en \{count name\}, si \{count name\}, ta \{n name\}/
+    );
+    // The same arguments in another order, and a select form, pass.
+    assert.deepEqual(
+      problemsOfCatalogues(
+        texts(
+          { "a.b": "{gender, select, female {She} other {They}} paid {amount, number}" },
+          { "a.b": "{amount, number} {gender, select, female {ඇය} other {ඔවුන්}} ගෙව්වා" },
+          { "a.b": "{gender, select, female {அவள்} other {அவர்கள்}} {amount, number} செலுத்தினார்" }
+        )
+      ),
+      []
     );
   }
 );
@@ -630,6 +659,17 @@ test(
                     id
                 );
             }
+
+            Messages.Text e() {
+                return messages.text(
+                    "party.subtitle",
+                    locale
+                );
+            }
+
+            String f(JsonNode node) {
+                return node.asText("not.an.id");
+            }
         }
       `).map(
         (found) => found.id
@@ -640,7 +680,8 @@ test(
       [
         "party.entity.duplicate",
         "request.invalid",
-        "party.title"
+        "party.title",
+        "party.subtitle"
       ]
     );
   }
