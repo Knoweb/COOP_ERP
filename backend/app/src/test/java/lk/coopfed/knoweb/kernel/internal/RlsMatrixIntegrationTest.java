@@ -257,20 +257,18 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0032): a consumer's claims are the worker's own bookkeeping in the"
                             + " entity's scope, not a register the federation or a grantee views",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
-            // ---- found by the matrix, to fix in the owning module ------------------------------
-            // TODO(K-07 follow-up, CR-17A-3): party_read still applies the location line to both
-            // sides, so a shop-scoped counterparty does not see the documents it is a side of.
+            // The ENTITY series and the entity's location-less documents are the whole entity's:
+            // a shop-scoped session sees and advances them (kernel V0055; the K-07 review, for
+            // the architect). own_read and own_update admit location_id IS NULL there.
+            new Departure(
+                    "kernel.numbering_series",
+                    "own_read and own_update admit a NULL location (the ENTITY series) at a location scope",
+                    RlsMatrixIntegrationTest::entityWideRowsAtALocation),
             new Departure(
                     "kernel.document",
-                    "party_read applies the location to the counterparty's side too (CR-17A-3 correction)",
-                    check -> check.op() == Op.SELECT
-                                    && check.scope().location() != null
-                                    && (check.row().equals("B with A")
-                                                    && check.scope().is("OWN")
-                                            || check.row().equals("A@1 with B")
-                                                    && check.scope().is("PARTY"))
-                            ? HIDDEN
-                            : null),
+                    "own_read and own_update admit a NULL location (an entity-level document) at a location scope",
+                    RlsMatrixIntegrationTest::entityWideRowsAtALocation),
+            // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
             // (hello README); K-01 has landed, so hello can add it.
             new Departure("hello.greeting", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing),
@@ -299,6 +297,20 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
     /** An insert is admitted only when the caller owns the parent SKU; a made-up row has none. */
     private static String childRowsFollowTheirParent(Check check) {
         return check.op() == Op.INSERT && check.scope().is("OWN") ? REFUSED : null;
+    }
+
+    /**
+     * "A wide" (the owner's row with no location) is visible to OWN(A@1). own_update admits it
+     * too, but the matrix's UPDATE touches owner_entity_id, which these tables grant to nobody,
+     * so that cell stays the template's REFUSED.
+     */
+    private static String entityWideRowsAtALocation(Check check) {
+        return check.op() == Op.SELECT
+                        && check.scope().is("OWN")
+                        && check.scope().location() != null
+                        && "A wide".equals(check.row())
+                ? VISIBLE
+                : null;
     }
 
     private static String onlyTheOwnerReads(Check check) {

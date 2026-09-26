@@ -3,7 +3,7 @@ import { useIntl } from "react-intl";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatInstant } from "../../shell/i18n/formats";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -32,7 +32,7 @@ type PendingReason = "suspend" | "reinstate" | null;
 export function SocietyCardPage() {
   const t = useT();
   const { locale } = useIntl();
-  const formatInstant = useFormatInstant();
+  const formatDate = useFormatDate();
   const { entityId = "" } = useParams();
   const queryClient = useQueryClient();
   const api = usePartyApi();
@@ -136,7 +136,7 @@ export function SocietyCardPage() {
           { label: t("party.field.language").text, value: data.defaultLanguage ? t(`party.language.${data.defaultLanguage}`).text : undefined },
           { label: t("party.field.fy_start").text, value: data.financialYearStartMonth ? t(`party.month.${data.financialYearStartMonth}`).text : undefined },
           { label: t("party.card.officer").text, value: data.responsibleOfficerUserId },
-          { label: t("party.card.governance_signed").text, value: data.dataGovernanceSignedOn ? formatInstant(data.dataGovernanceSignedOn) : undefined }
+          { label: t("party.card.governance_signed").text, value: data.dataGovernanceSignedOn ? formatDate(data.dataGovernanceSignedOn) : undefined }
         ]}
       >
         <ApprovalBar actions={actions} />

@@ -15,6 +15,9 @@ import org.springframework.stereotype.Component;
 @Component
 class SyncSettings {
 
+    /** Doc 32 DR-1: 2 MB compressed, the register's default. */
+    static final long DR1_MAX_BATCH_BYTES = 2L * 1024 * 1024;
+
     private final ConfigRegistry config;
 
     SyncSettings(ConfigRegistry config) {
@@ -26,7 +29,7 @@ class SyncSettings {
     }
 
     long maxBatchBytes(ScopeContext scope) {
-        return config.getInt("sync.batch.max_bytes", scope, 2 * 1024 * 1024);
+        return config.getInt("sync.batch.max_bytes", scope, (int) DR1_MAX_BATCH_BYTES);
     }
 
     int maxEventBytes(ScopeContext scope) {

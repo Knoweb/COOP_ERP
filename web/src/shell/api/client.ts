@@ -10,29 +10,31 @@
 //
 // What this adds to every request, so that no screen can forget it:
 //   - the bearer token of the signed-in user: the server reads who the user is from it
-//   - X-Scope-Entity, the entity the user acts in now (19A section 1: the active scope is
-//     the caller's choice among the scopes the token and the assignments give)
+//   - X-Scope-Entity, the entity the user acts in now, and X-Scope-Location when the user acts
+//     at one location of it (19A section 1: the active scope is the caller's choice among the
+//     scopes the token and the assignments give)
 //   - Accept-Language, so that error messages come back in the user's language
 //   - a refusal to send a mutating request without an Idempotency-Key (see idempotency.ts)
 // and what it does with every answer: an error response becomes a thrown ApiProblem, and a
 // 401 that asks for a fresh second factor (mfa.required, 19A section 2) sends the user to the
-// identity server to present it, back to the same page, where the action is taken again.
+// identity server to present it, back to the same page, where the interrupted command is
+// taken again once with the fresher token (pendingCommand.ts, StepUpReplay.tsx).
 
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
 import { useIntl } from "react-intl";
 import { useAuth } from "react-oidc-context";
 import createClient, { type Client, type Middleware } from "openapi-fetch";
-import type { components } from "../../generated/common";
+import { STEP_UP_ACR_VALUES, type LoginState } from "../auth/oidc";
 import { useSession, type Session } from "../auth/session";
+import { ScopeContext } from "../scope/ScopeContext";
+import { pendingCommandOf, type PendingCommand } from "./pendingCommand";
+import { problemOf, STEP_UP_REQUIRED, type Problem } from "./problem";
+
+// The problem document and its reader live in problem.ts; screens keep importing them from here.
+export { problemOf, STEP_UP_REQUIRED, type Problem };
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-/** The error document of the API (RFC 9457 with our members; openapi/common.yaml). */
-export type Problem = components["schemas"]["Problem"];
-
-/** The problem code the server answers when the action needs a second factor fresher than it has. */
-export const STEP_UP_REQUIRED = "mfa.required";
 
 /**
  * An error answer of the API. `problem.code` is a stable message id a screen may test for;
@@ -53,26 +55,30 @@ export class ApiProblem extends Error {
   }
 }
 
-/** What an error response says, whatever shape it has. */
-export async function problemOf(response: Response): Promise<Problem> {
-  if (response.headers.get("Content-Type")?.includes("application/problem+json")) {
-    return (await response.json()) as Problem;
-  }
-  // Not from our API: a proxy, a gateway, a server that is starting.
-  return { status: response.status, code: "unknown" };
-}
-
 export type RequestContext = {
   accessToken: string;
   locale: string;
   session: Session;
-  /** Sends the user to the identity server for a fresh second factor; optional for tests. */
-  stepUp?: () => void;
+  /** The location the user acts at; null or absent for the whole entity. */
+  locationId?: string | null;
+  /**
+   * Sends the user to the identity server for a fresh second factor, carrying the command
+   * that was refused so that it can be taken again after the sign-in; null when the command
+   * cannot be carried (a file upload). Optional for tests.
+   */
+  stepUp?: (pending: PendingCommand | null) => void;
 };
 
 export function apiMiddleware(getContext: () => RequestContext): Middleware {
+  // The command each mutating request carries, kept until the answer arrives.
+  const pendingOf = new WeakMap<Request, PendingCommand | null>();
+  // One step-up per page life: the redirect leaves the page, and two requests refused at the
+  // same moment must not each start a sign-in. The first one carries its command; the rest
+  // are reported as problems and the person takes them again on return.
+  let steppingUp = false;
+
   return {
-    onRequest({ request }) {
+    async onRequest({ request }) {
       if (MUTATING.has(request.method) && !request.headers.get("Idempotency-Key")) {
         // A programming error, caught on the first click and not in production: a key made
         // up here would be new on every retry, which is the one thing a key must not be.
@@ -81,20 +87,27 @@ export function apiMiddleware(getContext: () => RequestContext): Middleware {
             `Take one from useIdempotencyKey() and pass it in params.header.`
         );
       }
-      const { accessToken, locale, session } = getContext();
+      const { accessToken, locale, session, locationId } = getContext();
       request.headers.set("Authorization", `Bearer ${accessToken}`);
       request.headers.set("Accept-Language", locale);
       if (session.entityId) {
         request.headers.set("X-Scope-Entity", session.entityId);
       }
+      if (locationId) {
+        request.headers.set("X-Scope-Location", locationId);
+      }
+      if (MUTATING.has(request.method)) {
+        pendingOf.set(request, await pendingCommandOf(request));
+      }
       return request;
     },
 
-    async onResponse({ response }) {
+    async onResponse({ request, response }) {
       if (!response.ok) {
         const problem = await problemOf(response);
-        if (response.status === 401 && problem.code === STEP_UP_REQUIRED) {
-          getContext().stepUp?.();
+        if (response.status === 401 && problem.code === STEP_UP_REQUIRED && !steppingUp) {
+          steppingUp = true;
+          getContext().stepUp?.(pendingOf.get(request) ?? null);
         }
         throw new ApiProblem(problem);
       }
@@ -111,6 +124,8 @@ export function useApiClient<Paths extends object>(): Client<Paths> {
   const session = useSession();
   const { locale } = useIntl();
   const auth = useAuth();
+  // Null outside the ScopeProvider (a test); the scope then is the whole entity.
+  const locationId = useContext(ScopeContext)?.active.locationId ?? null;
 
   return useMemo(() => {
     if (!session) {
@@ -118,13 +133,20 @@ export function useApiClient<Paths extends object>(): Client<Paths> {
     }
     const client = createClient<Paths>({ baseUrl: API_BASE });
     // Step-up (doc 19 section 2.2: "the challenge is at the action, not at login"): a fresh
-    // sign-in at the identity server, which asks for the second factor, and back to this page.
-    const stepUp = () =>
+    // sign-in at the identity server, which asks for the second factor (acr_values names it
+    // where the realm has one; oidc.ts), and back to this page with the refused command.
+    const stepUp = (pending: PendingCommand | null) => {
+      const state: LoginState = {
+        returnTo: window.location.pathname + window.location.search,
+        pendingCommand: pending ?? undefined
+      };
       void auth.signinRedirect({
         prompt: "login",
-        state: { returnTo: window.location.pathname + window.location.search }
+        ...(STEP_UP_ACR_VALUES ? { acr_values: STEP_UP_ACR_VALUES } : {}),
+        state
       });
-    client.use(apiMiddleware(() => ({ accessToken: session.accessToken, locale, session, stepUp })));
+    };
+    client.use(apiMiddleware(() => ({ accessToken: session.accessToken, locale, session, locationId, stepUp })));
     return client;
-  }, [session, locale, auth]);
+  }, [session, locale, auth, locationId]);
 }

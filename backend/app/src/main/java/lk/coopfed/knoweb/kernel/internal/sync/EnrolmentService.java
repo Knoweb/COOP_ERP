@@ -70,11 +70,17 @@ class EnrolmentService {
         return new IssuedCode(deviceId, code, expiresAt);
     }
 
+    /** The idempotency key is the slice's: a retry with the same key is answered again. */
     EnrolmentStore.Enrolled enrol(
-            UUID deviceId, String code, String hardwareSerial, String appVersion, UUID correlation) {
+            UUID deviceId,
+            String code,
+            String hardwareSerial,
+            String appVersion,
+            String idempotencyKey,
+            UUID correlation) {
         DeviceRecord device =
                 directory.findFresh(deviceId).orElseThrow(() -> new ProblemException("sync.enrolment.code_invalid"));
-        return store.enrol(scopeOf(device, correlation), device, code, hardwareSerial, appVersion);
+        return store.enrol(scopeOf(device, correlation), device, code, hardwareSerial, appVersion, idempotencyKey);
     }
 
     /**

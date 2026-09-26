@@ -10,17 +10,22 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentIssuance;
 import lk.coopfed.knoweb.kernel.api.DocumentIssued;
 import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
+import lk.coopfed.knoweb.kernel.api.DocumentLinkRecord;
 import lk.coopfed.knoweb.kernel.api.DocumentLinks;
 import lk.coopfed.knoweb.kernel.api.DocumentOrigin;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
+import lk.coopfed.knoweb.kernel.api.DocumentStateHistoryRecord;
 import lk.coopfed.knoweb.kernel.api.DocumentTypeHandler;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.LinkType;
@@ -61,6 +66,8 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID STRANGER = UUID.fromString("0190d000-0000-7000-8000-000000000003");
     private static final UUID USER = UUID.fromString("0190d000-0000-7000-8000-000000000010");
     private static final UUID DEVICE = UUID.fromString("0190d000-0000-7000-8000-000000000020");
+    private static final UUID LOCATION = UUID.fromString("0190d000-0000-7000-8000-000000000030");
+    private static final UUID POSITION = UUID.fromString("0190d000-0000-7000-8000-000000000031");
 
     @Autowired
     NumberingService numbering;
@@ -357,13 +364,325 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
 
         // ... and a status change through the history is fine.
         inScope(BUYER, () -> {
-            documents.addStateTransition(new lk.coopfed.knoweb.kernel.api.DocumentStateHistoryRecord(
-                    Ids.next(), id, "ISSUED", "ACCEPTED", Instant.now(), null, USER, null, null, null));
+            documents.addStateTransition(transition(id, "ISSUED", "ACCEPTED"), scope(BUYER));
             return null;
         });
         assertThat(inScope(BUYER, () -> documents.findById(id).orElseThrow().status()))
                 .isEqualTo("ACCEPTED");
         assertThat(inScope(BUYER, () -> documents.findHistory(id))).hasSize(2);
+    }
+
+    @Test
+    void noLineJoinsAnIssuedDocument() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
+
+        // The owner is refused by the policy ...
+        assertThatThrownBy(() -> inScope(BUYER, () -> {
+                    documents.saveLines(id, List.of(line(id, 3, "1", "1.00", "0.00")));
+                    return null;
+                }))
+                .isInstanceOf(DataAccessException.class);
+
+        // ... and the trigger refuses whoever bypasses the policies, the superuser included.
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update(
+                                "insert into kernel.document_line (document_line_id, document_id, line_no, qty)"
+                                        + " values (?, ?, 3, 1)",
+                                Ids.next(),
+                                id))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("document.immutable");
+
+        assertThat(inScope(BUYER, () -> documents.findLines(id))).hasSize(2);
+    }
+
+    @Test
+    void aStateTransitionIsCompareAndSetAndAudited() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        DocumentRecord issued =
+                inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
+        kernel.reset();
+
+        inScope(BUYER, () -> {
+            documents.addStateTransition(transition(id, "ISSUED", "ACCEPTED"), scope(BUYER));
+            return null;
+        });
+        assertThat(kernel.committedAudit()).extracting(r -> r.eventType()).containsExactly("DOCUMENT_STATUS_CHANGED");
+        kernel.reset();
+
+        // A transition from a status the document has left changes nothing and is refused.
+        assertThatThrownBy(() -> inScope(BUYER, () -> {
+                    documents.addStateTransition(transition(id, "ISSUED", "CANCELLED"), scope(BUYER));
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("document.status_conflict");
+        assertThat(inScope(BUYER, () -> documents.findById(id).orElseThrow().status()))
+                .isEqualTo("ACCEPTED");
+        assertThat(inScope(BUYER, () -> documents.findHistory(id))).hasSize(2);
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        // save() is not a way to change the status of an issued document ...
+        assertThatThrownBy(() -> inScope(BUYER, () -> documents.save(issued.withStatus("CANCELLED"))))
+                .isInstanceOf(ProblemException.class);
+
+        // ... nor a way to issue a draft around the protocol.
+        UUID draftId = Ids.next();
+        DocumentRecord numberedByHand = new DocumentRecord(
+                draftId,
+                "ORD",
+                issued.seriesId(),
+                99L,
+                "M042-ORD-0000099",
+                BUYER,
+                SELLER,
+                null,
+                null,
+                null,
+                "DRAFT",
+                null,
+                null,
+                null,
+                USER,
+                "LKR",
+                null,
+                null,
+                null,
+                null,
+                null,
+                DocumentOrigin.ONLINE,
+                null,
+                null);
+        assertThatThrownBy(() -> inScope(BUYER, () -> documents.save(numberedByHand)))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("document.issued_fields_reserved");
+    }
+
+    @Test
+    void aStoredDraftIsIssuedFromItsStoredHeaderAndLines() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        inScope(BUYER, () -> documents.save(draft(id, BUYER, SELLER)));
+        inScope(BUYER, () -> {
+            documents.saveLines(id, List.of(line(id, 1, "1.000", "50.00", "5.00")));
+            return null;
+        });
+
+        // The caller's copy names another counterparty and other lines: the store wins.
+        DocumentRecord issued =
+                inScope(BUYER, () -> issuance.issue(draft(id, BUYER, STRANGER), twoLines(id), scope(BUYER)));
+
+        assertThat(issued.counterpartyEntityId()).isEqualTo(SELLER);
+        assertThat(issued.grossAmount()).isEqualByComparingTo("55.00");
+        assertThat(inScope(BUYER, () -> documents.findLines(id))).hasSize(1);
+        DocumentRecord stored = inScope(BUYER, () -> documents.findById(id).orElseThrow());
+        assertThat(ContentHash.of(stored.withContentHash(null), inScope(BUYER, () -> documents.findLines(id))))
+                .isEqualTo(issued.contentHash());
+    }
+
+    @Test
+    void theHashIsOverTheStoredScaleOfEveryDecimal() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        List<DocumentLineRecord> lines = List.of(line(id, 1, "3.0005", "33.33333", "0.005"));
+
+        DocumentRecord issued = inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), lines, scope(BUYER)));
+
+        DocumentRecord stored = inScope(BUYER, () -> documents.findById(id).orElseThrow());
+        List<DocumentLineRecord> storedLines = inScope(BUYER, () -> documents.findLines(id));
+        assertThat(storedLines.get(0).unitPrice()).isEqualByComparingTo("33.3333");
+        assertThat(ContentHash.of(stored.withContentHash(null), storedLines)).isEqualTo(issued.contentHash());
+    }
+
+    @Test
+    void centralIssuanceRefusesWhatATillNumbers() {
+        // A series a device holds ...
+        UUID seriesId = inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        inScope(BUYER, () -> {
+            numbering.holderChange(List.of(seriesId), DEVICE, scope(BUYER));
+            return null;
+        });
+        UUID id = Ids.next();
+        assertThatThrownBy(() ->
+                        inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("document.series_device_held");
+        assertThat(nextNumber()).isEqualTo(1L);
+
+        // ... a TILL_POSITION series ...
+        inScope(
+                BUYER,
+                () -> numbering.registerSeries(
+                        SeriesRegistration.forTillPosition("RCT", BUYER, LOCATION, POSITION, "M042", "S01", 1, null),
+                        scope(BUYER)));
+        UUID receipt = Ids.next();
+        DocumentRecord tillDraft = draft(receipt, "RCT", BUYER, null, LOCATION, POSITION, DocumentOrigin.ONLINE);
+        assertThatThrownBy(() -> inScope(BUYER, () -> issuance.issue(tillDraft, twoLines(receipt), scope(BUYER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("document.series_device_held");
+
+        // ... and a draft that says it was issued offline.
+        UUID offline = Ids.next();
+        DocumentRecord offlineDraft = draft(offline, "ORD", BUYER, SELLER, null, null, DocumentOrigin.OFFLINE);
+        assertThatThrownBy(() -> inScope(BUYER, () -> issuance.issue(offlineDraft, twoLines(offline), scope(BUYER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("document.series_device_held");
+
+        assertThat(superuserJdbc().queryForObject("select count(*) from kernel.document", Long.class))
+                .isZero();
+    }
+
+    @Test
+    void aShopScopedSessionIssuesFromTheEntitySeries() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+
+        DocumentRecord issued = inScopeAt(
+                BUYER,
+                LOCATION,
+                () -> issuance.issue(
+                        draft(id, "ORD", BUYER, SELLER, LOCATION, null, DocumentOrigin.ONLINE),
+                        twoLines(id),
+                        scopeAt(BUYER, LOCATION)));
+
+        assertThat(issued.docNumberDisplay()).isEqualTo("M042-ORD-0000001");
+        assertThat(inScopeAt(BUYER, LOCATION, () -> documents.findById(id))).isPresent();
+    }
+
+    @Test
+    void aCounterpartyAtALocationReadsTheDocument() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
+
+        assertThat(inScopeAt(SELLER, LOCATION, () -> documents.findById(id))).isPresent();
+        assertThat(inScopeAt(SELLER, LOCATION, () -> documents.findLines(id))).hasSize(2);
+        assertThat(inScopeAt(STRANGER, LOCATION, () -> documents.findById(id))).isEmpty();
+    }
+
+    @Test
+    void concurrentSettlementsOfOneOriginalSeeEachOther() throws Exception {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID original = Ids.next();
+        UUID first = Ids.next();
+        UUID second = Ids.next();
+        for (UUID id : List.of(original, first, second)) {
+            inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
+        }
+
+        // The first settlement holds its transaction open after it linked 300.00; the second,
+        // for 200.00, must wait for it and then see 500.00 against a gross of 430.00.
+        CountDownLatch firstLinked = new CountDownLatch(1);
+        CountDownLatch secondFinished = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> holder = pool.submit(() -> inScope(BUYER, () -> {
+                links.link(first, original, LinkType.SETTLES, new BigDecimal("300.00"), scope(BUYER));
+                firstLinked.countDown();
+                try {
+                    // Long enough for the second to have queued behind the lock, not to have run.
+                    secondFinished.await(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return null;
+            }));
+            assertThat(firstLinked.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> waiter = pool.submit(() -> inScope(BUYER, () -> {
+                links.link(second, original, LinkType.SETTLES, new BigDecimal("200.00"), scope(BUYER));
+                return null;
+            }));
+
+            holder.get(30, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> waiter.get(30, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(ProblemException.class)
+                    .hasMessageContaining("document.link.exceeds_balance");
+            secondFinished.countDown();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(inScope(BUYER, () -> documents.findLinks(original))).hasSize(1);
+    }
+
+    @Test
+    void aSecondReversalIsRefusedByTheDatabaseToo() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID original = Ids.next();
+        UUID reversal = Ids.next();
+        UUID secondReversal = Ids.next();
+        for (UUID id : List.of(original, reversal, secondReversal)) {
+            inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
+        }
+        inScope(BUYER, () -> {
+            links.link(reversal, original, LinkType.REVERSES, null, scope(BUYER));
+            return null;
+        });
+
+        // Straight at the repository, past the check DocumentLinks makes: the index decides.
+        assertThatThrownBy(() -> inScope(BUYER, () -> {
+                    documents.addLink(new DocumentLinkRecord(
+                            secondReversal, original, LinkType.REVERSES, null, Instant.now(), USER));
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("document.link.reversed_already");
+    }
+
+    @Test
+    void concurrentRegistrationsOfOneSeriesGiveOneSeries() throws Exception {
+        int registrars = 4;
+        ExecutorService pool = Executors.newFixedThreadPool(registrars);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<UUID>> results = new ArrayList<>();
+        try {
+            for (int t = 0; t < registrars; t++) {
+                results.add(pool.submit(() -> {
+                    start.await(10, TimeUnit.SECONDS);
+                    return inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+                }));
+            }
+            start.countDown();
+            Set<UUID> ids = new java.util.HashSet<>();
+            for (Future<UUID> result : results) {
+                ids.add(result.get(30, TimeUnit.SECONDS));
+            }
+            assertThat(ids).hasSize(1);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(superuserJdbc().queryForObject("select count(*) from kernel.numbering_series", Long.class))
+                .isEqualTo(1L);
+        assertThat(kernel.committedAudit().stream().filter(r -> "SERIES_REGISTERED".equals(r.eventType())))
+                .hasSize(1);
+    }
+
+    @Test
+    void theGapCheckMeasuresASeriesWhoseCounterIsBehindItsDocuments() {
+        UUID seriesId = inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+
+        // A document numbered 3 arrived (as ingestion will write it) while the counter is at 1.
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.document (document_id, doc_type_code, series_id, doc_number,
+                            doc_number_display, owner_entity_id, status, issued_at, business_date, content_hash)
+                        values (?, 'ORD', ?, 3, 'M042-ORD-0000003', ?, 'ISSUED', now(), current_date, repeat('0', 64))
+                        """,
+                        Ids.next(),
+                        seriesId,
+                        BUYER);
+
+        List<GapCheck.Gap> gaps = inScope(BUYER, gapCheck::findGaps);
+        assertThat(gaps).hasSize(1);
+        assertThat(gaps.get(0).expectedCount()).isEqualTo(3);
+        assertThat(gaps.get(0).foundCount()).isEqualTo(1);
+        assertThat(gaps.get(0).firstMissing()).isEqualTo(1);
     }
 
     // ---- links -------------------------------------------------------------------------------
@@ -486,16 +805,31 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static DocumentRecord draftOfType(UUID id, String docTypeCode) {
+        return draft(id, docTypeCode, BUYER, SELLER, null, null, DocumentOrigin.ONLINE);
+    }
+
+    private static DocumentRecord draft(UUID id, UUID owner, UUID counterparty) {
+        return draft(id, "ORD", owner, counterparty, null, null, DocumentOrigin.ONLINE);
+    }
+
+    private static DocumentRecord draft(
+            UUID id,
+            String docTypeCode,
+            UUID owner,
+            UUID counterparty,
+            UUID locationId,
+            UUID tillPositionId,
+            DocumentOrigin origin) {
         return new DocumentRecord(
                 id,
                 docTypeCode,
                 null,
                 null,
                 null,
-                BUYER,
-                SELLER,
-                null,
-                null,
+                owner,
+                counterparty,
+                locationId,
+                tillPositionId,
                 null,
                 "DRAFT",
                 null,
@@ -508,37 +842,14 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                 null,
                 null,
                 null,
-                DocumentOrigin.ONLINE,
+                origin,
                 null,
                 null);
     }
 
-    private static DocumentRecord draft(UUID id, UUID owner, UUID counterparty) {
-        return new DocumentRecord(
-                id,
-                "ORD",
-                null,
-                null,
-                null,
-                owner,
-                counterparty,
-                null,
-                null,
-                null,
-                "DRAFT",
-                null,
-                null,
-                null,
-                USER,
-                "LKR",
-                null,
-                null,
-                null,
-                null,
-                null,
-                DocumentOrigin.ONLINE,
-                null,
-                null);
+    private static DocumentStateHistoryRecord transition(UUID documentId, String from, String to) {
+        return new DocumentStateHistoryRecord(
+                Ids.next(), documentId, from, to, Instant.now(), null, USER, null, null, null);
     }
 
     private static List<DocumentLineRecord> twoLines(UUID documentId) {
@@ -565,7 +876,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                 null,
                 new BigDecimal("10.000"),
                 new BigDecimal(tax),
-                quantity.multiply(price).setScale(2),
+                quantity.multiply(price).setScale(2, java.math.RoundingMode.HALF_UP),
                 null,
                 null,
                 null);
@@ -578,7 +889,11 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static ScopeContext scope(UUID entity) {
-        Scope active = new Scope(entity, null);
+        return scopeAt(entity, null);
+    }
+
+    private static ScopeContext scopeAt(UUID entity, UUID location) {
+        Scope active = new Scope(entity, location);
         return new ScopeContext(
                 USER,
                 null,
@@ -594,14 +909,20 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
 
     /** One transaction in the OWN scope of an entity, as the application user, the way a handler runs. */
     private <T> T inScope(UUID entity, Supplier<T> work) {
+        return inScopeAt(entity, null, work);
+    }
+
+    /** The same, for a session scoped to one location of the entity (a shop manager at a shop). */
+    private <T> T inScopeAt(UUID entity, UUID location, Supplier<T> work) {
         return new TransactionTemplate(transactionManager).execute(status -> {
             jdbc.queryForList(
                     "select set_config('app.user_id', ?, true), set_config('app.correlation_id', ?, true),"
-                            + " set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                            + " set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', ?, true),"
                             + " set_config('app.scope_class', 'OWN', true), set_config('app.granted_entities', '{}', true)",
                     USER.toString(),
                     Ids.next().toString(),
-                    entity.toString());
+                    entity.toString(),
+                    location == null ? "" : location.toString());
             return work.get();
         });
     }
@@ -641,6 +962,20 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         @Bean
         OrderType orderType() {
             return new OrderType();
+        }
+
+        /** A till receipt, so that the test can register a TILL_POSITION series and try to issue from it. */
+        static class ReceiptType implements DocumentTypeHandler {
+
+            @Override
+            public String docTypeCode() {
+                return "RCT";
+            }
+        }
+
+        @Bean
+        ReceiptType receiptType() {
+            return new ReceiptType();
         }
     }
 }

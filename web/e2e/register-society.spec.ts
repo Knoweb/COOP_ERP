@@ -46,15 +46,18 @@ test("a registered society lands on its card, is found in the register, and its 
   await expect(page.getByRole("alert")).toHaveText(backendEnglish["m1.entity.code_duplicate"]);
 });
 
-test("the Federation view sees the register but is refused a registration by the server", async ({ page }) => {
-  await openSignedIn(page, FED_ADMIN, "/party/societies/new");
+test("the Federation view sees the register and is offered no register form", async ({ page }) => {
+  // fed-admin's scope is FEDERATION_VIEW, a read-only class that resolves to no command
+  // (K-03b; 19A section 3). The shell mirrors that rule (shell/auth/permissions.ts): the
+  // register is shown, the links to the forms are not, and the form's address shows the page
+  // that says so. The server would refuse the registration anyway (permission.denied under
+  // K-02's enforcement); the point of this test is that nobody has to find that out on submit.
+  await openSignedIn(page, FED_ADMIN, "/party/societies");
+  await expect(page.getByRole("heading", { level: 1, name: textOf(FED_ADMIN, "party.register.title") })).toBeVisible();
+  await expect(page.getByRole("link", { name: textOf(FED_ADMIN, "party.register.new") })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: textOf(FED_ADMIN, "party.register.bulk") })).toHaveCount(0);
 
-  await page.getByLabel(textOf(FED_ADMIN, "party.field.code")).fill(uniqueCode());
-  await page.getByLabel(textOf(FED_ADMIN, "party.field.name_en")).fill("Not the Federation itself");
-  await page.getByRole("button", { name: textOf(FED_ADMIN, "party.new.submit") }).click();
-
-  // fed-admin's scope is FEDERATION_VIEW, a read-only class that resolves to no permission
-  // (K-03b), and the stack enforces permissions (K-02): the kernel refuses before the handler's
-  // own guard ("only the Federation") is reached, and the screen shows why.
-  await expect(page.getByRole("alert")).toHaveText(backendEnglish["permission.denied"]);
+  await page.goto("/party/societies/new");
+  await expect(page.getByRole("heading", { level: 1, name: textOf(FED_ADMIN, "shell.not_allowed.title") })).toBeVisible();
+  await expect(page.getByLabel(textOf(FED_ADMIN, "party.field.code"))).toHaveCount(0);
 });

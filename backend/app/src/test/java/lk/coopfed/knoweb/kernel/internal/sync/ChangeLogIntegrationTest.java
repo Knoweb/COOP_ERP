@@ -85,6 +85,19 @@ class ChangeLogIntegrationTest extends SyncIntegrationTest {
     }
 
     @Test
+    void aTillOnAShopNothingWasPublishedToGetsAnEmptyPageNotAFullSnapshot() {
+        // Enrolled before any price list or catalogue reached its shop: nothing to download, and
+        // the snapshot endpoint has nothing to serve, so "full snapshot required" would strand it.
+        JsonNode page = changes(0, 500).getBody();
+
+        assertThat(page.path("current_version").asLong()).isZero();
+        assertThat(page.path("full_snapshot_required").asBoolean()).isFalse();
+        assertThat(page.path("entries")).isEmpty();
+        assertThat(page.path("next_since").asLong()).isZero();
+        assertThat(page.path("has_more").asBoolean()).isFalse();
+    }
+
+    @Test
     void aTillOlderThanTheRetentionIsSentToAFullSnapshot() {
         publish(List.of(new Target(ENTITY, SHOP)), List.of(Change.upsert("sku", Ids.next())), null, false);
         publish(List.of(new Target(ENTITY, SHOP)), List.of(Change.upsert("sku", Ids.next())), null, false);
