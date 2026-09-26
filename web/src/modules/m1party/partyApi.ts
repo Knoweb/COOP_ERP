@@ -21,6 +21,8 @@ export type BulkValidationReport = components["schemas"]["BulkValidationReport"]
 export type SocietyFilter = {
   status?: SocietyStatus;
   district?: string;
+  /** The text of the search box: a prefix of the code or a part of a name; the server filters. */
+  query?: string;
 };
 
 /** The server's page size for the register list: enough that a district fits on one page. */
@@ -37,6 +39,7 @@ export function usePartyApi() {
             query: {
               status: filter.status,
               district: filter.district || undefined,
+              q: filter.query || undefined,
               cursor,
               limit: PAGE_SIZE
             }

@@ -5,6 +5,7 @@
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 import { MODULES } from "./modules/registry";
+import { StepUpReplay } from "./shell/auth/StepUpReplay";
 import { UserMenu } from "./shell/auth/UserMenu";
 import { isTrainingMode, TrainingBadge } from "./shell/components/TrainingBadge";
 import { DesignPage } from "./shell/design/DesignPage";
@@ -31,6 +32,8 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
           <ScopeBanner />
           <UserMenu />
         </header>
+        {/* What became of the command a step-up interrupted; nothing, nearly always. */}
+        <StepUpReplay />
         <Navigation modules={modules} />
         <Outlet />
       </div>

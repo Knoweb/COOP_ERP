@@ -44,20 +44,68 @@ describe("the API client", () => {
     expect(headers.get("X-Dev-User")).toBeNull();
   });
 
-  it("sends the user for a fresh second factor when the server asks for one, and still reports the problem", async () => {
-    const stepUp = vi.fn();
+  it("sends the location the user acts at, when the scope is narrowed to one", async () => {
     const sent: Request[] = [];
     const fetch = vi.fn(async (request: Request) => {
       sent.push(request);
-      return json(401, { status: 401, code: "mfa.required", title: "Fresh second factor needed", params: { stepUpUrl: "http://idp/auth" } }, "application/problem+json");
+      return json(200, []);
     });
     const client = createClient<paths>({ baseUrl: "http://api.test", fetch });
+    const locationId = "0190f000-0000-7000-8000-0000000000l1";
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, locationId })));
+
+    await client.GET("/v1/hello/greetings");
+
+    expect(sent[0].headers.get("X-Scope-Entity")).toBe(session.entityId);
+    expect(sent[0].headers.get("X-Scope-Location")).toBe(locationId);
+  });
+
+  const stepUpRequired = () =>
+    json(401, { status: 401, code: "mfa.required", title: "Fresh second factor needed", params: { stepUpUrl: "http://idp/auth" } }, "application/problem+json");
+
+  it("sends the user for a fresh second factor when the server asks for one, and still reports the problem", async () => {
+    const stepUp = vi.fn();
+    const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
     client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
 
     const error = await client.GET("/v1/hello/greetings").catch((e: unknown) => e);
 
     expect(stepUp).toHaveBeenCalledTimes(1);
+    expect(stepUp).toHaveBeenCalledWith(null); // a read has nothing to take again
     expect((error as ApiProblem).problem.code).toBe("mfa.required");
+  });
+
+  it("hands the step-up the command that was refused, with its key and body and without the token, so it can be taken again after the sign-in", async () => {
+    const stepUp = vi.fn();
+    const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
+
+    await client
+      .POST("/v1/hello/greetings", { params: { header: { "Idempotency-Key": "key-7" } }, body: { textEn: "Hello" } })
+      .catch(() => undefined);
+
+    expect(stepUp).toHaveBeenCalledTimes(1);
+    const pending = stepUp.mock.calls[0][0];
+    expect(pending).toEqual({
+      method: "POST",
+      url: "http://api.test/v1/hello/greetings",
+      headers: { "Idempotency-Key": "key-7", "Content-Type": "application/json" },
+      body: JSON.stringify({ textEn: "Hello" })
+    });
+  });
+
+  it("starts one step-up for two requests refused at the same moment, and reports both", async () => {
+    const stepUp = vi.fn();
+    const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
+
+    const outcomes = await Promise.all([
+      client.GET("/v1/hello/greetings").catch((e: unknown) => e),
+      client.GET("/v1/hello/greetings").catch((e: unknown) => e)
+    ]);
+
+    expect(stepUp).toHaveBeenCalledTimes(1);
+    expect(outcomes.map((e) => (e as ApiProblem).problem.code)).toEqual(["mfa.required", "mfa.required"]);
   });
 
   it("refuses to send a mutating request without an Idempotency-Key", async () => {

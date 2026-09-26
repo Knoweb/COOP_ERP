@@ -28,7 +28,10 @@ type ReasonCaptureProps = {
 
 export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: ReasonCaptureProps) {
   const t = useT();
-  const [code, setCode] = useState(codes[0]?.code ?? "");
+  // Nothing is chosen until the person chooses: a reason that goes into the audit record must
+  // be the clerk's, not the first one on the list (the review of 26 September). `required`
+  // and the empty-code check below stop a Confirm without a choice.
+  const [code, setCode] = useState("");
   const [text, setText] = useState("");
 
   const submit = (event: FormEvent) => {
@@ -47,6 +50,7 @@ export function ReasonCapture({ title, codes, onConfirm, onCancel, pending }: Re
       <label className="reason-capture__field">
         {t("shell.reason.code").text}
         <select value={code} onChange={(event) => setCode(event.target.value)} required>
+          <option value="">{t("shell.reason.choose").text}</option>
           {codes.map((option) => (
             <option key={option.code} value={option.code}>
               {option.label}

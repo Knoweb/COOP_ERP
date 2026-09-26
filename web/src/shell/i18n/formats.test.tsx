@@ -1,5 +1,35 @@
+import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { IntlProvider } from "react-intl";
 import { describe, expect, it } from "vitest";
-import { formatMoneyDigits } from "./formats";
+import { formatMoneyDigits, useFormatDate, useFormatInstant } from "./formats";
+import { messages } from "./messages";
+
+const inEnglish = ({ children }: { children: ReactNode }) => (
+  <IntlProvider locale="en" messages={messages.en}>
+    {children}
+  </IntlProvider>
+);
+
+describe("formatting a calendar date", () => {
+  it("prints the day the API sent and no time, whatever the zone: a date is not an instant", () => {
+    const { result } = renderHook(() => useFormatDate(), { wrapper: inEnglish });
+    // 2026-09-25 read as UTC midnight is 5:30 AM in Colombo; a signature has no such time.
+    expect(result.current("2026-09-25")).toBe("Sep 25, 2026");
+    expect(result.current("2026-01-01")).toBe("Jan 1, 2026");
+  });
+
+  it("differs from an instant, which is a date AND a time in the business zone", () => {
+    const { result } = renderHook(() => useFormatInstant(), { wrapper: inEnglish });
+    expect(result.current("2026-09-25T00:00:00Z")).toContain("5:30");
+  });
+
+  it("shows a text that is not a calendar date as it came, never 'Invalid Date'", () => {
+    const { result } = renderHook(() => useFormatDate(), { wrapper: inEnglish });
+    expect(result.current("25/09/2026")).toBe("25/09/2026");
+    expect(result.current("")).toBe("");
+  });
+});
 
 describe("formatting an amount of money", () => {
   it("shows at least two decimals, because a JSON number loses its zeros on the way", () => {

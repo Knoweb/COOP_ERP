@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { Link } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -13,11 +13,12 @@ import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyVi
 
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
- * governs, as a list a clerk can narrow. Two kinds of narrowing, on purpose:
- *   - status and district go to the SERVER, which filters and pages (the register will hold
- *     hundreds of societies, and the district is an index there);
- *   - the search box filters what has been LOADED, by code or name, as a person types; it never
- *     calls the server, so it is instant and costs nothing.
+ * governs, as a list a clerk can narrow. Status, district and the search box all go to the
+ * SERVER, which filters and pages: the register will hold hundreds of societies, a hundred to
+ * a page, and a society on a later page must be found as surely as one on the first. (The
+ * search box used to filter only the pages already loaded, so a society past the first page
+ * was reported as "no societies match"; the review of 26 September.) The search text is sent
+ * deferred, so that a person typing fast does not fire a request per keystroke.
  * A row leads to the society's card; the links above the list lead to the register form and
  * the bulk upload, and are not offered to a user without the permission to register.
  */
@@ -30,8 +31,13 @@ export function SocietyRegisterPage() {
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
 
-  const filter = { status: status || undefined, district: district.trim() || undefined };
+  const filter = {
+    status: status || undefined,
+    district: district.trim() || undefined,
+    query: deferredSearch.trim() || undefined
+  };
 
   const societies = useInfiniteQuery({
     queryKey: ["party", "societies", filter],
@@ -40,19 +46,11 @@ export function SocietyRegisterPage() {
     getNextPageParam: (page) => page.nextCursor ?? undefined
   });
 
-  const loaded: Society[] = useMemo(() => societies.data?.pages.flatMap((page) => page.items) ?? [], [societies.data]);
+  const shown: Society[] = useMemo(() => societies.data?.pages.flatMap((page) => page.items) ?? [], [societies.data]);
 
-  const shown = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) {
-      return loaded;
-    }
-    return loaded.filter((society) =>
-      [society.entityCode, society.legalNameEn, society.legalNameSi, society.legalNameTa]
-        .filter((value): value is string => Boolean(value))
-        .some((value) => value.toLowerCase().includes(needle))
-    );
-  }, [loaded, search]);
+  // "No societies match" is said only when the server has no more pages: a page can be empty
+  // while a later one is not, and a clerk must never be told the register is empty by mistake.
+  const empty = societies.isSuccess && shown.length === 0 && !societies.hasNextPage;
 
   return (
     <main className="shell-page">
@@ -68,7 +66,7 @@ export function SocietyRegisterPage() {
       <form role="search" onSubmit={(event) => event.preventDefault()} style={{ display: "grid", gap: "var(--target-gap)", marginBottom: "var(--space-3)" }}>
         <label style={field}>
           {t("party.filter.search").text}
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} />
         </label>
         <label style={field}>
           {t("party.filter.status").text}
@@ -89,7 +87,7 @@ export function SocietyRegisterPage() {
 
       {societies.isLoading && <p>{t("party.list.loading").text}</p>}
       {societies.isError && <p role="alert">{errorText(societies.error, t("party.error.generic").text)}</p>}
-      {societies.isSuccess && shown.length === 0 && <p>{t("party.list.empty").text}</p>}
+      {empty && <p>{t("party.list.empty").text}</p>}
 
       {shown.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
