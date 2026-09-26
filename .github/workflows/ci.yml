@@ -35,8 +35,9 @@
 # How the jobs are ordered, and why. build-verify, integration-test, till, scaffolder,
 # stack-smoke and secret-scan start together: none of them needs another's output (each compiles what it
 # needs itself), and a pull request is answered in the time of the longest one instead of the
-# sum of two. Only package-main, on main, waits for build-verify and integration-test, so that
-# the artefacts of main are never built from a commit whose tests failed. The unit and the
+# sum of two. Only package-main, on main, waits for every test job (build-verify,
+# integration-test, till, scaffolder and stack-smoke), so that the artefacts of main are never
+# built from a commit any test failed on. The unit and the
 # integration tests are two jobs because each took half of the longest job: two runners pay
 # forty seconds of setup twice and answer in about half the time. The price is paid only
 # by a red run, where the other jobs now finish instead of being skipped.
@@ -57,9 +58,13 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request makes the run of the previous push pointless.
+# A new push to a pull request makes the run of the previous push pointless, so a pull request's
+# runs share one group and the newer one cancels the older. Every other run (a push to main,
+# the nightly, a dispatch) gets a group of its own: GitHub keeps only one *pending* run per
+# group, so with a shared group a push to main that queued behind another was cancelled
+# while pending, never tested and never packaged (review of 26 September 2026).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -393,7 +398,7 @@ jobs:
 
   # On a pull request nothing is published, so package starts with the other jobs and the run
   # answers in the time of its longest job. On main (and the nightly run) package-main does the
-  # same steps after green build-verify and integration-test, so that no artefact of main is built from a
+  # same steps after every test job is green, so that no artefact of main is built from a
   # commit whose tests failed. Two jobs, because `needs` delays a job even when its condition
   # would not need the other: one job with a condition still waited. The steps are written once
   # (a YAML anchor) and each step says itself what it does on a pull request.
@@ -482,10 +487,14 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+  # Every test job of the run, not only the two of the backend: the till tests, the scaffolder
+  # proof and the two-instance smoke all run on main, and an artefact of main must not come from
+  # a commit any of them failed on (review of 26 September 2026: a shared-engine change that
+  # broke the till was packaged and uploaded).
   package-main:
     name: Package (main)
     runs-on: ubuntu-latest
-    needs: [build-verify, integration-test]
+    needs: [build-verify, integration-test, till, scaffolder, stack-smoke]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
     steps: *package-steps
