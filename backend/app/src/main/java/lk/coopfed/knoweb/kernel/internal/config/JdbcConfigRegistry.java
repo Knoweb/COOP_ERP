@@ -222,8 +222,8 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
 
     /**
      * A module's defaults (seed/&lt;module&gt;/config.yaml): the default of a registered item is
-     * updated; a key the register does not know becomes a plain ENTITY-scoped string item of
-     * that module, so that a module can ship a setting before the register lists it.
+     * updated; a key the register does not know fails the start, so that every setting a module
+     * reads is typed and bounded in seed/kernel/config-items.yaml before it can be set.
      */
     @Override
     public void addDefaults(Map<String, String> items) {

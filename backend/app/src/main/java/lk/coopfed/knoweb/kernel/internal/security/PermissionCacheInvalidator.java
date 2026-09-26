@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.event.CacheFanoutListener;
 import lk.coopfed.knoweb.kernel.internal.event.PublishedEventListener;
 import org.springframework.stereotype.Component;
 
@@ -14,14 +15,15 @@ import org.springframework.stereotype.Component;
  * user.deactivated.v1 fanned out over the broker"), and the grant caches on the external grant
  * events (M1-09). Twice: on this instance the moment the change commits
  * ({@link PublishedEventListener}), so that a revoke usually bites on the next command here; on
- * the instances that consume the events when they arrive. It is not a guarantee: a cache load
+ * every instance, whatever its role, when the event reaches its own fan-out queue
+ * ({@link CacheFanoutListener}). It is not a guarantee: a cache load
  * that began before the commit can put the old permissions back after the entry was emptied.
  * The promise is "within a minute": the one-minute expiry bounds what any instance, one that
  * raced the change or one that heard nothing, still serves. A payload naming the user (userId, granteeUserId)
  * empties that user's entries, any other empties everything.
  */
 @Component
-class PermissionCacheInvalidator implements PublishedEventListener {
+class PermissionCacheInvalidator implements CacheFanoutListener {
 
     static final String CONSUMER = "kernel-permission-cache";
 
@@ -55,6 +57,11 @@ class PermissionCacheInvalidator implements PublishedEventListener {
             consumer = CONSUMER)
     public void onChange(JsonNode payload, ScopeContext scope) {
         invalidate(payload);
+    }
+
+    @Override
+    public Set<String> eventTypes() {
+        return TYPES;
     }
 
     @Override

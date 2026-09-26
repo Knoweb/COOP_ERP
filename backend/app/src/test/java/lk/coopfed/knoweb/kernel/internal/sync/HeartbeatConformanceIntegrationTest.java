@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -175,6 +177,25 @@ class HeartbeatConformanceIntegrationTest extends SyncIntegrationTest {
         current.put("snapshot_version", 3);
         assertThat(heartbeat(current).getBody().path("urgent_change").asBoolean())
                 .isFalse();
+    }
+
+    @Test
+    void aHeartbeatWhileABatchHoldsTheCursorIsAnsweredAndHoldsNoLockOfItsOwn() throws Exception {
+        // A batch claim on another connection holds the cursor row (FOR UPDATE, as claim() does).
+        try (Connection batch = superuserJdbc().getDataSource().getConnection()) {
+            batch.setAutoCommit(false);
+            try (PreparedStatement claim = batch.prepareStatement(
+                    "select last_applied_seq from kernel.device_sync_cursor where device_id = ? for update")) {
+                claim.setObject(1, DEVICE);
+                claim.executeQuery().close();
+            }
+
+            ResponseEntity<JsonNode> response = heartbeat(report(0));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().path("last_applied_seq").asLong()).isZero();
+            batch.rollback();
+        }
     }
 
     ObjectNode report(long acknowledged) {

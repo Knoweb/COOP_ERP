@@ -18,14 +18,12 @@ import lk.coopfed.knoweb.kernel.api.DeviceSyncEnrolled;
 import lk.coopfed.knoweb.kernel.api.EnrolmentCodeIssued;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
-import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
-import lk.coopfed.knoweb.kernel.internal.security.StepUp;
+import lk.coopfed.knoweb.kernel.internal.security.PermissionGate;
 import lk.coopfed.knoweb.kernel.internal.sync.DeviceDirectory.DeviceRecord;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,8 +41,13 @@ public class EnrolmentStore {
     static final String AUDIT_CODE_ISSUED = "DEVICE_ENROLMENT_CODE_ISSUED";
     static final String AUDIT_ENROLLED = "DEVICE_SYNC_ENROLLED";
 
-    /** The permission of the catalogue that lets an administrator enrol and suspend devices (M1). */
-    static final String PERMISSION = "sys.device.manage";
+    /**
+     * The permission of the catalogue that lets an administrator enrol a device (M1's
+     * EnrolDevice and AssignDeviceToPosition, 21A section 6): the code is the other half of the
+     * same workflow, so it asks for the same permission; sys.device.manage stays unused for the
+     * catalogue freeze (M1-06).
+     */
+    static final String PERMISSION = "sys.device.enrol";
 
     /** What the device receives. */
     record Enrolled(
@@ -60,33 +63,27 @@ public class EnrolmentStore {
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
-    private final PermissionResolver permissions;
+    private final PermissionGate gate;
     private final DeviceCredentials credentials;
     private final Clock clock;
-    private final StepUp stepUp;
-    private final boolean enforcePermissions;
 
     EnrolmentStore(
             JdbcTemplate jdbc,
             AuditFacade audit,
             EventPublisher events,
-            PermissionResolver permissions,
+            PermissionGate gate,
             DeviceCredentials credentials,
-            Clock clock,
-            StepUp stepUp,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
+            Clock clock) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
-        this.permissions = permissions;
+        this.gate = gate;
         this.credentials = credentials;
         this.clock = clock;
-        this.stepUp = stepUp;
-        this.enforcePermissions = enforcePermissions;
     }
 
     /**
-     * Issues a code: the caller holds sys.device.manage with a fresh second factor (the catalogue
+     * Issues a code: the caller holds sys.device.enrol with a fresh second factor (the catalogue
      * asks for one), the device is M1's in the caller's entity and ENROLLED or ACTIVE. Any code of
      * the device not yet used is withdrawn.
      */
@@ -132,26 +129,43 @@ public class EnrolmentStore {
      * Spends the code and enrols the device, in the device's own scope. A wrong, spent, withdrawn
      * or expired code and a hardware serial other than M1's are one answer, so a guess learns
      * nothing; the code is spent only when everything else succeeded, the credential included.
+     *
+     * <p>A retry is answered again: the till's network may drop after central committed, and the
+     * till then holds no credential while its code is spent (doc 32 section 8, "central answers
+     * idempotently"). The slice's Idempotency-Key is stored with the spent code; the same key,
+     * the same serial and a code still within its lifetime enrol the device again, with a
+     * credential of its own (the first was never delivered and is replaced; a secret is never
+     * stored). Any other key is a guess and learns nothing.
      */
     @Transactional
     public Enrolled enrol(
-            ScopeContext deviceScope, DeviceRecord device, String code, String hardwareSerial, String appVersion) {
+            ScopeContext deviceScope,
+            DeviceRecord device,
+            String code,
+            String hardwareSerial,
+            String appVersion,
+            String idempotencyKey) {
         Instant now = clock.instant();
-        List<Map<String, Object>> open = jdbc.queryForList(
+        List<Map<String, Object>> latest = jdbc.queryForList(
                 """
-                select enrolment_code_id, code_hash, expires_at from kernel.device_enrolment_code
-                 where device_id = ? and used_at is null and withdrawn_at is null
+                select enrolment_code_id, code_hash, expires_at, used_at, spent_with_key
+                  from kernel.device_enrolment_code
+                 where device_id = ? and withdrawn_at is null
                  order by issued_at desc
                  limit 1
                 """,
                 device.deviceId());
-        boolean valid = !open.isEmpty()
+        boolean valid = !latest.isEmpty()
                 && MessageDigest.isEqual(
-                        ((String) open.getFirst().get("code_hash")).getBytes(StandardCharsets.US_ASCII),
+                        ((String) latest.getFirst().get("code_hash")).getBytes(StandardCharsets.US_ASCII),
                         hash(code).getBytes(StandardCharsets.US_ASCII))
-                && ((Timestamp) open.getFirst().get("expires_at")).toInstant().isAfter(now)
+                && ((Timestamp) latest.getFirst().get("expires_at")).toInstant().isAfter(now)
                 && device.hardwareSerial().equals(hardwareSerial.strip());
-        if (!valid) {
+        boolean spent = valid && latest.getFirst().get("used_at") != null;
+        boolean retry = spent
+                && idempotencyKey != null
+                && idempotencyKey.equals(latest.getFirst().get("spent_with_key"));
+        if (!valid || (spent && !retry)) {
             throw new ProblemException("sync.enrolment.code_invalid");
         }
         if (!device.isActive() || device.locationId() == null) {
@@ -160,10 +174,13 @@ public class EnrolmentStore {
 
         DeviceCredentials.Credential credential = credentials.issue(device.deviceId(), device.ownerEntityId());
 
-        jdbc.update(
-                "update kernel.device_enrolment_code set used_at = ? where enrolment_code_id = ?",
-                Timestamp.from(now),
-                open.getFirst().get("enrolment_code_id"));
+        if (!retry) {
+            jdbc.update(
+                    "update kernel.device_enrolment_code set used_at = ?, spent_with_key = ? where enrolment_code_id = ?",
+                    Timestamp.from(now),
+                    idempotencyKey,
+                    latest.getFirst().get("enrolment_code_id"));
+        }
         List<Long> cursor = jdbc.queryForList(
                 "select last_applied_seq from kernel.device_sync_cursor where device_id = ? for update",
                 Long.class,
@@ -230,6 +247,7 @@ public class EnrolmentStore {
         after.put("locationId", device.locationId());
         after.put("clientId", credential.clientId());
         after.put("nextDeviceSeq", lastApplied + 1);
+        after.put("retry", retry);
         audit.record(AUDIT_ENROLLED, Subject.of("device", device.deviceId()), null, after, deviceScope);
         events.publish(new DeviceSyncEnrolled(
                 device.deviceId(),
@@ -242,23 +260,16 @@ public class EnrolmentStore {
     }
 
     /**
-     * The handler rule of the modules (K-03b), for a kernel operation: the permission in the
-     * caller's scope, then a fresh second factor where the catalogue asks for one; refused only
-     * when enforcement is on (coop-erp.security.enforce-permissions), as for every command.
+     * The handler rule of the modules (K-03b), for a kernel operation: a user of the OWN class,
+     * then the kernel's one permission check ({@link PermissionGate}: the permission in the
+     * caller's scope, a fresh second factor where the catalogue asks for one, refused only when
+     * enforcement is on), the same rule as every command's.
      */
     private void checkPermission(ScopeContext ctx) {
         if (ctx.userId() == null || ctx.policyClass() != PolicyClass.OWN) {
             throw new ProblemException("permission.denied", Map.of("permission", PERMISSION));
         }
-        if (!enforcePermissions) {
-            return;
-        }
-        if (!permissions.allows(ctx, PERMISSION)) {
-            throw new ProblemException("permission.denied", Map.of("permission", PERMISSION));
-        }
-        if (permissions.requiresMfa(PERMISSION) && !stepUp.isFresh(ctx)) {
-            throw new ProblemException("mfa.required", Map.of("permission", PERMISSION));
-        }
+        gate.require(ctx, PERMISSION);
     }
 
     static String hash(String code) {

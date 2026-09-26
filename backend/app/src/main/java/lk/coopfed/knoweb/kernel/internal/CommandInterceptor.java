@@ -2,13 +2,11 @@ package lk.coopfed.knoweb.kernel.internal;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.IdempotencyStore;
-import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import lk.coopfed.knoweb.kernel.internal.security.StepUp;
+import lk.coopfed.knoweb.kernel.internal.security.PermissionGate;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -33,24 +31,16 @@ public class CommandInterceptor {
 
     private final IdempotencyStore idempotency;
     private final ObjectMapper mapper;
-    private final PermissionResolver permissions;
-    private final StepUp stepUp;
-    private final boolean enforcePermissions;
-    private final String stepUpUrl;
+    private final PermissionGate gate;
 
     public CommandInterceptor(
             IdempotencyStore idempotency,
             ObjectMapper mapper,
-            PermissionResolver permissions,
-            StepUp stepUp,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions,
-            @Value("${coop-erp.security.oidc.step-up-url:}") String stepUpUrl) {
+            PermissionGate gate,
+            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
         this.idempotency = idempotency;
         this.mapper = mapper;
-        this.permissions = permissions;
-        this.stepUp = stepUp;
-        this.enforcePermissions = enforcePermissions;
-        this.stepUpUrl = stepUpUrl;
+        this.gate = gate;
         if (!enforcePermissions) {
             log.warn("Permissions are resolved but NOT enforced (coop-erp.security.enforce-permissions=false):"
                     + " switch it on where the token's user holds roles (compose: COOP_ERP_ENFORCE_PERMISSIONS)");
@@ -114,42 +104,15 @@ public class CommandInterceptor {
     }
 
     /**
-     * The handler's permission (its @CommandHandler) against the caller's roles in the scope,
-     * then the second factor where the catalogue asks for one. Refuses only when enforcement is
-     * on; until then a would-be refusal is logged, so the gap between the roles and the handlers
-     * shows before K-02 makes it bite.
+     * The handler's permission (its @CommandHandler) through the one rule of the kernel
+     * ({@link PermissionGate}: the roles in the scope, then the second factor where the
+     * catalogue asks for one; refused only when enforcement is on). The kernel's own operations
+     * (an enrolment code, K-08) go through the same gate, so one rule holds everywhere.
      */
     private void checkPermission(ProceedingJoinPoint call, ScopeContext scope) {
         Class<?> type = call.getSignature().getDeclaringType();
         CommandHandler handler = type.getAnnotation(CommandHandler.class);
-        String permission = handler == null ? null : handler.permission();
-        if (permission == null || permission.isBlank()) {
-            return;
-        }
-
-        boolean allowed = permissions.allows(scope, permission);
-        boolean mfaFresh = !permissions.requiresMfa(permission) || stepUp.isFresh(scope);
-
-        if (!enforcePermissions) {
-            if (!allowed || !mfaFresh) {
-                log.info(
-                        "Would refuse {} for user {} at entity {}: allowed={}, mfaFresh={} (not enforced)",
-                        permission,
-                        scope.userId(),
-                        scope.entityId(),
-                        allowed,
-                        mfaFresh);
-            }
-            return;
-        }
-        if (!allowed) {
-            throw new ProblemException("permission.denied", Map.of("permission", permission));
-        }
-        if (!mfaFresh) {
-            // 19A section 2: 401 with the provider's step-up address; the web shell takes the
-            // user there and retries the command with the fresher token (17A section 7).
-            throw new ProblemException("mfa.required", Map.of("permission", permission, "stepUpUrl", stepUpUrl));
-        }
+        gate.require(scope, handler == null ? null : handler.permission());
     }
 
     private Object deserialize(ProceedingJoinPoint call, String body) throws Exception {

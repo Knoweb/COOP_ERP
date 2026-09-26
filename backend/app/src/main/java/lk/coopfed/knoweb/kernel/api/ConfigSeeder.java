@@ -13,6 +13,10 @@ import java.util.Map;
  */
 public interface ConfigSeeder {
 
-    /** Registers default values by configuration key; a key already set keeps its value. */
+    /**
+     * Registers default values by configuration key; a key already set keeps its value. Every
+     * key must be an item of {@code seed/kernel/config-items.yaml} (typed, bounded, with its
+     * scope and permission): an unknown key fails the start.
+     */
     void addDefaults(Map<String, String> items);
 }
