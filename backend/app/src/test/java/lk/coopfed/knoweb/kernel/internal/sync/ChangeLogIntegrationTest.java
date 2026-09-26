@@ -152,11 +152,11 @@ class ChangeLogIntegrationTest extends SyncIntegrationTest {
     }
 
     @Test
-    void theSnapshotItselfIsTheSecondPartOfTheTicket() {
-        ResponseEntity<JsonNode> response =
-                get("/v1/sync/locations/" + SHOP + "/snapshot?since=0", TestIdentityProvider.deviceHeaders(DEVICE));
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
-        assertThat(response.getBody().path("code").asText()).isEqualTo("sync.snapshot.unavailable");
+    void anotherShopsSnapshotIsNotTheDevicesToRead() {
+        ResponseEntity<JsonNode> refused = get(
+                "/v1/sync/locations/" + OTHER_SHOP + "/snapshot?since=0", TestIdentityProvider.deviceHeaders(DEVICE));
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(refused.getBody().path("code").asText()).isEqualTo("sync.location_mismatch");
     }
 
     private Map<UUID, Long> publish(List<Target> targets, List<Change> changes, LocalDate applyFrom, boolean urgent) {

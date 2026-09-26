@@ -66,7 +66,7 @@ public class ProblemResponses {
             Map.entry("sync.batch_inconsistent", HttpStatus.BAD_REQUEST),
             Map.entry("sync.batch_too_large", HttpStatus.PAYLOAD_TOO_LARGE),
             Map.entry("sync.app_below_floor", HttpStatus.UPGRADE_REQUIRED),
-            Map.entry("sync.snapshot.unavailable", HttpStatus.NOT_IMPLEMENTED));
+            Map.entry("sync.rate_limited", HttpStatus.TOO_MANY_REQUESTS));
 
     private final Messages messages;
 

@@ -49,8 +49,13 @@ abstract class SyncIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     DeviceDirectory directory;
 
+    @Autowired
+    SyncRateLimiter rateLimiter;
+
     @BeforeEach
     void aShopWithAnEnrolledTill() {
+        // The suite shares one application and one device id: every test starts with full buckets.
+        rateLimiter.forgetAll();
         JdbcTemplate db = superuserJdbc();
         forgetTheShop(db);
         db.update(
