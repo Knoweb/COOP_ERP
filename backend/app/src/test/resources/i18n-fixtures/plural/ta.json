@@ -1,3 +1,4 @@
 {
-  "a.items": "{count, number} பொருட்கள்"
+  "a.items": "{count, plural, one {# பொருள்} other {# பொருட்கள்}}",
+  "a.who": "{gender, select, female {அவள்} male {அவன்} other {அவர்கள்}} கையொப்பமிட்டார்"
 }

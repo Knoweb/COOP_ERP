@@ -11,9 +11,19 @@ import java.util.Optional;
  */
 interface ObjectStore {
 
-    URI presignPut(String key, String contentType, Duration validFor);
+    /**
+     * @param contentLength the exact size the client declared, signed into the URL so the store
+     *                      refuses any other, or null when the client declared none (the verifier
+     *                      still refuses an object over the limit)
+     */
+    URI presignPut(String key, String contentType, Long contentLength, Duration validFor);
 
-    URI presignGet(String key, Duration validFor);
+    /**
+     * @param contentType what the object was declared as when it was uploaded; a browser is told
+     *                    to download anything that is not an image rather than render it from the
+     *                    store's origin (Content-Disposition attachment)
+     */
+    URI presignGet(String key, String contentType, Duration validFor);
 
     /** The object's size, when it exists. */
     Optional<Long> head(String key);

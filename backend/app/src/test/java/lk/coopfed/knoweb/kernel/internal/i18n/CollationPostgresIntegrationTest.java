@@ -57,6 +57,57 @@ class CollationPostgresIntegrationTest extends PostgresIntegrationTest {
         for (List<String> pair : pairs) {
             assertThat(pair.get(0)).isNotEqualTo(pair.get(1));
             assertThat(TextNormaliser.nfc(pair.get(0))).isEqualTo(TextNormaliser.nfc(pair.get(1)));
+
+            // PostgreSQL itself: the ICU collations of the baseline are deterministic, so the two
+            // raw spellings are two values that sort next to each other (equal at every ICU
+            // level, told apart by their bytes), and one value once normalised. That is why the
+            // write boundary normalises and a lookup parameter must be normalised too.
+            String language = pair.get(0).codePoints().anyMatch(cp -> cp >= 0x0D80 && cp <= 0x0DFF)
+                    ? "si"
+                    : pair.get(0).codePoints().anyMatch(cp -> cp >= 0x0B80 && cp <= 0x0BFF) ? "ta" : "en";
+            String collation = "kernel." + language + "_icu";
+            assertThat(jdbc.queryForObject(
+                            "select count(distinct n collate " + collation + ") from (values (?), (?)) as t(n)",
+                            Long.class,
+                            pair.get(0),
+                            pair.get(1)))
+                    .as("raw spellings, %s", language)
+                    .isEqualTo(2L);
+            assertThat(jdbc.queryForObject(
+                            "select count(distinct n collate " + collation + ") from (values (?), (?)) as t(n)",
+                            Long.class,
+                            TextNormaliser.nfc(pair.get(0)),
+                            TextNormaliser.nfc(pair.get(1))))
+                    .as("normalised spellings, %s", language)
+                    .isEqualTo(1L);
+            // Adjacent: with a name that sorts before and one after, the pair stays together.
+            List<String> sorted = jdbc.queryForList(
+                    "select n from (values (?), (?), (?), (?)) as t(n) order by n collate " + collation,
+                    String.class,
+                    pair.get(1),
+                    "\u0001",
+                    pair.get(0),
+                    "\uFFFF");
+            int first = sorted.indexOf(pair.get(0));
+            int second = sorted.indexOf(pair.get(1));
+            assertThat(Math.abs(first - second)).as("adjacent, %s", language).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void theCollationVersionsOfTheDatabaseMatchTheOnesTheyWereCreatedWith() {
+        // After a PostgreSQL image upgrade with another libicu, an index on a collated column is
+        // silently wrong until REINDEX and ALTER COLLATION ... REFRESH VERSION; PostgreSQL only
+        // warns. This makes the pipeline fail instead.
+        List<Map<String, Object>> collations = superuserJdbc()
+                .queryForList("select collname, collversion, pg_collation_actual_version(oid) as actual"
+                        + " from pg_collation where collname in ('en_icu', 'si_icu', 'ta_icu')");
+        assertThat(collations).hasSize(3);
+        for (Map<String, Object> collation : collations) {
+            assertThat(collation.get("collversion"))
+                    .as("%s", collation.get("collname"))
+                    .isNotNull()
+                    .isEqualTo(collation.get("actual"));
         }
     }
 

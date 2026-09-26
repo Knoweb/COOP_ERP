@@ -13,6 +13,7 @@ import lk.coopfed.knoweb.kernel.api.NotificationAudience;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries.AudienceKind;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries.NotificationRule;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,15 +78,28 @@ class NotificationDispatcher {
                 continue;
             }
             for (NotificationAudience.Recipient recipient : audience(rule, body, scope.entityId(), counterparty)) {
-                service.deliver(
-                        rule.ruleId(),
-                        eventId,
-                        recipient.channel(),
-                        recipient.recipient(),
-                        recipient.language(),
-                        rule.templateId(),
-                        arguments(body),
-                        scope);
+                try {
+                    service.deliver(
+                            rule.ruleId(),
+                            eventId,
+                            recipient.channel(),
+                            recipient.recipient(),
+                            recipient.language(),
+                            rule.templateId(),
+                            arguments(body),
+                            scope);
+                } catch (ProblemException refused) {
+                    // A rule that names a channel with no adapter, or an audience with a blank
+                    // recipient, must not roll back the recipients before it (and be redelivered
+                    // to them): the recipient is skipped and said in the log. The sends themselves
+                    // run after the commit and never throw into the consumer.
+                    log.warn(
+                            "Rule {} on event {}: recipient on {} skipped: {}",
+                            rule.ruleId(),
+                            eventId,
+                            recipient.channel(),
+                            refused.messageId());
+                }
             }
         }
     }

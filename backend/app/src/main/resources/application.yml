@@ -119,8 +119,11 @@ coop-erp:
     endpoint: ${OBJECT_STORE_ENDPOINT:http://localhost:9000}
     public-endpoint: ${OBJECT_STORE_PUBLIC_ENDPOINT:${OBJECT_STORE_ENDPOINT:http://localhost:9000}}
     region: ${OBJECT_STORE_REGION:us-east-1}
-    access-key: ${OBJECT_STORE_ACCESS_KEY:coopminio}
-    secret-key: ${OBJECT_STORE_SECRET_KEY:coopminio-dev}
+    # No default for the credentials: the local stack passes MinIO's (infra/compose), a
+    # deployed environment its own bucket-scoped key. Unset, the store logs an ERROR at start
+    # and every attachment call fails with a clear message.
+    access-key: ${OBJECT_STORE_ACCESS_KEY:}
+    secret-key: ${OBJECT_STORE_SECRET_KEY:}
     attachments-bucket: ${OBJECT_STORE_ATTACHMENTS_BUCKET:attachments}
     presign-minutes: 15
     # A PENDING attachment nobody uploaded within this time is FAILED by the verifier.

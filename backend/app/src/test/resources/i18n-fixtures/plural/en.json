@@ -1,3 +1,5 @@
 {
-  "a.items": "{count, plural, one {# item} other {# items}}"
+  "a.items": "{count, plural, one {# item} other {# items}}",
+  "a.who": "{gender, select, female {She} male {He} other {They}} signed",
+  "a.only_english_plural": "{count, plural, one {# receipt} other {# receipts}}"
 }

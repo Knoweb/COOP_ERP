@@ -1,5 +1,8 @@
 package lk.coopfed.knoweb.kernel.api;
 
+import com.ibm.icu.text.Collator;
+import com.ibm.icu.util.ULocale;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -29,9 +32,11 @@ public final class SearchSupport {
     }
 
     /**
-     * An ORDER BY fragment on the display language's name column, with English as the tie
-     * breaker for rows that lack the translation (they sort after, in English):
-     * {@code coalesce(legal_name_si, legal_name_en) COLLATE kernel.si_icu, legal_name_en COLLATE kernel.en_icu}.
+     * An ORDER BY fragment on the display language's name column: the translated rows first
+     * in the language's collation, then the rows that lack the translation, in English:
+     * {@code (legal_name_si IS NULL), legal_name_si COLLATE kernel.si_icu, legal_name_en COLLATE kernel.en_icu}.
+     * The null test comes first on purpose: a {@code coalesce} into the Sinhala collation would
+     * put the Latin fallbacks before the Sinhala names, not after them.
      *
      * @param nameColumn the column stem, for example {@code legal_name}
      */
@@ -41,8 +46,19 @@ public final class SearchSupport {
         if ("en".equals(language)) {
             return nameColumn + "_en COLLATE kernel.en_icu";
         }
-        return "coalesce(" + nameColumn + "_" + language + ", " + nameColumn + "_en) COLLATE kernel." + language
-                + "_icu, " + nameColumn + "_en COLLATE kernel.en_icu";
+        String translated = nameColumn + "_" + language;
+        return "(" + translated + " IS NULL), " + translated + " COLLATE kernel." + language + "_icu, " + nameColumn
+                + "_en COLLATE kernel.en_icu";
+    }
+
+    /**
+     * The same order in Java, for a list sorted in memory (a snapshot, a report): an ICU
+     * collator of the display language, so the backend and PostgreSQL agree on the order of
+     * the sort test set. Not thread-safe; make one per sort.
+     */
+    public static Comparator<String> comparator(Locale locale) {
+        Collator collator = Collator.getInstance(ULocale.forLanguageTag(language(locale) + "-LK"));
+        return Comparator.nullsLast(collator::compare);
     }
 
     /**

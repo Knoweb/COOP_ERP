@@ -241,6 +241,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0032): a consumer's claims are the worker's own bookkeeping in the"
                             + " entity's scope, not a register the federation or a grantee views",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "kernel.notification_pending",
+                    "own_* only (kernel V0058): the recipient of a queued notification in clear, held until it"
+                            + " is settled; the sweep reads it in the owner's scope, nobody else at all",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(K-07 follow-up, CR-17A-3): party_read still applies the location line to both
             // sides, so a shop-scoped counterparty does not see the documents it is a side of.
