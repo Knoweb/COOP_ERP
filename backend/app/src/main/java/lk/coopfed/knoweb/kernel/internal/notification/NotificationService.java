@@ -56,6 +56,7 @@ class NotificationService implements Notifications {
     private final NotificationSuppression suppression;
     private final NotificationTransactions transactions;
     private final Map<String, NotificationChannel> channels = new HashMap<>();
+    private final Map<String, NotificationChannel> secondaries = new HashMap<>();
     private final AuditFacade audit;
     private final Clock clock;
 
@@ -74,7 +75,14 @@ class NotificationService implements Notifications {
         this.audit = audit;
         this.clock = clock;
         for (NotificationChannel channel : channelBeans) {
-            channels.put(channel.channel().toUpperCase(), channel);
+            Map<String, NotificationChannel> byRole =
+                    channel.role() == NotificationChannel.Role.SECONDARY ? secondaries : channels;
+            NotificationChannel earlier = byRole.put(channel.channel().toUpperCase(), channel);
+            if (earlier != null) {
+                throw new IllegalStateException("Two " + channel.role() + " adapters for the channel "
+                        + channel.channel() + ": " + earlier.getClass().getName() + " and "
+                        + channel.getClass().getName());
+            }
         }
     }
 
@@ -227,7 +235,11 @@ class NotificationService implements Notifications {
         }
 
         NotificationLog.Pending what = claimed.get().pending().get();
-        NotificationChannel channel = channels.get(channelCode);
+        // 19A section 10: the primary provider for the first three attempts, then one more
+        // through the channel's secondary provider when there is one.
+        NotificationChannel secondary = secondaries.get(channelCode);
+        NotificationChannel channel =
+                secondary != null && claim.attempts() > MAX_ATTEMPTS ? secondary : channels.get(channelCode);
         NotificationRenderer.Rendered rendered;
         String providerRef;
         try {
@@ -238,7 +250,7 @@ class NotificationService implements Notifications {
             providerRef = channel.send(new NotificationChannel.Outgoing(
                     notificationId, what.recipient(), rendered.subject(), rendered.body(), rendered.language()));
         } catch (RuntimeException failure) {
-            boolean spent = claim.attempts() >= MAX_ATTEMPTS
+            boolean spent = claim.attempts() >= maxAttempts(channelCode)
                     || claim.createdAt().plus(MAX_AGE).isBefore(now);
             String error = failure.getClass().getSimpleName() + ": " + failure.getMessage();
             transactions.inOwnScope(owner, () -> {
@@ -259,6 +271,11 @@ class NotificationService implements Notifications {
             return null;
         });
         return true;
+    }
+
+    /** Three attempts, and a fourth through the secondary provider when the channel has one. */
+    int maxAttempts(String channelCode) {
+        return secondaries.containsKey(channelCode) ? MAX_ATTEMPTS + 1 : MAX_ATTEMPTS;
     }
 
     /** The wait after the n-th failed attempt: one, five, then fifteen minutes. */

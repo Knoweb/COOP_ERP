@@ -3,7 +3,6 @@ package lk.coopfed.knoweb.kernel.internal.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,6 +25,7 @@ import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -76,7 +76,16 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     com.fasterxml.jackson.databind.ObjectMapper json;
 
     @Autowired
+    @Qualifier("testSmsChannel")
     TestBeans.TestChannel sms;
+
+    @Autowired
+    @Qualifier("testEmailChannel")
+    TestBeans.TestChannel email;
+
+    @Autowired
+    @Qualifier("testEmailSecondaryChannel")
+    TestBeans.TestChannel emailSecondary;
 
     @Autowired
     TestBeans.TestRules rules;
@@ -98,10 +107,19 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         sms.sent.clear();
         sms.failNext = 0;
         sms.refs = 0;
+        for (TestBeans.TestChannel channel : List.of(email, emailSecondary)) {
+            channel.sent.clear();
+            channel.failNext = 0;
+            channel.refs = 0;
+        }
         rules.rules.clear();
+        rules.reads = 0;
+        dispatcher.invalidateRules();
         ((lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry) config).invalidate("notification.sms.enabled");
         ((lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry) config)
                 .invalidate("notification.sms.quiet_hours");
+        ((lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry) config)
+                .invalidate(NotificationDispatcher.CACHE_SECONDS);
         // No quiet hours in this test unless a case sets them: the clock is whatever it is.
         inScope(ENTITY, () -> {
             config.set("notification.sms.quiet_hours", ConfigScope.entity(ENTITY), "", scope(ENTITY), "test");
@@ -358,7 +376,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 "greeting-registered",
                 NotificationRuleQueries.AudienceKind.EXPLICIT,
                 "notify",
-                List.of("SMS", "EMAIL"),
+                List.of("SMS", "FAX"),
                 100));
         String envelope = "{\"eventType\":\"hello.greeting.registered.v1\",\"eventId\":\"" + Ids.next() + "\","
                 + "\"ownerEntityId\":\"" + ENTITY + "\",\"payload\":{\"notify\":\"0771111111\",\"textEn\":\"Hi\"}}";
@@ -431,6 +449,149 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
             return null;
         });
         assertThat(sms.sent).hasSize(2);
+    }
+
+    @Test
+    void afterTheThirdFailureTheSecondaryProviderIsTried() {
+        // 19A section 10, "provider failover": three attempts through the primary, the fourth
+        // through the secondary.
+        email.failNext = 3;
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "EMAIL",
+                                "member@example.lk",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        // Three primary failures: not given up, since the channel has a secondary provider.
+        assertThat(status(id)).isEqualTo("QUEUED");
+        assertThat(attempts(id)).isEqualTo(3);
+        assertThat(emailSecondary.sent).isEmpty();
+
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(id)).isEqualTo("SENT");
+        assertThat(attempts(id)).isEqualTo(4);
+        assertThat(email.sent).isEmpty();
+        assertThat(emailSecondary.sent)
+                .extracting(NotificationChannel.Outgoing::recipient)
+                .containsExactly("member@example.lk");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select provider_ref from kernel.notification_log where notification_id = ?",
+                                String.class,
+                                id))
+                .isEqualTo("secondary-ref-1");
+        assertThat(heldRecipient(id)).isNull();
+    }
+
+    @Test
+    void whenTheSecondaryFailsTooTheNotificationIsGivenUpWithAnAlert() {
+        email.failNext = 3;
+        emailSecondary.failNext = 1;
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "EMAIL",
+                                "member@example.lk",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        for (int i = 0; i < 3; i++) {
+            makeDue(id);
+            assertThat(sweep.retryDue()).isEqualTo(1);
+        }
+        assertThat(status(id)).isEqualTo("FAILED");
+        assertThat(attempts(id)).isEqualTo(4);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.audit_event where event_type_code = 'NOTIFICATION_FAILED'",
+                                Long.class))
+                .isEqualTo(1L);
+        assertThat(heldRecipient(id)).isNull();
+    }
+
+    @Test
+    void theActiveRulesAreCachedUntilTheRuleChangeEvent() {
+        NotificationRuleQueries.NotificationRule rule = new NotificationRuleQueries.NotificationRule(
+                RULE,
+                null,
+                "hello.greeting.registered.v1",
+                null,
+                "greeting-registered",
+                NotificationRuleQueries.AudienceKind.EXPLICIT,
+                "notify",
+                List.of("SMS"),
+                100);
+        rules.rules.add(rule);
+
+        dispatch("hello.greeting.registered.v1", "{\"notify\":\"0771111111\",\"textEn\":\"Hi\"}");
+        assertThat(sms.sent).hasSize(1);
+        int readsAfterFirst = rules.reads;
+
+        // M9 retires the rule; until its change event arrives the cached rule still matches,
+        // and M9 is not asked again.
+        rules.rules.clear();
+        dispatch("hello.greeting.registered.v1", "{\"notify\":\"0772222222\",\"textEn\":\"Hi\"}");
+        assertThat(sms.sent).hasSize(2);
+        assertThat(rules.reads).isEqualTo(readsAfterFirst);
+
+        // notification_rule.changed.v1 invalidates the cache: the retired rule no longer matches.
+        dispatch(NotificationDispatcher.RULE_CHANGED, "{\"ruleId\":\"" + RULE + "\"}");
+        dispatch("hello.greeting.registered.v1", "{\"notify\":\"0773333333\",\"textEn\":\"Hi\"}");
+        assertThat(sms.sent).hasSize(2);
+        assertThat(rules.reads).isGreaterThan(readsAfterFirst);
+    }
+
+    @Test
+    void aZeroCacheLifetimeReadsTheRulesEveryTime() {
+        inScope(FEDERATION, () -> {
+            config.set(NotificationDispatcher.CACHE_SECONDS, ConfigScope.federation(), "0", scope(FEDERATION), "test");
+            return null;
+        });
+        try {
+            rules.rules.add(new NotificationRuleQueries.NotificationRule(
+                    RULE,
+                    null,
+                    "hello.greeting.registered.v1",
+                    null,
+                    "greeting-registered",
+                    NotificationRuleQueries.AudienceKind.EXPLICIT,
+                    "notify",
+                    List.of("SMS"),
+                    100));
+            dispatch("hello.greeting.registered.v1", "{\"notify\":\"0771111111\",\"textEn\":\"Hi\"}");
+            rules.rules.clear();
+            dispatch("hello.greeting.registered.v1", "{\"notify\":\"0772222222\",\"textEn\":\"Hi\"}");
+            assertThat(sms.sent).hasSize(1);
+        } finally {
+            ((lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry) config)
+                    .invalidate(NotificationDispatcher.CACHE_SECONDS);
+        }
+    }
+
+    private void dispatch(String eventType, String payload) {
+        String envelope = "{\"eventType\":\"" + eventType + "\",\"eventId\":\"" + Ids.next() + "\","
+                + "\"ownerEntityId\":\"" + ENTITY + "\",\"payload\":" + payload + "}";
+        inScope(ENTITY, () -> {
+            try {
+                dispatcher.onEvent(json.readTree(envelope), scope(ENTITY));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalStateException(e);
+            }
+            return null;
+        });
     }
 
     @Test
@@ -507,15 +668,27 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @TestConfiguration(proxyBeanMethods = false)
     static class TestBeans {
 
-        /** An SMS adapter that remembers what it sent and can be told to fail. */
+        /** An adapter that remembers what it sent and can be told to fail. */
         static class TestChannel implements NotificationChannel {
             final List<Outgoing> sent = new CopyOnWriteArrayList<>();
             volatile int failNext;
             volatile int refs;
+            private final String channel;
+            private final Role role;
+
+            TestChannel(String channel, Role role) {
+                this.channel = channel;
+                this.role = role;
+            }
 
             @Override
             public String channel() {
-                return "SMS";
+                return channel;
+            }
+
+            @Override
+            public Role role() {
+                return role;
             }
 
             @Override
@@ -525,16 +698,18 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                     throw new IllegalStateException("gateway down");
                 }
                 sent.add(outgoing);
-                return "ref-" + (++refs);
+                return (role == Role.SECONDARY ? "secondary-ref-" : "ref-") + (++refs);
             }
         }
 
         /** M9's rules and templates, in memory. */
         static class TestRules implements NotificationRuleQueries {
-            final List<NotificationRule> rules = new ArrayList<>();
+            final List<NotificationRule> rules = new CopyOnWriteArrayList<>();
+            volatile int reads;
 
             @Override
             public List<NotificationRule> activeRules(String eventType, UUID ownerEntityId) {
+                reads++;
                 return rules.stream()
                         .filter(rule -> rule.eventType().equals(eventType))
                         .toList();
@@ -559,7 +734,18 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Bean
         TestChannel testSmsChannel() {
-            return new TestChannel();
+            return new TestChannel("SMS", NotificationChannel.Role.PRIMARY);
+        }
+
+        /** E-mail has two providers here, to prove the failover of 19A section 10. */
+        @Bean
+        TestChannel testEmailChannel() {
+            return new TestChannel("EMAIL", NotificationChannel.Role.PRIMARY);
+        }
+
+        @Bean
+        TestChannel testEmailSecondaryChannel() {
+            return new TestChannel("EMAIL", NotificationChannel.Role.SECONDARY);
         }
 
         @Bean
