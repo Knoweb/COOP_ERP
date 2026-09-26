@@ -80,12 +80,16 @@ class JdbcNumberingService implements NumberingService {
         UUID seriesId = Ids.next();
         String prefix = prefixOf(registration);
 
-        jdbc.update(
+        // Two registrations of the same series at once (a location created while its shop
+        // enrols a till) both passed the lookup above; the unique key decides, and the loser
+        // reads the winner's row instead of failing on the violation.
+        int inserted = jdbc.update(
                 """
                 insert into kernel.numbering_series (
                     series_id, doc_type_code, series_scope, owner_entity_id, location_id, till_position_id,
                     prefix, holder_device_id
                 ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict (doc_type_code, owner_entity_id, location_id, till_position_id) do nothing
                 """,
                 seriesId,
                 registration.docTypeCode(),
@@ -95,6 +99,13 @@ class JdbcNumberingService implements NumberingService {
                 registration.tillPositionId(),
                 prefix,
                 registration.holderDeviceId());
+
+        if (inserted == 0) {
+            return findByScope(registration)
+                    .orElseThrow(() -> new IllegalStateException("The series " + prefix
+                            + " was neither inserted nor found; is its row-level security" + " hiding it?"))
+                    .seriesId();
+        }
 
         audit.record(
                 AUDIT_REGISTERED,
