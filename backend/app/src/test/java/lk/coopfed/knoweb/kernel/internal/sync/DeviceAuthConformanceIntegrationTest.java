@@ -37,7 +37,7 @@ class DeviceAuthConformanceIntegrationTest extends SyncIntegrationTest {
 
     @Test
     void aUserTokenIsRefusedOnEveryDeviceOperation() {
-        HttpHeaders user = TestIdentityProvider.headers(ADMIN, ENTITY);
+        HttpHeaders user = TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY);
 
         assertRefused(
                 post("/v1/sync/devices/" + DEVICE + "/batches", batch(Ids.next(), 1, events(1, 1)), user),
@@ -47,11 +47,13 @@ class DeviceAuthConformanceIntegrationTest extends SyncIntegrationTest {
                 post(
                         "/v1/sync/devices/" + DEVICE + "/heartbeat",
                         json.createObjectNode().put("app_version", "1"),
-                        TestIdentityProvider.headers(ADMIN, ENTITY)),
+                        TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY)),
                 HttpStatus.FORBIDDEN,
                 "sync.device_token_required");
         assertRefused(
-                get("/v1/sync/locations/" + SHOP + "/changes?since=0", TestIdentityProvider.headers(ADMIN, ENTITY)),
+                get(
+                        "/v1/sync/locations/" + SHOP + "/changes?since=0",
+                        TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY)),
                 HttpStatus.FORBIDDEN,
                 "sync.device_token_required");
         assertThat(cursor()).isZero();
@@ -184,7 +186,7 @@ class DeviceAuthConformanceIntegrationTest extends SyncIntegrationTest {
                 HttpStatus.UNPROCESSABLE_ENTITY,
                 "attachment.document_not_found");
         assertRefused(
-                post("/v1/sync/attachments/presign", request, TestIdentityProvider.headers(ADMIN, ENTITY)),
+                post("/v1/sync/attachments/presign", request, TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY)),
                 HttpStatus.FORBIDDEN,
                 "sync.device_token_required");
     }

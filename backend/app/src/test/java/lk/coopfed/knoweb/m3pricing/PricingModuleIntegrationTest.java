@@ -365,7 +365,7 @@ class PricingModuleIntegrationTest extends PostgresIntegrationTest {
 
     private static HttpHeaders scope(UUID entity) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(UUID.fromString(REQUEST_USER.get()), entity));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(UUID.fromString(REQUEST_USER.get()), entity));
         headers.set("X-Scope-Entity", entity.toString());
         return headers;
     }

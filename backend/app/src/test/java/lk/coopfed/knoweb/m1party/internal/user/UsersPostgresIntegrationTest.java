@@ -612,7 +612,7 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theTemporaryPasswordIsNotKeptForAReplay() {
         UUID userId = insertUser(ENTITY, "http.clerk", "BACK_OFFICE", "PENDING", "subject-http");
-        HttpHeaders headers = TestIdentityProvider.headers(ADMIN, ENTITY);
+        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY);
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(Map.of("credential", "PASSWORD"), headers);
@@ -646,7 +646,7 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aPinThatBreaksTheShapeIsRefusedBeforeTheHandler() {
         UUID userId = insertUser(ENTITY, "http.till", "TILL", "ACTIVE");
-        HttpHeaders headers = TestIdentityProvider.headers(ADMIN, ENTITY);
+        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(ADMIN, ENTITY);
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
 

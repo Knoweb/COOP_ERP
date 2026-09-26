@@ -599,7 +599,7 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theSliceRegistersAShopAndATillAndListsThem() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(TestIdentityProvider.token(USER, MPCS));
+        headers.setBearerAuth(TestIdentityProvider.entityWideToken(USER, MPCS));
         headers.set("X-Scope-Entity", MPCS.toString());
         headers.setContentType(MediaType.APPLICATION_JSON);
 

@@ -25,7 +25,10 @@ const GREETINGS = `${BACKEND}/v1/hello/greetings`;
 // The users of the dev realm (infra/compose/realm-dev.json) and of seed/m1security/users.dev.sql.
 // Permissions are enforced in the stack (K-03b), so the user that registers must hold a role
 // there, and every request carries that user's token (K-02): the smoke test signs in as the
-// back office does, with the password grant the dev realm allows the web client.
+// back office does, with the password grant the dev realm allows the web client. That grant is
+// on in realm-dev.json only, for this test and UsersAgainstTheProviderIntegrationTest: with it,
+// and with COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS on compose, a password alone passes a step-up.
+// A production realm keeps directAccessGrantsEnabled false on coop-erp-web (code and PKCE only).
 const tokens = {};
 
 async function signIn(username) {

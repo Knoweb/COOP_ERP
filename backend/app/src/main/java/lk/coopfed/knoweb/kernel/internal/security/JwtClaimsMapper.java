@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.kernel.internal.security;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,6 +14,8 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -66,6 +69,7 @@ public class JwtClaimsMapper {
     static final String LANGUAGE = "lang";
 
     private static final Set<String> LANGUAGES = Set.of("en", "si", "ta");
+    private static final Logger LOG = LoggerFactory.getLogger(JwtClaimsMapper.class);
 
     private final UserScopes userScopes;
     private final DeviceScopes deviceScopes;
@@ -77,16 +81,57 @@ public class JwtClaimsMapper {
             UserScopes userScopes,
             DeviceScopes deviceScopes,
             @Value("${coop-erp.security.mfa.acr-values:2,loa2,mfa,otp}") List<String> secondFactorAcr,
-            @Value("${coop-erp.security.mfa.password-reauth-counts:false}") boolean passwordReauthCounts) {
+            @Value("${coop-erp.security.mfa.password-reauth-counts:false}") boolean passwordReauthCounts,
+            @Value("${coop-erp.security.oidc.issuer:}") String issuer) {
         this.userScopes = userScopes;
         this.deviceScopes = deviceScopes;
         this.secondFactorAcr = Set.copyOf(secondFactorAcr);
         this.passwordReauthCounts = passwordReauthCounts;
+        if (passwordReauthCounts && !isDevelopmentIssuer(issuer)) {
+            // A password sign-in counted as the second factor is for a development realm without
+            // OTP; with any other issuer it switches the step-up off. Loud, not fatal: an
+            // operator may be testing a staging realm on purpose.
+            LOG.error(
+                    "coop-erp.security.mfa.password-reauth-counts is true with the issuer {}, which is not a"
+                            + " development issuer: a password sign-in counts as the second factor. Set it to"
+                            + " false outside development.",
+                    issuer);
+        }
+    }
+
+    JwtClaimsMapper(
+            UserScopes userScopes,
+            DeviceScopes deviceScopes,
+            List<String> secondFactorAcr,
+            boolean passwordReauthCounts) {
+        this(userScopes, deviceScopes, secondFactorAcr, passwordReauthCounts, "http://localhost:8085/realms/coop");
     }
 
     /** The production rule: only an acr or amr that names a second factor counts. */
     JwtClaimsMapper(UserScopes userScopes, DeviceScopes deviceScopes) {
         this(userScopes, deviceScopes, List.of("2", "loa2", "mfa", "otp"), false);
+    }
+
+    /** An issuer on this machine or on a development host name (localhost, *.localhost, *.test). */
+    static boolean isDevelopmentIssuer(String issuer) {
+        if (issuer == null || issuer.isBlank()) {
+            return false;
+        }
+        String host;
+        try {
+            host = URI.create(issuer.trim()).getHost();
+        } catch (IllegalArgumentException notAUri) {
+            return false;
+        }
+        if (host == null) {
+            return false;
+        }
+        host = host.toLowerCase(Locale.ROOT);
+        return host.equals("localhost")
+                || host.equals("127.0.0.1")
+                || host.equals("[::1]")
+                || host.endsWith(".localhost")
+                || host.endsWith(".test");
     }
 
     public ScopeContext map(

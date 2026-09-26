@@ -13,9 +13,11 @@ import org.springframework.stereotype.Component;
  * 1.3; 19A section 3: "invalidated by role.changed.v1, role.assigned/revoked.v1,
  * user.deactivated.v1 fanned out over the broker"), and the grant caches on the external grant
  * events (M1-09). Twice: on this instance the moment the change commits
- * ({@link PublishedEventListener}), so that a revoke bites on the next command here; on the
- * instances that consume the events when they arrive. The one-minute expiry bounds what an
- * instance that hears neither still serves. A payload naming the user (userId, granteeUserId)
+ * ({@link PublishedEventListener}), so that a revoke usually bites on the next command here; on
+ * the instances that consume the events when they arrive. It is not a guarantee: a cache load
+ * that began before the commit can put the old permissions back after the entry was emptied.
+ * The promise is "within a minute": the one-minute expiry bounds what any instance, one that
+ * raced the change or one that heard nothing, still serves. A payload naming the user (userId, granteeUserId)
  * empties that user's entries, any other empties everything.
  */
 @Component
