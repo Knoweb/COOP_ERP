@@ -215,6 +215,17 @@ class NotificationLog {
                 notificationId);
     }
 
+    /** The status of one row under the caller's scope; empty when there is no such row. */
+    Optional<String> status(UUID notificationId) {
+        return jdbc
+                .queryForList(
+                        "select status from kernel.notification_log where notification_id = ?",
+                        String.class,
+                        notificationId)
+                .stream()
+                .findFirst();
+    }
+
     /**
      * Whether the same thing (the dedup key: an event id, a document id) went to the same
      * recipient with the same template inside the hour, from another row (another rule, or a

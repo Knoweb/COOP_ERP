@@ -29,6 +29,13 @@ public interface IdentityProviderClient {
     void disableUser(ScopeContext ctx, String subjectId);
 
     /**
+     * Lets a disabled login sign in again, with the credentials it had: the way back for a user
+     * whose kind lost the back office and regains it (M1's UpdateUser). A deactivated user is
+     * never enabled again (doc 21 DR-5: a returning member of staff is a new user).
+     */
+    void enableUser(ScopeContext ctx, String subjectId);
+
+    /**
      * A one-time password the user must change at the next sign-in; generated here, returned
      * once for delivery by a notification, never logged (AGENTS.md).
      */

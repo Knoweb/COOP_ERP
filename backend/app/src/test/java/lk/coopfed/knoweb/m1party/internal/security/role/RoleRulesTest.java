@@ -96,7 +96,10 @@ class RoleRulesTest {
                         + "\"count\":{\"type\":\"integer\"},\"note\":{\"type\":\"string\"},"
                         + "\"strict\":{\"type\":\"boolean\"}},\"required\":[\"max_value\"]}");
 
-        assertThat(RoleRules.limitsProblem(null, schema)).isEmpty();
+        // No limits at all is refused when the schema requires one, else an approval permission
+        // could be granted without its ceiling; a schema that requires nothing accepts none.
+        assertThat(RoleRules.limitsProblem(null, schema)).contains("max_value");
+        assertThat(RoleRules.limitsProblem(null, null)).isEmpty();
         assertThat(RoleRules.limitsProblem(Map.of("max_value", 25000), schema)).isEmpty();
         assertThat(RoleRules.limitsProblem(Map.of("max_value", 2.5, "count", 3, "note", "x", "strict", true), schema))
                 .isEmpty();

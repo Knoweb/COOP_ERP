@@ -111,10 +111,14 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDirectSendIsRenderedInTheRecipientsLanguageAndLoggedWithoutTheNumber() {
-        UUID id = inScope(
+        Notifications.Delivery delivery = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "si", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        // Decided inside the transaction: logged for sending; the provider is called after commit.
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
+        assertThat(delivery.accepted()).isTrue();
 
         assertThat(sms.sent).hasSize(1);
         assertThat(sms.sent.get(0).recipient()).isEqualTo("0771234567");
@@ -181,10 +185,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
             config.set("notification.sms.enabled", ConfigScope.entity(ENTITY), "false", scope(ENTITY), "test");
             return null;
         });
-        UUID off = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID off = inScope(ENTITY, () -> notifications
+                .send("SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
+                .notificationId());
         assertThat(sms.sent).isEmpty();
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -200,10 +203,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                     "notification.sms.quiet_hours", ConfigScope.entity(ENTITY), "00:00-23:59", scope(ENTITY), "test");
             return null;
         });
-        UUID quiet = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID quiet = inScope(ENTITY, () -> notifications
+                .send("SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
+                .notificationId());
         assertThat(sms.sent).isEmpty();
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -216,10 +218,14 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aFailingProviderIsRetriedBySweepAndGivenUpWithAnAlert() {
         sms.failNext = 5;
-        UUID id = inScope(
+        Notifications.Delivery delivery = inScope(
                 ENTITY,
                 () -> notifications.send(
                         "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        // At call time the send is only logged; the failure happens after commit and is the sweep's.
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
+        assertThat(delivery.accepted()).isTrue();
 
         assertThat(status(id)).isEqualTo("QUEUED");
         assertThat(attempts(id)).isEqualTo(1);
@@ -249,9 +255,16 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     void aRetryIsServedFromWhatIsHeldBesideTheLogAndClearedOnceSent() {
         sms.failNext = 1;
         UUID id = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
         assertThat(status(id)).isEqualTo("QUEUED");
         // While QUEUED the recipient is held in clear beside the log (never in the log), for any instance.
         assertThat(heldRecipient(id)).isEqualTo("0771234567");
@@ -275,9 +288,16 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     void aRetryChecksTheKillSwitchAgain() {
         sms.failNext = 1;
         UUID id = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
         assertThat(status(id)).isEqualTo("QUEUED");
 
         // The entity switches SMS off between the first attempt and the retry (19A section 10).
@@ -301,9 +321,16 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     void aSweepClaimsEachRowSoARowAnotherSweepHoldsIsLeftAlone() {
         sms.failNext = 1;
         UUID id = inScope(
-                ENTITY,
-                () -> notifications.send(
-                        "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
         makeDue(id);
 
         // Another sweep claimed the row a moment ago: its next attempt is in the future, so this

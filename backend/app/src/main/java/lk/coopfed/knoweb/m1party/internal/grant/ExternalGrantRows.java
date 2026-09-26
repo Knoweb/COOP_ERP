@@ -23,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Reads of {@code security.external_grant} shared by the handlers, the expiry job and the
  * queries. Reads only: the writes are in the three handlers (only a command handler writes).
  * Every read runs under the caller's row-level security, which is what limits it: the Federation
- * reads its grants (own_read), a grantee its own (grantee_read, V0009), anybody else nothing.
+ * reads its grants (own_read), anybody else nothing. (The grantee_read policy of V0009 stays in
+ * the schema, a merged migration being never edited; nothing reads through it since the kernel
+ * resolves a grantee's entities itself, JdbcUserScopes.)
  */
 @Component
 class ExternalGrantRows {
@@ -79,23 +81,6 @@ class ExternalGrantRows {
      * own transaction with no tenant scope (see ExternalGrantQueriesImpl), so only the policy on
      * {@code app.user_id} admits rows.
      */
-    List<UUID> activeEntitiesOfGrantee(UUID userId, Instant at) {
-        return jdbc.queryForList(
-                """
-                select distinct e.entity_id
-                  from security.external_grant g
-                 cross join lateral unnest(g.scope_entity_ids) as e(entity_id)
-                 where g.grantee_user_id = ?
-                   and g.status = 'ACTIVE'
-                   and g.valid_from <= ?
-                   and ? < g.valid_until
-                """,
-                UUID.class,
-                userId,
-                timestamp(at),
-                timestamp(at));
-    }
-
     /** {@code from} plus whole calendar months, computed by the database as the CHECK constraint does. */
     Instant plusMonths(Instant from, int months) {
         return jdbc.queryForObject(
