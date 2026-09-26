@@ -18,8 +18,10 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     public JdbcIdempotencyStore(
             JdbcTemplate jdbc, @Value("${coop-erp.idempotency.retention-hours:24}") int windowHours) {
 
-        if (windowHours <= 0) {
-            throw new IllegalArgumentException("coop-erp.idempotency.retention-hours must be positive");
+        if (windowHours < 24) {
+            throw new IllegalArgumentException(
+                    "coop-erp.idempotency.retention-hours must be at least 24: the key is unique per UTC day, so a shorter window"
+                            + " would refuse the reuse of a key it has already expired");
         }
 
         this.jdbc = jdbc;
