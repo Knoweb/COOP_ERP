@@ -241,6 +241,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0032): a consumer's claims are the worker's own bookkeeping in the"
                             + " entity's scope, not a register the federation or a grantee views",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "kernel.notification_pending",
+                    "own_* only (kernel V0059): the recipient of a queued notification in clear, held until it"
+                            + " is settled; the sweep reads it in the owner's scope, nobody else at all",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             // The ENTITY series and the entity's location-less documents are the whole entity's:
             // a shop-scoped session sees and advances them (kernel V0055; the K-07 review, for
             // the architect). own_read and own_update admit location_id IS NULL there.

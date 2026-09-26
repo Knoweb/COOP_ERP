@@ -158,9 +158,7 @@ class IssuanceProtocol implements DocumentIssuance {
         // Microseconds: what timestamptz keeps, so the stored instant is exactly the hashed one.
         Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         LocalDateTime issuedLocal = LocalDateTime.ofInstant(issuedAt, businessZone);
-        LocalDate date = header.locationId() != null
-                ? businessDate.current(header.locationId())
-                : LocalDate.ofInstant(issuedAt, businessZone);
+        LocalDate date = businessDateFor(header, ctx, issuedAt);
 
         Totals totals = Totals.of(documentLines);
 
@@ -236,6 +234,26 @@ class IssuanceProtocol implements DocumentIssuance {
                 issued.id(), type.code(), display, issued.ownerEntityId(), issued.counterpartyEntityId()));
 
         return issued;
+    }
+
+    /**
+     * The business date of the document (19A section 13: from the location's day-close state,
+     * never the wall clock), read held so that a day close of that location waits for this
+     * transaction. A document without a location (an entity-level order or discount) takes
+     * the date of the location the issuer acts at; an issuer acting entity-wide has none, and
+     * the document then takes the calendar date in the business time zone, a deviation from
+     * 19A section 13 recorded in docs/PROGRESS.md until an entity has a business date of its own.
+     */
+    private LocalDate businessDateFor(DocumentRecord draft, ScopeContext ctx, Instant issuedAt) {
+        if (draft.locationId() != null) {
+            return businessDate.currentHeld(draft.locationId());
+        }
+
+        if (ctx.locationId() != null) {
+            return businessDate.currentHeld(ctx.locationId());
+        }
+
+        return LocalDate.ofInstant(issuedAt, businessZone);
     }
 
     /** Totals frozen from the lines (money scale 2): net is the sum of line totals, gross is net plus tax. */
