@@ -156,8 +156,14 @@ class EventBackbonePostgresIntegrationTest extends PostgresIntegrationTest {
         BrokerAdapter broker = message -> {
             TransactionTemplate consumerTransaction = new TransactionTemplate(transactionManager);
 
-            consumerTransaction.executeWithoutResult(
-                    status -> inbox.applyOnce("test.consumer", message.eventId(), applied::incrementAndGet));
+            consumerTransaction.executeWithoutResult(status -> {
+                // A consumer claims in the scope of the event's owner (V0032).
+                jdbc.queryForList(
+                        "SELECT set_config('app.scope_entity_id', ?, true),"
+                                + " set_config('app.scope_class', 'OWN', true)",
+                        message.ownerEntityId().toString());
+                inbox.applyOnce("test.consumer", message.eventId(), applied::incrementAndGet);
+            });
 
             if (crashAfterDelivery.getAndSet(false)) {
                 throw new IllegalStateException("simulated crash after publish");
