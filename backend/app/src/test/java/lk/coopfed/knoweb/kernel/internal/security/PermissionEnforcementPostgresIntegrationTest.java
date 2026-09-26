@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,18 +46,19 @@ class PermissionEnforcementPostgresIntegrationTest extends PostgresIntegrationTe
     @Autowired
     JdbcPermissionResolver resolver;
 
+    /** True when this test inserted the hello permission, so that it is the one to remove it. */
+    private boolean insertedHelloPermission;
+
     @BeforeEach
     void aUserWithARoleButNoPermissionYet() {
         JdbcTemplate admin = superuserJdbc();
-        admin.execute("delete from security.user_role where user_id = '" + USER + "'");
-        admin.execute("delete from security.role_permission where role_id = '" + ROLE + "'");
-        admin.execute("delete from security.role where role_id = '" + ROLE + "'");
-        admin.execute("delete from security.app_user where user_id = '" + USER + "'");
+        removeTheUserAndTheRole(admin);
         // The hello permission is the template module's; the catalogue of M1 does not seed it.
-        admin.update(
-                "insert into security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)"
-                        + " values ('hello.greeting.register', 'hello', 'Register a greeting', false, false, 'ENTITY')"
-                        + " on conflict (permission_code) do nothing");
+        insertedHelloPermission = admin.update(
+                        "insert into security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)"
+                                + " values ('hello.greeting.register', 'hello', 'Register a greeting', false, false, 'ENTITY')"
+                                + " on conflict (permission_code) do nothing")
+                == 1;
         admin.update(
                 "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
                         + " values (?, ?, ?, 'Enforcement test user', 'BACK_OFFICE', 'ACTIVE')",
@@ -74,6 +76,28 @@ class PermissionEnforcementPostgresIntegrationTest extends PostgresIntegrationTe
                 ROLE,
                 ENTITY);
         resolver.invalidateAll();
+    }
+
+    /**
+     * The database is shared by every integration test of the JVM: what this test adds to the
+     * permission catalogue it takes away again, or a later test that counts the catalogue
+     * (M1SeedLoaderTest) fails far from the cause (review of 26 September 2026).
+     */
+    @AfterEach
+    void leaveTheCatalogueAsItWas() {
+        JdbcTemplate admin = superuserJdbc();
+        removeTheUserAndTheRole(admin);
+        if (insertedHelloPermission) {
+            admin.execute("delete from security.permission where permission_code = 'hello.greeting.register'");
+        }
+        resolver.invalidateAll();
+    }
+
+    private static void removeTheUserAndTheRole(JdbcTemplate admin) {
+        admin.execute("delete from security.user_role where user_id = '" + USER + "'");
+        admin.execute("delete from security.role_permission where role_id = '" + ROLE + "'");
+        admin.execute("delete from security.role where role_id = '" + ROLE + "'");
+        admin.execute("delete from security.app_user where user_id = '" + USER + "'");
     }
 
     @Test
