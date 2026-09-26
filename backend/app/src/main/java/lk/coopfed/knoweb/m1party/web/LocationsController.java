@@ -165,7 +165,11 @@ class LocationsController implements LocationsApi {
     public ResponseEntity<Void> setPrimaryTill(UUID locationId, String idempotencyKey, SetPrimaryTillRequest request) {
         setPrimaryTill.handle(
                 new SetPrimaryTill(
-                        locationId, request.getTillPositionId(), request.getReasonCode(), request.getReasonText()),
+                        locationId,
+                        request.getTillPositionId(),
+                        request.getReasonCode(),
+                        request.getReasonText(),
+                        Boolean.TRUE.equals(request.getOutboxLossRecorded())),
                 currentScope.get());
         return ResponseEntity.noContent().build();
     }

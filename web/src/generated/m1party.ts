@@ -960,6 +960,11 @@ export interface components {
             tillPositionId: string;
             reasonCode: string;
             reasonText?: string | null;
+            /**
+             * @description Set when the device at the old primary till cannot be shown drained: its loss is recorded, and the numbers it took from the shop's series and never sent become a documented gap. Otherwise the change is refused with m1.device.outbox_not_drained while the counters would move away from an undrained device.
+             * @default false
+             */
+            outboxLossRecorded: boolean;
         };
         RegisterTillPositionRequest: {
             /** @description The till number at the shop (T1, T2 ...); never reused, retired positions included */

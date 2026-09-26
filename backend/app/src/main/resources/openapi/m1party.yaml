@@ -2331,6 +2331,14 @@ components:
         reasonText:
           type: [string, 'null']
           maxLength: 500
+        outboxLossRecorded:
+          type: boolean
+          default: false
+          description: >
+            Set when the device at the old primary till cannot be shown drained: its loss is
+            recorded, and the numbers it took from the shop's series and never sent become a
+            documented gap. Otherwise the change is refused with m1.device.outbox_not_drained
+            while the counters would move away from an undrained device.
 
     RegisterTillPositionRequest:
       type: object

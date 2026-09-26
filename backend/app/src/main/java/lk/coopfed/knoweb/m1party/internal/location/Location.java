@@ -137,6 +137,15 @@ public class Location implements Persistable<UUID> {
         this.connectivitySpecMet = true;
     }
 
+    /**
+     * A dormant location's connectivity is confirmed again before it trades again (doc 21
+     * section 4.3, Reactivate: "connectivity gate met"): the fact recorded before it went
+     * dormant is not taken as still true.
+     */
+    void clearConnectivity() {
+        this.connectivitySpecMet = false;
+    }
+
     void moveTo(String newStatus) {
         this.status = newStatus;
     }

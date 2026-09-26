@@ -40,6 +40,15 @@ record JobDefinition(
                     + "and maxRuntime positive: " + method);
         }
 
+        // A critical job that fails is run again at once under the same lock (19A section 12), so
+        // the lock has to outlive two full runs; otherwise the retry runs past the lock's expiry
+        // and a second instance starts the job beside it (review of 26 Sep).
+        if (annotation.critical() && lockTimeout.compareTo(maxRuntime.multipliedBy(2)) <= 0) {
+            throw new IllegalStateException(
+                    "@ScheduledJob " + name + " is critical and is retried once under its lock: "
+                            + "lockTimeout must be longer than twice maxRuntime: " + method);
+        }
+
         Class<?>[] parameters = method.getParameterTypes();
 
         if (parameters.length > 1
