@@ -386,3 +386,56 @@ config_items:
     default: "0"
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # M2-06: product images (22A section 6, AttachImage; doc 22 section 3.4). The thumbnail is made
+  # in plain Java (javax.imageio), so the types are the ones it reads; the kernel's
+  # attachment.max_bytes and attachment.content_types still bound every upload.
+  - key: m2.image.content_types
+    value_type: STRING
+    schema: { pattern: "^[a-z]+/[a-z0-9.+-]+(,[a-z]+/[a-z0-9.+-]+)*$" }
+    description_en: The image types a product image may be uploaded as, comma-separated
+    description_si: භාණ්ඩ රූපයක් උඩුගත කළ හැකි රූප වර්ග, කොමාවෙන් වෙන් කර
+    description_ta: பொருள் படத்தைப் பதிவேற்றக்கூடிய பட வகைகள், காற்புள்ளியால் பிரிக்கப்பட்டவை
+    default: "image/jpeg,image/png"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  - key: m2.image.thumbnail_px
+    value_type: INTEGER
+    schema: { minimum: 16, maximum: 1024 }
+    description_en: The longest side of a product image thumbnail, in pixels
+    description_si: භාණ්ඩ රූපයක කුඩා රූපයේ දිගම පැත්ත, පික්සල් වලින්
+    description_ta: பொருள் படத்தின் சிறுபடத்தின் நீளமான பக்கம், படப்புள்ளிகளில்
+    default: 128
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  - key: m2.image.max_pixels
+    value_type: INTEGER
+    schema: { minimum: 10000, maximum: 100000000 }
+    description_en: The most pixels (width times height) a product image may have to be made into a thumbnail
+    description_si: කුඩා රූපයක් සෑදීමට භාණ්ඩ රූපයකට තිබිය හැකි උපරිම පික්සල් ගණන (පළල වාර උස)
+    description_ta: சிறுபடம் உருவாக்க ஒரு பொருள் படத்தில் இருக்கக்கூடிய அதிகபட்ச படப்புள்ளிகள் (அகலம் பெருக்கல் உயரம்)
+    default: 40000000
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  - key: m2.image.upload_window_hours
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 720 }
+    description_en: How long an attached product image may wait for its upload before it is marked failed, in hours
+    description_si: ඇමුණු භාණ්ඩ රූපයක් අසාර්ථක ලෙස සලකුණු කිරීමට පෙර එහි උඩුගත කිරීම සඳහා රැඳී සිටිය හැකි කාලය, පැය වලින්
+    description_ta: இணைக்கப்பட்ட பொருள் படம் தோல்வியுற்றதாகக் குறிக்கப்படும் முன் அதன் பதிவேற்றத்திற்குக் காத்திருக்கக்கூடிய நேரம், மணிநேரங்களில்
+    default: 24
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  - key: m2.image.thumbnail.batch_size
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 10000 }
+    description_en: The most uploaded product images one run of the thumbnail job processes (the rest wait for the next run)
+    description_si: කුඩා රූප කාර්යයේ එක් ධාවනයක් සකසන උපරිම උඩුගත කළ භාණ්ඩ රූප ගණන (ඉතිරිය ඊළඟ ධාවනයට බලා සිටී)
+    description_ta: சிறுபட வேலையின் ஒரு ஓட்டம் செயலாக்கும் அதிகபட்ச பதிவேற்றிய பொருள் படங்கள் (மீதி அடுத்த ஓட்டத்திற்குக் காத்திருக்கும்)
+    default: 100
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue

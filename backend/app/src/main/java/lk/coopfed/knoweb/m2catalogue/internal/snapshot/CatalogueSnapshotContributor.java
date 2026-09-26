@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>{@code sku} (row id = SKU id): the item as the till sells it, with its conversions in
- *       force, its ACTIVE barcodes and its tag codes inside the row. 22A lists those as tables of
+ *       force, its ACTIVE barcodes, its tag codes and its thumbnail keys (M2-06) inside the row. 22A lists those as tables of
  *       their own, but their rows have no id of their own to name in the change log (the keys are
  *       SKU and unit, or barcode and symbology), and the till needs the whole item at once:
  *       "UPSERT rows so the till receives the whole item" (22A section 7.2). So a change to any
@@ -61,17 +61,17 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
         if (rowIds.isEmpty()) {
             return Map.of();
         }
-        return read(table, rowIds);
+        return read(table, shop, rowIds);
     }
 
     @Override
     public Map<UUID, Map<String, Object>> allRows(String table, Shop shop) {
-        return read(table, null);
+        return read(table, shop, null);
     }
 
-    private Map<UUID, Map<String, Object>> read(String table, Collection<UUID> ids) {
+    private Map<UUID, Map<String, Object>> read(String table, Shop shop, Collection<UUID> ids) {
         return switch (table) {
-            case SKU -> skus(ids);
+            case SKU -> skus(shop, ids);
             case TAX_CATEGORY -> taxCategories(ids);
             default -> throw new IllegalArgumentException("Not an M2 snapshot table: " + table);
         };
@@ -79,7 +79,7 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
 
     // ---- sku ----------------------------------------------------------------------------------
 
-    private Map<UUID, Map<String, Object>> skus(Collection<UUID> ids) {
+    private Map<UUID, Map<String, Object>> skus(Shop shop, Collection<UUID> ids) {
         MapSqlParameterSource params = new MapSqlParameterSource("ids", ids);
         String onlyIds = ids == null ? "" : " and s.sku_id in (:ids)";
 
@@ -112,6 +112,7 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
                     row.put("conversions", new ArrayList<Map<String, Object>>());
                     row.put("barcodes", new ArrayList<Map<String, Object>>());
                     row.put("tags", new ArrayList<String>());
+                    row.put("images", new ArrayList<Map<String, Object>>());
                     skus.put(rs.getObject("sku_id", UUID.class), row);
                 });
         if (skus.isEmpty()) {
@@ -160,6 +161,29 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
                 found,
                 rs -> {
                     listOf(skus, rs.getObject("sku_id", UUID.class), "tags").add(rs.getString("tag_code"));
+                });
+
+        // The thumbnails the shop shows (M2-06; 22A section 7.3: "images = thumb keys only"): one
+        // per item and per pack, the shop entity's own local override before the SKU owner's
+        // image (doc 22 section 3.4, DR-5). Row-level security in the device's scope shows the
+        // entity's own images and the owner's images of a SHARED item, nobody else's override.
+        MapSqlParameterSource images = new MapSqlParameterSource("skus", skus.keySet())
+                .addValue("entity", shop == null ? null : shop.ownerEntityId());
+        jdbc.query(
+                """
+                select distinct on (sku_id, coalesce(barcode, ''))
+                       sku_id, barcode, object_key_thumb
+                  from catalogue.sku_image
+                 where sku_id in (:skus) and status = 'ACTIVE'
+                 order by sku_id, coalesce(barcode, ''),
+                          case when owner_entity_id = :entity then 0 else 1 end
+                """,
+                images,
+                rs -> {
+                    Map<String, Object> image = new LinkedHashMap<>();
+                    image.put("barcode", rs.getString("barcode"));
+                    image.put("thumb_key", rs.getString("object_key_thumb"));
+                    listOf(skus, rs.getObject("sku_id", UUID.class), "images").add(image);
                 });
         return skus;
     }

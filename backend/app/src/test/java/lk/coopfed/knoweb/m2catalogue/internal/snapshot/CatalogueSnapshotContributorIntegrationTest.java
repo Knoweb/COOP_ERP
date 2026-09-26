@@ -109,6 +109,34 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
     }
 
     @Test
+    void aSkuRowCarriesTheThumbnailTheShopShowsItsOwnOverrideFirst() {
+        // M2-06: the Federation's image of the SHARED item, this entity's override, another
+        // entity's override, and a RETIRED one.
+        JdbcTemplate db = superuserJdbc();
+        image(db, SHARED, TEST_FEDERATION, "ACTIVE", "fed/thumb.png");
+        image(db, SHARED, ENTITY, "ACTIVE", "own/thumb.png");
+        image(db, SHARED, OTHER_ENTITY, "ACTIVE", "other/thumb.png");
+        image(db, LOCAL, ENTITY, "RETIRED", "old/thumb.png");
+
+        Map<UUID, Map<String, Object>> rows =
+                transactions.inScope(till, () -> catalogue.rows("sku", shop, List.of(SHARED, LOCAL)));
+
+        assertThat(rows.get(SHARED).get("images").toString())
+                .contains("own/thumb.png")
+                .doesNotContain("fed/thumb.png")
+                .doesNotContain("other/thumb.png");
+        assertThat(rows.get(LOCAL).get("images")).isEqualTo(List.of());
+
+        // Another entity's shop sees the Federation's image, never this entity's override.
+        Map<UUID, Map<String, Object>> elsewhere = transactions.inScope(
+                SystemScope.own(TEST_FEDERATION, null),
+                () -> catalogue.rows("sku", new Shop(TEST_FEDERATION, null), List.of(SHARED)));
+        assertThat(elsewhere.get(SHARED).get("images").toString())
+                .contains("fed/thumb.png")
+                .doesNotContain("own/thumb.png");
+    }
+
+    @Test
     void theTaxCategoriesWithTheirRates() {
         superuserJdbc()
                 .update(
@@ -148,9 +176,23 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 TAX);
     }
 
+    private static void image(JdbcTemplate db, UUID sku, UUID owner, String status, String thumb) {
+        db.update(
+                """
+                insert into catalogue.sku_image (image_id, sku_id, owner_entity_id, object_key_full, object_key_thumb,
+                                                 content_hash, content_type, status, upload_expires_at)
+                values (gen_random_uuid(), ?, ?, 'objects/m2catalogue/x', ?, repeat('a', 64), 'image/png', ?, now())
+                """,
+                sku,
+                owner,
+                thumb,
+                status);
+    }
+
     private static void forget(JdbcTemplate db) {
         List<UUID> skus = List.of(LOCAL, DRAFT, OTHERS, SHARED);
         for (UUID sku : skus) {
+            db.update("delete from catalogue.sku_image where sku_id = ?", sku);
             db.update("delete from catalogue.sku_tag where sku_id = ?", sku);
             db.update("delete from catalogue.sku_barcode where sku_id = ?", sku);
             db.update("delete from catalogue.sku_uom_conversion where sku_id = ?", sku);
