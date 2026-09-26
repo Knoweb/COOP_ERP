@@ -64,36 +64,44 @@ public class OutboxRelay implements AutoCloseable {
         Integer result = transaction.execute(status -> {
             List<String> sources = jdbc.queryForList(
                     """
-                                            SELECT source
+                                            SELECT DISTINCT source
                                               FROM kernel.event_outbox
                                              WHERE published_at IS NULL
-                                             ORDER BY source, source_seq
-                                             LIMIT 1
+                                             ORDER BY source
                                             """,
                     String.class);
 
-            if (sources.isEmpty()) {
+            // The first source no other relay holds: a second instance relays another source
+            // instead of nothing.
+            String source = null;
+
+            for (String candidate : sources) {
+
+                Boolean locked = jdbc.queryForObject(
+                        """
+                                                SELECT pg_try_advisory_xact_lock(
+                                                    hashtextextended(?, 0)
+                                                )
+                                                """,
+                        Boolean.class,
+                        "outbox-relay:" + candidate);
+
+                if (Boolean.TRUE.equals(locked)) {
+                    source = candidate;
+                    break;
+                }
+            }
+
+            if (source == null) {
                 return 0;
             }
 
-            String source = sources.getFirst();
-
-            Boolean locked = jdbc.queryForObject(
-                    """
-                                            SELECT pg_try_advisory_xact_lock(
-                                                hashtextextended(?, 0)
-                                            )
-                                            """,
-                    Boolean.class,
-                    "outbox-relay:" + source);
-
-            if (!Boolean.TRUE.equals(locked)) {
-                return 0;
-            }
+            List<java.time.Instant> receivedAt = new java.util.ArrayList<>();
 
             List<OutboxMessage> messages = jdbc.query(
                     """
                                             SELECT
+                                                received_at,
                                                 event_id,
                                                 event_type,
                                                 occurred_at,
@@ -115,45 +123,45 @@ public class OutboxRelay implements AutoCloseable {
                                             LIMIT ?
                                             FOR UPDATE SKIP LOCKED
                                             """,
-                    (rs, rowNum) -> new OutboxMessage(
-                            rs.getObject("event_id", java.util.UUID.class),
-                            rs.getString("event_type"),
-                            rs.getTimestamp("occurred_at").toInstant(),
-                            rs.getString("source"),
-                            rs.getLong("source_seq"),
-                            rs.getObject("owner_entity_id", java.util.UUID.class),
-                            rs.getObject("location_id", java.util.UUID.class),
-                            rs.getString("aggregate_type"),
-                            rs.getObject("aggregate_id", java.util.UUID.class),
-                            rs.getObject("correlation_id", java.util.UUID.class),
-                            rs.getObject("causation_id", java.util.UUID.class),
-                            rs.getObject("actor_user_id", java.util.UUID.class),
-                            rs.getString("engine_version"),
-                            rs.getString("payload")),
+                    (rs, rowNum) -> {
+                        receivedAt.add(rs.getTimestamp("received_at").toInstant());
+                        return new OutboxMessage(
+                                rs.getObject("event_id", java.util.UUID.class),
+                                rs.getString("event_type"),
+                                rs.getTimestamp("occurred_at").toInstant(),
+                                rs.getString("source"),
+                                rs.getLong("source_seq"),
+                                rs.getObject("owner_entity_id", java.util.UUID.class),
+                                rs.getObject("location_id", java.util.UUID.class),
+                                rs.getString("aggregate_type"),
+                                rs.getObject("aggregate_id", java.util.UUID.class),
+                                rs.getObject("correlation_id", java.util.UUID.class),
+                                rs.getObject("causation_id", java.util.UUID.class),
+                                rs.getObject("actor_user_id", java.util.UUID.class),
+                                rs.getString("engine_version"),
+                                rs.getString("payload"));
+                    },
                     source,
                     batchSize);
 
             int published = 0;
 
-            for (OutboxMessage message : messages) {
+            for (int i = 0; i < messages.size(); i++) {
+
+                OutboxMessage message = messages.get(i);
 
                 broker.publish(message);
 
+                // By the primary key (received_at, event_id): one partition, one index probe.
                 int updated = jdbc.update(
                         """
                                                 UPDATE kernel.event_outbox
                                                    SET published_at = now()
-                                                 WHERE received_at = (
-                                                     SELECT received_at
-                                                       FROM kernel.event_outbox
-                                                      WHERE event_id = ?
-                                                      ORDER BY received_at DESC
-                                                      LIMIT 1
-                                                 )
+                                                 WHERE received_at = ?
                                                    AND event_id = ?
                                                    AND published_at IS NULL
                                                 """,
-                        message.eventId(),
+                        java.sql.Timestamp.from(receivedAt.get(i)),
                         message.eventId());
 
                 if (updated != 1) {

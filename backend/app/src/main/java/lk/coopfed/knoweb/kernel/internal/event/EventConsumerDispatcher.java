@@ -55,20 +55,29 @@ public class EventConsumerDispatcher {
         }
 
         EventConsumerRegistry.Registration registration = registry.find(consumer, message.eventType())
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new PoisonMessageException(
                         "No @EventConsumer registered for " + consumer + " / " + message.eventType()));
 
-        ScopeContext scope = systemScope(message);
+        // What is read from the envelope fails the same way on every delivery (no owner entity,
+        // a payload that is not JSON): poison, not a handler failure worth retrying.
+        ScopeContext scope;
+        String payload;
+
+        try {
+            scope = systemScope(message);
+            payload = payloadFor(registration, message);
+        } catch (RuntimeException unreadable) {
+            throw new PoisonMessageException(
+                    "Event " + message.eventId() + " cannot be delivered to " + consumer + ": " + unreadable,
+                    unreadable);
+        }
 
         try {
 
             Boolean applied = transaction.execute(status -> {
                 applyScope(scope);
 
-                return inbox.applyOnce(
-                        consumer,
-                        message.eventId(),
-                        () -> registration.invoke(payloadFor(registration, message), scope, mapper));
+                return inbox.applyOnce(consumer, message.eventId(), () -> registration.invoke(payload, scope, mapper));
             });
 
             return Boolean.TRUE.equals(applied) ? DeliveryResult.APPLIED : DeliveryResult.DUPLICATE;
@@ -141,6 +150,10 @@ public class EventConsumerDispatcher {
     }
 
     private static ScopeContext systemScope(OutboxMessage message) {
+
+        if (message.eventId() == null || message.ownerEntityId() == null || message.correlationId() == null) {
+            throw new IllegalArgumentException("The envelope lacks its event id, owner entity or correlation id");
+        }
 
         Scope active = new Scope(message.ownerEntityId(), message.locationId());
 

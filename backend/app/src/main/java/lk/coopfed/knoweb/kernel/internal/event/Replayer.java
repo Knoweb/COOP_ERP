@@ -54,7 +54,35 @@ public class Replayer {
             throw new IllegalArgumentException("No @EventConsumer registered for " + consumer);
         }
 
-        List<OutboxMessage> messages = jdbc.query(
+        // Page by source_seq: an archive of months is never one list in memory.
+        int replayed = 0;
+        long next = fromSeq;
+
+        while (true) {
+
+            List<OutboxMessage> page = page(next, types);
+
+            for (OutboxMessage message : page) {
+                broker.publishToConsumer(consumer, message);
+            }
+
+            replayed += page.size();
+
+            if (page.size() < pageSize) {
+                return replayed;
+            }
+
+            next = page.getLast().sourceSeq() + 1;
+        }
+    }
+
+    static final int PAGE_SIZE = 500;
+
+    int pageSize = PAGE_SIZE;
+
+    private List<OutboxMessage> page(long fromSeq, java.util.Set<String> types) {
+
+        return jdbc.query(
                 """
                         SELECT
                             event_id,
@@ -76,6 +104,7 @@ public class Replayer {
                           AND source_seq >= ?
                           AND (? OR event_type = ANY (?))
                         ORDER BY source_seq
+                        LIMIT ?
                         """,
                 (rs, rowNum) -> new OutboxMessage(
                         rs.getObject("event_id", java.util.UUID.class),
@@ -94,12 +123,7 @@ public class Replayer {
                         rs.getString("payload")),
                 fromSeq,
                 types.contains("*"),
-                types.toArray(String[]::new));
-
-        for (OutboxMessage message : messages) {
-            broker.publishToConsumer(consumer, message);
-        }
-
-        return messages.size();
+                types.toArray(String[]::new),
+                pageSize);
     }
 }
