@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useT } from "../i18n/useT";
 import { StateChip } from "./StateChip";
 import type { ChipState } from "./StateChip";
 
@@ -9,8 +10,10 @@ import type { ChipState } from "./StateChip";
  * how it looks is the shell's, so a GRN, a society and a price list read the same way.
  *
  * Every text arrives ALREADY TRANSLATED: the header shows what it is given and translates
- * nothing itself. A fact with no value shows an em dash, never an empty cell, so a reader can
- * tell "not set" from "not loaded".
+ * nothing itself, except the one word for a fact with no value. Such a fact shows an em dash,
+ * never an empty cell, so a reader can tell "not set" from "not loaded"; a screen reader gets
+ * the words "Not set" (shell.fact.empty) instead of the dash, which it would skip, as
+ * MoneyDisplay does for an amount it cannot show.
  */
 export type DocumentFact = {
   /** Translated label, for example t("m1.card.registration").text. */
@@ -30,6 +33,7 @@ type DocumentHeaderProps = {
 };
 
 export function DocumentHeader({ code, title, subtitle, state, facts = [], children }: DocumentHeaderProps) {
+  const t = useT();
   return (
     <header className="document-header">
       <div className="document-header__top">
@@ -45,7 +49,16 @@ export function DocumentHeader({ code, title, subtitle, state, facts = [], child
           {facts.map((fact) => (
             <div key={fact.label} className="document-header__fact">
               <dt>{fact.label}</dt>
-              <dd>{fact.value === undefined || fact.value === null || fact.value === "" ? "—" : fact.value}</dd>
+              <dd>
+                {fact.value === undefined || fact.value === null || fact.value === "" ? (
+                  <>
+                    <span aria-hidden="true">—</span>
+                    <span className="visually-hidden">{t("shell.fact.empty").text}</span>
+                  </>
+                ) : (
+                  fact.value
+                )}
+              </dd>
             </div>
           ))}
         </dl>

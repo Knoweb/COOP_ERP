@@ -3,6 +3,7 @@
 // in ../registry.ts; the shell builds the router and the navigation from there, so a module
 // never edits the shell.
 
+import { RequirePermission } from "../../shell/auth/RequirePermission";
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { BulkRegisterPage } from "./BulkRegisterPage";
 import { RegisterSocietyPage } from "./RegisterSocietyPage";
@@ -12,10 +13,27 @@ import { SocietyRegisterPage } from "./SocietyRegisterPage";
 export const partyModule: ModuleDefinition = {
   id: "party",
 
+  // The two register forms need the permission to register, not only one of the module's:
+  // a user who may only view the register (the Federation view) sees the page that says so
+  // instead of a form the server would refuse.
   routes: [
     { path: "party/societies", element: <SocietyRegisterPage /> },
-    { path: "party/societies/new", element: <RegisterSocietyPage /> },
-    { path: "party/societies/bulk", element: <BulkRegisterPage /> },
+    {
+      path: "party/societies/new",
+      element: (
+        <RequirePermission anyOf={["gov.entity.register"]}>
+          <RegisterSocietyPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "party/societies/bulk",
+      element: (
+        <RequirePermission anyOf={["gov.entity.register"]}>
+          <BulkRegisterPage />
+        </RequirePermission>
+      )
+    },
     { path: "party/societies/:entityId", element: <SocietyCardPage /> }
   ],
 

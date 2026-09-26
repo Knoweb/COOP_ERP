@@ -124,10 +124,11 @@ class EntitiesController implements EntitiesApi {
     }
 
     @Override
-    public ResponseEntity<EntityPage> listEntities(String status, String district, UUID cursor, Integer limit) {
+    public ResponseEntity<EntityPage> listEntities(
+            String status, String district, String q, UUID cursor, Integer limit) {
 
         lk.coopfed.knoweb.m1party.query.EntityPage page =
-                queries.listEntities(new EntityFilter(status, district, cursor, limit), currentScope.get());
+                queries.listEntities(new EntityFilter(status, district, q, cursor, limit), currentScope.get());
 
         List<EntityResponse> items =
                 page.items().stream().map(EntitiesController::toResponse).toList();
