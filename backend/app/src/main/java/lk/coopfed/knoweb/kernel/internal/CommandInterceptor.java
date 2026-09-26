@@ -50,6 +50,17 @@ public class CommandInterceptor {
     @Around("@within(lk.coopfed.knoweb.kernel.api.CommandHandler)")
     public Object intercept(ProceedingJoinPoint call) throws Throwable {
 
+        Class<?> handlerType = call.getSignature().getDeclaringType();
+        CommandHandler annotation = handlerType.getAnnotation(CommandHandler.class);
+        if (annotation != null && CommandHandler.INTERNAL.equals(annotation.permission())) {
+            // An internal command runs inside the command that called it: that one was checked
+            // and claimed the request's idempotency key, which a second claim would find taken.
+            if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+                throw new IllegalStateException("An internal command runs inside its caller's transaction");
+            }
+            return call.proceed();
+        }
+
         ScopeContext scope = findScope(call.getArgs());
 
         // 19A section 3, in this order: permission -> MFA -> idempotency -> handler. The permission

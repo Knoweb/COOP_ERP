@@ -5,6 +5,8 @@
 |Spring components
 |_Services_
 
+* `l.c.k.m.api.BatchRegistration` (via `l.c.k.m.internal.batch.RegisterBatchHandler`)
+* `l.c.k.m.query.BatchQueries` (via `l.c.k.m.internal.queries.BatchQueriesImpl`)
 * `l.c.k.m.query.CatalogueQueries` (via `l.c.k.m.internal.queries.CatalogueQueriesImpl`)
 
 _Others_

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -105,8 +106,9 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void clean() {
         JdbcTemplate admin = superuserJdbc();
-        admin.execute("truncate catalogue.batch, catalogue.batch_key, catalogue.sku_tag, catalogue.sku_barcode,"
-                + " catalogue.sku_uom_conversion, catalogue.sku");
+        admin.execute(
+                "truncate catalogue.batch, catalogue.batch_key, catalogue.supplier, catalogue.sku_tag, catalogue.sku_barcode,"
+                        + " catalogue.sku_uom_conversion, catalogue.sku");
         admin.update("delete from catalogue.tag where tag_code like 't-%'");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
@@ -251,14 +253,72 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                     sharedSku);
         });
         assertThat(pointedAt).isEqualTo(replacement);
+    }
 
-        // Another entity correcting A's batch changes no identity row, so the correction is refused
-        // (M2-05 settles the lot holder's correction, 22A section 6).
+    @Test
+    void anotherEntitysCorrectionSupersedesTheBatchAndMovesItsIdentity() {
+        // M2-05 (V0004): a lot holder or the Federation corrects a batch it did not register
+        // (22A section 6; who may is CorrectBatchHandler's guard). The trigger batch_correction
+        // marks the old row SUPERSEDED and re-points the identity, as the function's owner.
+        UUID replacement = Ids.next();
+        Map<String, Object> after = inScope(MPCS_B, "OWN", () -> {
+            insertBatch(replacement, sharedSku, "B2411A", batchOfA, MPCS_B);
+            return jdbc.queryForMap(
+                    "select (select status from catalogue.batch where batch_id = ?) as old_status,"
+                            + " (select batch_id from catalogue.batch_key where sku_id = ? and batch_no = 'B2411A')"
+                            + " as identity",
+                    batchOfA,
+                    sharedSku);
+        });
+        assertThat(after.get("old_status")).isEqualTo("SUPERSEDED");
+        assertThat(after.get("identity")).isEqualTo(replacement);
+
+        // A superseded batch is not corrected again (its replacement is), nor a batch of another item.
+        superuserJdbc().update("update catalogue.batch set status = 'SUPERSEDED' where batch_id = ?", batchOfA);
         assertThatThrownBy(() ->
                         inScope(MPCS_B, "OWN", () -> insertBatch(Ids.next(), sharedSku, "B2411A", batchOfA, MPCS_B)))
                 .isInstanceOf(DataAccessException.class)
                 .rootCause()
-                .hasMessageContaining("cannot change");
+                .hasMessageContaining("not a registered batch of the same item");
+        assertThatThrownBy(() ->
+                        inScope(MPCS_A, "OWN", () -> insertBatch(Ids.next(), localSkuOfA, "B2411A", batchOfA, MPCS_A)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("not a registered batch of the same item");
+        // The correction row itself is still the caller's own: nobody writes one for another entity.
+        assertThatThrownBy(() ->
+                        inScope(MPCS_B, "OWN", () -> insertBatch(Ids.next(), sharedSku, "B2411A", batchOfA, MPCS_A)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void aSupplierIsWrittenByItsOwnerAndReadByEveryScope() {
+        UUID supplier = Ids.next();
+        int inserted = inScope(
+                MPCS_A,
+                "OWN",
+                () -> jdbc.update(
+                        "insert into catalogue.supplier (supplier_id, owner_entity_id, name) values (?, ?, 'Acme')",
+                        supplier,
+                        MPCS_A));
+        assertThat(inserted).isEqualTo(1);
+        assertThatThrownBy(() -> inScope(
+                        MPCS_B,
+                        "OWN",
+                        () -> jdbc.update(
+                                "insert into catalogue.supplier (supplier_id, owner_entity_id, name) values (?, ?, 'X')",
+                                Ids.next(),
+                                MPCS_A)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() ->
+                        inScope(MPCS_A, "OWN", () -> jdbc.update("update catalogue.supplier set name = 'Renamed'")))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("permission denied");
     }
 
     @Test
