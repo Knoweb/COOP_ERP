@@ -1,8 +1,12 @@
+# Frozen at M1-13 (21A section 10; docs/PLAN_TO_M2.md Phase 4): version 1 means the shape below is
+# depended on by M2 and later modules. A change from here on is a new minor or major version, not an
+# edit in place, and goes through the change-request path of AGENTS.md ("contract... frozen once
+# depended on"). See m1party/README.md, "Contract freeze (M1-13)", for the review this freeze recorded.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
-  version: 0.1.0
+  version: 1.0.0
 
 paths:
 
