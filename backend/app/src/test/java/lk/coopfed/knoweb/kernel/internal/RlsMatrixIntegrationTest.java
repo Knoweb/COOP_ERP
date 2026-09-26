@@ -118,7 +118,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
      * and the template's expectation and returns this table's. Nothing is skipped: every check of
      * every table is still run and compared.
      */
-    record Departure(String table, String why, Function<Check, String> expected) {}
+    record Departure(String table, String why, Function<Check, String> expected, boolean mustExist) {
+        Departure(String table, String why, Function<Check, String> expected) {
+            this(table, why, expected, true);
+        }
+    }
 
     private static List<Scope> scopes(Shape shape) {
         List<Scope> scopes = new ArrayList<>();
@@ -254,6 +258,14 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
             // (hello README); K-01 has landed, so hello can add it.
             new Departure("hello.greeting", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing),
+            // The scaffolder's throwaway copy of hello (make test-scaffold: integration.webhook)
+            // carries hello's policies, so it carries hello's departure; it exists only during
+            // that proof, hence it is not required to exist.
+            new Departure(
+                    "integration.webhook",
+                    "the scaffolded copy of hello.greeting: no ext_view yet",
+                    RlsMatrixIntegrationTest::externalReadsNothing,
+                    false),
             // TODO(M3 price list): pricing.price_list has no ext_view.
             new Departure("pricing.price_list", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing),
             // TODO(M1 party, after M1-09): party.entity has no ext_view; m1security V0009 left the
@@ -309,8 +321,9 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                 .as("discovery found the owned tables")
                 .contains("kernel.document", "party.location", "hello.greeting");
         List<String> known = tables.stream().toList();
-        assertThat(EXCEPTIONS).as("every exception names a table that exists").allSatisfy(e -> assertThat(known)
-                .contains(e.table()));
+        assertThat(EXCEPTIONS.stream().filter(Departure::mustExist))
+                .as("every exception names a table that exists")
+                .allSatisfy(e -> assertThat(known).contains(e.table()));
 
         List<String> mismatches = new ArrayList<>();
         for (String table : tables) {
