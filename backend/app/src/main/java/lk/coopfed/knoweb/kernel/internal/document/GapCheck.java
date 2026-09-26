@@ -59,12 +59,15 @@ public class GapCheck {
                         rs.getLong("first_missing")));
     }
 
-    /** Nightly, after the day-close window: every series. Critical: a failure is retried at once. */
+    /**
+     * Nightly, after the day-close window: every series. Critical: a failure is retried at once,
+     * under the same lock, so the lock outlives two runs.
+     */
     @ScheduledJob(
             name = "gap-check",
             cron = "0 40 0 * * *",
             critical = true,
-            lockTimeout = "PT30M",
+            lockTimeout = "PT35M",
             maxRuntime = "PT15M")
     public int nightly(JobExecution execution) {
         List<Gap> gaps = system.inScope(SystemScope.federationView(), this::findGaps);

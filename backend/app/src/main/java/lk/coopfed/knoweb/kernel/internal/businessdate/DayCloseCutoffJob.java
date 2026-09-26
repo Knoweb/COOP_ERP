@@ -13,9 +13,14 @@ import org.springframework.stereotype.Component;
  * location whose business date is behind today is closed in the OWN scope of its entity, one
  * transaction each, so that one location's failure does not hold the others.
  *
+ * <p>Before closing, every location of M1's register that has no row here gets one on today's
+ * calendar date (a location registered before {@link LocationRegisteredListener} existed):
+ * from the next night the cut-off sees it like any other (review of 26 Sep).
+ *
  * <p>The cut-off is one time for the fleet ({@code coop-erp.business-date.cutoff-cron},
- * 02:30 in the business time zone by default); a per-location cut-off is a configuration item
- * for K-11 to carry when a location asks for one.
+ * 02:30 in the business time zone by default); the register's {@code business_date.cutoff_time}
+ * (LOCATION scope) is not read yet, a deviation from 19A section 12 recorded in
+ * docs/PROGRESS.md.
  */
 @Component
 class DayCloseCutoffJob {
@@ -36,6 +41,20 @@ class DayCloseCutoffJob {
             lockTimeout = "PT30M",
             maxRuntime = "PT20M")
     public int closeOverdueDays() {
+        List<LocationBusinessDates.State> unregistered =
+                system.inScope(SystemScope.federationView(), dates::withoutARow);
+
+        for (LocationBusinessDates.State state : unregistered) {
+            try {
+                system.inScope(SystemScope.own(state.ownerEntityId(), null), () -> {
+                    dates.register(state.locationId(), state.ownerEntityId());
+                    return null;
+                });
+            } catch (RuntimeException e) {
+                log.error("Business-date row could not be created for location {}", state.locationId(), e);
+            }
+        }
+
         List<LocationBusinessDates.State> overdue = system.inScope(SystemScope.federationView(), dates::behindToday);
 
         int closed = 0;

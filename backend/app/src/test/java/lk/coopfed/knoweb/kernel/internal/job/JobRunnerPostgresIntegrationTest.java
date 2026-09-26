@@ -57,7 +57,9 @@ class JobRunnerPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.execute("delete from kernel.job_run");
         // Never delete kernel.shedlock rows here: ShedLock remembers which rows it has created and
         // updates them from then on; a row deleted behind its back makes every later lock fail.
-        // Every run releases its lock, so nothing is left to clean.
+        // A lock outlives its run (jobs.lock.at_least_for, and until lockTimeout after a
+        // timeout), so the rows are expired instead.
+        expireLocks();
         admin.execute("update kernel.scheduled_job set enabled = true");
         admin.execute("truncate table kernel.audit_event");
         jobs.reset();
@@ -126,7 +128,13 @@ class JobRunnerPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(1L);
         assertThat(jobs.slowRuns.get()).isEqualTo(1);
 
-        // The lock is released with the run: the next schedule runs again.
+        // The lock is held a little after the run (jobs.lock.at_least_for): a second instance
+        // firing the same schedule a moment later skips instead of running it again.
+        assertThat(runner.run("test-slow")).isEqualTo(JobRunner.Outcome.SKIPPED_LOCKED);
+        assertThat(jobs.slowRuns.get()).isEqualTo(1);
+
+        // Once it has expired, the next schedule runs again.
+        expireLocks();
         assertThat(runner.run("test-slow")).isEqualTo(JobRunner.Outcome.SUCCESS);
     }
 
@@ -149,6 +157,34 @@ class JobRunnerPostgresIntegrationTest extends PostgresIntegrationTest {
                                 Long.class,
                                 SYSTEM_ENTITY))
                 .isEqualTo(1L);
+
+        // The interrupted body may still be inside a blocking call, so the lock is kept until
+        // lockTimeout (PT1M here): the next firing skips rather than overlaps it.
+        assertThat(runner.run("test-slow")).isEqualTo(JobRunner.Outcome.SKIPPED_LOCKED);
+        assertThat(jobs.slowRuns.get()).isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select lock_until > " + DB_NOW + " + interval '30 seconds' from kernel.shedlock"
+                                        + " where name = 'job:test-slow'",
+                                Boolean.class))
+                .isTrue();
+
+        // The row reads as UTC whatever zone the session runs in (kernel/V0057): locked_at is
+        // now, not five and a half hours ago.
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select abs(extract(epoch from (locked_at - " + DB_NOW + "))) < 60"
+                                        + " from kernel.shedlock where name = 'job:test-slow'",
+                                Boolean.class))
+                .isTrue();
+    }
+
+    /** ShedLock's PostgreSQL statements keep the lock times as naive UTC; the tests read them the same way. */
+    private static final String DB_NOW = "timezone('utc', now())";
+
+    /** Ends every lock now, as the passing of lockTimeout would. */
+    private static void expireLocks() {
+        superuserJdbc().execute("update kernel.shedlock set lock_until = " + DB_NOW + " where lock_until > " + DB_NOW);
     }
 
     @Test
@@ -225,7 +261,8 @@ class JobRunnerPostgresIntegrationTest extends PostgresIntegrationTest {
                 name = "test-critical",
                 cron = "0 0 3 * * *",
                 critical = true,
-                lockTimeout = "PT2M",
+                // A critical job runs twice under one lock: longer than twice the runtime.
+                lockTimeout = "PT3M",
                 maxRuntime = "PT1M")
         public void critical() {
             criticalAttempts.incrementAndGet();

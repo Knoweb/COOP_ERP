@@ -23,4 +23,14 @@ public interface BusinessDate {
      * @param locationId the location the document or movement belongs to; never null
      */
     LocalDate current(UUID locationId);
+
+    /**
+     * The same date, held until the caller's transaction ends: a day close of that location
+     * waits for the transaction, so a document that commits while the day is closing carries
+     * the date it was issued on. Issuance reads the date this way; a plain read uses
+     * {@link #current}. Must be called inside a transaction.
+     *
+     * @param locationId the location the document belongs to; never null
+     */
+    LocalDate currentHeld(UUID locationId);
 }
