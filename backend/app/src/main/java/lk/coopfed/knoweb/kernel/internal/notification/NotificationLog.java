@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -122,6 +123,17 @@ class NotificationLog {
                 Timestamp.from(now),
                 finalFailure ? null : Timestamp.from(nextAttempt),
                 notificationId);
+    }
+
+    /** The status of one row under the caller's scope; empty when there is no such row. */
+    Optional<String> status(UUID notificationId) {
+        return jdbc
+                .queryForList(
+                        "select status from kernel.notification_log where notification_id = ?",
+                        String.class,
+                        notificationId)
+                .stream()
+                .findFirst();
     }
 
     boolean sentWithinLastHour(String recipientHash, String templateId) {

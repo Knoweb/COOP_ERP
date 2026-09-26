@@ -165,6 +165,7 @@
   "m1.role.permission_unknown": "Some of these permissions are not in the permission catalogue",
   "m1.role.retired": "This role has been retired",
   "m1.role.sod_conflict": "This role would hold two duties that one person may not hold together",
+  "m1.role.template_held_outside_federation": "This template is held by users outside the Federation; it cannot lose the user-management permission or gain a Federation-only one while it is",
   "m1.role.template_not_found": "The role template could not be found",
   "m1.sod.cannot_lower": "The Federation requires these two duties to be held by different people; an entity cannot relax that",
   "m1.sod.existing_conflict": "A role or a person of this entity already holds both duties; change them before tightening the rule",

@@ -44,6 +44,11 @@ class RecordingIdentityProvider implements IdentityProviderClient {
     }
 
     @Override
+    public void enableUser(ScopeContext ctx, String subjectId) {
+        calls.add(new Call("enableUser", subjectId));
+    }
+
+    @Override
     public TemporaryPassword setTemporaryPassword(ScopeContext ctx, String subjectId) {
         calls.add(new Call("setTemporaryPassword", subjectId));
         return new TemporaryPassword("Tmp" + passwords.incrementAndGet() + "xQ7kWz9pR");

@@ -77,7 +77,7 @@ class NotificationService implements Notifications {
     }
 
     @Override
-    public UUID send(
+    public Delivery send(
             String channel,
             String recipient,
             String language,
@@ -85,7 +85,7 @@ class NotificationService implements Notifications {
             Map<String, Object> arguments,
             UUID dedupKey,
             ScopeContext ctx) {
-        return deliver(
+        UUID notificationId = deliver(
                 DIRECT_RULE,
                 dedupKey == null ? Ids.next() : dedupKey,
                 channel,
@@ -94,6 +94,10 @@ class NotificationService implements Notifications {
                 templateId,
                 arguments,
                 ctx);
+        // A repeat of the same key and recipient was never logged under this id: nobody was
+        // reached by this call, which for the caller is the same as a suppression.
+        Outcome outcome = logRows.status(notificationId).map(Outcome::valueOf).orElse(Outcome.SUPPRESSED);
+        return new Delivery(notificationId, outcome);
     }
 
     /**

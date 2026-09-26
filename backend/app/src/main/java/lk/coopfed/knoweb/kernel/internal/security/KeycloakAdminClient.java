@@ -170,6 +170,18 @@ public class KeycloakAdminClient implements IdentityProviderClient {
     }
 
     @Override
+    public void enableUser(ScopeContext ctx, String subjectId) {
+        assertInScope(ctx, homeEntityOf(subjectId));
+        call(() -> rest.put()
+                .uri(realmPath + "/users/{id}", subjectId)
+                .headers(this::bearer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("enabled", true))
+                .retrieve()
+                .toBodilessEntity());
+    }
+
+    @Override
     public TemporaryPassword setTemporaryPassword(ScopeContext ctx, String subjectId) {
         assertInScope(ctx, homeEntityOf(subjectId));
         StringBuilder password = new StringBuilder(PASSWORD_LENGTH);

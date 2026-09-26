@@ -21,11 +21,11 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.JobExecution;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.security.JdbcUserScopes;
 import lk.coopfed.knoweb.m1party.api.ExpireExternalGrant;
 import lk.coopfed.knoweb.m1party.api.ExternalGrantExpired;
 import lk.coopfed.knoweb.m1party.api.ExternalGrantIssued;
 import lk.coopfed.knoweb.m1party.api.ExternalGrantRevoked;
-import lk.coopfed.knoweb.m1party.query.ExternalGrantQueries;
 import lk.coopfed.knoweb.testsupport.KernelRecorder.AuditRecord;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
@@ -46,8 +46,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * M1-09: external grants, doc 21 flow 6.5 ("Regulator access for an inspection") end to end, the
- * guards of 21A section 6, the resolution of an EXTERNAL_TIMEBOXED principal's entities, the
- * expiry job, and what such a principal reads under row-level security.
+ * guards of 21A section 6, the resolution of an EXTERNAL_TIMEBOXED principal's entities through
+ * the path a request takes (the kernel's {@link JdbcUserScopes#grantsOf}, which the claims
+ * mapper asks), the expiry job, and what such a principal reads under row-level security.
  *
  * <p>The external user is written here as the superuser: CreateUser is M1-07. The Federation
  * owns the user, as it does in the flow ("Federation admin creates an EXTERNAL user").
@@ -77,7 +78,7 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
     private TestRestTemplate http;
 
     @Autowired
-    private ExternalGrantQueries queries;
+    private JdbcUserScopes userScopes;
 
     @Autowired
     private ExternalGrantExpiryJob expiryJob;
@@ -110,6 +111,7 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
         insertUser(admin, CLERK, "clerk-m109", "BACK_OFFICE", "ACTIVE");
         insertUser(admin, RETIRED_AUDITOR, "retired-m109", "EXTERNAL", "DEACTIVATED");
         insertUser(admin, SECOND_AUDITOR, "auditor-m109", "EXTERNAL", "PENDING");
+        userScopes.invalidateAll();
 
         // What an inspector of society A may read: A's duties, who holds them, its segregation pairs.
         admin.update(
@@ -187,8 +189,9 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
                     assertThat(event.validUntil()).isEqualTo(until);
                 });
 
-        // Scope resolution for the external user: the granted society, and it alone.
-        Set<UUID> granted = queries.activeGrantedEntities(REGULATOR, clock.instant());
+        // Scope resolution for the external user, as the claims mapper does it: the granted
+        // society, and it alone. The issue event emptied whatever the kernel had cached.
+        Set<UUID> granted = userScopes.grantsOf(REGULATOR);
         assertThat(granted).containsExactly(MPCS_A);
 
         // What that principal reads: society A's rows, nothing of B, nothing to write.
@@ -217,7 +220,9 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).isEmpty();
         assertThat(grantsOf(REGULATOR)).isEqualTo(1);
 
-        // Failure path: revocation is immediate.
+        // Failure path: revocation is immediate, on the instance that revoked, even while the
+        // resolution was cached a moment before.
+        assertThat(userScopes.grantsOf(REGULATOR)).containsExactly(MPCS_A);
         kernel.reset();
         ResponseEntity<JsonNode> revoked =
                 post(GRANTS + "/" + grantId + "/revoke", Map.of("reason", "Inspection closed"));
@@ -235,7 +240,7 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
                     assertThat(event.grantId()).isEqualTo(grantId);
                     assertThat(event.scopeEntityIds()).containsExactly(MPCS_A);
                 });
-        Set<UUID> afterRevoke = queries.activeGrantedEntities(REGULATOR, clock.instant());
+        Set<UUID> afterRevoke = userScopes.grantsOf(REGULATOR);
         assertThat(afterRevoke).isEmpty();
         assertThat(externalReads(afterRevoke))
                 .isEqualTo(Map.of("role", List.of(), "user_role", List.of(), "sod_pair", List.of()));
@@ -243,7 +248,8 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
         // Expiry by clock: a grant whose window has passed admits nothing before the job runs,
         // and the job marks it, audits it and announces it.
         UUID ended = insertGrant(REGULATOR, MPCS_B, Duration.ofDays(10), Duration.ofHours(-1), "ACTIVE");
-        assertThat(queries.activeGrantedEntities(REGULATOR, clock.instant())).isEmpty();
+        userScopes.invalidateUser(REGULATOR);
+        assertThat(userScopes.grantsOf(REGULATOR)).isEmpty();
 
         kernel.reset();
         assertThat(expiryJob.expireEndedGrants(systemScope(FEDERATION))).isEqualTo(1);
@@ -331,10 +337,16 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
         assertThat(response.getStatusCode())
                 .as(String.valueOf(response.getBody()))
                 .isEqualTo(HttpStatus.CREATED);
-        assertThat(queries.activeGrantedEntities(SECOND_AUDITOR, clock.instant()))
-                .isEmpty();
-        assertThat(queries.activeGrantedEntities(SECOND_AUDITOR, from.plusSeconds(1)))
-                .containsExactlyInAnyOrder(MPCS_A, MPCS_B);
+        // A PENDING grantee holds a grant that admits nothing yet, twice over: the window has
+        // not opened, and the user is not ACTIVE. Once both hold, the grant opens both societies.
+        assertThat(userScopes.grantsOf(SECOND_AUDITOR)).isEmpty();
+        superuserJdbc()
+                .update(
+                        "update security.external_grant set valid_from = now() - interval '1 minute' where grantee_user_id = ?",
+                        SECOND_AUDITOR);
+        superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", SECOND_AUDITOR);
+        userScopes.invalidateUser(SECOND_AUDITOR);
+        assertThat(userScopes.grantsOf(SECOND_AUDITOR)).containsExactlyInAnyOrder(MPCS_A, MPCS_B);
     }
 
     // ---- guards of RevokeExternalView and ExpireExternalGrant -----------------------------------
@@ -400,41 +412,53 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
     // ---- resolution -------------------------------------------------------------------------
 
     @Test
-    void aUserResolvesItsOwnGrantsOnly() {
+    void aUserResolvesItsOwnCurrentGrantsOnly() {
         insertGrant(REGULATOR, MPCS_A, Duration.ofDays(1), Duration.ofDays(3), "ACTIVE");
         insertGrant(SECOND_AUDITOR, MPCS_B, Duration.ofDays(1), Duration.ofDays(3), "ACTIVE");
         insertGrant(REGULATOR, MPCS_B, Duration.ofDays(1), Duration.ofDays(3), "EXPIRED");
+        superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", SECOND_AUDITOR);
+        userScopes.invalidateAll();
 
-        assertThat(queries.activeGrantedEntities(REGULATOR, clock.instant())).containsExactly(MPCS_A);
-        assertThat(queries.activeGrantedEntities(SECOND_AUDITOR, clock.instant()))
-                .containsExactly(MPCS_B);
-        assertThat(queries.activeGrantedEntities(CLERK, clock.instant())).isEmpty();
-        assertThat(queries.activeGrantedEntities(null, clock.instant())).isEmpty();
+        assertThat(userScopes.grantsOf(REGULATOR)).containsExactly(MPCS_A);
+        assertThat(userScopes.grantsOf(SECOND_AUDITOR)).containsExactly(MPCS_B);
+        assertThat(userScopes.grantsOf(CLERK)).isEmpty();
     }
 
     @Test
-    void resolvingInsideAnotherTransactionLeavesThatTransactionsScopeAlone() {
-        insertGrant(REGULATOR, MPCS_A, Duration.ofDays(1), Duration.ofDays(3), "ACTIVE");
+    void aDeactivatedGranteeResolvesNothingWhileTheRegisterKeepsTheGrant() {
+        UUID grantId = insertGrant(RETIRED_AUDITOR, MPCS_A, Duration.ofDays(1), Duration.ofDays(3), "ACTIVE");
+        userScopes.invalidateUser(RETIRED_AUDITOR);
 
-        String classAfter = new TransactionTemplate(transactions).execute(status -> {
-            jdbc.queryForObject("select set_config('app.scope_class', 'OWN', true)", String.class);
-            jdbc.queryForObject("select set_config('app.scope_entity_id', ?, true)", String.class, MPCS_B.toString());
-
-            assertThat(queries.activeGrantedEntities(REGULATOR, clock.instant()))
-                    .containsExactly(MPCS_A);
-
-            String scopeClass = jdbc.queryForObject("select current_setting('app.scope_class', true)", String.class)
-                    + "/" + jdbc.queryForObject("select current_setting('app.scope_entity_id', true)", String.class);
-            status.setRollbackOnly();
-            return scopeClass;
-        });
-
-        assertThat(classAfter).isEqualTo("OWN/" + MPCS_B);
+        // Deactivation ends the grant for the grantee; the row stays ACTIVE in the register for
+        // the Federation to see and revoke (DeactivateUser does not write M1's grant rows).
+        assertThat(userScopes.grantsOf(RETIRED_AUDITOR)).isEmpty();
+        assertThat(statusOf(grantId)).isEqualTo("ACTIVE");
     }
 
     @Test
-    void anExpiredOrEmptyGrantReadsNothing() {
-        assertThat(externalReads(Set.of()))
+    void anExpiredGrantReadsNothing() {
+        // A grant that ended an hour ago and that the job has not yet marked: resolution gives
+        // nothing, and a session built from that resolution reads nothing.
+        insertGrant(REGULATOR, MPCS_A, Duration.ofDays(10), Duration.ofHours(-1), "ACTIVE");
+        userScopes.invalidateUser(REGULATOR);
+
+        Set<UUID> granted = userScopes.grantsOf(REGULATOR);
+        assertThat(granted).isEmpty();
+        assertThat(externalReads(granted))
+                .isEqualTo(Map.of("role", List.of(), "user_role", List.of(), "sod_pair", List.of()));
+    }
+
+    @Test
+    void aGrantRevokedWhileCachedIsForgottenAtOnce() {
+        UUID grantId = insertGrant(REGULATOR, MPCS_A, Duration.ofDays(1), Duration.ofDays(3), "ACTIVE");
+        userScopes.invalidateUser(REGULATOR);
+        assertThat(userScopes.grantsOf(REGULATOR)).containsExactly(MPCS_A);
+
+        ResponseEntity<JsonNode> revoked = post(GRANTS + "/" + grantId + "/revoke", Map.of("reason", "Closed"));
+
+        assertThat(revoked.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(userScopes.grantsOf(REGULATOR)).isEmpty();
+        assertThat(externalReads(userScopes.grantsOf(REGULATOR)))
                 .isEqualTo(Map.of("role", List.of(), "user_role", List.of(), "sod_pair", List.of()));
     }
 
