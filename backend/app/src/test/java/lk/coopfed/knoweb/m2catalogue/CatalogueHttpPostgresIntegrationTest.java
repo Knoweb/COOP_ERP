@@ -179,6 +179,129 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void conversionsBarcodesAndTheLookupFollowTheGeneratedContract() {
+        HttpHeaders headers = headers();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        JsonNode created = http.exchange(
+                        "/v1/catalogue/skus",
+                        HttpMethod.POST,
+                        new HttpEntity<>(skuBody("HTTP milk powder", null, null), headers),
+                        JsonNode.class)
+                .getBody();
+        String skuId = created.get("skuId").asText();
+
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/activate",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("target", "LOCAL"), headers),
+                Void.class);
+
+        superuserJdbc()
+                .update("insert into catalogue.uom (uom_code, name_en, is_weight) values ('CASE', 'Case', false)"
+                        + " on conflict do nothing");
+        UUID batchId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.batch (batch_id, sku_id, batch_no, owner_entity_id) values (?, ?, 'H1', ?)",
+                        batchId,
+                        UUID.fromString(skuId),
+                        MPCS);
+        kernel.reset();
+
+        // POST /skus/{skuId}/conversions
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> conversion = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/conversions",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("uomCode", "CASE", "factorToBase", 24, "effectiveFrom", "2026-01-01"), headers),
+                JsonNode.class);
+        assertThat(conversion.getStatusCode())
+                .as(String.valueOf(conversion.getBody()))
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        // A broken rule is 422 with its message id.
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> overlap = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/conversions",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("uomCode", "CASE", "factorToBase", 12, "effectiveFrom", "2025-06-01"), headers),
+                JsonNode.class);
+        assertThat(overlap.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(overlap.getBody().get("code").asText()).isEqualTo("m2.conversion.overlap");
+
+        // POST /skus/{skuId}/barcodes: a case code with a batch
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> registered = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/barcodes",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("barcode", "4791234567891", "symbology", "EAN13", "uomCode", "CASE"), headers),
+                JsonNode.class);
+        assertThat(registered.getStatusCode())
+                .as(String.valueOf(registered.getBody()))
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        // The slice's shape is checked by the kernel: an unknown symbology is 400.
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> badSymbology = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/barcodes",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("barcode", "4791234567891", "symbology", "CODE128", "uomCode", "EA"), headers),
+                JsonNode.class);
+        assertThat(badSymbology.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // POST /skus/{skuId}/barcodes/{barcode}/link
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> linked = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/barcodes/4791234567891/link",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("symbology", "EAN13", "batchId", batchId.toString()), headers),
+                JsonNode.class);
+        assertThat(linked.getStatusCode()).as(String.valueOf(linked.getBody())).isEqualTo(HttpStatus.NO_CONTENT);
+
+        // GET /lookup: the item card with the unit's factor and the linked batch
+        ResponseEntity<JsonNode> lookup = http.exchange(
+                "/v1/catalogue/lookup?barcode=4791234567891&symbology=EAN13",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(lookup.getStatusCode()).as(String.valueOf(lookup.getBody())).isEqualTo(HttpStatus.OK);
+        JsonNode card = lookup.getBody();
+        assertThat(card.get("skuId").asText()).isEqualTo(skuId);
+        assertThat(card.get("uomCode").asText()).isEqualTo("CASE");
+        assertThat(card.get("factorToBase").decimalValue()).isEqualByComparingTo("24");
+        assertThat(card.get("fallback").get("si").asBoolean()).isTrue();
+        assertThat(card.get("nameSi").asText()).isEqualTo("HTTP milk powder");
+        assertThat(card.get("batch").get("batchId").asText()).isEqualTo(batchId.toString());
+        assertThat(card.get("batch").get("batchNo").asText()).isEqualTo("H1");
+        assertThat(card.get("sellThrough").asBoolean()).isFalse();
+
+        // DELETE /skus/{skuId}/barcodes/{barcode}?symbology=...&reasonCode=...
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> retired = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/barcodes/4791234567891?symbology=EAN13&reasonCode=WRONG_PACK",
+                HttpMethod.DELETE,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(retired.getStatusCode())
+                .as(String.valueOf(retired.getBody()))
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        ResponseEntity<JsonNode> gone = http.exchange(
+                "/v1/catalogue/lookup?barcode=4791234567891",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(gone.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(gone.getBody().get("code").asText()).isEqualTo("m2.barcode.not_found");
+
+        assertThat(kernel.committedAudit())
+                .extracting(record -> record.eventType())
+                .containsOnlyOnce("CONVERSION_DEFINED", "BARCODE_REGISTERED", "BARCODE_LINKED", "BARCODE_RETIRED");
+    }
+
+    @Test
     void aRepeatedCreateWithTheSameKeyAnswersTheFirstSkuAndCreatesNothingMore() {
         HttpHeaders headers = headers();
         headers.set("Idempotency-Key", UUID.randomUUID().toString());

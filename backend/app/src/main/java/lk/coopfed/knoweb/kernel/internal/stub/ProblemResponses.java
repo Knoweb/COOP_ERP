@@ -36,6 +36,8 @@ public class ProblemResponses {
             Map.entry("permission.denied", HttpStatus.FORBIDDEN),
             // M2-02: a SKU the caller cannot see, on a read or a command, is 404 as the slice says.
             Map.entry("m2.sku.not_found", HttpStatus.NOT_FOUND),
+            // M2-04: a barcode the caller has no row for, as the slice says.
+            Map.entry("m2.barcode.not_found", HttpStatus.NOT_FOUND),
             // K-02: a token the resource server refuses, and a second factor that is not fresh
             // enough for the action (19A section 2: step-up is 401 with the provider's address).
             Map.entry("token.invalid", HttpStatus.UNAUTHORIZED),
