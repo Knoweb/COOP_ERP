@@ -20,6 +20,7 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.internal.sku.SkuCommandRouter;
+import lk.coopfed.knoweb.m2catalogue.internal.unit.DefineConversionHandler;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,12 @@ class CatalogueControllerViewPermissionTest {
 
     private CatalogueController controller(ScopeContext scope, boolean enforce) {
         CurrentScope current = () -> scope;
-        return new CatalogueController(mock(SkuCommandRouter.class), queries, current, permissions, enforce);
+        return new CatalogueController(
+                mock(SkuCommandRouter.class),
+                mock(DefineConversionHandler.class),
+                queries,
+                current,
+                permissions,
+                enforce);
     }
 }

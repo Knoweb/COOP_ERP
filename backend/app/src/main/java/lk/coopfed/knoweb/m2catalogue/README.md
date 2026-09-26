@@ -13,7 +13,9 @@ M2 defines what can be counted and sold: SKU identity in one global namespace, u
 | `resources/db/migration/m2catalogue/V0001__catalogue.sql` | The tables of M2-01, their row-level security, grants, and the batch partitions. |
 | `resources/seed/m2catalogue/` | `uom.yaml`, `tax.yaml`, `tags.yaml` (loaded by `M2SeedLoader`), `audit-event-types.yaml` (loaded by the kernel's `AuditEventTypeSeedLoader`). |
 | `resources/seed/m1party/permissions.yaml` | The eleven `cat.*` permissions of M2, at the end of M1's file (see "Permissions" below). |
-| `resources/openapi/m2catalogue.yaml` | The slice: info only, no operation yet. |
+| `resources/openapi/m2catalogue.yaml` | The slice: the SKU operations (M2-02), conversions, barcodes and the lookup (M2-03/M2-04). |
+| `internal/sku/`, `internal/unit/`, `internal/barcode/`, `internal/queries/` | The SKU aggregate and its router; the conversion handler; the barcode handlers and `GtinParser`; the reads (`CatalogueQueries`, `BarcodeLookupQuery`). |
+| `web/CatalogueController`, `web/BarcodeController` | The generated `CatalogueApi` (SKUs, conversions) and `BarcodeApi` (barcodes, lookup). |
 | `web/src/modules/m2catalogue/` | The module registration only: no route, no navigation entry, until M2-10. |
 | `src/test/.../m2catalogue/` | `CatalogueSchemaIntegrationTest` (tables, forced RLS, policies, grants, partitions), `CatalogueRlsIntegrationTest` (rows of the RLS matrix of 22A section 9), `internal/seed/M2SeedLoaderTest`. |
 
@@ -56,6 +58,24 @@ A new tax rate is published through PublishTaxRate (M2-03), never by editing `ta
 
 22A section 3.1 says the permission catalogue of M2 is "appended to the M1-owned catalogue file". `M1SeedLoader` reads one file, `seed/m1party/permissions.yaml`, and `security.permission` is M1's table, so the eleven `cat.*` codes are at the end of that file under a comment, with `module: m2catalogue`. `M1SeedLoaderTest` counts them.
 
+## Units, conversions and barcodes (M2-03 / M2-04)
+
+Pull request #117, by Shehan, reworked on 26 September against the M2-01 tables. The rows are `catalogue.sku_uom_conversion` and `catalogue.sku_barcode` of V0001; there is no other table. The operations are the ones 22A section 5 names, as sub-resources of the SKU:
+
+| Operation | Handler | Permission | Guards (22A section 6) | Audit / event |
+|---|---|---|---|---|
+| `POST /v1/catalogue/skus/{skuId}/conversions` | `internal/unit/DefineConversionHandler` | `cat.sku.create_local` | owner; unit exists; factor > 0; not the base unit; a weighed SKU takes no count unit; the exclusion constraint (`m2.conversion.overlap`) | `CONVERSION_DEFINED`, `conversion.defined.v1` |
+| `POST /v1/catalogue/skus/{skuId}/barcodes` | `internal/barcode/RegisterBarcodeHandler` | `cat.barcode.manage` | SKU active; symbology valid; check digit for EAN-13, EAN-8, UPC-A (`GtinParser`); unique per rule (B-I2); a factory code by the SKU's owner, an INTERNAL code by any entity on an item it sells | `BARCODE_REGISTERED`, `barcode.registered.v1` |
+| `DELETE /v1/catalogue/skus/{skuId}/barcodes/{barcode}?symbology=` | `internal/barcode/RetireBarcodeHandler` | `cat.barcode.manage` | the caller's own ACTIVE row; a reason | `BARCODE_RETIRED`, `barcode.retired.v1` |
+| `POST /v1/catalogue/skus/{skuId}/barcodes/{barcode}/link` | `internal/barcode/LinkBarcodeToBatchHandler` | `cat.barcode.manage` | the caller's own ACTIVE row; the batch belongs to the SKU | `BARCODE_LINKED`, `barcode.linked.v1` |
+| `GET /v1/catalogue/lookup` | `internal/queries/BarcodeLookupQuery` (through `CatalogueQueries.lookupByBarcode`) | `cat.sku.view` | exact ACTIVE row; else GTIN + lot resolves the batch by number; INTERNAL codes in the owner's scope only | read |
+
+A new conversion of a unit that already has an open-ended row closes that row the day before the new one starts (doc 22 section 3.2: a case-size change is a new effective-dated row; V0001's `own_update` exists for exactly this). A row dated before the open one, or inside a closed one, is the exclusion problem.
+
+Whose row a barcode is (doc 22 sections 3.3 and 4.2): the row's `owner_entity_id` is always the caller (the `own_write` policy admits nothing else). A factory code identifies the item, so only the SKU's owner registers it and it is unique federation-wide (`barcode_factory_unique`). An INTERNAL code is an entity's own sticker or weigh label on an item it sells, its own or a SHARED one, unique within that entity (the primary key), and the lookup resolves it in that entity's scope only. Retire and Link read the row by the caller's entity, so another entity's row of the same code is simply not found. The audit subject of all three is the SKU (a registry row has no id of its own).
+
+`GtinParser` validates the check digit of a GTIN-8, -12, -13 or -14 and splits a GS1 element string (AI 01, 17, 10, group separator U+001D) that a till sends whole; the lookup accepts either the code as scanned or the parsed `gtin`, `lot` and `expiry`. `LookupResult` answers a missing Sinhala or Tamil name with the English one and the fallback flag set; `factorToBase` is null when no conversion of the code's unit is in force today; `sellThrough` is false and `thumbKey` null until `location_assortment` (M2-09) and `sku_image` (M2-06) exist. The per-instance cache of 22A section 7 is not built yet.
+
 ## What the next tickets build on
 
 - **M2-02 SKU aggregate**: `catalogue.sku` with its indexes and policies; the units and tax categories a SKU cites are seeded; `SKU_*` audit codes are in place; permissions `cat.sku.create`, `cat.sku.create_local`, `cat.sku.deactivate`. Adds the first operations to the slice and the first `api` records.
@@ -72,3 +92,7 @@ A new tax rate is published through PublishTaxRate (M2-03), never by editing `ta
 4. `shared_read` tests `kernel.scope_class() <> 'NONE'` besides what 22A writes (`status = 'SHARED'`, `true` for batch): a transaction with no scope reads nothing (RLS template). The conversions, barcodes and tags of a SHARED SKU are readable by everyone as well, through the same policy name; 22A says only "SHARED visible to all", and a till cannot sell a shared item without its barcodes.
 5. `tax_rate.effective_from` is the `apply_from` of a publication (22A section 7.3: "applyFrom = effective_from"); the column keeps the name of 22A section 3.
 6. Units are read-only for the application (`GRANT SELECT`), and `sku_tag` is insert-only; 22A section 3 grants SELECT, INSERT, UPDATE on every table, but no command changes a unit or a tag assignment.
+7. DefineConversion runs under `cat.sku.create_local`: 22A section 3.1 names no conversion code among its eleven, and doc 22 section 5.1 says only "owner"; the owner's SKU-definition permission is the closest. The three barcode commands share `cat.barcode.manage`, as 22A section 3.1 and doc 22 section 4.2 say.
+8. An INTERNAL barcode may be registered on a SHARED SKU by an entity that does not own the SKU (doc 22 section 4.2: "any entity for INTERNAL on its own SKUs" read as "on the items it sells"); 22A section 6 writes "INTERNAL only for own SKUs". The RLS finding against M2-01 (child rows should follow the SKU's owner) must keep this case open for INTERNAL rows when it is fixed.
+9. `retireBarcode` is a DELETE with `symbology`, `reasonCode` and `reasonText` as query parameters: the row is keyed by barcode and symbology, and a DELETE carries no body.
+10. The lookup's per-instance cache (22A section 7, 60 seconds, invalidated by `barcode.*`) is not built: no module has a cache yet and the window would be a configuration item.

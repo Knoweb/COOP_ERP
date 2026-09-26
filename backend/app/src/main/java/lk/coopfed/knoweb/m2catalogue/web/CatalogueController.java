@@ -5,21 +5,23 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.PermissionResolver;
-import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
 import lk.coopfed.knoweb.m2catalogue.api.DeactivateSku;
+import lk.coopfed.knoweb.m2catalogue.api.DefineConversion;
 import lk.coopfed.knoweb.m2catalogue.api.ReactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDetails;
 import lk.coopfed.knoweb.m2catalogue.api.UpdateSku;
 import lk.coopfed.knoweb.m2catalogue.internal.sku.SkuCommandRouter;
+import lk.coopfed.knoweb.m2catalogue.internal.unit.DefineConversionHandler;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ActivateSkuRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueApi;
+import lk.coopfed.knoweb.m2catalogue.web.generated.DefineConversionRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuPageResponse;
@@ -31,25 +33,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class CatalogueController implements CatalogueApi {
 
-    private static final String VIEW = "cat.sku.view";
-
     private final SkuCommandRouter commands;
+    private final DefineConversionHandler conversions;
     private final CatalogueQueries queries;
     private final CurrentScope currentScope;
-    private final PermissionResolver permissions;
-    private final boolean enforcePermissions;
+    private final ViewPermission view;
 
     CatalogueController(
             SkuCommandRouter commands,
+            DefineConversionHandler conversions,
             CatalogueQueries queries,
             CurrentScope currentScope,
             PermissionResolver permissions,
             @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
         this.commands = commands;
+        this.conversions = conversions;
         this.queries = queries;
         this.currentScope = currentScope;
-        this.permissions = permissions;
-        this.enforcePermissions = enforcePermissions;
+        this.view = new ViewPermission(permissions, enforcePermissions);
     }
 
     @Override
@@ -97,19 +98,23 @@ class CatalogueController implements CatalogueApi {
                 .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", skuId)));
     }
 
-    /**
-     * The reads declare x-permission cat.sku.view, and no command interceptor runs for a read, so
-     * the controller checks it: for the OWN class (the read-only classes resolve no permission;
-     * row-level security is what limits them), and only when enforcement is on, as for commands
-     * (coop-erp.security.enforce-permissions).
-     */
     private void requireView(ScopeContext scope) {
-        if (!enforcePermissions || scope == null || scope.policyClass() != PolicyClass.OWN) {
-            return;
-        }
-        if (!permissions.allows(scope, VIEW)) {
-            throw new ProblemException("permission.denied", Map.of("permission", VIEW));
-        }
+        view.require(scope);
+    }
+
+    @Override
+    public ResponseEntity<Void> defineConversion(UUID skuId, String idempotencyKey, DefineConversionRequest request) {
+
+        conversions.handle(
+                new DefineConversion(
+                        skuId,
+                        request.getUomCode(),
+                        request.getFactorToBase(),
+                        request.getEffectiveFrom(),
+                        request.getEffectiveTo()),
+                currentScope.get());
+
+        return ResponseEntity.noContent().build();
     }
 
     @Override

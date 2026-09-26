@@ -11,7 +11,9 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
@@ -51,10 +53,17 @@ class CatalogueQueriesImpl implements CatalogueQueries {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final BarcodeLookupQuery barcodes;
 
-    CatalogueQueriesImpl(JdbcTemplate jdbc, ObjectMapper mapper) {
+    CatalogueQueriesImpl(JdbcTemplate jdbc, ObjectMapper mapper, BarcodeLookupQuery barcodes) {
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.barcodes = barcodes;
+    }
+
+    @Override
+    public Optional<LookupResult> lookupByBarcode(BarcodeLookup lookup, ScopeContext scope) {
+        return barcodes.lookup(lookup, scope);
     }
 
     @Override

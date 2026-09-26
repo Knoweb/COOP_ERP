@@ -1,9 +1,12 @@
 package lk.coopfed.knoweb.m2catalogue.api;
 
-import java.time.Instant;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 
-public record BarcodeRetired(UUID barcodeId, String reason, Instant occurredAt) implements DomainEvent {
-    public static final String TYPE = "catalogue.barcode.retired.v1";
+/** barcode.retired.v1 (doc 22 section 5.3). */
+public record BarcodeRetired(
+        UUID skuId, UUID ownerEntityId, String barcode, String symbology, String uomCode, UUID batchId)
+        implements DomainEvent {
+
+    public static final String TYPE = "barcode.retired.v1";
 }

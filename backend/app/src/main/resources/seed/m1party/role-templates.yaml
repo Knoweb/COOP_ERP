@@ -42,6 +42,7 @@ templates:
       - "cat.sku.view"
       - "cat.sku.create_local"
       - "cat.sku.deactivate"
+      - "cat.barcode.manage"
   # The Federation's catalogue team (22A section 3.1): the shared path (cat.sku.create with the
   # guard FederationCaller of M2), promotion, and its own drafts and deactivations. Assigned at
   # the Federation entity; cat.sku.create and cat.sku.promote are FEDERATION-scope permissions.
@@ -54,3 +55,4 @@ templates:
       - "cat.sku.create"
       - "cat.sku.promote"
       - "cat.sku.deactivate"
+      - "cat.barcode.manage"
