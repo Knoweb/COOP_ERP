@@ -97,6 +97,7 @@ class SyncController implements SyncApi {
                 enrolmentRequest.getEnrolmentCode(),
                 enrolmentRequest.getHardwareSerial(),
                 enrolmentRequest.getAppVersion(),
+                idempotencyKey,
                 currentScope.get().correlationId());
         DeviceRecord device = enrolled.device();
         List<SeriesAssignment> series = enrolled.series().stream()
