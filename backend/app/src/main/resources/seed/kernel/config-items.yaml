@@ -347,6 +347,36 @@ config_items:
     default: "PT24H"
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # K-08 part 2: the rate limiting of doc 32 section 9 ("per device: batches per minute and
+  # bytes per hour; global: ingest capacity; 429 with retry_after"), token buckets per device and
+  # a concurrency limit per instance (19A section 8). To be settled after the load test (spike 5).
+  - key: sync.rate.batches_per_minute
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 6000 }
+    description_en: How many batches one till may upload in a minute before it is told to wait (doc 32 section 9)
+    description_si: රැඳී සිටින ලෙස දැනුම් දීමට පෙර එක් මුදල් ලේඛනයකට විනාඩියකදී උඩුගත කළ හැකි කාණ්ඩ ගණන
+    description_ta: காத்திருக்கச் சொல்லப்படும் முன் ஒரு பணப்பெட்டி ஒரு நிமிடத்தில் பதிவேற்றக்கூடிய தொகுப்புகள்
+    default: 20
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.rate.bytes_per_hour
+    value_type: INTEGER
+    schema: { minimum: 1048576, maximum: 1073741824 }
+    description_en: How many bytes, as sent, one till may upload in an hour before it is told to wait (doc 32 section 9)
+    description_si: රැඳී සිටින ලෙස දැනුම් දීමට පෙර එක් මුදල් ලේඛනයකට පැයකදී උඩුගත කළ හැකි බයිට් ගණන
+    description_ta: காத்திருக்கச் சொல்லப்படும் முன் ஒரு பணப்பெட்டி ஒரு மணி நேரத்தில் பதிவேற்றக்கூடிய பைட்டுகள்
+    default: 16777216
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.ingest.max_concurrent
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 1000 }
+    description_en: How many till batches one server instance ingests at the same time; more are told to wait
+    description_si: එක් සේවාදායක අවස්ථාවක් එකවර ගන්නා මුදල් ලේඛන කාණ්ඩ ගණන; වැඩිපුර ඒවාට රැඳී සිටින ලෙස දන්වයි
+    description_ta: ஒரு சேவையக நிகழ்வு ஒரே நேரத்தில் ஏற்கும் பணப்பெட்டித் தொகுப்புகள்; மேலதிகமானவை காத்திருக்கச் சொல்லப்படும்
+    default: 32
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   - key: m1.device.version_floor
     value_type: STRING
     schema: { pattern: "^[0-9]{1,5}(\\.[0-9]{1,5}){0,3}$", max_length: 20 }

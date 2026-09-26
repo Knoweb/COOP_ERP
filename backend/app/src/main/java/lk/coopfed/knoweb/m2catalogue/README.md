@@ -90,6 +90,14 @@ Whose row a barcode is (doc 22 sections 3.3 and 4.2): the row's `owner_entity_id
 
 `GtinParser` validates the check digit of a GTIN-8, -12, -13 or -14 and splits a GS1 element string (AI 01, 17, 10, group separator U+001D) that a till sends whole; the lookup accepts either the code as scanned or the parsed `gtin`, `lot` and `expiry`. `LookupResult` answers a missing Sinhala or Tamil name with the English one and the fallback flag set; `factorToBase` is null when no conversion of the code's unit is in force today; `sellThrough` is false and `thumbKey` null until `location_assortment` (M2-09) and `sku_image` (M2-06) exist. The per-instance cache of 22A section 7 is not built yet.
 
+## Snapshot contributor (K-08 part 2; the contributor half of M2-09)
+
+`internal/snapshot/CatalogueSnapshotContributor` implements the kernel's `SnapshotContributor` (19A section 8; 22A section 7.3). The kernel's snapshot builder calls it in the device's scope, in one read-only, repeatable-read transaction.
+
+- Table `sku`, row id = SKU id: the item as the till sells it, with `conversions` (in force today or later, factors as text), `barcodes` (ACTIVE only) and `tags` inside the row. Which SKUs: until `location_assortment` exists (M2-09), every LOCAL SKU of the shop's entity and every SHARED one, which is what row-level security shows the device; a DRAFT or INACTIVE SKU is left out, so the till receives a tombstone.
+- Table `tax_category`, row id = category id, with its `rates` in force or scheduled (rates as text).
+- **Still M2-09's**: the assortment and its change-log producers (`ChangeLog.append` for the shops of an assortment change, an upsert of `sku` for a change to its barcodes, conversions or tags). `batch` is named by M5's lot contributor (22A: "ids supplied by M5") and is not served yet.
+
 ## What the next tickets build on
 
 - **M2-02 SKU aggregate**: `catalogue.sku` with its indexes and policies; the units and tax categories a SKU cites are seeded; `SKU_*` audit codes are in place; permissions `cat.sku.create`, `cat.sku.create_local`, `cat.sku.deactivate`. Adds the first operations to the slice and the first `api` records.
@@ -117,3 +125,4 @@ Every difference between the schema as migrated (V0001 to V0003) and 22A section
 12. DefineConversion runs under `cat.sku.create_local`: 22A section 3.1 names no conversion code among its eleven, and doc 22 section 5.1 says only "owner"; the owner's SKU-definition permission is the closest. The three barcode commands share `cat.barcode.manage`, as 22A section 3.1 and doc 22 section 4.2 say.
 13. `retireBarcode` is a DELETE with `symbology`, `reasonCode` and `reasonText` as query parameters: the row is keyed by barcode and symbology, and a DELETE carries no body.
 14. The lookup's per-instance cache (22A section 7, 60 seconds, invalidated by `barcode.*`) is not built: no module has a cache yet and the window would be a configuration item.
+15. The snapshot tables are `sku` and `tax_category` where 22A section 7.3 lists nine (`sku_uom_conversion`, `sku_barcode`, `sku_image`, `tag`, `sku_tag`, `tax_rate`, `batch` as well): the change log names a row by a UUID, and conversions, barcodes, tag assignments and rates have none of their own, so they travel inside the row of their SKU or category, as 22A section 7.2's "so the till receives the whole item" intends. `tag` (keyed by code) is not served: a SKU row carries its tag codes.
