@@ -13,8 +13,8 @@ _Others_
 |Bean references
 |* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
-* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
+* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===

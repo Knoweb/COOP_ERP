@@ -9,7 +9,7 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m2catalogue.api.ActivateSharedSku;
-import lk.coopfed.knoweb.m2catalogue.api.SkuActivated;
+import lk.coopfed.knoweb.m2catalogue.api.SkuShared;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +17,19 @@ import org.springframework.transaction.annotation.Transactional;
 @CommandHandler(permission = "cat.sku.create")
 public class ActivateSharedSkuHandler implements Handles<ActivateSharedSku, UUID> {
 
-    private static final String AUDIT_ACTIVATED = "SKU_ACTIVATED";
+    // 22A section 6: the shared path audits SKU_SHARED and publishes sku.shared.v1; the local
+    // path keeps SKU_ACTIVATED and sku.activated.v1.
+    private static final String AUDIT_SHARED = "SKU_SHARED";
 
     private final SkuRepository repository;
+    private final FederationCaller federation;
     private final AuditFacade audit;
     private final EventPublisher events;
 
-    ActivateSharedSkuHandler(SkuRepository repository, AuditFacade audit, EventPublisher events) {
+    ActivateSharedSkuHandler(
+            SkuRepository repository, FederationCaller federation, AuditFacade audit, EventPublisher events) {
         this.repository = repository;
+        this.federation = federation;
         this.audit = audit;
         this.events = events;
     }
@@ -32,6 +37,8 @@ public class ActivateSharedSkuHandler implements Handles<ActivateSharedSku, UUID
     @Override
     @Transactional
     public UUID handle(ActivateSharedSku command, ScopeContext scope) {
+        federation.require(scope);
+
         Sku sku = SkuGuards.requireOwned(repository, command.skuId(), scope);
 
         Map<String, Object> before = sku.auditState();
@@ -39,9 +46,9 @@ public class ActivateSharedSkuHandler implements Handles<ActivateSharedSku, UUID
         sku.activateShared();
         repository.saveAndFlush(sku);
 
-        audit.record(AUDIT_ACTIVATED, Subject.of("sku", sku.getId()), before, sku.auditState(), scope);
+        audit.record(AUDIT_SHARED, Subject.of("sku", sku.getId()), before, sku.auditState(), scope);
 
-        events.publish(new SkuActivated(sku.getId(), sku.ownerEntityId(), sku.skuCode(), sku.status()));
+        events.publish(new SkuShared(sku.getId(), sku.ownerEntityId(), sku.skuCode(), sku.status()));
 
         return sku.getId();
     }

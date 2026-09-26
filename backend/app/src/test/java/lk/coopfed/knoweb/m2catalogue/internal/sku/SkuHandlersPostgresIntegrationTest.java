@@ -2,6 +2,12 @@ package lk.coopfed.knoweb.m2catalogue.internal.sku;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
@@ -13,12 +19,16 @@ import lk.coopfed.knoweb.m2catalogue.api.ActivateLocalSku;
 import lk.coopfed.knoweb.m2catalogue.api.ActivateSharedSku;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
 import lk.coopfed.knoweb.m2catalogue.api.DeactivateSku;
+import lk.coopfed.knoweb.m2catalogue.api.InventoryLotQuery;
 import lk.coopfed.knoweb.m2catalogue.api.ReactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.SkuActivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuCreated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDeactivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDetails;
 import lk.coopfed.knoweb.m2catalogue.api.SkuReactivated;
+import lk.coopfed.knoweb.m2catalogue.api.SkuShared;
+import lk.coopfed.knoweb.m2catalogue.api.SkuUpdated;
+import lk.coopfed.knoweb.m2catalogue.api.UpdateSku;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -27,6 +37,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
@@ -42,7 +56,7 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     CreateLocalSkuHandler createLocal;
 
     @Autowired
-    CreateSharedSkuHandler createShared;
+    SkuCommandRouter router;
 
     @Autowired
     ActivateLocalSkuHandler activateLocal;
@@ -55,6 +69,26 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     ReactivateSkuHandler reactivate;
+
+    @Autowired
+    UpdateLocalSkuHandler updateLocal;
+
+    @Autowired
+    UpdateSharedSkuHandler updateShared;
+
+    // Forces a code another entity holds, to prove the retry on the unique index.
+    @MockitoSpyBean
+    SkuCodeGenerator codes;
+
+    // M5 owns the lots; a stub answers for it (false unless a test says otherwise).
+    @MockitoBean
+    InventoryLotQuery inventory;
+
+    // The shared path is the Federation's (FederationCaller), which the platform names here.
+    @DynamicPropertySource
+    static void federation(DynamicPropertyRegistry registry) {
+        registry.add("coop-erp.system.entity-id", FEDERATION::toString);
+    }
 
     @BeforeEach
     void cleanCatalogue() {
@@ -176,7 +210,7 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void sharedActivationRequiresSinhalaAndTamil() {
-        UUID incomplete = createShared.handle(
+        UUID incomplete = createLocal.handle(
                 new CreateSku(details("Milk powder", null, null, "EA", false, false, false)), own(FEDERATION));
 
         kernel.reset();
@@ -189,7 +223,7 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
 
-        UUID complete = createShared.handle(
+        UUID complete = createLocal.handle(
                 new CreateSku(details("Milk powder 400g", "කිරිපිටි 400g", "பால் மா 400g", "EA", false, false, false)),
                 own(FEDERATION));
 
@@ -198,9 +232,157 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         activateShared.handle(new ActivateSharedSku(complete), own(FEDERATION));
 
         assertThat(status(complete)).isEqualTo("SHARED");
-        assertThat(audit("SKU_ACTIVATED")).hasSize(1);
-        assertThat(events(SkuActivated.class)).singleElement().satisfies(event -> assertThat(event.status())
-                .isEqualTo("SHARED"));
+        assertThat(audit("SKU_SHARED")).singleElement().satisfies(record -> {
+            assertThat(((Map<?, ?>) record.before()).get("status")).isEqualTo("DRAFT");
+            assertThat(((Map<?, ?>) record.after()).get("status")).isEqualTo("SHARED");
+        });
+        assertThat(audit("SKU_ACTIVATED")).isEmpty();
+        assertThat(events(SkuShared.class))
+                .containsExactly(new SkuShared(complete, FEDERATION, code(complete), "SHARED"));
+        assertThat(events(SkuActivated.class)).isEmpty();
+    }
+
+    @Test
+    void anEntityThatIsNotTheFederationIsRefusedTheSharedPath() {
+        UUID draft = createLocal.handle(
+                new CreateSku(details("Society milk", "කිරි", "பால்", "EA", false, false, false)), own(MPCS));
+
+        kernel.reset();
+
+        refused(() -> activateShared.handle(new ActivateSharedSku(draft), own(MPCS)), "m2.sku.federation_only");
+        refused(
+                () -> updateShared.handle(
+                        new UpdateSku(draft, details("Changed", "කිරි", "பால்", "EA", false, false, false)), own(MPCS)),
+                "m2.sku.federation_only");
+
+        assertThat(status(draft)).isEqualTo("DRAFT");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void theRouterSendsAnUpdateWhereTheSkuStatusSays() {
+        UUID shared = createLocal.handle(
+                new CreateSku(details("Shared salt", "ලුණු", "உப்பு", "EA", false, false, false)), own(FEDERATION));
+        activateShared.handle(new ActivateSharedSku(shared), own(FEDERATION));
+        UUID local = createLocal.handle(
+                new CreateSku(details("Local salt", null, null, "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+
+        kernel.reset();
+
+        // A society sees the SHARED SKU (shared_read), so the router sends it to the shared path,
+        // whose guard refuses it; the local handler refuses a SHARED SKU as well.
+        refused(
+                () -> router.update(
+                        new UpdateSku(shared, details("Renamed", "ලුණු", "உப்பு", "EA", false, false, false)),
+                        own(MPCS)),
+                "m2.sku.federation_only");
+        refused(
+                () -> updateLocal.handle(
+                        new UpdateSku(shared, details("Renamed", "ලුණු", "உப்பு", "EA", false, false, false)),
+                        own(FEDERATION)),
+                "m2.sku.federation_only");
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        router.update(
+                new UpdateSku(shared, details("Shared salt 1kg", "ලුණු", "உப்பு", "EA", false, false, false)),
+                own(FEDERATION));
+        router.update(
+                new UpdateSku(local, details("Local salt 1kg", null, null, "EA", false, false, false)), own(MPCS));
+
+        assertThat(audit("SKU_UPDATED")).hasSize(2);
+        assertThat(events(SkuUpdated.class))
+                .extracting(SkuUpdated::skuId, SkuUpdated::status)
+                .containsExactly(tuple(shared, "SHARED"), tuple(local, "LOCAL"));
+    }
+
+    @Test
+    void theFederationCannotChangeAnotherEntitysLocalSku() {
+        UUID local = createLocal.handle(
+                new CreateSku(details("Society rice", null, null, "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+
+        kernel.reset();
+
+        // Row-level security hides another entity's LOCAL SKU from the Federation's OWN scope.
+        refused(
+                () -> router.update(
+                        new UpdateSku(local, details("Taken over", null, null, "EA", false, false, false)),
+                        own(FEDERATION)),
+                "m2.sku.not_found");
+        refused(
+                () -> deactivate.handle(new DeactivateSku(local, "SEASONAL", null), own(FEDERATION)),
+                "m2.sku.not_found");
+
+        assertThat(status(local)).isEqualTo("LOCAL");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aCodeAnotherEntityHoldsIsReplacedByAFreshOne() {
+        UUID first = createLocal.handle(
+                new CreateSku(details("First holder", null, null, "EA", false, false, false)), own(MPCS));
+        String taken = code(first);
+
+        kernel.reset();
+
+        // The Federation cannot see the society's draft, so the handler's own check passes and
+        // the insert meets the unique index; the router runs the create again with a new code.
+        clearInvocations(codes);
+        doReturn(taken).doCallRealMethod().when(codes).next();
+
+        UUID second = router.create(
+                new CreateSku(details("Second holder", null, null, "EA", false, false, false)), own(FEDERATION));
+
+        assertThat(code(second)).isNotEqualTo(taken).startsWith("SKU-");
+        assertThat(audit("SKU_CREATED"))
+                .singleElement()
+                .satisfies(record -> assertThat(record.subject().id()).isEqualTo(second));
+        assertThat(events(SkuCreated.class)).extracting(SkuCreated::skuId).containsExactly(second);
+        // The clash is met at the insert, before anything is audited: one code taken, one fresh.
+        verify(codes, times(2)).next();
+    }
+
+    @Test
+    void aCodeThatKeepsClashingEndsInAProblemNotAServerError() {
+        UUID first = createLocal.handle(
+                new CreateSku(details("First holder", null, null, "EA", false, false, false)), own(MPCS));
+        String taken = code(first);
+
+        kernel.reset();
+        doReturn(taken).when(codes).next();
+
+        refused(
+                () -> router.create(
+                        new CreateSku(details("Unlucky", null, null, "EA", false, false, false)), own(FEDERATION)),
+                "m2.sku.code_generation_failed");
+
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(superuserJdbc().queryForObject("select count(*) from catalogue.sku", Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void theUnitAndTrackingCannotChangeOnceLotsExist() {
+        UUID local = createLocal.handle(
+                new CreateSku(details("Lot rice", null, null, "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+        when(inventory.hasAnyLot(local)).thenReturn(true);
+
+        kernel.reset();
+
+        refused(
+                () -> router.update(
+                        new UpdateSku(local, details("Lot rice", null, null, "EA", false, true, false)), own(MPCS)),
+                "m2.sku.has_lots");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        // A change that leaves the unit and the tracking alone is still allowed.
+        router.update(new UpdateSku(local, details("Lot rice 5kg", null, null, "EA", false, false, false)), own(MPCS));
+        assertThat(audit("SKU_UPDATED")).hasSize(1);
     }
 
     @Test
@@ -315,6 +497,11 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static String status(UUID skuId) {
         return superuserJdbc().queryForObject("select status from catalogue.sku where sku_id = ?", String.class, skuId);
+    }
+
+    private static String code(UUID skuId) {
+        return superuserJdbc()
+                .queryForObject("select sku_code from catalogue.sku where sku_id = ?", String.class, skuId);
     }
 
     private static String priorStatus(UUID skuId) {
