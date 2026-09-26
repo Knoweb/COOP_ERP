@@ -9,6 +9,9 @@
 # path is chosen when the draft is activated (body.target). The kernel
 # CommandInterceptor authorizes the handler that runs; x-permission-any-of
 # documents the routing without inventing a new permission code.
+# Conversions (cat.sku.create_local, the owner's SKU-definition permission) and
+# barcodes (cat.barcode.manage) are sub-resources of the SKU, as 22A section 5
+# writes them; the lookup is the till's scan resolution (cat.sku.view).
 openapi: 3.1.0
 
 info:
@@ -313,6 +316,313 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  # Units and conversions (22A section 5; doc 22 section 3.2). The owner of the SKU defines them.
+  /v1/catalogue/skus/{skuId}/conversions:
+
+    post:
+      tags: [Catalogue]
+      operationId: defineConversion
+      summary: Define an effective-dated unit conversion of a SKU
+      description: >
+        Owner only. The open-ended conversion of the same unit, if one started earlier, ends the
+        day before the new one starts. Problems: m2.sku.not_found, m2.sku.owner_mismatch,
+        m2.conversion.uom_unknown, m2.conversion.factor_not_positive,
+        m2.conversion.effective_range_invalid, m2.conversion.base_unit,
+        m2.conversion.weight_sku_count_unit, m2.conversion.overlap.
+      x-permission: cat.sku.create_local
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineConversionRequest'
+
+      responses:
+        '204':
+          description: Conversion defined
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.sku.not_found, the SKU is not visible or does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  # The barcode registry (22A section 5; doc 22 sections 3.3 and 4.2). A row is keyed by
+  # (barcode, symbology, owner): a factory code belongs to the SKU's owner and is unique
+  # federation-wide; an INTERNAL code is the caller's own sticker on an item it sells, its own
+  # or a SHARED one, and is unique within the caller's entity.
+  /v1/catalogue/skus/{skuId}/barcodes:
+
+    post:
+      tags: [Barcode]
+      operationId: registerBarcode
+      summary: Register a barcode of a SKU in a unit
+      description: >
+        Problems: m2.sku.not_found, m2.sku.owner_mismatch, m2.barcode.sku_not_active,
+        m2.barcode.symbology_invalid, m2.barcode.format_invalid, m2.barcode.check_digit_invalid,
+        m2.barcode.uom_unknown, m2.barcode.batch_mismatch, m2.barcode.already_registered.
+      x-permission: cat.barcode.manage
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterBarcodeRequest'
+
+      responses:
+        '204':
+          description: Barcode registered
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.sku.not_found, the SKU is not visible or does not exist
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/barcodes/{barcode}:
+
+    delete:
+      tags: [Barcode]
+      operationId: retireBarcode
+      summary: Retire an ACTIVE barcode of the caller's own registry
+      description: >
+        The row stays as history with status RETIRED. A reason code or text is required.
+        Problems: m2.sku.not_found, m2.barcode.symbology_invalid, m2.barcode.not_found,
+        m2.barcode.not_active, m2.barcode.reason_required.
+      x-permission: cat.barcode.manage
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - in: path
+          name: barcode
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 48
+
+        - in: query
+          name: symbology
+          required: true
+          schema:
+            $ref: '#/components/schemas/Symbology'
+
+        - in: query
+          name: reasonCode
+          required: false
+          schema:
+            type: string
+            maxLength: 80
+
+        - in: query
+          name: reasonText
+          required: false
+          schema:
+            type: string
+            maxLength: 500
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+        '204':
+          description: Barcode retired
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.sku.not_found or m2.barcode.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/barcodes/{barcode}/link:
+
+    post:
+      tags: [Barcode]
+      operationId: linkBarcodeToBatch
+      summary: Point an ACTIVE barcode at one batch of its SKU
+      description: >
+        Problems: m2.sku.not_found, m2.barcode.symbology_invalid, m2.barcode.not_found,
+        m2.barcode.not_active, m2.barcode.batch_mismatch.
+      x-permission: cat.barcode.manage
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - in: path
+          name: barcode
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 48
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkBarcodeToBatchRequest'
+
+      responses:
+        '204':
+          description: Barcode linked to the batch
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.sku.not_found or m2.barcode.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  # The till's scan resolution (22A sections 5 and 7; doc 22 section 6.5). Reads under the
+  # catalogue's row-level security: the caller's own items and every SHARED item.
+  /v1/catalogue/lookup:
+
+    get:
+      tags: [Barcode]
+      operationId: lookupByBarcode
+      summary: Resolve a scanned code to a SKU, its unit and, when it can, a batch
+      description: >
+        Pass the code as scanned in `barcode`, or the GTIN with the lot and expiry the scan
+        layer parsed from a 2D code. A GS1 element string (AI 01, 10, 17) in `barcode` is split
+        here. The exact ACTIVE registry row wins; else the GTIN finds the SKU and the lot finds
+        the batch by its number, without a registered batch barcode; an INTERNAL code resolves
+        in the caller's own entity only. 404 m2.barcode.not_found when nothing matches.
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: query
+          name: barcode
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+
+        - in: query
+          name: gtin
+          required: false
+          description: 8, 12, 13 or 14 digits with a valid check digit
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 14
+
+        - in: query
+          name: lot
+          required: false
+          schema:
+            type: string
+            maxLength: 40
+
+        - in: query
+          name: expiry
+          required: false
+          schema:
+            type: string
+            format: date
+
+        - in: query
+          name: symbology
+          required: false
+          schema:
+            $ref: '#/components/schemas/Symbology'
+
+        - in: query
+          name: locationId
+          required: false
+          description: The shop that scans; used for the assortment's sell-through flag once it exists
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: The item card data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupResult'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.barcode.not_found, nothing visible in the scope matches
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+
 components:
 
   schemas:
@@ -526,3 +836,180 @@ components:
         nextOffset:
           type: integer
           minimum: 0
+
+
+    Symbology:
+      type: string
+      enum:
+        - EAN13
+        - EAN8
+        - UPCA
+        - GS1_128
+        - GS1_DATAMATRIX
+        - GS1_QR
+        - INTERNAL
+
+
+    DefineConversionRequest:
+      type: object
+      required:
+        - uomCode
+        - factorToBase
+        - effectiveFrom
+
+      properties:
+
+        uomCode:
+          type: string
+          minLength: 1
+          maxLength: 10
+
+        factorToBase:
+          description: How many of the base unit make one of uomCode (CASE = 24 x EA)
+          type: number
+          exclusiveMinimum: 0
+
+        effectiveFrom:
+          type: string
+          format: date
+
+        effectiveTo:
+          description: Open-ended when absent
+          type: string
+          format: date
+
+
+    RegisterBarcodeRequest:
+      type: object
+      required:
+        - barcode
+        - symbology
+        - uomCode
+
+      properties:
+
+        barcode:
+          type: string
+          minLength: 1
+          maxLength: 48
+
+        symbology:
+          $ref: '#/components/schemas/Symbology'
+
+        uomCode:
+          description: The unit the code identifies, the base unit or one with a conversion
+          type: string
+          minLength: 1
+          maxLength: 10
+
+        batchId:
+          description: Set when the code identifies one batch of the SKU
+          type: string
+          format: uuid
+
+
+    LinkBarcodeToBatchRequest:
+      type: object
+      required:
+        - symbology
+        - batchId
+
+      properties:
+
+        symbology:
+          $ref: '#/components/schemas/Symbology'
+
+        batchId:
+          type: string
+          format: uuid
+
+
+    LookupResult:
+      type: object
+      required:
+        - skuId
+        - skuCode
+        - nameEn
+        - nameSi
+        - nameTa
+        - fallback
+        - uomCode
+        - sellThrough
+        - hasPrintedMrp
+        - soldByWeight
+
+      properties:
+
+        skuId:
+          type: string
+          format: uuid
+
+        skuCode:
+          type: string
+
+        nameEn:
+          type: string
+
+        nameSi:
+          description: The English name when the Sinhala one is missing (fallback.si is then true)
+          type: string
+
+        nameTa:
+          description: The English name when the Tamil one is missing (fallback.ta is then true)
+          type: string
+
+        fallback:
+          type: object
+          required: [si, ta]
+          properties:
+            si:
+              type: boolean
+            ta:
+              type: boolean
+
+        uomCode:
+          type: string
+
+        factorToBase:
+          description: Absent when no conversion of the unit is in force today
+          type: number
+
+        batch:
+          $ref: '#/components/schemas/LookupBatch'
+
+        thumbKey:
+          description: The thumbnail object key, once images exist (M2-06)
+          type: string
+
+        sellThrough:
+          description: From the location assortment, once it exists (M2-09); false until then
+          type: boolean
+
+        hasPrintedMrp:
+          type: boolean
+
+        soldByWeight:
+          type: boolean
+
+
+    LookupBatch:
+      type: object
+      required:
+        - batchId
+        - batchNo
+
+      properties:
+
+        batchId:
+          type: string
+          format: uuid
+
+        batchNo:
+          type: string
+
+        expiryDate:
+          type: string
+          format: date
+
+        printedMrp:
+          type: number

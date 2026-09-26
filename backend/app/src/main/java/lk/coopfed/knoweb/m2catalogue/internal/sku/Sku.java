@@ -238,6 +238,10 @@ class Sku implements Persistable<UUID> {
         return baseUomCode;
     }
 
+    boolean soldByWeight() {
+        return soldByWeight;
+    }
+
     boolean batchTracked() {
         return batchTracked;
     }

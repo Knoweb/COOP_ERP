@@ -96,6 +96,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/skus/{skuId}/conversions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Define an effective-dated unit conversion of a SKU
+         * @description Owner only. The open-ended conversion of the same unit, if one started earlier, ends the day before the new one starts. Problems: m2.sku.not_found, m2.sku.owner_mismatch, m2.conversion.uom_unknown, m2.conversion.factor_not_positive, m2.conversion.effective_range_invalid, m2.conversion.base_unit, m2.conversion.weight_sku_count_unit, m2.conversion.overlap.
+         */
+        post: operations["defineConversion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/barcodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register a barcode of a SKU in a unit
+         * @description Problems: m2.sku.not_found, m2.sku.owner_mismatch, m2.barcode.sku_not_active, m2.barcode.symbology_invalid, m2.barcode.format_invalid, m2.barcode.check_digit_invalid, m2.barcode.uom_unknown, m2.barcode.batch_mismatch, m2.barcode.already_registered.
+         */
+        post: operations["registerBarcode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/barcodes/{barcode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire an ACTIVE barcode of the caller's own registry
+         * @description The row stays as history with status RETIRED. A reason code or text is required. Problems: m2.sku.not_found, m2.barcode.symbology_invalid, m2.barcode.not_found, m2.barcode.not_active, m2.barcode.reason_required.
+         */
+        delete: operations["retireBarcode"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/barcodes/{barcode}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Point an ACTIVE barcode at one batch of its SKU
+         * @description Problems: m2.sku.not_found, m2.barcode.symbology_invalid, m2.barcode.not_found, m2.barcode.not_active, m2.barcode.batch_mismatch.
+         */
+        post: operations["linkBarcodeToBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve a scanned code to a SKU, its unit and, when it can, a batch
+         * @description Pass the code as scanned in `barcode`, or the GTIN with the lot and expiry the scan layer parsed from a 2D code. A GS1 element string (AI 01, 10, 17) in `barcode` is split here. The exact ACTIVE registry row wins; else the GTIN finds the SKU and the lot finds the batch by its number, without a registered batch barcode; an INTERNAL code resolves in the caller's own entity only. 404 m2.barcode.not_found when nothing matches.
+         */
+        get: operations["lookupByBarcode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -162,6 +262,68 @@ export interface components {
         SkuPageResponse: {
             items: components["schemas"]["SkuResponse"][];
             nextOffset?: number;
+        };
+        /** @enum {string} */
+        Symbology: "EAN13" | "EAN8" | "UPCA" | "GS1_128" | "GS1_DATAMATRIX" | "GS1_QR" | "INTERNAL";
+        DefineConversionRequest: {
+            uomCode: string;
+            /** @description How many of the base unit make one of uomCode (CASE = 24 x EA) */
+            factorToBase: number;
+            /** Format: date */
+            effectiveFrom: string;
+            /**
+             * Format: date
+             * @description Open-ended when absent
+             */
+            effectiveTo?: string;
+        };
+        RegisterBarcodeRequest: {
+            barcode: string;
+            symbology: components["schemas"]["Symbology"];
+            /** @description The unit the code identifies, the base unit or one with a conversion */
+            uomCode: string;
+            /**
+             * Format: uuid
+             * @description Set when the code identifies one batch of the SKU
+             */
+            batchId?: string;
+        };
+        LinkBarcodeToBatchRequest: {
+            symbology: components["schemas"]["Symbology"];
+            /** Format: uuid */
+            batchId: string;
+        };
+        LookupResult: {
+            /** Format: uuid */
+            skuId: string;
+            skuCode: string;
+            nameEn: string;
+            /** @description The English name when the Sinhala one is missing (fallback.si is then true) */
+            nameSi: string;
+            /** @description The English name when the Tamil one is missing (fallback.ta is then true) */
+            nameTa: string;
+            fallback: {
+                si: boolean;
+                ta: boolean;
+            };
+            uomCode: string;
+            /** @description Absent when no conversion of the unit is in force today */
+            factorToBase?: number;
+            batch?: components["schemas"]["LookupBatch"];
+            /** @description The thumbnail object key, once images exist (M2-06) */
+            thumbKey?: string;
+            /** @description From the location assortment, once it exists (M2-09); false until then */
+            sellThrough: boolean;
+            hasPrintedMrp: boolean;
+            soldByWeight: boolean;
+        };
+        LookupBatch: {
+            /** Format: uuid */
+            batchId: string;
+            batchNo: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -424,6 +586,199 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    defineConversion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineConversionRequest"];
+            };
+        };
+        responses: {
+            /** @description Conversion defined */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found, the SKU is not visible or does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    registerBarcode: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterBarcodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Barcode registered */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found, the SKU is not visible or does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireBarcode: {
+        parameters: {
+            query: {
+                symbology: components["schemas"]["Symbology"];
+                reasonCode?: string;
+                reasonText?: string;
+            };
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+                barcode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Barcode retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found or m2.barcode.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    linkBarcodeToBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+                barcode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkBarcodeToBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Barcode linked to the batch */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found or m2.barcode.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    lookupByBarcode: {
+        parameters: {
+            query?: {
+                barcode?: string;
+                /** @description 8, 12, 13 or 14 digits with a valid check digit */
+                gtin?: string;
+                lot?: string;
+                expiry?: string;
+                symbology?: components["schemas"]["Symbology"];
+                /** @description The shop that scans; used for the assortment's sell-through flag once it exists */
+                locationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item card data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LookupResult"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.barcode.not_found, nothing visible in the scope matches */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
 }
