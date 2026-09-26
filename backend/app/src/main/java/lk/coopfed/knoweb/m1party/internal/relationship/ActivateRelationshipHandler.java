@@ -51,8 +51,8 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
         Relationship relationship =
                 RelationshipRules.found(repository, command == null ? null : command.relationshipId());
 
-        // 1. only the seller activates.
-        RelationshipRules.requireSeller(scope, relationship);
+        // 1. only the seller activates; the row is then locked and re-read.
+        relationship = RelationshipRules.lockedForSeller(repository, scope, relationship);
 
         // 2. status DRAFT.
         if (!relationship.isDraft()) {
