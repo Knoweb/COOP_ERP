@@ -196,6 +196,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The batches of one SKU, newest first, with the corrects and superseded chain */
+        get: operations["listBatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/batches/{batchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One batch */
+        get: operations["getBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/batches/{batchId}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correct the printed MRP or the expiry of a batch by a replacement batch
+         * @description The caller is the Federation or holds a lot of the batch (M5). The old batch becomes SUPERSEDED and its identity moves to the replacement, which the response returns. Problems: m2.batch.not_found, m2.batch.superseded, m2.batch.not_holder, m2.batch.reason_required, m2.batch.mrp_invalid, m2.batch.dates_invalid, m2.batch.correction_unchanged, mfa.required.
+         */
+        post: operations["correctBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The suppliers of the caller's entity */
+        get: operations["listSuppliers"];
+        put?: never;
+        /**
+         * Register a supplier of the caller's entity
+         * @description Problems: m2.supplier.name_taken.
+         */
+        post: operations["registerSupplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -324,6 +399,51 @@ export interface components {
             /** Format: date */
             expiryDate?: string;
             printedMrp?: number;
+        };
+        BatchResponse: {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            supplierId?: string;
+            batchNo: string;
+            /** Format: date */
+            manufactureDate?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /** Format: uuid */
+            originDocumentId?: string;
+            synthetic: boolean;
+            /** Format: uuid */
+            correctsBatchId?: string;
+            /** @enum {string} */
+            status: "REGISTERED" | "SUPERSEDED";
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description At least one of printedMrp and expiryDate, and a reason (a code, a text or both). */
+        CorrectBatchRequest: {
+            printedMrp?: number;
+            /** Format: date */
+            expiryDate?: string;
+            reasonCode?: string;
+            reasonText?: string;
+        };
+        RegisterSupplierRequest: {
+            name: string;
+        };
+        SupplierResponse: {
+            /** Format: uuid */
+            supplierId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            name: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -779,6 +899,155 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    listBatches: {
+        parameters: {
+            query: {
+                skuId: string;
+                batchNo?: string;
+                /** @description Only batches whose expiry date is before this date */
+                expiringBefore?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The batches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The batch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.batch.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    correctBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description The replacement batch */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.batch.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listSuppliers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suppliers, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    registerSupplier: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterSupplierRequest"];
+            };
+        };
+        responses: {
+            /** @description The supplier */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
 }

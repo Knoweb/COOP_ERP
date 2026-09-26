@@ -623,6 +623,209 @@ paths:
                 $ref: 'common.yaml#/components/schemas/Problem'
 
 
+  # Batches (M2-05; 22A sections 5 and 7). A batch is global identity: every scope reads it.
+  # RegisterBatch has no operation: M4 and M5 call it inside their own commands
+  # (api.BatchRegistration). A correction is a replacement batch that cites the old one.
+  /v1/catalogue/batches:
+
+    get:
+      tags: [Batch]
+      operationId: listBatches
+      summary: The batches of one SKU, newest first, with the corrects and superseded chain
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: query
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: batchNo
+          required: false
+          schema:
+            type: string
+            maxLength: 40
+
+        - in: query
+          name: expiringBefore
+          required: false
+          description: Only batches whose expiry date is before this date
+          schema:
+            type: string
+            format: date
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+
+      responses:
+        '200':
+          description: The batches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BatchResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+
+  /v1/catalogue/batches/{batchId}:
+
+    get:
+      tags: [Batch]
+      operationId: getBatch
+      summary: One batch
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: The batch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.batch.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+
+  /v1/catalogue/batches/{batchId}/correct:
+
+    post:
+      tags: [Batch]
+      operationId: correctBatch
+      summary: Correct the printed MRP or the expiry of a batch by a replacement batch
+      description: >
+        The caller is the Federation or holds a lot of the batch (M5). The old batch becomes
+        SUPERSEDED and its identity moves to the replacement, which the response returns.
+        Problems: m2.batch.not_found, m2.batch.superseded, m2.batch.not_holder,
+        m2.batch.reason_required, m2.batch.mrp_invalid, m2.batch.dates_invalid,
+        m2.batch.correction_unchanged, mfa.required.
+      x-permission: cat.batch.correct
+      x-mfa: true
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrectBatchRequest'
+
+      responses:
+        '201':
+          description: The replacement batch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.batch.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  # Suppliers (M2-05; doc 22 section 3.9): the minimal table until M10 takes it over.
+  /v1/catalogue/suppliers:
+
+    get:
+      tags: [Supplier]
+      operationId: listSuppliers
+      summary: The suppliers of the caller's entity
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: The suppliers, by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupplierResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Supplier]
+      operationId: registerSupplier
+      summary: Register a supplier of the caller's entity
+      description: >
+        Problems: m2.supplier.name_taken.
+      x-permission: cat.supplier.manage
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterSupplierRequest'
+
+      responses:
+        '201':
+          description: The supplier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -1013,3 +1216,130 @@ components:
 
         printedMrp:
           type: number
+
+
+    BatchResponse:
+      type: object
+      required:
+        - batchId
+        - skuId
+        - batchNo
+        - synthetic
+        - status
+        - ownerEntityId
+        - createdAt
+
+      properties:
+
+        batchId:
+          type: string
+          format: uuid
+
+        skuId:
+          type: string
+          format: uuid
+
+        supplierId:
+          type: string
+          format: uuid
+
+        batchNo:
+          type: string
+
+        manufactureDate:
+          type: string
+          format: date
+
+        expiryDate:
+          type: string
+          format: date
+
+        printedMrp:
+          type: number
+
+        originDocumentId:
+          type: string
+          format: uuid
+
+        synthetic:
+          type: boolean
+
+        correctsBatchId:
+          type: string
+          format: uuid
+
+        status:
+          type: string
+          enum:
+            - REGISTERED
+            - SUPERSEDED
+
+        ownerEntityId:
+          type: string
+          format: uuid
+
+        createdAt:
+          type: string
+          format: date-time
+
+
+    CorrectBatchRequest:
+      type: object
+      description: At least one of printedMrp and expiryDate, and a reason (a code, a text or both).
+      properties:
+
+        printedMrp:
+          type: number
+          exclusiveMinimum: 0
+
+        expiryDate:
+          type: string
+          format: date
+
+        reasonCode:
+          type: string
+          maxLength: 80
+
+        reasonText:
+          type: string
+          maxLength: 500
+
+
+    RegisterSupplierRequest:
+      type: object
+      required:
+        - name
+      properties:
+
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+
+    SupplierResponse:
+      type: object
+      required:
+        - supplierId
+        - ownerEntityId
+        - name
+        - status
+
+      properties:
+
+        supplierId:
+          type: string
+          format: uuid
+
+        ownerEntityId:
+          type: string
+          format: uuid
+
+        name:
+          type: string
+
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
