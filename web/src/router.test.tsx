@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { IntlProvider } from "react-intl";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MODULES } from "./modules/registry";
@@ -37,9 +38,12 @@ const registerOnly: ModuleDefinition = {
 
 function renderShell(modules: ModuleDefinition[], address: string, locale: Locale = "en") {
   const router = createMemoryRouter(shellRoutes(modules), { initialEntries: [address] });
+  // The frame holds the step-up replay, which invalidates queries; App gives it the client.
   return render(
     <IntlProvider locale={locale} messages={messages[locale]}>
-      <RouterProvider router={router} />
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
     </IntlProvider>
   );
 }

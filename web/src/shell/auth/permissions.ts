@@ -14,16 +14,17 @@ import type { Session } from "./session";
 const EVERY_PERMISSION = "*";
 
 /**
- * TEMPORARY, until 19A K-03 (the permission resolver).
+ * TEMPORARY, until the server hands the shell the resolved permission set.
  *
- * The real rule (doc 19): a role is a set of permissions, maintained as data in M1, and the
- * kernel resolves the permissions of a user in a scope. Neither exists yet. The token of the
- * dev realm (infra/compose/realm-dev.json) carries `roles` only, so until K-03 the three
- * development roles are given their permissions here, by hand.
+ * The real rule (doc 19 section 3; doc 30 section 3, "visibility from the resolved permission
+ * set"): a role is a set of permissions, maintained as data in M1, and the kernel resolves the
+ * permissions of a user in a scope (19A K-03b, `PermissionResolver`). The resolver exists on
+ * the server, but no operation of any slice hands its answer to a client yet, and the token
+ * of the dev realm (infra/compose/realm-dev.json) carries `roles` only. So until that read
+ * exists the three development roles are given their permissions here, by hand.
  *
- * K-03 replaces this map with the resolved permission set the server hands out; the two
- * functions below keep their signatures, so no caller changes. Do not add production roles
- * here, and do not grow this into a rule engine.
+ * That read replaces this map; the functions below keep their signatures, so no caller
+ * changes. Do not add production roles here, and do not grow this into a rule engine.
  *
  * fed-admin holds everything, so that a freshly scaffolded module shows up for one
  * development user without anybody editing the shell.
@@ -34,8 +35,29 @@ const TEMPORARY_DEV_ROLE_PERMISSIONS: Record<string, string[]> = {
   cashier: ["hello.greeting.read"]
 };
 
-/** Does this user hold the permission? A role the map does not know holds nothing. */
-export function hasPermission(session: Pick<Session, "roles">, permission: string): boolean {
+/**
+ * The permission codes that name a read, by the catalogue's convention (gov.entity.view,
+ * cat.sku.view, hello.greeting.read). Everything else is a command.
+ */
+const READ_SUFFIXES = [".view", ".read"];
+
+function isRead(permission: string): boolean {
+  return READ_SUFFIXES.some((suffix) => permission.endsWith(suffix));
+}
+
+/**
+ * Does this user hold the permission? A role the map does not know holds nothing.
+ *
+ * The one rule of the server the shell can mirror without the resolved set: only the OWN
+ * class runs a command (19A section 3, `PermissionResolver`: "the read-only classes run no
+ * command"). So a user in FEDERATION_VIEW, PARTY or EXTERNAL_TIMEBOXED is shown the reads
+ * their roles give and no command, whatever the map says; before this, fed-admin (a
+ * FEDERATION_VIEW user) was offered the register form and refused only on submit.
+ */
+export function hasPermission(session: Pick<Session, "roles" | "policyClass">, permission: string): boolean {
+  if (session.policyClass !== "OWN" && !isRead(permission)) {
+    return false;
+  }
   return session.roles.some((role) => {
     const granted = TEMPORARY_DEV_ROLE_PERMISSIONS[role] ?? [];
     return granted.includes(EVERY_PERMISSION) || granted.includes(permission);
@@ -43,7 +65,7 @@ export function hasPermission(session: Pick<Session, "roles">, permission: strin
 }
 
 /** Does this user hold at least one of them? An empty list asks for nothing, so: yes. */
-export function hasAnyPermission(session: Pick<Session, "roles">, permissions: string[]): boolean {
+export function hasAnyPermission(session: Pick<Session, "roles" | "policyClass">, permissions: string[]): boolean {
   return permissions.length === 0 || permissions.some((permission) => hasPermission(session, permission));
 }
 

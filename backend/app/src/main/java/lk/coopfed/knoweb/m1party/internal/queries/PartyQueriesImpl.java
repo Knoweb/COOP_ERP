@@ -106,20 +106,20 @@ class PartyQueriesImpl implements PartyQueries {
             return new EntityPage(List.of(), null);
         }
 
-        EntityFilter effectiveFilter = filter == null ? new EntityFilter(null, null, null, 50) : filter;
+        EntityFilter effectiveFilter = filter == null ? new EntityFilter(null, null, null, null, 50) : filter;
 
         int limit = effectiveFilter.normalizedLimit();
 
         int fetchLimit = limit + 1;
 
         if (scope.policyClass() == PolicyClass.PARTY) {
-            return listParty(effectiveFilter.cursor(), limit, fetchLimit);
+            return listParty(effectiveFilter, limit, fetchLimit);
         }
 
         return listFull(effectiveFilter, limit, fetchLimit);
     }
 
-    private EntityPage listParty(UUID cursor, int limit, int fetchLimit) {
+    private EntityPage listParty(EntityFilter filter, int limit, int fetchLimit) {
 
         StringBuilder sql = new StringBuilder(
                 PARTY_SELECT + """
@@ -127,6 +127,11 @@ class PartyQueriesImpl implements PartyQueries {
                                 """);
 
         List<Object> params = new ArrayList<>();
+
+        // The directory carries the names only, so a trading partner searches by name, not by code.
+        appendSearch(sql, params, filter.query(), false);
+
+        UUID cursor = filter.cursor();
 
         if (cursor != null) {
             sql.append("""
@@ -175,6 +180,8 @@ class PartyQueriesImpl implements PartyQueries {
             params.add(filter.district().strip());
         }
 
+        appendSearch(sql, params, filter.query(), true);
+
         if (filter.cursor() != null) {
             sql.append("""
                      and entity_id > ?
@@ -193,6 +200,56 @@ class PartyQueriesImpl implements PartyQueries {
         List<EntityView> rows = jdbc.query(sql.toString(), FULL_MAPPER, params.toArray());
 
         return page(rows, limit);
+    }
+
+    /**
+     * The search box of the register (21A section 8): a prefix of the entity code (codes are
+     * upper case) or a part of one of the three legal names, whatever the case. The text is
+     * escaped so that %, _ and \ in it are letters and not wildcards, as M2's SKU search does
+     * (CatalogueQueriesImpl). The server filters, so a society on a later page is found; the
+     * web client used to search only the pages it had loaded and said "empty" for the rest.
+     */
+    private static void appendSearch(StringBuilder sql, List<Object> params, String query, boolean withCode) {
+
+        if (query == null || query.isBlank()) {
+            return;
+        }
+
+        String escaped = escapeLike(query.strip());
+
+        String contains = "%" + escaped + "%";
+
+        if (withCode) {
+            sql.append(
+                    """
+                     and (
+                         entity_code like ? escape '\\'
+                         or legal_name_en ilike ? escape '\\'
+                         or legal_name_si ilike ? escape '\\'
+                         or legal_name_ta ilike ? escape '\\'
+                     )
+                    """);
+
+            params.add(escaped.toUpperCase() + "%");
+        } else {
+            sql.append(
+                    """
+                     and (
+                         legal_name_en ilike ? escape '\\'
+                         or legal_name_si ilike ? escape '\\'
+                         or legal_name_ta ilike ? escape '\\'
+                     )
+                    """);
+        }
+
+        params.add(contains);
+        params.add(contains);
+        params.add(contains);
+    }
+
+    /** Makes the backslash, % and _ of the user's text literal in a LIKE pattern with escape '\'. */
+    static String escapeLike(String text) {
+        return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     // ---- locations and till positions (M1-05) ----------------------------------------------
