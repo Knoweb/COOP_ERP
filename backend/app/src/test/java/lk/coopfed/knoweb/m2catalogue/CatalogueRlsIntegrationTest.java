@@ -107,7 +107,7 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     void clean() {
         JdbcTemplate admin = superuserJdbc();
         admin.execute(
-                "truncate catalogue.batch, catalogue.batch_key, catalogue.supplier, catalogue.sku_tag, catalogue.sku_barcode,"
+                "truncate catalogue.batch, catalogue.batch_key, catalogue.supplier, catalogue.sku_tag, catalogue.sku_barcode, catalogue.sku_image,"
                         + " catalogue.sku_uom_conversion, catalogue.sku");
         admin.update("delete from catalogue.tag where tag_code like 't-%'");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);

@@ -23,6 +23,7 @@ import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentOrigin;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.ObjectStorage;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
@@ -65,6 +66,9 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     AttachmentVerifier verifier;
+
+    @Autowired
+    ObjectStorage objectStorage;
 
     @Autowired
     DocumentBaseRepository documents;
@@ -378,6 +382,63 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                         attachmentId);
     }
 
+    @Test
+    void aModulesOwnObjectIsPresignedVerifiedReadAndWrittenUnderTheSameLimits() {
+        // CR-19A-7: an object whose owner is no document (an M2 image of a SKU).
+        UUID imageId = Ids.next();
+        String key = ObjectStorage.keyOf("m2catalogue", OWNER, imageId);
+        assertThat(key).isEqualTo("objects/m2catalogue/" + OWNER + "/" + imageId);
+
+        ObjectStorage.PresignedPut put = objectStorage.presignPut(key, "image/png", 12L, scope(OWNER));
+        assertThat(put.objectKey()).isEqualTo(key);
+        assertThat(put.url().toString()).contains(key).contains("length=12");
+        assertThat(put.expiresAt()).isAfter(java.time.Instant.now().minusSeconds(60));
+        // Asking again for the same key is a new URL for the same object (idempotent per id).
+        assertThat(objectStorage.presignPut(key, "image/png", 12L, scope(OWNER)).objectKey())
+                .isEqualTo(key);
+
+        // The register's limits hold as for a document's attachment.
+        assertThatThrownBy(() -> objectStorage.presignPut(key, "text/html", null, scope(OWNER)))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.content_type_not_allowed");
+        assertThatThrownBy(() -> objectStorage.presignPut(key, "image/png", 1L << 40, scope(OWNER)))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.too_large");
+        // A module names only module keys: never a document's attachment.
+        assertThatThrownBy(() -> objectStorage.presignPut(
+                        "attachments/" + OWNER + "/" + documentId + "/" + imageId, "image/png", null, scope(OWNER)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        byte[] bytes = "a product photo".getBytes(StandardCharsets.UTF_8);
+        assertThat(objectStorage.verify(key, sha256(bytes), scope(OWNER)).outcome())
+                .isEqualTo(ObjectStorage.Outcome.MISSING);
+
+        store.objects.put(key, bytes);
+        ObjectStorage.Verification verified =
+                objectStorage.verify(key, sha256(bytes).toUpperCase(), scope(OWNER));
+        assertThat(verified.outcome()).isEqualTo(ObjectStorage.Outcome.VERIFIED);
+        assertThat(verified.sha256Hex()).isEqualTo(sha256(bytes));
+        assertThat(verified.size()).isEqualTo(bytes.length);
+        assertThat(objectStorage
+                        .verify(key, sha256("other".getBytes(StandardCharsets.UTF_8)), scope(OWNER))
+                        .outcome())
+                .isEqualTo(ObjectStorage.Outcome.HASH_MISMATCH);
+
+        store.objects.put(key, new byte[6 * 1024 * 1024]);
+        assertThat(objectStorage.verify(key, null, scope(OWNER)).outcome()).isEqualTo(ObjectStorage.Outcome.TOO_LARGE);
+
+        store.objects.put(key, bytes);
+        assertThat(objectStorage.read(key, scope(OWNER))).isEqualTo(bytes);
+
+        objectStorage.write(key + "/thumb.png", "image/png", new byte[] {1, 2, 3});
+        assertThat(store.objects.get(key + "/thumb.png")).containsExactly(1, 2, 3);
+        assertThat(objectStorage.presignGet(key + "/thumb.png", "image/png").toString())
+                .isEqualTo("memory://get/" + key + "/thumb.png");
+
+        // Nothing of this is a row or an audit record of the kernel: the module keeps both.
+        assertThat(kernel.committedAudit()).isEmpty();
+    }
+
     private static DocumentRecord draft(UUID id) {
         return new DocumentRecord(
                 id,
@@ -474,6 +535,20 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
         @Override
         public String sha256Hex(String key) {
             return sha256(objects.get(key));
+        }
+
+        @Override
+        public byte[] read(String key, long maxBytes) {
+            byte[] bytes = objects.get(key);
+            if (bytes == null || bytes.length > maxBytes) {
+                throw new IllegalStateException("No object " + key + " within " + maxBytes + " bytes");
+            }
+            return bytes.clone();
+        }
+
+        @Override
+        public void put(String key, String contentType, byte[] bytes) {
+            objects.put(key, bytes.clone());
         }
     }
 }

@@ -16,6 +16,7 @@ import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -150,6 +151,36 @@ class S3ObjectStore implements ObjectStore {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is part of every JDK", e);
         }
+    }
+
+    @Override
+    public byte[] read(String key, long maxBytes) {
+        requireConfigured();
+        try (InputStream bytes = client.getObject(
+                GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+            // At most one byte past the limit is read: a larger object is refused without being
+            // held in memory, whatever a HEAD said a moment earlier.
+            byte[] read = bytes.readNBytes((int) Math.min(Integer.MAX_VALUE - 8L, maxBytes + 1));
+            if (read.length > maxBytes) {
+                throw new IllegalStateException("Object " + key + " is larger than the " + maxBytes + " bytes allowed");
+            }
+            return read;
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read object " + key + " from the store", e);
+        }
+    }
+
+    @Override
+    public void put(String key, String contentType, byte[] bytes) {
+        requireConfigured();
+        client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(contentType)
+                        .contentLength((long) bytes.length)
+                        .build(),
+                RequestBody.fromBytes(bytes));
     }
 
     private void requireConfigured() {
