@@ -278,7 +278,7 @@ public class IngestTransactions {
             int applied,
             int duplicates,
             int quarantined) {
-        Map<String, Object> cursor = jdbc.queryForMap(
+        List<Map<String, Object>> released = jdbc.queryForList(
                 """
                 update kernel.device_sync_cursor
                    set last_batch_id = ?, last_ack = cast(? as jsonb), last_ack_at = ?,
@@ -293,6 +293,13 @@ public class IngestTransactions {
                 Timestamp.from(clock.instant()),
                 device.deviceId(),
                 batchId);
+        if (released.isEmpty()) {
+            // The claim was taken over after the in-flight timeout (a resend on another instance
+            // while this ingestion outlived it): the same answer as a chunk that finds its claim
+            // gone, 409 sync.batch_in_flight naming the holder, not a result-size exception.
+            throw new ClaimLost(inFlightBatch(device));
+        }
+        Map<String, Object> cursor = released.getFirst();
         if (applied + quarantined > 0) {
             events.publish(new SyncBatchReceived(
                     batchId,

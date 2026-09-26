@@ -3,10 +3,12 @@ package lk.coopfed.knoweb.kernel.internal.sync;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DeviceCredentials;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.event.CacheFanoutListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -21,13 +23,25 @@ import org.springframework.stereotype.Component;
  * <p>M1's device events (M1-06) name the device in a field ending in "DeviceId"
  * (enrolledDeviceId, suspendedDeviceId, revokedDeviceId, previousDeviceId ...): every UUID field of the payload
  * whose name ends in "deviceId" (deviceId, previousDeviceId, enrolledDeviceId ...) is emptied,
- * and a payload with none empties the whole cache. The expiry of {@link DeviceDirectory} bounds
- * the staleness where the consumer runtime does not run.
+ * and a payload with none empties the whole cache. The cache empties on every instance through
+ * its own fan-out queue ({@link CacheFanoutListener}, whatever the role) and on the worker's
+ * shared queue as well; the credential is disabled on the shared queue alone, once. The expiry
+ * of {@link DeviceDirectory} bounds the staleness where the broker is away.
  */
 @Component
-class DeviceCacheInvalidator {
+class DeviceCacheInvalidator implements CacheFanoutListener {
 
     static final String CONSUMER = "kernel-device-cache";
+
+    static final Set<String> CACHE_TYPES = Set.of(
+            "device.enrolled.v1",
+            "device.assigned.v1",
+            "device.position_changed.v1",
+            "device.suspended.v1",
+            "device.reinstated.v1",
+            "device.revoked.v1",
+            "device.retired.v1",
+            "location.primary_changed.v1");
 
     private static final Logger log = LoggerFactory.getLogger(DeviceCacheInvalidator.class);
 
@@ -53,6 +67,18 @@ class DeviceCacheInvalidator {
             consumer = CONSUMER)
     public void onDeviceChanged(JsonNode payload, ScopeContext scope) {
         if (!forgetDevicesNamedIn(payload)) {
+            directory.invalidateAll();
+        }
+    }
+
+    @Override
+    public Set<String> eventTypes() {
+        return CACHE_TYPES;
+    }
+
+    @Override
+    public void published(String eventType, JsonNode payload) {
+        if (CACHE_TYPES.contains(eventType) && (payload == null || !forgetDevicesNamedIn(payload))) {
             directory.invalidateAll();
         }
     }

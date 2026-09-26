@@ -68,6 +68,9 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
         ((JdbcConfigRegistry) config).invalidate("m1.bulk.max_rows");
         ((JdbcConfigRegistry) config).invalidate("till.idle_lock");
         ((JdbcConfigRegistry) config).invalidate("security.policy.mfa_enabled");
+        for (String pin : List.of("lockout_attempts", "lockout_duration", "history_depth")) {
+            ((JdbcConfigRegistry) config).invalidate("security.pin." + pin);
+        }
     }
 
     @Test
@@ -221,18 +224,63 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aModuleDefaultUpdatesARegisteredItemAndRegistersAnUnknownOne() {
-        seeder.addDefaults(Map.of("m1.bulk.max_rows", "750", "test.new_setting", "hello"));
+    void aModuleDefaultUpdatesARegisteredItemAndAnUnknownKeyFailsTheStart() {
+        seeder.addDefaults(Map.of("m1.bulk.max_rows", "750"));
 
         assertThat(inScope(SOCIETY, null, () -> config.getInt("m1.bulk.max_rows", scope(SOCIETY, null), 1)))
                 .isEqualTo(750);
-        assertThat(inScope(SOCIETY, null, () -> config.get("test.new_setting", scope(SOCIETY, null))))
-                .contains("hello");
+
+        // An unregistered key used to become an untyped, ENTITY-scoped, not sensitive string item
+        // that set() then accepted any text for; now it is a typed entry in config-items.yaml or
+        // nothing.
+        assertThatThrownBy(() -> seeder.addDefaults(Map.of("test.new_setting", "hello")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("test.new_setting");
         assertThat(superuserJdbc()
-                        .queryForMap(
-                                "select module, scope_kind from kernel.config_item where key = 'test.new_setting'"))
-                .containsEntry("module", "test")
-                .containsEntry("scope_kind", "ENTITY");
+                        .queryForObject(
+                                "select count(*) from kernel.config_item where key = 'test.new_setting'",
+                                Integer.class))
+                .isZero();
+        // And a default outside the item's schema is refused the same way it would be at set().
+        assertThatThrownBy(() -> seeder.addDefaults(Map.of("m1.bulk.max_rows", "0")))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.value_invalid");
+    }
+
+    @Test
+    void thePinPolicyCanOnlyBeTightenedByAnEntity() {
+        // Doc 19 section 2.1: a PIN is acceptable only because of 5 attempts, a 15-minute lockout
+        // and no reuse of the last 3; an entity may go stricter, never looser.
+        ScopeContext withMfa = scope(SOCIETY, null, Instant.now());
+
+        assertThatThrownBy(() -> inScope(SOCIETY, null, () -> {
+                    config.set("security.pin.lockout_attempts", ConfigScope.entity(SOCIETY), "6", withMfa, "looser");
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.value_invalid");
+        assertThatThrownBy(() -> inScope(SOCIETY, null, () -> {
+                    config.set("security.pin.lockout_duration", ConfigScope.entity(SOCIETY), "PT5M", withMfa, "looser");
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.value_invalid");
+        assertThatThrownBy(() -> inScope(SOCIETY, null, () -> {
+                    config.set("security.pin.history_depth", ConfigScope.entity(SOCIETY), "1", withMfa, "looser");
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.value_invalid");
+
+        inScope(SOCIETY, null, () -> {
+            config.set("security.pin.lockout_attempts", ConfigScope.entity(SOCIETY), "3", withMfa, "stricter");
+            config.set("security.pin.lockout_duration", ConfigScope.entity(SOCIETY), "PT1H", withMfa, "stricter");
+            config.set("security.pin.history_depth", ConfigScope.entity(SOCIETY), "5", withMfa, "stricter");
+            return null;
+        });
+        assertThat(inScope(
+                        SOCIETY, null, () -> config.getInt("security.pin.lockout_attempts", scope(SOCIETY, null), 5)))
+                .isEqualTo(3);
     }
 
     private static ScopeContext scope(UUID entity, UUID location) {
