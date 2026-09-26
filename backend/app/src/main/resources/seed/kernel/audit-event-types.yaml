@@ -25,6 +25,10 @@ audit_event_types:
     severity: INFO
     offline_capturable: true
     description_en: Correcting document linked to its original
+  - code: DOCUMENT_STATUS_CHANGED
+    severity: INFO
+    offline_capturable: true
+    description_en: Document moved to another status through its state history
   - code: NUMBERING_GAP
     severity: REVIEW
     offline_capturable: false

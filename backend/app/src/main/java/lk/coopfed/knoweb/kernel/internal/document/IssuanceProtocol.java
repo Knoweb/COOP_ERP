@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Optional;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.BusinessDate;
-import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentIssuance;
 import lk.coopfed.knoweb.kernel.api.DocumentIssued;
 import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
@@ -28,6 +27,7 @@ import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.SeriesScope;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -48,7 +48,7 @@ class IssuanceProtocol implements DocumentIssuance {
     private final DocumentTypes types;
     private final Map<String, DocumentTypeHandler> handlers = new HashMap<>();
     private final JdbcNumberingService numbering;
-    private final DocumentBaseRepository documents;
+    private final JdbcDocumentBaseRepository documents;
     private final BusinessDate businessDate;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -59,7 +59,7 @@ class IssuanceProtocol implements DocumentIssuance {
             DocumentTypes types,
             List<DocumentTypeHandler> typeHandlers,
             JdbcNumberingService numbering,
-            DocumentBaseRepository documents,
+            JdbcDocumentBaseRepository documents,
             BusinessDate businessDate,
             AuditFacade audit,
             EventPublisher events,
@@ -92,14 +92,25 @@ class IssuanceProtocol implements DocumentIssuance {
                             + " @Transactional method");
         }
 
-        // 1. the base's checks, then the type's validator: no invalid document takes a number.
-        if (draft.id() == null || !STATUS_DRAFT.equals(draft.status()) || draft.isIssued()) {
+        if (draft == null || draft.id() == null) {
             throw new ProblemException("document.not_draft");
         }
 
-        DocumentType type = types.find(draft.docTypeCode())
+        // The stored header and lines are what is issued, locked so that nothing joins or
+        // changes them while the number is taken: a module that keeps drafts may pass a copy
+        // that is behind the store (updateDraft never writes the parties or the place), and the
+        // hash must be over the rows that exist. The caller's record only says which document.
+        Optional<DocumentRecord> stored = documents.findByIdForUpdate(draft.id());
+        DocumentRecord header = stored.orElse(draft);
+
+        // 1. the base's checks, then the type's validator: no invalid document takes a number.
+        if (!STATUS_DRAFT.equals(header.status()) || header.isIssued()) {
+            throw new ProblemException("document.not_draft");
+        }
+
+        DocumentType type = types.find(header.docTypeCode())
                 .orElseThrow(() -> new ProblemException(
-                        "document.type_unknown", Map.of("docTypeCode", String.valueOf(draft.docTypeCode()))));
+                        "document.type_unknown", Map.of("docTypeCode", String.valueOf(header.docTypeCode()))));
 
         DocumentTypeHandler handler = handlers.get(type.code());
 
@@ -107,32 +118,38 @@ class IssuanceProtocol implements DocumentIssuance {
             throw new ProblemException("document.type_unowned", Map.of("docTypeCode", type.code()));
         }
 
-        if (ctx == null || ctx.entityId() == null || !ctx.entityId().equals(draft.ownerEntityId())) {
+        if (ctx == null || ctx.entityId() == null || !ctx.entityId().equals(header.ownerEntityId())) {
             throw new ProblemException("document.owner_mismatch");
         }
 
-        if (type.bilateral() && draft.counterpartyEntityId() == null) {
+        if (type.bilateral() && header.counterpartyEntityId() == null) {
             throw new ProblemException("document.counterparty_required", Map.of("docTypeCode", type.code()));
         }
 
-        Optional<DocumentRecord> stored = documents.findById(draft.id());
-
-        if (stored.isPresent() && stored.get().isIssued()) {
-            throw new ProblemException("document.not_draft");
+        // 19A section 7: offline scopes are never issued here; a till numbers its own documents
+        // and they arrive with the number through ingestion (K-08).
+        if (header.origin() == DocumentOrigin.OFFLINE) {
+            throw new ProblemException("document.series_device_held", Map.of("docTypeCode", type.code()));
         }
 
-        List<DocumentLineRecord> documentLines = stored.isPresent() ? documents.findLines(draft.id()) : List.of();
+        List<DocumentLineRecord> storedLines = stored.isPresent() ? documents.findLines(header.id()) : List.of();
+        List<DocumentLineRecord> documentLines =
+                storedLines.isEmpty() ? (lines == null ? List.of() : List.copyOf(lines)) : storedLines;
 
-        if (documentLines.isEmpty()) {
-            documentLines = lines == null ? List.of() : List.copyOf(lines);
-        }
-
-        handler.validate(draft, documentLines, ctx);
+        handler.validate(header, documentLines, ctx);
 
         // 2. the number, from the finest series that exists for this issuer at this place.
         Series series = numbering
-                .seriesFor(type.code(), draft.ownerEntityId(), draft.locationId(), draft.tillPositionId())
+                .seriesFor(type.code(), header.ownerEntityId(), header.locationId(), header.tillPositionId())
                 .orElseThrow(() -> new ProblemException("document.series_missing", Map.of("docTypeCode", type.code())));
+
+        // The counter of a TILL_POSITION series, or of any series a device holds, is the
+        // device's (doc 18 section 5.5: "the holder device holds the authoritative counter"):
+        // central taking a number from it would hand out the same number twice.
+        if (series.holderDeviceId() != null || series.scope() == SeriesScope.TILL_POSITION) {
+            throw new ProblemException(
+                    "document.series_device_held", Map.of("docTypeCode", type.code(), "prefix", series.prefix()));
+        }
 
         long number = numbering.takeNumber(series.seriesId());
         String display = String.format(JdbcNumberingService.NUMBER_FORMAT, series.prefix(), number);
@@ -141,45 +158,51 @@ class IssuanceProtocol implements DocumentIssuance {
         // Microseconds: what timestamptz keeps, so the stored instant is exactly the hashed one.
         Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         LocalDateTime issuedLocal = LocalDateTime.ofInstant(issuedAt, businessZone);
-        LocalDate date = businessDateFor(draft, ctx, issuedAt);
+        LocalDate date = businessDateFor(header, ctx, issuedAt);
 
         Totals totals = Totals.of(documentLines);
 
         DocumentRecord numbered = new DocumentRecord(
-                draft.id(),
+                header.id(),
                 type.code(),
                 series.seriesId(),
                 number,
                 display,
-                draft.ownerEntityId(),
-                draft.counterpartyEntityId(),
-                draft.locationId(),
-                draft.tillPositionId(),
-                draft.deviceId(),
+                header.ownerEntityId(),
+                header.counterpartyEntityId(),
+                header.locationId(),
+                header.tillPositionId(),
+                header.deviceId(),
                 STATUS_ISSUED,
                 issuedAt,
                 issuedLocal,
                 date,
-                draft.operatorUserId() != null ? draft.operatorUserId() : ctx.userId(),
-                draft.currency() == null ? "LKR" : draft.currency(),
+                header.operatorUserId() != null ? header.operatorUserId() : ctx.userId(),
+                header.currency() == null ? "LKR" : header.currency(),
                 totals.net(),
                 totals.tax(),
                 totals.gross(),
-                draft.referenceDocumentId(),
+                header.referenceDocumentId(),
                 null,
-                draft.origin() == null ? DocumentOrigin.ONLINE : draft.origin(),
-                draft.deviceSeq(),
-                draft.notes());
+                DocumentOrigin.ONLINE,
+                header.deviceSeq(),
+                header.notes());
 
         DocumentRecord issued = numbered.withContentHash(ContentHash.of(numbered, documentLines));
 
-        documents.save(issued);
+        // The rows in the order the database allows: the header as a draft, its lines, then the
+        // one update that issues it. No line joins a header whose issued_at is set (V0055).
+        if (stored.isEmpty()) {
+            documents.save(header);
+        }
 
-        if (stored.isEmpty() && !documentLines.isEmpty()) {
+        if (storedLines.isEmpty() && !documentLines.isEmpty()) {
             documents.saveLines(issued.id(), documentLines);
         }
 
-        documents.addStateTransition(new DocumentStateHistoryRecord(
+        documents.writeIssued(issued);
+
+        documents.insertHistory(new DocumentStateHistoryRecord(
                 Ids.next(),
                 issued.id(),
                 STATUS_DRAFT,

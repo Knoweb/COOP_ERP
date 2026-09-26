@@ -23,11 +23,15 @@ public interface DocumentIssuance {
     /**
      * @param draft the header in status DRAFT, with an id, its type, its parties and its
      *              location; number, display, hash, issuance timestamps and totals are ignored
-     *              and set here. The draft may already be stored (a module keeps drafts) or not.
-     * @param lines the lines, in line order; stored here if the document was not stored before
+     *              and set here. The draft may already be stored (a module keeps drafts) or not;
+     *              when it is, the stored header and lines are what is issued, locked for the
+     *              transaction, and this record only names the document.
+     * @param lines the lines, in line order; stored here when the document has none stored yet
      * @throws ProblemException {@code document.not_draft}, {@code document.type_unknown},
      *                          {@code document.type_unowned}, {@code document.counterparty_required},
      *                          {@code document.owner_mismatch}, {@code document.series_missing},
+     *                          {@code document.series_device_held} (an OFFLINE draft, a series a
+     *                          device holds or a TILL_POSITION series: the till numbers those),
      *                          {@code series.closed}, or whatever the type's validator raises
      */
     DocumentRecord issue(DocumentRecord draft, List<DocumentLineRecord> lines, ScopeContext ctx);
