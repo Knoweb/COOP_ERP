@@ -264,6 +264,10 @@ services:
       VITE_API_BASE: http://localhost:8080
       VITE_OIDC_AUTHORITY: http://localhost:8085/realms/coop
       VITE_OIDC_CLIENT_ID: coop-erp-web
+      # The step-up asks the realm for no acr: this realm has no OTP, and a fresh password
+      # sign-in counts here (COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS on the backend). A realm
+      # with a second factor names its context, e.g. "mfa" (web/src/shell/auth/oidc.ts).
+      VITE_OIDC_STEP_UP_ACR_VALUES: ""
       CHOKIDAR_USEPOLLING: "true"   # file events do not cross a Windows or macOS bind mount
       CI: "true"                    # pnpm must never prompt inside a container
     ports:

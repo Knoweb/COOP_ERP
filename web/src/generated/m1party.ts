@@ -1426,6 +1426,8 @@ export interface operations {
             query?: {
                 status?: "ONBOARDING" | "ACTIVE" | "SUSPENDED";
                 district?: string;
+                /** @description Narrows the list to entities whose code starts with the text or whose English, Sinhala or Tamil legal name contains it (21A section 8, the register's search box). The server filters, so a match on a later page is found. */
+                q?: string;
                 cursor?: string;
                 limit?: number;
             };
