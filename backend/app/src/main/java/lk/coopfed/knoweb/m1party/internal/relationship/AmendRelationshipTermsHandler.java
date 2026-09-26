@@ -21,6 +21,7 @@ import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.AmendRelationshipTerms;
 import lk.coopfed.knoweb.m1party.api.CreditLimitChanged;
 import lk.coopfed.knoweb.m1party.api.RelationshipAmended;
+import lk.coopfed.knoweb.m1party.api.TradePriceListCheck;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
  * AmendRelationshipTerms (21A section 6.1; doc 21 flow 6.4). Effective-dated: the current row
  * is closed the day before the new terms start and a new ACTIVE row carries them. The old
  * row's terms are never edited; its closing date is the only thing that changes on it.
+ *
+ * <p>Only the latest row of the pair is amended, and the new terms may start on any day after
+ * that row's first day, as 21A section 6 writes the guard: whether an amendment may be dated
+ * before today (it changes what LookupRelationship answers for past dates) is the question of
+ * CR-21A-2, not decided here.
  *
  * <p>A change of the credit limit needs more than {@code prt.relationship.amend}: the caller
  * must also hold {@code bil.creditlimit.change} and have presented a second factor recently.
@@ -51,6 +57,7 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
     static final Duration DEFAULT_MFA_MAX_AGE = Duration.ofMinutes(10);
 
     private final RelationshipRepository repository;
+    private final TradePriceListCheck priceLists;
     private final Optional<PermissionResolver> permissions;
     private final ConfigRegistry config;
     private final Clock clock;
@@ -59,12 +66,14 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
 
     AmendRelationshipTermsHandler(
             RelationshipRepository repository,
+            TradePriceListCheck priceLists,
             Optional<PermissionResolver> permissions,
             ConfigRegistry config,
             Clock clock,
             AuditFacade audit,
             EventPublisher events) {
         this.repository = repository;
+        this.priceLists = priceLists;
         this.permissions = permissions;
         this.config = config;
         this.clock = clock;
@@ -79,14 +88,12 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
         Relationship current = RelationshipRules.found(repository, command == null ? null : command.relationshipId());
 
         // 1. the row is ACTIVE.
-        if (!current.isActive()) {
-            throw new ProblemException(
-                    "m1.relationship.not_active",
-                    Map.of("relationshipId", current.getId(), "status", current.status()));
-        }
+        requireActive(current);
 
-        // 2. only the seller amends.
-        RelationshipRules.requireSeller(scope, current);
+        // 2. only the seller amends; the row is then locked and re-read, and is still ACTIVE
+        //    (a suspension committed meanwhile is seen here, not written over).
+        current = RelationshipRules.lockedForSeller(repository, scope, current);
+        requireActive(current);
 
         // 3. the new terms start after the current row's first day, and while it still runs.
         if (command.effectiveFrom() == null) {
@@ -103,8 +110,25 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
                     Map.of("currentEffectiveTo", current.effectiveTo().toString()));
         }
 
+        // 3b. the row is the latest of its pair: an earlier row's amendment would stop the day
+        //     the later row starts (RelationshipRules.requireLatest says why).
+        RelationshipRules.requireLatest(repository, current);
+
         Relationship.Terms before = current.terms();
         Relationship.Terms after = amended(before, command);
+
+        // 3c. a new price list passes the same M3 check as at activation (21A section 6,
+        //     ActivateRelationship: "price list belongs to seller and is published"); the check
+        //     runs only when the list changes, since the current list already passed it.
+        if (command.priceListId() != null && !command.priceListId().equals(before.priceListId())) {
+            Optional<String> refusal = priceLists.refusal(command.priceListId(), current.sellerEntityId(), scope);
+            if (refusal.isPresent()) {
+                Map<String, Object> params = new LinkedHashMap<>();
+                params.put("priceListId", command.priceListId());
+                params.put("reason", refusal.get());
+                throw new ProblemException("m1.relationship.price_list_refused", params);
+            }
+        }
 
         // 4. a credit-limit change: the extra permission and a fresh second factor.
         boolean limitChange = command.creditLimit() != null && !before.sameCreditLimitAs(command.creditLimit());
@@ -181,6 +205,14 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
         }
 
         return next.getId();
+    }
+
+    private static void requireActive(Relationship current) {
+        if (!current.isActive()) {
+            throw new ProblemException(
+                    "m1.relationship.not_active",
+                    Map.of("relationshipId", current.getId(), "status", current.status()));
+        }
     }
 
     /**

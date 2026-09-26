@@ -48,6 +48,18 @@ public interface NumberingService {
     void holderChange(Collection<UUID> seriesIds, UUID deviceId, ScopeContext ctx);
 
     /**
+     * Leaves these series with no holder: the device that held them moved to another position
+     * (21A section 6.1, AssignDeviceToPosition on re-assign), so the lane it left has nobody who
+     * may take its numbers offline until a device is assigned there again. The number is not
+     * touched. Audited and published as a holder change to no device; a series that already has
+     * no holder is left alone.
+     *
+     * @throws ProblemException {@code series.not_found} for a series the caller cannot see;
+     *                          {@code series.closed} for a closed one
+     */
+    void releaseHolder(Collection<UUID> seriesIds, ScopeContext ctx);
+
+    /**
      * Closes a series for good: retiring a position closes its series (doc 18). A closed
      * series issues nothing and is never reopened; a new position gets a new series.
      */

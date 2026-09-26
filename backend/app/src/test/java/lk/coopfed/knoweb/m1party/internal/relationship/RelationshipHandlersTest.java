@@ -85,14 +85,16 @@ class RelationshipHandlersTest {
     void setUp() {
         open = new OpenTradingRelationshipHandler(repository, standing, config, audit, events);
         activate = new ActivateRelationshipHandler(repository, priceLists, audit, events);
-        amend = new AmendRelationshipTermsHandler(repository, Optional.of(permissions), config, clock, audit, events);
-        suspend = new SuspendRelationshipHandler(repository, audit, events);
+        amend = new AmendRelationshipTermsHandler(
+                repository, priceLists, Optional.of(permissions), config, clock, audit, events);
+        suspend = new SuspendRelationshipHandler(repository, clock, audit, events);
 
         when(standing.of(FEDERATION)).thenReturn(Optional.of(new Standing("FEDERATION", "ACTIVE")));
         when(standing.of(DISTRIBUTOR)).thenReturn(Optional.of(new Standing("DISTRIBUTOR", "ACTIVE")));
         when(standing.of(SOCIETY)).thenReturn(Optional.of(new Standing("MPCS", "ONBOARDING")));
         when(repository.activeOverlapping(any(), any(), any(), any(), any())).thenReturn(List.of());
         when(repository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(repository.lockForUpdate(any())).thenAnswer(call -> call.getArgument(0));
         when(priceLists.refusal(any(), any(), any())).thenReturn(Optional.empty());
         when(permissions.allows(any(), anyString())).thenReturn(true);
         when(config.getDuration(eq(AmendRelationshipTermsHandler.MFA_MAX_AGE), any(), any()))
@@ -477,11 +479,61 @@ class RelationshipHandlersTest {
         }
 
         @Test
+        void aRowALaterRowHasReplacedIsNotAmended() {
+            // R1 [Apr, 30 Sep] and R2 [Oct, open] after an amendment: amending R1 would give the
+            // change R1's closing date, so it would stop when R2 starts (the review of M1-04).
+            Relationship r1 = found(active(DISTRIBUTOR, SOCIETY, APRIL, LocalDate.of(2026, 9, 30)));
+            Relationship r2 = active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 10, 1), null);
+            when(repository.activeStartingAfter(DISTRIBUTOR, SOCIETY, APRIL)).thenReturn(List.of(r2));
+
+            assertThatThrownBy(() -> amend.handle(limitTo(r1, "5000000", JULY, "X"), withFreshMfa(DISTRIBUTOR)))
+                    .isInstanceOfSatisfying(ProblemException.class, e -> {
+                        assertThat(e.messageId()).isEqualTo("m1.relationship.not_latest");
+                        assertThat(e.parameters()).containsEntry("latestRelationshipId", r2.getId());
+                    });
+            nothingWritten();
+            assertThat(r1.effectiveTo()).isEqualTo(LocalDate.of(2026, 9, 30));
+        }
+
+        @Test
+        void aNewPriceListPassesTheM3CheckAndARefusedOneStopsTheAmendment() {
+            Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
+            UUID otherList = UUID.randomUUID();
+            when(priceLists.refusal(eq(otherList), eq(DISTRIBUTOR), any()))
+                    .thenReturn(Optional.of("prc.price_list.not_published"));
+            AmendRelationshipTerms toOtherList = new AmendRelationshipTerms(
+                    current.getId(), JULY, otherList, null, null, null, null, null, "NEW_LIST", null);
+
+            assertThatThrownBy(() -> amend.handle(toOtherList, own(DISTRIBUTOR)))
+                    .isInstanceOfSatisfying(ProblemException.class, e -> {
+                        assertThat(e.messageId()).isEqualTo("m1.relationship.price_list_refused");
+                        assertThat(e.parameters())
+                                .containsEntry("priceListId", otherList)
+                                .containsEntry("reason", "prc.price_list.not_published");
+                    });
+            nothingWritten();
+
+            // The same list as today is not checked again; an accepted new list goes through.
+            amend.handle(
+                    new AmendRelationshipTerms(
+                            current.getId(), JULY, PRICE_LIST, null, 45, null, null, null, "TERMS", null),
+                    own(DISTRIBUTOR));
+            verify(priceLists, never()).refusal(eq(PRICE_LIST), any(), any());
+            UUID acceptedList = UUID.randomUUID();
+            Relationship again = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
+            amend.handle(
+                    new AmendRelationshipTerms(
+                            again.getId(), JULY, acceptedList, null, null, null, null, null, "NEW_LIST", null),
+                    own(DISTRIBUTOR));
+            verify(priceLists).refusal(eq(acceptedList), eq(DISTRIBUTOR), any());
+        }
+
+        @Test
         void withoutAPermissionResolverTheLimitPermissionIsNotYetChecked() {
             // K-03b is not on main: no resolver bean exists, and the check is skipped rather than
             // refusing every limit change. The second factor is still required.
-            AmendRelationshipTermsHandler withoutResolver =
-                    new AmendRelationshipTermsHandler(repository, Optional.empty(), config, clock, audit, events);
+            AmendRelationshipTermsHandler withoutResolver = new AmendRelationshipTermsHandler(
+                    repository, priceLists, Optional.empty(), config, clock, audit, events);
             Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
 
             withoutResolver.handle(limitTo(current, "5000000", JULY, "X"), withFreshMfa(DISTRIBUTOR));
@@ -536,6 +588,29 @@ class RelationshipHandlersTest {
                             any(),
                             eq("OVERDUE: three invoices overdue"));
             verify(events).publish(any(RelationshipSuspended.class));
+        }
+
+        @Test
+        void everyActiveRowOfThePairInForceTodayOrLaterIsSuspendedWithIt() {
+            // R1 [Apr, 30 Sep] and R2 [Oct, open] on 25 Sep: suspending R1 alone would let
+            // trading come back on 1 Oct (the review of M1-04); an ended row is history.
+            Relationship r1 = found(active(DISTRIBUTOR, SOCIETY, APRIL, LocalDate.of(2026, 9, 30)));
+            Relationship r2 = active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 10, 1), null);
+            when(repository.activeOnOrAfterForUpdate(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 9, 25)))
+                    .thenReturn(List.of(r1, r2));
+
+            suspend.handle(new SuspendRelationship(r1.getId(), "OVERDUE", null), own(DISTRIBUTOR));
+
+            assertThat(r1.status()).isEqualTo("SUSPENDED");
+            assertThat(r2.status()).isEqualTo("SUSPENDED");
+            verify(repository, times(2)).saveAndFlush(any());
+            verify(audit, times(2)).record(eq("RELATIONSHIP_SUSPENDED"), any(), any(), any(), any(), eq("OVERDUE"));
+            ArgumentCaptor<DomainEvent> published = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(events, times(2)).publish(published.capture());
+            assertThat(published.getAllValues())
+                    .allSatisfy(event -> assertThat(event).isInstanceOf(RelationshipSuspended.class))
+                    .extracting(event -> ((RelationshipSuspended) event).relationshipId())
+                    .containsExactly(r1.getId(), r2.getId());
         }
 
         @Test

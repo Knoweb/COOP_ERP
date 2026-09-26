@@ -155,6 +155,12 @@ coop-erp:
     # A PENDING attachment nobody uploaded within this time is FAILED by the verifier.
     upload-window-hours: 24
 
+  # M1's stub of M3's price-list check (21A section 11: "stub returns true for the seed list").
+  # The lists the stub accepts: the ids the relationship seed names
+  # (seed/m1party/relationships.dev.sql). Gone the day M3 implements TradePriceListCheck.
+  party:
+    stub-price-lists: ${COOP_ERP_STUB_PRICE_LISTS:0190f000-0000-7000-8000-000000000501,0190f000-0000-7000-8000-000000000502}
+
   # Browser origins allowed to call /v1/** (the Vite dev server). Comma-separated; never "*".
   web:
     allowed-origins: ${WEB_ALLOWED_ORIGINS:http://localhost:5173}

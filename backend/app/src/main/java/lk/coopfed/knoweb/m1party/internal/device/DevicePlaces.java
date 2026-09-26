@@ -49,9 +49,24 @@ class DevicePlaces {
     }
 
     Optional<Lane> position(UUID tillPositionId) {
+        return position(tillPositionId, false);
+    }
+
+    /**
+     * The position, locked until the caller's transaction ends ({@code FOR UPDATE}): two
+     * assignments to one position run one after the other, so the second sees the holder the
+     * first left there (the review of M1-06). The lock is on M1's own row; RetireTillPosition
+     * takes the same lock, so a position is not retired under a device being assigned to it.
+     */
+    Optional<Lane> positionForUpdate(UUID tillPositionId) {
+        return position(tillPositionId, true);
+    }
+
+    private Optional<Lane> position(UUID tillPositionId, boolean forUpdate) {
         List<Lane> found = jdbc.query(
                 "select till_position_id, location_id, owner_entity_id, position_no, status"
-                        + " from party.till_position where till_position_id = ?",
+                        + " from party.till_position where till_position_id = ?"
+                        + (forUpdate ? " for update" : ""),
                 (rs, row) -> new Lane(
                         rs.getObject("till_position_id", UUID.class),
                         rs.getObject("location_id", UUID.class),

@@ -7,12 +7,19 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Two facts the location handlers read from tables that are not the location's own, both in
- * M1's schemas and both read under the caller's row-level security. Read only: the handlers
- * write.
+ * Facts the location handlers read from tables that are not the location's own, all in M1's
+ * schemas and all read under the caller's row-level security. Read only: the handlers write.
  */
 @Component
 class LocationFacts {
+
+    /** A device at a position, as the location handlers see it. */
+    record DeviceAt(UUID deviceId, String status) {
+
+        boolean isActive() {
+            return "ACTIVE".equals(status);
+        }
+    }
 
     private final JdbcTemplate jdbc;
 
@@ -21,19 +28,29 @@ class LocationFacts {
     }
 
     /**
-     * The device assigned to a position, if any (party.device.current_till_position_id; one per
-     * position by the unique index). M1-06 assigns devices; until then no position has one.
+     * The device assigned to a position, whatever its status, if any
+     * (party.device.current_till_position_id; one per position by the unique index). A
+     * SUSPENDED device keeps its position until a replacement takes it (M1-06), so the device
+     * here may be one that no longer trades.
      */
     Optional<UUID> deviceAt(UUID tillPositionId) {
-        List<UUID> devices = jdbc.queryForList(
-                "select device_id from party.device where current_till_position_id = ?", UUID.class, tillPositionId);
+        return holderAt(tillPositionId).map(DeviceAt::deviceId);
+    }
+
+    /** The device at the position with its status: SetPrimaryTill moves counters only to an ACTIVE one. */
+    Optional<DeviceAt> holderAt(UUID tillPositionId) {
+        List<DeviceAt> devices = jdbc.query(
+                "select device_id, status from party.device where current_till_position_id = ?",
+                (rs, row) -> new DeviceAt(rs.getObject("device_id", UUID.class), rs.getString("status")),
+                tillPositionId);
         return devices.stream().findFirst();
     }
 
     /**
-     * Whether the shop has an operator: a till user (kind TILL or BOTH, not deactivated) with a
-     * role assignment scoped to that location (21A section 6, ActivateLocation "at least one
-     * operator"; section 7, ListOperators).
+     * Whether the shop has an operator: an ACTIVE till user (kind TILL or BOTH) with a role
+     * assignment scoped to that location (21A section 6, ActivateLocation "at least one
+     * operator"; section 7, ListOperators). A PENDING user has no PIN yet and a LOCKED one
+     * cannot sign in, so neither can open the till (the review of M1-05).
      */
     boolean hasOperator(UUID ownerEntityId, UUID locationId) {
         Boolean found = jdbc.queryForObject(
@@ -45,7 +62,7 @@ class LocationFacts {
                      where ur.scope_entity_id = ?
                        and ur.scope_location_id = ?
                        and u.user_kind in ('TILL', 'BOTH')
-                       and u.status <> 'DEACTIVATED'
+                       and u.status = 'ACTIVE'
                 )
                 """,
                 Boolean.class,
