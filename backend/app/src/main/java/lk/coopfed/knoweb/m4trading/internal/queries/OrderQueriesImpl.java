@@ -51,7 +51,8 @@ class OrderQueriesImpl implements OrderQueries {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 """
                 select o.document_id, o.relationship_id, o.buyer_entity_id, o.seller_entity_id, o.requested_eta,
-                       o.deliver_to_location_id,
+                       o.deliver_to_location_id, o.deliver_to_code, o.deliver_to_name_en, o.deliver_to_name_si,
+                       o.deliver_to_name_ta, o.deliver_to_address,
                        a.status as allocation_status, a.committed_eta, a.lock_at, a.reason_code
                   from trading.doc_order o
                   left join trading.order_allocation a on a.order_id = o.document_id
@@ -142,7 +143,21 @@ class OrderQueriesImpl implements OrderQueries {
                 header.isIssued() ? header.netAmount() : draftNet(lines),
                 header.notes(),
                 lines,
-                (UUID) row.get("deliver_to_location_id"));
+                (UUID) row.get("deliver_to_location_id"),
+                deliveryPoint(row));
+    }
+
+    /** The delivery point the order was drafted for (V0004); null for an order that names none. */
+    private static OrderView.DeliveryPoint deliveryPoint(Map<String, Object> row) {
+        if (row.get("deliver_to_code") == null) {
+            return null;
+        }
+        return new OrderView.DeliveryPoint(
+                (String) row.get("deliver_to_code"),
+                (String) row.get("deliver_to_name_en"),
+                (String) row.get("deliver_to_name_si"),
+                (String) row.get("deliver_to_name_ta"),
+                (String) row.get("deliver_to_address"));
     }
 
     private static BigDecimal draftNet(List<OrderLineView> lines) {

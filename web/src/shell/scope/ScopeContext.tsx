@@ -99,18 +99,20 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
   const policyClass = session?.policyClass ?? "NONE";
   const permissions = usePermissions();
   const intl = useIntl();
-  const party = useApiClient<partyPaths>();
 
   // Worked out again only when the entity or the class changes, not on every token renewal.
   // A user who holds one place only acts there: the session read names it (PermissionsContext).
   const active = permissions?.activeScope;
   const locationId = active && active.entityId === entityId ? (active.locationId ?? null) : null;
+  // This provider is outside its own context, so its client is told the location: without it the
+  // entity read of a user who holds one place only named the entity alone and was refused (400).
+  const party = useApiClient<partyPaths>({ locationId });
 
   // The banner names the entity when the user holds gov.entity.view for it (M1); otherwise it
   // keeps the honest short id (ScopeBanner.tsx). Read once per entity, not on every render.
   const canReadEntity = permissions !== null && hasPermission(permissions, "gov.entity.view");
   const entityQuery = useQuery({
-    queryKey: ["shell", "scope-entity", entityId],
+    queryKey: ["shell", "scope-entity", entityId, locationId],
     enabled: entityId !== null && canReadEntity,
     staleTime: Infinity,
     queryFn: async () => {

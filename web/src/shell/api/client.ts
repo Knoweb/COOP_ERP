@@ -127,13 +127,17 @@ export function apiMiddleware(getContext: () => RequestContext): Middleware {
 /**
  * The API client of one module, typed by that module's generated `paths`. Only inside
  * RequireLogin, which is everywhere: there is always a session.
+ *
+ * `options.locationId` is for the ScopeProvider alone, which reads before its own context
+ * exists: it names the location the provider has just worked out.
  */
-export function useApiClient<Paths extends object>(): Client<Paths> {
+export function useApiClient<Paths extends object>(options?: { locationId: string | null }): Client<Paths> {
   const session = useSession();
   const { locale } = useIntl();
   const auth = useAuth();
   // Null outside the ScopeProvider (a test); the scope then is the whole entity.
-  const locationId = useContext(ScopeContext)?.active.locationId ?? null;
+  const fromContext = useContext(ScopeContext)?.active.locationId ?? null;
+  const locationId = options ? options.locationId : fromContext;
 
   return useMemo(() => {
     if (!session) {

@@ -86,7 +86,7 @@ export function DeliveryNotePage() {
         facts={[
           { label: t("trading.column.seller").text, value: <EntityName entityId={n.sellerEntityId} /> },
           { label: t("trading.column.buyer").text, value: <EntityName entityId={n.buyerEntityId} /> },
-          { label: t("trading.field.from_location").text, value: n.fromLocationId && <LocationName locationId={n.fromLocationId} /> },
+          { label: t("trading.field.from_location").text, value: n.fromLocationId && <LocationName locationId={n.fromLocationId} own={isSeller} /> },
           { label: t("trading.field.vehicle").text, value: n.vehicleRef },
           { label: t("trading.field.driver").text, value: n.driverName },
           { label: t("trading.field.issued_at").text, value: n.issuedAt && formatInstant(n.issuedAt) },
@@ -105,7 +105,7 @@ export function DeliveryNotePage() {
       {n.drops.map((drop) => (
         <section key={drop.dropId}>
           <h2>
-            {t("trading.note.drop", undefined, { seq: drop.seq }).text} <LocationName locationId={drop.shipToLocationId} />
+            {t("trading.note.drop", undefined, { seq: drop.seq }).text} <LocationName locationId={drop.shipToLocationId} own={isBuyer} orderId={drop.orderIds[0]} />
           </h2>
           <table>
             <thead>

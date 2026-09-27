@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { locationText } from "../../shell/i18n/localName";
 import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
@@ -155,7 +156,7 @@ export function ReportPage() {
               <option value="">{t("reporting.field.location.all").text}</option>
               {(locations.data ?? []).map((location) => (
                 <option key={location.locationId} value={location.locationId}>
-                  {location.locationCode} {location.nameEn}
+                  {locationText(location, intl.locale)}
                 </option>
               ))}
             </select>

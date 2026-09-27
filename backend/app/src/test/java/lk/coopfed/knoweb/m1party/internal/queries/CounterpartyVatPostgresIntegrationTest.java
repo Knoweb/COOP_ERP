@@ -68,8 +68,9 @@ class CounterpartyVatPostgresIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(view.legalNameEn()).isEqualTo("Kurunegala MPCS");
         assertThat(view.vatRegistrationNo()).isEqualTo("VAT-BUYER-9722");
-        // The counterparty projection, not the full row: fields PARTY may not see stay null.
-        assertThat(view.entityCode()).isNull();
+        // The counterparty projection, not the full row: the code (V0014) and the names, and the
+        // fields PARTY may not see stay null.
+        assertThat(view.entityCode()).isEqualTo("Q972B");
         assertThat(view.registrationNo()).isNull();
     }
 

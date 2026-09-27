@@ -2,17 +2,12 @@ import { useEffect } from "react";
 import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { inLocale } from "../../shell/i18n/localName";
 import { errorText } from "./stockView";
 import { useInventoryApi, type Location } from "./inventoryApi";
 
 function nameOf(location: Location, locale: string): string {
-  if (locale === "si" && location.nameSi) {
-    return location.nameSi;
-  }
-  if (locale === "ta" && location.nameTa) {
-    return location.nameTa;
-  }
-  return location.nameEn;
+  return inLocale(locale, location.nameEn, location.nameSi, location.nameTa);
 }
 
 /** The locations the caller's scope sees (M1's list); the first is chosen until the user picks. */

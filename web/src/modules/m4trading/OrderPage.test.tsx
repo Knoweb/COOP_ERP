@@ -106,6 +106,29 @@ describe("the order card", () => {
     expect(api.sellerAvailability).not.toHaveBeenCalled();
   });
 
+  it("names the buyer's delivery point to the seller from the order, without reading the buyer's location", async () => {
+    current = {
+      ...current,
+      deliverTo: { code: "W01", nameEn: "Kurunegala warehouse", nameSi: "කුරුණෑගල ගබඩාව" }
+    };
+    Object.assign(state, { entityId: SELLER, permissions: new Set<string>() });
+    renderOrder();
+
+    expect(await screen.findByText("W01 Kurunegala warehouse")).toBeTruthy();
+    expect(screen.queryByText("000111")).toBeNull();
+    // The seller may not read the buyer's locations (CR-24A-2): asking would only be refused (404).
+    expect(api.location).not.toHaveBeenCalled();
+  });
+
+  it("shows a counterparty's location it cannot name as a dash, not as a short id, and does not ask for it", async () => {
+    Object.assign(state, { entityId: SELLER, permissions: new Set<string>() });
+    renderOrder();
+
+    await screen.findByText("D101-ORD-0000001");
+    expect(screen.queryByText("000111")).toBeNull();
+    expect(api.location).not.toHaveBeenCalled();
+  });
+
   it("shows the allocation and the tier price once accepted, and leads the seller to the delivery note", async () => {
     current = {
       ...current,

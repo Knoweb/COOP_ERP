@@ -109,7 +109,7 @@ export function NewDeliveryNotePage() {
           <EntityName entityId={o.buyerEntityId} />
         </dd>
         <dt>{t("trading.field.deliver_to").text}</dt>
-        <dd>{o.deliverToLocationId ? <LocationName locationId={o.deliverToLocationId} /> : "—"}</dd>
+        <dd>{o.deliverToLocationId ? <LocationName locationId={o.deliverToLocationId} own={false} known={o.deliverTo} /> : "—"}</dd>
       </dl>
       {!o.deliverToLocationId && <p role="alert">{t("trading.note.no_deliver_to").text}</p>}
 

@@ -42,10 +42,10 @@ describe("MoneyDisplay", () => {
     expect(renderIn("en", <MoneyDisplay amount="10.00" />).container.querySelector(".money--total")).toBeNull();
   });
 
-  it("keeps Western Arabic digits in Sinhala and Tamil and writes the currency their way", () => {
-    expect(renderIn("si", <MoneyDisplay amount="1234567.00" />).container.textContent).toBe("රු. 1,234,567.00");
+  it("keeps Western Arabic digits and writes Rs in Sinhala and Tamil too (doc 19 section 5.1)", () => {
+    expect(renderIn("si", <MoneyDisplay amount="1234567.00" />).container.textContent).toBe("Rs 1,234,567.00");
     cleanup();
-    expect(renderIn("ta", <MoneyDisplay amount="1234567.00" />).container.textContent).toBe("ரூ. 1,234,567.00");
+    expect(renderIn("ta", <MoneyDisplay amount="1234567.00" />).container.textContent).toBe("Rs 1,234,567.00");
   });
 
   it("shows more than two decimals exactly as they arrived, because the client never rounds", () => {

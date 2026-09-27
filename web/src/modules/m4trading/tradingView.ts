@@ -22,7 +22,16 @@ export function errorText(error: unknown, fallback: string): string {
 
 /** Today's business date (Asia/Colombo), as the server's guards read it: yyyy-mm-dd. */
 export function businessToday(now: Date = new Date()): string {
-  return now.toLocaleDateString("en-CA", { timeZone: BUSINESS_TIME_ZONE });
+  // Built from the parts, not from a locale's date format ("en-CA" writes yyyy-mm-dd): where the
+  // date formatter is the FormatJS polyfill (shell/i18n/localeData.ts) only en, si and ta exist.
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((each) => each.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 /**

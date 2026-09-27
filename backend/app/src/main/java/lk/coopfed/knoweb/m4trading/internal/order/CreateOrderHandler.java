@@ -18,6 +18,7 @@ import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
@@ -102,11 +103,14 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
             throw new ProblemException("m4.order.eta_past");
         }
         UUID deliverTo = command.deliverToLocationId();
-        if (deliverTo != null
-                && parties.getLocation(deliverTo, scope)
-                        .filter(location -> buyer.equals(location.ownerEntityId()))
-                        .isEmpty()) {
-            throw new ProblemException("m4.order.deliver_to_unknown");
+        // The location is read here, in the buyer's session, and its code, names and address are
+        // kept on the order (V0004): the seller may not read the buyer's locations, and reads the
+        // delivery point from the order instead (CR-24A-2 as revised, 28 September 2026).
+        LocationView deliverToLocation = null;
+        if (deliverTo != null) {
+            deliverToLocation = parties.getLocation(deliverTo, scope)
+                    .filter(location -> buyer.equals(location.ownerEntityId()))
+                    .orElseThrow(() -> new ProblemException("m4.order.deliver_to_unknown"));
         }
         if (command.lines() == null || command.lines().isEmpty()) {
             throw new ProblemException("m4.order.lines_required");
@@ -150,15 +154,21 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         jdbc.update(
                 """
                 insert into trading.doc_order (document_id, relationship_id, buyer_entity_id, seller_entity_id,
-                    requested_eta, deliver_to_location_id)
-                values (?, ?, ?, ?, ?, ?)
+                    requested_eta, deliver_to_location_id, deliver_to_code, deliver_to_name_en, deliver_to_name_si,
+                    deliver_to_name_ta, deliver_to_address)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 orderId,
                 relationship.relationshipId(),
                 buyer,
                 seller,
                 command.requestedEta(),
-                deliverTo);
+                deliverTo,
+                deliverToLocation == null ? null : deliverToLocation.locationCode(),
+                deliverToLocation == null ? null : deliverToLocation.nameEn(),
+                deliverToLocation == null ? null : deliverToLocation.nameSi(),
+                deliverToLocation == null ? null : deliverToLocation.nameTa(),
+                deliverToLocation == null ? null : deliverToLocation.address());
         for (DocumentLineRecord line : lines) {
             jdbc.update(
                     "insert into trading.doc_order_line (line_id, document_id, requested_qty) values (?, ?, ?)",

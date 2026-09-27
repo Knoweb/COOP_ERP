@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.m4trading.query.OrderView;
 import lk.coopfed.knoweb.m4trading.web.generated.AcceptOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreateOrderRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.DeliveryPointResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderApi;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderResponse;
@@ -161,6 +162,14 @@ class OrderController implements OrderApi {
         response.setNetAmount(order.netAmount());
         response.setNotes(order.notes());
         response.setDeliverToLocationId(order.deliverToLocationId());
+        if (order.deliverTo() != null) {
+            OrderView.DeliveryPoint point = order.deliverTo();
+            DeliveryPointResponse deliverTo = new DeliveryPointResponse(point.code(), point.nameEn());
+            deliverTo.setNameSi(point.nameSi());
+            deliverTo.setNameTa(point.nameTa());
+            deliverTo.setAddress(point.address());
+            response.setDeliverTo(deliverTo);
+        }
         return response;
     }
 

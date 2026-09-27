@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
+import { inLocale, skuText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -247,13 +249,15 @@ export function TradePriceListPage() {
 /** The item's code and name, read from the catalogue (M2); the id while it loads. */
 function SkuName({ skuId }: { skuId: string }) {
   const api = usePricingApi();
+  const { locale } = useIntl();
   const sku = useQuery({ queryKey: ["pricing", "sku", skuId], queryFn: () => api.getSku(skuId), staleTime: Infinity });
-  return <span>{sku.data ? `${sku.data.skuCode} ${sku.data.nameEn}` : skuId}</span>;
+  return <span>{sku.data ? skuText(sku.data, locale) : skuId}</span>;
 }
 
 /** Finds catalogue items by code or name and adds the one chosen as a new line at tier 0. */
 function SkuPicker({ onPick }: { onPick: (sku: Sku) => void }) {
   const t = useT();
+  const { locale } = useIntl();
   const api = usePricingApi();
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Sku[] | null>(null);
@@ -280,7 +284,7 @@ function SkuPicker({ onPick }: { onPick: (sku: Sku) => void }) {
           {found.map((sku) => (
             <li key={sku.skuId}>
               <button type="button" onClick={() => onPick(sku)}>
-                {t("pricing.add_item", undefined, { code: sku.skuCode, name: sku.nameEn }).text}
+                {t("pricing.add_item", undefined, { code: sku.skuCode, name: inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa) }).text}
               </button>
             </li>
           ))}

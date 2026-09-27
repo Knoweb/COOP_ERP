@@ -175,6 +175,12 @@ importers:
       '@fontsource/noto-sans-tamil':
         specifier: ^5.3.0
         version: 5.3.0
+      '@formatjs/intl-datetimeformat':
+        specifier: ^7.8.0
+        version: 7.8.0
+      '@formatjs/intl-numberformat':
+        specifier: ^9.4.3
+        version: 9.4.3
       '@tanstack/react-query':
         specifier: ^5.103.1
         version: 5.103.1(react@18.3.1)
@@ -601,6 +607,9 @@ packages:
   '@fontsource/noto-sans@5.3.0':
     resolution: {integrity: sha512-fBCog2PY7DiVVTEEqtI/Qdinx/knobHYfoGpjFXdfBX5RoJaBp1Prw2G75p0OIsdlMZg3cLo0c+YbIUYOxnQJw==}
 
+  '@formatjs/bigdecimal@0.2.7':
+    resolution: {integrity: sha512-B4+XY/e4u5v261r3a37Kq2ax91gPZSKGyVpx8X5dygAggLlUz+6MeBpmAhaBFGB8WQ4JB1qD+QtKHk9aJkEb9Q==}
+
   '@formatjs/fast-memoize@3.1.7':
     resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
 
@@ -609,6 +618,15 @@ packages:
 
   '@formatjs/icu-skeleton-parser@2.1.12':
     resolution: {integrity: sha512-ca7tZMLpfHX3sUD7hP6gE/qr6Iq89EDd3ZLeRhbsB7r0UD55DGJq+tmFLzrGrnx5StahUevQmQQVtbDRHsfDHA==}
+
+  '@formatjs/intl-datetimeformat@7.8.0':
+    resolution: {integrity: sha512-SvEbCcvcGN4l4j/k59hXyCoamKWoSKuvSsTSqa85DX6xkHWvsI6hSDJXKSzADF8vdJvIT7v+2n0TXLG/pRbLJg==}
+
+  '@formatjs/intl-localematcher@0.9.0':
+    resolution: {integrity: sha512-Z7TD3ssNry1Av1dVDoq/mzpxGyxqWwU0ClWEo+BB3k0JQTeQvUGmeK9WZGYvlqStS0UqkaKXk3dfjsb6NaHAxw==}
+
+  '@formatjs/intl-numberformat@9.4.3':
+    resolution: {integrity: sha512-absVu2I7FlWl+Buictw2PL8Fl385uab3bEA3TCCTu+0DBHHFE+RTbmPmj0nUVO82U1b2Qw3/OA2I7KKLI48EpQ==}
 
   '@formatjs/intl@6.1.1':
     resolution: {integrity: sha512-kKxt7HZrmlSChntA4OAD5DlaDcKeUJOOvWKA/7ORiM1dQ+GYuiIz6FuDOkMeo/aVzSJ6hA25etFAtCnHEalqJw==}
@@ -2137,6 +2155,8 @@ snapshots:
 
   '@fontsource/noto-sans@5.3.0': {}
 
+  '@formatjs/bigdecimal@0.2.7': {}
+
   '@formatjs/fast-memoize@3.1.7': {}
 
   '@formatjs/icu-messageformat-parser@3.5.19':
@@ -2144,6 +2164,20 @@ snapshots:
       '@formatjs/icu-skeleton-parser': 2.1.12
 
   '@formatjs/icu-skeleton-parser@2.1.12': {}
+
+  '@formatjs/intl-datetimeformat@7.8.0':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.9.0
+
+  '@formatjs/intl-localematcher@0.9.0':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
+  '@formatjs/intl-numberformat@9.4.3':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.9.0
 
   '@formatjs/intl@6.1.1':
     dependencies:

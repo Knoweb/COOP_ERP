@@ -31,6 +31,24 @@ export type PermissionsState = PermissionSet & {
 /** null while the set is being read; a provider is always there inside RequireLogin (App.tsx). */
 export const PermissionsContext = createContext<PermissionsState | null | undefined>(undefined);
 
+// A convenience of this browser only: storage may be missing or refused, and then the refusal
+// is simply met again.
+function remembered(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function remember(key: string): void {
+  try {
+    window.localStorage.setItem(key, "1");
+  } catch {
+    // nothing to do
+  }
+}
+
 /** Put once around the pages by App, inside RequireLogin and the QueryClientProvider. */
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -46,15 +64,24 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     retry: 1,
     queryFn: async () => {
       let data;
-      try {
-        ({ data } = await api.GET("/v1/session"));
-      } catch (error) {
-        // A user whose only scope is one place holds no entity-wide scope, so naming the entity
-        // alone is refused; asked with no scope, the server takes the one they hold.
-        if (!(error instanceof ApiProblem && error.problem.code === "scope.invalid")) {
-          throw error;
-        }
+      // A user who holds one place only (the stores of one warehouse) holds no entity-wide scope,
+      // so naming the entity alone is refused (400 scope.invalid) and the read is asked again with
+      // no scope, when the server takes the one they hold. The browser remembers that answer for
+      // the user, so the refusal is met once, not on every page load. Everybody else names the
+      // entity: asked with no scope, a Federation user may be given another of its scopes.
+      const unnamedKey = `coop-erp.session.unnamed.${session?.userId ?? ""}`;
+      if (remembered(unnamedKey)) {
         ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
+      } else {
+        try {
+          ({ data } = await api.GET("/v1/session"));
+        } catch (error) {
+          if (!(error instanceof ApiProblem && error.problem.code === "scope.invalid")) {
+            throw error;
+          }
+          ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
+          remember(unnamedKey);
+        }
       }
       if (!data) {
         throw new Error("GET /v1/session answered without a body");

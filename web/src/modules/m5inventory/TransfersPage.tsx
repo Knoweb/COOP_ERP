@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
+import { locationText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -20,6 +22,7 @@ import { errorText, transferLinesOf } from "./stockView";
  */
 export function TransfersPage() {
   const t = useT();
+  const { locale } = useIntl();
   const api = useInventoryApi();
   const queryClient = useQueryClient();
   const canIssue = useHasPermission("inv.transfer.issue");
@@ -74,7 +77,7 @@ export function TransfersPage() {
 
   const nameOf = (id: string) => {
     const found: Location | undefined = (locations.data ?? []).find((l) => l.locationId === id);
-    return found ? `${found.locationCode} ${found.nameEn}` : id.slice(0, 8);
+    return found ? locationText(found, locale) : id.slice(0, 8);
   };
   const lineCount = transferLinesOf(sendable, quantities).length;
 
@@ -131,7 +134,7 @@ export function TransfersPage() {
               <option value="" />
               {destinations.map((l) => (
                 <option key={l.locationId} value={l.locationId}>
-                  {`${l.locationCode} ${l.nameEn}`}
+                  {locationText(l, locale)}
                 </option>
               ))}
             </select>

@@ -78,6 +78,9 @@ class PartyQueriesImplTest {
         // counterparty is entitled to see on a tax invoice.
         assertThat(sql.getValue()).contains("vat_registration_no");
 
+        // V0014: and the entity code, so a counterparty reads "FED Cooperative Federation", not "null ...".
+        assertThat(sql.getValue()).contains("entity_code");
+
         assertThat(result.entityId()).isEqualTo(TARGET_ENTITY_ID);
 
         assertThat(result.legalNameEn()).isEqualTo("MPCS 301");
@@ -227,7 +230,8 @@ class PartyQueriesImplTest {
 
         assertThat(sql.getValue()).contains("party.entity_party_directory");
         assertThat(sql.getValue()).contains("legal_name_en ilike ?");
-        assertThat(sql.getValue()).doesNotContain("entity_code");
+        // The code is selected (V0014) but not searched: the search stays by name.
+        assertThat(sql.getValue()).doesNotContain("entity_code like");
     }
 
     @Test
