@@ -12,7 +12,7 @@ M4 records the inter-entity flow from order to settlement: order, delivery note,
 |---|---|
 | `api/` | The published contract: the event records of the document families the demo builds (`order.*`, `delivery_note.*`, `grn.*`, `discrepancy.raised.v1`, `invoice.issued.v1`, `journal.postings_ready.v1`) with their value records, published in M4-01 so that M5's consumers can bind to them; and the three questions M4 asks of modules not built yet, `TradePricing` (M3), `TaxRates` (M2), `InventoryAvailability` (M5). Command records arrive with their tickets. |
 | `query/` | The read-only queries of doc 24 section 5.2, with their tickets. |
-| `internal/integration/` | The demo answers to the three questions, from the configuration register: `DemoTradePricing` (`m4.demo.trade_price`), `DemoTaxRates` (`m4.demo.vat_rate_percent`), `DemoInventoryAvailability` (`m4.demo.availability_qty`). Each is deleted in the pull request that lands the real module's query. |
+| `internal/integration/` | The answers to the three questions: `M3TradePricing` (M3's `PricingQueries.resolveTradePrice`, since M4-04); for the demo, from the configuration register, `DemoTaxRates` (`m4.demo.vat_rate_percent`) and `DemoInventoryAvailability` (`m4.demo.availability_qty`), each deleted in the pull request that lands the real module's query. |
 | `internal/seed/M4SeedLoader` | Loads `seed/m4trading/posting-map.yaml` into `trading.posting_map` on start, as the migrator (the arrangement of `M1SeedLoader` and `M2SeedLoader`), upserted by key. |
 | `resources/db/migration/m4trading/V0001__trading.sql` | The tables of M4-01 (below), their row-level security and grants. |
 | `resources/seed/m4trading/` | `posting-map.yaml` (doc 24 section 3.9), `audit-event-types.yaml` (the codes of 24A section 6 the demo tickets use). |
@@ -51,7 +51,7 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 | `posting-map.yaml` | `trading.posting_map` | upserted by (type, line kind, side, debit, credit); the amount source follows the file |
 | `audit-event-types.yaml` | `kernel.audit_event_type` | the audit codes of 24A section 6 used by the demo tickets, all INFO |
 | `seed/m1party/permissions.yaml` | `security.permission` | the 28 `m4trading` codes (`M1SeedLoaderTest` counts them) |
-| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.trade_price`, `m4.demo.vat_rate_percent`, `m4.demo.availability_qty` |
+| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.vat_rate_percent`, `m4.demo.availability_qty` (`m4.demo.trade_price` until M4-04) |
 
 ## What the next tickets build on
 
@@ -70,6 +70,16 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 | CancelOrder | `ord.order.submit` | owner's DRAFT or SUBMITTED; not rejected; nothing fulfilled; reason | CANCELLED; `cancelled_qty` = request | ORDER_CANCELLED, `order.cancelled.v1` |
 | AcceptOrder | `ord.order.accept` | seller entity-wide OWN; order placed with the caller; SUBMITTED, undecided; relationship ACTIVE; ETA not past; overrides on known lines with a reason, ≤ open request, ≤ available; a trade price per line | `allocation_run`, `order_allocation` ACCEPTED (ETA, `lock_at` = ETA day start − lock hours), `order_allocation_line` (allocated = min(open, available) or the override; tier price) | ORDER_ACCEPTED, `order.accepted.v1`, `order.allocated.v1` |
 | RejectOrder | `ord.order.accept` | as AcceptOrder's first three; reason | `order_allocation` REJECTED | ORDER_REJECTED, `order.rejected.v1` |
+
+## Delivery notes (M4-04)
+
+| Command | Permission | Guards, in order | Effect | Audit, event |
+|---|---|---|---|---|
+| CreateDeliveryNote | `del.note.draft` | seller entity-wide OWN; drops with ship-to, bill-to, lines; one buyer; per line an order line the caller accepted, not cancelled, billed to its buyer, qty > 0, within allocated − fulfilled | kernel draft (lines at the tier price, the order line as reference), `doc_delivery`, drops, lines | DN_CREATED, `delivery_note.created.v1` |
+| IssueDeliveryNote | `del.note.issue` | owner's DRAFT; allocated − fulfilled re-checked under lock | seller's ENTITY series of DN, issued; `fulfilled_qty` raised | DN_ISSUED, `delivery_note.issued.v1` |
+| DispatchDeliveryNote | `del.note.dispatch` | owner's ISSUED; vehicle; driver | vehicle, driver, `dispatched_at`; ISSUED to IN_TRANSIT | DN_DISPATCHED, `delivery_note.dispatched.v1` |
+
+`internal/integration/M3TradePricing` answers `TradePricing` from M3's `PricingQueries.resolveTradePrice` since M4-04 (the register's demo price is gone).
 
 Shared pieces in `internal/document`: `TradingClock` (today in the business zone, a state history row), `TradingSeries`, `TradingGuards`, `TradingDocuments` (draft header and line builders). `internal/queries/OrderStatus` derives the status the screens show. Only a `@CommandHandler` class writes (ArchitectureTests), so the handlers hold their own SQL.
 
