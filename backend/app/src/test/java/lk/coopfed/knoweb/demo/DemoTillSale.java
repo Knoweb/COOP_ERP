@@ -131,6 +131,10 @@ public final class DemoTillSale {
         if (rct == null) {
             throw new IllegalStateException("The enrolment answer carries no RCT series for the till position");
         }
+        // Central raises the series' next number from every receipt it applies (doc 32 section 8),
+        // so each run's fresh till goes on after the last run's receipt: 1, 2, 3 ...
+        System.out.println("The till numbers its receipts from "
+                + rct.path("prefix").asText() + "-" + rct.path("next_number").asLong() + ", as central reports");
         String deviceToken = token(Map.of(
                 "grant_type", "client_credentials",
                 "client_id", enrolled.path("credential").path("client_id").asText(),

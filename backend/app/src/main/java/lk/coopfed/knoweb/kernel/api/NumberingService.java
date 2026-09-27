@@ -60,6 +60,23 @@ public interface NumberingService {
     void releaseHolder(Collection<UUID> seriesIds, ScopeContext ctx);
 
     /**
+     * Records that central has seen this number of a device-held series: a till issued it offline
+     * and its document arrived (doc 32 section 8: on a counter transfer central returns the next
+     * number "computed from the highest applied doc_number"). Raises {@code next_number} to
+     * {@code number + 1} when that is higher and never lowers it, so a device newly given the
+     * series (enrolment, holder change, replacement) starts after the highest number central has
+     * applied. Call it inside the transaction that applies the document; the row lock it takes
+     * serialises two documents of the same series.
+     *
+     * <p>Not audited on its own: the raise is derived from the applied document, whose own audit
+     * record names the number. A series the caller cannot see, or no series, is left alone: the
+     * fact is applied anyway and never refused for it (AGENTS.md).
+     *
+     * @return true when the high-water mark moved
+     */
+    boolean observeDeviceNumber(UUID seriesId, long number);
+
+    /**
      * Closes a series for good: retiring a position closes its series (doc 18). A closed
      * series issues nothing and is never reopened; a new position gets a new series.
      */
