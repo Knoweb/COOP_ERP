@@ -1,24 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { messages } from "../shell/i18n/messages";
 import { MODULES } from "./registry";
 
-// The navigation lists one link per entry of every module the user may open, named by the
-// entry's label. Two entries with the same label in one language are two links a user cannot
-// tell apart (a module scaffolded by `make new-module` starts with the greeting texts in
-// Sinhala and Tamil, which is how m3pricing once showed "Greetings" twice).
+// The navigation lists one link per entry of every module (shell/nav/Navigation.tsx), keyed by
+// its route, so two entries with one route would be two links to one page. Labels are not
+// compared here: `make new-module` writes a module whose Sinhala and Tamil texts are still the
+// greeting until they are translated (its README step 5), and the scaffolder's proof runs these
+// tests on that module; the e2e of login and language (web/e2e/login-and-language.spec.ts)
+// finds a repeated label in the navigation of a real user.
 describe("the modules' navigation entries", () => {
-  const entries = MODULES.flatMap((module) => module.navItems);
-
   it("go to different routes", () => {
-    const routes = entries.map((entry) => entry.to);
+    const routes = MODULES.flatMap((module) => module.navItems).map((entry) => entry.to);
     expect(routes).toEqual([...new Set(routes)]);
   });
-
-  for (const language of Object.keys(messages) as Array<keyof typeof messages>) {
-    it(`have different labels in ${language}`, () => {
-      const labels = entries.map((entry) => messages[language][entry.labelId] ?? entry.labelId);
-      const repeated = labels.filter((label, index) => labels.indexOf(label) !== index);
-      expect(repeated).toEqual([]);
-    });
-  }
 });

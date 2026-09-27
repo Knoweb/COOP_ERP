@@ -97,13 +97,14 @@ class ReadPermissionsPostgresIntegrationTest extends PostgresIntegrationTest {
         List<UUID> found =
                 admin.queryForList("select entity_id from party.entity where entity_type = 'FEDERATION'", UUID.class);
         if (found.isEmpty()) {
-            // The trigger of m1party V0002 records it as the Federation (party.federation_identity).
             federation = UUID.randomUUID();
             madeFederation = true;
             insertEntity(admin, federation, "FEDERATION", "Federation (read permissions test)");
         } else {
             federation = found.get(0);
         }
+        // The policies that ask kernel.system_entity() (m1party V0012, m1security V0016) must know it.
+        theDatabaseNamesTheFederation(federation);
         societyA = UUID.randomUUID();
         societyB = UUID.randomUUID();
         insertEntity(admin, societyA, "MPCS", "Society A (read permissions test)");
@@ -419,7 +420,6 @@ class ReadPermissionsPostgresIntegrationTest extends PostgresIntegrationTest {
                 + " (select entity_id from party.entity where legal_name_en like 'Society % (read permissions test)')");
         admin.execute("delete from party.entity where legal_name_en like 'Society % (read permissions test)'");
         if (madeFederation) {
-            admin.execute("delete from party.federation_identity where entity_id = '" + federation + "'");
             admin.execute("delete from party.entity_party_directory where entity_id = '" + federation + "'");
             admin.execute("delete from party.entity where entity_id = '" + federation + "'");
             madeFederation = false;
