@@ -1,12 +1,13 @@
 /**
- * M3 Pricing & Rules. Scaffolded from the hello module; its implementation guide says what to
- * build, and README.md in this package is the living guide once code exists.
+ * M3 Pricing & Rules (doc 23; 23A). README.md in this package is the living guide.
  *
- * <p>allowedDependencies lists every module package this one may use (17A section 4.2):
- * the kernel's api, then the api or query package of each module the guide names, for
- * example "m1party::api". The architecture tests fail on anything else.
+ * <p>allowedDependencies: the kernel; the shared engine (central calls the same functions the
+ * till runs, 23A section 6); and, of the modules 23A section 4 names, those this code uses
+ * today: M1's api (TradePriceListCheck, which M3 answers) and query (relationships), M2's query
+ * (SKUs and batches). M5's query arrives with the retail ceiling check (M3-06).
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M3 Pricing & Rules",
-        allowedDependencies = {"kernel::api"})
+        allowedDependencies = {"kernel", "kernel::api", "engine", "m1party::api", "m1party::query", "m2catalogue::query"
+        })
 package lk.coopfed.knoweb.m3pricing;

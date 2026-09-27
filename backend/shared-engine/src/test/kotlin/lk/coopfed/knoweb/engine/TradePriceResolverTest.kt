@@ -6,7 +6,6 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import lk.coopfed.knoweb.engine.model.TradeLine
 
 /** Volume tiers of a TRADE list (doc 23 section 3.2; doc 10 A-03: the tier basis is the ordered quantity). */
 class TradePriceResolverTest {

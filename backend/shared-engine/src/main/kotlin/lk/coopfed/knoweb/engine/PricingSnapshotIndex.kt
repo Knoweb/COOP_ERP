@@ -1,14 +1,7 @@
-package lk.coopfed.knoweb.engine.snapshot
+package lk.coopfed.knoweb.engine
 
 import java.time.LocalDate
 import java.util.UUID
-import lk.coopfed.knoweb.engine.model.BatchCandidate
-import lk.coopfed.knoweb.engine.model.Ceiling
-import lk.coopfed.knoweb.engine.model.Policy
-import lk.coopfed.knoweb.engine.model.RetailLine
-import lk.coopfed.knoweb.engine.model.Rule
-import lk.coopfed.knoweb.engine.model.SkuFacts
-import lk.coopfed.knoweb.engine.model.StackingPolicy
 
 /**
  * Everything the engine reads, indexed once per snapshot version (23A section 6, "Index").

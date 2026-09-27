@@ -33,10 +33,11 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
     // The catalogue of M1 (22 after CR-21A-1 retired the four coarse manage codes and added
-    // gov.audit.review), bil.creditlimit.change of M4, the two of M3 and the 13 of M2 (22A
-    // section 3.1 plus cat.sku.view and cat.tag.govern, CR-22A-3): the number of `- code:` lines
-    // in permissions.yaml. Plus the 18 of M5 (25A section 3.1 and inv.stock.view).
-    private static final int PERMISSIONS = 56;
+    // gov.audit.review), bil.creditlimit.change of M4, the three of M3 (M3-04: prc.pricelist.view,
+    // .author, .publish) and the 13 of M2 (22A section 3.1 plus cat.sku.view and cat.tag.govern,
+    // CR-22A-3) and the 18 of M5 (25A section 3.1 plus inv.stock.view): the number of `- code:`
+    // lines in permissions.yaml.
+    private static final int PERMISSIONS = 57;
     private static final int ROLE_TEMPLATES = 4;
     private static final int SOD_PAIRS = 2;
 
