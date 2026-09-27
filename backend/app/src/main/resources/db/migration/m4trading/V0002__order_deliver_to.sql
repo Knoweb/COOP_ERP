@@ -1,0 +1,13 @@
+-- M4-11 (demo scope, 27 September 2026): where the buyer wants the goods of an order delivered.
+--
+-- The seller's delivery note names a ship-to location of the buyer on each drop (24A section 6,
+-- CreateDeliveryNote), and the buyer's GRN is captured at that location (M4-05). Row-level
+-- security lets only the owner read its locations (party.location, own_read), so the seller has
+-- no way to learn them. The buyer, who can, names its receiving location on the order; the
+-- seller's delivery note screen takes the drop's ship-to from it. docs/PROGRESS.md Deviations,
+-- "M4-11 deliver-to on the order"; docs/change-requests/CR-24A-2.
+--
+-- Optional: an order drafted without it (the earlier tickets, a job) still works, and its
+-- delivery note then needs the ship-to from elsewhere. The table's INSERT grant (V0001) covers
+-- the new column; nothing updates it.
+ALTER TABLE trading.doc_order ADD COLUMN deliver_to_location_id uuid;
