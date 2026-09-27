@@ -2,7 +2,7 @@
 
 Updated after every ticket, in the same commit. Three headings: Done, Next, Deviations. A person or tool arriving cold reads `AGENTS.md`, then `docs/README.md`, then this file, and can continue.
 
-Last updated: 27 September 2026, branch `feat/m5-12-stock-screens` (stacked on `feat/m2-10-catalogue-screens`).
+Last updated: 27 September 2026, branch `feat/m5-12-stock-screens`.
 
 ## Done
 
