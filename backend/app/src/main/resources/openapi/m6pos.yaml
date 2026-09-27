@@ -1,0 +1,99 @@
+# M6 Point of Sale API slice, the central side (26A section 10), minimal for the demo: the
+# receipts and sessions the shops' tills uploaded. Sales themselves arrive through the sync
+# contract (sync.yaml, receipt.issued.v1), never through this slice. Every operation names its
+# permission in x-permission; row-level security decides the rows.
+# After changing this file run `sh tools/gen-clients.sh` and commit web/src/generated/m6pos.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP M6 Point of Sale API
+  version: 0.1.0
+paths:
+  /v1/pos/receipts:
+    get:
+      tags: [Pos]
+      operationId: listReceipts
+      summary: The receipts the tills of a location issued, newest first
+      description: >
+        Each receipt as the till issued it (its number from the till's series), its lines and
+        what central flagged about it. A location the caller's scope does not read answers an
+        empty list.
+      x-permission: pos.receipt.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The receipts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReceiptResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/pos/sessions:
+    get:
+      tags: [Pos]
+      operationId: listSessions
+      summary: The till sessions of a location, newest first
+      x-permission: pos.receipt.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SessionResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+components:
+  schemas:
+    ReceiptResponse:
+      type: object
+      required: [documentId, locationId, issuedAt, flags, lines]
+      properties:
+        documentId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        docNumberDisplay: { type: string }
+        issuedAt: { type: string, format: date-time }
+        businessDate: { type: string, format: date }
+        grossAmount: { type: number }
+        flags:
+          type: array
+          items: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/ReceiptLineResponse' }
+    ReceiptLineResponse:
+      type: object
+      required: [lineNo, qty]
+      properties:
+        lineNo: { type: integer }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        qty: { type: number }
+        unitPrice: { type: number }
+        lineTotal: { type: number }
+    SessionResponse:
+      type: object
+      required: [sessionId, locationId, openedAt, status]
+      properties:
+        sessionId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        tillPositionId: { type: string, format: uuid }
+        businessDate: { type: string, format: date }
+        openedAt: { type: string, format: date-time }
+        floatAmount: { type: number }
+        status: { type: string, enum: [OPEN, CLOSED] }
+        closedAt: { type: string, format: date-time }
+        countedCash: { type: number }
+        expectedCash: { type: number }
+        variance: { type: number }
