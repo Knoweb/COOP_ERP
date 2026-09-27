@@ -169,6 +169,7 @@ What the demo lanes of 27 September 2026 built to a demo-minimal scope left out,
 - **M5-10:** the ONBOARDING-location guard, the Federation's countersignature from its own scope (a Federation-administers policy and the posting in the owner's scope), M1's activation gate on opening_balance.posted.v1.
 - **M5-04:** the stock card (`GET /v1/inventory/skus/{id}/movements`), the 30-second availability cache per instance, the PARTY caller's "live or last end-of-day" availability mode (25A section 7), and M5's web screens (M5-12).
 - **K-06b rest** (kernel, the platform pair): a ledger of rendered reports with a retention and a clean-up job; a render request queue for web-role callers if a module needs one; a pixel comparison of the golden PDF; the worker image in the `package` job's artefacts. Before M4's invoices go beyond the demo.
+- **M2-10:** bulk import, promote and merge, the control price register, the tag and assortment screens, the image thumbnail and upload on the SKU view, deactivate and reactivate buttons, barcode retire and batch link, batch correction, and the descriptions, MRP policy, origin and expiry warning fields in the editor (kept as they are on save).
 
 ## Part B — running the plan in parallel with a larger team
 
