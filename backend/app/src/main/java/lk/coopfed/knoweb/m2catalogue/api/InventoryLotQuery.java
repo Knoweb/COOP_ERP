@@ -5,7 +5,7 @@ import java.util.UUID;
 /**
  * The questions M2's guards ask of M5 (22A section 6). M2 cannot call M5 before M5 exists, so M2
  * publishes the question and M5 answers it by implementing this interface; until then
- * {@code internal.integration.NoInventoryLotQuery} answers "no lots".
+ * {@code internal.integration.RegistrationLotQuery} answers from the batches M2 registered.
  */
 public interface InventoryLotQuery {
 

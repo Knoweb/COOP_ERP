@@ -254,6 +254,37 @@ config_items:
     default: 500
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # Decisions of 27 Sep 2026 (CR-19A-8): the upload URL's validity is how long an attachment waits
+  # before it is settled (the verifier settles only after the URL expires), so it is the lever on
+  # how long a write-off approval waits for its photograph; failed uploads are deleted after a
+  # retention by the attachment-cleanup job.
+  - key: attachment.upload_url_minutes
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 60 }
+    description_en: How long an upload link for an attachment stays valid, in minutes; an attachment is verified only after its link expires
+    description_si: ඇමුණුමක් උඩුගත කිරීමේ සබැඳියක් වලංගු වන කාලය, මිනිත්තු වලින්; ඇමුණුමක් සත්‍යාපනය වන්නේ එහි සබැඳිය කල් ඉකුත් වූ පසුව පමණි
+    description_ta: இணைப்பைப் பதிவேற்றும் இணைப்புச்சுட்டி செல்லுபடியாகும் நேரம், நிமிடங்களில்; இணைப்புச்சுட்டி காலாவதியான பின்னரே இணைப்பு சரிபார்க்கப்படும்
+    default: 15
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: attachment.failed_retention_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 3650 }
+    description_en: How many days the file of an upload that failed verification is kept before it is deleted
+    description_si: සත්‍යාපනය අසාර්ථක වූ උඩුගත කිරීමක ගොනුව මකා දැමීමට පෙර තබා ගන්නා දින ගණන
+    description_ta: சரிபார்ப்பில் தோல்வியுற்ற பதிவேற்றத்தின் கோப்பு நீக்கப்படுவதற்கு முன் வைத்திருக்கப்படும் நாட்கள்
+    default: 30
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: attachment.cleanup.batch_size
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 10000 }
+    description_en: The most failed uploads of each kind one run of the clean-up deletes (the rest wait for the next run)
+    description_si: පිරිසිදු කිරීමේ එක් ධාවනයක් එක් වර්ගයකින් මකා දමන උපරිම අසාර්ථක උඩුගත කිරීම් ගණන (ඉතිරිය ඊළඟ ධාවනයට බලා සිටී)
+    description_ta: சுத்திகரிப்பு ஓட்டம் ஒன்று ஒவ்வொரு வகையிலும் நீக்கும் அதிகபட்ச தோல்வியுற்ற பதிவேற்றங்கள் (மீதி அடுத்த ஓட்டத்திற்குக் காத்திருக்கும்)
+    default: 500
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   # K-08: the sync gateway (doc 32; 19A section 8). The batch limits and the chunk size are doc 32
   # DR-1 and DR-5, the change-log retention DR-4: proposed values, to be settled after the load
   # test (spike 5), so they are configuration and not constants.
@@ -406,6 +437,18 @@ config_items:
     description_si: භාණ්ඩ රූපයක කුඩා රූපයේ දිගම පැත්ත, පික්සල් වලින්
     description_ta: பொருள் படத்தின் சிறுபடத்தின் நீளமான பக்கம், படப்புள்ளிகளில்
     default: 128
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
+  # Doc 22 section 7, thumbnail_px / max_thumb_kb = 128 / 10; the JPEG thumbnail steps its
+  # quality down to fit (CR-22A-2).
+  - key: m2.image.thumbnail_max_kb
+    value_type: INTEGER
+    schema: { minimum: 2, maximum: 512 }
+    description_en: The size a product image thumbnail is kept within where the image allows, in kilobytes
+    description_si: හැකි තැන භාණ්ඩ රූපයක කුඩා රූපය තබා ගන්නා ප්‍රමාණය, කිලෝබයිට් වලින්
+    description_ta: இயன்ற இடங்களில் பொருள் படத்தின் சிறுபடம் வைக்கப்படும் அளவு, கிலோபைட்டுகளில்
+    default: 10
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue

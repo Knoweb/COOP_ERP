@@ -69,7 +69,8 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 LOCAL,
                 ENTITY);
         db.update(
-                "insert into catalogue.sku_tag (sku_id, tag_code, owner_entity_id) values (?, 'rice', ?)",
+                "insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id)"
+                        + " values (?, (select tag_id from catalogue.tag where tag_code = 'rice' and governed), ?)",
                 LOCAL,
                 ENTITY);
     }

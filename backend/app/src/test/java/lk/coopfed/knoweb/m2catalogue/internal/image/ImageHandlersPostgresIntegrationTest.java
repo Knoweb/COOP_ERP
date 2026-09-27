@@ -214,12 +214,12 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         windowOver(upload.imageId());
         assertThat(job.makeThumbnails(execution())).isEqualTo(1);
 
-        String thumbKey = key + "/thumb.png";
+        String thumbKey = key + "/thumb.jpg";
         assertThat(row(upload.imageId())).satisfies(row -> {
             assertThat(row.get("status")).isEqualTo("ACTIVE");
             assertThat(row.get("object_key_thumb")).isEqualTo(thumbKey);
         });
-        // The thumbnail is produced and keyed: a PNG of at most 128 pixels a side.
+        // The thumbnail is produced and keyed: a JPEG of at most 128 pixels a side (CR-22A-2).
         BufferedImage thumb = ImageIO.read(new ByteArrayInputStream(storage.objects.get(thumbKey)));
         assertThat(thumb.getWidth()).isEqualTo(128);
         assertThat(thumb.getHeight()).isEqualTo(96);

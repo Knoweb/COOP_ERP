@@ -32,6 +32,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-19A-5` — see 17A above; also `GRANT SELECT, UPDATE (published_at) ON kernel.event_outbox TO app_relay` and a policy stating the relay reads every entity's events.
 - `CR-19A-6` — `CommandHandler.INTERNAL` for a handler with no operation of its own, called only inside the caller's transaction; accepted with the guard rails of pull request #138.
 - `CR-19A-7` — accepted as revised: the kernel keeps an upload ledger (`kernel.object_upload`) and enforces the K-09 rules once for every module that owns objects without a document, rather than generalising `document_attachment`.
+- `CR-19A-8` — seven kernel decisions: a notification retry's recipient and placeholders sealed under a key outside the database (also doc 19 §7); the upload URL's validity and the verifier's schedule as configuration (§9); a nightly clean-up of failed uploads' files after a retention (§9, §12; also doc 18 part C); NFC on every String, no `I18nText` (§6); no provider adapter in the kernel (§10); a document with no location takes the calendar date in the business time zone (§13; also doc 18 part C and 24A for DISC); the A4 renderer is K-06b, before M3-10 (§6; `docs/PLAN_TO_M2.md`).
 
 ### 21A (M1 Party, Tenancy and Security Implementation Guide)
 
@@ -40,6 +41,12 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-21A-3` — option 1: `user_role`, `role_permission` and `sod_pair` keep their audited deletes (§6; also 17A §6.2 and 18 Part F).
 - `CR-21A-4` — `LocationFilter` (m1party's frozen query package) gains an optional `entityId`, needed by 22A's `listLocations(entity)`.
 - `CR-21A-5` — BulkRegister is all or none (also doc 21 §5.1's "commit per row"); a till position is registered at a shop in any status.
+
+### 22A (M2 Catalogue and Batch Implementation Guide)
+
+- `CR-22A-1` — accepted as revised: `catalogue.tag` is keyed by `tag_id`, its code unique within its owner (`tag_code_per_owner`); `sku_tag` names the tag by id; the Federation writes governed tags; no reserved prefix for governed codes (m2catalogue V0007).
+- `CR-22A-2` — accepted as revised: the thumbnail is a JPEG within doc 22's 10 KB (`m2.image.thumbnail_max_kb`), not WebP; the image audits and publishes at the attach and at the settle (`image.pending.v1`, `image.attached.v1`, `image.failed.v1`; `IMAGE_ACTIVATED`, `IMAGE_FAILED`, `IMAGE_RETIRED`).
+- `CR-22A-3` — `cat.sku.view` (the reads) and `cat.tag.govern` (FEDERATION, governed tags) beside 22A's eleven codes; `cat.tag.manage` is local tags only.
 
 ### 28A (M8 Reporting Implementation Guide)
 
