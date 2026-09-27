@@ -328,3 +328,4 @@ Work left out of the demo-minimal build of 27 September 2026 (the architect's pr
 
 - **M3-02 rest** (M3, with the till track): the golden-basket JSON fixtures and the Android parity harness; the FREE_ITEM rule kind; ceiling unit conversion (with M3-06). Before M6 links the engine.
 - **M3-04 rest** (M3): RETAIL and ADVISORY lists (after M3-06); carry-forward and closure of the previous version's lines; WithdrawDraft; `pricing.review_raised.v1` for a trade price above the lowest MRP; trade lines in units other than the base unit (needs an M2 query of a SKU's conversions); the RETAIL publish fan-out to the snapshot change log.
+- **DEMO-01** (demo): M4 demo data (a completed order-to-invoice for D101, an open order for D102) through M4's handlers, once M4 is on main; the demo parties and users as commands instead of seed rows, if the realm ever resolves the home entity from M1 (TODO in `docs/DEMO.md`).

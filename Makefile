@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke e2e
+.PHONY: help image up up-2 down reset migrate seed demo-data urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke e2e
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -45,6 +45,7 @@ help:
 	@echo "make reset        stop the stack and delete its data volumes"
 	@echo "make migrate      rebuild and restart the backend, which runs the Flyway migrations"
 	@echo "make seed         load the development seed rows (safe to repeat)"
+	@echo "make demo-data    load the demo for cooperative staff (docs/DEMO.md; safe to repeat)"
 	@echo "make roles        apply the database users and groups to the running database (make up does this)"
 	@echo "make build        build backend and web on the host"
 	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
@@ -122,6 +123,22 @@ seed:
 		echo "seeding $$f"; \
 		$(COMPOSE) exec -T postgres sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < "$$f" || exit 1; \
 	done
+
+# The demo for cooperative staff (docs/DEMO.md). Needs the stack (make up). First the demo's
+# parties and users (seed/*/*.demo.sql, rows because the dev realm's tokens name their entity),
+# as the superuser like `make seed`; then a one-off backend container, role web only and no port
+# of its own, that loads the rest through the command handlers as the demo users and exits
+# (COOP_ERP_DEMO_LOAD). Safe to repeat: a second run changes nothing. A clean demo:
+# `make reset && make up && make demo-data`.
+demo-data:
+	@$(MAKE) --no-print-directory seed
+	@for f in $(SEED_DIR)/m1party/*.demo.sql $(SEED_DIR)/m1security/*.demo.sql; do \
+		[ -f "$$f" ] || continue; \
+		echo "seeding $$f"; \
+		$(COMPOSE) exec -T postgres sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < "$$f" || exit 1; \
+	done
+	$(COMPOSE) run --rm --no-deps -e COOP_ERP_DEMO_LOAD=true -e COOP_ERP_ROLE=web -e SPRING_PROFILES_ACTIVE=web -e SERVER_PORT=8099 backend
+	@echo "demo data loaded: the users and the storyline are in docs/DEMO.md (password: demo)"
 
 urls:
 	@echo ""

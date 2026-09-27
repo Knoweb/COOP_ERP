@@ -1,0 +1,16 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`lk.coopfed.knoweb.demo`
+|Spring components
+|_Services_
+
+* `l.c.k.d.DemoDataLoader`
+|Bean references
+|* `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
+* `l.c.k.m.query.RelationshipQueries` (in M1 Party, Tenancy & Security)
+* `l.c.k.m.query.CatalogueQueries` (in M2 Catalogue & Batch)
+* `l.c.k.m.query.PricingQueries` (in M3 Pricing & Rules)
+* `l.c.k.m.query.InventoryQueries` (in M5 Inventory, Costing, Repack & Loss)
+|===
