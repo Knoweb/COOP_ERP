@@ -63,3 +63,31 @@ templates:
       - "cat.barcode.manage"
       - "cat.tag.manage"
       - "cat.tag.govern"
+  # M4 Trading Documents (24A section 8): the two desks of the demo of 27 September 2026. A
+  # buyer's stores role drafts and submits orders and confirms what arrives at its warehouse; a
+  # seller's sales role accepts orders, issues and dispatches delivery notes and issues invoices.
+  # Both read the trading documents of their scope (trd.document.view, CR-24A-1), the catalogue
+  # and their relationships.
+  - role_id: "01999a10-2c4e-7f1a-8b3d-5e6f70819a01"
+    name_en: "Trading Buyer"
+    role_class: "OWN"
+    permissions:
+      - "trd.document.view"
+      - "cat.sku.view"
+      - "prt.relationship.view"
+      - "ord.order.draft"
+      - "ord.order.submit"
+      - "whs.grn.confirm"
+      - "bil.invoice.dispute"
+  - role_id: "01999a10-2c4e-7f1a-8b3d-5e6f70819a02"
+    name_en: "Trading Seller"
+    role_class: "OWN"
+    permissions:
+      - "trd.document.view"
+      - "cat.sku.view"
+      - "prt.relationship.view"
+      - "ord.order.accept"
+      - "del.note.draft"
+      - "del.note.issue"
+      - "del.note.dispatch"
+      - "bil.invoice.issue"

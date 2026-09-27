@@ -296,6 +296,17 @@ The gain comes from four things: four streams in wave 1 instead of one pair, fou
 - **Machines.** The full compose stack plus Testcontainers needs 16 GB of RAM. A developer without it runs PostgreSQL only and relies on CI for the rest; a Postgres-only compose profile is an addition to 17A.
 - **Sinhala and Tamil text.** The build fails on a missing translation. Ten developers will add message ids faster than one person can translate them. Someone has to be named, or a marked-placeholder convention agreed and checked before release.
 
+## Deferred after the demo
+
+Added 27 September 2026. The architect's priority is a working demo for cooperative staff (Federation selling to a distributor: catalogue, price list, stock, order, acceptance, delivery note, GRN, invoice). Each module ticket of the demo is built to its happy path, its guards, audit, events, RLS and tests; what a ticket leaves out is listed here with the ticket it belongs to, so that nothing deferred lives only in a pull request. `docs/PROGRESS.md` carries the same under Deviations ("deferred for the demo, <ticket>").
+
+| Ticket | Deferred | Where it is needed | Notes |
+|---|---|---|---|
+| M4-01 | Notification rules (`seed/m4/notification-rules.yaml`, 24A section 3.1) | Before staff are notified of an accepted order or a dispatched note (M9 seeds the rules; K-10 delivers) | The events the rules would bind to are published |
+| M4-01 | The PARTY masking views `trading.v_invoice_party` and `v_invoice_line_party` (24A section 3) | With M4-08, where the invoice exists; before a counterparty reads an invoice line, since `kernel.document_line.unit_cost_at_issue` is visible to the counterparty through `document_read` | M4 writes no cost on an invoice line, so nothing leaks today |
+| M4-01 | The tables of claims, payment receipts, cheques, exposure and transfer requests | With M4-06, M4-07, M4-09, M4-10, each in a new migration of the lane | – |
+| M4-01 | Partitioning of the extension tables by month (24A section 3; doc 24 section 9.1) | With the partitioning of `kernel.document` (K-07 did not partition it) and doc 14's tiering policy (D-02) | CR-24A-1 |
+
 ## Phase 7 — decisions only the architect can take
 
 1. Adopt this plan as the Next list of PROGRESS.md, or cut it.
