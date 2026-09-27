@@ -32,5 +32,6 @@
   "m5.transfer.insufficient_stock": "மூல இடத்தில் அந்தத் தொகுதியில் அவ்வளவு அளவு இல்லை",
   "m5.transfer.not_found": "இடமாற்றம் கிடைக்கவில்லை",
   "m5.transfer.not_destination": "சேருமிட இடம் மட்டுமே இடமாற்றத்தைப் பெற முடியும்",
-  "m5.transfer.already_received": "இடமாற்றம் ஏற்கனவே பெறப்பட்டுள்ளது"
+  "m5.transfer.already_received": "இடமாற்றம் ஏற்கனவே பெறப்பட்டுள்ளது",
+  "m5.sale.location_required": "பணப்பெட்டியின் விற்பனை அந்தப் பணப்பெட்டியின் கடையிலேயே பதிவாகும்"
 }

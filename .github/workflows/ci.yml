@@ -468,6 +468,11 @@ jobs:
       - name: make smoke TWO=1
         run: make smoke TWO=1
 
+      # The demo data of docs/DEMO.md (parties, users, catalogue, price lists, relationships,
+      # opening stock), which web/e2e/trading.spec.ts walks as the demo users. Safe to repeat.
+      - name: make demo-data
+        run: make demo-data
+
       - name: make e2e
         run: make e2e
 

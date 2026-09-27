@@ -20,8 +20,10 @@ import lk.coopfed.knoweb.m4trading.TradingFlow;
 import lk.coopfed.knoweb.m4trading.api.CaptureGrn;
 import lk.coopfed.knoweb.m4trading.api.ConfirmGrn;
 import lk.coopfed.knoweb.m4trading.api.InvoiceIssued;
+import lk.coopfed.knoweb.m4trading.api.InvoicePrinted;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
 import lk.coopfed.knoweb.m4trading.api.JournalPostingsReady;
+import lk.coopfed.knoweb.m4trading.api.RecordInvoicePrint;
 import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.ConfirmGrnHandler;
 import lk.coopfed.knoweb.m4trading.query.DeliveryQueries;
@@ -51,6 +53,9 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     IssueInvoiceHandler issue;
+
+    @Autowired
+    RecordInvoicePrintHandler print;
 
     @Autowired
     InvoiceQueries invoices;
@@ -136,6 +141,33 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         refused(() -> issue.handle(new IssueInvoice(List.of(grnId)), seller()), "m4.invoice.seller_vat_missing");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void thePrintedCopyIsKeptOnTheSellersInvoice() {
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        UUID invoiceId = issue.handle(new IssueInvoice(List.of(grnId)), seller());
+        kernel.reset();
+        String key = "reports/" + SELLER + "/" + UUID.randomUUID() + ".pdf";
+
+        // The buyer is refused: not its invoice (m4.invoice.not_seller, or not_found where it cannot lock it).
+        assertThatThrownBy(() -> print.handle(new RecordInvoicePrint(invoiceId, key), buyer()))
+                .isInstanceOf(ProblemException.class);
+        refused(() -> print.handle(new RecordInvoicePrint(UUID.randomUUID(), key), seller()), "m4.invoice.not_found");
+        refused(() -> print.handle(new RecordInvoicePrint(invoiceId, " "), seller()), "request.field.required");
+        assertThat(invoices.printObjectKey(invoiceId, seller())).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        print.handle(new RecordInvoicePrint(invoiceId, key), seller());
+
+        assertThat(invoices.printObjectKey(invoiceId, seller())).contains(key);
+        assertThat(kernel.committedAudit())
+                .extracting(record -> record.eventType())
+                .containsExactly("INVOICE_PRINTED");
+        assertThat(events(InvoicePrinted.class)).singleElement().satisfies(event -> {
+            assertThat(event.invoiceId()).isEqualTo(invoiceId);
+            assertThat(event.objectKey()).isEqualTo(key);
+        });
     }
 
     private static CaptureGrn.Line line(UUID sku, String received) {

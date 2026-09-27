@@ -32,5 +32,6 @@
   "m5.transfer.insufficient_stock": "The source location does not hold that much of the batch",
   "m5.transfer.not_found": "The transfer was not found",
   "m5.transfer.not_destination": "Only the destination location can receive the transfer",
-  "m5.transfer.already_received": "The transfer has already been received"
+  "m5.transfer.already_received": "The transfer has already been received",
+  "m5.sale.location_required": "A till’s sale is applied at the shop of the till that made it"
 }

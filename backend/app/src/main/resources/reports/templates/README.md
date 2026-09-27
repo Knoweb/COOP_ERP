@@ -27,3 +27,18 @@ Every key is optional except `title`.
 | `lines` | list of `{description, quantity, unitPrice, amount}` |
 | `totals` | list of `{label, value}`; the last one is printed as the grand total |
 | `notes`, `footer` | text with line breaks |
+
+## m8-report
+
+M8's A4 report (28A section 7): one table with a title, the period, when it was made and how
+fresh its data is. Written by `ReportPrintModel` (m8reporting); every value arrives formatted.
+
+| Key | Shape |
+|---|---|
+| `title` | text, the report's name in the reader's language |
+| `subtitle` | text, the period; absent for a report without one |
+| `generated`, `freshness` | text; `freshness` absent when no event was applied yet |
+| `columns` | list of `{label, num}`, `num` true for a right-aligned number column |
+| `rows` | list of rows, each a list of texts in column order |
+| `totals` | list of texts in column order (the word "Total" in the first free cell); absent when nothing sums or there are no rows |
+| `empty` | text shown instead of the table when there are no rows |

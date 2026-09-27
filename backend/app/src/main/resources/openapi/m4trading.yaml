@@ -616,6 +616,41 @@ paths:
               schema:
                 $ref: 'common.yaml#/components/schemas/Problem'
 
+  /v1/trading/invoices/{invoiceId}/print:
+
+    parameters:
+      - in: path
+        name: invoiceId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Billing]
+      operationId: getInvoicePrint
+      summary: A fresh link to the printed A4 copy of the seller's invoice (M4-11)
+      description: >
+        The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it
+        has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity
+        is refused (report.scope_mismatch).
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoicePrintResponse'
+        '404':
+          description: m4.invoice.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -1198,5 +1233,16 @@ components:
         grnLineId:
           type: string
           format: uuid
+
+    InvoicePrintResponse:
+      type: object
+      required: [invoiceId, url]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
 
     # @@SCHEMAS@@

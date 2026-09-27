@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
@@ -28,6 +28,9 @@ export function GrnPage() {
   const scope = useScope();
   const queryClient = useQueryClient();
   const canConfirm = useHasPermission("shop.grn.confirm");
+  const canInvoice = useHasPermission("bil.invoice.issue");
+  const navigate = useNavigate();
+  const invoiceKey = useIdempotencyKey();
   const key = useIdempotencyKey();
 
   const grn = useQuery({ queryKey: ["trading", "grn", grnId], queryFn: () => api.grn(grnId) });
@@ -51,6 +54,20 @@ export function GrnPage() {
     onError: (error) => {
       if (error instanceof ApiProblem) {
         key.next();
+      }
+    }
+  });
+  // The seller's accounts invoice the confirmed GRN (M4-08); one GRN per invoice for the demo.
+  const invoice = useMutation({
+    mutationFn: () => api.issueInvoice([grnId], invoiceKey.current()),
+    onSuccess: (issued) => {
+      invoiceKey.next();
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+      navigate(`/trading/invoices/${issued.invoiceId}`);
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        invoiceKey.next();
       }
     }
   });
@@ -132,6 +149,15 @@ export function GrnPage() {
         </section>
       )}
       {confirm.isError && <p role="alert">{errorText(confirm.error, t("trading.error.generic").text)}</p>}
+
+      {confirmed && !isReceiver && canInvoice && (
+        <section style={{ marginTop: "var(--space-3)" }}>
+          <button type="button" disabled={invoice.isPending} onClick={() => invoice.mutate()}>
+            {t("trading.invoice.issue").text}
+          </button>
+          {invoice.isError && <p role="alert">{errorText(invoice.error, t("trading.error.generic").text)}</p>}
+        </section>
+      )}
 
       {confirmed && isReceiver && (
         <section style={{ marginTop: "var(--space-3)" }}>

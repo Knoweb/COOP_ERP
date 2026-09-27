@@ -22,6 +22,7 @@ export function TradingPage() {
   const canIssueNote = useHasPermission("del.note.issue");
   const canDispatch = useHasPermission("del.note.dispatch");
   const canReceive = useHasPermission("shop.grn.confirm");
+  const canInvoice = useHasPermission("bil.invoice.issue");
 
   return (
     <main className="shell-page">
@@ -52,9 +53,21 @@ export function TradingPage() {
           <h2>{t("trading.incoming.title").text}</h2>
           <DeliveryRegister role="BUYER" />
           <h2>{t("trading.grns.title").text}</h2>
-          <GrnRegister />
+          <GrnRegister role="BUYER" />
         </section>
       )}
+      {canInvoice && (
+        <section>
+          <h2>{t("trading.to_invoice.title").text}</h2>
+          <GrnRegister role="SELLER" />
+          <h2>{t("trading.invoices.issued.title").text}</h2>
+          <InvoiceRegister role="SELLER" />
+        </section>
+      )}
+      <section>
+        <h2>{t("trading.invoices.received.title").text}</h2>
+        <InvoiceRegister role="BUYER" />
+      </section>
     </main>
   );
 }
@@ -148,10 +161,10 @@ function DeliveryRegister({ role }: { role: Side }) {
   );
 }
 
-function GrnRegister() {
+function GrnRegister({ role }: { role: Side }) {
   const t = useT();
   const api = useTradingApi();
-  const grns = useQuery({ queryKey: ["trading", "grns", "BUYER"], queryFn: () => api.grns("BUYER") });
+  const grns = useQuery({ queryKey: ["trading", "grns", role], queryFn: () => api.grns(role) });
 
   if (grns.isLoading) {
     return <p>{t("trading.loading").text}</p>;
@@ -167,7 +180,7 @@ function GrnRegister() {
       <thead>
         <tr>
           <th>{t("trading.column.number").text}</th>
-          <th>{t("trading.column.seller").text}</th>
+          <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
           <th>{t("trading.column.status").text}</th>
         </tr>
       </thead>
@@ -177,9 +190,57 @@ function GrnRegister() {
             <td>
               <Link to={`/trading/grns/${grn.grnId}`}>{grn.docNumber ?? t("trading.order.draft_number").text}</Link>
             </td>
-            <td>{grn.sellerEntityId && <EntityName entityId={grn.sellerEntityId} />}</td>
+            <td>
+              {role === "BUYER"
+                ? grn.sellerEntityId && <EntityName entityId={grn.sellerEntityId} />
+                : <EntityName entityId={grn.receiverEntityId} />}
+            </td>
             <td>
               <StateChip state={grnChip(grn.status)} label={t(`trading.grn.status.${grn.status}`).text} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function InvoiceRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const invoices = useQuery({ queryKey: ["trading", "invoices", role], queryFn: () => api.invoices(role) });
+
+  if (invoices.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (invoices.isError) {
+    return <p role="alert">{errorText(invoices.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!invoices.data?.length) {
+    return <p>{t("trading.invoices.empty").text}</p>;
+  }
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{t("trading.column.number").text}</th>
+          <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+          <th>{t("trading.invoice.due").text}</th>
+          <th>{t("trading.invoice.gross").text}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {invoices.data.map((invoice) => (
+          <tr key={invoice.invoiceId}>
+            <td>
+              <Link to={`/trading/invoices/${invoice.invoiceId}`}>{invoice.docNumber}</Link>
+            </td>
+            <td>
+              <EntityName entityId={role === "BUYER" ? invoice.sellerEntityId : invoice.buyerEntityId} />
+            </td>
+            <td>{invoice.dueDate}</td>
+            <td>
+              <MoneyDisplay amount={invoice.grossAmount} />
             </td>
           </tr>
         ))}

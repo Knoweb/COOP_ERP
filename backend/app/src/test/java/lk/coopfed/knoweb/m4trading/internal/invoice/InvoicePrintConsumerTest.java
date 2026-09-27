@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +19,10 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.Formats;
+import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.RecordInvoicePrint;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import org.junit.jupiter.api.Test;
@@ -71,7 +75,17 @@ class InvoicePrintConsumerTest {
         Messages messages = mock(Messages.class);
         when(messages.t(anyString(), any())).thenAnswer(call -> call.getArgument(0));
 
-        new InvoicePrintConsumer(queries, renderer, formats, messages)
+        Handles<RecordInvoicePrint, Void> record = mock(Handles.class);
+        when(renderer.render(anyString(), any(), any(), any()))
+                .thenReturn(new A4Renderer.Rendered(
+                        UUID.randomUUID(),
+                        "reports/" + seller + "/r.pdf",
+                        URI.create("http://s/r.pdf"),
+                        Instant.now(),
+                        10,
+                        "ab"));
+
+        new InvoicePrintConsumer(queries, renderer, formats, messages, record)
                 .onInvoiceIssued(new ObjectMapper().readTree("{\"invoiceId\":\"" + invoiceId + "\"}"), scope);
 
         ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
@@ -86,5 +100,7 @@ class InvoicePrintConsumerTest {
         assertThat((List<Map<String, Object>>) data.getValue().get("totals"))
                 .last()
                 .satisfies(total -> assertThat(total).containsEntry("value", "1510.40"));
+        // The PDF's key is kept on the invoice for the Print button (M4-11).
+        verify(record).handle(new RecordInvoicePrint(invoiceId, "reports/" + seller + "/r.pdf"), scope);
     }
 }

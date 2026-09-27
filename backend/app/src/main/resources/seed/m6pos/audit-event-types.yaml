@@ -1,0 +1,21 @@
+# M6's audit codes (26A section 10, the ingest hooks), loaded by the kernel's AuditEventTypeSeedLoader.
+audit_event_types:
+  - code: RECEIPT_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A receipt a till issued was recorded at central
+
+  - code: RECEIPT_FLAGGED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A receipt a till issued was recorded with something central found odd about it
+
+  - code: TILL_SESSION_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: A till session's opening was recorded at central
+
+  - code: TILL_SESSION_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A till session's close was recorded at central
