@@ -80,13 +80,18 @@ public class DeliveryReads {
     }
 
     public List<UUID> orderIds(List<DropSummary> drops) {
-        return drops.stream().flatMap(drop -> drop.orderIds().stream()).distinct().toList();
+        return drops.stream()
+                .flatMap(drop -> drop.orderIds().stream())
+                .distinct()
+                .toList();
     }
 
     static List<UUID> uuids(Object array) {
         try {
             if (array instanceof java.sql.Array sql) {
-                return Arrays.stream((Object[]) sql.getArray()).map(UUID.class::cast).toList();
+                return Arrays.stream((Object[]) sql.getArray())
+                        .map(UUID.class::cast)
+                        .toList();
             }
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException(e);

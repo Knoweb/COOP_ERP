@@ -50,8 +50,10 @@ public class AllocatedLines {
         }
         Map<String, Object> row = rows.get(0);
         UUID orderId = (UUID) row.get("order_id");
-        DocumentRecord order = documents.findById(orderId)
-                .orElseThrow(() -> new ProblemException("m4.delivery.order_line_unknown", Map.of("orderLineId", orderLineId)));
+        DocumentRecord order = documents
+                .findById(orderId)
+                .orElseThrow(() ->
+                        new ProblemException("m4.delivery.order_line_unknown", Map.of("orderLineId", orderLineId)));
         if (!sellerEntityId.equals(row.get("seller_entity_id"))
                 || !OrderStatus.ACCEPTED.equals(row.get("allocation_status"))
                 || !OrderStatus.SUBMITTED.equals(order.status())) {

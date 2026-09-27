@@ -72,8 +72,9 @@ class OrderHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(order.relationshipId()).isEqualTo(RELATIONSHIP);
         assertThat(order.lines()).hasSize(2);
         assertThat(order.lines().get(0).requestedQty()).isEqualByComparingTo("10");
-        // m4.demo.trade_price, the demo answer of TradePricing, is 100.00 per unit.
-        assertThat(order.lines().get(0).indicativePrice()).isNotNull();
+        // The seller's published TRADE list of the relationship, through M3's ResolveTradePrice.
+        assertThat(order.lines().get(0).indicativePrice()).isEqualByComparingTo(TradingFixture.RICE_PRICE);
+        assertThat(order.netAmount()).isEqualByComparingTo("1520.00"); // 10 x 120 + 4 x 80
 
         assertThat(kernel.committedAudit())
                 .extracting(record -> record.eventType())

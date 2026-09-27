@@ -356,5 +356,19 @@
   "m3.price_list.line.duplicate": "The same item, unit and tier appear twice",
   "m3.price_list.line.tier_base_missing": "The tiers of an item start at quantity 0, the base price",
   "m3.price_list.line.tiers_not_ascending": "The tiers of an item must rise",
-  "m3.price_list.review.above_mrp": "The trade price is above the lowest printed MRP of the item; it will be reviewed"
+  "m3.price_list.review.above_mrp": "The trade price is above the lowest printed MRP of the item; it will be reviewed",
+  "m4.delivery.not_found": "The delivery note was not found",
+  "m4.delivery.not_seller": "Only the seller can change this delivery note",
+  "m4.delivery.drops_required": "A delivery note needs at least one drop",
+  "m4.delivery.lines_required": "Each drop needs at least one line",
+  "m4.delivery.one_buyer": "Every drop of a delivery note is billed to the same buyer",
+  "m4.delivery.order_line_unknown": "The order line was not found",
+  "m4.delivery.order_not_accepted": "The order has not been accepted by this seller",
+  "m4.delivery.bill_to_mismatch": "The drop is billed to an entity other than the buyer of the order",
+  "m4.delivery.qty_not_positive": "The quantity dispatched must be more than zero",
+  "m4.delivery.exceeds_allocation": "The quantity is more than is allocated and not yet dispatched",
+  "m4.delivery.not_draft": "The delivery note has already been issued",
+  "m4.delivery.not_issued": "Only an issued delivery note can be dispatched",
+  "m4.delivery.vehicle_required": "Name the vehicle before dispatch",
+  "m4.delivery.driver_required": "Name the driver before dispatch"
 }

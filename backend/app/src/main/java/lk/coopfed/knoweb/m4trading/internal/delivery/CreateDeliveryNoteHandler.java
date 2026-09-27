@@ -113,7 +113,8 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
                 if (line.qty() == null || line.qty().signum() <= 0) {
                     throw new ProblemException("m4.delivery.qty_not_positive", Map.of("orderLineId", orderLineId));
                 }
-                BigDecimal total = onThisNote.getOrDefault(orderLineId, BigDecimal.ZERO).add(line.qty());
+                BigDecimal total =
+                        onThisNote.getOrDefault(orderLineId, BigDecimal.ZERO).add(line.qty());
                 if (total.compareTo(source.undispatched()) > 0) {
                     throw new ProblemException(
                             "m4.delivery.exceeds_allocation",
@@ -146,7 +147,8 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
             dropRows.add(new Object[] {dropId, seq, shipTo, billTo, dropOrders.toArray(new UUID[0])});
         }
 
-        documents.save(TradingDocuments.draft(noteId, DeliveryReads.DN, seller, buyer, null, scope.userId(), null, null));
+        documents.save(
+                TradingDocuments.draft(noteId, DeliveryReads.DN, seller, buyer, null, scope.userId(), null, null));
         documents.saveLines(noteId, kernelLines);
         jdbc.update(
                 """

@@ -8,11 +8,10 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 
 /**
  * The price question M4 asks of M3 (24A section 2: "ResolveTradePrice(relationship, sku, uom,
- * qty, date)"; doc 24 section 3.6: tier by the ordered quantity, DR-2). M3's query package does
- * not exist on main yet (the M3 lane is building it), so M4 publishes the question here and the
- * demo answers it from the configuration register ({@code internal.integration.DemoTradePricing},
- * item {@code m4.demo.trade_price}). When M3's {@code ResolveTradePrice} lands, M4 calls it from
- * this seam's one implementation and the demo answer is deleted in the same pull request.
+ * qty, date)"; doc 24 section 3.6: tier by the ordered quantity, DR-2). M4 keeps the question in its
+ * own api so that its handlers do not change with the answer; since M4-04 the one implementation,
+ * {@code internal.integration.M3TradePricing}, asks M3's {@code PricingQueries.resolveTradePrice}
+ * (M3-04, #153), and the register's demo answer is gone.
  */
 public interface TradePricing {
 

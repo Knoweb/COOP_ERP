@@ -68,11 +68,13 @@ public class DispatchDeliveryNoteHandler implements Handles<DispatchDeliveryNote
             throw new ProblemException("m4.delivery.not_issued", Map.of("status", note.status()));
         }
         Map<String, Object> current = jdbc.queryForMap(
-                "select vehicle_ref, driver_user_id, driver_name from trading.doc_delivery where document_id = ?", noteId);
+                "select vehicle_ref, driver_user_id, driver_name from trading.doc_delivery where document_id = ?",
+                noteId);
         String vehicle = blankToNull(command.vehicleRef()) != null
                 ? command.vehicleRef().strip()
                 : (String) current.get("vehicle_ref");
-        UUID driverUser = command.driverUserId() != null ? command.driverUserId() : (UUID) current.get("driver_user_id");
+        UUID driverUser =
+                command.driverUserId() != null ? command.driverUserId() : (UUID) current.get("driver_user_id");
         String driverName = blankToNull(command.driverName()) != null
                 ? command.driverName().strip()
                 : (String) current.get("driver_name");

@@ -83,7 +83,8 @@ public class TradingFlow {
                                 shipTo,
                                 BUYER,
                                 order.lines().stream()
-                                        .map(line -> new CreateDeliveryNote.Line(line.lineId(), line.allocatedQty(), null))
+                                        .map(line ->
+                                                new CreateDeliveryNote.Line(line.lineId(), line.allocatedQty(), null))
                                         .toList()))),
                 seller());
     }

@@ -93,10 +93,9 @@ class DeliveryController implements DeliveryApi {
 
     @Override
     public ResponseEntity<List<DeliveryNoteResponse>> listDeliveryNotes(String role) {
-        return ResponseEntity.ok(
-                queries.listDeliveryNotes(OrderQueries.Role.valueOf(role), currentScope.get()).stream()
-                        .map(DeliveryController::toResponse)
-                        .toList());
+        return ResponseEntity.ok(queries.listDeliveryNotes(OrderQueries.Role.valueOf(role), currentScope.get()).stream()
+                .map(DeliveryController::toResponse)
+                .toList());
     }
 
     private DeliveryNoteResponse read(UUID noteId, ScopeContext scope) {

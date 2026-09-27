@@ -106,8 +106,8 @@ class DeliveryQueriesImpl implements DeliveryQueries {
 
     /** The issued GRN that received this drop, if any (the receiver's document; the seller reads it as counterparty). */
     private UUID receivingGrn(UUID dropId) {
-        for (UUID grnId : jdbc.queryForList(
-                "select document_id from trading.doc_grn where drop_id = ?", UUID.class, dropId)) {
+        for (UUID grnId :
+                jdbc.queryForList("select document_id from trading.doc_grn where drop_id = ?", UUID.class, dropId)) {
             if (documents.findById(grnId).map(DocumentRecord::isIssued).orElse(false)) {
                 return grnId;
             }

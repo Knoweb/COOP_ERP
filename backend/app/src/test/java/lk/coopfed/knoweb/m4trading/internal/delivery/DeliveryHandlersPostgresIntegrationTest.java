@@ -74,20 +74,22 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID noteId = flow.draftNote(order, SHOP);
         assertThat(events(DeliveryNoteCreated.class)).singleElement().satisfies(event -> {
             assertThat(event.orderIds()).containsExactly(order.orderId());
-            assertThat(event.drops()).singleElement().satisfies(drop -> assertThat(drop.lines()).hasSize(2));
+            assertThat(event.drops()).singleElement().satisfies(drop -> assertThat(drop.lines())
+                    .hasSize(2));
         });
         DeliveryView draft = deliveries.getDeliveryNote(noteId, seller()).orElseThrow();
         assertThat(draft.status()).isEqualTo("DRAFT");
         // The buyer does not see a draft note in its list.
-        assertThat(deliveries.listDeliveryNotes(OrderQueries.Role.BUYER, buyer())).isEmpty();
+        assertThat(deliveries.listDeliveryNotes(OrderQueries.Role.BUYER, buyer()))
+                .isEmpty();
         kernel.reset();
 
         String number = issue.handle(new IssueDeliveryNote(noteId), seller());
         assertThat(number).isEqualTo("D4S-DN-0000001");
         OrderView fulfilled = orders.getOrder(order.orderId(), buyer()).orElseThrow();
         assertThat(fulfilled.status()).isEqualTo("FULFILLED");
-        assertThat(fulfilled.lines()).allSatisfy(line -> assertThat(line.fulfilledQty())
-                .isEqualByComparingTo(line.allocatedQty()));
+        assertThat(fulfilled.lines())
+                .allSatisfy(line -> assertThat(line.fulfilledQty()).isEqualByComparingTo(line.allocatedQty()));
         assertThat(events(DeliveryNoteIssued.class)).singleElement().satisfies(event -> {
             assertThat(event.docNumberDisplay()).isEqualTo(number);
             assertThat(event.buyerEntityId()).isEqualTo(BUYER);
@@ -101,19 +103,24 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(inTransit.vehicleRef()).isEqualTo("WP-9999");
         assertThat(inTransit.driverName()).isEqualTo("Sunil");
         assertThat(inTransit.dispatchedAt()).isNotNull();
-        assertThat(inTransit.drops()).singleElement().satisfies(drop -> assertThat(drop.status()).isEqualTo("PLANNED"));
-        assertThat(deliveries.listDeliveryNotes(OrderQueries.Role.BUYER, buyer())).hasSize(1);
+        assertThat(inTransit.drops()).singleElement().satisfies(drop -> assertThat(drop.status())
+                .isEqualTo("PLANNED"));
+        assertThat(deliveries.listDeliveryNotes(OrderQueries.Role.BUYER, buyer()))
+                .hasSize(1);
         assertThat(kernel.committedAudit())
                 .extracting(record -> record.eventType())
                 .contains("DN_DISPATCHED");
-        assertThat(events(DeliveryNoteDispatched.class)).singleElement().satisfies(event -> assertThat(event.vehicleRef())
-                .isEqualTo("WP-9999"));
+        assertThat(events(DeliveryNoteDispatched.class))
+                .singleElement()
+                .satisfies(event -> assertThat(event.vehicleRef()).isEqualTo("WP-9999"));
     }
 
     @Test
     void theGuardsOfCreateDeliveryNote() {
         UUID riceLine = order.lines().get(0).lineId();
-        refused(() -> create.handle(new CreateDeliveryNote(null, null, null, List.of()), seller()), "m4.delivery.drops_required");
+        refused(
+                () -> create.handle(new CreateDeliveryNote(null, null, null, List.of()), seller()),
+                "m4.delivery.drops_required");
         refused(() -> create.handle(note(SHOP, BUYER, List.of()), seller()), "m4.delivery.lines_required");
         refused(
                 () -> create.handle(
@@ -130,12 +137,16 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         refused(
                 () -> create.handle(note(SHOP, STRANGER, List.of(line(riceLine, "1"))), seller()),
                 "m4.delivery.bill_to_mismatch");
-        refused(() -> create.handle(note(SHOP, BUYER, List.of(line(riceLine, "0"))), seller()), "m4.delivery.qty_not_positive");
+        refused(
+                () -> create.handle(note(SHOP, BUYER, List.of(line(riceLine, "0"))), seller()),
+                "m4.delivery.qty_not_positive");
         refused(
                 () -> create.handle(note(SHOP, BUYER, List.of(line(riceLine, "6"), line(riceLine, "5"))), seller()),
                 "m4.delivery.exceeds_allocation");
         // The buyer is not the seller of its own order.
-        refused(() -> create.handle(note(SHOP, BUYER, List.of(line(riceLine, "1"))), buyer()), "m4.delivery.order_not_accepted");
+        refused(
+                () -> create.handle(note(SHOP, BUYER, List.of(line(riceLine, "1"))), buyer()),
+                "m4.delivery.order_not_accepted");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
     }
@@ -144,7 +155,9 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     void issuanceRechecksWhatIsLeftToDispatchAndDispatchNeedsAnIssuedNoteWithAVehicle() {
         UUID first = flow.draftNote(order, SHOP);
         UUID second = flow.draftNote(order, SHOP);
-        refused(() -> dispatch.handle(new DispatchDeliveryNote(first, "WP-1", null, null), seller()), "m4.delivery.not_issued");
+        refused(
+                () -> dispatch.handle(new DispatchDeliveryNote(first, "WP-1", null, null), seller()),
+                "m4.delivery.not_issued");
         issue.handle(new IssueDeliveryNote(first), seller());
         kernel.reset();
 
@@ -153,7 +166,9 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         refused(() -> issue.handle(new IssueDeliveryNote(first), buyer()), "m4.delivery.not_seller");
         refused(() -> issue.handle(new IssueDeliveryNote(UUID.randomUUID()), seller()), "m4.delivery.not_found");
         superuserJdbc().update("update trading.doc_delivery set vehicle_ref = null where document_id = ?", first);
-        refused(() -> dispatch.handle(new DispatchDeliveryNote(first, " ", null, null), seller()), "m4.delivery.vehicle_required");
+        refused(
+                () -> dispatch.handle(new DispatchDeliveryNote(first, " ", null, null), seller()),
+                "m4.delivery.vehicle_required");
         assertThat(kernel.committedEvents()).isEmpty();
     }
 
@@ -170,9 +185,9 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static void refused(ThrowingCallable call, String messageId) {
-        assertThatThrownBy(call)
-                .isInstanceOf(ProblemException.class)
-                .satisfies(error -> assertThat(((ProblemException) error).messageId()).isEqualTo(messageId));
+        assertThatThrownBy(call).isInstanceOf(ProblemException.class).satisfies(error -> assertThat(
+                        ((ProblemException) error).messageId())
+                .isEqualTo(messageId));
     }
 
     private <E extends DomainEvent> List<E> events(Class<E> type) {
