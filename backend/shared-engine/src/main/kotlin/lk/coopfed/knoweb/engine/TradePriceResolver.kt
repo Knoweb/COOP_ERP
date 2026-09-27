@@ -2,8 +2,6 @@ package lk.coopfed.knoweb.engine
 
 import java.time.LocalDate
 import java.util.UUID
-import lk.coopfed.knoweb.engine.model.TradeLine
-import lk.coopfed.knoweb.engine.model.TradeQuote
 
 /**
  * The trade price of an order line (doc 23 sections 3.2 and 5.2, ResolveTradePrice): among the

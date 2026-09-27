@@ -7,19 +7,6 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import lk.coopfed.knoweb.engine.model.Basket
-import lk.coopfed.knoweb.engine.model.BatchCandidate
-import lk.coopfed.knoweb.engine.model.BenefitKind
-import lk.coopfed.knoweb.engine.model.CapReason
-import lk.coopfed.knoweb.engine.model.Ceiling
-import lk.coopfed.knoweb.engine.model.LineInput
-import lk.coopfed.knoweb.engine.model.RetailLine
-import lk.coopfed.knoweb.engine.model.Rule
-import lk.coopfed.knoweb.engine.model.RuleKind
-import lk.coopfed.knoweb.engine.model.SkuFacts
-import lk.coopfed.knoweb.engine.model.StackingPolicy
-import lk.coopfed.knoweb.engine.model.TenderKind
-import lk.coopfed.knoweb.engine.snapshot.PricingSnapshotIndex
 
 /**
  * The engine's properties over random snapshots and baskets (23A section 9, "Engine
