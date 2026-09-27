@@ -382,5 +382,21 @@
   "m5.opening.not_signed": "எதிர்க்கையொப்பத்திற்கு முன் நிறுவனம் தொடக்க இருப்பில் கையொப்பமிட வேண்டும்",
   "m5.opening.countersigner_is_signer": "நிறுவனத்துக்காகக் கையொப்பமிட்டவர் எதிர்க்கையொப்பமும் இட முடியாது",
   "m5.opening.user_required": "தொடக்க இருப்பில் ஒரு நபரே கையொப்பமிடுவார்",
-  "m5.opening.entity_unknown": "தொடக்க இருப்பின் நிறுவனம் கிடைக்கவில்லை"
+  "m5.opening.entity_unknown": "தொடக்க இருப்பின் நிறுவனம் கிடைக்கவில்லை",
+  "report.renderer_unavailable": "அச்சிடுதல் பணிச் சேவையகத்தில் இயங்குகிறது; இந்தச் சேவையகத்தால் அச்சிட முடியாது",
+  "report.template_invalid": "அச்சு வார்ப்புருவின் பெயர் செல்லுபடியாகாது",
+  "report.template_unknown": "{templateId} என்ற அச்சு வார்ப்புரு இல்லை",
+  "report.scope_mismatch": "இந்த அச்சுப்பிரதி நீங்கள் பணிபுரியும் நிறுவனத்தைச் சேராமல் வேறொரு நிறுவனத்தைச் சேர்ந்தது",
+  "report.too_large": "அச்சுப்பிரதி மிகப் பெரியது ({size} பைட்டுகள், அதிகபட்சம் {maxBytes})",
+  "report.timeout": "அச்சுப்பிரதி {seconds} வினாடிகளுக்கு மேல் எடுத்ததால் நிறுத்தப்பட்டது",
+  "report.failed": "அச்சுப்பிரதியை உருவாக்க முடியவில்லை; மீண்டும் முயற்சிக்கவும்",
+  "report.document.number": "எண்",
+  "report.document.date": "தேதி",
+  "report.document.from": "அனுப்புநர்",
+  "report.document.to": "பெறுநர்",
+  "report.document.line_no": "எண்",
+  "report.document.item": "பொருள்",
+  "report.document.quantity": "அளவு",
+  "report.document.unit_price": "அலகு விலை",
+  "report.document.amount": "தொகை"
 }
