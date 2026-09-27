@@ -266,7 +266,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(1L);
         assertThat(sweep.retryDue()).isZero();
         // Given up: nothing of the recipient is kept.
-        assertThat(heldRecipient(id)).isNull();
+        assertThat(held(id)).isNull();
     }
 
     @Test
@@ -284,8 +284,17 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 scope(ENTITY)))
                 .notificationId();
         assertThat(status(id)).isEqualTo("QUEUED");
-        // While QUEUED the recipient is held in clear beside the log (never in the log), for any instance.
-        assertThat(heldRecipient(id)).isEqualTo("0771234567");
+        // While QUEUED what a retry needs is held beside the log for any instance, sealed
+        // (kernel V0063, CR-19A-8): the row carries ciphertext and a key id, never the number.
+        assertThat(held(id)).isNotNull();
+        assertThat(new String(held(id), java.nio.charset.StandardCharsets.ISO_8859_1))
+                .doesNotContain("0771234567");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select to_jsonb(p)::text from kernel.notification_pending p where notification_id = ?",
+                                String.class,
+                                id))
+                .doesNotContain("0771234567");
 
         makeDue(id);
         assertThat(sweep.retryDue()).isEqualTo(1);
@@ -293,13 +302,79 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(attempts(id)).isEqualTo(2);
         assertThat(sms.sent).hasSize(1);
         assertThat(sms.sent.get(0).recipient()).isEqualTo("0771234567");
-        assertThat(heldRecipient(id)).isNull();
+        assertThat(held(id)).isNull();
         assertThat(superuserJdbc()
                         .queryForObject(
                                 "select cleared_at is not null from kernel.notification_pending where notification_id = ?",
                                 Boolean.class,
                                 id))
                 .isTrue();
+    }
+
+    @Test
+    void theHeldPlaceholdersAreSealedAndASealedValueMovedToAnotherRowDoesNotOpen() {
+        sms.failNext = 2;
+        UUID first = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of("temporaryPassword", "Xy7-kept-secret"),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        UUID second = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0779999999",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        assertThat(status(first)).isEqualTo("QUEUED");
+        assertThat(status(second)).isEqualTo("QUEUED");
+        // A temporary password among the placeholders (M1's direct send) is not in the row either.
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select to_jsonb(p)::text from kernel.notification_pending p where notification_id = ?",
+                                String.class,
+                                first))
+                .doesNotContain("Xy7-kept-secret")
+                .doesNotContain("0771234567");
+
+        // The notification id is the associated data: the first row's value copied onto the second
+        // does not open there, so the retry has nothing to send and gives up, reaching nobody.
+        superuserJdbc()
+                .update(
+                        """
+                        update kernel.notification_pending p
+                           set sealed = f.sealed, key_id = f.key_id
+                          from kernel.notification_pending f
+                         where f.notification_id = ? and p.notification_id = ?
+                        """,
+                        first,
+                        second);
+        makeDue(second);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(second)).isEqualTo("FAILED");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select last_error from kernel.notification_log where notification_id = ?",
+                                String.class,
+                                second))
+                .isEqualTo("nothing held for the retry");
+        assertThat(sms.sent).isEmpty();
+
+        // The first row's own value still opens, and the retry reaches its recipient.
+        makeDue(first);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(first)).isEqualTo("SENT");
+        assertThat(sms.sent).extracting(NotificationChannel.Outgoing::recipient).containsExactly("0771234567");
     }
 
     @Test
@@ -332,7 +407,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 id))
                 .containsEntry("status", "SUPPRESSED")
                 .containsEntry("suppressed_reason", "KILL_SWITCH");
-        assertThat(heldRecipient(id)).isNull();
+        assertThat(held(id)).isNull();
     }
 
     @Test
@@ -490,7 +565,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 String.class,
                                 id))
                 .isEqualTo("secondary-ref-1");
-        assertThat(heldRecipient(id)).isNull();
+        assertThat(held(id)).isNull();
     }
 
     @Test
@@ -519,7 +594,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 "select count(*) from kernel.audit_event where event_type_code = 'NOTIFICATION_FAILED'",
                                 Long.class))
                 .isEqualTo(1L);
-        assertThat(heldRecipient(id)).isNull();
+        assertThat(held(id)).isNull();
     }
 
     @Test
@@ -616,12 +691,11 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                         "select status from kernel.notification_log where notification_id = ?", String.class, id);
     }
 
-    private String heldRecipient(UUID id) {
+    /** The sealed value held for a notification, or null once cleared. */
+    private byte[] held(UUID id) {
         return superuserJdbc()
                 .queryForObject(
-                        "select recipient from kernel.notification_pending where notification_id = ?",
-                        String.class,
-                        id);
+                        "select sealed from kernel.notification_pending where notification_id = ?", byte[].class, id);
     }
 
     private int attempts(UUID id) {

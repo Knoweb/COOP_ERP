@@ -26,6 +26,14 @@ import org.springframework.stereotype.Component;
  * content hash and the approval that read it would no longer describe the stored object.
  * Once settled, the row never changes (kernel V0058), and no new URL is issued for it.
  *
+ * <p>So an attachment settles at most the upload URL's validity plus one interval after it was
+ * uploaded (fifteen plus five minutes by default), and a write-off approval waiting on its
+ * photograph (doc 32 section 4) waits that long. Decided 27 September 2026 on the architect's
+ * delegation (CR-19A-8): the rule stays, and both halves are configuration, the validity the
+ * register's {@code attachment.upload_url_minutes} and the interval
+ * {@code coop-erp.attachment.verify-cron}; an "upload complete" call with an immutable copy is a
+ * follow-up for M5 if the measured wait is too long (docs/PLAN_TO_M2.md).
+ *
  * <p>Reads as a federation-wide viewer, at most {@code attachment.verify.batch_size} rows per
  * run; writes each row in the OWN scope of the document's entity, one transaction per row
  * and conditional on the row still being PENDING, so one bad object does not hold the rest
@@ -58,7 +66,11 @@ public class AttachmentVerifier {
         this.uploadWindow = Duration.ofHours(uploadWindowHours);
     }
 
-    @ScheduledJob(name = "attachment-verify", cron = "0 */5 * * * *", lockTimeout = "PT30M", maxRuntime = "PT10M")
+    @ScheduledJob(
+            name = "attachment-verify",
+            cron = "${coop-erp.attachment.verify-cron:0 */5 * * * *}",
+            lockTimeout = "PT30M",
+            maxRuntime = "PT10M")
     public int verifyPending() {
         ScopeContext viewer = SystemScope.federationView();
         Instant now = clock.instant();

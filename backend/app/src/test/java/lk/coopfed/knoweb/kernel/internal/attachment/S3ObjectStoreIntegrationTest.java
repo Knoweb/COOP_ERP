@@ -140,4 +140,18 @@ class S3ObjectStoreIntegrationTest {
         assertThat(read.body()).isEqualTo(bytes);
         assertThat(read.headers().firstValue("Content-Type")).contains("image/png");
     }
+
+    @Test
+    void aDeleteRemovesTheObjectAndMayBeRepeated() {
+        // CR-19A-8: the clean-up of a failed upload deletes its file; a run that stopped half-way
+        // deletes it again, which the store answers with success.
+        String key = "attachments/test/" + System.nanoTime() + "/failed";
+        store.put(key, "image/png", "a failed upload".getBytes(StandardCharsets.UTF_8));
+        assertThat(store.head(key)).isPresent();
+
+        store.delete(key);
+        assertThat(store.head(key)).isEmpty();
+        store.delete(key);
+        assertThat(store.head(key)).isEmpty();
+    }
 }

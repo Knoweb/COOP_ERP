@@ -132,6 +132,16 @@ coop-erp:
   idempotency:
     hash-secret: ${COOP_ERP_IDEMPOTENCY_SECRET:}
 
+  # K-10 (decided 27 Sep 2026, CR-19A-8): what a notification retry needs (the recipient, the
+  # placeholders, which can be a temporary password) is sealed with AES-256-GCM under this key
+  # before it is written to kernel.notification_pending. Base64 of 32 random bytes
+  # (`openssl rand -base64 32`), the same on every instance. No default outside development:
+  # empty, the backend starts only against a development issuer, with a fixed development key.
+  # To change it, move the old key to pending-key-previous for 24 hours (the longest a row lives).
+  notification:
+    pending-key: ${COOP_ERP_NOTIFICATION_KEY:}
+    pending-key-previous: ${COOP_ERP_NOTIFICATION_KEY_PREVIOUS:}
+
   # The per-instance cache fan-out (doc 19 section 8, 19A section 3): every instance, in every
   # role, holds an exclusive queue on the domain exchange for the events that empty its
   # permission, configuration and device caches, beside the worker's consumer queues. Off only
@@ -154,6 +164,11 @@ coop-erp:
     access-key: ${OBJECT_STORE_ACCESS_KEY:}
     secret-key: ${OBJECT_STORE_SECRET_KEY:}
     attachments-bucket: ${OBJECT_STORE_ATTACHMENTS_BUCKET:attachments}
+    # How long a read (GET) URL is valid. The upload URL's validity is the register's
+    # attachment.upload_url_minutes (decided 27 Sep 2026, CR-19A-8), because it sets how long an
+    # attachment waits to be verified. The verifier runs on coop-erp.attachment.verify-cron
+    # (every five minutes by default) and the clean-up of failed uploads on
+    # coop-erp.attachment.cleanup-cron (03:40 by default).
     presign-minutes: 15
     # A PENDING attachment nobody uploaded within this time is FAILED by the verifier.
     upload-window-hours: 24

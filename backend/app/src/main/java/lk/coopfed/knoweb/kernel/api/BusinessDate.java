@@ -14,6 +14,12 @@ import java.util.UUID;
  * <p>The argument is the location, not the caller's scope: an accountant working entity-wide
  * has no location in the scope and still posts for one particular shop.
  *
+ * <p>An entity has no business date of its own (decided 27 September 2026 on the architect's
+ * delegation, CR-19A-8): nothing closes an entity's day. A document that concerns one location
+ * names it and takes that location's date; an entity-level document with no location (an
+ * order, an invoice) takes the calendar date in the business time zone, and a report that
+ * groups such documents by day groups them by that date.
+ *
  * <p>17A stub: the calendar date in the business time zone, the same for every location.
  * 19A K-13 replaces it with the location's day-close state; the interface does not change.
  */
