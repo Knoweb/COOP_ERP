@@ -122,6 +122,29 @@ class JwtClaimsMapperTest {
     }
 
     @Test
+    void anEntityNamedWithoutItsPlaceIsTheOnePlaceTheUserHoldsThere() {
+        Jwt jwt = jwt(Map.of("sub", USER.toString(), "ent", OTHER.toString(), "cls", "OWN"));
+
+        // The web client names the token's entity only; the user holds one shop of it.
+        ScopeContext scope = mapper.map(jwt, OTHER.toString(), null, null, null);
+
+        assertThat(scope.activeScope()).isEqualTo(new Scope(OTHER, SHOP));
+    }
+
+    @Test
+    void anEntityWithSeveralPlacesOrNoneStaysAsAsked() {
+        UUID secondShop = UUID.fromString("0190a500-0000-7000-8000-000000000102");
+        List<Scope> twoShops = List.of(new Scope(OTHER, SHOP), new Scope(OTHER, secondShop));
+
+        assertThat(JwtClaimsMapper.narrowed(new Scope(OTHER, null), twoShops)).isEqualTo(new Scope(OTHER, null));
+        assertThat(JwtClaimsMapper.narrowed(new Scope(HOME, null), twoShops)).isEqualTo(new Scope(HOME, null));
+        assertThat(JwtClaimsMapper.narrowed(
+                        new Scope(OTHER, null), List.of(new Scope(OTHER, null), new Scope(OTHER, SHOP))))
+                .isEqualTo(new Scope(OTHER, null));
+        assertThat(JwtClaimsMapper.narrowed(null, twoShops)).isNull();
+    }
+
+    @Test
     void anOwnUserWithNoAssignmentActsNowhere() {
         UUID stranger = UUID.fromString("0190a500-0000-7000-8000-000000000011");
         Jwt jwt = jwt(Map.of("sub", stranger.toString(), "ent", HOME.toString(), "cls", "OWN"));
