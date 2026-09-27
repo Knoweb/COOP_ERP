@@ -366,5 +366,21 @@
   "m5.ledger.cost_required": "Stock received needs a unit cost of zero or more",
   "m5.ledger.cost_invalid": "A unit cost cannot have more than four decimals",
   "m5.location.not_in_scope": "The location is not one of the locations of your entity",
-  "m5.batch.not_found": "The batch was not found"
+  "m5.batch.not_found": "The batch was not found",
+  "m5.grn.receiver_mismatch": "The goods received note belongs to another entity than the one receiving it",
+  "m5.grn.location_required": "The goods received note names no receiving location",
+  "m5.grn.line_invalid": "A line of the goods received note has quantities or a cost that cannot be received",
+  "m5.delivery.seller_mismatch": "The delivery note belongs to another entity than the seller",
+  "m5.delivery.line_invalid": "A delivery line needs an item and a quantity above zero",
+  "m5.pick_list.not_found": "The delivery note has no pick list yet",
+  "m5.opening.location_has_stock": "Stock has already moved at this location; an opening balance is only for a location without stock",
+  "m5.opening.already_open": "An opening balance for this location is already being prepared",
+  "m5.opening.lines_required": "An opening balance needs at least one counted line",
+  "m5.opening.line_invalid": "A counted line needs a batch, a quantity above zero and a cost of zero or more",
+  "m5.opening.not_found": "The opening balance was not found",
+  "m5.opening.not_draft": "Only an opening balance in preparation can be signed",
+  "m5.opening.not_signed": "The entity must sign the opening balance before it is countersigned",
+  "m5.opening.countersigner_is_signer": "The person who signed for the entity cannot also countersign",
+  "m5.opening.user_required": "An opening balance is signed by a person",
+  "m5.opening.entity_unknown": "The entity of the opening balance was not found"
 }

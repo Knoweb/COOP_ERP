@@ -47,4 +47,13 @@ public interface InventoryQueries {
      * the GRN received into, since it did. M4's ReverseGrn refuses when it did (doc 24).
      */
     boolean lotsConsumed(UUID grnDocumentId, ScopeContext scope);
+
+    /** The movements a document caused (a GRN's receipts, a delivery note's dispatch, an OPB), in ledger order. */
+    List<MovementView> movementsOf(UUID documentId, ScopeContext scope);
+
+    /** GetPickList(dn): the pick list of a delivery note of the caller's. */
+    Optional<PickListView> pickList(UUID deliveryDocumentId, ScopeContext scope);
+
+    /** An opening balance of the caller's with its lines. */
+    Optional<OpeningBalanceView> openingBalance(UUID openingBalanceId, ScopeContext scope);
 }

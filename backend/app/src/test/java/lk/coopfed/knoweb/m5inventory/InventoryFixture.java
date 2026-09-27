@@ -71,6 +71,17 @@ public final class InventoryFixture {
         return batch;
     }
 
+    /** The entity's M1 row (its code names its document series); kept between tests, it is reference data here. */
+    public void entity(UUID id, String code, String type) {
+        admin.update(
+                "insert into party.entity (entity_id, entity_code, entity_type, legal_name_en) values (?, ?, ?, ?)"
+                        + " on conflict do nothing",
+                id,
+                code,
+                type,
+                "M5 test " + code);
+    }
+
     public UUID location(UUID owner, String type) {
         UUID id = Ids.next();
         admin.update(
@@ -87,7 +98,8 @@ public final class InventoryFixture {
 
     public void clean() {
         admin.execute("truncate table inventory.stock_lot, inventory.stock_movement, inventory.movement_sequence,"
-                + " inventory.entity_sku_cost");
+                + " inventory.entity_sku_cost, inventory.pick_list_line, inventory.pick_list,"
+                + " inventory.opening_balance_line, inventory.opening_balance");
         for (UUID batch : batches) {
             admin.update("delete from catalogue.batch_key where batch_id = ?", batch);
             admin.update("delete from catalogue.batch where batch_id = ?", batch);
@@ -107,6 +119,27 @@ public final class InventoryFixture {
         batches.clear();
         skus.clear();
         locations.clear();
+    }
+
+    /** The scope an event consumer runs in: the event owner's OWN scope, no user (EventConsumerDispatcher). */
+    public static ScopeContext system(UUID entity) {
+        lk.coopfed.knoweb.kernel.api.Scope scope = new lk.coopfed.knoweb.kernel.api.Scope(entity, null);
+        return new ScopeContext(
+                null,
+                null,
+                entity,
+                java.util.List.of(scope),
+                scope,
+                lk.coopfed.knoweb.kernel.api.PolicyClass.OWN,
+                java.util.Set.of(),
+                null,
+                java.util.Locale.ENGLISH,
+                null);
+    }
+
+    /** An entity-wide OWN scope of another user of the entity (a second signature). */
+    public static ScopeContext own(UUID entity, UUID user) {
+        return ScopeContext.dev(user, entity, null);
     }
 
     /** An entity-wide OWN scope of a user. */
