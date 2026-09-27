@@ -33,3 +33,7 @@ include::module-m3pricing.adoc[]
 plantuml::module-m4trading.puml[,,format=svg]
 include::module-m4trading.adoc[]
 
+== M5 Inventory, Costing, Repack & Loss
+plantuml::module-m5inventory.puml[,,format=svg]
+include::module-m5inventory.adoc[]
+
