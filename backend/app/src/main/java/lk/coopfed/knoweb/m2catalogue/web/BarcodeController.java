@@ -15,6 +15,7 @@ import lk.coopfed.knoweb.m2catalogue.internal.barcode.RetireBarcodeHandler;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.web.generated.BarcodeApi;
+import lk.coopfed.knoweb.m2catalogue.web.generated.BarcodeResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.LinkBarcodeToBatchRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.LookupBatch;
 import lk.coopfed.knoweb.m2catalogue.web.generated.LookupResult;
@@ -45,6 +46,21 @@ class BarcodeController implements BarcodeApi {
         this.link = link;
         this.queries = queries;
         this.currentScope = currentScope;
+    }
+
+    @Override
+    public ResponseEntity<java.util.List<BarcodeResponse>> listBarcodes(UUID skuId) {
+        return ResponseEntity.ok(queries.barcodes(skuId, currentScope.get()).stream()
+                .map(row -> {
+                    BarcodeResponse response = new BarcodeResponse(
+                            row.barcode(),
+                            Symbology.fromValue(row.symbology()),
+                            row.uomCode(),
+                            BarcodeResponse.StatusEnum.fromValue(row.status()));
+                    response.setBatchId(row.batchId());
+                    return response;
+                })
+                .toList());
     }
 
     @Override

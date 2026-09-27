@@ -260,6 +260,37 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 JsonNode.class);
         assertThat(linked.getStatusCode()).as(String.valueOf(linked.getBody())).isEqualTo(HttpStatus.NO_CONTENT);
 
+        // The reads of the SKU view (M2-10): conversions, barcodes and the editor's reference data.
+        ResponseEntity<JsonNode> conversions = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/conversions",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(conversions.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(conversions.getBody()).hasSize(1);
+        assertThat(conversions.getBody().get(0).get("uomCode").asText()).isEqualTo("CASE");
+        assertThat(conversions.getBody().get(0).get("factorToBase").decimalValue())
+                .isEqualByComparingTo("24");
+        assertThat(conversions.getBody().get(0).get("effectiveFrom").asText()).isEqualTo("2026-01-01");
+
+        ResponseEntity<JsonNode> barcodes = http.exchange(
+                "/v1/catalogue/skus/" + skuId + "/barcodes", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(barcodes.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(barcodes.getBody()).hasSize(1);
+        assertThat(barcodes.getBody().get(0).get("barcode").asText()).isEqualTo("4791234567891");
+        assertThat(barcodes.getBody().get(0).get("symbology").asText()).isEqualTo("EAN13");
+        assertThat(barcodes.getBody().get(0).get("status").asText()).isEqualTo("ACTIVE");
+        assertThat(barcodes.getBody().get(0).get("batchId").asText()).isEqualTo(batchId.toString());
+
+        ResponseEntity<JsonNode> reference =
+                http.exchange("/v1/catalogue/reference", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        assertThat(reference.getStatusCode())
+                .as(String.valueOf(reference.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(reference.getBody().get("units").findValuesAsText("uomCode")).contains("EA", "CASE");
+        assertThat(reference.getBody().get("taxCategories").findValuesAsText("code"))
+                .contains("M2HTTP");
+
         // GET /lookup: the item card with the unit's factor and the linked batch
         ResponseEntity<JsonNode> lookup = http.exchange(
                 "/v1/catalogue/lookup?barcode=4791234567891&symbology=EAN13",

@@ -168,6 +168,7 @@ What the demo lanes of 27 September 2026 built to a demo-minimal scope left out,
 - **M5-03:** grn.reversed.v1, the ReceiptConsumer (sales, oversell, two-simulator test), claim returns, undelivered drops back to stock, batch.corrected.v1 re-pointing, OverridePick, delivery-line unit conversion; a dispatching location on M4's delivery note event.
 - **M5-10:** the ONBOARDING-location guard, the Federation's countersignature from its own scope (a Federation-administers policy and the posting in the owner's scope), M1's activation gate on opening_balance.posted.v1.
 - **M5-04:** the stock card (`GET /v1/inventory/skus/{id}/movements`), the 30-second availability cache per instance, the PARTY caller's "live or last end-of-day" availability mode (25A section 7), and M5's web screens (M5-12).
+- **M2-10:** bulk import, promote and merge, the control price register, the tag and assortment screens, the image thumbnail and upload on the SKU view, deactivate and reactivate buttons, barcode retire and batch link, batch correction, and the descriptions, MRP policy, origin and expiry warning fields in the editor (kept as they are on save).
 
 ## Part B — running the plan in parallel with a larger team
 

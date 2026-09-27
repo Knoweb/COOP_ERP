@@ -22,6 +22,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The units of measure and tax categories */
+        get: operations["getCatalogueReference"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/skus/{skuId}": {
         parameters: {
             query?: never;
@@ -103,7 +120,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The unit conversions of a SKU, for the SKU view (M2-10) */
+        get: operations["listConversions"];
         put?: never;
         /**
          * Define an effective-dated unit conversion of a SKU
@@ -123,7 +141,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The barcode registry rows of a SKU, for the SKU view (M2-10) */
+        get: operations["listBarcodes"];
         put?: never;
         /**
          * Register a barcode of a SKU in a unit
@@ -392,6 +411,42 @@ export interface components {
              */
             effectiveTo?: string;
         };
+        ConversionResponse: {
+            uomCode: string;
+            factorToBase: number;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string;
+        };
+        BarcodeResponse: {
+            barcode: string;
+            symbology: components["schemas"]["Symbology"];
+            uomCode: string;
+            /** Format: uuid */
+            batchId?: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "RETIRED";
+        };
+        UomResponse: {
+            uomCode: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            weight: boolean;
+        };
+        TaxCategoryResponse: {
+            /** Format: uuid */
+            taxCategoryId: string;
+            code: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+        };
+        CatalogueReferenceResponse: {
+            units: components["schemas"]["UomResponse"][];
+            taxCategories: components["schemas"]["TaxCategoryResponse"][];
+        };
         RegisterBarcodeRequest: {
             barcode: string;
             symbology: components["schemas"]["Symbology"];
@@ -624,6 +679,26 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    getCatalogueReference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The reference data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogueReferenceResponse"];
+                };
+            };
+        };
+    };
     getSku: {
         parameters: {
             query?: never;
@@ -772,6 +847,29 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    listConversions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversions, by unit and newest first; empty when the SKU is not visible */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversionResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
     defineConversion: {
         parameters: {
             query?: never;
@@ -808,6 +906,29 @@ export interface operations {
                 };
             };
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listBarcodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rows the caller may see, ACTIVE first; empty when the SKU is not visible */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BarcodeResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
     registerBarcode: {

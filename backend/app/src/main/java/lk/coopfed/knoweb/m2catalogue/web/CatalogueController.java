@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m2catalogue.web;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
@@ -20,11 +21,15 @@ import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ActivateSkuRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueApi;
+import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueReferenceResponse;
+import lk.coopfed.knoweb.m2catalogue.web.generated.ConversionResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.DefineConversionRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuPageResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuResponse;
+import lk.coopfed.knoweb.m2catalogue.web.generated.TaxCategoryResponse;
+import lk.coopfed.knoweb.m2catalogue.web.generated.UomResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -91,6 +96,43 @@ class CatalogueController implements CatalogueApi {
     }
 
     private void requireView(ScopeContext scope) {}
+
+    @Override
+    public ResponseEntity<CatalogueReferenceResponse> getCatalogueReference() {
+        ScopeContext scope = currentScope.get();
+        List<UomResponse> units = queries.units(scope).stream()
+                .map(unit -> {
+                    UomResponse response = new UomResponse(unit.uomCode(), unit.nameEn(), unit.weight());
+                    response.setNameSi(unit.nameSi());
+                    response.setNameTa(unit.nameTa());
+                    return response;
+                })
+                .toList();
+
+        List<TaxCategoryResponse> taxCategories = queries.taxCategories(scope).stream()
+                .map(category -> {
+                    TaxCategoryResponse response =
+                            new TaxCategoryResponse(category.taxCategoryId(), category.code(), category.nameEn());
+                    response.setNameSi(category.nameSi());
+                    response.setNameTa(category.nameTa());
+                    return response;
+                })
+                .toList();
+
+        return ResponseEntity.ok(new CatalogueReferenceResponse(units, taxCategories));
+    }
+
+    @Override
+    public ResponseEntity<List<ConversionResponse>> listConversions(UUID skuId) {
+        return ResponseEntity.ok(queries.conversions(skuId, currentScope.get()).stream()
+                .map(conversion -> {
+                    ConversionResponse response = new ConversionResponse(
+                            conversion.uomCode(), conversion.factorToBase(), conversion.effectiveFrom());
+                    response.setEffectiveTo(conversion.effectiveTo());
+                    return response;
+                })
+                .toList());
+    }
 
     @Override
     public ResponseEntity<Void> defineConversion(UUID skuId, String idempotencyKey, DefineConversionRequest request) {
