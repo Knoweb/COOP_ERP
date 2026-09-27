@@ -32,7 +32,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What a seller can allocate today of the given items, in each item's base unit */
+        /**
+         * What a seller can allocate today of the given items, in each item's base unit
+         * @description M5's availability over the seller's active warehouses. Row-level security lets only the seller read its own stock: asked by anyone else, every item answers 0.
+         */
         get: operations["sellerAvailability"];
         put?: never;
         post?: never;
@@ -161,7 +164,7 @@ export interface paths {
         put?: never;
         /**
          * Draft a delivery note of accepted order lines, in drops
-         * @description Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer, m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch, m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation.
+         * @description Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer, m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch, m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation, m4.delivery.from_location_unknown.
          */
         post: operations["createDeliveryNote"];
         delete?: never;
@@ -227,6 +230,68 @@ export interface paths {
          * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_issued, m4.delivery.vehicle_required, m4.delivery.driver_required.
          */
         post: operations["dispatchDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/grns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The GRNs the caller's entity received (BUYER) or that were received from it (SELLER) */
+        get: operations["listGrns"];
+        put?: never;
+        /**
+         * Count a delivery note drop at one of the receiver's locations
+         * @description Problems: m4.grn.location_unknown, m4.grn.drop_unknown, m4.grn.not_receiver, m4.grn.location_mismatch, m4.grn.drop_already_captured, m4.grn.lines_required, m4.grn.sku_not_on_drop, m4.grn.line_duplicate, m4.grn.uom_invalid, m4.grn.line_quantities.
+         */
+        post: operations["captureGrn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/grns/{grnId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        /** One GRN the caller's entity received or that was received from it */
+        get: operations["getGrn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/grns/{grnId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a GRN, the pivot where ownership passes; raises a discrepancy on a variance
+         * @description Problems: m4.grn.not_found, m4.grn.not_receiver, m4.grn.not_draft, m4.grn.mrp_required, m4.grn.expiry_required, document.series_device_held (a shop whose GRN series a till holds receives at the till).
+         */
+        post: operations["confirmGrn"];
         delete?: never;
         options?: never;
         head?: never;
@@ -313,6 +378,11 @@ export interface components {
             reason: string;
         };
         CreateDeliveryNoteRequest: {
+            /**
+             * Format: uuid
+             * @description The seller's warehouse the goods leave from (optional)
+             */
+            fromLocationId?: string;
             vehicleRef?: string;
             driverName?: string;
             routeRef?: string;
@@ -348,6 +418,8 @@ export interface components {
             sellerEntityId: string;
             /** Format: uuid */
             buyerEntityId: string;
+            /** Format: uuid */
+            fromLocationId?: string;
             vehicleRef?: string;
             driverName?: string;
             /** Format: date-time */
@@ -385,6 +457,70 @@ export interface components {
             batchId?: string;
             uomCode: string;
             dispatchedQty: number;
+        };
+        CaptureGrnRequest: {
+            /** Format: uuid */
+            dropId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date */
+            receivedOn?: string;
+            lines: components["schemas"]["GrnLineRequest"][];
+        };
+        GrnLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            uomCode?: string;
+            receivedQty: number;
+            damagedQty?: number;
+            batchNo?: string;
+            /** Format: date */
+            manufactureDate?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+        };
+        GrnResponse: {
+            /** Format: uuid */
+            grnId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIRMED";
+            /** Format: uuid */
+            receiverEntityId: string;
+            /** Format: uuid */
+            receiverLocationId: string;
+            /** Format: uuid */
+            sellerEntityId?: string;
+            /** Format: uuid */
+            dropId?: string;
+            /** Format: uuid */
+            deliveryNoteId?: string;
+            /** Format: date */
+            receivedOn?: string;
+            /** Format: date-time */
+            confirmedAt?: string;
+            /** Format: uuid */
+            discrepancyId?: string;
+            lines: components["schemas"]["GrnLineResponse"][];
+        };
+        GrnLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            expectedQty?: number;
+            receivedQty: number;
+            damagedQty: number;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            unitCost?: number;
+            /** Format: uuid */
+            batchId?: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -434,6 +570,7 @@ export interface components {
     parameters: {
         OrderId: string;
         DeliveryNoteId: string;
+        GrnId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -806,6 +943,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listGrns: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The GRNs, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    captureGrn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureGrnRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft GRN */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getGrn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The GRN */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"];
+                };
+            };
+            /** @description m4.grn.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirmGrn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The confirmed GRN */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];

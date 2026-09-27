@@ -4,7 +4,6 @@ import static lk.coopfed.knoweb.m4trading.TradingFixture.BUYER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.DHAL;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
-import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER_USER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.seller;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.today;
@@ -18,7 +17,6 @@ import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
-import lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry;
 import lk.coopfed.knoweb.m4trading.TradingFixture;
 import lk.coopfed.knoweb.m4trading.api.AcceptOrder;
 import lk.coopfed.knoweb.m4trading.api.CancelOrder;
@@ -40,8 +38,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** AcceptOrder and RejectOrder (24A section 6, section 6.2): every guard, the seller's rows, the derived status, audit and events. */
 class AcceptanceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
-    private static final String AVAILABILITY = "m4.demo.availability_qty";
-
     @Autowired
     CreateOrderHandler create;
 
@@ -59,9 +55,6 @@ class AcceptanceHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
 
     @Autowired
     OrderQueries orders;
-
-    @Autowired
-    JdbcConfigRegistry config;
 
     private UUID orderId;
 
@@ -83,9 +76,6 @@ class AcceptanceHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
 
     @AfterEach
     void clean() {
-        superuserJdbc()
-                .update("delete from kernel.config_value where key = ? and scope_entity_id = ?", AVAILABILITY, SELLER);
-        config.invalidate(AVAILABILITY);
         TradingFixture.clean(superuserJdbc());
     }
 
@@ -131,14 +121,8 @@ class AcceptanceHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
 
     @Test
     void theAllocationIsCappedByAvailabilityAndAnOverrideCarriesItsReason() {
-        superuserJdbc()
-                .update(
-                        "insert into kernel.config_value (key, scope_entity_id, scope_location_id, value, changed_by)"
-                                + " values (?, ?, null, '6'::jsonb, ?)",
-                        AVAILABILITY,
-                        SELLER,
-                        SELLER_USER);
-        config.invalidate(AVAILABILITY);
+        // M5 reports 6 rice in the seller's warehouse.
+        TradingFixture.stock(superuserJdbc(), RICE, new BigDecimal("6"));
         OrderView before = orders.getOrder(orderId, seller()).orElseThrow();
         UUID riceLine = before.lines().get(0).lineId();
         UUID dhalLine = before.lines().get(1).lineId();

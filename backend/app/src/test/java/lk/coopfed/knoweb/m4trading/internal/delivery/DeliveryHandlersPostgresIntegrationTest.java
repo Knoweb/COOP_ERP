@@ -172,6 +172,26 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).isEmpty();
     }
 
+    @Test
+    void theWarehouseTheGoodsLeaveFromIsTheSellersOwnAndTravelsOnTheIssuedEvent() {
+        UUID riceLine = order.lines().get(0).lineId();
+        List<CreateDeliveryNote.Drop> drops = List.of(drop(SHOP, BUYER, riceLine, "10"));
+        refused(
+                () -> create.handle(new CreateDeliveryNote(null, null, null, drops, SHOP), seller()),
+                "m4.delivery.from_location_unknown");
+
+        UUID noteId = create.handle(
+                new CreateDeliveryNote(null, null, null, drops, TradingFixture.SELLER_WAREHOUSE), seller());
+        kernel.reset();
+        issue.handle(new IssueDeliveryNote(noteId), seller());
+
+        assertThat(deliveries.getDeliveryNote(noteId, seller()).orElseThrow().fromLocationId())
+                .isEqualTo(TradingFixture.SELLER_WAREHOUSE);
+        assertThat(events(DeliveryNoteIssued.class))
+                .singleElement()
+                .satisfies(event -> assertThat(event.fromLocationId()).isEqualTo(TradingFixture.SELLER_WAREHOUSE));
+    }
+
     private static CreateDeliveryNote note(UUID shipTo, UUID billTo, List<CreateDeliveryNote.Line> lines) {
         return new CreateDeliveryNote(null, null, null, List.of(new CreateDeliveryNote.Drop(shipTo, billTo, lines)));
     }

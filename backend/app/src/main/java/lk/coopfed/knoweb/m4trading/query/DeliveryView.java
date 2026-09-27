@@ -16,6 +16,7 @@ public record DeliveryView(
         String status,
         UUID sellerEntityId,
         UUID buyerEntityId,
+        UUID fromLocationId,
         String vehicleRef,
         String driverName,
         Instant dispatchedAt,

@@ -91,6 +91,9 @@ paths:
       tags: [Order]
       operationId: sellerAvailability
       summary: What a seller can allocate today of the given items, in each item's base unit
+      description: >
+        M5's availability over the seller's active warehouses. Row-level security lets only the
+        seller read its own stock: asked by anyone else, every item answers 0.
       x-permission: trd.document.view
       parameters:
         - in: query
@@ -310,7 +313,7 @@ paths:
       description: >
         Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer,
         m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch,
-        m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation.
+        m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation, m4.delivery.from_location_unknown.
       x-permission: del.note.draft
       x-scope: ENTITY
       parameters:
@@ -419,6 +422,115 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/grns:
+
+    get:
+      tags: [Grn]
+      operationId: listGrns
+      summary: The GRNs the caller's entity received (BUYER) or that were received from it (SELLER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The GRNs, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GrnResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Grn]
+      operationId: captureGrn
+      summary: Count a delivery note drop at one of the receiver's locations
+      description: >
+        Problems: m4.grn.location_unknown, m4.grn.drop_unknown, m4.grn.not_receiver,
+        m4.grn.location_mismatch, m4.grn.drop_already_captured, m4.grn.lines_required,
+        m4.grn.sku_not_on_drop, m4.grn.line_duplicate, m4.grn.uom_invalid, m4.grn.line_quantities.
+      x-permission: shop.grn.confirm
+      x-scope: LOCATION
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureGrnRequest'
+      responses:
+        '201':
+          description: The draft GRN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrnResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/grns/{grnId}:
+
+    parameters:
+      - $ref: '#/components/parameters/GrnId'
+
+    get:
+      tags: [Grn]
+      operationId: getGrn
+      summary: One GRN the caller's entity received or that was received from it
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The GRN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrnResponse'
+        '404':
+          description: m4.grn.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/grns/{grnId}/confirm:
+
+    parameters:
+      - $ref: '#/components/parameters/GrnId'
+
+    post:
+      tags: [Grn]
+      operationId: confirmGrn
+      summary: Confirm a GRN, the pivot where ownership passes; raises a discrepancy on a variance
+      description: >
+        Problems: m4.grn.not_found, m4.grn.not_receiver, m4.grn.not_draft, m4.grn.mrp_required,
+        m4.grn.expiry_required, document.series_device_held (a shop whose GRN series a till holds
+        receives at the till).
+      x-permission: shop.grn.confirm
+      x-scope: LOCATION
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The confirmed GRN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrnResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -436,6 +548,14 @@ components:
     DeliveryNoteId:
       in: path
       name: deliveryNoteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    GrnId:
+      in: path
+      name: grnId
       required: true
       schema:
         type: string
@@ -612,6 +732,10 @@ components:
       type: object
       required: [drops]
       properties:
+        fromLocationId:
+          description: The seller's warehouse the goods leave from (optional)
+          type: string
+          format: uuid
         vehicleRef:
           type: string
           maxLength: 40
@@ -689,6 +813,9 @@ components:
         buyerEntityId:
           type: string
           format: uuid
+        fromLocationId:
+          type: string
+          format: uuid
         vehicleRef:
           type: string
         driverName:
@@ -760,5 +887,131 @@ components:
           type: string
         dispatchedQty:
           type: number
+
+    CaptureGrnRequest:
+      type: object
+      required: [dropId, locationId, lines]
+      properties:
+        dropId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        receivedOn:
+          type: string
+          format: date
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/GrnLineRequest'
+
+    GrnLineRequest:
+      type: object
+      required: [skuId, receivedQty]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+          maxLength: 10
+        receivedQty:
+          type: number
+          minimum: 0
+          maximum: 99999999999
+        damagedQty:
+          type: number
+          minimum: 0
+          maximum: 99999999999
+        batchNo:
+          type: string
+          maxLength: 40
+        manufactureDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        printedMrp:
+          type: number
+          minimum: 0
+          maximum: 999999999999
+
+    GrnResponse:
+      type: object
+      required: [grnId, status, receiverEntityId, receiverLocationId, lines]
+      properties:
+        grnId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, CONFIRMED]
+        receiverEntityId:
+          type: string
+          format: uuid
+        receiverLocationId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        dropId:
+          type: string
+          format: uuid
+        deliveryNoteId:
+          type: string
+          format: uuid
+        receivedOn:
+          type: string
+          format: date
+        confirmedAt:
+          type: string
+          format: date-time
+        discrepancyId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/GrnLineResponse'
+
+    GrnLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, receivedQty, damagedQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        expectedQty:
+          type: number
+        receivedQty:
+          type: number
+        damagedQty:
+          type: number
+        batchNo:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        printedMrp:
+          type: number
+        unitCost:
+          type: number
+        batchId:
+          type: string
+          format: uuid
 
     # @@SCHEMAS@@

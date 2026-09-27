@@ -62,7 +62,12 @@ class DeliveryController implements DeliveryApi {
                                 .toList()))
                 .toList();
         UUID noteId = create.handle(
-                new CreateDeliveryNote(request.getVehicleRef(), request.getDriverName(), request.getRouteRef(), drops),
+                new CreateDeliveryNote(
+                        request.getVehicleRef(),
+                        request.getDriverName(),
+                        request.getRouteRef(),
+                        drops,
+                        request.getFromLocationId()),
                 scope);
         return ResponseEntity.created(URI.create("/v1/trading/delivery-notes/" + noteId))
                 .body(read(noteId, scope));
@@ -112,6 +117,7 @@ class DeliveryController implements DeliveryApi {
                 note.buyerEntityId(),
                 note.drops().stream().map(DeliveryController::toDrop).toList());
         response.setDocNumber(note.docNumberDisplay());
+        response.setFromLocationId(note.fromLocationId());
         response.setVehicleRef(note.vehicleRef());
         response.setDriverName(note.driverName());
         response.setDispatchedAt(note.dispatchedAt());

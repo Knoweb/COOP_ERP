@@ -122,7 +122,13 @@ public class IssueDeliveryNoteHandler implements Handles<IssueDeliveryNote, Stri
                 scope);
 
         events.publish(new DeliveryNoteIssued(
-                noteId, issued.docNumberDisplay(), scope.entityId(), note.counterpartyEntityId(), orderIds, drops));
+                noteId,
+                issued.docNumberDisplay(),
+                scope.entityId(),
+                note.counterpartyEntityId(),
+                orderIds,
+                drops,
+                note.locationId()));
         return issued.docNumberDisplay();
     }
 }

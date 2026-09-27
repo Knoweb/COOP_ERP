@@ -316,6 +316,8 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-04 | RecordProofOfDelivery, MarkDropUndelivered (driver API) | Before drivers record deliveries | – |
 | M4-04 | DropSnapshotContributor and the change-log of expected drops to shops | Before a till receives against expected lines (with K-08-F4) | – |
 | M4-04 | M5 PickBatches; several buyers on one note | With M5's picking; with multi-party routes | – |
+| M4-05 | Local-supply GRN; till GRN bundle and post-ingest hook (K-08-F4); ReverseGrn; GRN CLOSED | Before shops receive from local suppliers or at the till; before a GRN is reversed | `grn.confirmed.v1` is frozen |
+| M4-05 | `whs.grn.confirm` for warehouses; items not on the drop | Before warehouse receipts need their own permission | `shop.grn.confirm` serves both |
 
 ## Phase 7 — decisions only the architect can take
 
