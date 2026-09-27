@@ -149,6 +149,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/delivery-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The delivery notes the caller's entity sent (SELLER) or is to receive (BUYER) */
+        get: operations["listDeliveryNotes"];
+        put?: never;
+        /**
+         * Draft a delivery note of accepted order lines, in drops
+         * @description Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer, m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch, m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation.
+         */
+        post: operations["createDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/delivery-notes/{deliveryNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        /** One delivery note the caller's entity sent or is to receive */
+        get: operations["getDeliveryNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/delivery-notes/{deliveryNoteId}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a draft delivery note from the seller's series
+         * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_draft, m4.delivery.exceeds_allocation, m4.delivery.order_not_accepted.
+         */
+        post: operations["issueDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/delivery-notes/{deliveryNoteId}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The vehicle leaves with an issued delivery note
+         * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_issued, m4.delivery.vehicle_required, m4.delivery.driver_required.
+         */
+        post: operations["dispatchDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -228,6 +312,80 @@ export interface components {
             allocatedQty: number;
             reason: string;
         };
+        CreateDeliveryNoteRequest: {
+            vehicleRef?: string;
+            driverName?: string;
+            routeRef?: string;
+            drops: components["schemas"]["DropRequest"][];
+        };
+        DropRequest: {
+            /** Format: uuid */
+            shipToLocationId: string;
+            /** Format: uuid */
+            billToEntityId: string;
+            lines: components["schemas"]["DeliveryLineRequest"][];
+        };
+        DeliveryLineRequest: {
+            /** Format: uuid */
+            orderLineId: string;
+            qty: components["schemas"]["Quantity"];
+            /** Format: uuid */
+            batchId?: string;
+        };
+        DispatchRequest: {
+            vehicleRef?: string;
+            /** Format: uuid */
+            driverUserId?: string;
+            driverName?: string;
+        };
+        DeliveryNoteResponse: {
+            /** Format: uuid */
+            deliveryNoteId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "ISSUED" | "IN_TRANSIT" | "CLOSED";
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            vehicleRef?: string;
+            driverName?: string;
+            /** Format: date-time */
+            dispatchedAt?: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            drops: components["schemas"]["DropResponse"][];
+        };
+        DropResponse: {
+            /** Format: uuid */
+            dropId: string;
+            seq: number;
+            /** Format: uuid */
+            shipToLocationId: string;
+            /** Format: uuid */
+            billToEntityId: string;
+            orderIds: string[];
+            /** @enum {string} */
+            status: "PLANNED" | "RECEIVED";
+            /** Format: uuid */
+            grnId?: string;
+            lines: components["schemas"]["DeliveryLineResponse"][];
+        };
+        DeliveryLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            orderId: string;
+            /** Format: uuid */
+            orderLineId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            dispatchedQty: number;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -275,6 +433,7 @@ export interface components {
     };
     parameters: {
         OrderId: string;
+        DeliveryNoteId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -506,6 +665,147 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDeliveryNotes: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery notes, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    createDeliveryNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeliveryNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft delivery note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDeliveryNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            /** @description m4.delivery.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    issueDeliveryNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issued delivery note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    dispatchDeliveryNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchRequest"];
+            };
+        };
+        responses: {
+            /** @description The delivery note in transit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
                 };
             };
             400: components["responses"]["RequestProblem"];
