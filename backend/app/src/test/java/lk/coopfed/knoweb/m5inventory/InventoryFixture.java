@@ -99,7 +99,8 @@ public final class InventoryFixture {
     public void clean() {
         admin.execute("truncate table inventory.stock_lot, inventory.stock_movement, inventory.movement_sequence,"
                 + " inventory.entity_sku_cost, inventory.pick_list_line, inventory.pick_list,"
-                + " inventory.opening_balance_line, inventory.opening_balance");
+                + " inventory.opening_balance_line, inventory.opening_balance, inventory.transfer_receipt,"
+                + " inventory.transfer_line, inventory.transfer");
         for (UUID batch : batches) {
             admin.update("delete from catalogue.batch_key where batch_id = ?", batch);
             admin.update("delete from catalogue.batch where batch_id = ?", batch);
