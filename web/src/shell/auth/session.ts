@@ -2,8 +2,11 @@
 // useSession(); nothing outside shell/auth touches the OIDC library or a raw token.
 //
 // The facts come from the claims of the access token (doc 19 section 1): sub, ent (home
-// entity), cls (policy class), lang, roles. The dev realm of infra/compose issues them; 19A
-// K-02 makes the backend read the same claims from the same token.
+// entity), cls (policy class), lang. The dev realm of infra/compose issues them; 19A K-02
+// makes the backend read the same claims from the same token. What the user may DO is not
+// in the token (doc 19 section 2.2: permissions are not carried in it); the server resolves
+// it and the shell reads it through GET /v1/session (PermissionsContext.tsx). The token's
+// `roles` claim is read by nobody in the web client.
 
 import { useMemo } from "react";
 import { useAuth } from "react-oidc-context";
@@ -20,7 +23,6 @@ export type Session = {
   policyClass: PolicyClass;
   /** The user's language (claim `lang`); null when the token names none we support. */
   language: Locale | null;
-  roles: string[];
 };
 
 const POLICY_CLASSES: PolicyClass[] = ["OWN", "PARTY", "FEDERATION_VIEW", "EXTERNAL_TIMEBOXED"];
@@ -54,8 +56,7 @@ export function sessionFromAccessToken(accessToken: string): Session {
     displayName: text("name") ?? text("preferred_username") ?? "",
     entityId: text("ent"),
     policyClass: cls && POLICY_CLASSES.includes(cls) ? cls : "NONE",
-    language: lang && LANGUAGES.includes(lang) ? lang : null,
-    roles: Array.isArray(claims.roles) ? claims.roles.filter((r): r is string => typeof r === "string") : []
+    language: lang && LANGUAGES.includes(lang) ? lang : null
   };
 }
 

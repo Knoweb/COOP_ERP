@@ -675,6 +675,25 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
+        void theFederationGivesAnExternalRoleToAnExternalUserAndToNobodyElse() {
+            // Doc 21 flow 6.5 (CR-19A-8): the Regulator template reaches the EXTERNAL user the
+            // Federation created; the grant of M1-09 then says where and until when.
+            UUID regulatorTemplate = fx.roleOfClass(null, "EXTERNAL_TIMEBOXED", "prt.location.view");
+            UUID regulator = fx.externalUser(federation);
+            UUID officer = fx.user(federation);
+
+            refused(
+                    () -> assignRole.handle(new AssignRole(officer, regulatorTemplate, null), asFederation()),
+                    "m1.assignment.class_not_permitted");
+
+            assignRole.handle(new AssignRole(regulator, regulatorTemplate, null), asFederation());
+            assertThat(kernel.committedAudit()).singleElement().satisfies(record -> assertThat(record.eventType())
+                    .isEqualTo(AssignRoleHandler.AUDIT));
+            assertThat(kernel.committedEvents())
+                    .containsExactly(new RoleAssigned(regulatorTemplate, regulator, federation, null));
+        }
+
+        @Test
         void anAssignmentIsMadeOnce() {
             UUID roleId = fx.role(mpcs, "prt.location.view");
             fx.assign(clerk, roleId, mpcs, shop);

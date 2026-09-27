@@ -18,7 +18,6 @@ _Others_
 * `l.c.k.k.api.ObjectStorage` (in Platform Kernel)
 * `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
-* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
 |===

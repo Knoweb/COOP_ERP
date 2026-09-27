@@ -4,7 +4,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
-import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.RegisterSupplier;
 import lk.coopfed.knoweb.m2catalogue.internal.supplier.RegisterSupplierHandler;
@@ -13,7 +12,6 @@ import lk.coopfed.knoweb.m2catalogue.query.SupplierView;
 import lk.coopfed.knoweb.m2catalogue.web.generated.RegisterSupplierRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SupplierApi;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SupplierResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,24 +22,16 @@ class SupplierController implements SupplierApi {
     private final RegisterSupplierHandler register;
     private final BatchQueries queries;
     private final CurrentScope currentScope;
-    private final ViewPermission view;
 
-    SupplierController(
-            RegisterSupplierHandler register,
-            BatchQueries queries,
-            CurrentScope currentScope,
-            PermissionResolver permissions,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
+    SupplierController(RegisterSupplierHandler register, BatchQueries queries, CurrentScope currentScope) {
         this.register = register;
         this.queries = queries;
         this.currentScope = currentScope;
-        this.view = new ViewPermission(permissions, enforcePermissions);
     }
 
     @Override
     public ResponseEntity<List<SupplierResponse>> listSuppliers() {
         ScopeContext scope = currentScope.get();
-        view.require(scope);
 
         return ResponseEntity.ok(queries.listSuppliers(scope).stream()
                 .map(SupplierController::toResponse)

@@ -1,0 +1,99 @@
+# OpenAPI slice of the caller's session (doc 30 section 3, "visibility from the resolved
+# permission set"; 19A section 3, PermissionResolver). The kernel serves it, not a module: the
+# interface is generated into lk.coopfed.knoweb.kernel.session.web.generated
+# (backend/app/build.gradle.kts, sliceOwners) and implemented by kernel.internal.security.
+#
+# Decided 27 September 2026 on the architect's delegation (CR-19A-8): the web shell reads the
+# caller's resolved permission set from this operation, not from a token claim. A claim is
+# fixed for the token's lifetime, a role change or a revoked grant must bite at once (doc 21
+# flow 6.5, "revocation immediate"), and doc 19 section 2.2 keeps permissions out of the token
+# ("a role can hold hundreds").
+#
+# x-permission "authenticated" is the one value of x-permission that is not a code of the
+# catalogue: any signed-in principal may call the operation, because it answers with nothing
+# but the caller's own facts. The kernel's read check (ReadPermissionInterceptor) passes it for
+# every user token; tools/check-permissions.mjs allows it on a GET and refuses it on a
+# mutating operation or a @CommandHandler.
+#
+# After changing this file run `make gen-clients` and commit web/src/generated/session.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP Session API
+  version: 0.1.0
+paths:
+  /v1/session:
+    get:
+      tags: [Session]
+      operationId: getSession
+      summary: Who the caller is, where they may act, and what they may do in the active scope
+      description: >-
+        The facts of the verified token and of M1's records, as the kernel resolved them for
+        this request (19A sections 1 to 3): the user, the home entity, the policy class, the
+        scopes held (the active role assignments), the active scope chosen by the X-Scope
+        headers, the entities an external grant opens, and the permissions resolved for the
+        active scope. A caller holding several scopes may call this without naming one (the one
+        place scope.required is not answered), and gets an empty permission list until it does.
+        The web shell hides what the list does not hold; the server checks every request anyway.
+      x-permission: authenticated
+      responses:
+        '200':
+          description: The caller's session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+components:
+  schemas:
+    ScopeRef:
+      type: object
+      required: [entityId]
+      properties:
+        entityId:
+          type: string
+          format: uuid
+        locationId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Null for the whole entity
+    SessionResponse:
+      type: object
+      required: [userId, policyClass, scopes, grantedEntities, permissions]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        homeEntityId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The entity the user belongs to (claim ent); null when the token names none
+        policyClass:
+          type: string
+          enum: [OWN, PARTY, FEDERATION_VIEW, EXTERNAL_TIMEBOXED, NONE]
+        # The scope this request ran in; null when the caller holds several and named none.
+        activeScope:
+          $ref: '#/components/schemas/ScopeRef'
+        scopes:
+          type: array
+          description: Every entity or entity/location pair the caller may act in (doc 19 section 3.1)
+          items:
+            $ref: '#/components/schemas/ScopeRef'
+        grantedEntities:
+          type: array
+          description: The entities an EXTERNAL_TIMEBOXED caller may read now; empty for every other class
+          items:
+            type: string
+            format: uuid
+        permissions:
+          type: array
+          description: >-
+            The permission codes resolved for the active scope: the roles held there (OWN), the
+            external roles while a grant runs (EXTERNAL_TIMEBOXED), every read of every slice
+            (FEDERATION_VIEW). Empty without an active scope.
+          items:
+            type: string

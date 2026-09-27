@@ -15,7 +15,7 @@ let session: Session | null = null;
 vi.mock("../auth/session", () => ({ useSession: () => session }));
 
 function signedIn(overrides: Partial<Session>): Session {
-  return { userId: "u-1", displayName: "Sunil Perera", entityId: MPCS, policyClass: "OWN", language: "en", roles: [], ...overrides };
+  return { userId: "u-1", displayName: "Sunil Perera", entityId: MPCS, policyClass: "OWN", language: "en", ...overrides };
 }
 
 function renderBanner(locale: Locale = "en") {

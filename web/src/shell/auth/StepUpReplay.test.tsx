@@ -9,7 +9,7 @@ import { StepUpReplay } from "./StepUpReplay";
 
 const session = {
   userId: "u-1", displayName: "Officer", entityId: "0190f000-0000-7000-8000-000000000001",
-  policyClass: "OWN" as const, language: "en" as const, roles: ["fed-admin"], accessToken: "fresh", signOut: () => {}
+  policyClass: "OWN" as const, language: "en" as const, accessToken: "fresh", signOut: () => {}
 };
 vi.mock("./session", () => ({ useSession: () => session }));
 
