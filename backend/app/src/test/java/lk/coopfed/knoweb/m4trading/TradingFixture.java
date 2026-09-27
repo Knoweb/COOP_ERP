@@ -24,6 +24,7 @@ public final class TradingFixture {
 
     /** What the seller has in its warehouse of each item (M5 stock lots, GOOD). */
     public static final java.math.BigDecimal STOCK = new java.math.BigDecimal("1000");
+
     public static final UUID SELLER_USER = UUID.fromString("0190f400-0000-7000-8000-000000000021");
     public static final UUID BUYER_USER = UUID.fromString("0190f400-0000-7000-8000-000000000022");
     public static final UUID RELATIONSHIP = UUID.fromString("0190f400-0000-7000-8000-000000000031");
@@ -127,7 +128,8 @@ public final class TradingFixture {
         admin.update("delete from kernel.document where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from inventory.stock_lot where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
-        admin.update("delete from inventory.stock_movement where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
+        admin.update(
+                "delete from inventory.stock_movement where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from catalogue.batch_key where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.batch where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.sku where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);

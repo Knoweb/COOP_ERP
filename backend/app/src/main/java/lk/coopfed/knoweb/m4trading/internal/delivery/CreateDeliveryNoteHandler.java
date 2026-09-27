@@ -158,9 +158,8 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
             dropRows.add(new Object[] {dropId, seq, shipTo, billTo, dropOrders.toArray(new UUID[0])});
         }
 
-        documents.save(
-                TradingDocuments.draft(
-                        noteId, DeliveryReads.DN, seller, buyer, command.fromLocationId(), scope.userId(), null, null));
+        documents.save(TradingDocuments.draft(
+                noteId, DeliveryReads.DN, seller, buyer, command.fromLocationId(), scope.userId(), null, null));
         documents.saveLines(noteId, kernelLines);
         jdbc.update(
                 """

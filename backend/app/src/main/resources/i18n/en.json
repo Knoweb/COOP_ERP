@@ -394,5 +394,6 @@
   "m5.ledger.cost_required": "Stock received needs a unit cost of zero or more",
   "m5.ledger.cost_invalid": "A unit cost cannot have more than four decimals",
   "m5.location.not_in_scope": "The location is not one of the locations of your entity",
-  "m5.batch.not_found": "The batch was not found"
+  "m5.batch.not_found": "The batch was not found",
+  "m4.delivery.from_location_unknown": "The warehouse is not one of your own"
 }

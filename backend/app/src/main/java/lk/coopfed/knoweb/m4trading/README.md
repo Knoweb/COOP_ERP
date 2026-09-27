@@ -12,7 +12,7 @@ M4 records the inter-entity flow from order to settlement: order, delivery note,
 |---|---|
 | `api/` | The published contract: the event records of the document families the demo builds (`order.*`, `delivery_note.*`, `grn.*`, `discrepancy.raised.v1`, `invoice.issued.v1`, `journal.postings_ready.v1`) with their value records, published in M4-01 so that M5's consumers can bind to them; and the three questions M4 asks of modules not built yet, `TradePricing` (M3), `TaxRates` (M2), `InventoryAvailability` (M5). Command records arrive with their tickets. |
 | `query/` | The read-only queries of doc 24 section 5.2, with their tickets. |
-| `internal/integration/` | The answers to the three questions: `M3TradePricing` (M3's `PricingQueries.resolveTradePrice`, since M4-04); for the demo, from the configuration register, `DemoTaxRates` (`m4.demo.vat_rate_percent`) and `DemoInventoryAvailability` (`m4.demo.availability_qty`), each deleted in the pull request that lands the real module's query. |
+| `internal/integration/` | The answers to the three questions: `M3TradePricing` (M3's `PricingQueries.resolveTradePrice`, since M4-04), `M5InventoryAvailability` (M5's `InventoryQueries.availability` over the seller's active warehouses, since M4-05); for the demo, from the configuration register, `DemoTaxRates` (`m4.demo.vat_rate_percent`), deleted when M2 publishes the rate in force. |
 | `internal/seed/M4SeedLoader` | Loads `seed/m4trading/posting-map.yaml` into `trading.posting_map` on start, as the migrator (the arrangement of `M1SeedLoader` and `M2SeedLoader`), upserted by key. |
 | `resources/db/migration/m4trading/V0001__trading.sql` | The tables of M4-01 (below), their row-level security and grants. |
 | `resources/seed/m4trading/` | `posting-map.yaml` (doc 24 section 3.9), `audit-event-types.yaml` (the codes of 24A section 6 the demo tickets use). |
@@ -51,7 +51,7 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 | `posting-map.yaml` | `trading.posting_map` | upserted by (type, line kind, side, debit, credit); the amount source follows the file |
 | `audit-event-types.yaml` | `kernel.audit_event_type` | the audit codes of 24A section 6 used by the demo tickets, all INFO |
 | `seed/m1party/permissions.yaml` | `security.permission` | the 28 `m4trading` codes (`M1SeedLoaderTest` counts them) |
-| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.vat_rate_percent`, `m4.demo.availability_qty` (`m4.demo.trade_price` until M4-04) |
+| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.vat_rate_percent` (`m4.demo.trade_price` until M4-04, `m4.demo.availability_qty` until M4-05) |
 
 ## What the next tickets build on
 
@@ -110,4 +110,5 @@ Every difference between the schema as migrated and 24A section 3, and between t
 12. **CancelOrder cancels a whole order before any dispatch (M4-02)**: 24A cancels the undispatched remainder; the demo refuses once anything is fulfilled (`m4.order.dispatched`).
 13. **The seller does not check that a drop's ship-to shop belongs to its bill-to entity (M4-04)**: it cannot read the buyer's locations (m1party `own_read`); CaptureGrn, at a location of the receiver's own, is where a wrong ship-to shows.
 14. **CaptureGrn and ConfirmGrn carry `shop.grn.confirm` for every location (M4-05)**: 24A resolves `shop.grn.confirm | whs.grn.confirm` by location type; a handler has one permission, so the warehouse code waits until the demo is past.
+16. **Availability is the seller's own (M4-05)**: M5's lots and M1's locations are read under the caller's row-level security, so a buyer cannot see a seller's availability; the endpoint answers 0 for another entity until a masked read exists.
 15. **One GRN per drop, of the drop's items only (M4-05)**; the uncounted item of a drop is received as zero, so a short delivery is always a line of the discrepancy.

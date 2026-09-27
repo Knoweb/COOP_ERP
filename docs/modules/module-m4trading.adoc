@@ -11,16 +11,16 @@
 
 _Others_
 
-* `l.c.k.m.api.InventoryAvailability` (via `l.c.k.m.internal.integration.DemoInventoryAvailability`)
 * `l.c.k.m.api.TaxRates` (via `l.c.k.m.internal.integration.DemoTaxRates`)
 * `l.c.k.m.api.TradePricing` (via `l.c.k.m.internal.integration.M3TradePricing`)
+* `l.c.k.m.api.InventoryAvailability` (via `l.c.k.m.internal.integration.M5InventoryAvailability`)
 |Bean references
 |* `l.c.k.k.api.DocumentBaseRepository` (in Platform Kernel)
+* `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
 * `l.c.k.k.api.DocumentIssuance` (in Platform Kernel)
 * `l.c.k.k.api.NumberingService` (in Platform Kernel)
-* `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.k.api.BusinessDate` (in Platform Kernel)
 * `l.c.k.k.api.DocumentLinks` (in Platform Kernel)
 * `l.c.k.m.query.RelationshipQueries` (in M1 Party, Tenancy & Security)
@@ -28,6 +28,7 @@ _Others_
 * `l.c.k.m.api.BatchRegistration` (in M2 Catalogue & Batch)
 * `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.m.query.PricingQueries` (in M3 Pricing & Rules)
+* `l.c.k.m.query.InventoryQueries` (in M5 Inventory, Costing, Repack & Loss)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 

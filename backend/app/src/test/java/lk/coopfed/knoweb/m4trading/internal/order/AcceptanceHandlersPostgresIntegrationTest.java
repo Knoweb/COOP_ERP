@@ -38,7 +38,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** AcceptOrder and RejectOrder (24A section 6, section 6.2): every guard, the seller's rows, the derived status, audit and events. */
 class AcceptanceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
-
     @Autowired
     CreateOrderHandler create;
 

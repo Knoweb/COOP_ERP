@@ -394,5 +394,6 @@
   "m5.ledger.cost_required": "ලැබුණු තොගයට ශුන්‍ය හෝ ඊට වැඩි ඒකක පිරිවැයක් අවශ්‍යයි",
   "m5.ledger.cost_invalid": "ඒකක පිරිවැයට දශම ස්ථාන හතරකට වඩා තිබිය නොහැක",
   "m5.location.not_in_scope": "මෙම ස්ථානය ඔබේ ආයතනයේ ස්ථානයක් නොවේ",
-  "m5.batch.not_found": "කාණ්ඩය හමු නොවීය"
+  "m5.batch.not_found": "කාණ්ඩය හමු නොවීය",
+  "m4.delivery.from_location_unknown": "ගබඩාව ඔබේම ස්ථානයක් නොවේ"
 }
