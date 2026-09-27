@@ -119,6 +119,7 @@ public final class TradingFixture {
         admin.update("delete from kernel.document_line where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
+        admin.update("delete from catalogue.batch_key where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.batch where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.sku where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
@@ -191,8 +192,8 @@ public final class TradingFixture {
         admin.update(
                 """
                 insert into catalogue.sku (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si,
-                    short_name_ta, base_uom_code, sold_by_weight, tax_category_id)
-                values (?, ?, ?, ?, ?, ?, ?, 'EA', false, ?)
+                    short_name_ta, base_uom_code, sold_by_weight, has_printed_mrp, tax_category_id)
+                values (?, ?, ?, ?, ?, ?, ?, 'EA', false, false, ?)
                 """,
                 id,
                 code,
