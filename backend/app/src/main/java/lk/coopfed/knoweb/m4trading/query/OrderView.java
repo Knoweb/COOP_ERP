@@ -13,6 +13,8 @@ import java.util.UUID;
  * allocation lines' fulfilled quantity.
  *
  * @param netAmount the indicative value of the order at the prices resolved when it was drafted
+ * @param deliverToLocationId the buyer's location the goods go to, as the buyer named it (M4-11,
+ *     CR-24A-2); null when it named none
  */
 public record OrderView(
         UUID orderId,
@@ -28,7 +30,8 @@ public record OrderView(
         String rejectReasonCode,
         BigDecimal netAmount,
         String notes,
-        List<OrderLineView> lines) {
+        List<OrderLineView> lines,
+        UUID deliverToLocationId) {
 
     /**
      * @param indicativePrice the trade price per unit resolved when the order was drafted

@@ -24,7 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Dispatch (24A section 6). Guards: the seller's entity-wide OWN scope; its own ISSUED note; a
+ * Dispatch (24A section 6). Guards: the seller's OWN scope, entity-wide or at the warehouse the
+ * note leaves from (M4-11); its own ISSUED note; a
  * vehicle and a driver (named now or on the draft). Mutation: vehicle, driver and dispatch time on
  * {@code doc_delivery}; ISSUED to IN_TRANSIT. Audit DN_DISPATCHED; event
  * delivery_note.dispatched.v1 (no person's name in it).
@@ -61,9 +62,14 @@ public class DispatchDeliveryNoteHandler implements Handles<DispatchDeliveryNote
         if (command == null) {
             throw new ProblemException("request.invalid");
         }
-        TradingGuards.requireEntityScope(scope);
+        // The stores of the warehouse the goods leave from dispatch, often in a session scoped to
+        // that warehouse (the demo's fed-stores): entity-wide, or at the note's own location (M4-11).
+        TradingGuards.requireOwnScope(scope);
         UUID noteId = TradingGuards.required(command.deliveryNoteId(), "deliveryNoteId");
         DocumentRecord note = DeliveryGuards.ownNote(documents, noteId, scope);
+        if (scope.locationId() != null && !scope.locationId().equals(note.locationId())) {
+            throw new ProblemException("m4.delivery.not_at_location");
+        }
         if (!TradingDocuments.ISSUED.equals(note.status())) {
             throw new ProblemException("m4.delivery.not_issued", Map.of("status", note.status()));
         }
