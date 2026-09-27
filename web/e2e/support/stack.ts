@@ -27,6 +27,26 @@ export type DevUser = {
   locale: Locale;
   /** The policy class the scope banner must name, from the `cls` claim. */
   policyClass: "OWN" | "FEDERATION_VIEW";
+  /** The realm password when it is not the development one (the demo users of docs/DEMO.md). */
+  password?: string;
+};
+
+/**
+ * The demo users of docs/DEMO.md (DEMO-01, `make demo-data`), whose password is the demo fixture
+ * `demo` in infra/compose/realm-dev.json, as public as `dev`. Only the ones the phase 1 storyline
+ * (web/e2e/trading.spec.ts) signs in as.
+ */
+function demoUser(username: string, displayName: string, locale: Locale): DevUser {
+  return { username, displayName, locale, policyClass: "OWN", password: process.env.E2E_DEMO_PASSWORD ?? "demo" };
+}
+
+export const DEMO = {
+  fedSales: demoUser("fed-sales", "Tharindu Silva", "en"),
+  fedStores: demoUser("fed-stores", "Kamal Jayasinghe", "si"),
+  fedAccounts: demoUser("fed-accounts", "Fathima Rizwan", "en"),
+  d101Buyer: demoUser("d101-buyer", "Chaminda Rathnayake", "si"),
+  d101Stores: demoUser("d101-stores", "Lasantha Herath", "si"),
+  d101Accounts: demoUser("d101-accounts", "Dilani Wijesekara", "si")
 };
 
 export const FED_ADMIN: DevUser = {
@@ -108,7 +128,7 @@ export async function signIn(page: Page, user: DevUser): Promise<void> {
   await usernameBox(page).fill(user.username);
   // The name is anchored: beside the field the page also has a "Show password" button, and a
   // loose /password/ would match both.
-  await page.getByRole("textbox", { name: /^password$/i }).fill(PASSWORD);
+  await page.getByRole("textbox", { name: /^password$/i }).fill(user.password ?? PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((url) => url.origin === new URL(WEB).origin);
 }

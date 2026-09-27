@@ -114,3 +114,8 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Tax invoice issued from confirmed goods received notes
+
+  - code: INVOICE_PRINTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The A4 copy of an issued tax invoice stored for printing

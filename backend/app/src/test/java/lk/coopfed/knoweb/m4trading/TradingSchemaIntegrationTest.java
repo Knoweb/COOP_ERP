@@ -45,7 +45,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_grn_line", FOLLOWS_HEADER_UPDATED),
             Map.entry("doc_discrepancy", FOLLOWS_HEADER),
             Map.entry("doc_discrepancy_line", FOLLOWS_HEADER),
-            Map.entry("doc_invoice", FOLLOWS_HEADER),
+            Map.entry("doc_invoice", FOLLOWS_HEADER_UPDATED),
             Map.entry("posting_map", Set.of("reference_read", "seed_reference")));
 
     /** The columns app_rw may update, per table; a table not named here grants no UPDATE. */
@@ -63,7 +63,8 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
                             "undelivered_reason"),
             "doc_grn", Set.of("confirmed_by", "confirmed_at"),
             "doc_grn_line", Set.of("batch_id", "unit_cost"),
-            "order_allocation_line", Set.of("fulfilled_qty"));
+            "order_allocation_line", Set.of("fulfilled_qty"),
+            "doc_invoice", Set.of("print_object_key"));
 
     @Test
     void theTradingSchemaHoldsTheTablesOfM401() {

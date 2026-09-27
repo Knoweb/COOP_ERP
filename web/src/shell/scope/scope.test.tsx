@@ -39,6 +39,11 @@ describe("the scope of a session", () => {
     expect(active.seesData).toBe(true);
   });
 
+  it("narrows to the one place a user holds, as the session read names it", () => {
+    const shop = "0190f000-0000-7000-8000-000000000201";
+    expect(scopesOf({ entityId: MPCS, policyClass: "OWN" }, shop).active.locationId).toBe(shop);
+  });
+
   it("shortens the entity id to its end, where two ids created together differ", () => {
     expect(scopesOf({ entityId: MPCS, policyClass: "OWN" }).active.entityShortId).toBe("00000002");
   });

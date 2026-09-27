@@ -72,12 +72,20 @@ public class GrnDrops {
                                     known.unitPrice(),
                                     known.deliveryLineId()));
         }
+        // The relationship from the seller's decision on the order, which the receiver reads as
+        // its counterparty from any of its sessions; its own order row (location-less) is hidden
+        // from a session scoped to the receiving warehouse or shop (M4-11, the demo's stores).
         UUID relationshipId = drop.orderIds().isEmpty()
                 ? null
                 : jdbc
                         .queryForList(
-                                "select relationship_id from trading.doc_order where document_id = ?",
+                                """
+                                select relationship_id from trading.order_allocation where order_id = ?
+                                union all
+                                select relationship_id from trading.doc_order where document_id = ?
+                                """,
                                 UUID.class,
+                                drop.orderIds().get(0),
                                 drop.orderIds().get(0))
                         .stream()
                         .findFirst()

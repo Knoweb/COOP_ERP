@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  m8-report: M8's A4 report (28A section 7, render/ReportRunWorker). One table: a title, the
+  period, when it was made and how fresh its data is, the columns, the rows and a totals row.
+  The model is written by ReportPrintModel (m8reporting/internal/report): every value arrives
+  formatted and translated, every value is escaped (th:text), and the template does no
+  arithmetic (README.md beside this file).
+-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang}">
+<head>
+<title th:text="${data.title}">Report</title>
+<style>
+  h1 { font-size: 16pt; margin: 0 0 1mm 0; }
+  .subtitle { font-size: 10pt; margin-bottom: 1mm; }
+  .meta { font-size: 8.5pt; color: #555; margin-bottom: 5mm; border-bottom: 2px solid #222; padding-bottom: 3mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  thead { display: table-header-group; }
+  th { background: #eee; text-align: left; padding: 1.5mm 2mm; border-bottom: 1px solid #999; }
+  td { padding: 1.5mm 2mm; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr { break-inside: avoid; }
+  .num { text-align: right; white-space: nowrap; }
+  tr.totals td { font-weight: 700; border-top: 2px solid #222; border-bottom: none; }
+  .empty { margin-top: 6mm; font-style: italic; }
+</style>
+</head>
+<body>
+  <h1 th:text="${data.title}">Report</h1>
+  <div class="subtitle" th:if="${data.subtitle}" th:text="${data.subtitle}"></div>
+  <div class="meta">
+    <span th:text="${data.generated}"></span>
+    <span th:if="${data.freshness}"> · </span>
+    <span th:if="${data.freshness}" th:text="${data.freshness}"></span>
+  </div>
+
+  <table th:unless="${#lists.isEmpty(data.rows)}">
+    <thead>
+      <tr>
+        <th th:each="column : ${data.columns}" th:classappend="${column.num} ? 'num'" th:text="${column.label}"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="row : ${data.rows}">
+        <td th:each="cell, it : ${row}" th:classappend="${data.columns[it.index].num} ? 'num'" th:text="${cell}"></td>
+      </tr>
+      <tr class="totals" th:if="${data.totals}">
+        <td th:each="cell, it : ${data.totals}" th:classappend="${data.columns[it.index].num} ? 'num'" th:text="${cell}"></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="empty" th:if="${#lists.isEmpty(data.rows)}" th:text="${data.empty}"></div>
+</body>
+</html>

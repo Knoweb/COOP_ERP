@@ -69,6 +69,22 @@ class InvoiceQueriesImpl implements InvoiceQueries {
         return views;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> printObjectKey(UUID invoiceId, ScopeContext scope) {
+        if (invoiceId == null) {
+            return Optional.empty();
+        }
+        return jdbc
+                .queryForList(
+                        "select print_object_key from trading.doc_invoice where document_id = ?",
+                        String.class,
+                        invoiceId)
+                .stream()
+                .filter(key -> key != null)
+                .findFirst();
+    }
+
     private InvoiceView view(DocumentRecord header, Map<String, Object> row) {
         return new InvoiceView(
                 header.id(),

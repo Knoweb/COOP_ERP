@@ -2,7 +2,7 @@
 
 The living guide of the module (AGENTS.md): the read side. Projections built from the events of the other modules, the reports read from them, and the dashboard. Once code exists, this file and the tests supersede 28A for day-to-day work; every deviation from the guide is listed at the end with its reason. Read `hello/README.md` first: its rules apply here, with the one exemption below.
 
-Built so far, for the demo (phase 4, "administration and reporting for administration"): M8-01 (the projection base) with the stock position as its sample projection (M8-03, part), and the trading projections (M8-04, part). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
+Built so far, for the demo (phase 4, "administration and reporting for administration"): M8-01 (the projection base) with the stock position as its sample projection (M8-03, part), the trading projections (M8-04, part), and three reports with CSV, A4 print and the dashboard (M8-06 and M8-07, demo part). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
 
 ## The one rule
 
@@ -61,10 +61,37 @@ Until the rebuild service exists (M8-01 rest, below), a rebuild is an operator's
 2. Remove the consumer's rows from `kernel.event_inbox` (the platform pair's step: the inbox would otherwise refuse the replayed events as duplicates).
 3. Replay the consumer from the start of the archive: `Replayer.replay("m8.<name>", 0)` on the worker.
 
+## Reports, CSV, A4 and the dashboard
+
+`query.ReportingQueries` (`internal/report/ReportQueriesImpl`), read-only, in the caller's scope under row-level security; `web/ReportingController` implements the slice `openapi/m8reporting.yaml`.
+
+| Report (`ReportCatalogue`) | Rows | Parameters |
+|---|---|---|
+| `stock-position` | `stock_position` summed by entity, location and SKU: quantity, and the value at the entity average (a cost: only for the owner's users and the Federation view) | `locationId?` |
+| `trade-by-distributor` | `trade_line_fact` RECEIVED lines summed by day, seller, buyer and SKU: quantity and value. A seller sees its buyers, a buyer its sellers, the Federation view everybody | `from`, `to` (required) |
+| `invoices-issued` | `trade_document_event` INVOICE/ISSUED rows: tax point, number, seller, buyer, net, VAT, total | `from`, `to` (required) |
+
+Each answer carries its columns (key, message id, kind TEXT, DATE, QTY or MONEY), the rows as text (dates ISO, amounts and quantities as stored, never rounded), the totals of the QTY and MONEY columns, the freshness (the latest event the projection applied that the caller can see) and when it was made. Names are resolved when the report is read, through M1's and M2's queries in the caller's scope and language (`Names`); a name the scope cannot read shows as the end of its id. Guards: `m8.report.unknown`, `m8.report.period_required`, `m8.report.period_invalid`.
+
+| Operation | Permission | What |
+|---|---|---|
+| `GET /v1/reporting/reports` | `rpt.report.run` | The three definitions (id, title and decision message ids, whether they take a period or a location). |
+| `GET /v1/reporting/reports/{id}/data` | `rpt.report.run` | The rows. |
+| `GET /v1/reporting/reports/{id}/csv` | `rpt.export.run` | The same rows as RFC 4180 CSV, UTF-8, with a header line in the caller's language; a text cell that starts with `= + - @` gets a leading apostrophe so a spreadsheet never runs it. |
+| `POST /v1/reporting/reports/{id}/runs` | `rpt.export.run` | `RequestReportRun`: records `report_run` REQUESTED, audits `REPORT_RUN_REQUESTED`, publishes `report_run.requested.v1`. Guards also `m8.run.own_required` (a user in an OWN scope: the PDF belongs to an entity) and `m8.run.language_invalid`. |
+| `GET /v1/reporting/runs/{runId}` | `rpt.export.run` | The run; once READY, a fresh pre-signed link to the PDF (`A4Renderer.presignGet`, any role). |
+| `GET /v1/reporting/dashboard` | `rpt.report.run` | Tiles: orders awaiting acceptance (SUBMITTED with no ACCEPTED, REJECTED or CANCELLED), deliveries in transit (DISPATCHED with no GRN confirmed against the note), GRNs confirmed today (business date in `coop-erp.business-timezone`), and the stock value for the owner's users and the Federation view. |
+
+**Printing** (`ReportRunWorker`, consumer `m8.render`, only where `coop-erp.report.enabled` is true, the worker): reads the report in the OWN scope of the run's entity at the requester's location, fills M8's template `reports/templates/m8-report.html` through `ReportPrintModel` (labels from the kernel's messages in the run's language, values through `Formats`) and prints it with the kernel's `A4Renderer` (K-06b). `CompleteReportRun` (a command handler run by the worker with no user, as M5's GRN receipt) records READY with the object key or FAILED with the renderer's message id, once (`m8.run.not_open`), audits `REPORT_RUN_COMPLETED` and publishes `report_run.completed.v1`. The events are `report_run.*`, not 28A's `report.requested.v1`, because the kernel's renderer already publishes `report.rendered.v1`.
+
+Permissions `rpt.report.run` and `rpt.export.run` (28A section 3.1) are in `seed/m1party/permissions.yaml`, in the Federation Viewer (read only), Entity Administrator, Trading Buyer and Trading Seller templates, and in the demo's sales, accounts, distributor and society manager roles (`seed/m1security/demo-users.demo.sql`).
+
 ## Tests
 
 | Test | What it proves |
 |---|---|
+| `ReportingHttpPostgresIntegrationTest` | Every operation over HTTP: the three definitions; the stock position for its owner with the value, by location, nothing for the counterparty, everything with the value for the Federation view; trade by distributor for both parties and nobody else, in and out of the period; the invoices with their totals; the period and unknown-report refusals (422); the CSV header in English and its rows; the dashboard of seller, buyer and a third entity; a print run REQUESTED, audited and published, not visible to another entity; a run without its period refused with nothing committed. |
+| `ReportRunPostgresIntegrationTest` | The worker with a stand-in renderer: the report printed with `m8-report` in the run's language (Tamil title), READY with the key, audited and published, a second outcome refused; a renderer failure recorded FAILED with its message id; an unknown run; the request guards (no user, unknown report, a language outside the catalogue) commit nothing; the print model formats cells and totals. |
 | `TradeProjectionPostgresIntegrationTest` (with `TradeFlows`) | Rebuild equivalence over five sets of twelve random order flows (submitted only, rejected or cancelled, in transit, received and invoiced) with redeliveries; one whole flow leaves one row per event on its owner's side with the counterparty, the business date in Colombo, the accepted and received volume and the invoice totals. |
 | `StockPositionProjectionPostgresIntegrationTest` | Rebuild equivalence over five random streams of 60 movements (two entities, three locations each, two sources, redeliveries); a late or repeated movement changes nothing; an event of another type is ignored; a delivery in another entity's scope is refused by row-level security; nothing is audited or published. |
 | `RlsMatrixIntegrationTest`, `SchemaRulesIntegrationTest` | Both tables follow the template (found by their `owner_entity_id`), and `app_rw` cannot delete from them. |
@@ -75,3 +102,4 @@ Until the rebuild service exists (M8-01 rest, below), a rebuild is an operator's
 - `stock_position` takes the lot's quantity from the event instead of adding deltas (above), and carries `last_source` and `last_movement_seq` for it. `expiry_date`, `received_at`, `days_held` and `negative_since` wait for the expiry reports. `canonical_sku_id` is the SKU itself until M2 publishes SKU merges.
 - The projections subscribe to `"*"` and filter, for the envelope (above).
 - `trade_document_fact` (one row per document, updated) is `trade_document_event` (one row per event, inserted) plus `trade_line_fact`: row-level security lets no party update the other's row, and an inserted row per event is idempotent by its key. `settled`, `credited`, `committed_eta`, `delivered_at` and `fill_rate` wait for the payment, credit note and fill-rate reports. `dispute_register` and `exposure_snapshot` are not built.
+- The report definitions are code (`ReportCatalogue`, three), not data in `report_definition` with the validator, the audience check and the twelve placeholders of 28A section 3.1. `report_run` has `location_id` (a shop's run stays the shop's), `error_code` and `completed_at`, and no `scope`, `freshness` or `stale_locations` (no freshness resolver yet). The events are `report_run.requested.v1` and `report_run.completed.v1`. CSV stands in for the xlsx export worker, and is answered at once rather than as an export job.
