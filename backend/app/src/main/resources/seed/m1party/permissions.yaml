@@ -399,3 +399,10 @@ permissions:
     module: "m5inventory"
     description_en: "Pick delivery notes at the warehouse"
     scope: "ENTITY"
+  # M6 Point of Sale, the central side (26A section 10), minimal for the demo: the reads of the
+  # receipts and sessions the tills uploaded. The till's own permissions (sale, refund, session)
+  # come with the till track.
+  - code: "pos.receipt.view"
+    module: "m6pos"
+    description_en: "See the receipts and till sessions of the shops"
+    scope: "LOCATION"
