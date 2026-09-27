@@ -63,14 +63,14 @@ public class StockPositionProjection extends Projection {
                 """,
                 event.uuid("locationId"),
                 event.uuid("batchId"),
-                event.text("condition"),
+                event.string("condition"),
                 // The lot's owner as M5 reports it; row-level security refuses the row unless it
                 // is the scope's entity, which the dispatcher took from the same event.
                 event.uuid("ownerEntityId"),
                 event.uuid("skuId"),
                 event.decimal("lotQtyOnHand"),
                 event.decimal("unitCostAtMovement"),
-                event.text("source"),
+                event.string("source"),
                 event.payload().path("movementSeq").asLong(),
                 Timestamp.from(event.occurredAt()));
     }
