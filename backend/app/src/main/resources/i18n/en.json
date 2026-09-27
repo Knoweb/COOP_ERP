@@ -322,6 +322,7 @@
   "m4.order.seller_is_buyer": "An entity cannot order from itself",
   "m4.order.relationship_inactive": "There is no active trading relationship with this seller today",
   "m4.order.eta_past": "The requested delivery date is in the past",
+  "m4.order.deliver_to_unknown": "The delivery location is not one of your locations",
   "m4.order.lines_required": "An order needs at least one line",
   "m4.order.sku_not_found": "The item was not found",
   "m4.order.sku_not_active": "The item is not active for trading",

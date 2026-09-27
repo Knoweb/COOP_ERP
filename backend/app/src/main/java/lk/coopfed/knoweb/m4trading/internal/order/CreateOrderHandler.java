@@ -18,6 +18,7 @@ import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
@@ -36,7 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * CreateOrder (24A section 6). Guards, in order: the buyer's entity-wide OWN scope; a seller other
  * than the buyer; the ACTIVE relationship of the pair today (M1 LookupRelationship); a requested
- * ETA not in the past; at least one line; per line an item the buyer can see that is tradable, its
+ * ETA not in the past; a delivery location, when named, that is one of the buyer's own (M4-11,
+ * CR-24A-2); at least one line; per line an item the buyer can see that is tradable, its
  * base unit (M2 publishes no conversion query yet; a demo deviation) and a positive quantity.
  * Mutation: the kernel draft (header and lines, the line priced at the indicative trade price of
  * the relationship, {@link TradePricing}), {@code doc_order} and {@code doc_order_line}. Audit
@@ -51,6 +53,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
     private final JdbcTemplate jdbc;
     private final DocumentBaseRepository documents;
     private final RelationshipQueries relationships;
+    private final PartyQueries parties;
     private final CatalogueQueries catalogue;
     private final TradePricing pricing;
     private final TradingClock clock;
@@ -61,6 +64,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
             JdbcTemplate jdbc,
             DocumentBaseRepository documents,
             RelationshipQueries relationships,
+            PartyQueries parties,
             CatalogueQueries catalogue,
             TradePricing pricing,
             TradingClock clock,
@@ -69,6 +73,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         this.jdbc = jdbc;
         this.documents = documents;
         this.relationships = relationships;
+        this.parties = parties;
         this.catalogue = catalogue;
         this.pricing = pricing;
         this.clock = clock;
@@ -95,6 +100,13 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
                 .orElseThrow(() -> new ProblemException("m4.order.relationship_inactive"));
         if (command.requestedEta() != null && command.requestedEta().isBefore(today)) {
             throw new ProblemException("m4.order.eta_past");
+        }
+        UUID deliverTo = command.deliverToLocationId();
+        if (deliverTo != null
+                && parties.getLocation(deliverTo, scope)
+                        .filter(location -> buyer.equals(location.ownerEntityId()))
+                        .isEmpty()) {
+            throw new ProblemException("m4.order.deliver_to_unknown");
         }
         if (command.lines() == null || command.lines().isEmpty()) {
             throw new ProblemException("m4.order.lines_required");
@@ -138,14 +150,15 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         jdbc.update(
                 """
                 insert into trading.doc_order (document_id, relationship_id, buyer_entity_id, seller_entity_id,
-                    requested_eta)
-                values (?, ?, ?, ?, ?)
+                    requested_eta, deliver_to_location_id)
+                values (?, ?, ?, ?, ?, ?)
                 """,
                 orderId,
                 relationship.relationshipId(),
                 buyer,
                 seller,
-                command.requestedEta());
+                command.requestedEta(),
+                deliverTo);
         for (DocumentLineRecord line : lines) {
             jdbc.update(
                     "insert into trading.doc_order_line (line_id, document_id, requested_qty) values (?, ?, ?)",
@@ -159,6 +172,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         after.put("relationshipId", relationship.relationshipId());
         after.put("sellerEntityId", seller);
         after.put("requestedEta", command.requestedEta());
+        after.put("deliverToLocationId", deliverTo);
         after.put("lines", summary.size());
         audit.record(AUDIT_CREATED, Subject.of("order", orderId), null, after, scope);
 

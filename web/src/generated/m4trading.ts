@@ -16,7 +16,7 @@ export interface paths {
         put?: never;
         /**
          * Draft an order to a seller the caller's entity trades with
-         * @description Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
+         * @description Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past, m4.order.deliver_to_unknown, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
          */
         post: operations["createOrder"];
         delete?: never;
@@ -313,6 +313,11 @@ export interface components {
             /** Format: date */
             requestedEta?: string;
             notes?: string;
+            /**
+             * Format: uuid
+             * @description One of the buyer's own locations, where the goods are to be delivered (CR-24A-2)
+             */
+            deliverToLocationId?: string;
             lines: components["schemas"]["OrderLineRequest"][];
         };
         OrderLineRequest: {
@@ -345,6 +350,8 @@ export interface components {
             rejectReasonCode?: string;
             netAmount?: number;
             notes?: string;
+            /** Format: uuid */
+            deliverToLocationId?: string;
             lines: components["schemas"]["OrderLineResponse"][];
         };
         OrderLineResponse: {

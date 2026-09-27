@@ -322,6 +322,7 @@
   "m4.order.seller_is_buyer": "ආයතනයකට තමන්ගෙන්ම ඇණවුම් කළ නොහැක",
   "m4.order.relationship_inactive": "අද මෙම විකුණුම්කරු සමඟ සක්‍රිය වෙළඳ සබඳතාවක් නැත",
   "m4.order.eta_past": "ඉල්ලූ බෙදාහැරීමේ දිනය අතීතයේ ය",
+  "m4.order.deliver_to_unknown": "බෙදාහැරීමේ ස්ථානය ඔබේ ස්ථානයක් නොවේ",
   "m4.order.lines_required": "ඇණවුමකට අවම වශයෙන් එක් පේළියක් අවශ්‍ය ය",
   "m4.order.sku_not_found": "අයිතමය හමු නොවීය",
   "m4.order.sku_not_active": "අයිතමය වෙළඳාම සඳහා සක්‍රිය නැත",
