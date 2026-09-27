@@ -1,0 +1,49 @@
+# The demo catalogue (DEMO-01, docs/DEMO.md): the Federation's shared SKUs, their trade prices and
+# the opening stock. One SKU per line, fields separated by |. Read by lk.coopfed.knoweb.demo.
+# Change a line here and run `make reset && make up && make demo-data` to see it; the loader matches
+# SKUs by their English name, so renaming one adds a new SKU on a stack that already has the old one.
+#
+# name_en | name_si | name_ta | base unit | sold by weight | batch tracked | expiry tracked |
+# printed MRP | tax category | pack unit | units per pack | Federation price | Federation price
+# from 100 | distributor price to societies | Federation unit cost | opening qty at the Federation
+# warehouse | opening qty at each distributor | MRP on the pack (Rs) | shelf life (days)
+Samba rice 5 kg|සම්බා සහල් 5 kg|சம்பா அரிசி 5 kg|EA|N|Y|Y|Y|EXEMPT|BAG|5|1150.00|1120.00|1210.00|1080.00|600|120|1290.00|365
+Nadu rice 5 kg|නාඩු සහල් 5 kg|நாடு அரிசி 5 kg|EA|N|Y|Y|Y|EXEMPT|BAG|5|1020.00|995.00|1075.00|960.00|800|160|1150.00|365
+Red raw rice 5 kg|රතු කැකුළු සහල් 5 kg|சிவப்பு பச்சை அரிசி 5 kg|EA|N|Y|Y|Y|EXEMPT|BAG|5|1080.00|1050.00|1140.00|1010.00|400|80|1220.00|365
+Keeri samba rice 1 kg|කීරි සම්බා සහල් 1 kg|கீரி சம்பா அரிசி 1 kg|EA|N|Y|Y|Y|EXEMPT|CASE|10|295.00|288.00|312.00|276.00|500|100|335.00|365
+Samba rice, loose|සම්බා සහල්, ලිහිල්|சம்பா அரிசி, தளர்வானது|KG|Y|N|N|N|EXEMPT|||225.00|219.00|238.00|210.00|2000|400||
+Red dhal 1 kg|රතු පරිප්පු 1 kg|சிவப்பு பருப்பு 1 kg|EA|N|Y|Y|Y|EXEMPT|CASE|20|298.00|291.00|315.00|280.00|700|140|340.00|540
+Mysore dhal 500 g|මයිසූර් පරිප්පු 500 g|மைசூர் பருப்பு 500 g|EA|N|Y|Y|Y|EXEMPT|CASE|24|156.00|152.00|165.00|146.00|500|100|178.00|540
+Dhal, loose|පරිප්පු, ලිහිල්|பருப்பு, தளர்வானது|KG|Y|N|N|N|EXEMPT|||285.00|278.00|301.00|268.00|1000|200||
+White sugar 1 kg|සුදු සීනි 1 kg|வெள்ளைச் சீனி 1 kg|EA|N|N|N|Y|EXEMPT|CASE|20|255.00|249.00|270.00|240.00|900|180|290.00|
+Brown sugar 1 kg|දුඹුරු සීනි 1 kg|பழுப்புச் சீனி 1 kg|EA|N|N|N|Y|EXEMPT|CASE|20|310.00|302.00|328.00|292.00|300|60|350.00|
+Sugar, loose|සීනි, ලිහිල්|சீனி, தளர்வானது|KG|Y|N|N|N|EXEMPT|||245.00|239.00|259.00|231.00|1500|300||
+Wheat flour 1 kg|තිරිඟු පිටි 1 kg|கோதுமை மா 1 kg|EA|N|Y|Y|Y|EXEMPT|CASE|20|215.00|209.00|228.00|202.00|800|160|245.00|180
+Rice flour 1 kg|සහල් පිටි 1 kg|அரிசி மா 1 kg|EA|N|Y|Y|Y|EXEMPT|CASE|20|240.00|234.00|254.00|226.00|300|60|275.00|180
+Kurakkan flour 500 g|කුරක්කන් පිටි 500 g|குரக்கன் மா 500 g|EA|N|Y|Y|Y|EXEMPT|CASE|24|185.00|180.00|196.00|174.00|200|40|210.00|180
+Coconut oil 1 l|පොල් තෙල් 1 l|தேங்காய் எண்ணெய் 1 l|EA|N|Y|Y|Y|STD|CASE|12|760.00|742.00|805.00|715.00|400|80|860.00|365
+Coconut oil 500 ml|පොල් තෙල් 500 ml|தேங்காய் எண்ணெய் 500 ml|EA|N|Y|Y|Y|STD|CASE|24|390.00|381.00|413.00|367.00|400|80|440.00|365
+Vegetable oil 1 l|එළවළු තෙල් 1 l|தாவர எண்ணெய் 1 l|EA|N|Y|Y|Y|STD|CASE|12|690.00|674.00|731.00|649.00|300|60|780.00|365
+Full cream milk powder 400 g|කිරිපිටි 400 g|முழு ஆடைப் பால் மா 400 g|EA|N|Y|Y|Y|STD|CASE|24|1060.00|1036.00|1123.00|997.00|500|100|1200.00|540
+Full cream milk powder 1 kg|කිරිපිටි 1 kg|முழு ஆடைப் பால் மா 1 kg|EA|N|Y|Y|Y|STD|CASE|12|2580.00|2522.00|2734.00|2427.00|250|50|2900.00|540
+Ceylon tea 200 g|ලංකා තේ 200 g|இலங்கைத் தேயிலை 200 g|EA|N|Y|Y|Y|STD|CASE|48|395.00|386.00|418.00|371.00|600|120|450.00|730
+Ceylon tea 400 g|ලංකා තේ 400 g|இலங்கைத் தேயிலை 400 g|EA|N|Y|Y|Y|STD|CASE|24|760.00|743.00|805.00|715.00|300|60|860.00|730
+Tea bags, 50|තේ බෑග් 50|தேநீர்ப் பைகள் 50|EA|N|Y|Y|Y|STD|CASE|48|420.00|410.00|445.00|395.00|300|60|480.00|730
+Laundry soap bar|රෙදි සෝදන සබන්|சலவைச் சவர்க்காரம்|EA|N|N|N|Y|STD|CASE|72|118.00|115.00|125.00|110.00|1500|300|135.00|
+Bath soap 100 g|නාන සබන් 100 g|குளியல் சவர்க்காரம் 100 g|EA|N|N|N|Y|STD|CASE|72|135.00|132.00|143.00|127.00|1200|240|155.00|
+Carbolic soap 110 g|කාබොලික් සබන් 110 g|கார்போலிக் சவர்க்காரம் 110 g|EA|N|N|N|Y|STD|CASE|72|110.00|107.00|116.00|103.00|800|160|125.00|
+Washing powder 1 kg|රෙදි සෝදන කුඩු 1 kg|சலவைத் தூள் 1 kg|EA|N|N|N|Y|STD|CASE|12|540.00|527.00|572.00|507.00|400|80|615.00|
+Dishwash liquid 500 ml|පිඟන් සෝදන දියර 500 ml|பாத்திரம் கழுவும் திரவம் 500 ml|EA|N|N|N|Y|STD|CASE|24|365.00|356.00|386.00|343.00|300|60|415.00|
+Toothpaste 120 g|දත් බෙහෙත් 120 g|பற்பசை 120 g|EA|N|Y|Y|Y|STD|CASE|48|295.00|288.00|312.00|277.00|500|100|335.00|730
+Salt 1 kg|ලුණු 1 kg|உப்பு 1 kg|EA|N|N|N|Y|EXEMPT|CASE|25|110.00|107.00|116.00|103.00|800|160|125.00|
+Chilli powder 100 g|මිරිස් කුඩු 100 g|மிளகாய்த் தூள் 100 g|EA|N|Y|Y|Y|STD|CASE|50|195.00|190.00|206.00|183.00|400|80|225.00|365
+Curry powder 100 g|තුනපහ කුඩු 100 g|கறித் தூள் 100 g|EA|N|Y|Y|Y|STD|CASE|50|175.00|171.00|185.00|164.00|400|80|200.00|365
+Turmeric powder 50 g|කහ කුඩු 50 g|மஞ்சள் தூள் 50 g|EA|N|Y|Y|Y|STD|CASE|50|145.00|141.00|153.00|136.00|300|60|165.00|365
+Soya meat 90 g|සෝයා මීට් 90 g|சோயா மீட் 90 g|EA|N|Y|Y|Y|STD|CASE|50|105.00|102.00|111.00|98.00|500|100|120.00|365
+Canned mackerel 425 g|ටින් මාළු 425 g|டின் மீன் 425 g|EA|N|Y|Y|Y|STD|CASE|24|520.00|508.00|551.00|488.00|400|80|590.00|1095
+Chickpeas 500 g|කඩල 500 g|கடலை 500 g|EA|N|Y|Y|Y|EXEMPT|CASE|24|265.00|259.00|280.00|249.00|300|60|300.00|365
+Green gram 500 g|මුං ඇට 500 g|பச்சைப் பயறு 500 g|EA|N|Y|Y|Y|EXEMPT|CASE|24|320.00|312.00|339.00|300.00|300|60|365.00|365
+Cream crackers 190 g|ක්‍රීම් ක්‍රැකර් 190 g|கிரீம் கிரேக்கர் 190 g|EA|N|Y|Y|Y|STD|CASE|36|215.00|210.00|228.00|202.00|500|100|245.00|180
+Noodles 400 g|නූඩ්ල්ස් 400 g|நூடுல்ஸ் 400 g|EA|N|Y|Y|Y|STD|CASE|30|290.00|283.00|307.00|272.00|400|80|330.00|270
+Matches, 10 boxes|ගිනිපෙට්ටි 10|தீப்பெட்டி 10|EA|N|N|N|Y|STD|CASE|50|60.00|58.00|64.00|56.00|600|120|70.00|
+Kerosene lamp wick|භුමිතෙල් ලාම්පු පොට|மண்ணெண்ணெய் விளக்குத் திரி|EA|N|N|N|N|STD|DOZ|12|25.00|24.00|27.00|23.00|600|120||

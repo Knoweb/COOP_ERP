@@ -3,7 +3,13 @@
 |Base package
 |`lk.coopfed.knoweb.kernel`
 |Spring components
-|* `l.c.k.k.api.Attachments` (via `l.c.k.k.internal.attachment.AttachmentService`)
+|_Services_
+
+* `l.c.k.k.api.A4Renderer` (via `l.c.k.k.internal.render.A4RenderService`)
+
+_Others_
+
+* `l.c.k.k.api.Attachments` (via `l.c.k.k.internal.attachment.AttachmentService`)
 * `l.c.k.k.api.ObjectStorage` (via `l.c.k.k.internal.attachment.ObjectStorageService`)
 * `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)
 * `l.c.k.k.api.BusinessDate`, `l.c.k.k.api.DayClose` (via `l.c.k.k.internal.businessdate.LocationBusinessDates`)

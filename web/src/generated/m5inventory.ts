@@ -44,10 +44,223 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/receipts/{grnId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The movements a confirmed GRN put into the receiver's stock
+         * @description M5 applies grn.confirmed.v1 in the receiver's scope (the permission inv.stock.receive is that command's; the system runs it with no user). An empty list until it is applied, and for a GRN the caller's scope does not see.
+         */
+        get: operations["getReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/pick-lists/{deliveryNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pick list of an issued delivery note, FEFO lots per line */
+        get: operations["getPickList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare the opening stock of a location, with batch data and cost
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required, m5.opening.line_invalid, m5.batch.not_found.
+         */
+        post: operations["prepareOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/{openingBalanceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One opening balance with its lines */
+        get: operations["getOpeningBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/{openingBalanceId}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The entity's officer signs the counted stock
+         * @description Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found, m5.opening.not_draft; mfa.required when the second factor is not fresh.
+         */
+        post: operations["signOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/opening-balances/{openingBalanceId}/countersign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The Federation's officer countersigns; the OPB is issued and the stock posted
+         * @description Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found, m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock, m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+         */
+        post: operations["countersignOpeningBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MovementResponse: {
+            /** Format: uuid */
+            movementId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            movementType: string;
+            qtyDelta: number;
+            unitCostAtMovement?: number;
+            /** Format: uuid */
+            documentId: string;
+            /** Format: uuid */
+            documentLineId?: string;
+            /** Format: int64 */
+            movementSeq: number;
+            /** Format: date-time */
+            occurredAt?: string;
+        };
+        PickListResponse: {
+            /** Format: uuid */
+            pickListId: string;
+            /** Format: uuid */
+            deliveryNoteId: string;
+            /** @enum {string} */
+            status: "OPEN" | "DISPATCHED";
+            lines: components["schemas"]["PickResponse"][];
+        };
+        PickResponse: {
+            /** Format: uuid */
+            deliveryLineId: string;
+            /** Format: uuid */
+            skuId: string;
+            /**
+             * Format: uuid
+             * @description absent on the short part of a line
+             */
+            locationId?: string;
+            /** Format: uuid */
+            stockLotId?: string;
+            /** Format: uuid */
+            batchId?: string;
+            qty: number;
+        };
+        PrepareOpeningBalanceRequest: {
+            /** Format: uuid */
+            locationId: string;
+            lines: components["schemas"]["OpeningBalanceLineRequest"][];
+        };
+        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires), which the prepare registers in M2 (M5-12). */
+        OpeningBalanceLineRequest: {
+            /** Format: uuid */
+            batchId?: string;
+            /** Format: uuid */
+            skuId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            qty: number;
+            unitCost: number;
+        };
+        OpeningBalanceResponse: {
+            /** Format: uuid */
+            openingBalanceId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            status: "DRAFT" | "SIGNED_ENTITY" | "POSTED";
+            /** Format: uuid */
+            preparedBy?: string;
+            /** Format: uuid */
+            signedEntityBy?: string;
+            /** Format: uuid */
+            countersignedBy?: string;
+            /** Format: uuid */
+            documentId?: string;
+            lines: components["schemas"]["OpeningBalanceLineResponse"][];
+        };
+        OpeningBalanceLineResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            qty: number;
+            unitCost: number;
+        };
         LotBalanceResponse: {
             /** Format: uuid */
             stockLotId: string;
@@ -110,8 +323,20 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description 422. A business rule was broken; `code` says which one */
+        RuleBroken: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
     };
-    parameters: never;
+    parameters: {
+        /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+        IdempotencyKey: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -166,6 +391,167 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    getReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt movements */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovementResponse"][];
+                };
+            };
+        };
+    };
+    getPickList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pick list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListResponse"];
+                };
+            };
+            /** @description No pick list for this delivery note, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    prepareOpeningBalance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareOpeningBalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Prepared, in status DRAFT */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getOpeningBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                openingBalanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The opening balance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            /** @description No such opening balance, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    signOpeningBalance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                openingBalanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed, in status SIGNED_ENTITY */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    countersignOpeningBalance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                openingBalanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Posted, with the OPB document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
         };
     };
 }
