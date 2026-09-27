@@ -81,6 +81,32 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         assertThat(counts()).isEqualTo(afterFirst);
     }
 
+    /**
+     * A demo user who can see the Stock tab (any role permission {@code inv.*}) must also be able
+     * to list locations for the picker (bug seen live 28 Sep 2026: fed-steward and fed-accounts held
+     * inv.stock.view but not prt.location.view, so /v1/party/locations answered 403 and the Stock and
+     * Transfers screens showed an empty dropdown). Every demo role with an inv.* permission holds
+     * prt.location.view too.
+     */
+    @Test
+    void everyDemoRoleThatSeesInventoryCanAlsoListItsLocations() {
+        JdbcTemplate admin = superuserJdbc();
+        Long offenders = admin.queryForObject(
+                """
+                        select count(*)
+                        from security.role r
+                        where r.role_id::text like '0190f0de-%'
+                          and exists (
+                              select 1 from security.role_permission rp
+                              where rp.role_id = r.role_id and rp.permission_code like 'inv.%')
+                          and not exists (
+                              select 1 from security.role_permission rp
+                              where rp.role_id = r.role_id and rp.permission_code = 'prt.location.view')
+                        """,
+                Long.class);
+        assertThat(offenders).isZero();
+    }
+
     /** What the demo consists of, counted as the superuser over the demo's own rows. */
     private static Map<String, Long> counts() {
         JdbcTemplate admin = superuserJdbc();

@@ -14,9 +14,14 @@
 // security filters every query by the scope of the verified token.
 
 import { createContext, useMemo, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useIntl } from "react-intl";
+import { useApiClient } from "../api/client";
 import { usePermissions } from "../auth/PermissionsContext";
+import { hasPermission } from "../auth/permissions";
 import { useSession } from "../auth/session";
 import type { PolicyClass, Session } from "../auth/session";
+import type { paths as partyPaths } from "../../generated/m1party";
 
 export type Scope = {
   /** The entity the user acts for; null when the token names none. */
@@ -54,16 +59,34 @@ export type ScopeState = {
 const SHORT_ID_LENGTH = 8;
 
 /** The scopes a session gives. A plain function, so that it can be tested without a browser. */
-export function scopesOf(session: Pick<Session, "entityId" | "policyClass">, locationId: string | null = null): ScopeState {
+export function scopesOf(
+  session: Pick<Session, "entityId" | "policyClass">,
+  locationId: string | null = null,
+  entityName: string | null = null
+): ScopeState {
   const active: Scope = {
     entityId: session.entityId,
-    entityName: null,
+    entityName,
     entityShortId: session.entityId ? session.entityId.slice(-SHORT_ID_LENGTH) : null,
     locationId,
     policyClass: session.policyClass,
     seesData: session.entityId !== null && session.policyClass !== "NONE"
   };
   return { active, available: [active] };
+}
+
+/** The entity's name in the reader's language, en falling back when si/ta is missing. */
+function localNameOf(
+  entity: { legalNameEn: string; legalNameSi?: string | null; legalNameTa?: string | null },
+  locale: string
+): string {
+  if (locale === "si" && entity.legalNameSi) {
+    return entity.legalNameSi;
+  }
+  if (locale === "ta" && entity.legalNameTa) {
+    return entity.legalNameTa;
+  }
+  return entity.legalNameEn;
 }
 
 /** null outside a ScopeProvider; useScope() turns that into an error with a clear text. */
@@ -74,13 +97,33 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
   const session = useSession();
   const entityId = session?.entityId ?? null;
   const policyClass = session?.policyClass ?? "NONE";
+  const permissions = usePermissions();
+  const intl = useIntl();
+  const party = useApiClient<partyPaths>();
 
   // Worked out again only when the entity or the class changes, not on every token renewal.
   // A user who holds one place only acts there: the session read names it (PermissionsContext).
-  const active = usePermissions()?.activeScope;
+  const active = permissions?.activeScope;
   const locationId = active && active.entityId === entityId ? (active.locationId ?? null) : null;
 
-  const state = useMemo(() => scopesOf({ entityId, policyClass }, locationId), [entityId, policyClass, locationId]);
+  // The banner names the entity when the user holds gov.entity.view for it (M1); otherwise it
+  // keeps the honest short id (ScopeBanner.tsx). Read once per entity, not on every render.
+  const canReadEntity = permissions !== null && hasPermission(permissions, "gov.entity.view");
+  const entityQuery = useQuery({
+    queryKey: ["shell", "scope-entity", entityId],
+    enabled: entityId !== null && canReadEntity,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const { data } = await party.GET("/v1/party/entities/{entityId}", { params: { path: { entityId: entityId! } } });
+      return data ?? null;
+    }
+  });
+  const entityName = entityQuery.data ? localNameOf(entityQuery.data, intl.locale) : null;
+
+  const state = useMemo(
+    () => scopesOf({ entityId, policyClass }, locationId, entityName),
+    [entityId, policyClass, locationId, entityName]
+  );
 
   return <ScopeContext.Provider value={state}>{children}</ScopeContext.Provider>;
 }
