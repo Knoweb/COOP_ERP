@@ -16,14 +16,15 @@ import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.YamlMapFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * The seed loader runs on start (the context of this test started it once already) and
- * connects as the migrator. The counts below are the rows of the four YAML files under
- * seed/m1party; change them together with the files.
+ * connects as the migrator. The counts are the entries of the YAML files under seed/m1party,
+ * read by a YAML parser when the test runs.
  *
  * <p>Only the ids the YAML files name are counted, never the whole table: the database is
  * shared by every integration test of the JVM, and a test that leaves one template, one pair
@@ -32,14 +33,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
-    // The catalogue of M1 (22 after CR-21A-1 retired the four coarse manage codes and added
-    // gov.audit.review), bil.creditlimit.change of M4, the three of M3 (M3-04: prc.pricelist.view,
-    // .author, .publish), the 13 of M2 (22A section 3.1 plus cat.sku.view and cat.tag.govern,
-    // CR-22A-3), the 28 of M4 (24A section 3.1 plus trd.document.view, CR-24A-1) and the 19 of M5
-    // (25A section 3.1, inv.stock.view, inv.stock.receive): the number of `- code:` lines in permissions.yaml.
-    private static final int PERMISSIONS = 86;
-    private static final int ROLE_TEMPLATES = 6;
-    private static final int SOD_PAIRS = 2;
+    // Counted from the YAML files when the test runs, never written here: a hard-coded count was
+    // one line every branch that added a permission had to change, and two such branches always
+    // conflicted on it (17 of 223 recent merges). The id patterns below must still find every
+    // entry the YAML parser finds, and the database must hold exactly those ids.
+    private static final int PERMISSIONS = entriesOf("permissions.yaml", "permissions");
+    private static final int ROLE_TEMPLATES = entriesOf("role-templates.yaml", "templates");
+    private static final int SOD_PAIRS = entriesOf("sod-pairs.yaml", "pairs");
 
     /** The codes CR-21A-1 item 1 retired; m1security V0014 removes them from older databases. */
     private static final List<String> RETIRED =
@@ -209,6 +209,17 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
                 "SELECT COUNT(*) FROM security.sod_pair WHERE sod_pair_id = ANY (CAST(? AS uuid[]))",
                 Integer.class,
                 (Object) ids.toArray(String[]::new));
+    }
+
+    /** How many entries the list under {@code key} of the seed file has, read by a YAML parser. */
+    private static int entriesOf(String file, String key) {
+        YamlMapFactoryBean yaml = new YamlMapFactoryBean();
+        yaml.setResources(new ClassPathResource("seed/m1party/" + file));
+        Object list = yaml.getObject().get(key);
+        if (!(list instanceof java.util.Collection<?> entries) || entries.isEmpty()) {
+            throw new IllegalStateException("seed/m1party/" + file + " has no list under " + key);
+        }
+        return entries.size();
     }
 
     /** The first group of every line of the seed file that matches, in file order. */
