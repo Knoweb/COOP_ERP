@@ -38,7 +38,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
-    private static final UUID FEDERATION = UUID.fromString("0190e660-0000-7000-8000-000000000001");
+    private static final UUID FEDERATION = TEST_FEDERATION; // only its SHARED rows are published (m2catalogue V0006)
     private static final UUID MPCS_A = UUID.fromString("0190e660-0000-7000-8000-000000000002");
     private static final UUID MPCS_B = UUID.fromString("0190e660-0000-7000-8000-000000000003");
     private static final UUID USER = UUID.fromString("0190e660-0000-7000-8000-000000000010");

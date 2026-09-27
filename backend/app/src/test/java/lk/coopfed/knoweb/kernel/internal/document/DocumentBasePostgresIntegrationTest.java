@@ -552,6 +552,45 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(inScopeAt(BUYER, LOCATION, () -> documents.findById(id))).isPresent();
     }
 
+    /**
+     * Doc 18 section 3.7 (OWN reads the location's rows when the assignment is location-scoped)
+     * and M-05: the entity's location-less documents are not a shop's (kernel V0061, decided 27
+     * September 2026 on the architect's delegation). The ENTITY series stays readable; the
+     * documents do not, nor their lines.
+     */
+    @Test
+    void aShopScopedSessionDoesNotReadTheEntitysLocationLessDocuments() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
+
+        assertThat(inScope(BUYER, () -> documents.findById(id))).isPresent();
+        assertThat(inScopeAt(BUYER, LOCATION, () -> documents.findById(id))).isEmpty();
+        assertThat(inScopeAt(BUYER, LOCATION, () -> documents.findLines(id))).isEmpty();
+    }
+
+    /** The other half: a shop-scoped session cannot create a document it could not read back. */
+    @Test
+    void aShopScopedSessionCannotIssueALocationLessDocument() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        kernel.reset();
+        UUID id = Ids.next();
+
+        assertThatThrownBy(() -> inScopeAt(
+                        BUYER,
+                        LOCATION,
+                        () -> issuance.issue(
+                                draft(id, "ORD", BUYER, SELLER, null, null, DocumentOrigin.ONLINE),
+                                twoLines(id),
+                                scopeAt(BUYER, LOCATION))))
+                .hasStackTraceContaining("row-level security");
+
+        assertThat(superuserJdbc().queryForObject("select count(*) from kernel.document", Long.class))
+                .isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
     @Test
     void aCounterpartyAtALocationReadsTheDocument() {
         inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));

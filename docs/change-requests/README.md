@@ -15,6 +15,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-17A-1` — the problem document's field list (`errors`, `FieldProblem`); the message id is carried by `code`, not `type`.
 - `CR-17A-2` — Spring Boot 3.5 / Spring Modulith 1.4 (17A §3 says 3.3 / 1.2); applied in the repository (#55).
 - `CR-19A-5` — a login user `coop_relay` (member of `app_relay` only) and its own small data source; 17A §6's role line needs the same wording as 19A §5.
+- `CR-17A-3` — the policy template's `own_*` test the class OWN, and `party_read` carries the location line on the owner's side only (also 19A §1); every write policy of `app_rw` is checked for the class by `OwnPoliciesTestTheClassIntegrationTest`.
 
 ### 18 (Core Data Model)
 
@@ -34,6 +35,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 
 ### 21A (M1 Party, Tenancy and Security Implementation Guide)
 
+- `CR-21A-1` item 2, first half only (the rest of the request is still raised) — the kernel names the Federation: `kernel.system_entity()` (kernel V0061) from `coop-erp.system.entity-id`; folding `party.federation_identity` into it is `docs/PLAN_TO_M2.md` task 6.11.
 - `CR-21A-4` — `LocationFilter` (m1party's frozen query package) gains an optional `entityId`, needed by 22A's `listLocations(entity)`.
 
 ### 28A (M8 Reporting Implementation Guide)

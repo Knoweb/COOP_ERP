@@ -240,7 +240,9 @@ class IssuanceProtocol implements DocumentIssuance {
      * The business date of the document (19A section 13: from the location's day-close state,
      * never the wall clock), read held so that a day close of that location waits for this
      * transaction. A document without a location (an entity-level order or discount) takes
-     * the date of the location the issuer acts at; an issuer acting entity-wide has none, and
+     * the date of the location the issuer acts at (kept as a defence: since kernel V0061 a
+     * location-scoped session can store only documents at its own location); an issuer acting
+     * entity-wide has none, and
      * the document then takes the calendar date in the business time zone, a deviation from
      * 19A section 13 recorded in docs/PROGRESS.md until an entity has a business date of its own.
      */

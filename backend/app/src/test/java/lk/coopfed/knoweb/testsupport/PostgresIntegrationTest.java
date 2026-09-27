@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.testsupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -66,6 +67,29 @@ public abstract class PostgresIntegrationTest {
     @BeforeEach
     void forgetWhatEarlierTestsRecorded() {
         kernel.reset();
+    }
+
+    @Value("${coop-erp.system.entity-id:}")
+    private String systemEntityId;
+
+    /**
+     * The database names this context's Federation. SystemEntityRecorder writes {@code
+     * kernel.system_identity} when a context starts, but the contexts of a run share one
+     * database and Spring keeps them cached, so the context that started last would otherwise
+     * decide for every test (kernel V0061).
+     */
+    @BeforeEach
+    void theDatabaseNamesThisContextsFederation() {
+        if (systemEntityId == null || systemEntityId.isBlank()) {
+            return;
+        }
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.system_identity (singleton, entity_id) values (true, ?::uuid)
+                        on conflict (singleton) do update set entity_id = excluded.entity_id
+                        """,
+                        systemEntityId);
     }
 
     protected static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
