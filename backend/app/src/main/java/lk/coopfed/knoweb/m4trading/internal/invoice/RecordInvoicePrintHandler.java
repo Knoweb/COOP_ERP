@@ -54,9 +54,6 @@ public class RecordInvoicePrintHandler implements Handles<RecordInvoicePrint, Vo
         TradingGuards.requireOwnScope(scope);
         UUID invoiceId = TradingGuards.required(command.invoiceId(), "invoiceId");
         String objectKey = TradingGuards.required(command.objectKey(), "objectKey");
-        if (objectKey.isBlank()) {
-            throw new ProblemException("request.invalid", Map.of("field", "objectKey"));
-        }
         DocumentRecord invoice = documents
                 .findById(invoiceId)
                 .filter(document -> IssueInvoiceHandler.INV.equals(document.docTypeCode()))

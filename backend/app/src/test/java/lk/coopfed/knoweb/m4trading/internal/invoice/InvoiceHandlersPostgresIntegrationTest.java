@@ -150,7 +150,7 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> print.handle(new RecordInvoicePrint(invoiceId, key), buyer()))
                 .isInstanceOf(ProblemException.class);
         refused(() -> print.handle(new RecordInvoicePrint(UUID.randomUUID(), key), seller()), "m4.invoice.not_found");
-        refused(() -> print.handle(new RecordInvoicePrint(invoiceId, " "), seller()), "request.invalid");
+        refused(() -> print.handle(new RecordInvoicePrint(invoiceId, " "), seller()), "request.field.required");
         assertThat(invoices.printObjectKey(invoiceId, seller())).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
 
