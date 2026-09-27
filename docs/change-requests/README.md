@@ -32,6 +32,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-19A-5` — see 17A above; also `GRANT SELECT, UPDATE (published_at) ON kernel.event_outbox TO app_relay` and a policy stating the relay reads every entity's events.
 - `CR-19A-6` — `CommandHandler.INTERNAL` for a handler with no operation of its own, called only inside the caller's transaction; accepted with the guard rails of pull request #138.
 - `CR-19A-7` — accepted as revised: the kernel keeps an upload ledger (`kernel.object_upload`) and enforces the K-09 rules once for every module that owns objects without a document, rather than generalising `document_attachment`.
+- `CR-19A-8` — seven kernel decisions: a notification retry's recipient and placeholders sealed under a key outside the database (also doc 19 §7); the upload URL's validity and the verifier's schedule as configuration (§9); a nightly clean-up of failed uploads' files after a retention (§9, §12; also doc 18 part C); NFC on every String, no `I18nText` (§6); no provider adapter in the kernel (§10); a document with no location takes the calendar date in the business time zone (§13; also doc 18 part C and 24A for DISC); the A4 renderer is K-06b, before M3-10 (§6; `docs/PLAN_TO_M2.md`).
 
 ### 21A (M1 Party, Tenancy and Security Implementation Guide)
 

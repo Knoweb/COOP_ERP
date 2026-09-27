@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -223,7 +224,7 @@ class ObjectStorageService implements ObjectStorage {
         }
 
         Instant now = clock.instant();
-        Instant expiresAt = now.plus(attachments.presignFor());
+        Instant expiresAt = now.plus(attachments.uploadUrlFor(ctx));
 
         // Asking again for the same key renews the window of a PENDING row (a client that lost its
         // connection); a settled row gets no new URL, so its verified bytes cannot be replaced.
@@ -264,7 +265,7 @@ class ObjectStorageService implements ObjectStorage {
                     Timestamp.from(now));
         }
 
-        URI url = store.presignPut(key.base(), contentType, contentLength, attachments.presignFor());
+        URI url = store.presignPut(key.base(), contentType, contentLength, Duration.between(now, expiresAt));
         return new PresignedPut(url, expiresAt, key.base());
     }
 
@@ -378,6 +379,60 @@ class ObjectStorageService implements ObjectStorage {
                 .orElseThrow(() -> new ProblemException("object.not_found", Map.of("objectKey", key.base())));
     }
 
+    // ---- what the clean-up job does (kernel V0063) --------------------------------------------
+
+    static final String AUDIT_DELETED = "OBJECT_DELETED";
+
+    /** A FAILED module object still in the store. */
+    record Failed(String objectKey, String module, UUID ownerEntityId) {}
+
+    /**
+     * FAILED ledger rows settled before {@code settledBefore} whose object has not been deleted,
+     * the oldest first, at most {@code limit}, under the caller's scope (the job reads as a
+     * federation-wide viewer). A VERIFIED object is never offered: it is the module's to keep.
+     */
+    List<Failed> failedWithObject(Instant settledBefore, int limit) {
+        return jdbc.query(
+                """
+                select object_key, owner_module, owner_entity_id from kernel.object_upload
+                 where status = 'FAILED' and object_deleted_at is null and settled_at < ?
+                 order by settled_at
+                 limit ?
+                """,
+                (rs, rowNum) -> new Failed(
+                        rs.getString("object_key"),
+                        rs.getString("owner_module"),
+                        rs.getObject("owner_entity_id", UUID.class)),
+                Timestamp.from(settledBefore),
+                limit);
+    }
+
+    /** The object of a FAILED ledger row is gone from the store: the row says when, once, audited. */
+    boolean objectDeleted(Failed row, ScopeContext ctx) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("The ledger is written inside a transaction");
+        }
+        int changed = jdbc.update(
+                "update kernel.object_upload set object_deleted_at = ?"
+                        + " where object_key = ? and status = 'FAILED' and object_deleted_at is null",
+                Timestamp.from(clock.instant()),
+                row.objectKey());
+        if (changed == 0) {
+            return false;
+        }
+        // A ledger row holds a base key, objects/{module}/{entity}/{object}: the object id is last.
+        UUID objectId =
+                UUID.fromString(row.objectKey().substring(row.objectKey().lastIndexOf('/') + 1));
+        audit.record(
+                AUDIT_DELETED,
+                Subject.of("object", objectId),
+                Map.of("status", "FAILED"),
+                Map.of("objectKey", row.objectKey(), "module", row.module()),
+                ctx,
+                "Failed upload kept past its retention");
+        return true;
+    }
+
     @Override
     public byte[] read(String objectKey, ScopeContext ctx) {
         Key key = parse(objectKey);
@@ -418,6 +473,6 @@ class ObjectStorageService implements ObjectStorage {
         // Whether it is verified is the ledger's, read with the federation-wide view for that
         // question alone.
         requireVerified(key, SystemScope.federationView());
-        return store.presignGet(key.text(), contentType, attachments.presignFor());
+        return store.presignGet(key.text(), contentType, attachments.readUrlFor());
     }
 }

@@ -161,7 +161,10 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(issued.taxAmount()).isEqualByComparingTo("30.00");
         assertThat(issued.grossAmount()).isEqualByComparingTo("430.00");
         assertThat(issued.contentHash()).hasSize(64);
-        assertThat(issued.businessDate()).isNotNull();
+        // An entity-level order issued entity-wide has no location: its business date is the
+        // calendar date in the business time zone (decided 27 September 2026, CR-19A-8).
+        assertThat(issued.locationId()).isNull();
+        assertThat(issued.businessDate()).isEqualTo(issued.issuedLocal().toLocalDate());
 
         DocumentRecord stored = inScope(BUYER, () -> documents.findById(id).orElseThrow());
         assertThat(stored.docNumberDisplay()).isEqualTo(issued.docNumberDisplay());
