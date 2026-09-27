@@ -120,6 +120,29 @@ class ArchitectureRulesBiteTest {
         assertTrue(!report.contains("BorrowsAnEntitysScope.job "), report);
     }
 
+    @Test
+    void internalCommandRuleCatchesAControllerThatReachesOne() {
+        assertViolation(ArchitectureTests.webDoesNotUseInternalCommandsRule(), "ControllerReachingAnInternalCommand");
+    }
+
+    @Test
+    void internalCommandRuleCatchesAHandlerWithoutAnInterfaceOfItsOwnApi() {
+        assertViolation(ArchitectureTests.internalHandlersImplementTheirApiRule(), "InternalWithoutApiHandler");
+        assertViolation(ArchitectureTests.internalHandlersImplementTheirApiRule(), "InternalBehindAnotherModulesApi");
+        String report = ArchitectureTests.internalHandlersImplementTheirApiRule()
+                .evaluate(FIXTURES)
+                .getFailureReport()
+                .toString();
+        assertTrue(!report.contains("RegisterStockHandler"), report);
+    }
+
+    @Test
+    void internalCommandRuleCatchesACallFromOutsideACommandHandler() {
+        assertViolation(ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "JobCallingAnInternalCommand");
+        assertViolation(
+                ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "ControllerReachingAnInternalCommand");
+    }
+
     private static void assertViolation(ArchRule rule, String offendingClass) {
 
         EvaluationResult result = rule.evaluate(FIXTURES);

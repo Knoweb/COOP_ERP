@@ -39,7 +39,7 @@ import org.testcontainers.utility.MountableFile;
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "coop-erp.system.entity-id=" + PostgresIntegrationTest.TEST_FEDERATION_ID)
-@Import({KernelRecorder.class, KernelRecording.class})
+@Import({KernelRecorder.class, KernelRecording.class, OuterCommand.class})
 public abstract class PostgresIntegrationTest {
 
     private static final String DATABASE = "coop_erp";

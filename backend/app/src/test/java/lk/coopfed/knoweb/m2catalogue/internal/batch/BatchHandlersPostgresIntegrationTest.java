@@ -37,6 +37,7 @@ import lk.coopfed.knoweb.m2catalogue.query.BatchFilter;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
+import lk.coopfed.knoweb.testsupport.OuterCommand;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
@@ -65,6 +66,10 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     RegisterBatchHandler register;
+
+    /** RegisterBatch is an internal command: it runs inside another command, as in M4's GRN (CR-19A-6). */
+    @Autowired
+    OuterCommand outer;
 
     @Autowired
     CorrectBatchHandler correct;
@@ -126,7 +131,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aNewBatchIsRegisteredAuditedAndPublishedAndTheSameIdentityAnswersIt() {
-        RegisteredBatch first = registration.register(milk("B2411A", "1080.00"), own(FEDERATION));
+        RegisteredBatch first = registered(milk("B2411A", "1080.00"), own(FEDERATION));
 
         assertThat(first.created()).isTrue();
         assertThat(first.synthetic()).isFalse();
@@ -153,7 +158,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         // The distributor's GRN of the same physical batch cites it (doc 22 section 3.7): the same
         // batch returned, nothing written, audited or published.
         kernel.reset();
-        RegisteredBatch again = registration.register(milk(" B2411A ", "1080.00"), own(MPCS_B));
+        RegisteredBatch again = registered(milk(" B2411A ", "1080.00"), own(MPCS_B));
         assertThat(again).isEqualTo(new RegisteredBatch(first.batchId(), "B2411A", false, false));
         assertThat(count("catalogue.batch")).isEqualTo(1);
         assertThat(kernel.committedAudit()).isEmpty();
@@ -161,7 +166,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         // Another supplier's B2411A is another batch.
         UUID otherSupplier = suppliers.handle(new RegisterSupplier("Other Dairy"), own(FEDERATION));
-        RegisteredBatch other = register.handle(
+        RegisteredBatch other = handled(
                 new RegisterBatch(
                         trackedSku,
                         otherSupplier,
@@ -179,9 +184,9 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void anItemThatIsNotBatchTrackedGetsASyntheticBatchPerDocumentLine() {
-        RegisteredBatch line1 = register.handle(loose(null, "GRN-000017", 1), own(MPCS_A));
-        RegisteredBatch line1Again = register.handle(loose("IGNORED", "GRN-000017", 1), own(MPCS_A));
-        RegisteredBatch line2 = register.handle(loose(null, "GRN-000017", 2), own(MPCS_A));
+        RegisteredBatch line1 = handled(loose(null, "GRN-000017", 1), own(MPCS_A));
+        RegisteredBatch line1Again = handled(loose("IGNORED", "GRN-000017", 1), own(MPCS_A));
+        RegisteredBatch line2 = handled(loose(null, "GRN-000017", 2), own(MPCS_A));
 
         assertThat(line1.synthetic()).isTrue();
         assertThat(line1.batchNo()).isEqualTo("S-GRN-000017-1");
@@ -192,7 +197,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isTrue();
 
         // A batch-tracked item whose supplier printed no number gets one too.
-        RegisteredBatch unnumbered = register.handle(
+        RegisteredBatch unnumbered = handled(
                 new RegisterBatch(
                         trackedSku,
                         supplierOfF,
@@ -208,45 +213,45 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(unnumbered.synthetic()).isTrue();
 
         // Without the document line there is nothing to name it by.
-        refused(() -> register.handle(loose(null, null, 1), own(MPCS_A)), "request.field.required");
-        refused(() -> register.handle(loose(null, "GRN-1", null), own(MPCS_A)), "request.field.required");
-        refused(() -> register.handle(loose(null, "GRN-1", 0), own(MPCS_A)), "request.field.required");
-        refused(() -> register.handle(loose(null, "G".repeat(40), 1), own(MPCS_A)), "m2.batch.batch_no_too_long");
+        refused(() -> handled(loose(null, null, 1), own(MPCS_A)), "request.field.required");
+        refused(() -> handled(loose(null, "GRN-1", null), own(MPCS_A)), "request.field.required");
+        refused(() -> handled(loose(null, "GRN-1", 0), own(MPCS_A)), "request.field.required");
+        refused(() -> handled(loose(null, "G".repeat(40), 1), own(MPCS_A)), "m2.batch.batch_no_too_long");
     }
 
     @Test
     void everyGuardOfRegisterBatchRefusesItsCase() {
-        refused(() -> register.handle(null, own(MPCS_A)), "request.invalid");
-        refused(() -> register.handle(loose(null, "D", 1), viewOnly(MPCS_A)), "scope.invalid");
+        refused(() -> handled(null, own(MPCS_A)), "request.invalid");
+        refused(() -> handled(loose(null, "D", 1), viewOnly(MPCS_A)), "scope.invalid");
         refused(
-                () -> register.handle(new RegisterBatch(null, null, "X", null, null, null, null, "D", 1), own(MPCS_A)),
+                () -> handled(new RegisterBatch(null, null, "X", null, null, null, null, "D", 1), own(MPCS_A)),
                 "request.field.required");
         // Another entity's LOCAL item is not found; a DRAFT or INACTIVE item is not active.
-        refused(() -> register.handle(looseOf(localSkuOfB), own(MPCS_A)), "m2.sku.not_found");
-        refused(() -> register.handle(looseOf(draftSku), own(MPCS_A)), "m2.batch.sku_not_active");
-        refused(() -> register.handle(looseOf(inactiveSku), own(MPCS_A)), "m2.batch.sku_not_active");
+        refused(() -> handled(looseOf(localSkuOfB), own(MPCS_A)), "m2.sku.not_found");
+        refused(() -> handled(looseOf(draftSku), own(MPCS_A)), "m2.batch.sku_not_active");
+        refused(() -> handled(looseOf(inactiveSku), own(MPCS_A)), "m2.batch.sku_not_active");
         // The supplier must exist and be ACTIVE.
         refused(
-                () -> register.handle(
+                () -> handled(
                         new RegisterBatch(looseSku, Ids.next(), null, null, null, null, null, "D", 1), own(MPCS_A)),
                 "m2.supplier.not_found");
         superuserJdbc().update("update catalogue.supplier set status = 'INACTIVE' where supplier_id = ?", supplierOfF);
-        refused(() -> register.handle(milk("B1", "10.00"), own(FEDERATION)), "m2.supplier.not_active");
+        refused(() -> handled(milk("B1", "10.00"), own(FEDERATION)), "m2.supplier.not_active");
         superuserJdbc().update("update catalogue.supplier set status = 'ACTIVE' where supplier_id = ?", supplierOfF);
         // A batch number longer than the column.
-        refused(() -> register.handle(milk("B".repeat(41), "10.00"), own(FEDERATION)), "m2.batch.batch_no_too_long");
+        refused(() -> handled(milk("B".repeat(41), "10.00"), own(FEDERATION)), "m2.batch.batch_no_too_long");
         // MRP present when has_printed_mrp, and positive.
-        refused(() -> register.handle(milk("B1", null), own(FEDERATION)), "m2.batch.mrp_required");
-        refused(() -> register.handle(milk("B1", "0"), own(FEDERATION)), "m2.batch.mrp_invalid");
+        refused(() -> handled(milk("B1", null), own(FEDERATION)), "m2.batch.mrp_required");
+        refused(() -> handled(milk("B1", "0"), own(FEDERATION)), "m2.batch.mrp_invalid");
         // Expiry when expiry_tracked, and not before the manufacture date.
         refused(
-                () -> register.handle(
+                () -> handled(
                         new RegisterBatch(
                                 trackedSku, supplierOfF, "B1", null, null, new BigDecimal("10"), null, null, null),
                         own(FEDERATION)),
                 "m2.batch.expiry_required");
         refused(
-                () -> register.handle(
+                () -> handled(
                         new RegisterBatch(
                                 trackedSku,
                                 supplierOfF,
@@ -268,7 +273,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     void twoRegistrationsOfTheSameBatchTogetherBothAnswerOneBatch() throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Callable<RegisteredBatch> call = () -> registration.register(milk("RACE-1", "500.00"), own(FEDERATION));
+            Callable<RegisteredBatch> call = () -> registered(milk("RACE-1", "500.00"), own(FEDERATION));
             Future<RegisteredBatch> one = pool.submit(call);
             Future<RegisteredBatch> two = pool.submit(call);
             assertThat(one.get().batchId()).isEqualTo(two.get().batchId());
@@ -282,7 +287,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void theFederationCorrectsTheMrpByAReplacementThatTakesOverTheIdentity() {
-        RegisteredBatch keyed = registration.register(milk("B2411A", "980.00"), own(MPCS_B));
+        RegisteredBatch keyed = registered(milk("B2411A", "980.00"), own(MPCS_B));
         kernel.reset();
 
         UUID replacement = correct.handle(
@@ -300,8 +305,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(now.ownerEntityId()).as("the corrector's row").isEqualTo(FEDERATION);
 
         // The identity moved: the next GRN of B2411A cites the replacement.
-        assertThat(registration.register(milk("B2411A", "1080.00"), own(MPCS_A)).batchId())
-                .isEqualTo(replacement);
+        assertThat(registered(milk("B2411A", "1080.00"), own(MPCS_A)).batchId()).isEqualTo(replacement);
 
         assertThat(audit("BATCH_CORRECTED")).singleElement().satisfies(record -> {
             assertThat(record.subject().id()).isEqualTo(replacement);
@@ -324,7 +328,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aLotHolderThatDidNotRegisterTheBatchCorrectsItsExpiry() {
-        RegisteredBatch keyed = registration.register(milk("B7", "500.00"), own(FEDERATION));
+        RegisteredBatch keyed = registered(milk("B7", "500.00"), own(FEDERATION));
         doReturn(true).when(lots).holdsLotOf(keyed.batchId(), MPCS_A);
         kernel.reset();
 
@@ -349,7 +353,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void everyGuardOfCorrectBatchRefusesItsCase() {
-        RegisteredBatch keyed = registration.register(milk("B8", "500.00"), own(FEDERATION));
+        RegisteredBatch keyed = registered(milk("B8", "500.00"), own(FEDERATION));
         kernel.reset();
 
         refused(() -> correct.handle(null, own(FEDERATION)), "request.invalid");
@@ -379,7 +383,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void anExpiryBeforeTheManufactureDateIsRefused() {
-        RegisteredBatch keyed = registration.register(
+        RegisteredBatch keyed = registered(
                 new RegisterBatch(
                         trackedSku,
                         supplierOfF,
@@ -428,8 +432,8 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void theBatchListFiltersByNumberAndExpiry() {
-        registration.register(milk("E1", "10"), own(FEDERATION));
-        register.handle(
+        registered(milk("E1", "10"), own(FEDERATION));
+        handled(
                 new RegisterBatch(
                         trackedSku,
                         supplierOfF,
@@ -455,6 +459,16 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     // ---- helpers ----------------------------------------------------------------------------
+
+    /** RegisterBatch as another module calls it: through BatchRegistration, inside its own command. */
+    private RegisteredBatch registered(RegisterBatch command, ScopeContext scope) {
+        return outer.run(scope, () -> registration.register(command, scope));
+    }
+
+    /** RegisterBatch through the handler's own handle method, inside a command as well. */
+    private RegisteredBatch handled(RegisterBatch command, ScopeContext scope) {
+        return outer.run(scope, () -> register.handle(command, scope));
+    }
 
     /** M5's lot re-pointing as a stub: every lot of the corrected batch now names the replacement. */
     private static void m5StubRepoints(BatchCorrected event, Map<UUID, Integer> lotsByBatch) {
