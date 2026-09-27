@@ -1,0 +1,19 @@
+# M5 Inventory: the audit event types of the ledger and of the commands built so far (25A
+# section 6). Loaded by the kernel's AuditEventTypeSeedLoader, which reads every
+# seed/*/audit-event-types.yaml. A lot going below zero is REVIEW (25A section 6.1: "audit
+# REVIEW NEGATIVE_STOCK"), its clearing INFO. Codes are at most 40 characters.
+audit_event_types:
+  - code: STOCK_POSTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock movements posted to the ledger for a document
+
+  - code: STOCK_LOT_NEGATIVE
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A stock lot went below zero
+
+  - code: STOCK_LOT_NEGATIVE_CLEARED
+    severity: INFO
+    offline_capturable: false
+    description_en: A negative stock lot came back to zero or above
