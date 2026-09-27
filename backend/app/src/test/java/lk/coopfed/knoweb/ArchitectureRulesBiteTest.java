@@ -1,12 +1,12 @@
 package lk.coopfed.knoweb;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.EvaluationResult;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 17A §14, S0-05 done-when: "a deliberate violation fails the build". The rules of
@@ -17,8 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ArchitectureRulesBiteTest {
 
-    private static final JavaClasses FIXTURES = new ClassFileImporter()
-            .importPackages("lk.coopfed.archfixtures");
+    private static final JavaClasses FIXTURES = new ClassFileImporter().importPackages("lk.coopfed.archfixtures");
 
     @Test
     void layerRuleCatchesMasterDataReachingIntoTransactions() {
@@ -104,13 +103,37 @@ class ArchitectureRulesBiteTest {
     @Test
     void writersRuleLeavesACommandHandlerAlone() {
         // SilentHandler saves too, but it is a handler: the writers rule must not name it.
-        String report = ArchitectureTests.onlyHandlersWriteRule().evaluate(FIXTURES).getFailureReport().toString();
+        String report = ArchitectureTests.onlyHandlersWriteRule()
+                .evaluate(FIXTURES)
+                .getFailureReport()
+                .toString();
         assertTrue(!report.contains("SilentHandler"), report);
     }
 
-    private static void assertViolation(
-            ArchRule rule,
-            String offendingClass) {
+    @Test
+    void internalCommandRuleCatchesAControllerThatReachesOne() {
+        assertViolation(ArchitectureTests.webDoesNotUseInternalCommandsRule(), "ControllerReachingAnInternalCommand");
+    }
+
+    @Test
+    void internalCommandRuleCatchesAHandlerWithoutAnInterfaceOfItsOwnApi() {
+        assertViolation(ArchitectureTests.internalHandlersImplementTheirApiRule(), "InternalWithoutApiHandler");
+        assertViolation(ArchitectureTests.internalHandlersImplementTheirApiRule(), "InternalBehindAnotherModulesApi");
+        String report = ArchitectureTests.internalHandlersImplementTheirApiRule()
+                .evaluate(FIXTURES)
+                .getFailureReport()
+                .toString();
+        assertTrue(!report.contains("RegisterStockHandler"), report);
+    }
+
+    @Test
+    void internalCommandRuleCatchesACallFromOutsideACommandHandler() {
+        assertViolation(ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "JobCallingAnInternalCommand");
+        assertViolation(
+                ArchitectureTests.internalCommandsCalledOnlyFromHandlersRule(), "ControllerReachingAnInternalCommand");
+    }
+
+    private static void assertViolation(ArchRule rule, String offendingClass) {
 
         EvaluationResult result = rule.evaluate(FIXTURES);
 
