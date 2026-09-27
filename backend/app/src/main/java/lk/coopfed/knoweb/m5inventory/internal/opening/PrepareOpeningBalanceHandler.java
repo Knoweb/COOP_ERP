@@ -14,6 +14,8 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m2catalogue.api.BatchRegistration;
+import lk.coopfed.knoweb.m2catalogue.api.RegisterBatch;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceChanged;
@@ -48,6 +50,7 @@ class PrepareOpeningBalanceHandler implements Handles<PrepareOpeningBalance, UUI
     private final OpeningBalanceStore store;
     private final PartyQueries party;
     private final BatchQueries batches;
+    private final BatchRegistration registration;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -56,12 +59,14 @@ class PrepareOpeningBalanceHandler implements Handles<PrepareOpeningBalance, UUI
             OpeningBalanceStore store,
             PartyQueries party,
             BatchQueries batches,
+            BatchRegistration registration,
             JdbcTemplate jdbc,
             AuditFacade audit,
             EventPublisher events) {
         this.store = store;
         this.party = party;
         this.batches = batches;
+        this.registration = registration;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -89,15 +94,51 @@ class PrepareOpeningBalanceHandler implements Handles<PrepareOpeningBalance, UUI
         if (command.lines() == null || command.lines().isEmpty()) {
             throw new ProblemException("m5.opening.lines_required");
         }
-        List<UUID> skus = new ArrayList<>();
         for (OpeningBalanceLine line : command.lines()) {
             requireLine(line);
-            BatchView batch = batches.getBatch(line.batchId(), scope)
-                    .orElseThrow(() -> new ProblemException("m5.batch.not_found", Map.of("batchId", line.batchId())));
-            skus.add(batch.skuId());
+        }
+        List<UUID> skus = new ArrayList<>();
+        List<UUID> batchIds = new ArrayList<>();
+        for (OpeningBalanceLine line : command.lines()) {
+            if (line.batchId() != null) {
+                BatchView batch = batches.getBatch(line.batchId(), scope)
+                        .orElseThrow(
+                                () -> new ProblemException("m5.batch.not_found", Map.of("batchId", line.batchId())));
+                skus.add(batch.skuId());
+                batchIds.add(batch.batchId());
+            } else {
+                skus.add(line.skuId());
+                batchIds.add(null);
+            }
         }
 
         UUID id = Ids.next();
+        // A line that carries its batch as counted registers it in M2 now, in this transaction and
+        // the entity's OWN scope (22A section 4: RegisterBatch is exported for M5). M2's guards
+        // apply (an active SKU, expiry and MRP where the item needs them); the same SKU and
+        // number answer the batch already registered. The origin is this opening balance.
+        String originNo = "OPB-" + id.toString().substring(0, 8);
+        for (int i = 0; i < command.lines().size(); i++) {
+            OpeningBalanceLine line = command.lines().get(i);
+            if (batchIds.get(i) == null) {
+                batchIds.set(
+                        i,
+                        registration
+                                .register(
+                                        new RegisterBatch(
+                                                line.skuId(),
+                                                null,
+                                                line.batchNo(),
+                                                null,
+                                                line.expiryDate(),
+                                                line.printedMrp(),
+                                                id,
+                                                originNo,
+                                                i + 1),
+                                        scope)
+                                .batchId());
+            }
+        }
         jdbc.update(
                 "insert into inventory.opening_balance (opening_balance_id, owner_entity_id, location_id, prepared_by)"
                         + " values (?, ?, ?, ?)",
@@ -119,7 +160,7 @@ class PrepareOpeningBalanceHandler implements Handles<PrepareOpeningBalance, UUI
                     scope.entityId(),
                     location,
                     i + 1,
-                    line.batchId(),
+                    batchIds.get(i),
                     skus.get(i),
                     line.condition() == null ? "GOOD" : line.condition().name(),
                     line.qty(),
@@ -144,7 +185,7 @@ class PrepareOpeningBalanceHandler implements Handles<PrepareOpeningBalance, UUI
 
     private static void requireLine(OpeningBalanceLine line) {
         boolean valid = line != null
-                && line.batchId() != null
+                && (line.batchId() != null || line.skuId() != null)
                 && line.qty() != null
                 && line.qty().signum() > 0
                 && line.qty().stripTrailingZeros().scale() <= 3
