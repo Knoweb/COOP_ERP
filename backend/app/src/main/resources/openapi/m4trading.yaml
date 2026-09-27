@@ -1,0 +1,26 @@
+# M4 Trading Documents API slice (24A section 5). The slice is written first; the controllers
+# and the web client follow it. Rules every slice obeys (AGENTS.md):
+#   - every operation names its permission in x-permission, and that string is the same as
+#     the permission on the @CommandHandler; the reads carry trd.document.view, which the kernel
+#     checks for every GET (CR-24A-1)
+#   - every mutating operation requires the Idempotency-Key header
+#   - errors are RFC 9457 problem documents whose `code` is a message id
+#   - the shape of a request (required, minLength, maxLength, minimum ...) is written in the
+#     schema and nowhere else: the kernel enforces it; a business rule is a handler guard
+#   - what every slice shares (the Idempotency-Key header, the Problem schema) lives in
+#     common.yaml and is referred to, never copied
+#   - every operation has a tag: it names the generated Java interface (Order -> OrderApi)
+# After changing this file run `make gen-clients` and commit web/src/generated/m4trading.ts.
+#
+# M4-01 registers the slice and nothing else: the operations arrive with the tickets that
+# implement them (M4-02 orders, M4-03 acceptance, M4-04 delivery notes, M4-05 goods received
+# notes, M4-08 invoices).
+openapi: 3.1.0
+info:
+  title: COOP ERP M4 Trading Documents API
+  version: 0.1.0
+  description: >
+    Orders, delivery notes, goods received notes, discrepancies and invoices between trading
+    entities. What a caller sees is decided by the row-level security of the document base: a
+    party reads the documents it owns or is the counterparty of.
+paths: {}
