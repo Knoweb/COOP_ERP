@@ -67,9 +67,10 @@ public final class ChromiumPdf {
                     "--mute-audio",
                     "--user-data-dir=" + dir.resolve("profile"),
                     "--no-pdf-header-footer",
-                    // Web fonts are decoded asynchronously; virtual time lets the page settle
-                    // (fonts applied) before it is printed, without a wall-clock wait.
-                    "--virtual-time-budget=5000",
+                    // No --virtual-time-budget: it never ended on the pipeline's Linux Chrome. The
+                    // fonts are data URIs, loaded before the load event the print waits for.
+                    "--disable-crash-reporter",
+                    "--disable-breakpad",
                     "--print-to-pdf=" + pdf.toAbsolutePath(),
                     page.toUri().toString());
             ProcessBuilder builder = new ProcessBuilder(command)
@@ -80,6 +81,7 @@ public final class ChromiumPdf {
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
+                log.error("Chromium did not finish within {}: {}", timeout, tail(dir.resolve("chromium.log")));
                 throw new ProblemException("report.timeout", Map.of("seconds", timeout.toSeconds()));
             }
             if (process.exitValue() != 0 || !Files.exists(pdf)) {
