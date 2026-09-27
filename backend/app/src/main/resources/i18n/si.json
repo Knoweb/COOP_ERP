@@ -142,6 +142,7 @@
   "m1.relationship.buyer_not_found": "මිලදී ගන්නා ආයතනය සොයාගත නොහැකි විය",
   "m1.relationship.credit_limit_permission_required": "ණය සීමාව වෙනස් කිරීමට ඔබට අවසර නැත",
   "m1.relationship.effective_from_after_end": "නව කොන්දේසි වත්මන් කොන්දේසි අවසන් වීමට පෙර ආරම්භ විය යුතුය",
+  "m1.relationship.effective_from_in_past": "නව කොන්දේසි අද දිනට පෙර ආරම්භ කළ නොහැක",
   "m1.relationship.effective_from_not_after": "නව කොන්දේසි වත්මන් කොන්දේසි ආරම්භ වූ දිනයට පසුව ආරම්භ විය යුතුය",
   "m1.relationship.effective_range_invalid": "අවසාන දිනය පළමු දිනයට පෙර විය නොහැක",
   "m1.relationship.not_active": "සංශෝධනය කිරීමට හෝ අත්හිටුවීමට හැක්කේ සක්‍රිය සම්බන්ධතාවයක් පමණි",

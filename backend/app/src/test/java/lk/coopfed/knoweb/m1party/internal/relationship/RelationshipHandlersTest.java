@@ -42,6 +42,7 @@ import lk.coopfed.knoweb.m1party.api.RelationshipSuspended;
 import lk.coopfed.knoweb.m1party.api.SuspendRelationship;
 import lk.coopfed.knoweb.m1party.api.TradePriceListCheck;
 import lk.coopfed.knoweb.m1party.internal.relationship.TradingStanding.Standing;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,10 @@ class RelationshipHandlersTest {
     private static final UUID SHOP = UUID.fromString("00000000-0000-0000-0000-000000000301");
     private static final UUID PRICE_LIST = UUID.fromString("00000000-0000-0000-0000-000000000401");
 
-    private static final Instant NOW = Instant.parse("2026-09-25T06:00:00Z");
+    /** 11:30 on 15 June in Colombo, the business time zone: "today" for an amendment. */
+    private static final Instant NOW = Instant.parse("2026-06-15T06:00:00Z");
+
+    private static final String ZONE = "Asia/Colombo";
     private static final LocalDate APRIL = LocalDate.of(2026, 4, 1);
     private static final LocalDate JULY = LocalDate.of(2026, 7, 1);
 
@@ -86,7 +90,7 @@ class RelationshipHandlersTest {
         open = new OpenTradingRelationshipHandler(repository, standing, config, audit, events);
         activate = new ActivateRelationshipHandler(repository, priceLists, audit, events);
         amend = new AmendRelationshipTermsHandler(
-                repository, priceLists, Optional.of(permissions), config, clock, audit, events);
+                repository, priceLists, Optional.of(permissions), config, clock, ZONE, audit, events);
         suspend = new SuspendRelationshipHandler(repository, clock, audit, events);
 
         when(standing.of(FEDERATION)).thenReturn(Optional.of(new Standing("FEDERATION", "ACTIVE")));
@@ -426,6 +430,99 @@ class RelationshipHandlersTest {
         }
 
         @Test
+        void theNewTermsNeverStartBeforeToday() {
+            // CR-21A-2 item 1: 1 June is after the row's first day (21A's guard) but before
+            // today, 15 June; what LookupRelationship answered for 1 to 14 June must not change.
+            Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
+            assertThatThrownBy(() -> amend.handle(
+                            limitTo(current, "5000000", LocalDate.of(2026, 6, 1), "X"), withFreshMfa(DISTRIBUTOR)))
+                    .isInstanceOfSatisfying(ProblemException.class, e -> {
+                        assertThat(e.messageId()).isEqualTo("m1.relationship.effective_from_in_past");
+                        assertThat(e.parameters()).containsEntry("today", "2026-06-15");
+                    });
+            nothingWritten();
+            assertThat(current.effectiveTo()).isNull();
+        }
+
+        @Test
+        void todayIsTheEarliestDayAndItIsTodayInColomboNotInUtc() {
+            // 20:00 UTC on 14 June is 01:30 on 15 June in Colombo: 15 June is today.
+            AmendRelationshipTermsHandler lateEvening = new AmendRelationshipTermsHandler(
+                    repository,
+                    priceLists,
+                    Optional.of(permissions),
+                    config,
+                    Clock.fixed(Instant.parse("2026-06-14T20:00:00Z"), ZoneOffset.UTC),
+                    ZONE,
+                    audit,
+                    events);
+            Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
+            AmendRelationshipTerms fromToday = new AmendRelationshipTerms(
+                    current.getId(), LocalDate.of(2026, 6, 15), null, null, 45, null, null, null, "TERMS", null);
+
+            lateEvening.handle(fromToday, own(DISTRIBUTOR));
+
+            assertThat(current.effectiveTo()).isEqualTo(LocalDate.of(2026, 6, 14));
+        }
+
+        @Test
+        void aRowThatHasNotStartedIsReplacedByAnAmendmentOnItsFirstDay() {
+            // CR-21A-2 item 2: R2 [1 Oct, open] was agreed with a typo; on 15 June it is
+            // corrected from 1 Oct itself. R2 becomes REPLACED with its terms and range as they
+            // were, and the new row takes the whole range.
+            LocalDate october = LocalDate.of(2026, 10, 1);
+            Relationship r2 = found(active(DISTRIBUTOR, SOCIETY, october, LocalDate.of(2027, 3, 31)));
+            AmendRelationshipTerms correction = new AmendRelationshipTerms(
+                    r2.getId(), october, null, null, 45, null, null, null, "TYPO", "30 days was meant to be 45");
+
+            UUID next = amend.handle(correction, own(DISTRIBUTOR));
+
+            assertThat(r2.status()).isEqualTo("REPLACED");
+            assertThat(r2.effectiveFrom()).isEqualTo(october);
+            assertThat(r2.effectiveTo()).as("a replaced row keeps its range").isEqualTo(LocalDate.of(2027, 3, 31));
+            assertThat(r2.paymentTermsDays()).as("and its terms").isEqualTo((short) 30);
+
+            ArgumentCaptor<Relationship> saved = ArgumentCaptor.forClass(Relationship.class);
+            verify(repository, times(2)).saveAndFlush(saved.capture());
+            assertThat(saved.getAllValues().get(0))
+                    .as("the replaced row leaves the ACTIVE set first")
+                    .isSameAs(r2);
+            Relationship nextRow = saved.getAllValues().get(1);
+            assertThat(nextRow.getId()).isEqualTo(next);
+            assertThat(nextRow.isActive()).isTrue();
+            assertThat(nextRow.effectiveFrom()).isEqualTo(october);
+            assertThat(nextRow.effectiveTo()).isEqualTo(LocalDate.of(2027, 3, 31));
+            assertThat(nextRow.paymentTermsDays()).isEqualTo((short) 45);
+
+            ArgumentCaptor<Object> before = ArgumentCaptor.forClass(Object.class);
+            verify(audit)
+                    .record(
+                            eq("RELATIONSHIP_AMENDED"),
+                            any(),
+                            before.capture(),
+                            any(),
+                            any(),
+                            eq("TYPO: 30 days was meant to be 45"));
+            assertThat(before.getValue())
+                    .as("the audit keeps the row as it stood before it was replaced")
+                    .asInstanceOf(InstanceOfAssertFactories.MAP)
+                    .containsEntry("status", "ACTIVE");
+            verify(events).publish(any(RelationshipAmended.class));
+        }
+
+        @Test
+        void aRowThatHasStartedIsNeverReplaced() {
+            // The first day has come (today, 15 June): an amendment on it would change what that
+            // day's lookups answered, so 21A's guard applies as written.
+            Relationship current = found(active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 6, 15), null));
+            refused(
+                    () -> amend.handle(
+                            limitTo(current, "5000000", LocalDate.of(2026, 6, 15), "X"), withFreshMfa(DISTRIBUTOR)),
+                    "m1.relationship.effective_from_not_after");
+            assertThat(current.isActive()).isTrue();
+        }
+
+        @Test
         void theNewTermsStartWhileTheCurrentOnesRun() {
             Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, LocalDate.of(2026, 6, 30)));
             refused(
@@ -533,7 +630,7 @@ class RelationshipHandlersTest {
             // K-03b is not on main: no resolver bean exists, and the check is skipped rather than
             // refusing every limit change. The second factor is still required.
             AmendRelationshipTermsHandler withoutResolver = new AmendRelationshipTermsHandler(
-                    repository, priceLists, Optional.empty(), config, clock, audit, events);
+                    repository, priceLists, Optional.empty(), config, clock, ZONE, audit, events);
             Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
 
             withoutResolver.handle(limitTo(current, "5000000", JULY, "X"), withFreshMfa(DISTRIBUTOR));
@@ -592,11 +689,11 @@ class RelationshipHandlersTest {
 
         @Test
         void everyActiveRowOfThePairInForceTodayOrLaterIsSuspendedWithIt() {
-            // R1 [Apr, 30 Sep] and R2 [Oct, open] on 25 Sep: suspending R1 alone would let
+            // R1 [Apr, 30 Sep] and R2 [Oct, open] on 15 Jun: suspending R1 alone would let
             // trading come back on 1 Oct (the review of M1-04); an ended row is history.
             Relationship r1 = found(active(DISTRIBUTOR, SOCIETY, APRIL, LocalDate.of(2026, 9, 30)));
             Relationship r2 = active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 10, 1), null);
-            when(repository.activeOnOrAfterForUpdate(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 9, 25)))
+            when(repository.activeOnOrAfterForUpdate(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 6, 15)))
                     .thenReturn(List.of(r1, r2));
 
             suspend.handle(new SuspendRelationship(r1.getId(), "OVERDUE", null), own(DISTRIBUTOR));
