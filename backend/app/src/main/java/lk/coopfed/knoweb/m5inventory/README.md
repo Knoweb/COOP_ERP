@@ -68,6 +68,10 @@ Reads: `GET /v1/inventory/receipts/{grnId}` (`inv.stock.receive`) and `GET /v1/i
 
 `POST /v1/inventory/opening-balances` (`inv.opening.prepare`): the counted lines of a location (batch, condition, quantity, cost), DRAFT; refused where stock has moved or another is being prepared. `/{id}/sign` (`inv.opening.sign`, MFA): SIGNED_ENTITY. `/{id}/countersign` (`inv.opening.countersign`, MFA), by another person: the entity's OPB series is registered where missing, the OPB document issued (kernel issuance, ENTITY series; M5 owns the type through `OpeningBalanceDocumentType`), the OPENING_BALANCE movements posted citing it (lots and entity average seeded), POSTED. This is how the demo loader puts stock in.
 
+**A line can carry its batch as counted (M5-12).** Instead of `batchId`, a line may give `skuId` with `batchNo`, `expiryDate` and `printedMrp` as the item needs them; the prepare registers the batch through M2's `BatchRegistration` in the same transaction and the entity's OWN scope, with the opening balance as its origin (`OPB-<first 8 of its id>` numbers a synthetic batch). M2's own guards answer for it (an active item, an expiry or MRP where required); the same item and number give back the batch already registered. This lets staff load opening stock from the web screen (`web/src/modules/m5inventory`), where no batch exists yet before the first GRN.
+
+**The web screens (M5-12, demo scope; doc 30 section 5.5):** `/inventory` shows a location's lots (M1's location list; item names from M2) with FEFO rank, cost when the server sends it, and the availability of each item there; `/inventory/opening/new` prepares an opening balance; `/inventory/opening/:id` signs and countersigns it.
+
 ## Tests
 
 | Test | What it proves |

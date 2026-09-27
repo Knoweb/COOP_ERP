@@ -25,7 +25,7 @@ test("the opening stock of a location is prepared from the screen, and the stock
   await tax.selectOption({ index: 1 });
   await page.getByRole("button", { name: textOf(MPCS_ADMIN, "catalogue.new.submit") }).click();
   await page.getByRole("button", { name: textOf(MPCS_ADMIN, "catalogue.activate.local") }).click();
-  await expect(page.getByText(textOf(MPCS_ADMIN, "catalogue.status.LOCAL"))).toBeVisible();
+  await expect(page.getByText(textOf(MPCS_ADMIN, "catalogue.status.LOCAL"), { exact: true })).toBeVisible();
 
   // The opening stock of the warehouse.
   await page.goto("/inventory/opening/new");
@@ -37,7 +37,7 @@ test("the opening stock of a location is prepared from the screen, and the stock
   await page.getByLabel(textOf(MPCS_ADMIN, "inventory.column.unit_cost")).fill("310.5");
   await page.getByRole("button", { name: textOf(MPCS_ADMIN, "inventory.opening.prepare") }).click();
 
-  const prepared = page.getByText(textOf(MPCS_ADMIN, "inventory.opening.status.DRAFT"));
+  const prepared = page.getByText(textOf(MPCS_ADMIN, "inventory.opening.status.DRAFT"), { exact: true });
   const refused = page
     .getByRole("alert")
     .filter({ hasText: new RegExp(`${backendSinhala["m5.opening.already_open"]}|${backendSinhala["m5.opening.location_has_stock"]}`) });
@@ -52,6 +52,6 @@ test("the opening stock of a location is prepared from the screen, and the stock
   await expect(page.getByRole("heading", { level: 1, name: textOf(MPCS_ADMIN, "inventory.title") })).toBeVisible();
   await page.getByLabel(textOf(MPCS_ADMIN, "inventory.field.location")).selectOption(WAREHOUSE);
   await expect(
-    page.getByText(textOf(MPCS_ADMIN, "inventory.balances.empty")).or(page.getByRole("columnheader", { name: textOf(MPCS_ADMIN, "inventory.column.on_hand") }))
+    page.getByText(textOf(MPCS_ADMIN, "inventory.balances.empty"), { exact: true }).or(page.getByRole("columnheader", { name: textOf(MPCS_ADMIN, "inventory.column.on_hand") }))
   ).toBeVisible();
 });
