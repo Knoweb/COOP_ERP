@@ -282,6 +282,7 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
         ResponseEntity<JsonNode> unknown = get("/v1/reporting/reports/no-such-report/data", as(SELLER));
         assertThat(unknown.getBody().get("code").asText()).isEqualTo("m8.report.unknown");
+        assertThat(unknown.getBody().get("title").asText()).isEqualTo("There is no report no-such-report");
     }
 
     @Test

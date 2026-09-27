@@ -83,7 +83,9 @@ public class ProblemResponses {
         HttpStatus status = REQUEST_ERRORS.getOrDefault(e.messageId(), HttpStatus.UNPROCESSABLE_ENTITY);
 
         ProblemDetail problem = ProblemDetail.forStatus(status);
-        Messages.Text title = messages.text(e.messageId(), locale);
+        // The parameters fill the title's named placeholders ({templateId}); with no argument an
+        // ICU format that has named placeholders throws, and the client got no code at all.
+        Messages.Text title = messages.text(e.messageId(), locale, e.parameters());
         problem.setTitle(title.value());
         if (title.fallback()) {
             // Shown in English because the language lacks the text: the client marks it (doc 19 section 5.1).
