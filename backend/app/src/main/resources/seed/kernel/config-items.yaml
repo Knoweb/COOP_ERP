@@ -452,6 +452,18 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  # Doc 22 section 7, thumbnail_px / max_thumb_kb = 128 / 10; the JPEG thumbnail steps its
+  # quality down to fit (CR-22A-2).
+  - key: m2.image.thumbnail_max_kb
+    value_type: INTEGER
+    schema: { minimum: 2, maximum: 512 }
+    description_en: The size a product image thumbnail is kept within where the image allows, in kilobytes
+    description_si: හැකි තැන භාණ්ඩ රූපයක කුඩා රූපය තබා ගන්නා ප්‍රමාණය, කිලෝබයිට් වලින්
+    description_ta: இயன்ற இடங்களில் பொருள் படத்தின் சிறுபடம் வைக்கப்படும் அளவு, கிலோபைட்டுகளில்
+    default: 10
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
   - key: m2.image.max_pixels
     value_type: INTEGER
     schema: { minimum: 10000, maximum: 100000000 }

@@ -30,8 +30,9 @@ import org.springframework.stereotype.Component;
  *       attached (or until the kernel settled the upload as missing), then FAILED;
  *   <li>larger than {@code attachment.max_bytes}, or another hash than announced: FAILED;
  *   <li>not an image the JDK reads, or more than {@code m2.image.max_pixels}: FAILED;
- *   <li>otherwise a PNG thumbnail of at most {@code m2.image.thumbnail_px} pixels is written
- *       beside the full image ({@code <full key>/thumb.png}) and the image becomes ACTIVE.
+ *   <li>otherwise a JPEG thumbnail of at most {@code m2.image.thumbnail_px} pixels (and, where the
+ *       image allows, {@code m2.image.thumbnail_max_kb}) is written
+ *       beside the full image ({@code <full key>/thumb.jpg}) and the image becomes ACTIVE.
  * </ul>
  * The store is asked outside any transaction; each image is settled by {@link SettleImageHandler}
  * in a transaction of its own, so one bad upload does not hold the rest, and a row another run or
@@ -42,7 +43,7 @@ class ThumbnailJob {
 
     private static final Logger log = LoggerFactory.getLogger(ThumbnailJob.class);
 
-    static final String THUMB_SUFFIX = "/thumb.png";
+    static final String THUMB_SUFFIX = "/thumb.jpg";
 
     /** The handler's answers that mean somebody else settled the image first: not a failure. */
     static final Set<String> SKIPPED = Set.of("m2.image.not_pending", "m2.image.not_found", "m2.image.upload_open");
@@ -139,7 +140,10 @@ class ThumbnailJob {
                 byte[] thumbnail;
                 try {
                     thumbnail = Thumbnailer.thumbnail(
-                            storage.read(row.objectKeyFull(), owner), limits.thumbnailPx(), limits.maxPixels());
+                            storage.read(row.objectKeyFull(), owner),
+                            limits.thumbnailPx(),
+                            limits.maxPixels(),
+                            limits.thumbnailMaxBytes());
                 } catch (Thumbnailer.NotAnImage notAnImage) {
                     settle.handle(SettleImage.fail(row.imageId(), notAnImage.getMessage()), owner);
                     return true;

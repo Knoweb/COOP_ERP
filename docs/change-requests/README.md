@@ -42,6 +42,12 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-21A-4` — `LocationFilter` (m1party's frozen query package) gains an optional `entityId`, needed by 22A's `listLocations(entity)`.
 - `CR-21A-5` — BulkRegister is all or none (also doc 21 §5.1's "commit per row"); a till position is registered at a shop in any status.
 
+### 22A (M2 Catalogue and Batch Implementation Guide)
+
+- `CR-22A-1` — accepted as revised: `catalogue.tag` is keyed by `tag_id`, its code unique within its owner (`tag_code_per_owner`); `sku_tag` names the tag by id; the Federation writes governed tags; no reserved prefix for governed codes (m2catalogue V0007).
+- `CR-22A-2` — accepted as revised: the thumbnail is a JPEG within doc 22's 10 KB (`m2.image.thumbnail_max_kb`), not WebP; the image audits and publishes at the attach and at the settle (`image.pending.v1`, `image.attached.v1`, `image.failed.v1`; `IMAGE_ACTIVATED`, `IMAGE_FAILED`, `IMAGE_RETIRED`).
+- `CR-22A-3` — `cat.sku.view` (the reads) and `cat.tag.govern` (FEDERATION, governed tags) beside 22A's eleven codes; `cat.tag.manage` is local tags only.
+
 ### 28A (M8 Reporting Implementation Guide)
 
 - `CR-28A-1` — cost of goods sold comes from M5's `stock.moved.v1` event, not from the receipt bundle.

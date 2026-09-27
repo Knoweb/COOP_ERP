@@ -116,13 +116,17 @@ public class M2SeedLoader {
     private int loadTags() {
         int inserted = 0;
         for (TagSeed tag : read(tagsResource, "tags", TagSeed.class)) {
-            // Governed: the Federation's vocabulary, which no entity owns (doc 22 section 3.5).
+            // Governed: the Federation's vocabulary, which no entity owns (doc 22 section 3.5). The
+            // key is the code within its owner (V0007, CR-22A-1): a local tag of the same code
+            // does not stop the governed one.
             inserted += jdbc.sql(
                             """
-                            INSERT INTO catalogue.tag (tag_code, name_en, name_si, name_ta, governed, owner_entity_id)
-                            VALUES (:code, :en, :si, :ta, true, NULL)
-                            ON CONFLICT (tag_code) DO NOTHING
+                            INSERT INTO catalogue.tag (tag_id, tag_code, name_en, name_si, name_ta, governed, owner_entity_id)
+                            VALUES (:id, :code, :en, :si, :ta, true, NULL)
+                            ON CONFLICT (tag_code, coalesce(owner_entity_id, '00000000-0000-0000-0000-000000000000'::uuid))
+                            DO NOTHING
                             """)
+                    .param("id", Ids.next())
                     .param("code", tag.code())
                     .param("en", tag.en())
                     .param("si", tag.si())
