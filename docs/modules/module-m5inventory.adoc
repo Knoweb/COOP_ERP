@@ -5,10 +5,12 @@
 |Spring components
 |_Services_
 
+* `l.c.k.m.query.InventoryQueries` (via `l.c.k.m.internal.availability.InventoryQueriesImpl`)
 * `l.c.k.m.api.StockLedger` (via `l.c.k.m.internal.ledger.LedgerService`)
 |Bean references
 |* `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.m.query.BatchQueries` (in M2 Catalogue & Batch)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===

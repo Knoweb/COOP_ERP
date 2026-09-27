@@ -8,10 +8,6 @@
 * `l.c.k.m.api.BatchRegistration` (via `l.c.k.m.internal.batch.RegisterBatchHandler`)
 * `l.c.k.m.query.BatchQueries` (via `l.c.k.m.internal.queries.BatchQueriesImpl`)
 * `l.c.k.m.query.CatalogueQueries` (via `l.c.k.m.internal.queries.CatalogueQueriesImpl`)
-
-_Others_
-
-* `l.c.k.m.api.InventoryLotQuery` (via `l.c.k.m.internal.integration.RegistrationLotQuery`)
 |Bean references
 |* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)

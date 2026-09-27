@@ -26,8 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * CorrectBatchMrp / CorrectBatchExpiry (22A section 6; doc 22 section 3.7, B-I8). Guards: an OWN
  * scope; the batch exists and is REGISTERED (a SUPERSEDED batch was corrected already, and its
  * replacement is the one to correct); the caller is the Federation or holds a lot of the batch
- * (M5's answer through {@link InventoryLotQuery}; until M5 exists, the entity that registered the
- * batch or corrected it, internal.integration.RegistrationLotQuery); MFA (the permission cat.batch.correct asks for it); a reason; a new
+ * (M5's answer through {@link InventoryLotQuery}, from its lots); MFA (the permission cat.batch.correct asks for it); a reason; a new
  * value that differs. Mutation: a replacement batch citing the old one, owned by the caller; the
  * trigger batch_correction (V0004) marks the old batch SUPERSEDED and re-points its identity, as
  * the database's owner, because the old row belongs to the registering entity.
