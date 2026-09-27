@@ -1,0 +1,19 @@
+@startuml
+set separator none
+title M8 Reporting Pipeline
+
+top to bottom direction
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
+  Component(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, "M8 Reporting Pipeline", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.PlatformKernel, "Platform Kernel", $techn="Module", $descr="", $tags="", $link="")
+}
+
+Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.PlatformKernel, "depends on", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+@enduml

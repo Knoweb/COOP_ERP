@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m4trading.internal.delivery;
 
 import static lk.coopfed.knoweb.m4trading.TradingFixture.BUYER;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SHOP;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.STRANGER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.TradingFixture;
 import lk.coopfed.knoweb.m4trading.TradingFlow;
 import lk.coopfed.knoweb.m4trading.api.CreateDeliveryNote;
@@ -190,6 +192,19 @@ class DeliveryHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(events(DeliveryNoteIssued.class))
                 .singleElement()
                 .satisfies(event -> assertThat(event.fromLocationId()).isEqualTo(TradingFixture.SELLER_WAREHOUSE));
+
+        // The stores of that warehouse dispatch it in a session scoped there (M4-11); a session
+        // scoped to another place of the seller cannot.
+        kernel.reset();
+        ScopeContext elsewhere = ScopeContext.dev(TradingFixture.SELLER_USER, SELLER, UUID.randomUUID());
+        assertThatThrownBy(() -> dispatch.handle(new DispatchDeliveryNote(noteId, "WP-7", null, "Sunil"), elsewhere))
+                .isInstanceOf(ProblemException.class);
+        assertThat(kernel.committedEvents()).isEmpty();
+        ScopeContext stores = ScopeContext.dev(TradingFixture.SELLER_USER, SELLER, TradingFixture.SELLER_WAREHOUSE);
+        dispatch.handle(new DispatchDeliveryNote(noteId, "WP-7", null, "Sunil"), stores);
+        assertThat(deliveries.getDeliveryNote(noteId, seller()).orElseThrow().status())
+                .isEqualTo("IN_TRANSIT");
+        assertThat(events(DeliveryNoteDispatched.class)).hasSize(1);
     }
 
     private static CreateDeliveryNote note(UUID shipTo, UUID billTo, List<CreateDeliveryNote.Line> lines) {

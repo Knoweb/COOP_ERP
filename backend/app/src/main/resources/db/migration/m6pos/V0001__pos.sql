@@ -104,28 +104,82 @@ CREATE TABLE pos.receipt_tender (
 
 -- ---------------------------------------------------------------------------------------------
 -- 3. Row-level security: the template on every table (17A section 6.3), insert-only.
-DO $$
-DECLARE
-    t text;
-BEGIN
-    FOREACH t IN ARRAY ARRAY['pos.till_session', 'pos.till_session_close', 'pos.receipt', 'pos.receipt_line',
-                             'pos.receipt_tender']
-    LOOP
-        EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', t);
-        EXECUTE format('ALTER TABLE %s FORCE ROW LEVEL SECURITY', t);
-        EXECUTE format($p$CREATE POLICY own_read ON %s FOR SELECT TO app_rw
-            USING (kernel.scope_class() = 'OWN'
-                   AND owner_entity_id = kernel.scope_entity()
-                   AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))$p$, t);
-        EXECUTE format($p$CREATE POLICY own_write ON %s FOR INSERT TO app_rw
-            WITH CHECK (kernel.scope_class() = 'OWN'
-                        AND owner_entity_id = kernel.scope_entity()
-                        AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))$p$, t);
-        EXECUTE format($p$CREATE POLICY fed_view ON %s FOR SELECT TO app_rw
-            USING (kernel.scope_class() = 'FEDERATION_VIEW')$p$, t);
-        EXECUTE format($p$CREATE POLICY ext_view ON %s FOR SELECT TO app_rw
-            USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()))$p$, t);
-        EXECUTE format('GRANT SELECT, INSERT ON %s TO app_rw', t);
-    END LOOP;
-END
-$$;
+ALTER TABLE pos.till_session ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos.till_session FORCE ROW LEVEL SECURITY;
+CREATE POLICY own_read ON pos.till_session FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY own_write ON pos.till_session FOR INSERT TO app_rw
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY fed_view ON pos.till_session FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+CREATE POLICY ext_view ON pos.till_session FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
+GRANT SELECT, INSERT ON pos.till_session TO app_rw;
+
+ALTER TABLE pos.till_session_close ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos.till_session_close FORCE ROW LEVEL SECURITY;
+CREATE POLICY own_read ON pos.till_session_close FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY own_write ON pos.till_session_close FOR INSERT TO app_rw
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY fed_view ON pos.till_session_close FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+CREATE POLICY ext_view ON pos.till_session_close FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
+GRANT SELECT, INSERT ON pos.till_session_close TO app_rw;
+
+ALTER TABLE pos.receipt ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos.receipt FORCE ROW LEVEL SECURITY;
+CREATE POLICY own_read ON pos.receipt FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY own_write ON pos.receipt FOR INSERT TO app_rw
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY fed_view ON pos.receipt FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+CREATE POLICY ext_view ON pos.receipt FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
+GRANT SELECT, INSERT ON pos.receipt TO app_rw;
+
+ALTER TABLE pos.receipt_line ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos.receipt_line FORCE ROW LEVEL SECURITY;
+CREATE POLICY own_read ON pos.receipt_line FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY own_write ON pos.receipt_line FOR INSERT TO app_rw
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY fed_view ON pos.receipt_line FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+CREATE POLICY ext_view ON pos.receipt_line FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
+GRANT SELECT, INSERT ON pos.receipt_line TO app_rw;
+
+ALTER TABLE pos.receipt_tender ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos.receipt_tender FORCE ROW LEVEL SECURITY;
+CREATE POLICY own_read ON pos.receipt_tender FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY own_write ON pos.receipt_tender FOR INSERT TO app_rw
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+CREATE POLICY fed_view ON pos.receipt_tender FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+CREATE POLICY ext_view ON pos.receipt_tender FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
+GRANT SELECT, INSERT ON pos.receipt_tender TO app_rw;

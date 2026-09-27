@@ -15,12 +15,18 @@
 # row corrected before its first day came, and amendRelationshipTerms refuses a date before
 # today (m1.relationship.effective_from_in_past). Additive: no operation, field or permission
 # was removed or renamed.
+#
+# 1.2.0 (CR-21A-6, accepted 27 September 2026): getEntity's counterparty projection (the PARTY
+# visibility of EntityResponse, and now an OWN-scoped caller's read of a counterparty) gains
+# vatRegistrationNo; the schema's field already existed (an OWN caller's own entity always had
+# it), only the counterparty's read of it was withheld. No field, operation or permission was
+# removed or renamed; the version records a visibility change, not a shape change.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
-  version: 1.1.0
-  x-change-request: CR-21A-2
+  version: 1.2.0
+  x-change-request: CR-21A-6
 
 paths:
 
