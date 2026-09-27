@@ -349,5 +349,15 @@
   "m3.price_list.line.duplicate": "The same item, unit and tier appear twice",
   "m3.price_list.line.tier_base_missing": "The tiers of an item start at quantity 0, the base price",
   "m3.price_list.line.tiers_not_ascending": "The tiers of an item must rise",
-  "m3.price_list.review.above_mrp": "The trade price is above the lowest printed MRP of the item; it will be reviewed"
+  "m3.price_list.review.above_mrp": "The trade price is above the lowest printed MRP of the item; it will be reviewed",
+  "m5.scope.own_required": "Stock can only be changed in the scope of the entity that holds it",
+  "m5.ledger.document_required": "Every stock movement must cite a document",
+  "m5.ledger.movements_required": "There are no stock movements to post",
+  "m5.ledger.movement_incomplete": "A stock movement needs a location, a batch, a condition, a type and a quantity",
+  "m5.ledger.qty_invalid": "A stock quantity cannot be zero or have more than three decimals",
+  "m5.ledger.sign_invalid": "This kind of stock movement cannot move stock in that direction",
+  "m5.ledger.cost_required": "Stock received needs a unit cost of zero or more",
+  "m5.ledger.cost_invalid": "A unit cost cannot have more than four decimals",
+  "m5.location.not_in_scope": "The location is not one of the locations of your entity",
+  "m5.batch.not_found": "The batch was not found"
 }
