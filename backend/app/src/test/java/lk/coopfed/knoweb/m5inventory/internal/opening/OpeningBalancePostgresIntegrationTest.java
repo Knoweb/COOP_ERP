@@ -145,6 +145,49 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
         assertProblem(() -> prepare.handle(command(line("1", "1")), own(MPCS)), "m5.opening.location_has_stock");
     }
 
+    @Test
+    void aLineWithItsBatchAsCountedRegistersTheBatchInM2() {
+        OpeningBalanceLine counted = new OpeningBalanceLine(
+                null,
+                LotCondition.GOOD,
+                new BigDecimal("12"),
+                new BigDecimal("95"),
+                sku,
+                "NEW-7",
+                LocalDate.of(2027, 8, 31),
+                new BigDecimal("120.00"));
+
+        UUID id = prepare.handle(command(counted), own(MPCS));
+
+        UUID registered = queries.openingBalance(id, own(MPCS))
+                .orElseThrow()
+                .lines()
+                .get(0)
+                .batchId();
+        Map<String, Object> batchRow = superuserJdbc()
+                .queryForMap(
+                        "select sku_id, batch_no, expiry_date, owner_entity_id, origin_document_id"
+                                + " from catalogue.batch where batch_id = ?",
+                        registered);
+        assertThat(batchRow.get("sku_id")).isEqualTo(sku);
+        assertThat(batchRow.get("batch_no")).isEqualTo("NEW-7");
+        assertThat(batchRow.get("owner_entity_id")).isEqualTo(MPCS);
+        assertThat(batchRow.get("origin_document_id")).isEqualTo(id);
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("OPB_PREPARED");
+
+        // M2's own guard answers for the counted batch: this item needs an expiry date.
+        fixture.clean();
+        fixture.entity(MPCS, "M5OB", "MPCS");
+        shop = fixture.location(MPCS, "SHOP");
+        sku = fixture.sku(MPCS, "DHAL2");
+        OpeningBalanceLine noExpiry = new OpeningBalanceLine(
+                null, LotCondition.GOOD, BigDecimal.ONE, BigDecimal.ONE, sku, "NEW-8", null, new BigDecimal("120.00"));
+        assertThatThrownBy(() -> prepare.handle(command(noExpiry), own(MPCS))).isInstanceOf(ProblemException.class);
+        assertThat(queries.balances(shop, null, true, own(MPCS))).isEmpty();
+    }
+
     // ---- guards ------------------------------------------------------------------------------
 
     @Test
@@ -159,6 +202,12 @@ class OpeningBalancePostgresIntegrationTest extends PostgresIntegrationTest {
                 "m5.opening.lines_required");
         assertProblem(() -> prepare.handle(command(line("0", "1")), own(MPCS)), "m5.opening.line_invalid");
         assertProblem(() -> prepare.handle(command(line("1", "-1")), own(MPCS)), "m5.opening.line_invalid");
+        // Neither a batch nor an item to register one for.
+        assertProblem(
+                () -> prepare.handle(
+                        command(new OpeningBalanceLine(null, LotCondition.GOOD, BigDecimal.ONE, BigDecimal.ONE)),
+                        own(MPCS)),
+                "m5.opening.line_invalid");
         assertProblem(
                 () -> prepare.handle(
                         new PrepareOpeningBalance(

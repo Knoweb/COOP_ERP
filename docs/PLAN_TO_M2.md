@@ -169,6 +169,7 @@ What the demo lanes of 27 September 2026 built to a demo-minimal scope left out,
 - **M5-10:** the ONBOARDING-location guard, the Federation's countersignature from its own scope (a Federation-administers policy and the posting in the owner's scope), M1's activation gate on opening_balance.posted.v1.
 - **M5-04:** the stock card (`GET /v1/inventory/skus/{id}/movements`), the 30-second availability cache per instance, the PARTY caller's "live or last end-of-day" availability mode (25A section 7), and M5's web screens (M5-12).
 - **K-06b rest** (kernel, the platform pair): a ledger of rendered reports with a retention and a clean-up job; a render request queue for web-role callers if a module needs one; a pixel comparison of the golden PDF; the worker image in the `package` job's artefacts. Before M4's invoices go beyond the demo.
+- **M5-12:** the stock card, count, adjustment, write-off, repack, transfer, expiry and loss screens of 25A section 8; a list of a location's opening balances; a SKU filter on the stock position; an e2e of sign and countersign (needs a second society user and a second factor in the development realm).
 - **M2-10:** bulk import, promote and merge, the control price register, the tag and assortment screens, the image thumbnail and upload on the SKU view, deactivate and reactivate buttons, barcode retire and batch link, batch correction, and the descriptions, MRP policy, origin and expiry warning fields in the editor (kept as they are on save).
 
 ## Part B — running the plan in parallel with a larger team
@@ -307,6 +308,9 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-01 | The PARTY masking views `trading.v_invoice_party` and `v_invoice_line_party` (24A section 3) | With M4-08, where the invoice exists; before a counterparty reads an invoice line, since `kernel.document_line.unit_cost_at_issue` is visible to the counterparty through `document_read` | M4 writes no cost on an invoice line, so nothing leaks today |
 | M4-01 | The tables of claims, payment receipts, cheques, exposure and transfer requests | With M4-06, M4-07, M4-09, M4-10, each in a new migration of the lane | – |
 | M4-01 | Partitioning of the extension tables by month (24A section 3; doc 24 section 9.1) | With the partitioning of `kernel.document` (K-07 did not partition it) and doc 14's tiering policy (D-02) | CR-24A-1 |
+| M4-02 | AmendOrder, order versions and re-acceptance (24A section 6) | Before a buyer changes a submitted order | – |
+| M4-02 | Order lines in a unit other than the base unit | When M2 publishes a conversion query | `m4.order.uom_invalid` until then |
+| M4-02 | Paging of ListOrders; cancelling the undispatched remainder of a partly fulfilled order | Before order volumes grow; before partial deliveries are cancelled | – |
 
 ## Phase 7 — decisions only the architect can take
 

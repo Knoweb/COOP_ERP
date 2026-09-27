@@ -69,6 +69,9 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID LOCATION = UUID.fromString("0190d000-0000-7000-8000-000000000030");
     private static final UUID POSITION = UUID.fromString("0190d000-0000-7000-8000-000000000031");
 
+    /** The test's own type: ENTITY series, bilateral, owned by nobody but {@link TestBeans}. */
+    private static final String TEST_TYPE = "TST";
+
     @Autowired
     NumberingService numbering;
 
@@ -96,6 +99,16 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void cleanDocumentTables() {
         JdbcTemplate admin = superuserJdbc();
+        // The test's own type in the registry (the seed loader upserts its own codes and leaves
+        // this one alone), so that the protocol finds a handler that only this context owns.
+        admin.update(
+                """
+                insert into kernel.document_type (doc_type_code, name_en, series_scope, issuer_role, bilateral,
+                    fiscal, offline_issuable, owning_module)
+                values (?, 'Test document', 'ENTITY', 'BUYER', true, false, false, 'test')
+                on conflict (doc_type_code) do nothing
+                """,
+                TEST_TYPE);
         admin.execute("delete from kernel.document_link");
         admin.execute("delete from kernel.document_state_history");
         admin.execute("delete from kernel.document_line");
@@ -118,7 +131,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(superuserJdbc()
                         .queryForObject(
                                 "select prefix from kernel.numbering_series where series_id = ?", String.class, first))
-                .isEqualTo("M042-ORD");
+                .isEqualTo("M042-TST");
     }
 
     @Test
@@ -154,7 +167,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                 inScope(BUYER, () -> issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER)));
 
         assertThat(issued.docNumber()).isEqualTo(1L);
-        assertThat(issued.docNumberDisplay()).isEqualTo("M042-ORD-0000001");
+        assertThat(issued.docNumberDisplay()).isEqualTo("M042-TST-0000001");
         assertThat(issued.status()).isEqualTo("ISSUED");
         assertThat(issued.isIssued()).isTrue();
         assertThat(issued.netAmount()).isEqualByComparingTo("400.00");
@@ -436,10 +449,10 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         UUID draftId = Ids.next();
         DocumentRecord numberedByHand = new DocumentRecord(
                 draftId,
-                "ORD",
+                TEST_TYPE,
                 issued.seriesId(),
                 99L,
-                "M042-ORD-0000099",
+                "M042-TST-0000099",
                 BUYER,
                 SELLER,
                 null,
@@ -529,7 +542,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
 
         // ... and a draft that says it was issued offline.
         UUID offline = Ids.next();
-        DocumentRecord offlineDraft = draft(offline, "ORD", BUYER, SELLER, null, null, DocumentOrigin.OFFLINE);
+        DocumentRecord offlineDraft = draft(offline, TEST_TYPE, BUYER, SELLER, null, null, DocumentOrigin.OFFLINE);
         assertThatThrownBy(() -> inScope(BUYER, () -> issuance.issue(offlineDraft, twoLines(offline), scope(BUYER))))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("document.series_device_held");
@@ -547,11 +560,11 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                 BUYER,
                 LOCATION,
                 () -> issuance.issue(
-                        draft(id, "ORD", BUYER, SELLER, LOCATION, null, DocumentOrigin.ONLINE),
+                        draft(id, TEST_TYPE, BUYER, SELLER, LOCATION, null, DocumentOrigin.ONLINE),
                         twoLines(id),
                         scopeAt(BUYER, LOCATION)));
 
-        assertThat(issued.docNumberDisplay()).isEqualTo("M042-ORD-0000001");
+        assertThat(issued.docNumberDisplay()).isEqualTo("M042-TST-0000001");
         assertThat(inScopeAt(BUYER, LOCATION, () -> documents.findById(id))).isPresent();
     }
 
@@ -583,7 +596,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                         BUYER,
                         LOCATION,
                         () -> issuance.issue(
-                                draft(id, "ORD", BUYER, SELLER, null, null, DocumentOrigin.ONLINE),
+                                draft(id, TEST_TYPE, BUYER, SELLER, null, null, DocumentOrigin.ONLINE),
                                 twoLines(id),
                                 scopeAt(BUYER, LOCATION))))
                 .hasStackTraceContaining("row-level security");
@@ -714,7 +727,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                         """
                         insert into kernel.document (document_id, doc_type_code, series_id, doc_number,
                             doc_number_display, owner_entity_id, status, issued_at, business_date, content_hash)
-                        values (?, 'ORD', ?, 3, 'M042-ORD-0000003', ?, 'ISSUED', now(), current_date, repeat('0', 64))
+                        values (?, 'TST', ?, 3, 'M042-TST-0000003', ?, 'ISSUED', now(), current_date, repeat('0', 64))
                         """,
                         Ids.next(),
                         seriesId,
@@ -843,7 +856,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     // ---- helpers -----------------------------------------------------------------------------
 
     private static SeriesRegistration orderSeries() {
-        return SeriesRegistration.forEntity("ORD", BUYER, "M042");
+        return SeriesRegistration.forEntity(TEST_TYPE, BUYER, "M042");
     }
 
     private static DocumentRecord draftOfType(UUID id, String docTypeCode) {
@@ -851,7 +864,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static DocumentRecord draft(UUID id, UUID owner, UUID counterparty) {
-        return draft(id, "ORD", owner, counterparty, null, null, DocumentOrigin.ONLINE);
+        return draft(id, TEST_TYPE, owner, counterparty, null, null, DocumentOrigin.ONLINE);
     }
 
     private static DocumentRecord draft(
@@ -927,7 +940,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     private long nextNumber() {
         return superuserJdbc()
                 .queryForObject(
-                        "select next_number from kernel.numbering_series where prefix = 'M042-ORD'", Long.class);
+                        "select next_number from kernel.numbering_series where prefix = 'M042-TST'", Long.class);
     }
 
     private static ScopeContext scope(UUID entity) {
@@ -980,7 +993,7 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
 
             @Override
             public String docTypeCode() {
-                return "ORD";
+                return TEST_TYPE;
             }
 
             @Override

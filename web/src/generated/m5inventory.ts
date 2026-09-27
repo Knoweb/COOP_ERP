@@ -215,9 +215,16 @@ export interface components {
             locationId: string;
             lines: components["schemas"]["OpeningBalanceLineRequest"][];
         };
+        /** @description A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and printedMrp as the item requires), which the prepare registers in M2 (M5-12). */
         OpeningBalanceLineRequest: {
             /** Format: uuid */
-            batchId: string;
+            batchId?: string;
+            /** Format: uuid */
+            skuId?: string;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
             /**
              * @default GOOD
              * @enum {string}

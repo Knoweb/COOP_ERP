@@ -265,9 +265,16 @@ components:
           items: { $ref: '#/components/schemas/OpeningBalanceLineRequest' }
     OpeningBalanceLineRequest:
       type: object
-      required: [batchId, qty, unitCost]
+      description: >
+        A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and
+        printedMrp as the item requires), which the prepare registers in M2 (M5-12).
+      required: [qty, unitCost]
       properties:
         batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchNo: { type: string, maxLength: 40 }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
         condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
         qty: { type: number, exclusiveMinimum: 0 }
         unitCost: { type: number, minimum: 0 }

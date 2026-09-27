@@ -3,15 +3,396 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/v1/trading/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The orders of the caller's entity as buyer or as seller, newest first */
+        get: operations["listOrders"];
+        put?: never;
+        /**
+         * Draft an order to a seller the caller's entity trades with
+         * @description Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
+         */
+        post: operations["createOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/orders/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a seller can allocate today of the given items, in each item's base unit */
+        get: operations["sellerAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        /** One order the caller's entity placed or received */
+        get: operations["getOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/orders/{orderId}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a draft order from the buyer's series
+         * @description Problems: m4.order.not_found, m4.order.not_buyer, m4.order.not_draft, m4.order.relationship_inactive, m4.order.lines_required.
+         */
+        post: operations["submitOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/orders/{orderId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer cancels its order while nothing of it is dispatched
+         * @description Problems: m4.order.not_found, m4.order.not_buyer, m4.order.not_cancellable, m4.order.dispatched.
+         */
+        post: operations["cancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
-    responses: never;
-    parameters: never;
+    schemas: {
+        Quantity: number;
+        ReasonRequest: {
+            reasonCode: string;
+            reasonText?: string;
+        };
+        CreateOrderRequest: {
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: date */
+            requestedEta?: string;
+            notes?: string;
+            lines: components["schemas"]["OrderLineRequest"][];
+        };
+        OrderLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            uomCode?: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        /** @enum {string} */
+        OrderStatus: "DRAFT" | "SUBMITTED" | "ACCEPTED" | "REJECTED" | "LOCKED" | "PARTIALLY_FULFILLED" | "FULFILLED" | "CANCELLED";
+        OrderResponse: {
+            /** Format: uuid */
+            orderId: string;
+            docNumber?: string;
+            status: components["schemas"]["OrderStatus"];
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: date */
+            requestedEta?: string;
+            /** Format: date */
+            committedEta?: string;
+            /** Format: date-time */
+            lockAt?: string;
+            /** Format: date-time */
+            submittedAt?: string;
+            rejectReasonCode?: string;
+            netAmount?: number;
+            notes?: string;
+            lines: components["schemas"]["OrderLineResponse"][];
+        };
+        OrderLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            requestedQty: number;
+            cancelledQty: number;
+            indicativePrice?: number;
+            allocatedQty?: number;
+            fulfilledQty?: number;
+            tierPrice?: number;
+        };
+        AvailabilityResponse: {
+            /** Format: uuid */
+            skuId: string;
+            availableQty: number;
+        };
+        FieldProblem: {
+            /** @description The property of the body, or the header, query or path parameter */
+            field: string;
+            /** @description A message id such as request.field.required or request.field.too_long */
+            code: string;
+            /** @description The message in the caller's language */
+            message?: string;
+            /** @description What the message mentions (min or max) */
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        Problem: {
+            status: number;
+            /** @description A message id such as hello.greeting.duplicate */
+            code: string;
+            /** @description The message in the caller's language */
+            title?: string;
+            params?: {
+                [key: string]: unknown;
+            };
+            /** @description Only with code request.invalid: one entry for every part of the request that does not match the slice (a required field left out, a text too long ...). */
+            errors?: components["schemas"]["FieldProblem"][];
+        };
+    };
+    responses: {
+        /** @description 400. The request itself is wrong: idempotency.key_required, scope.required, scope.invalid, request.malformed, or request.invalid, which lists in `errors` every field that does not match the slice. The kernel checks the slice's constraints (required, minLength, maximum ...) for every module; a module writes no code for them. */
+        RequestProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 422. A business rule was broken; `code` says which one */
+        RuleBroken: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
+    parameters: {
+        OrderId: string;
+        /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+        IdempotencyKey: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    listOrders: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+                status?: components["schemas"]["OrderStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    createOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft order */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    sellerAvailability: {
+        parameters: {
+            query: {
+                sellerId: string;
+                skuIds: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One row per item asked; an item the seller cannot supply has quantity 0 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description m4.order.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    submitOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The submitted order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    cancelOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The cancelled order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+}
