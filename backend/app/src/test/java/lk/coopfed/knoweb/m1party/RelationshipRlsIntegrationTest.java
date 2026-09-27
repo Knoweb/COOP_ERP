@@ -45,6 +45,7 @@ class RelationshipRlsIntegrationTest extends PostgresIntegrationTest {
         clean();
         JdbcTemplate admin = superuserJdbc();
         insertEntity(admin, FEDERATION, "FED", "FEDERATION");
+        theDatabaseNamesTheFederation(FEDERATION);
         insertEntity(admin, DISTRIBUTOR, "D01", "DISTRIBUTOR");
         insertEntity(admin, SOCIETY, "M01", "MPCS");
         insertEntity(admin, STRANGER, "M02", "MPCS");
@@ -56,7 +57,7 @@ class RelationshipRlsIntegrationTest extends PostgresIntegrationTest {
     void clean() {
         superuserJdbc()
                 .execute("truncate table party.entity_relationship, party.entity_party_directory,"
-                        + " party.federation_identity, party.entity cascade");
+                        + " party.entity cascade");
     }
 
     // ---- reads ----------------------------------------------------------------------------

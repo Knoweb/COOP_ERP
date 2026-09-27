@@ -133,7 +133,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?)", MPCS, OTHER);
         admin.update("delete from kernel.config_value where key = ?", FLOOR_KEY);
         admin.execute("truncate table party.device, party.till_position, party.location, party.entity_relationship,"
-                + " party.entity_party_directory, party.federation_identity, party.entity cascade");
+                + " party.entity_party_directory, party.entity cascade");
         sync.drained.clear();
         sync.versions.clear();
 

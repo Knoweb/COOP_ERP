@@ -115,7 +115,7 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
         if (command.effectiveFrom() == null) {
             throw new ProblemException("request.field.required", Map.of("field", "effectiveFrom"));
         }
-        LocalDate today = LocalDate.ofInstant(clock.instant(), businessZone);
+        LocalDate today = RelationshipRules.businessToday(clock, businessZone);
         boolean replacesUnstartedRow = current.effectiveFrom().isAfter(today)
                 && command.effectiveFrom().equals(current.effectiveFrom());
         if (!replacesUnstartedRow && !command.effectiveFrom().isAfter(current.effectiveFrom())) {

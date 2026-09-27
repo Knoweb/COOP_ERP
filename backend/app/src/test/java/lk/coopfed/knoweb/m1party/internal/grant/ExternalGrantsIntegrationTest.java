@@ -99,10 +99,11 @@ class ExternalGrantsIntegrationTest extends PostgresIntegrationTest {
     void theFederationTwoSocietiesAndTheirPeople() {
         JdbcTemplate admin = superuserJdbc();
         removeSecurityRows(admin);
-        admin.execute("truncate table party.entity_relationship, party.entity_party_directory,"
-                + " party.federation_identity, party.entity cascade");
+        admin.execute(
+                "truncate table party.entity_relationship, party.entity_party_directory," + " party.entity cascade");
 
         insertEntity(admin, FEDERATION, "FED001", "FEDERATION", "Cooperative Federation");
+        theDatabaseNamesTheFederation(FEDERATION);
         insertEntity(admin, MPCS_A, "M9A01", "MPCS", "Society A");
         insertEntity(admin, MPCS_B, "M9B01", "MPCS", "Society B");
 

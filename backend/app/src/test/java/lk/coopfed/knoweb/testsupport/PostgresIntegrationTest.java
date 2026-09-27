@@ -92,6 +92,24 @@ public abstract class PostgresIntegrationTest {
                         systemEntityId);
     }
 
+    /**
+     * For this test only, the database names {@code entityId} as the Federation: a test that
+     * registers a Federation of its own calls it after inserting the row, from its own
+     * {@code @BeforeEach} (which runs after the one above), so that the policies and functions
+     * that ask {@code kernel.system_entity()} (m1party V0012, m1security V0016) know it. The next
+     * test starts from the context's Federation again. The Java guards that read the property
+     * (m2's FederationCaller, SystemScope) keep the context's Federation.
+     */
+    public static void theDatabaseNamesTheFederation(java.util.UUID entityId) {
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.system_identity (singleton, entity_id) values (true, ?::uuid)
+                        on conflict (singleton) do update set entity_id = excluded.entity_id
+                        """,
+                        entityId.toString());
+    }
+
     protected static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName(DATABASE)
             .withUsername("postgres")

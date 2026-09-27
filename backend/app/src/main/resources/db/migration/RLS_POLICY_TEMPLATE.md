@@ -30,16 +30,26 @@ CREATE POLICY own_read ON <schema>.<table> FOR SELECT TO app_rw
            AND owner_entity_id = kernel.scope_entity()
            AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
+-- INSERT: the same rows own_read shows, so a shop-scoped session writes only at its own
+-- location, never a row at a sibling shop that it could not read back (doc 18 section 3.7, M-05;
+-- PLAN_TO_M2 6.12, decided 27 September 2026). An entity-wide session writes anywhere in its
+-- entity. A shop-scoped session cannot write a row with no location either: that is entity-wide
+-- work (kernel.numbering_series is the one departure, for the ENTITY series; kernel V0064).
 CREATE POLICY own_write ON <schema>.<table> FOR INSERT TO app_rw
-    WITH CHECK (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
 -- UPDATE and DELETE, where the table grants them: the rows own_read shows, and (WITH CHECK)
--- an update cannot hand a row to another entity. Every clause carries the class test.
+-- an update cannot hand a row to another entity, nor move it to another location. Every clause
+-- carries the class test.
 CREATE POLICY own_update ON <schema>.<table> FOR UPDATE TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND owner_entity_id = kernel.scope_entity()
            AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))
-    WITH CHECK (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
 CREATE POLICY own_delete ON <schema>.<table> FOR DELETE TO app_rw
     USING (kernel.scope_class() = 'OWN'
@@ -81,7 +91,7 @@ What the matrix guarantees, and the test proves:
 | Class | Reads | Writes |
 |---|---|---|
 | OWN, entity-wide | rows owned by the scope entity, and rows where it is the counterparty | inserts, updates and deletes rows owned by the scope entity; never moves one to another owner |
-| OWN, at a location | the entity's rows at that location, and rows where it is the counterparty | updates and deletes the entity's rows at that location |
+| OWN, at a location | the entity's rows at that location, and rows where it is the counterparty | inserts, updates and deletes the entity's rows at that location; never inserts a row at another location or with none, never moves one to another location |
 | PARTY | rows it owns (at its location, if it has one), and rows where it is the counterparty | nothing |
 | FEDERATION_VIEW | every row | nothing |
 | EXTERNAL_TIMEBOXED | rows owned by a granted entity; nothing with an empty grant | nothing |
@@ -101,8 +111,10 @@ Three cases the template does not cover, and what does:
   administers rows it does not own, and the handler guard stays. A policy that must know which entity is the Federation
   asks `(SELECT kernel.system_entity())` (kernel `V0061`: the copy of
   `coop-erp.system.entity-id` the platform writes on every start; NULL, so admitting nothing,
-  when none is configured), never a session variable. `catalogue.sku` is the example: only the
-  Federation's rows are SHARED (m2catalogue `V0006`).
+  when none is configured), never a session variable and never a table of its own.
+  `catalogue.sku` is the example: only the Federation's rows are SHARED (m2catalogue `V0006`);
+  the `federation_*` policies of `party.entity` and M1's security functions ask the same since
+  m1party `V0012` and m1security `V0016`, which retired M1's copy `party.federation_identity`.
 - **A user's own rows regardless of tenant** (the idempotency key): a policy on
   `app.user_id`, which the customizer sets for the request's user (kernel `V0010`).
 
