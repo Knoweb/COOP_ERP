@@ -314,5 +314,15 @@
   "m2.image.not_pending": "The image is no longer waiting for its upload",
   "m2.image.upload_open": "The image upload link is still valid; the image is processed after it expires",
   "m2.supplier.not_active": "The supplier is not active",
-  "m2.supplier.name_taken": "A supplier with this name is already registered"
+  "m2.supplier.name_taken": "A supplier with this name is already registered",
+  "m5.scope.own_required": "Stock can only be changed in the scope of the entity that holds it",
+  "m5.ledger.document_required": "Every stock movement must cite a document",
+  "m5.ledger.movements_required": "There are no stock movements to post",
+  "m5.ledger.movement_incomplete": "A stock movement needs a location, a batch, a condition, a type and a quantity",
+  "m5.ledger.qty_invalid": "A stock quantity cannot be zero or have more than three decimals",
+  "m5.ledger.sign_invalid": "This kind of stock movement cannot move stock in that direction",
+  "m5.ledger.cost_required": "Stock received needs a unit cost of zero or more",
+  "m5.ledger.cost_invalid": "A unit cost cannot have more than four decimals",
+  "m5.location.not_in_scope": "The location is not one of the locations of your entity",
+  "m5.batch.not_found": "The batch was not found"
 }

@@ -160,6 +160,12 @@ Before M2-01, confirm or accept the 22A §11 assumptions: deactivation sell-thro
 | 6.14 | **Settle evidence on "upload complete"** (only if M5 measures the wait as too long): a client call after the PUT, the kernel copies the object server-side to an immutable key no URL points to, hashes the copy and settles at once; reads go to the copy. Until then the wait is `attachment.upload_url_minutes` plus `coop-erp.attachment.verify-cron`, both configuration | M5's write-off approval (doc 32 §4), if needed | Decision of 27 Sep 2026, CR-19A-8 item 2 |
 | 6.15 | **Module objects nobody refers to** (19A §9, CR-19A-7): a kernel SPI through which a module confirms which of its VERIFIED `object_upload` keys it still refers to (M2: `sku_image` rows, including replaced images), and a sweep that deletes the rest after a retention, with PENDING ledger rows a module never verified. Half a day to a day, the platform pair with M2's developer | Before the first bulk image import (M2-08) | Decision of 27 Sep 2026, CR-19A-8 item 3 |
 
+## Deferred after the demo
+
+What the demo lanes of 27 September 2026 built to a demo-minimal scope left out, one line per deferral, with the ticket it belongs to. Each is also under Deviations in `docs/PROGRESS.md`.
+
+- **M5-01:** the tables of the later M5 tickets (repack recipes, variance thresholds, loss tolerances, expiry windows, count and expiry tasks, loss categories, the CNT/ADJ/WOF/RPK/XFR document extensions), each with its ticket and its own migration.
+
 ## Part B — running the plan in parallel with a larger team
 
 Part A (phases 0 to 6) is the work. Part B is how to spread it over more people without breaking the rules in `AGENTS.md`. It is written in waves with an entry condition and a "done when", not in dates. Ticket ids are those of Part A.
