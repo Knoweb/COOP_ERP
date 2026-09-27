@@ -2,7 +2,7 @@
 
 Updated after every ticket, in the same commit. Three headings: Done, Next, Deviations. A person or tool arriving cold reads `AGENTS.md`, then `docs/README.md`, then this file, and can continue.
 
-Last updated: 27 September 2026, branch `feat/m4-08-invoices` (stacked on `feat/m4-05-grn`).
+Last updated: 27 September 2026, branch `feat/m4-08-invoices` (on `main` after #163).
 
 ## Done
 
