@@ -531,6 +531,91 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/invoices:
+
+    get:
+      tags: [Billing]
+      operationId: listInvoices
+      summary: The invoices the caller's entity issued (SELLER) or received (BUYER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The invoices, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Billing]
+      operationId: issueInvoice
+      summary: Issue a tax invoice from confirmed GRNs of one buyer
+      description: >
+        Problems: m4.invoice.grns_required, m4.invoice.grn_unknown, m4.invoice.grn_not_confirmed,
+        m4.invoice.one_buyer, m4.invoice.grn_invoiced, m4.invoice.seller_vat_missing,
+        m4.invoice.tax_rate_missing, m4.invoice.nothing_received.
+      x-permission: bil.invoice.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueInvoiceRequest'
+      responses:
+        '201':
+          description: The issued invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/invoices/{invoiceId}:
+
+    parameters:
+      - in: path
+        name: invoiceId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Billing]
+      operationId: getInvoice
+      summary: One invoice the caller's entity issued or received
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          description: m4.invoice.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -1018,6 +1103,99 @@ components:
         unitCost:
           type: number
         batchId:
+          type: string
+          format: uuid
+
+    IssueInvoiceRequest:
+      type: object
+      required: [grnIds]
+      properties:
+        grnIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+
+    InvoiceResponse:
+      type: object
+      required: [invoiceId, status, sellerEntityId, buyerEntityId, grnIds, taxPointDate, dueDate, netAmount,
+        taxAmount, grossAmount, lines]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        sellerVatNo:
+          type: string
+        buyerVatNo:
+          type: string
+        grnIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        taxPointDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        issuedAt:
+          type: string
+          format: date-time
+        netAmount:
+          type: number
+        taxAmount:
+          type: number
+        grossAmount:
+          type: number
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineResponse'
+
+    InvoiceLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, qty, unitPrice, taxRatePercent, taxAmount, lineTotal]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        qty:
+          type: number
+        unitPrice:
+          type: number
+        taxRatePercent:
+          type: number
+        taxAmount:
+          type: number
+        lineTotal:
+          type: number
+        grnLineId:
           type: string
           format: uuid
 
