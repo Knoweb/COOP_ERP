@@ -7,7 +7,8 @@ Operating instructions for everything under `docs/`, for people and for every AI
 ```
 docs/
   DECISIONS_PENDING.md     doc 10 Open Items Register in Markdown: the assumption in force for every open decision
-  PROGRESS.md              done / next / deviations, updated after every ticket; the resume point for any person or tool
+  PROGRESS.md              how progress is kept (not edited per ticket)
+  progress/                done/ and deviations/ (one file per entry, added by every ticket) and NEXT.md; the resume point for any person or tool
   README.md                this file
   requirements/            the requirements baseline: the register 00 (Word, live), 01–13 (Word), 15–16 (PDF), plus txt/ extracts
   design/                  the system design: 14, 17–32, the nA guides, 24B, 00_Start_Here (Word), plus txt/ extracts
@@ -86,9 +87,9 @@ Decisions already taken are numbered ADR-01 onward in doc 09 (requirements basel
 - Mirror an existing doc 09 decision here the first time code touches its area, so the reason is beside the code. Record a **new** decision here first, with the next free number, and enter it in doc 09 at its next revision.
 - Small choices made during the build, such as a library or a version that 17A leaves unspecified, are one-paragraph ADRs too. A decision that closes an item in `docs/DECISIONS_PENDING.md` names the item id and updates that file in the same commit.
 
-## 9. Progress (`docs/PROGRESS.md`)
+## 9. Progress (`docs/progress/`)
 
-Three headings, always current: **Done** (tickets completed, with commit references), **Next** (the next ticket and anything blocking it), **Deviations** (every departure from a guide or document, with the reason and the ADR or change request that records it). Update it after every ticket, in the same commit. A person or tool arriving cold reads `AGENTS.md`, then this file, then `PROGRESS.md`, and can continue.
+Three parts, always current: **Done** (tickets completed, with commit references), **Next** (the next ticket and anything blocking it), **Deviations** (every departure from a guide or document, with the reason and the ADR or change request that records it). Each Done entry and each deviation is a file of its own, `docs/progress/done/<yyyy-mm-dd>-<branch-slug>.md` and `docs/progress/deviations/<yyyy-mm-dd>-<slug>.md`, added in the ticket's own commit; Next is `docs/progress/NEXT.md`. One file per entry means two branches never touch the same file. `docs/PROGRESS.md` says how the folder works; `make progress` joins every entry into `build/PROGRESS.md` to read in one page. A person or tool arriving cold reads `AGENTS.md`, then this file, then `docs/progress/NEXT.md` and the newest entries, and can continue.
 
 ## 10. When documents disagree
 

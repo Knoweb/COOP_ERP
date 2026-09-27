@@ -3,8 +3,13 @@
 //
 //   node tools/check-i18n.mjs
 //
+// The catalogue is one folder per module, i18n/<module>/{en,si,ta}.json (28 September 2026: the
+// three shared files conflicted in 23 of 223 recent merges each). The kernel's IcuMessages merges
+// them at start the same way.
+//
 // What it checks:
-//   - every id is in all three files, and no text is empty
+//   - every id of a module is in all three files of that module, and no text is empty
+//   - an id is in one module only, and no catalogue file lies outside a module folder
 //   - every id the Java code answers with is in the catalogue: the first argument of
 //     new ProblemException(...), of messages.t(...) and of messages.text(...). Before this, an
 //     id that was in none of the three files passed, and the user saw "party.entity.duplicate"
@@ -23,6 +28,60 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const LANGUAGES = ["en", "si", "ta"];
+
+/**
+ * The catalogue of every module: i18n/<module>/{en,si,ta}.json, one folder per module, so that
+ * two branches adding ids to two modules never edit the same file. A language file missing from
+ * a module folder reads as empty, so each of its ids is reported as missing in that language.
+ */
+export function readModuleCatalogues(i18nDir) {
+  const modules = {};
+  for (const entry of fs.readdirSync(i18nDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const dir = path.join(i18nDir, entry.name);
+    modules[entry.name] = Object.fromEntries(LANGUAGES.map((language) => {
+      const file = path.join(dir, `${language}.json`);
+      if (!fs.existsSync(file)) {
+        return [language, {}];
+      }
+      try {
+        return [language, JSON.parse(fs.readFileSync(file, "utf8"))];
+      } catch (error) {
+        throw new Error(`${file} is not valid JSON: ${error.message}`);
+      }
+    }));
+  }
+  return modules;
+}
+
+/** Every module's problems, named by module, plus an id that two modules both have. */
+export function problemsOfModules(modules, strayFiles = []) {
+  const problems = strayFiles.map(
+    (file) => `${file}: a catalogue file outside a module folder; move its ids to i18n/<module>/`
+  );
+  const ownerOf = new Map();
+  for (const [module, catalogues] of Object.entries(modules).sort()) {
+    problems.push(...problemsOfCatalogues(catalogues, `${module}/`));
+    for (const id of new Set(LANGUAGES.flatMap((language) => Object.keys(catalogues[language])))) {
+      if (ownerOf.has(id)) {
+        problems.push(`${module}: ${id} is also in ${ownerOf.get(id)}; an id belongs to one module`);
+      } else {
+        ownerOf.set(id, module);
+      }
+    }
+  }
+  return problems;
+}
+
+/** The modules merged into one catalogue per language, for the check of the Java sources. */
+export function mergedCatalogues(modules) {
+  return Object.fromEntries(LANGUAGES.map((language) => [
+    language,
+    Object.assign({}, ...Object.values(modules).map((catalogues) => catalogues[language]))
+  ]));
+}
 
 export function readCatalogues(i18nDir) {
   return Object.fromEntries(LANGUAGES.map((language) => {
@@ -120,7 +179,7 @@ function lostItsScript(text) {
   return text.includes("?") && !/\p{L}/u.test(text.replace(/[A-Za-z]/g, ""));
 }
 
-export function problemsOfCatalogues(catalogues) {
+export function problemsOfCatalogues(catalogues, prefix = "") {
   const problems = [];
   const ids = new Set(LANGUAGES.flatMap((language) => Object.keys(catalogues[language])));
 
@@ -128,19 +187,19 @@ export function problemsOfCatalogues(catalogues) {
     for (const language of LANGUAGES) {
       const text = catalogues[language][id];
       if (text === undefined) {
-        problems.push(`${language}.json: no text for ${id}`);
+        problems.push(`${prefix}${language}.json: no text for ${id}`);
       } else if (typeof text !== "string" || text.trim() === "") {
-        problems.push(`${language}.json: the text of ${id} is empty`);
+        problems.push(`${prefix}${language}.json: the text of ${id} is empty`);
       } else if (text.includes("'")) {
         problems.push(
-          `${language}.json: the text of ${id} contains the ASCII apostrophe ('), which a message format ` +
+          `${prefix}${language}.json: the text of ${id} contains the ASCII apostrophe ('), which a message format ` +
           `reads as a quote and drops, together with any {0} after it; write ’ instead`
         );
       } else if (language !== "en" && lostItsScript(text)) {
         // A Sinhala or Tamil text saved through a codepage that cannot hold it becomes a row
         // of "?" and passes every other check here. #72 shipped eight of them.
         problems.push(
-          `${language}.json: the text of ${id} is "${text}": it was saved through a codepage that lost the ` +
+          `${prefix}${language}.json: the text of ${id} is "${text}": it was saved through a codepage that lost the ` +
           `script; save the file as UTF-8 and write the text again`
         );
       }
@@ -150,7 +209,7 @@ export function problemsOfCatalogues(catalogues) {
       .map((language) => [language, placeholders(catalogues[language][id])]);
     if (new Set(used.map(([, found]) => found)).size > 1) {
       problems.push(
-        `${id}: the three texts do not name the same arguments: ` +
+        `${prefix}${id}: the three texts do not name the same arguments: ` +
         used.map(([language, found]) => `${language} {${found || "none"}}`).join(", ")
       );
     }
@@ -194,7 +253,7 @@ export function problemsOfJavaSources(javaRoot, catalogues) {
       if (!known.has(id)) {
         problems.push(
           `${path.relative(javaRoot, file).replaceAll("\\", "/")}:${line}: the code answers with "${id}", ` +
-          `which is in no catalogue; add it to en.json, si.json and ta.json`
+          `which is in no catalogue; add it to i18n/<module>/en.json, si.json and ta.json`
         );
       }
     }
@@ -203,9 +262,12 @@ export function problemsOfJavaSources(javaRoot, catalogues) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const catalogues = readCatalogues(path.resolve("backend/app/src/main/resources/i18n"));
+  const i18nDir = path.resolve("backend/app/src/main/resources/i18n");
+  const modules = readModuleCatalogues(i18nDir);
+  const strayFiles = fs.readdirSync(i18nDir).filter((name) => name.endsWith(".json"));
+  const catalogues = mergedCatalogues(modules);
   const problems = [
-    ...problemsOfCatalogues(catalogues),
+    ...problemsOfModules(modules, strayFiles),
     ...problemsOfJavaSources(path.resolve("backend/app/src/main/java"), catalogues)
   ];
   if (problems.length > 0) {
@@ -213,5 +275,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`\ni18n check failed: ${problems.length} problem(s).`);
     process.exit(1);
   }
-  console.log(`i18n check passed: ${Object.keys(catalogues.en).length} message id(s) present in en/si/ta`);
+  console.log(`i18n check passed: ${Object.keys(catalogues.en).length} message id(s) present in en/si/ta, in ${Object.keys(modules).length} module folder(s)`);
 }

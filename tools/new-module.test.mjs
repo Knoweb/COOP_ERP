@@ -26,7 +26,7 @@ const TEMPLATE_PARTS = [
   `${B}/main/resources/db/migration/hello`,
   `${B}/main/resources/seed/hello`,
   `${B}/main/resources/openapi/hello.yaml`,
-  `${B}/main/resources/i18n`,
+  `${B}/main/resources/i18n/hello`,
   `${B}/test/java/lk/coopfed/knoweb/hello`,
   "web/src/modules/hello",
   "web/src/modules/registry.ts",
@@ -257,10 +257,14 @@ test("plan: the module descriptor is written for the module, not copied from hel
 });
 
 test("shared files: message ids in three languages, the route and the web catalogue", (t) => {
-  const edits = Object.fromEntries(sharedEdits(templateCopy(t), SKU).map((e) => [e.target, e.content]));
+  const root = templateCopy(t);
+  const edits = Object.fromEntries(sharedEdits(root, SKU).map((e) => [e.target, e.content]));
+  assert.ok(!Object.keys(edits).some((target) => target.includes("/i18n/hello/")), "hello's catalogue is not edited");
   for (const language of ["en", "si", "ta"]) {
-    const catalogue = JSON.parse(edits[`${B}/main/resources/i18n/${language}.json`]);
-    assert.equal(catalogue["catalogue.sku.duplicate"], catalogue["hello.greeting.duplicate"]);
+    const catalogue = JSON.parse(edits[`${B}/main/resources/i18n/m2catalogue/${language}.json`]);
+    const hello = JSON.parse(text(root, `${B}/main/resources/i18n/hello/${language}.json`));
+    assert.equal(catalogue["catalogue.sku.duplicate"], hello["hello.greeting.duplicate"]);
+    assert.ok(!Object.keys(catalogue).some((id) => id.startsWith("hello.")), "only the module's own ids");
     assert.ok(catalogue["catalogue.title"]);
     assert.deepEqual(Object.keys(catalogue), Object.keys(catalogue).slice().sort(), `${language}.json is not sorted`);
   }
@@ -334,7 +338,7 @@ test("run: a real run writes the module, registers it, and removes the placehold
   assert.ok(!exists(root, placeholder), "the .gitkeep placeholder should be gone");
   assert.match(text(root, `${B}/main/resources/db/migration/m2catalogue/V0001__sku.sql`), /CREATE TABLE catalogue\.sku \(/);
   assert.ok(text(root, "web/src/modules/registry.ts").includes("  catalogueModule,"));
-  assert.ok(JSON.parse(text(root, `${B}/main/resources/i18n/ta.json`))["catalogue.sku.duplicate"]);
+  assert.ok(JSON.parse(text(root, `${B}/main/resources/i18n/m2catalogue/ta.json`))["catalogue.sku.duplicate"]);
   // hello itself is untouched
   assert.ok(exists(root, `${B}/main/java/lk/coopfed/knoweb/hello/internal/RegisterGreetingHandler.java`));
 });
@@ -387,5 +391,5 @@ test("run: a compound module is written with the right file names", (t) => {
   ]) {
     assert.ok(exists(root, file), "missing " + file);
   }
-  assert.ok(JSON.parse(text(root, B + "/main/resources/i18n/si.json"))["pricing.price_list.duplicate"]);
+  assert.ok(JSON.parse(text(root, B + "/main/resources/i18n/m3pricing/si.json"))["pricing.price_list.duplicate"]);
 });

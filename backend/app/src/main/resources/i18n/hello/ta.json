@@ -1,0 +1,7 @@
+{
+  "hello.greeting.duplicate": "இந்த வாழ்த்து ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது",
+  "hello.greeting.text_required": "வாழ்த்தை ஆங்கிலத்தில் உள்ளிடவும்",
+  "hello.register": "வாழ்த்தைப் பதிவு செய்",
+  "hello.registered": "வாழ்த்து பதிவு செய்யப்பட்டது",
+  "hello.title": "வாழ்த்துகள்"
+}

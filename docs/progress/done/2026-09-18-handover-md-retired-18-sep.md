@@ -1,0 +1,1 @@
+- **HANDOVER.md retired (18 Sep).** Everything actionable in the briefing now lives in the register, doc 10, `docs/README.md` and this file; its one unresolved point became CR-28A-1 (cost of goods sold from `stock.moved.v1`, not from the receipt bundle). The original stays in git history, commit `ed20626`.

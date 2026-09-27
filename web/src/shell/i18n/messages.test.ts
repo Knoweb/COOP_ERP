@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { messages } from "./messages";
+import { MODULE_CATALOGUES, messages, SHELL_MESSAGES } from "./messages";
 
 // The backend catalogues are checked by tools/check-i18n.mjs. These are the web client's own
 // catalogues (the shell's ids plus every module's <module>.messages.json), and nothing else
@@ -18,6 +18,18 @@ describe("web message catalogues", () => {
       languages.filter((language) => !(id in messages[language])).map((language) => `${language}: ${id}`)
     );
     expect(missing).toEqual([]);
+  });
+
+  it("give each id to one catalogue only: a second module's id would silently replace the first", () => {
+    const owners = new Map<string, number>();
+    const twice = [SHELL_MESSAGES, ...MODULE_CATALOGUES].flatMap((catalogue, index) =>
+      [...new Set(languages.flatMap((language) => Object.keys(catalogue[language])))].filter((id) => {
+        const before = owners.get(id);
+        owners.set(id, index);
+        return before !== undefined && before !== index;
+      })
+    );
+    expect(twice).toEqual([]);
   });
 
   it("have no empty text", () => {

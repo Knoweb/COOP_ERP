@@ -7,7 +7,7 @@
 // this assertion with it.
 
 import { expect, test } from "@playwright/test";
-import backendSinhala from "../../backend/app/src/main/resources/i18n/si.json" with { type: "json" };
+import backendSinhala from "../../backend/app/src/main/resources/i18n/hello/si.json" with { type: "json" };
 import { MPCS_ADMIN, openSignedIn, textOf } from "./support/stack";
 
 // The greeting table is insert-only and the stack is not reset between runs, so every run

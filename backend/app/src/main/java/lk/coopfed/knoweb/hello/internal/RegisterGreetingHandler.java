@@ -1,5 +1,7 @@
 package lk.coopfed.knoweb.hello.internal;
 
+import java.util.Map;
+import java.util.UUID;
 import lk.coopfed.knoweb.hello.api.GreetingRegistered;
 import lk.coopfed.knoweb.hello.api.RegisterGreeting;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
@@ -12,9 +14,6 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * The shape of every command handler in the system (17A section 12; AGENTS.md):
@@ -46,7 +45,7 @@ class RegisterGreetingHandler implements Handles<RegisterGreeting, UUID> {
     @Override
     @Transactional
     public UUID handle(RegisterGreeting command, ScopeContext scope) {
-        // 1. guards: each throws a ProblemException whose id is a message id in i18n/*.json
+        // 1. guards: each throws a ProblemException whose id is a message id in i18n/hello/*.json
         if (!scope.hasActiveScope()) {
             throw new ProblemException("scope.required");
         }
@@ -62,21 +61,12 @@ class RegisterGreetingHandler implements Handles<RegisterGreeting, UUID> {
         }
 
         // 2. mutation
-        Greeting greeting = Greeting.create(
-                Ids.next(),
-                scope.entityId(),
-                command.textEn(),
-                command.textSi(),
-                command.textTa());
+        Greeting greeting =
+                Greeting.create(Ids.next(), scope.entityId(), command.textEn(), command.textSi(), command.textTa());
         repository.save(greeting);
 
         // 3. audit, in the same transaction
-        audit.record(
-                AUDIT_REGISTERED,
-                Subject.of("greeting", greeting.getId()),
-                null,
-                greeting.snapshot(),
-                scope);
+        audit.record(AUDIT_REGISTERED, Subject.of("greeting", greeting.getId()), null, greeting.snapshot(), scope);
 
         // 4. event, in the same transaction (the outbox)
         events.publish(new GreetingRegistered(greeting.getId(), scope.entityId()));

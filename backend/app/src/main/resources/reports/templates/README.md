@@ -10,7 +10,7 @@ fills and Chromium prints to an A4 PDF on the worker role. A module adds its own
   `<head>`; the page must have a `<head>`, and may load nothing from outside itself (images as
   `data:` URIs only).
 - `${data}` is the map the module passed, `${lang}` the language code, `#{id}` a message of the
-  kernel's catalogue (`i18n/*.json`) in that language.
+  kernel's catalogue (`i18n/kernel/*.json`) in that language.
 - Amounts, quantities and dates arrive formatted (`Formats`): a template does no arithmetic.
 
 ## document-a4
