@@ -42,6 +42,11 @@ public class ProblemResponses {
             Map.entry("m2.batch.not_found", HttpStatus.NOT_FOUND),
             // M2-06: an image the caller has no row for, as the slice says.
             Map.entry("m2.image.not_found", HttpStatus.NOT_FOUND),
+            // M4: a trading document that is not visible to the caller, or does not exist.
+            Map.entry("m4.order.not_found", HttpStatus.NOT_FOUND),
+            Map.entry("m4.delivery.not_found", HttpStatus.NOT_FOUND),
+            Map.entry("m4.grn.not_found", HttpStatus.NOT_FOUND),
+            Map.entry("m4.invoice.not_found", HttpStatus.NOT_FOUND),
             // K-02: a token the resource server refuses, and a second factor that is not fresh
             // enough for the action (19A section 2: step-up is 401 with the provider's address).
             Map.entry("token.invalid", HttpStatus.UNAUTHORIZED),

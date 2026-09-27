@@ -12,9 +12,8 @@
 #   - every operation has a tag: it names the generated Java interface (Order -> OrderApi)
 # After changing this file run `make gen-clients` and commit web/src/generated/m4trading.ts.
 #
-# M4-01 registers the slice and nothing else: the operations arrive with the tickets that
-# implement them (M4-02 orders, M4-03 acceptance, M4-04 delivery notes, M4-05 goods received
-# notes, M4-08 invoices).
+# The operations arrive with the tickets that implement them (M4-02 orders, M4-03 acceptance,
+# M4-04 delivery notes, M4-05 goods received notes, M4-08 invoices).
 openapi: 3.1.0
 info:
   title: COOP ERP M4 Trading Documents API
@@ -23,4 +22,341 @@ info:
     Orders, delivery notes, goods received notes, discrepancies and invoices between trading
     entities. What a caller sees is decided by the row-level security of the document base: a
     party reads the documents it owns or is the counterparty of.
-paths: {}
+paths:
+
+  /v1/trading/orders:
+
+    get:
+      tags: [Order]
+      operationId: listOrders
+      summary: The orders of the caller's entity as buyer or as seller, newest first
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+      responses:
+        '200':
+          description: The orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Order]
+      operationId: createOrder
+      summary: Draft an order to a seller the caller's entity trades with
+      description: >
+        Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past,
+        m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
+        m4.order.uom_invalid, m4.order.qty_not_positive.
+      x-permission: ord.order.draft
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: The draft order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/orders/availability:
+
+    get:
+      tags: [Order]
+      operationId: sellerAvailability
+      summary: What a seller can allocate today of the given items, in each item's base unit
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: sellerId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: skuIds
+          required: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 500
+            items:
+              type: string
+              format: uuid
+      responses:
+        '200':
+          description: One row per item asked; an item the seller cannot supply has quantity 0
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AvailabilityResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+  /v1/trading/orders/{orderId}:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    get:
+      tags: [Order]
+      operationId: getOrder
+      summary: One order the caller's entity placed or received
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          description: m4.order.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/orders/{orderId}/submit:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    post:
+      tags: [Order]
+      operationId: submitOrder
+      summary: Issue a draft order from the buyer's series
+      description: >
+        Problems: m4.order.not_found, m4.order.not_buyer, m4.order.not_draft,
+        m4.order.relationship_inactive, m4.order.lines_required.
+      x-permission: ord.order.submit
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The submitted order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/orders/{orderId}/cancel:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    post:
+      tags: [Order]
+      operationId: cancelOrder
+      summary: The buyer cancels its order while nothing of it is dispatched
+      description: >
+        Problems: m4.order.not_found, m4.order.not_buyer, m4.order.not_cancellable,
+        m4.order.dispatched.
+      x-permission: ord.order.submit
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+      responses:
+        '200':
+          description: The cancelled order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  # @@PATHS@@ (later tickets add their operations above this line)
+
+components:
+
+  parameters:
+
+    OrderId:
+      in: path
+      name: orderId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    # @@PARAMETERS@@
+
+  schemas:
+
+    Quantity:
+      type: number
+      exclusiveMinimum: 0
+      maximum: 99999999999
+
+    ReasonRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reasonText:
+          type: string
+          maxLength: 500
+
+    CreateOrderRequest:
+      type: object
+      required: [sellerEntityId, lines]
+      properties:
+        sellerEntityId:
+          type: string
+          format: uuid
+        requestedEta:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 500
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/OrderLineRequest'
+
+    OrderLineRequest:
+      type: object
+      required: [skuId, qty]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+          maxLength: 10
+        qty:
+          $ref: '#/components/schemas/Quantity'
+
+    OrderStatus:
+      type: string
+      enum: [DRAFT, SUBMITTED, ACCEPTED, REJECTED, LOCKED, PARTIALLY_FULFILLED, FULFILLED, CANCELLED]
+
+    OrderResponse:
+      type: object
+      required: [orderId, status, relationshipId, buyerEntityId, sellerEntityId, lines]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        relationshipId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        requestedEta:
+          type: string
+          format: date
+        committedEta:
+          type: string
+          format: date
+        lockAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+        rejectReasonCode:
+          type: string
+        netAmount:
+          type: number
+        notes:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineResponse'
+
+    OrderLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, requestedQty, cancelledQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        requestedQty:
+          type: number
+        cancelledQty:
+          type: number
+        indicativePrice:
+          type: number
+        allocatedQty:
+          type: number
+        fulfilledQty:
+          type: number
+        tierPrice:
+          type: number
+
+    AvailabilityResponse:
+      type: object
+      required: [skuId, availableQty]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        availableQty:
+          type: number
+
+    # @@SCHEMAS@@
