@@ -171,6 +171,7 @@ What the demo lanes of 27 September 2026 built to a demo-minimal scope left out,
 - **K-06b rest** (kernel, the platform pair): a ledger of rendered reports with a retention and a clean-up job; a render request queue for web-role callers if a module needs one; a pixel comparison of the golden PDF; the worker image in the `package` job's artefacts. Before M4's invoices go beyond the demo.
 - **M5-12:** the stock card, count, adjustment, write-off, repack, transfer, expiry and loss screens of 25A section 8; a list of a location's opening balances; a SKU filter on the stock position; an e2e of sign and countersign (needs a second society user and a second factor in the development realm).
 - **M2-10:** bulk import, promote and merge, the control price register, the tag and assortment screens, the image thumbnail and upload on the SKU view, deactivate and reactivate buttons, barcode retire and batch link, batch correction, and the descriptions, MRP policy, origin and expiry warning fields in the editor (kept as they are on save).
+- **M8-01:** the RebuildService (shadow table swap, `POST /v1/reporting/projections/{name}/rebuild`, F and MFA) with a kernel way to replay one consumer past its inbox (platform pair); lag detection and LAGGING; `projection_state.last_seq`; SKU alias resolution; the stock position's expiry, received, days-held and negative-since columns (with the expiry reports).
 
 ## Part B — running the plan in parallel with a larger team
 
@@ -321,6 +322,7 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-11 | The other screens of 24A section 8 (amend, lock override, discrepancy, claim, statement, exposure); allocation overrides at acceptance; several drops or orders on one note; M5's pick list on the note | After the demo, with M4-06, M4-07, M4-09, M4-10 | Screens of the demo path are built |
 | M4-11 | M1's counterparty read of receiving locations (CR-24A-2 option 1); the buyer's masked view of the seller's availability | Before a note serves several buyers, or a buyer changes its delivery place after ordering | The order carries the delivery location meanwhile |
 | M4-11 | The buyer's printed invoice; an invoice of several GRNs from the screen; M4's own invoice template with item names | Before buyers print invoices; with invoice consolidation | The seller prints; the kernel's `document-a4` is used |
+| K-02 (fix) | The shell's scope banner and scope switcher from `GET /v1/session` (the active scope and the scopes held), so a user scoped to one place sees that place | With the scope switcher | The server narrows to the one place held |
 | M4-08 | Invoice disputes; credit and debit notes; consolidation; buyer-side postings; e-invoice; PARTY masking views | Before invoices are corrected, consolidated or submitted | M4-06, M4-07 wholly deferred |
 | M4-08 | The buyer's VAT number on the invoice | When M1's party projection carries the VAT number (architect) | Recorded empty when not visible |
 

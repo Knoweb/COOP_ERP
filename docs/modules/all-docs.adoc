@@ -25,6 +25,10 @@ include::module-m1party.adoc[]
 plantuml::module-m2catalogue.puml[,,format=svg]
 include::module-m2catalogue.adoc[]
 
+== M8 Reporting Pipeline
+plantuml::module-m8reporting.puml[,,format=svg]
+include::module-m8reporting.adoc[]
+
 == M3 Pricing & Rules
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]
