@@ -31,6 +31,24 @@ export type PermissionsState = PermissionSet & {
 /** null while the set is being read; a provider is always there inside RequireLogin (App.tsx). */
 export const PermissionsContext = createContext<PermissionsState | null | undefined>(undefined);
 
+// A convenience of this browser only: storage may be missing or refused, and then the refusal
+// is simply met again.
+function remembered(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function remember(key: string): void {
+  try {
+    window.localStorage.setItem(key, "1");
+  } catch {
+    // nothing to do
+  }
+}
+
 /** Put once around the pages by App, inside RequireLogin and the QueryClientProvider. */
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -46,19 +64,24 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     retry: 1,
     queryFn: async () => {
       let data;
-      try {
-        // Asked with no scope, the server takes the one scope the user holds: the whole entity,
-        // or the one place of a user who holds one place only (the stores of one warehouse), for
-        // whom naming the entity alone would be refused (400 scope.invalid, in the console of
-        // every page load before 28 September 2026).
+      // A user who holds one place only (the stores of one warehouse) holds no entity-wide scope,
+      // so naming the entity alone is refused (400 scope.invalid) and the read is asked again with
+      // no scope, when the server takes the one they hold. The browser remembers that answer for
+      // the user, so the refusal is met once, not on every page load. Everybody else names the
+      // entity: asked with no scope, a Federation user may be given another of its scopes.
+      const unnamedKey = `coop-erp.session.unnamed.${session?.userId ?? ""}`;
+      if (remembered(unnamedKey)) {
         ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
-      } catch (error) {
-        // A user who holds several scopes is asked to choose one (scope.required): the entity
-        // of the token, until the scope switcher exists (ScopeContext.tsx).
-        if (!(error instanceof ApiProblem && error.problem.code === "scope.required")) {
-          throw error;
+      } else {
+        try {
+          ({ data } = await api.GET("/v1/session"));
+        } catch (error) {
+          if (!(error instanceof ApiProblem && error.problem.code === "scope.invalid")) {
+            throw error;
+          }
+          ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
+          remember(unnamedKey);
         }
-        ({ data } = await api.GET("/v1/session"));
       }
       if (!data) {
         throw new Error("GET /v1/session answered without a body");

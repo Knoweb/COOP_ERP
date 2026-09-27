@@ -50,27 +50,33 @@ const SET = { policyClass: "OWN", permissions: ["del.note.dispatch"], activeScop
 describe("the session read", () => {
   beforeEach(() => {
     calls.length = 0;
+    window.localStorage.clear();
   });
   afterEach(cleanup);
 
-  it("asks with no scope first, so a user who holds one place is not refused (400) on every page load", async () => {
+  it("names the entity for a user who holds it", async () => {
     answer = () => SET;
     renderProvider();
 
     await waitFor(() => expect(screen.getByText("del.note.dispatch")).toBeTruthy());
-    expect(calls).toEqual([{ [SCOPE_UNNAMED]: "1" }]);
+    expect(calls).toEqual([undefined]);
   });
 
-  it("names the entity when the user holds several scopes and the server asks to choose", async () => {
+  it("asks a user who holds one place only with no scope, and remembers it so the refusal (400) is met once", async () => {
     answer = (headers) => {
-      if (headers?.[SCOPE_UNNAMED]) {
-        throw new ApiProblem({ code: "scope.required" } as never);
+      if (!headers?.[SCOPE_UNNAMED]) {
+        throw new ApiProblem({ code: "scope.invalid" } as never);
       }
       return SET;
     };
     renderProvider();
-
     await waitFor(() => expect(screen.getByText("del.note.dispatch")).toBeTruthy());
-    expect(calls).toEqual([{ [SCOPE_UNNAMED]: "1" }, undefined]);
+    expect(calls).toEqual([undefined, { [SCOPE_UNNAMED]: "1" }]);
+    cleanup();
+
+    calls.length = 0;
+    renderProvider();
+    await waitFor(() => expect(screen.getByText("del.note.dispatch")).toBeTruthy());
+    expect(calls).toEqual([{ [SCOPE_UNNAMED]: "1" }]);
   });
 });
