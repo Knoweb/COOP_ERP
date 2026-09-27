@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -41,6 +42,7 @@ final class SecurityFixture {
         List<UUID> found =
                 admin.queryForList("select entity_id from party.entity where entity_type = 'FEDERATION'", UUID.class);
         if (!found.isEmpty()) {
+            PostgresIntegrationTest.theDatabaseNamesTheFederation(found.get(0));
             return found.get(0);
         }
         madeFederation = Ids.next();
@@ -49,6 +51,7 @@ final class SecurityFixture {
                 madeFederation,
                 code("F"),
                 "Federation (M1-08 test)");
+        PostgresIntegrationTest.theDatabaseNamesTheFederation(madeFederation);
         return madeFederation;
     }
 
@@ -202,7 +205,6 @@ final class SecurityFixture {
         }
         if (!owners.isEmpty()) {
             admin.execute("delete from party.entity_party_directory where entity_id in " + in(owners));
-            admin.execute("delete from party.federation_identity where entity_id in " + in(owners));
             admin.execute("delete from party.entity where entity_id in " + in(owners));
         }
         if (!pairs.isEmpty()) {

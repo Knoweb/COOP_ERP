@@ -116,6 +116,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         clean();
         JdbcTemplate admin = superuserJdbc();
         insertEntity(admin, FEDERATION, "FED", "FEDERATION", "ACTIVE");
+        theDatabaseNamesTheFederation(FEDERATION);
         insertEntity(admin, DISTRIBUTOR, "D01", "DISTRIBUTOR", "ACTIVE");
         insertEntity(admin, SOCIETY, "M01", "MPCS", "ONBOARDING");
         insertEntity(admin, OTHER_SOCIETY, "M02", "MPCS", "ACTIVE");
@@ -155,7 +156,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         superuserJdbc().execute("delete from security.app_user where user_id = '" + USER + "'");
         superuserJdbc()
                 .execute("truncate table party.entity_relationship, party.entity_party_directory,"
-                        + " party.federation_identity, party.entity cascade");
+                        + " party.entity cascade");
     }
 
     // ---- Scenario 6.2: opening a distributor to MPCS relationship ------------------------------

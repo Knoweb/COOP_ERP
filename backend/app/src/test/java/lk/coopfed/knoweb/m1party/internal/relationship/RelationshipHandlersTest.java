@@ -91,7 +91,7 @@ class RelationshipHandlersTest {
         activate = new ActivateRelationshipHandler(repository, priceLists, audit, events);
         amend = new AmendRelationshipTermsHandler(
                 repository, priceLists, Optional.of(permissions), config, clock, ZONE, audit, events);
-        suspend = new SuspendRelationshipHandler(repository, clock, audit, events);
+        suspend = new SuspendRelationshipHandler(repository, clock, ZONE, audit, events);
 
         when(standing.of(FEDERATION)).thenReturn(Optional.of(new Standing("FEDERATION", "ACTIVE")));
         when(standing.of(DISTRIBUTOR)).thenReturn(Optional.of(new Standing("DISTRIBUTOR", "ACTIVE")));
@@ -708,6 +708,34 @@ class RelationshipHandlersTest {
                     .allSatisfy(event -> assertThat(event).isInstanceOf(RelationshipSuspended.class))
                     .extracting(event -> ((RelationshipSuspended) event).relationshipId())
                     .containsExactly(r1.getId(), r2.getId());
+        }
+
+        @Test
+        void todayIsTodayInColomboSoARowThatEndedYesterdayIsLeftAloneAtHalfPastMidnight() {
+            // 19:00 UTC on 15 June is 00:30 on 16 June in Colombo: 16 June is today, as for an
+            // amendment. R1 ended on 15 June and is history; only R2 [16 Jun, open] is suspended.
+            // With the UTC date the repository was asked for rows in force on 15 June, and R1
+            // was suspended with it (the review of PR #143).
+            SuspendRelationshipHandler halfPastMidnight = new SuspendRelationshipHandler(
+                    repository,
+                    Clock.fixed(Instant.parse("2026-06-15T19:00:00Z"), ZoneOffset.UTC),
+                    ZONE,
+                    audit,
+                    events);
+            Relationship r1 = active(DISTRIBUTOR, SOCIETY, APRIL, LocalDate.of(2026, 6, 15));
+            Relationship r2 = found(active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 6, 16), null));
+            when(repository.activeOnOrAfterForUpdate(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 6, 16)))
+                    .thenReturn(List.of(r2));
+            when(repository.activeOnOrAfterForUpdate(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 6, 15)))
+                    .thenReturn(List.of(r1, r2));
+
+            halfPastMidnight.handle(new SuspendRelationship(r2.getId(), "OVERDUE", null), own(DISTRIBUTOR));
+
+            assertThat(r2.status()).isEqualTo("SUSPENDED");
+            assertThat(r1.status()).isEqualTo("ACTIVE");
+            verify(repository).activeOnOrAfterForUpdate(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 6, 16));
+            verify(audit, times(1)).record(eq("RELATIONSHIP_SUSPENDED"), any(), any(), any(), any(), eq("OVERDUE"));
+            verify(events, times(1)).publish(any(RelationshipSuspended.class));
         }
 
         @Test

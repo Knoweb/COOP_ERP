@@ -47,6 +47,36 @@ class OwnPoliciesTestTheClassIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
+     * A shop writes only at its own location (PLAN_TO_M2 6.12, decided 27 September 2026): on a
+     * table with a {@code location_id} column, every policy that lets the application user
+     * insert or update carries the location line in its WITH CHECK, partitions included. The
+     * RLS matrix proves the behaviour on each parent table; this proves the text on every one.
+     */
+    @Test
+    void everyWritePolicyOnATableWithALocationKeepsAShopAtItsLocation() {
+        List<String> withoutTheLine = superuserJdbc()
+                .queryForList(
+                        """
+                        select p.schemaname || '.' || p.tablename || '.' || p.policyname
+                          from pg_policies p
+                          join pg_namespace n on n.nspname = p.schemaname
+                          join pg_class c on c.relnamespace = n.oid and c.relname = p.tablename
+                         where ('app_rw' = any (p.roles) or 'public' = any (p.roles))
+                           and p.cmd in ('INSERT', 'UPDATE', 'ALL')
+                           and exists (select 1 from pg_attribute a
+                                        where a.attrelid = c.oid and a.attname = 'location_id'
+                                          and not a.attisdropped)
+                           and position('kernel.scope_location()' in coalesce(p.with_check, '')) = 0
+                         order by 1
+                        """,
+                        String.class);
+
+        assertThat(withoutTheLine)
+                .as("write policies on a table with a location whose WITH CHECK lets a shop write elsewhere")
+                .isEmpty();
+    }
+
+    /**
      * The same rule for every policy that lets the application user write, whatever its name
      * (CR-17A-3, accepted 27 September 2026): FEDERATION_VIEW and EXTERNAL_TIMEBOXED write
      * nothing, so a write policy tests for OWN, directly or through {@code

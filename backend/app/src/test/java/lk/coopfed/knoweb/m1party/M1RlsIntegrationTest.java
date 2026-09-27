@@ -45,12 +45,12 @@ class M1RlsIntegrationTest extends PostgresIntegrationTest {
                     party.location,
                     party.entity_relationship,
                     party.entity_party_directory,
-                    party.federation_identity,
                     party.entity
                 cascade
                 """);
 
         insertEntity(admin, ENTITY_A, "FED001", "FEDERATION", "Cooperative Federation");
+        theDatabaseNamesTheFederation(ENTITY_A);
 
         insertEntity(admin, ENTITY_B, "M001", "MPCS", "MPCS One");
 
