@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -108,6 +109,7 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
         UUID entity = scope.entityId();
 
         Map<UUID, UUID> skuOfBatch = new HashMap<>();
+        Map<UUID, LocalDate> expiryOfBatch = new HashMap<>();
         for (Movement m : command.movements()) {
             if (skuOfBatch.containsKey(m.batchId())) {
                 continue;
@@ -115,6 +117,7 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
             BatchView batch = batches.getBatch(m.batchId(), scope)
                     .orElseThrow(() -> new ProblemException("m5.batch.not_found", Map.of("batchId", m.batchId())));
             skuOfBatch.put(m.batchId(), batch.skuId());
+            expiryOfBatch.put(m.batchId(), batch.expiryDate());
         }
         command.movements().stream().map(Movement::locationId).distinct().forEach(location -> {
             if (party.getLocation(location, scope)
@@ -147,8 +150,9 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
             jdbc.update(
                     """
                     insert into inventory.stock_lot
-                        (stock_lot_id, owner_entity_id, location_id, batch_id, sku_id, condition, unit_cost, received_at)
-                    values (?, ?, ?, ?, ?, ?, ?, ?)
+                        (stock_lot_id, owner_entity_id, location_id, batch_id, sku_id, expiry_date, condition, unit_cost,
+                         received_at)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     on conflict (location_id, batch_id, condition) do nothing
                     """,
                     Ids.next(),
@@ -156,6 +160,7 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
                     key.locationId(),
                     key.batchId(),
                     sku,
+                    expiryOfBatch.get(key.batchId()),
                     key.condition(),
                     startingCost,
                     Timestamp.from(now));

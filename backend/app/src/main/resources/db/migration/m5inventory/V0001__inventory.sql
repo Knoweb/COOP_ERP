@@ -15,6 +15,7 @@
 --     every query of 25A section 7 asks by SKU (balances, availability, the entity average),
 --     which would otherwise join M2's catalogue.batch from this schema. The SKU is copied from
 --     the batch when the lot is created (B-I3: the lot's batch is of the line's SKU).
+--     The batch's expiry is copied onto the lot the same way, for FEFO.
 --   * movement_sequence is new: 25A names SequenceService ("dense per location and source")
 --     and no table for it.
 -- The tables of the later tickets (recipes, policies, count and expiry tasks, pick lists, the
@@ -28,6 +29,9 @@ CREATE TABLE inventory.stock_lot (
     location_id              uuid          NOT NULL,
     batch_id                 uuid          NOT NULL,
     sku_id                   uuid          NOT NULL,
+    -- The batch's expiry, copied like the SKU: FEFO ranks by it (25A section 7). A batch's
+    -- expiry never changes (a correction is a replacement batch, doc 18 B-I8).
+    expiry_date              date,
     condition                text          NOT NULL DEFAULT 'GOOD' CHECK (condition IN ('GOOD', 'DAMAGED')),
     qty_on_hand              numeric(14,3) NOT NULL DEFAULT 0,
     -- The lot's acquisition cost (doc 25 section 3.3): kept for traceability and claims; the
