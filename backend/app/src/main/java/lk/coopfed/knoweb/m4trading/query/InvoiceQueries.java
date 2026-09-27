@@ -12,4 +12,10 @@ public interface InvoiceQueries {
 
     /** The invoices the caller's entity issued (SELLER) or received (BUYER), newest first. */
     List<InvoiceView> listInvoices(OrderQueries.Role role, ScopeContext scope);
+
+    /**
+     * Where the printed A4 copy of an invoice the caller can see is in the object store (M4-11);
+     * empty until the worker has printed it.
+     */
+    Optional<String> printObjectKey(UUID invoiceId, ScopeContext scope);
 }

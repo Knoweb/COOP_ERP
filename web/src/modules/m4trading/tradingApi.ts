@@ -19,7 +19,8 @@ export type DeliveryNote = components["schemas"]["DeliveryNoteResponse"];
 export type CreateDeliveryNoteRequest = components["schemas"]["CreateDeliveryNoteRequest"];
 export type Grn = components["schemas"]["GrnResponse"];
 export type CaptureGrnRequest = components["schemas"]["CaptureGrnRequest"];
-export type Relationship = partyComponents["schemas"]["RelationshipResponse"];
+export type Invoice = components["schemas"]["InvoiceResponse"];
+export type Relationship =partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
@@ -80,6 +81,22 @@ export function useTradingApi() {
       async grn(grnId: string): Promise<Grn> {
         const { data } = await api.GET("/v1/trading/grns/{grnId}", { params: { path: { grnId } } });
         return data!;
+      },
+
+      async invoices(role: Side): Promise<Invoice[]> {
+        const { data } = await api.GET("/v1/trading/invoices", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async invoice(invoiceId: string): Promise<Invoice> {
+        const { data } = await api.GET("/v1/trading/invoices/{invoiceId}", { params: { path: { invoiceId } } });
+        return data!;
+      },
+
+      /** A fresh link to the A4 PDF of the seller's invoice; refused until the worker printed it. */
+      async invoicePrint(invoiceId: string): Promise<string> {
+        const { data } = await api.GET("/v1/trading/invoices/{invoiceId}/print", { params: { path: { invoiceId } } });
+        return data!.url;
       },
 
       /** The ACTIVE relationships in which the caller's entity buys: the sellers it can order from. */
@@ -209,6 +226,14 @@ export function useTradingApi() {
 
       async captureGrn(body: CaptureGrnRequest, key: string): Promise<Grn> {
         const { data } = await api.POST("/v1/trading/grns", { params: { header: { "Idempotency-Key": key } }, body });
+        return data!;
+      },
+
+      async issueInvoice(grnIds: string[], key: string): Promise<Invoice> {
+        const { data } = await api.POST("/v1/trading/invoices", {
+          params: { header: { "Idempotency-Key": key } },
+          body: { grnIds }
+        });
         return data!;
       },
 
