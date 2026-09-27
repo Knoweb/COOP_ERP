@@ -186,6 +186,21 @@ class JdbcNumberingService implements NumberingService {
     }
 
     @Override
+    public boolean observeDeviceNumber(UUID seriesId, long number) {
+        requireTransaction("observeDeviceNumber");
+
+        if (seriesId == null || number < 1) {
+            return false;
+        }
+        return jdbc.update(
+                        "update kernel.numbering_series set next_number = ? where series_id = ? and next_number < ?",
+                        number + 1,
+                        seriesId,
+                        number + 1)
+                > 0;
+    }
+
+    @Override
     public void closeSeries(UUID seriesId, ScopeContext ctx) {
         requireTransaction("closeSeries");
 

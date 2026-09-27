@@ -60,6 +60,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     private static final UUID POSITION = UUID.fromString("0190e6a0-0000-7000-8000-000000000201");
     private static final UUID DEVICE = UUID.fromString("0190e6a0-0000-7000-8000-000000000301");
     private static final UUID SERIES = UUID.fromString("0190e6a0-0000-7000-8000-000000000401");
+    private static final UUID REPLACEMENT = UUID.fromString("0190e6a0-0000-7000-8000-000000000302");
 
     @Autowired
     TestRestTemplate http;
@@ -261,11 +262,147 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .contains("RECEIPT_RECORDED", "STOCK_SOLD", "STOCK_LOT_NEGATIVE");
     }
 
+    @Test
+    void aReplacementTillOnThePositionContinuesTheNumbersCentralHasSeen() throws Exception {
+        registerTheSeries();
+
+        TillSimulator first = till();
+        first.refreshSnapshot();
+        first.openSession(BigDecimal.ZERO);
+        UUID one = first.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))));
+        UUID two = first.sell(List.of(new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))));
+        first.closeSession(new BigDecimal("1830.00"));
+        first.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents(DEVICE);
+
+        // Central saw 1 and 2: the next number it gives out for the series is 3.
+        assertThat(nextNumber()).isEqualTo(3L);
+
+        // The till is replaced: a new device on the same position takes the next number from
+        // central (what enrolment and a holder change return, doc 32 section 8).
+        replaceTheTill();
+        TillSimulator second = till(REPLACEMENT).numberingFrom(nextNumber());
+        second.refreshSnapshot();
+        second.openSession(BigDecimal.ZERO);
+        UUID three = second.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+        second.closeSession(new BigDecimal("95.00"));
+        second.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents(REPLACEMENT);
+
+        assertThat(numberOf(one)).isEqualTo(1L);
+        assertThat(numberOf(two)).isEqualTo(2L);
+        assertThat(numberOf(three)).isEqualTo(3L);
+        assertThat(nextNumber()).isEqualTo(4L);
+        assertThat(pos.receipts(SHOP, own(MPCS))).hasSize(3).allSatisfy(r -> assertThat(r.flags())
+                .isEmpty());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .doesNotContain("RECEIPT_FLAGGED", "RECEIPT_NUMBER_DUPLICATED");
+    }
+
+    @Test
+    void aDuplicateNumberIsStoredAndFlaggedNeverRefused() throws Exception {
+        registerTheSeries();
+
+        TillSimulator first = till();
+        first.refreshSnapshot();
+        first.openSession(BigDecimal.ZERO);
+        UUID original = first.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))));
+        first.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents(DEVICE);
+
+        // A replacement that did not ask central where the series stands starts again at 1.
+        replaceTheTill();
+        TillSimulator second = till(REPLACEMENT).numberingFrom(1);
+        second.refreshSnapshot();
+        second.openSession(BigDecimal.ZERO);
+        UUID duplicate = second.sell(List.of(new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))));
+        second.drain(50, Instant.now().plusSeconds(30));
+        kernel.reset();
+        deliverTheTillsEvents(REPLACEMENT);
+
+        // Both receipts are kept; the second carries the flag, and an ALERT names the first.
+        assertThat(numberOf(original)).isEqualTo(1L);
+        assertThat(numberOf(duplicate)).isEqualTo(1L);
+        assertThat(pos.receipts(SHOP, own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(duplicate))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("DUPLICATE_NUMBER"));
+        assertThat(pos.receipts(SHOP, own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(original))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).isEmpty());
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_NUMBER_DUPLICATED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains(original.toString()));
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("RECEIPT_RECORDED", "RECEIPT_FLAGGED");
+        assertThat(kernel.committedEvents())
+                .filteredOn(ReceiptRecorded.class::isInstance)
+                .map(ReceiptRecorded.class::cast)
+                .singleElement()
+                .satisfies(e -> assertThat(e.flags()).containsExactly("DUPLICATE_NUMBER"));
+        // A duplicate never moves the high-water mark back.
+        assertThat(nextNumber()).isEqualTo(2L);
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {
-        return new TillSimulator(http, json, DEVICE, SHOP, SyncTestKeys.signingKey(context))
+        return till(DEVICE);
+    }
+
+    private TillSimulator till(UUID device) {
+        return new TillSimulator(http, json, device, SHOP, SyncTestKeys.signingKey(context))
                 .sellsAs(MPCS, POSITION, SERIES, "M6S1-1");
+    }
+
+    /** The position's RCT series, held by the first till, as M1 registers it at enrolment. */
+    private void registerTheSeries() {
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.numbering_series (series_id, doc_type_code, series_scope, owner_entity_id,
+                                                             location_id, till_position_id, prefix, holder_device_id)
+                        values (?, 'RCT', 'TILL_POSITION', ?, ?, ?, 'M6S1-1', ?)
+                        """,
+                        SERIES,
+                        MPCS,
+                        SHOP,
+                        POSITION,
+                        DEVICE);
+    }
+
+    /** The first till leaves the position; a replacement device takes it and its series. */
+    private void replaceTheTill() {
+        JdbcTemplate db = superuserJdbc();
+        db.update("update party.device set current_till_position_id = null where device_id = ?", DEVICE);
+        db.update(
+                """
+                insert into party.device (device_id, hardware_serial, device_kind, owner_entity_id,
+                                          current_till_position_id, status, enrolled_at, location_id)
+                values (?, 'SN-M6-0002', 'POS_TERMINAL', ?, ?, 'ACTIVE', now(), ?)
+                """,
+                REPLACEMENT,
+                MPCS,
+                POSITION,
+                SHOP);
+        db.update(
+                "insert into kernel.device_sync_cursor (device_id, owner_entity_id) values (?, ?)", REPLACEMENT, MPCS);
+        db.update("update kernel.numbering_series set holder_device_id = ? where series_id = ?", REPLACEMENT, SERIES);
+    }
+
+    private long nextNumber() {
+        return superuserJdbc()
+                .queryForObject(
+                        "select next_number from kernel.numbering_series where series_id = ?", Long.class, SERIES);
+    }
+
+    private long numberOf(UUID receipt) {
+        return superuserJdbc()
+                .queryForObject("select doc_number from pos.receipt where document_id = ?", Long.class, receipt);
     }
 
     /**
@@ -273,6 +410,10 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
      * order, to every consumer of its type (M6's and M5's), as the consumer framework delivers it.
      */
     private void deliverTheTillsEvents() {
+        deliverTheTillsEvents(DEVICE);
+    }
+
+    private void deliverTheTillsEvents(UUID device) {
         List<OutboxMessage> messages = superuserJdbc()
                 .query(
                         """
@@ -298,7 +439,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                                 rs.getObject("actor_user_id", UUID.class),
                                 rs.getString("engine_version"),
                                 rs.getString("payload")),
-                        DEVICE.toString());
+                        device.toString());
         Map<String, List<String>> consumers = Map.of(
                 "till_session.opened.v1", List.of("m6.sessions"),
                 "till_session.closed.v1", List.of("m6.sessions"),
@@ -362,6 +503,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
             db.update("delete from " + table + " where owner_entity_id = ?", MPCS);
         }
         db.update("delete from catalogue.sku_barcode where owner_entity_id = ?", MPCS);
+        db.update("delete from kernel.numbering_series where series_id = ?", SERIES);
         db.update("delete from party.device where owner_entity_id = ?", MPCS);
         db.update("delete from party.till_position where owner_entity_id = ?", MPCS);
         db.update("delete from kernel.location_business_date where location_id = ?", SHOP);

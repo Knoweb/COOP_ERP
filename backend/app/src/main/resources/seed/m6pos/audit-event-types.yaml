@@ -10,6 +10,11 @@ audit_event_types:
     offline_capturable: false
     description_en: A receipt a till issued was recorded with something central found odd about it
 
+  - code: RECEIPT_NUMBER_DUPLICATED
+    severity: ALERT
+    offline_capturable: false
+    description_en: A receipt arrived with a number another receipt of the same series already has; both are kept
+
   - code: TILL_SESSION_OPENED
     severity: INFO
     offline_capturable: false
