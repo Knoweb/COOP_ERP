@@ -156,8 +156,16 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
                     listOf(skus, rs.getObject("sku_id", UUID.class), "barcodes").add(barcode);
                 });
 
+        // An assignment names its tag by id (V0007, CR-22A-1); the till receives the code. The
+        // join runs under the device's policies: governed tags and the entity's own local tags.
         jdbc.query(
-                "select sku_id, tag_code from catalogue.sku_tag where sku_id in (:skus) order by sku_id, tag_code",
+                """
+                select st.sku_id, t.tag_code
+                  from catalogue.sku_tag st
+                  join catalogue.tag t on t.tag_id = st.tag_id
+                 where st.sku_id in (:skus)
+                 order by st.sku_id, t.tag_code
+                """,
                 found,
                 rs -> {
                     listOf(skus, rs.getObject("sku_id", UUID.class), "tags").add(rs.getString("tag_code"));

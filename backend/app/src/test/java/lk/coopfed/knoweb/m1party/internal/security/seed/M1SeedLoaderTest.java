@@ -30,9 +30,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 class M1SeedLoaderTest extends PostgresIntegrationTest {
 
-    // The catalogue of M1 (25 with the locations, grants and relationships) and the 12 of M2 after the M2-02 catalogue
-    // read permission: the number of `- code:` lines in permissions.yaml.
-    private static final int PERMISSIONS = 40;
+    // The catalogue of M1 (25 with the locations, grants and relationships), the M3 price-list codes, and the 13 of M2
+    // (22A section 3.1 plus cat.sku.view and cat.tag.govern, CR-22A-3): the number of `- code:` lines in
+    // permissions.yaml.
+    private static final int PERMISSIONS = 41;
     private static final int ROLE_TEMPLATES = 4;
     private static final int SOD_PAIRS = 2;
 

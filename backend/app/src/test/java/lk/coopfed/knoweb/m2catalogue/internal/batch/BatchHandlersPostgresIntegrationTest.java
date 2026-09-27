@@ -235,6 +235,8 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> handled(
                         new RegisterBatch(looseSku, Ids.next(), null, null, null, null, null, "D", 1), own(MPCS_A)),
                 "m2.supplier.not_found");
+        // Another entity's supplier that no batch cites yet is not visible (V0007, cited_read).
+        refused(() -> handled(milk("B1", "10.00"), own(MPCS_B)), "m2.supplier.not_found");
         superuserJdbc().update("update catalogue.supplier set status = 'INACTIVE' where supplier_id = ?", supplierOfF);
         refused(() -> handled(milk("B1", "10.00"), own(FEDERATION)), "m2.supplier.not_active");
         superuserJdbc().update("update catalogue.supplier set status = 'ACTIVE' where supplier_id = ?", supplierOfF);
@@ -287,7 +289,9 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void theFederationCorrectsTheMrpByAReplacementThatTakesOverTheIdentity() {
-        RegisteredBatch keyed = registered(milk("B2411A", "980.00"), own(MPCS_B));
+        // B bought from its own supplier (a supplier no batch cites is its owner's alone, V0007).
+        UUID supplierOfB = suppliers.handle(new RegisterSupplier("Northern Dairy"), own(MPCS_B));
+        RegisteredBatch keyed = registered(milkOf(supplierOfB, "B2411A", "980.00"), own(MPCS_B));
         kernel.reset();
 
         UUID replacement = correct.handle(
@@ -305,7 +309,9 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(now.ownerEntityId()).as("the corrector's row").isEqualTo(FEDERATION);
 
         // The identity moved: the next GRN of B2411A cites the replacement.
-        assertThat(registered(milk("B2411A", "1080.00"), own(MPCS_A)).batchId()).isEqualTo(replacement);
+        assertThat(registered(milkOf(supplierOfB, "B2411A", "1080.00"), own(MPCS_A))
+                        .batchId())
+                .isEqualTo(replacement);
 
         assertThat(audit("BATCH_CORRECTED")).singleElement().satisfies(record -> {
             assertThat(record.subject().id()).isEqualTo(replacement);
@@ -487,9 +493,13 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private RegisterBatch milk(String batchNo, String mrp) {
+        return milkOf(supplierOfF, batchNo, mrp);
+    }
+
+    private RegisterBatch milkOf(UUID supplier, String batchNo, String mrp) {
         return new RegisterBatch(
                 trackedSku,
-                supplierOfF,
+                supplier,
                 batchNo,
                 null,
                 LocalDate.of(2027, 3, 31),

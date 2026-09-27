@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m2catalogue.internal.image;
 
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -7,15 +8,26 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.ImageOutputStream;
 
 /**
  * The thumbnail of doc 22 section 3.4, in plain Java (javax.imageio and java.awt, no native
- * library): the image fitted into a square of {@code maxSide} pixels, never enlarged, as PNG.
- * Doc 22 names a 128 px WebP; the JDK writes no WebP, so the thumbnail is PNG (module README,
- * Deviations). The size is the register's {@code m2.image.thumbnail_px}.
+ * library): the image fitted into a square of {@code maxSide} pixels, never enlarged, as a JPEG
+ * of at most {@code maxBytes} where the image allows it. Doc 22 names a 128 px WebP of at most
+ * 10 KB (section 7, {@code thumbnail_px / max_thumb_kb}); the JDK writes no WebP, and of what it
+ * writes a JPEG is the one that keeps a photograph inside that budget (a PNG of the same
+ * thumbnail is several times larger). Decided 27 September 2026, CR-22A-2. The sizes are the
+ * register's {@code m2.image.thumbnail_px} and {@code m2.image.thumbnail_max_kb}.
+ *
+ * <p>A JPEG has no transparency, so a transparent PNG is laid on white first, the background of
+ * a product card. The quality steps down until the file fits; the last step is kept even when it
+ * does not, because a slightly larger thumbnail is better than none.
  *
  * <p>The dimensions are read from the header before anything is decoded, and an image of more
  * than {@code maxPixels} is refused there: a small file can declare a huge image (a
@@ -23,7 +35,10 @@ import javax.imageio.stream.ImageInputStream;
  */
 final class Thumbnailer {
 
-    static final String CONTENT_TYPE = "image/png";
+    static final String CONTENT_TYPE = "image/jpeg";
+
+    /** The JPEG qualities tried in turn, best first (an encoder setting, not a business limit). */
+    private static final float[] QUALITIES = {0.85f, 0.75f, 0.65f, 0.55f, 0.45f};
 
     /** Why an upload cannot become a thumbnail; the message is the cause the image is FAILED with. */
     static final class NotAnImage extends Exception {
@@ -34,7 +49,7 @@ final class Thumbnailer {
 
     private Thumbnailer() {}
 
-    static byte[] thumbnail(byte[] bytes, int maxSide, long maxPixels) throws NotAnImage {
+    static byte[] thumbnail(byte[] bytes, int maxSide, long maxPixels, int maxBytes) throws NotAnImage {
         BufferedImage source = decode(bytes, maxPixels);
 
         int width = source.getWidth();
@@ -53,13 +68,47 @@ final class Thumbnailer {
             current = resize(current, targetWidth, targetHeight);
         }
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try {
-            if (!ImageIO.write(current, "png", out)) {
-                throw new IllegalStateException("The JDK has no PNG writer");
+        BufferedImage onWhite = onWhite(current);
+        byte[] jpeg = null;
+        for (float quality : QUALITIES) {
+            jpeg = jpeg(onWhite, quality);
+            if (jpeg.length <= maxBytes) {
+                break;
             }
+        }
+        return jpeg;
+    }
+
+    private static BufferedImage onWhite(BufferedImage argb) {
+        BufferedImage rgb = new BufferedImage(argb.getWidth(), argb.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = rgb.createGraphics();
+        try {
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+            g.drawImage(argb, 0, 0, null);
+        } finally {
+            g.dispose();
+        }
+        return rgb;
+    }
+
+    private static byte[] jpeg(BufferedImage rgb, float quality) {
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
+        if (!writers.hasNext()) {
+            throw new IllegalStateException("The JDK has no JPEG writer");
+        }
+        ImageWriter writer = writers.next();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ImageOutputStream output = ImageIO.createImageOutputStream(out)) {
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(quality);
+            writer.setOutput(output);
+            writer.write(null, new IIOImage(rgb, null, null), param);
         } catch (IOException e) {
-            throw new IllegalStateException("Could not write a PNG to memory", e);
+            throw new IllegalStateException("Could not write a JPEG to memory", e);
+        } finally {
+            writer.dispose();
         }
         return out.toByteArray();
     }
