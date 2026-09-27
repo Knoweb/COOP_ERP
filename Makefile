@@ -151,6 +151,8 @@ test:
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 	node tools/check-permissions.mjs
+	node tools/check-slices.mjs
+	node tools/check-frozen-contracts.mjs
 	cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm test
 
 # The tests tagged "integration": the whole application against a real PostgreSQL 16 that

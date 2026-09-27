@@ -37,6 +37,16 @@ import {
   versionToMoveTo
 } from "./vulnerability-report.mjs";
 
+import {
+  problemsOfFrozenContract
+} from "./check-frozen-contracts.mjs";
+
+import {
+  operationsOf,
+  problemsOfSlice,
+  problemsOfSlices
+} from "./check-slices.mjs";
+
 const repo = path.resolve(
   path.dirname(
     fileURLToPath(import.meta.url)
@@ -904,6 +914,236 @@ test(
           1
         ]
       ]
+    );
+  }
+);
+
+// ---- frozen contracts (the M1 freeze conditions, decisions of 27 September 2026) ------------
+
+const FROZEN = "info:\n  title: X\n  version: 1.0.0\n";
+const FROZEN_WITH_CR = (cr) => `info:\n  title: X\n  version: 1.0.0\n  x-change-request: ${cr}\n`;
+const UNFROZEN = "info:\n  title: X\n  version: 0.1.0\n";
+
+test(
+  "a frozen slice with nothing changed passes, whatever its content",
+  () => {
+    assert.deepEqual(
+      problemsOfFrozenContract("openapi/m1party.yaml", FROZEN, "info:\n  version: 9.9.9\n", false, new Set()),
+      []
+    );
+  }
+);
+
+test(
+  "an unfrozen slice on origin/main is never checked",
+  () => {
+    assert.deepEqual(
+      problemsOfFrozenContract("openapi/sync.yaml", UNFROZEN, "info:\n  version: 0.1.0\n", true, new Set()),
+      []
+    );
+  }
+);
+
+test(
+  "a real version bump passes",
+  () => {
+    assert.deepEqual(
+      problemsOfFrozenContract("openapi/m1party.yaml", FROZEN, "info:\n  version: 1.1.0\n", true, new Set()),
+      []
+    );
+  }
+);
+
+test(
+  "a change with no version bump and no change request is refused",
+  () => {
+    one(
+      problemsOfFrozenContract("openapi/m1party.yaml", FROZEN, FROZEN, true, new Set()),
+      /openapi\/m1party\.yaml: frozen at 1\.0\.0 on origin\/main.*info\.version was not raised/s
+    );
+  }
+);
+
+test(
+  "a change request that names no file under docs\\change-requests is refused",
+  () => {
+    one(
+      problemsOfFrozenContract(
+        "openapi/m1party.yaml",
+        FROZEN,
+        FROZEN_WITH_CR("CR-21A-4"),
+        true,
+        new Set(["CR-21A-3.md"])
+      ),
+      /x-change-request "CR-21A-4" names no file docs\/change-requests\/CR-21A-4\.md/
+    );
+  }
+);
+
+test(
+  "a change request that names a file that exists, and is new since origin/main, passes",
+  () => {
+    assert.deepEqual(
+      problemsOfFrozenContract(
+        "openapi/m1party.yaml",
+        FROZEN,
+        FROZEN_WITH_CR("CR-21A-4"),
+        true,
+        new Set(["CR-21A-4.md"])
+      ),
+      []
+    );
+  }
+);
+
+test(
+  "the same change request as origin/main is not a new one: it is still refused",
+  () => {
+    one(
+      problemsOfFrozenContract(
+        "openapi/m1party.yaml",
+        FROZEN_WITH_CR("CR-21A-4"),
+        FROZEN_WITH_CR("CR-21A-4"),
+        true,
+        new Set(["CR-21A-4.md"])
+      ),
+      /info\.version was not raised/
+    );
+  }
+);
+
+test(
+  "removing a frozen slice is refused",
+  () => {
+    one(
+      problemsOfFrozenContract("openapi/m1party.yaml", FROZEN, null, true, new Set()),
+      /frozen at 1\.0\.0 on origin\/main and now removed/
+    );
+  }
+);
+
+test(
+  "the real slices and Java packages pass check-frozen-contracts.mjs",
+  () => {
+    execFileSync(
+      process.execPath,
+      [
+        "tools/check-frozen-contracts.mjs"
+      ],
+      {
+        cwd: repo,
+        stdio: "pipe"
+      }
+    );
+  }
+);
+
+// ---- cross-slice checks (29A section 7 step 2, brought forward to the build) ------------------
+
+const slice = (operations) =>
+  `openapi: 3.1.0\ninfo:\n  version: 1.0.0\npaths:\n${operations}\n`;
+
+const operation = (opPath, method, { operationId, permission = "m.x", idempotencyKey = false } = {}) => {
+  const idem = idempotencyKey ? "\n      parameters:\n        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'" : "";
+  return `  ${opPath}:\n    ${method}:\n      operationId: ${operationId}\n      x-permission: ${permission}${idem}\n`;
+};
+
+test(
+  "operationsOf finds every operation of a slice, in order, with its permission and idempotency key",
+  () => {
+    const text = slice(
+      operation("/v1/x", "get", { operationId: "listX" }) +
+      operation("/v1/x", "post", { operationId: "createX", idempotencyKey: true })
+    );
+
+    const found = operationsOf(text).map((o) => [o.method, o.path, o.operationId, o.hasPermission, o.hasIdempotencyKey]);
+
+    assert.deepEqual(
+      found,
+      [
+        ["get", "/v1/x", "listX", true, false],
+        ["post", "/v1/x", "createX", true, true]
+      ]
+    );
+  }
+);
+
+test(
+  "a mutating operation with no Idempotency-Key parameter is refused",
+  () => {
+    one(
+      problemsOfSlice("m2catalogue", slice(operation("/v1/x", "post", { operationId: "createX" }))),
+      /openapi\/m2catalogue\.yaml:\d+ POST \/v1\/x: a mutating operation with no Idempotency-Key parameter/
+    );
+  }
+);
+
+test(
+  "a GET with no x-permission is refused: GETs are not exempt",
+  () => {
+    const text = slice("  /v1/x:\n    get:\n      operationId: listX\n");
+
+    one(
+      problemsOfSlice("m2catalogue", text),
+      /openapi\/m2catalogue\.yaml:\d+ GET \/v1\/x: no x-permission/
+    );
+  }
+);
+
+test(
+  "a complete slice passes on its own",
+  () => {
+    assert.deepEqual(
+      problemsOfSlice(
+        "m2catalogue",
+        slice(
+          operation("/v1/x", "get", { operationId: "listX" }) +
+          operation("/v1/x", "post", { operationId: "createX", idempotencyKey: true })
+        )
+      ),
+      []
+    );
+  }
+);
+
+test(
+  "the same operationId in two slices is refused, even though each slice is fine alone",
+  () => {
+    one(
+      problemsOfSlices({
+        m1party: slice(operation("/v1/a", "get", { operationId: "shared" })),
+        sync: slice(operation("/v1/b", "post", { operationId: "shared", idempotencyKey: true }))
+      }),
+      /openapi\/sync\.yaml:\d+: operationId "shared" is already used at openapi\/m1party\.yaml:\d+/
+    );
+  }
+);
+
+test(
+  "distinct operationIds across slices pass",
+  () => {
+    assert.deepEqual(
+      problemsOfSlices({
+        m1party: slice(operation("/v1/a", "get", { operationId: "listA" })),
+        sync: slice(operation("/v1/b", "post", { operationId: "createB", idempotencyKey: true }))
+      }),
+      []
+    );
+  }
+);
+
+test(
+  "the real slices pass check-slices.mjs (hello.yaml excluded)",
+  () => {
+    execFileSync(
+      process.execPath,
+      [
+        "tools/check-slices.mjs"
+      ],
+      {
+        cwd: repo,
+        stdio: "pipe"
+      }
     );
   }
 );

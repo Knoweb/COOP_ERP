@@ -37,7 +37,7 @@ export interface paths {
          * The device presents its enrolment code once and receives its credential (doc 32 section 8)
          * @description Called without a token: the enrolment code is the credential of this one call. The code must be the device's latest unused code, unexpired, and the hardware serial must be the one M1 registered; any mismatch is 403 sync.enrolment.code_invalid, one code for every reason so that a guess learns nothing. The device must be ACTIVE at a till position (M1 assigns it); otherwise 422 sync.enrolment.device_not_assigned. The answer carries the device credential (an OAuth2 client of the identity provider: the device exchanges it for a device token at token_endpoint with the client-credentials grant), the first device sequence to use, the numbering series the device holds, the snapshot pointer and the key that signs what central sends the device. Enrolling again (a re-installed application) rotates the credential and keeps the cursor.
          */
-        post: operations["enrolDevice"];
+        post: operations["enrolTill"];
         delete?: never;
         options?: never;
         head?: never;
@@ -581,7 +581,7 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
-    enrolDevice: {
+    enrolTill: {
         parameters: {
             query?: never;
             header: {

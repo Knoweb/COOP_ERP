@@ -283,7 +283,7 @@ class PartyQueriesImpl implements PartyQueries {
         if (scope == null || !scope.hasActiveScope()) {
             return new LocationPage(List.of(), null);
         }
-        LocationFilter effective = filter == null ? new LocationFilter(null, null, null, 50) : filter;
+        LocationFilter effective = filter == null ? new LocationFilter(null, null, null, null, 50) : filter;
         int limit = effective.normalizedLimit();
 
         StringBuilder sql = new StringBuilder(LOCATION_SELECT + " where 1 = 1");
@@ -295,6 +295,14 @@ class PartyQueriesImpl implements PartyQueries {
         if (effective.locationType() != null && !effective.locationType().isBlank()) {
             sql.append(" and location_type = ?");
             params.add(effective.locationType().strip());
+        }
+        if (effective.entityId() != null) {
+            // Row-level security already keeps an OWN caller to its own entity; naming another
+            // entity here only ever narrows further (to nothing, for an OWN caller), never widens
+            // it. A FEDERATION_VIEW or EXTERNAL_TIMEBOXED caller sees every row RLS allows and this
+            // is the only narrowing by entity they get (CR-21A-4).
+            sql.append(" and owner_entity_id = ?");
+            params.add(effective.entityId());
         }
         if (effective.cursor() != null) {
             sql.append(" and location_id > ?");

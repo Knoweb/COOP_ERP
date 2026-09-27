@@ -2,11 +2,20 @@
 # depended on by M2 and later modules. A change from here on is a new minor or major version, not an
 # edit in place, and goes through the change-request path of AGENTS.md ("contract... frozen once
 # depended on"). See m1party/README.md, "Contract freeze (M1-13)", for the review this freeze recorded.
+#
+# tools/check-frozen-contracts.mjs enforces the freeze: once info.version reaches 1.0.0, a diff
+# against origin/main touching this file, backend/.../m1party/api/** or .../m1party/query/**
+# needs either a higher info.version here (the slice itself changed) or an info.x-change-request
+# naming a file under docs/change-requests/ that differs from origin/main's value (api/query-only
+# change, the slice's shape unchanged). CR-21A-4 is the first such change-request: LocationFilter
+# gained entityId with no REST shape change, so info.version stays 1.0.0 and x-change-request
+# names it.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
   version: 1.0.0
+  x-change-request: CR-21A-4
 
 paths:
 

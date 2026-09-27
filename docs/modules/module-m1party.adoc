@@ -11,6 +11,10 @@
 * `l.c.k.m.query.RelationshipQueries` (via `l.c.k.m.internal.queries.RelationshipQueriesImpl`)
 * `l.c.k.m.query.SecurityQueries` (via `l.c.k.m.internal.queries.SecurityQueriesImpl`)
 * `l.c.k.m.query.UserQueries` (via `l.c.k.m.internal.queries.UserQueriesImpl`)
+
+_Others_
+
+* `l.c.k.m.api.TradePriceListCheck`
 |Bean references
 |* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)

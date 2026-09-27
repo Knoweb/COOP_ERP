@@ -682,7 +682,7 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         ScopeContext atMine = atShop(MPCS, mine);
         kernel.reset();
 
-        assertThat(queries.listLocations(new LocationFilter(null, null, null, null), atMine)
+        assertThat(queries.listLocations(new LocationFilter(null, null, null, null, null), atMine)
                         .items())
                 .extracting(LocationView::locationId)
                 .containsExactly(mine);
@@ -706,13 +706,42 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID theirs = registerLocation.handle(location("S01", "SHOP"), own(OTHER));
         ScopeContext federationView = view(MPCS, PolicyClass.FEDERATION_VIEW);
 
-        assertThat(queries.listLocations(new LocationFilter(null, "SHOP", null, null), federationView)
+        assertThat(queries.listLocations(new LocationFilter(null, "SHOP", null, null, null), federationView)
                         .items())
                 .extracting(LocationView::locationId)
                 .containsExactlyInAnyOrder(mine, theirs);
         refused(
                 () -> startOnboarding.handle(new StartLocationOnboarding(theirs), federationView),
                 "m1.location.scope_required");
+    }
+
+    @Test
+    void theEntityFilterNarrowsTheFederationViewAndEmptiesAnOwnCallerNamingAnotherEntity() {
+        // CR-21A-4: LocationFilter.entityId, for 22A's listLocations(entity) prerequisite.
+        UUID mine = registerShop("S01");
+        UUID theirs = registerLocation.handle(location("S01", "SHOP"), own(OTHER));
+        ScopeContext federationView = view(MPCS, PolicyClass.FEDERATION_VIEW);
+        ScopeContext atMine = atShop(MPCS, mine);
+
+        // FEDERATION_VIEW may name any entity: the filter narrows to it.
+        assertThat(queries.listLocations(new LocationFilter(null, null, MPCS, null, null), federationView)
+                        .items())
+                .extracting(LocationView::locationId)
+                .containsExactly(mine);
+        assertThat(queries.listLocations(new LocationFilter(null, null, OTHER, null, null), federationView)
+                        .items())
+                .extracting(LocationView::locationId)
+                .containsExactly(theirs);
+
+        // An OWN caller naming its own entity sees what it always saw; naming another entity
+        // gets nothing, because row-level security already restricted it to its own rows.
+        assertThat(queries.listLocations(new LocationFilter(null, null, MPCS, null, null), atMine)
+                        .items())
+                .extracting(LocationView::locationId)
+                .containsExactly(mine);
+        assertThat(queries.listLocations(new LocationFilter(null, null, OTHER, null, null), atMine)
+                        .items())
+                .isEmpty();
     }
 
     @Test
@@ -731,7 +760,7 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 Locale.ENGLISH,
                 null);
 
-        assertThat(queries.listLocations(new LocationFilter(null, null, null, null), external)
+        assertThat(queries.listLocations(new LocationFilter(null, null, null, null, null), external)
                         .items())
                 .extracting(LocationView::locationId)
                 .containsExactly(mine);

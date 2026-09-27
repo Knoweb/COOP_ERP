@@ -105,7 +105,7 @@ Prerequisite: Sprint 0 complete. One full-stack developer, about 19.5 days. The 
 | M1-10 | Snapshot contributors and change-log producers; till snapshot verified by the till simulator | 1 | Operator snapshot round trip |
 | M1-11 | BulkRegister with validation report; performance test | 1.5 | 40 shops under 60 s |
 | M1-12 | Web screens (nine) on the shell; Playwright flows | 3 | Both Playwright flows green |
-| M1-13 | Contract freeze: publish `m1party.yaml` v1, `api` package review with the M2 developer, doc 33 slice registered | 0.5 | M2 acknowledges |
+| M1-13 | Contract freeze: publish `m1party.yaml` v1, `api` package review with the M2 developer; the slice is at v1 and passes the cross-slice check, doc 33 is produced by M9 (register; 29A section 7) | 0.5 | M2 acknowledges |
 
 Before M1-01, confirm or accept the 21A §11 assumptions and cite them in code: entity activation prerequisites (doc 21 DR-6, Federation admins), direct Federation→MPCS trading flag default off (DR-3), external grant maximum 12 months (DR-4), returning staff as a new user with `succeeds_user_id` (DR-5), responsible officer fields and `sod_pair` per doc 18 (DR-1, DR-2), the RLS variant for MPCS admins reading shop users, and the M3 price-list stub. Add `m1party/README.md` as the living guide from M1-01 on.
 
@@ -125,7 +125,7 @@ Prerequisite: Sprint 0 and M1-13 (M1's `api` and `query` packages). One full-sta
 | M2-08 | Steward: import service, row validator, transliterator, duplicate scorer, suspects, translation dashboard | 3.5 | Flows 6.1 and 6.2; data-quality targets |
 | M2-09 | Assortment maintainer consumers and reconcile job; snapshot contributor; change-log producers | 2.5 | Snapshot tests; reconcile finds drift |
 | M2-10 | Web screens (eight) and Playwright flows | 3 | Both flows green |
-| M2-11 | Contract freeze: `m2catalogue.yaml` v1; `api`/`query` review with the M3 and M5 developers; doc 33 slice | 0.5 | M3 acknowledges |
+| M2-11 | Contract freeze: `m2catalogue.yaml` v1; `api`/`query` review with the M3 and M5 developers; the slice is at v1 and passes the cross-slice check, doc 33 is produced by M9 (register; 29A section 7) | 0.5 | M3 acknowledges |
 
 Before M2-01, confirm or accept the 22A §11 assumptions: deactivation sell-through on (DR-3), duplicate threshold 0.85 with transliteration v1 in the repository (DR-4), local image override allowed (DR-5), label content code plus weight/batch (DR-6), brand list seeded from the import sheet. M2-08 needs the catalogue data steward named (doc 10 P-01) and an import sheet to test against.
 
@@ -134,7 +134,7 @@ Before M2-01, confirm or accept the 22A §11 assumptions: deactivation sell-thro
 | # | Task | Needed by | Source |
 |---|---|---|---|
 | 6.1 | Choose and script the Markdown-to-PDF render (docs/README.md procedure) | First document re-issue (0.4) | PROGRESS.md Deviations |
-| 6.2 | Create doc 33 (API bundle) as a Markdown source that collects the frozen slices; register it | M1-13 | Doc 20 §6 week 7; 21A M1-13 |
+| 6.2 | ~~Create doc 33 (API bundle) as a Markdown source~~ — decided on the architect's delegation, 27 Sep 2026: the slice is at v1 and passes the cross-slice check; doc 33 is produced by M9 (register; 29A section 7) | Superseded | Doc 20 §6 week 7; 21A M1-13; `docs/PROGRESS.md` Deviations, "Doc 33 waits for M9" |
 | 6.3 | Add ADR-37 to ADR-51 to doc 09; mirror them in `docs/adr/` | Before M1 review | PROGRESS.md Deviations |
 | 6.4 | Design terms into glossary doc 12 | Before M1 review | PROGRESS.md Deviations |
 | 6.5 | Name the catalogue data steward and the cleansing owner (P-01); obtain the import sheet | M2-08 | Doc 10 P-01; doc 16 T-03 |

@@ -204,8 +204,8 @@ class LocationsController implements LocationsApi {
     @Override
     public ResponseEntity<lk.coopfed.knoweb.m1party.web.generated.LocationPage> listLocations(
             String status, String locationType, UUID cursor, Integer limit) {
-        lk.coopfed.knoweb.m1party.query.LocationPage page =
-                queries.listLocations(new LocationFilter(status, locationType, cursor, limit), currentScope.get());
+        lk.coopfed.knoweb.m1party.query.LocationPage page = queries.listLocations(
+                new LocationFilter(status, locationType, null, cursor, limit), currentScope.get());
         lk.coopfed.knoweb.m1party.web.generated.LocationPage response =
                 new lk.coopfed.knoweb.m1party.web.generated.LocationPage(page.items().stream()
                         .map(LocationsController::toResponse)

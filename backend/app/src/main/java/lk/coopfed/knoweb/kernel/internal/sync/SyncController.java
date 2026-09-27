@@ -101,7 +101,7 @@ class SyncController implements SyncApi {
     }
 
     @Override
-    public ResponseEntity<EnrolmentResponse> enrolDevice(
+    public ResponseEntity<EnrolmentResponse> enrolTill(
             UUID deviceId, String idempotencyKey, EnrolmentRequest enrolmentRequest) {
         EnrolmentStore.Enrolled enrolled = enrolment.enrol(
                 deviceId,
