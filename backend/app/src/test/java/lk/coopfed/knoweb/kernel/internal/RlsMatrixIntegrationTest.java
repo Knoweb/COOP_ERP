@@ -272,16 +272,14 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0059): the recipient of a queued notification in clear, held until it"
                             + " is settled; the sweep reads it in the owner's scope, nobody else at all",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
-            // The ENTITY series and the entity's location-less documents are the whole entity's:
-            // a shop-scoped session sees and advances them (kernel V0055; the K-07 review, for
-            // the architect). own_read and own_update admit location_id IS NULL there.
+            // The ENTITY series is the whole entity's: a shop-scoped session reads and advances it,
+            // because a document at a shop may draw its number from an ENTITY series (24B) and a
+            // counter carries no business content (kernel V0055; decided 27 September 2026 on the
+            // architect's delegation). own_read and own_update admit location_id IS NULL there.
+            // kernel.document does not (kernel V0061): a shop reads its own documents only.
             new Departure(
                     "kernel.numbering_series",
                     "own_read and own_update admit a NULL location (the ENTITY series) at a location scope",
-                    RlsMatrixIntegrationTest::entityWideRowsAtALocation),
-            new Departure(
-                    "kernel.document",
-                    "own_read and own_update admit a NULL location (an entity-level document) at a location scope",
                     RlsMatrixIntegrationTest::entityWideRowsAtALocation),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
@@ -296,10 +294,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::externalReadsNothing,
                     false),
             // TODO(M3 price list): pricing.price_list has no ext_view.
-            new Departure("pricing.price_list", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing),
-            // TODO(M1 party, after M1-09): party.entity has no ext_view; m1security V0009 left the
-            // party schema to an m1party migration, and the other party tables have theirs.
-            new Departure("party.entity", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing));
+            // party.entity has its ext_view since m1party V0010 and follows the template.
+            new Departure("pricing.price_list", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing));
 
     private static String everyClassButNoneReadsEverything(Check check) {
         return check.op() == Op.SELECT
