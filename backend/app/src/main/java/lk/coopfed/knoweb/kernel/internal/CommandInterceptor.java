@@ -47,20 +47,47 @@ public class CommandInterceptor {
         }
     }
 
+    /**
+     * The command running on this thread, if any: the handler, its permission and the
+     * idempotency key it claimed (null outside HTTP). An internal command (CR-19A-6) runs only
+     * while one is present; an ordinary command refuses to start while one is. A thread-local and
+     * not "a transaction is active": the handler's own {@code @Transactional} is the outer advice
+     * ({@link TransactionOrderConfig}), so a transaction is active for every handler, however it
+     * was called, and tells nothing about the caller.
+     */
+    private static final ThreadLocal<RunningCommand> RUNNING = new ThreadLocal<>();
+
     @Around("@within(lk.coopfed.knoweb.kernel.api.CommandHandler)")
     public Object intercept(ProceedingJoinPoint call) throws Throwable {
 
         Class<?> handlerType = call.getSignature().getDeclaringType();
         CommandHandler annotation = handlerType.getAnnotation(CommandHandler.class);
+        RunningCommand outer = RUNNING.get();
+
         if (annotation != null && CommandHandler.INTERNAL.equals(annotation.permission())) {
-            // An internal command runs inside the command that called it: that one was checked
-            // and claimed the request's idempotency key, which a second claim would find taken.
-            if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-                throw new IllegalStateException("An internal command runs inside its caller's transaction");
+            // An internal command runs inside the command that called it (CR-19A-6): that one was
+            // checked and claimed the request's idempotency key, which a second claim would find
+            // taken. Called any other way (a controller, a job, a consumer, a bare transaction) it
+            // would run with no permission check and no idempotency at all, so it is refused.
+            if (outer == null) {
+                throw new IllegalStateException(handlerType.getSimpleName()
+                        + " is an internal command (CommandHandler.INTERNAL, CR-19A-6): it runs only inside"
+                        + " another @CommandHandler, which checked the permission and holds the idempotency"
+                        + " key. Call it from a command handler, never from a controller, a job or a consumer.");
             }
             return call.proceed();
         }
 
+        if (outer != null) {
+            // Two ordinary commands in one: the inner one would check its own permission again and
+            // claim the request's idempotency key a second time, and find it taken by the outer one.
+            throw new IllegalStateException("Nested command: " + handlerType.getSimpleName() + " was called inside "
+                    + outer.handler() + ". A command handler calls another command only when that one is an"
+                    + " internal command (CommandHandler.INTERNAL, CR-19A-6); otherwise the caller (a"
+                    + " controller, a job, a consumer) runs the two commands one after the other.");
+        }
+
+        String permission = annotation == null ? null : annotation.permission();
         ScopeContext scope = findScope(call.getArgs());
 
         // 19A section 3, in this order: permission -> MFA -> idempotency -> handler. The permission
@@ -80,7 +107,7 @@ public class CommandInterceptor {
             log.warn(
                     "{} ran outside an HTTP request: no idempotency check (K-03a covers HTTP only)",
                     call.getSignature().getDeclaringType().getSimpleName());
-            return call.proceed();
+            return proceedAs(call, new RunningCommand(handlerType.getSimpleName(), permission, null));
         }
 
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -105,13 +132,23 @@ public class CommandInterceptor {
             return deserialize(call, replay.result().body());
         }
 
-        Object result = call.proceed();
+        Object result = proceedAs(call, new RunningCommand(handlerType.getSimpleName(), permission, request.key()));
 
         String resultBody = mapper.writeValueAsString(result);
 
         idempotency.complete(key, new IdempotencyStore.StoredResult(COMMAND_SUCCESS, resultBody));
 
         return result;
+    }
+
+    /** Runs the handler with the command recorded as running on this thread, and forgets it after. */
+    private static Object proceedAs(ProceedingJoinPoint call, RunningCommand command) throws Throwable {
+        RUNNING.set(command);
+        try {
+            return call.proceed();
+        } finally {
+            RUNNING.remove();
+        }
     }
 
     /**
@@ -167,4 +204,10 @@ public class CommandInterceptor {
     }
 
     private record RequestData(String key, String requestHash) {}
+
+    /**
+     * The command running on this thread. Its permission and key are what an internal command
+     * runs under: the outer command's, checked and claimed once.
+     */
+    private record RunningCommand(String handler, String permission, String idempotencyKey) {}
 }

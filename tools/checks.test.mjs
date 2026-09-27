@@ -32,6 +32,11 @@ import {
 } from "./new-module.mjs";
 
 import {
+  problemsOfHandlerSource,
+  readSlices
+} from "./check-permissions.mjs";
+
+import {
   compareVersions,
   summarise,
   versionToMoveTo
@@ -914,6 +919,93 @@ test(
           1
         ]
       ]
+    );
+  }
+);
+
+// ---- permissions ------------------------------------------------------------
+
+const catalogueSlice = readSlices({
+  m2catalogue: "paths:\n  /v1/catalogue/skus:\n    post:\n      x-permission: cat.sku.create\n"
+}).sliceOf;
+
+const handler = (annotation) =>
+  problemsOfHandlerSource(
+    "Handler.java",
+    "m2catalogue",
+    `package x;\n\n${annotation}\npublic class Handler {}\n`,
+    catalogueSlice
+  );
+
+test(
+  "a handler with a quoted code of its slice, or with CommandHandler.INTERNAL, passes",
+  () => {
+    assert.deepEqual(handler('@CommandHandler(permission = "cat.sku.create")'), []);
+    assert.deepEqual(handler("@CommandHandler(permission = CommandHandler.INTERNAL)"), []);
+    assert.deepEqual(
+      handler("@CommandHandler(permission = lk.coopfed.knoweb.kernel.api.CommandHandler.INTERNAL, requiresMfa = true)"),
+      []
+    );
+  }
+);
+
+test(
+  "a handler whose permission is a constant or an expression is refused: nothing could compare it with the slice",
+  () => {
+    one(handler("@CommandHandler(permission = Permissions.SKU_CREATE)"), /is not a quoted permission code/);
+    one(handler('@CommandHandler(permission = "cat." + "sku.create")'), /is not a quoted permission code/);
+    one(handler("@CommandHandler(permission = INTERNAL)"), /is not a quoted permission code/);
+  }
+);
+
+test(
+  "the internal permission written as a string is refused: the constant says what it is",
+  () => {
+    one(handler('@CommandHandler(permission = "internal")'), /write CommandHandler.INTERNAL/);
+  }
+);
+
+test(
+  "a handler whose permission no operation carries is refused",
+  () => {
+    one(handler('@CommandHandler(permission = "cat.sku.delete")'), /not the x-permission of any operation/);
+    one(handler('@CommandHandler(permission = "todo.m2catalogue.create")'), /scaffold placeholder/);
+  }
+);
+
+test(
+  "an example in a comment is not read as a handler",
+  () => {
+    assert.deepEqual(handler("/** {@code @CommandHandler(permission = X.Y)} */"), []);
+  }
+);
+
+test(
+  "an operation with x-permission internal is refused: an internal command has no operation",
+  () => {
+    one(
+      readSlices({ m2catalogue: "paths:\n  /v1/catalogue/batches:\n    post:\n      x-permission: internal\n" }).problems,
+      /x-permission "internal" on an operation/
+    );
+    one(
+      readSlices({ m2catalogue: "      x-permission: \"todo.m2catalogue.create\"\n" }).problems,
+      /scaffold placeholder/
+    );
+  }
+);
+
+test(
+  "the real slices and handlers pass",
+  () => {
+    execFileSync(
+      process.execPath,
+      [
+        "tools/check-permissions.mjs"
+      ],
+      {
+        cwd: repo,
+        stdio: "pipe"
+      }
     );
   }
 );

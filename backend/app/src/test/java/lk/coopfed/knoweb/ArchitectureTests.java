@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
@@ -274,6 +275,146 @@ class ArchitectureTests {
                             javaClass.getName() + " is a @CommandHandler whose handle method is not"
                                     + " @Transactional (org.springframework.transaction.annotation)"));
                 }
+            }
+        };
+    }
+
+    @Test
+    void noControllerReachesAnInternalCommand() { // CR-19A-6
+        webDoesNotUseInternalCommandsRule().check(CLASSES);
+    }
+
+    @Test
+    void internalCommandsArePublishedThroughTheirModulesApi() { // CR-19A-6
+        internalHandlersImplementTheirApiRule().check(CLASSES);
+    }
+
+    @Test
+    void internalCommandsAreCalledOnlyFromCommandHandlers() { // CR-19A-6
+        internalCommandsCalledOnlyFromHandlersRule().check(CLASSES);
+    }
+
+    /**
+     * An internal command (CommandHandler.INTERNAL, CR-19A-6) has no permission and no
+     * idempotency key of its own: it borrows those of the command that calls it. A controller
+     * that reached it would expose it without either, so no class of a web package may use the
+     * handler, the api interface it implements, or a command record that interface takes. The
+     * interceptor refuses such a call at run time as well; this rule says so at build time.
+     */
+    static ArchRule webDoesNotUseInternalCommandsRule() {
+        return noClasses()
+                .that()
+                .resideInAPackage("..web..")
+                .should()
+                .dependOnClassesThat(INTERNAL_COMMAND_PART)
+                .because("an internal command runs only inside another command, which carries the"
+                        + " permission and the idempotency key (CR-19A-6); a controller calls that command")
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * Other modules reach an internal command through an interface of the owning module's api
+     * package (M2's BatchRegistration), never through the handler class in internal, and never
+     * through an interface of another module.
+     */
+    static ArchRule internalHandlersImplementTheirApiRule() {
+        return classes()
+                .that(ARE_INTERNAL_HANDLERS)
+                .should(implementAnInterfaceOfTheirOwnApi())
+                .allowEmptyShould(true);
+    }
+
+    /**
+     * The interface of an internal command (and the handler behind it) is called only by
+     * command handlers: a job, a consumer or a service that called it would run it outside a
+     * command, which the interceptor refuses at run time. Tests are not imported here, so a test
+     * may call it inside a command of its own (testsupport.OuterCommand).
+     */
+    static ArchRule internalCommandsCalledOnlyFromHandlersRule() {
+        return noClasses()
+                .that()
+                .areNotAnnotatedWith(CommandHandler.class)
+                .should(callAnInternalCommand())
+                .allowEmptyShould(true);
+    }
+
+    static boolean isInternalHandler(JavaClass javaClass) {
+        return javaClass.isAnnotatedWith(CommandHandler.class)
+                && CommandHandler.INTERNAL.equals(
+                        javaClass.getAnnotationOfType(CommandHandler.class).permission());
+    }
+
+    /**
+     * An interface of an internal handler's own module api (M2's BatchRegistration); not the
+     * kernel's Handles, which every handler implements.
+     */
+    static boolean isInternalCommandInterface(JavaClass javaClass) {
+        return javaClass.isInterface()
+                && javaClass.getAllSubclasses().stream()
+                        .anyMatch(sub ->
+                                isInternalHandler(sub) && ownApiPackageOf(sub).equals(javaClass.getPackageName()));
+    }
+
+    /** The api package of the module a class belongs to: its package up to ".internal", plus ".api". */
+    static String ownApiPackageOf(JavaClass javaClass) {
+        String pkg = javaClass.getPackageName();
+        int internal = pkg.indexOf(".internal");
+        return (internal < 0 ? pkg : pkg.substring(0, internal)) + ".api";
+    }
+
+    /** A record of the same api package that a method of such an interface takes: the command. */
+    static boolean isInternalCommandRecord(JavaClass javaClass) {
+        return javaClass.isRecord()
+                && javaClass.getMethodsWithParameterTypeOfSelf().stream()
+                        .map(method -> method.getOwner())
+                        .anyMatch(owner -> owner.getPackageName().equals(javaClass.getPackageName())
+                                && isInternalCommandInterface(owner));
+    }
+
+    private static final DescribedPredicate<JavaClass> ARE_INTERNAL_HANDLERS =
+            DescribedPredicate.describe("are internal command handlers", ArchitectureTests::isInternalHandler);
+
+    private static final DescribedPredicate<JavaClass> INTERNAL_COMMAND_PART = DescribedPredicate.describe(
+            "are internal command handlers, their api interfaces or their command records",
+            javaClass -> isInternalHandler(javaClass)
+                    || isInternalCommandInterface(javaClass)
+                    || isInternalCommandRecord(javaClass));
+
+    private static ArchCondition<JavaClass> implementAnInterfaceOfTheirOwnApi() {
+        return new ArchCondition<>("implement an interface of their own module's api package") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                String ownApi = ownApiPackageOf(javaClass);
+                boolean implementsOwnApi = javaClass.getAllRawInterfaces().stream()
+                        .anyMatch(i -> i.getPackageName().equals(ownApi));
+                if (!implementsOwnApi) {
+                    events.add(SimpleConditionEvent.violated(
+                            javaClass,
+                            javaClass.getName() + " is an internal command (CommandHandler.INTERNAL) that implements"
+                                    + " no interface of " + ownApi + "; other modules call it through one"
+                                    + " (CR-19A-6)"));
+                }
+            }
+        };
+    }
+
+    /** Used under noClasses(): every call of an internal command found is reported as one violation. */
+    private static ArchCondition<JavaClass> callAnInternalCommand() {
+        return new ArchCondition<>("call an internal command (only @CommandHandler classes may)") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                Stream.concat(
+                                javaClass.getMethodCallsFromSelf().stream(),
+                                javaClass.getMethodReferencesFromSelf().stream())
+                        .filter(access -> isInternalHandler(access.getTargetOwner())
+                                || isInternalCommandInterface(access.getTargetOwner()))
+                        .forEach(access -> events.add(SimpleConditionEvent.satisfied(
+                                access,
+                                javaClass.getName() + " calls the internal command "
+                                        + access.getTargetOwner().getSimpleName() + "." + access.getName()
+                                        + "(...) but is not a @CommandHandler; an internal command runs"
+                                        + " only inside another command (CR-19A-6) "
+                                        + access.getSourceCodeLocation())));
             }
         };
     }
