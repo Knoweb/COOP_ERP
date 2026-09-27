@@ -8,7 +8,7 @@
 // a security measure.
 //
 // Where the set comes from (doc 30 section 3, "visibility from the resolved permission set";
-// decided 27 September 2026, CR-19A-8): the kernel resolves the permissions of the user in the
+// decided 27 September 2026, CR-19A-9): the kernel resolves the permissions of the user in the
 // active scope (19A K-03b, PermissionResolver) and hands them to the client through
 // GET /v1/session (openapi/session.yaml). PermissionsContext.tsx reads it once per token; the
 // functions below only look at what it returned. The temporary role map that stood here until

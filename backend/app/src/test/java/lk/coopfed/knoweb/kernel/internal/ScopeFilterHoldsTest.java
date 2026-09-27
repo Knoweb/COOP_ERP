@@ -56,7 +56,7 @@ class ScopeFilterHoldsTest {
     @Test
     void anExternalCallerMayNameAGrantedEntityAndNoOther() {
         // A regulator's nominal scope is its home entity; it may name the entity of its grant,
-        // entity-wide, and no location of it and no third entity (CR-19A-8).
+        // entity-wide, and no location of it and no third entity (CR-19A-9).
         ScopeContext regulator = new ScopeContext(
                 UUID.randomUUID(),
                 null,

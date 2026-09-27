@@ -239,11 +239,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "catalogue.sku_tag",
                     "own_write (m2catalogue V0003) follows the parent SKU's owner; the matrix's made-up row has no SKU",
                     RlsMatrixIntegrationTest::childRowsFollowTheirParent),
-            new Departure(
-                    "catalogue.supplier",
-                    "authenticated_read (m2catalogue V0004): a batch is global and carries its supplier;"
-                            + " supplier names are business names",
-                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            // catalogue.supplier follows the template since m2catalogue V0007: beyond it, a supplier
+            // is read by everyone once a batch cites it (cited_read), which no made-up row is.
             new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
@@ -269,7 +266,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "kernel.notification_pending",
-                    "own_* only (kernel V0059): the recipient of a queued notification in clear, held until it"
+                    "own_* only (kernel V0059, V0063): what a retry of a queued notification needs, sealed, held until it"
                             + " is settled; the sweep reads it in the owner's scope, nobody else at all",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
             // The ENTITY series is the whole entity's: a shop-scoped session reads and advances it,

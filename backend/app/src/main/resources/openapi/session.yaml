@@ -3,7 +3,7 @@
 # interface is generated into lk.coopfed.knoweb.kernel.session.web.generated
 # (backend/app/build.gradle.kts, sliceOwners) and implemented by kernel.internal.security.
 #
-# Decided 27 September 2026 on the architect's delegation (CR-19A-8): the web shell reads the
+# Decided 27 September 2026 on the architect's delegation (CR-19A-9): the web shell reads the
 # caller's resolved permission set from this operation, not from a token claim. A claim is
 # fixed for the token's lifetime, a role change or a revoked grant must bite at once (doc 21
 # flow 6.5, "revocation immediate"), and doc 19 section 2.2 keeps permissions out of the token

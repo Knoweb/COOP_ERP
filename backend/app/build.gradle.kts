@@ -41,7 +41,7 @@ val generateOpenApi = tasks.register("generateOpenApi") {
 // section 8), so its interfaces go into the kernel's package. Generated under
 // lk.coopfed.knoweb.sync they would make "sync" an application module of its own, and the
 // kernel's controller would depend on it.
-// The session slice (the caller's resolved permission set, CR-19A-8) is the kernel's for the
+// The session slice (the caller's resolved permission set, CR-19A-9) is the kernel's for the
 // same reason.
 val sliceOwners = mapOf("sync" to "kernel.sync", "session" to "kernel.session")
 

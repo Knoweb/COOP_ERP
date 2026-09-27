@@ -350,7 +350,8 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         batchId,
                         UUID.fromString(skuId),
                         UUID.fromString(supplierId),
-                        MPCS);
+                        // Registered by another entity: the society neither registered it nor holds a lot.
+                        UUID.fromString("0190e672-0000-7000-8000-00000000000d"));
         kernel.reset();
 
         // GET /batches?skuId=, GET /batches/{batchId}
@@ -375,7 +376,8 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(missing.getBody().get("code").asText()).isEqualTo("m2.batch.not_found");
 
-        // POST /batches/{batchId}/correct: the society holds no lot (M5 not built), the Federation may.
+        // POST /batches/{batchId}/correct: the society did not register the batch and holds no lot (M5 not
+        // built), the Federation may.
         Map<String, Object> correction = Map.of("printedMrp", 1080.00, "reasonCode", "MISKEYED");
         headers.set("Idempotency-Key", UUID.randomUUID().toString());
         ResponseEntity<JsonNode> refused = http.exchange(

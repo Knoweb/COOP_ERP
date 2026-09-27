@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * place, so that a change to the rule (the freshness window from the register, doc 19 DR-7)
  * reaches every caller at once instead of a copy of the rule keeping the old one.
  *
- * <p>Two rules by class, decided 27 September 2026 (CR-19A-8): a command runs in the OWN class
+ * <p>Two rules by class, decided 27 September 2026 (CR-19A-9): a command runs in the OWN class
  * only, whatever the resolver says (doc 18 section 3.7: the read-only classes write nothing;
  * said here and not left to the resolver, because a read code and a command code may be one
  * string, as {@code gov.external.grant} is); a read passes when the caller holds its code, and

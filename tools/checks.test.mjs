@@ -995,7 +995,7 @@ test(
 );
 
 test(
-  "x-permission authenticated is for a GET of the caller's own facts, never a command (CR-19A-8)",
+  "x-permission authenticated is for a GET of the caller's own facts, never a command (CR-19A-9)",
   () => {
     assert.deepEqual(
       readSlices({ session: "paths:\n  /v1/session:\n    get:\n      x-permission: authenticated\n" }).problems,

@@ -14,7 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * The resolver over M1's tables (19A section 3), by policy class (CR-19A-8, decided 27
+ * The resolver over M1's tables (19A section 3), by policy class (CR-19A-9, decided 27
  * September 2026):
  *
  * <ul>

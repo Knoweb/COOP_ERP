@@ -29,7 +29,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * The kernel enforces the x-permission of every GET (CR-19A-8, decided 27 September 2026), with
+ * The kernel enforces the x-permission of every GET (CR-19A-9, decided 27 September 2026), with
  * enforcement on, over HTTP, for every class of caller:
  *
  * <ul>

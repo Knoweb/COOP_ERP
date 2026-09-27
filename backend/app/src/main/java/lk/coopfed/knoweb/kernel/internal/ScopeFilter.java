@@ -100,7 +100,7 @@ public class ScopeFilter extends OncePerRequestFilter {
     /**
      * @param scopeMayBeUnnamed true for the one operation a caller holding several scopes may
      *                          call without choosing one: the session read, which is how a
-     *                          client learns the scopes it may choose from (CR-19A-8)
+     *                          client learns the scopes it may choose from (CR-19A-9)
      */
     static void validate(ScopeContext scope, Function<UUID, Optional<UUID>> ownerOf, boolean scopeMayBeUnnamed) {
         if (scope == null) {
@@ -132,7 +132,7 @@ public class ScopeFilter extends OncePerRequestFilter {
                 && scope.grantedEntities().contains(active.entityId())) {
             // A regulator may name the entity it inspects as its active scope (doc 21 flow 6.5);
             // it need not: its home entity is its nominal scope, and ext_view reads the granted
-            // entities whichever is named. Decided 27 September 2026 (CR-19A-8).
+            // entities whichever is named. Decided 27 September 2026 (CR-19A-9).
             return true;
         }
         return active.locationId() != null

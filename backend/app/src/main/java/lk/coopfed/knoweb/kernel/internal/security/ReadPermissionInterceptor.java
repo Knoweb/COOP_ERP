@@ -16,7 +16,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * The kernel enforces the {@code x-permission} of every GET on the generated interfaces
- * (decided 27 September 2026, CR-19A-8; doc 19 section 3.4: "permission code required by the
+ * (decided 27 September 2026, CR-19A-9; doc 19 section 3.4: "permission code required by the
  * operation", reads included), so no controller checks a read by hand and a module cannot
  * forget one. Before the controller runs: the request's path template (the one the slice
  * declares and the generated interface maps) names the operation, {@link SliceOperations}

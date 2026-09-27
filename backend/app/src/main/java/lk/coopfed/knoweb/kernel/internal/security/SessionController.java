@@ -15,7 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code GET /v1/session} (openapi/session.yaml; CR-19A-8): the caller's own facts as the
+ * {@code GET /v1/session} (openapi/session.yaml; CR-19A-9): the caller's own facts as the
  * kernel resolved them for this request, and the permissions resolved for the active scope.
  * The web shell decides what to show from the permission list (doc 30 section 3, "visibility
  * from the resolved permission set"); the server checks every request regardless. The read of

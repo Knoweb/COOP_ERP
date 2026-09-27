@@ -39,12 +39,15 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("sku", with("own_update", "shared_read")),
             Map.entry("sku_uom_conversion", with("own_update", "shared_read")),
             Map.entry("sku_barcode", with("own_update", "shared_read")),
-            Map.entry("tag", with("own_update", "governed_read", "seed_reference")),
+            // V0007 (CR-22A-1): the Federation writes the governed tags.
+            Map.entry(
+                    "tag", with("own_update", "governed_read", "seed_reference", "governed_write", "governed_update")),
             Map.entry("sku_tag", with("shared_read")),
             // V0004 (M2-05): the correction policies that admit the trigger batch_correction.
             Map.entry("batch", with("own_update", "shared_read", "correction_read", "correction_supersede")),
             Map.entry("batch_key", with("own_update", "shared_read", "correction_read", "correction_repoint")),
-            Map.entry("supplier", with("authenticated_read")),
+            // V0007: a supplier is read beyond its owner once a batch cites it.
+            Map.entry("supplier", with("cited_read")),
             // V0005 (M2-06): the images; own_write follows the SKU, shared_read the SKU owner's rows.
             Map.entry("sku_image", with("own_update", "shared_read")));
 

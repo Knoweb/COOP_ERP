@@ -19,7 +19,7 @@ import org.yaml.snakeyaml.Yaml;
  * {@code x-permission} of each operation by method and path template, and the set of read
  * permissions (the {@code x-permission} of every GET a user may call). The slices are the
  * contract (17A section 3: "the slice is the source"); the kernel enforces a GET's permission
- * from here (CR-19A-8, {@link ReadPermissionInterceptor}), so no controller checks a read by
+ * from here (CR-19A-9, {@link ReadPermissionInterceptor}), so no controller checks a read by
  * hand and no module can forget one.
  *
  * <p>The path template is the one the generated interface maps ({@code /v1/catalogue/skus/{skuId}}),

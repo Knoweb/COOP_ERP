@@ -5,7 +5,7 @@
 -- run again.
 --
 -- Why: K-02 puts the token's user behind every request, K-03b resolves the permission of every
--- command from these tables, and since 27 September 2026 (CR-19A-8) the kernel resolves the
+-- command from these tables, and since 27 September 2026 (CR-19A-9) the kernel resolves the
 -- permission of every read the same way and hands the web shell the resolved set
 -- (GET /v1/session), so what a user SEES in the back office is what these rows say. The user
 -- ids are the `id` of each realm user, which is what the token's `sub` carries; without these
@@ -22,7 +22,7 @@
 -- through M1's role management (M1-08). The cashier holds the reads of the catalogue and no
 -- command, so that the browser tests have one user who is shown a screen without its form
 -- (web/e2e/roles-and-scope.spec.ts). fed-admin's token carries the FEDERATION_VIEW class, which
--- resolves to every read of every slice and no command (K-03b, CR-19A-8), whatever its rows say;
+-- resolves to every read of every slice and no command (K-03b, CR-19A-9), whatever its rows say;
 -- its role here is for the day the class is switched.
 
 -- The hello module's permissions are the template module's and not in M1's catalogue

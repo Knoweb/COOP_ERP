@@ -46,6 +46,10 @@ class AttachmentService implements Attachments {
     static final String MAX_BYTES = "attachment.max_bytes";
     static final String CONTENT_TYPES = "attachment.content_types";
     static final String VERIFY_BATCH_SIZE = "attachment.verify.batch_size";
+    static final String UPLOAD_URL_MINUTES = "attachment.upload_url_minutes";
+    static final String FAILED_RETENTION_DAYS = "attachment.failed_retention_days";
+    static final String CLEANUP_BATCH_SIZE = "attachment.cleanup.batch_size";
+    static final String AUDIT_OBJECT_DELETED = "ATTACHMENT_OBJECT_DELETED";
 
     private static final Pattern CONTENT_TYPE = Pattern.compile("[a-z]+/[a-z0-9.+-]+");
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
@@ -56,7 +60,7 @@ class AttachmentService implements Attachments {
     private final EventPublisher events;
     private final ConfigRegistry config;
     private final Clock clock;
-    private final Duration presignFor;
+    private final Duration readUrlFor;
 
     AttachmentService(
             JdbcTemplate jdbc,
@@ -65,14 +69,14 @@ class AttachmentService implements Attachments {
             EventPublisher events,
             ConfigRegistry config,
             Clock clock,
-            @Value("${coop-erp.object-store.presign-minutes}") int presignMinutes) {
+            @Value("${coop-erp.object-store.presign-minutes}") int readUrlMinutes) {
         this.jdbc = jdbc;
         this.store = store;
         this.audit = audit;
         this.events = events;
         this.config = config;
         this.clock = clock;
-        this.presignFor = Duration.ofMinutes(presignMinutes);
+        this.readUrlFor = Duration.ofMinutes(readUrlMinutes);
     }
 
     @Override
@@ -112,7 +116,7 @@ class AttachmentService implements Attachments {
         UUID id = attachmentId == null ? Ids.next() : attachmentId;
         String key = keyOf(ownerEntityId, documentId, id);
         Instant now = clock.instant();
-        Instant expiresAt = now.plus(presignFor);
+        Instant expiresAt = now.plus(uploadUrlFor(ctx));
 
         // Asking again for the same attachment (a till that lost its connection and comes back,
         // doc 32 section 4: the upload is resumable and the URL lasts fifteen minutes) renews the
@@ -152,7 +156,7 @@ class AttachmentService implements Attachments {
                     Timestamp.from(expiresAt));
         }
 
-        URI url = store.presignPut(key, contentType, contentLength, presignFor);
+        URI url = store.presignPut(key, contentType, contentLength, Duration.between(now, expiresAt));
 
         audit.record(
                 AUDIT_PRESIGNED,
@@ -171,7 +175,7 @@ class AttachmentService implements Attachments {
                         "select object_key, content_type from kernel.document_attachment"
                                 + " where attachment_id = ? and status = 'COMPLETE'",
                         (rs, rowNum) ->
-                                store.presignGet(rs.getString("object_key"), rs.getString("content_type"), presignFor),
+                                store.presignGet(rs.getString("object_key"), rs.getString("content_type"), readUrlFor),
                         attachmentId)
                 .stream()
                 .findFirst();
@@ -217,8 +221,19 @@ class AttachmentService implements Attachments {
         }
     }
 
-    Duration presignFor() {
-        return presignFor;
+    /**
+     * How long an upload URL is valid: the register's {@code attachment.upload_url_minutes}
+     * (decided 27 September 2026, CR-19A-8). The verifier settles a row only after its URL has
+     * expired, so this, plus the verifier's interval, is how long a decision waiting on the
+     * evidence waits after the upload; shortening it is how the wait is shortened.
+     */
+    Duration uploadUrlFor(ScopeContext ctx) {
+        return Duration.ofMinutes(config.getInt(UPLOAD_URL_MINUTES, ctx, 15));
+    }
+
+    /** How long a read URL is valid ({@code coop-erp.object-store.presign-minutes}). */
+    Duration readUrlFor() {
+        return readUrlFor;
     }
 
     private Set<String> allowedContentTypes(ScopeContext ctx) {
@@ -280,9 +295,10 @@ class AttachmentService implements Attachments {
     boolean complete(Pending row, String hash, ScopeContext ctx) {
         requireTransaction();
         int settled = jdbc.update(
-                "update kernel.document_attachment set status = 'COMPLETE', content_hash = ?"
+                "update kernel.document_attachment set status = 'COMPLETE', content_hash = ?, settled_at = ?"
                         + " where attachment_id = ? and status = 'PENDING'",
                 hash,
+                Timestamp.from(clock.instant()),
                 row.attachmentId());
         if (settled == 0) {
             return false;
@@ -301,7 +317,9 @@ class AttachmentService implements Attachments {
     boolean fail(Pending row, String why, ScopeContext ctx) {
         requireTransaction();
         int settled = jdbc.update(
-                "update kernel.document_attachment set status = 'FAILED' where attachment_id = ? and status = 'PENDING'",
+                "update kernel.document_attachment set status = 'FAILED', settled_at = ?"
+                        + " where attachment_id = ? and status = 'PENDING'",
+                Timestamp.from(clock.instant()),
                 row.attachmentId());
         if (settled == 0) {
             return false;
@@ -313,6 +331,62 @@ class AttachmentService implements Attachments {
                 Map.of("status", "FAILED", "attachmentId", row.attachmentId().toString()),
                 ctx,
                 why);
+        return true;
+    }
+
+    // ---- what the clean-up job does (kernel V0063) --------------------------------------------
+
+    /** A FAILED attachment whose object is still in the store. */
+    record Failed(UUID attachmentId, UUID documentId, UUID ownerEntityId, String objectKey) {}
+
+    /**
+     * FAILED attachments settled before {@code settledBefore} whose object has not been deleted,
+     * the oldest first, at most {@code limit}, under the caller's scope (the job reads as a
+     * federation-wide viewer). A row settled before V0063 has no settled_at and counts from the
+     * end of its upload window, or from when it was captured.
+     */
+    List<Failed> failedWithObject(Instant settledBefore, int limit) {
+        return jdbc.query(
+                """
+                select a.attachment_id, a.document_id, d.owner_entity_id, a.object_key
+                  from kernel.document_attachment a
+                  join kernel.document d on d.document_id = a.document_id
+                 where a.status = 'FAILED' and a.object_deleted_at is null
+                   and coalesce(a.settled_at, a.upload_expires_at, a.captured_at) < ?
+                 order by coalesce(a.settled_at, a.upload_expires_at, a.captured_at)
+                 limit ?
+                """,
+                (rs, rowNum) -> new Failed(
+                        rs.getObject("attachment_id", UUID.class),
+                        rs.getObject("document_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getString("object_key")),
+                Timestamp.from(settledBefore),
+                limit);
+    }
+
+    /**
+     * The object of a FAILED attachment is gone from the store: the row says when, once, audited.
+     * The row itself stays (it is part of the document's history); only the bytes that failed
+     * verification are not kept.
+     */
+    boolean objectDeleted(Failed row, ScopeContext ctx) {
+        requireTransaction();
+        int changed = jdbc.update(
+                "update kernel.document_attachment set object_deleted_at = ?"
+                        + " where attachment_id = ? and status = 'FAILED' and object_deleted_at is null",
+                Timestamp.from(clock.instant()),
+                row.attachmentId());
+        if (changed == 0) {
+            return false;
+        }
+        audit.record(
+                AUDIT_OBJECT_DELETED,
+                Subject.of("document", row.documentId()),
+                Map.of("status", "FAILED"),
+                Map.of("attachmentId", row.attachmentId().toString(), "objectKey", row.objectKey()),
+                ctx,
+                "Failed upload kept past its retention");
         return true;
     }
 

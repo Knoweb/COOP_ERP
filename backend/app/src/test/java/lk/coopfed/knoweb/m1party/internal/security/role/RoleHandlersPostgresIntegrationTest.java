@@ -676,7 +676,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Test
         void theFederationGivesAnExternalRoleToAnExternalUserAndToNobodyElse() {
-            // Doc 21 flow 6.5 (CR-19A-8): the Regulator template reaches the EXTERNAL user the
+            // Doc 21 flow 6.5 (CR-19A-9): the Regulator template reaches the EXTERNAL user the
             // Federation created; the grant of M1-09 then says where and until when.
             UUID regulatorTemplate = fx.roleOfClass(null, "EXTERNAL_TIMEBOXED", "prt.location.view");
             UUID regulator = fx.externalUser(federation);

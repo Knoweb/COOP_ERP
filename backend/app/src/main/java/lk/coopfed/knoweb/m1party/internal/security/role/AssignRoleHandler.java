@@ -87,7 +87,7 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
         // role (the Regulator and Auditor templates) is the Federation's to give an EXTERNAL user
         // it created (doc 21 flow 6.5): the role says what the regulator may read, the external
         // grant of M1-09 says in which entities and until when; the kernel resolves the two
-        // together (CR-19A-8, decided 27 September 2026). Nobody else assigns either class.
+        // together (CR-19A-9, decided 27 September 2026). Nobody else assigns either class.
         boolean federation = records.scopeIsFederation();
         boolean classPermits = "OWN".equals(role.roleClass())
                 || ("FEDERATION_VIEW".equals(role.roleClass()) && federation)

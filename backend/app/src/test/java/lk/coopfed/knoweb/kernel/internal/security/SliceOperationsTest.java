@@ -8,7 +8,7 @@ import org.yaml.snakeyaml.Yaml;
 
 /**
  * The slices read at start: every GET's permission by its path template, and the read set a
- * FEDERATION_VIEW caller holds (CR-19A-8).
+ * FEDERATION_VIEW caller holds (CR-19A-9).
  */
 class SliceOperationsTest {
 

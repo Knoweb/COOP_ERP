@@ -59,6 +59,12 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
     AttachmentVerifier verifier;
 
     @Autowired
+    AttachmentCleanupJob cleanup;
+
+    @Autowired
+    lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
+
+    @Autowired
     DocumentBaseRepository documents;
 
     @Autowired
@@ -350,6 +356,104 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .extracting(r -> r.eventType())
                 .containsExactly("ATTACHMENT_FAILED", "ATTACHMENT_FAILED");
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void theCleanUpDeletesTheFileOfAFailedUploadAfterItsRetentionAndNeverACompleteOne() {
+        byte[] photo = "a photograph".getBytes(StandardCharsets.UTF_8);
+        PresignedUpload good = inScope(
+                OWNER,
+                () -> attachments.presignUpload(documentId, null, "image/jpeg", null, sha256(photo), scope(OWNER)));
+        PresignedUpload wrong = inScope(
+                OWNER,
+                () -> attachments.presignUpload(
+                        documentId,
+                        null,
+                        "image/jpeg",
+                        null,
+                        sha256("what was announced".getBytes(StandardCharsets.UTF_8)),
+                        scope(OWNER)));
+        store.objects.put(good.objectKey(), photo);
+        store.objects.put(wrong.objectKey(), "what arrived".getBytes(StandardCharsets.UTF_8));
+        windowOver(good.attachmentId());
+        windowOver(wrong.attachmentId());
+        assertThat(verifier.verifyPending()).isEqualTo(2);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.document_attachment where settled_at is not null",
+                                Integer.class))
+                .isEqualTo(2);
+        kernel.reset();
+
+        // Inside the retention (attachment.failed_retention_days, 30 by default) the file is kept.
+        assertThat(cleanup.deleteFailedObjects()).isZero();
+        assertThat(store.objects).containsKey(wrong.objectKey());
+
+        // Settled 31 days ago, both: only the FAILED one's file goes, once, audited; the rows stay.
+        superuserJdbc()
+                .execute("begin; set local session_replication_role = replica;"
+                        + " update kernel.document_attachment set settled_at = now() - interval '31 days'"
+                        + " where document_id = '" + documentId + "'; commit;");
+        assertThat(cleanup.deleteFailedObjects()).isEqualTo(1);
+        assertThat(store.objects).doesNotContainKey(wrong.objectKey()).containsKey(good.objectKey());
+        assertThat(kernel.committedAudit()).extracting(r -> r.eventType()).containsExactly("ATTACHMENT_OBJECT_DELETED");
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select status, object_deleted_at is not null as gone from kernel.document_attachment"
+                                        + " where attachment_id = ?",
+                                wrong.attachmentId()))
+                .containsEntry("status", "FAILED")
+                .containsEntry("gone", true);
+        assertThat(inScope(OWNER, () -> attachments.status(good.attachmentId())))
+                .contains("COMPLETE");
+
+        kernel.reset();
+        assertThat(cleanup.deleteFailedObjects()).isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        // The one change a settled row admits happens once, on a FAILED row only (kernel V0063).
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> jdbc.update(
+                                "update kernel.document_attachment set object_deleted_at = now() where attachment_id = ?",
+                                wrong.attachmentId())))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("attachment.immutable");
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> jdbc.update(
+                                "update kernel.document_attachment set object_deleted_at = now() where attachment_id = ?",
+                                good.attachmentId())))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("attachment.immutable");
+    }
+
+    @Test
+    void anUploadUrlLastsWhatTheRegisterSays() {
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, scope_location_id, value, changed_by)"
+                                + " values ('attachment.upload_url_minutes', null, null, '5'::jsonb, ?)",
+                        USER);
+        config.invalidate("attachment.upload_url_minutes");
+        try {
+            PresignedUpload upload = inScope(
+                    OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", null, null, scope(OWNER)));
+            assertThat(upload.expiresAt())
+                    .isBetween(
+                            java.time.Instant.now().plusSeconds(4 * 60),
+                            java.time.Instant.now().plusSeconds(5 * 60 + 1));
+            assertThat(superuserJdbc()
+                            .queryForObject(
+                                    "select upload_expires_at < now() + interval '6 minutes'"
+                                            + " from kernel.document_attachment where attachment_id = ?",
+                                    Boolean.class,
+                                    upload.attachmentId()))
+                    .isTrue();
+        } finally {
+            superuserJdbc().update("delete from kernel.config_value where key = 'attachment.upload_url_minutes'");
+            config.invalidate("attachment.upload_url_minutes");
+        }
     }
 
     @Test

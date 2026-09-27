@@ -121,7 +121,9 @@ permissions:
     scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
-  # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa.
+  # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes
+  # of 22A section 3.1, plus two recorded in docs/change-requests/CR-22A-3.md (decided 27 Sep
+  # 2026): cat.sku.view, the reads, and cat.tag.govern, the Federation's governed tags.
   - code: "cat.sku.view"
     module: "m2catalogue"
     description_en: "View catalogue items visible in the current scope"
@@ -152,8 +154,12 @@ permissions:
     scope: "ENTITY"
   - code: "cat.tag.manage"
     module: "m2catalogue"
-    description_en: "Define tags and tag items (governed tags by the Federation only)"
+    description_en: "Define the entity's own tags and tag its items"
     scope: "ENTITY"
+  - code: "cat.tag.govern"
+    module: "m2catalogue"
+    description_en: "Define governed tags and put them on shared items"
+    scope: "FEDERATION"
   - code: "cat.tax.publish"
     module: "m2catalogue"
     description_en: "Define tax categories and publish tax rates"

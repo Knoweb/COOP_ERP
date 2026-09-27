@@ -1,6 +1,6 @@
 // The resolved permission set of the signed-in user, read from the server once per token.
 //
-// GET /v1/session (openapi/session.yaml; decided 27 September 2026, CR-19A-8) answers who the
+// GET /v1/session (openapi/session.yaml; decided 27 September 2026, CR-19A-9) answers who the
 // caller is, the scopes they hold, and the permissions the kernel resolved for the active
 // scope. The shell keeps that answer here; permissions.ts asks it. A renewed token reads it
 // again (a role change or a revoked grant then shows within the token's lifetime), and the

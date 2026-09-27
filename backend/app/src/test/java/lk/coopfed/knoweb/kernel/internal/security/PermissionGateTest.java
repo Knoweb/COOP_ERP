@@ -80,7 +80,7 @@ class PermissionGateTest {
 
     @Test
     void aCommandRunsInTheOwnClassOnlyWhateverTheResolverSays() {
-        // CR-19A-8: a read code and a command code may be one string (gov.external.grant), and a
+        // CR-19A-9: a read code and a command code may be one string (gov.external.grant), and a
         // FEDERATION_VIEW caller resolves every read; the class rule keeps it from the command.
         when(permissions.allows(any(), eq(PERMISSION))).thenReturn(true);
 
