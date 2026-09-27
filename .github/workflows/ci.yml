@@ -175,7 +175,14 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
 
+      # K-06b: the A4 renderer's test prints with the worker image's Chromium (the runner's Google
+      # Chrome never exited after printing). Built while nothing else runs; about two minutes.
+      - name: Worker base image (Chromium for the A4 renderer test)
+        run: docker build --quiet --tag coop-erp/worker-base:dev infra/worker-image
+
       - name: make test-int
+        env:
+          CHROMIUM_PATH: ${{ github.workspace }}/tools/chromium-in-docker.sh
         run: make test-int
 
       # One coverage report over the integration tests. A report, not a gate: floors are set per

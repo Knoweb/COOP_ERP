@@ -45,8 +45,8 @@ import org.springframework.test.context.DynamicPropertySource;
  * extracts to the strings that went in, and the three Noto families are embedded in it. The
  * rendering is stored, audited and published once; the guards refuse what they must.
  *
- * <p>Needs a Chromium: {@code CHROMIUM_PATH}, or one of the usual places (the pipeline's runner
- * has Google Chrome). Without one the test is skipped on a laptop and fails in the pipeline
+ * <p>Needs a Chromium: {@code CHROMIUM_PATH}, or one of the usual places (the pipeline points it
+ * at the worker image's Chromium, {@code tools/chromium-in-docker.sh}). Without one the test is skipped on a laptop and fails in the pipeline
  * ({@code CI} set), so it cannot pass there by being skipped. Tagged {@code chromium} as well,
  * so it can be selected or left out on its own.
  */
