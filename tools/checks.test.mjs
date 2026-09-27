@@ -1199,6 +1199,31 @@ test(
 );
 
 test(
+  // CR-19A-4: the sync slice breaks no rule check-slices.mjs enforces. It carries every
+  // operation under /v1/ (so the till gets the same "everything under /v1 needs a token" rule
+  // as everyone else), a real Idempotency-Key on its mutating operations, and an x-permission
+  // whose value is a device marker ("sync.device") rather than a catalogue permission a role
+  // could hold — check-slices.mjs only checks that x-permission is present, never what it
+  // means, so this passes with no special case for sync.yaml.
+  "a device-authenticated slice (like sync.yaml) needs no exemption: a marker x-permission and a real Idempotency-Key satisfy the ordinary rules",
+  () => {
+    assert.deepEqual(
+      problemsOfSlice(
+        "sync",
+        slice(
+          operation("/v1/sync/devices/{id}/batches", "post", {
+            operationId: "uploadBatch",
+            permission: "sync.device",
+            idempotencyKey: true
+          })
+        )
+      ),
+      []
+    );
+  }
+);
+
+test(
   "the same operationId in two slices is refused, even though each slice is fine alone",
   () => {
     one(
