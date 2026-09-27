@@ -71,7 +71,12 @@ class OrderController implements OrderApi {
                 .map(line -> new CreateOrder.Line(line.getSkuId(), line.getUomCode(), line.getQty()))
                 .toList();
         UUID orderId = create.handle(
-                new CreateOrder(request.getSellerEntityId(), request.getRequestedEta(), request.getNotes(), lines),
+                new CreateOrder(
+                        request.getSellerEntityId(),
+                        request.getRequestedEta(),
+                        request.getNotes(),
+                        lines,
+                        request.getDeliverToLocationId()),
                 scope);
         return ResponseEntity.created(URI.create("/v1/trading/orders/" + orderId))
                 .body(read(orderId, scope));
@@ -155,6 +160,7 @@ class OrderController implements OrderApi {
         response.setRejectReasonCode(order.rejectReasonCode());
         response.setNetAmount(order.netAmount());
         response.setNotes(order.notes());
+        response.setDeliverToLocationId(order.deliverToLocationId());
         return response;
     }
 

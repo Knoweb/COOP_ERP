@@ -158,10 +158,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The transfers leaving or arriving at a location, newest first
+         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status IN_TRANSIT until the destination receives, then RECEIVED.
+         */
+        get: operations["listTransfers"];
+        put?: never;
+        /**
+         * Send stock from one location of the entity to another (issue and dispatch)
+         * @description The stock leaves the source as TRANSFER_OUT and is in transit until the destination receives it. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid, m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found, m5.transfer.insufficient_stock.
+         */
+        post: operations["issueTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/transfers/{transferId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One transfer with its lines */
+        get: operations["getTransfer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/transfers/{transferId}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The destination receives the transfer in full
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.already_received.
+         */
+        post: operations["receiveTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        IssueTransferRequest: {
+            /** Format: uuid */
+            fromLocationId: string;
+            /** Format: uuid */
+            toLocationId: string;
+            lines: components["schemas"]["TransferLineRequest"][];
+        };
+        TransferLineRequest: {
+            /** Format: uuid */
+            batchId: string;
+            qty: number;
+        };
+        TransferResponse: {
+            /** Format: uuid */
+            transferId: string;
+            /** Format: uuid */
+            fromLocationId: string;
+            /** Format: uuid */
+            toLocationId: string;
+            /** @enum {string} */
+            status: "IN_TRANSIT" | "RECEIVED";
+            /** Format: uuid */
+            issuedBy?: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            /** Format: uuid */
+            receivedBy?: string;
+            /** Format: date-time */
+            receivedAt?: string;
+            lines: components["schemas"]["TransferLineResponse"][];
+        };
+        TransferLineResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            skuId: string;
+            qty: number;
+        };
         MovementResponse: {
             /** Format: uuid */
             movementId: string;
@@ -549,6 +649,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpeningBalanceResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTransfers: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transfers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    issueTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Issued, in status IN_TRANSIT */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            /** @description No such transfer, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    receiveTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Received */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
                 };
             };
             422: components["responses"]["RuleBroken"];

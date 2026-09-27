@@ -95,6 +95,9 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(invoice.taxAmount()).isEqualByComparingTo("230.40");
         assertThat(invoice.grossAmount()).isEqualByComparingTo("1510.40");
         assertThat(invoice.sellerVatNo()).isEqualTo("209876543-7000");
+        // CR-21A-6: the buyer's VAT number, read through M1's counterparty view now that it
+        // carries it (an active relationship between SELLER and BUYER; TradingFixture.arrange).
+        assertThat(invoice.buyerVatNo()).isEqualTo("109876543-7000");
         assertThat(invoice.grnIds()).containsExactly(grnId);
         assertThat(invoice.lines()).hasSize(2).allSatisfy(line -> assertThat(line.batchId())
                 .isNotNull());
@@ -105,6 +108,7 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .contains("DOCUMENT_ISSUED", "INVOICE_ISSUED");
         assertThat(events(InvoiceIssued.class)).singleElement().satisfies(event -> {
             assertThat(event.buyerEntityId()).isEqualTo(BUYER);
+            assertThat(event.buyerVatNo()).isEqualTo("109876543-7000");
             assertThat(event.grossAmount()).isEqualByComparingTo("1510.40");
             assertThat(event.contentHash()).hasSize(64);
         });

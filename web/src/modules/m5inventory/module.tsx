@@ -9,6 +9,7 @@ import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { NewOpeningBalancePage } from "./NewOpeningBalancePage";
 import { OpeningBalancePage } from "./OpeningBalancePage";
 import { StockPage } from "./StockPage";
+import { TransfersPage } from "./TransfersPage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -23,12 +24,21 @@ export const inventoryModule: ModuleDefinition = {
         </RequirePermission>
       )
     },
-    { path: "inventory/opening/:openingBalanceId", element: <OpeningBalancePage /> }
+    { path: "inventory/opening/:openingBalanceId", element: <OpeningBalancePage /> },
+    // M5-09 (demo scope): send stock to another location of the entity, receive it there.
+    { path: "inventory/transfers", element: <TransfersPage /> }
   ],
 
   // The label is a message id of inventory.messages.json, never literal text.
   navItems: [{ labelId: "inventory.nav", to: "/inventory" }],
 
   // x-permissions of openapi/m5inventory.yaml, read from the session's resolved set (PR #144).
-  requiredPermissions: ["inv.stock.view", "inv.opening.prepare", "inv.opening.sign", "inv.opening.countersign"]
+  requiredPermissions: [
+    "inv.stock.view",
+    "inv.opening.prepare",
+    "inv.opening.sign",
+    "inv.opening.countersign",
+    "inv.transfer.issue",
+    "shop.transfer.receive"
+  ]
 };

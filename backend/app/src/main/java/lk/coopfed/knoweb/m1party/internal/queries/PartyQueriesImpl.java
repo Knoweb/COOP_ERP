@@ -53,7 +53,8 @@ class PartyQueriesImpl implements PartyQueries {
                 entity_id,
                 legal_name_en,
                 legal_name_si,
-                legal_name_ta
+                legal_name_ta,
+                vat_registration_no
             from party.entity_party_directory
             """;
 
@@ -75,18 +76,28 @@ class PartyQueriesImpl implements PartyQueries {
         }
 
         if (scope.policyClass() == PolicyClass.PARTY) {
-            return jdbc
-                    .query(
-                            PARTY_SELECT
-                                    + """
-                                     where entity_id = ?
-                                    """,
-                            PARTY_MAPPER,
-                            entityId)
-                    .stream()
-                    .findFirst();
+            return directoryLookup(entityId);
         }
 
+        Optional<EntityView> full = fullLookup(entityId);
+
+        if (full.isPresent()) {
+            return full;
+        }
+
+        // Not the caller's own row (party.entity's own_read policy shows only that): an
+        // OWN-scoped caller reading a trading counterparty falls back to the same directory a
+        // PARTY-scoped caller reads (CR-21A-6; M4's IssueInvoiceHandler reads the buyer's VAT
+        // number this way). Row-level security on the directory decides whether an active
+        // relationship makes the row visible; every other OWN-scoped miss stays a miss.
+        if (scope.policyClass() == PolicyClass.OWN) {
+            return directoryLookup(entityId);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<EntityView> fullLookup(UUID entityId) {
         return jdbc
                 .query(
                         FULL_SELECT
@@ -94,6 +105,19 @@ class PartyQueriesImpl implements PartyQueries {
                                  where entity_id = ?
                                 """,
                         FULL_MAPPER,
+                        entityId)
+                .stream()
+                .findFirst();
+    }
+
+    private Optional<EntityView> directoryLookup(UUID entityId) {
+        return jdbc
+                .query(
+                        PARTY_SELECT
+                                + """
+                                 where entity_id = ?
+                                """,
+                        PARTY_MAPPER,
                         entityId)
                 .stream()
                 .findFirst();
@@ -404,7 +428,7 @@ class PartyQueriesImpl implements PartyQueries {
                 rs.getString("legal_name_si"),
                 rs.getString("legal_name_ta"),
                 null,
-                null,
+                rs.getString("vat_registration_no"),
                 null,
                 null,
                 null,
