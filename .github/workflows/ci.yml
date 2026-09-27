@@ -32,7 +32,9 @@
 # Vulnerable dependencies are reported by security-scan.yml, pull request titles are checked
 # by pr-title.yml, and dependency updates come from dependabot.yml.
 #
-# How the jobs are ordered, and why. build-verify, integration-test, till, scaffolder,
+# How the jobs are ordered, and why. On a pull request the small job `changes` looks first at
+# which files changed (a few seconds) and the jobs with nothing to do are skipped; see the rules
+# above that job. Then build-verify, integration-test, till, scaffolder,
 # stack-smoke and secret-scan start together: none of them needs another's output (each compiles what it
 # needs itself), and a pull request is answered in the time of the longest one instead of the
 # sum of two. Only package-main, on main, waits for every test job (build-verify,
@@ -76,9 +78,87 @@ env:
 # run on a changed tree.
 jobs:
 
+  # What a pull request changed decides which jobs have work to do (28 September 2026). The rules:
+  #   docs only (docs/**, any *.md)  the title check, the secret scan and the docs check only
+  #   web only (web/**, with docs)   everything but the integration tests and the scaffolder
+  #                                  proof; the stack smoke runs, because the web e2e lives there
+  #   anything else                  everything
+  # A file under backend/shared-engine, the kernel, .github, infra or tools, or the Makefile, is
+  # never "docs" even when it is a *.md, so it always runs everything. A push to main, the nightly
+  # run and a dispatch run everything. A job with nothing to do is skipped by its `if`, and GitHub
+  # reports a skipped job as a success, so a required check still reports and does not block
+  # the merge. No job retries itself: a red job is read, not rerun blind.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.decide.outputs.docs_only }}
+      backend: ${{ steps.decide.outputs.backend }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          echo "$files"
+          always='^(backend/app/src/main/java/lk/coopfed/knoweb/kernel/|backend/shared-engine/|\.github/|infra/|tools/|Makefile$)'
+          docs_only=true
+          web_only=true
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if printf '%s' "$file" | grep -Eq "$always"; then
+              docs_only=false; web_only=false
+            elif printf '%s' "$file" | grep -Eq '^docs/|\.md$'; then
+              :
+            elif printf '%s' "$file" | grep -Eq '^web/'; then
+              docs_only=false
+            else
+              docs_only=false; web_only=false
+            fi
+          done <<< "$files"
+          backend=true
+          if [ "$docs_only" = true ] || [ "$web_only" = true ]; then backend=false; fi
+          echo "docs only: $docs_only, web only: $web_only, backend: $backend"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+
+  # The docs checks, on every run: the progress entries under docs/progress are named and shaped
+  # as tools/progress-index.mjs expects (it also builds the one-page view).
+  docs-check:
+    name: Docs checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: make progress
+        run: make progress
+
   build-verify:
     name: Build, verify, unit tests
     runs-on: ubuntu-latest
+    needs: changes
+    # When `changes` itself failed, run: a broken decision must never skip a job into green.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     timeout-minutes: 30
 
     steps:
@@ -143,6 +223,8 @@ jobs:
   integration-test:
     name: Integration tests
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.backend == 'true') }}
     timeout-minutes: 40
     env:
       COOP_ERP_INTEGRATION_FORKS: "1"
@@ -284,6 +366,8 @@ jobs:
   scaffolder:
     name: Scaffolder proof
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.backend == 'true') }}
     timeout-minutes: 30
 
     steps:
@@ -327,6 +411,8 @@ jobs:
   stack-smoke:
     name: Stack smoke (two instances)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     timeout-minutes: 30
 
     steps:
@@ -412,7 +498,8 @@ jobs:
   package:
     name: Package
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: ${{ github.event_name == 'pull_request' && !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     timeout-minutes: 30
 
     steps: &package-steps
