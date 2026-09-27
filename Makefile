@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed demo-data urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke e2e
+.PHONY: help image up up-2 down reset migrate seed demo-data demo-till-sale urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke e2e
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -46,6 +46,7 @@ help:
 	@echo "make migrate      rebuild and restart the backend, which runs the Flyway migrations"
 	@echo "make seed         load the development seed rows (safe to repeat)"
 	@echo "make demo-data    load the demo for cooperative staff (docs/DEMO.md; safe to repeat)"
+	@echo "make demo-till-sale  a till sale at the demo shop through the sync contract (after demo-data)"
 	@echo "make roles        apply the database users and groups to the running database (make up does this)"
 	@echo "make build        build backend and web on the host"
 	@echo "make test         backend unit and architecture tests, the script checks, web lint and web tests"
@@ -146,6 +147,13 @@ demo-data:
 	done
 	$(COMPOSE) run --rm --no-deps -e COOP_ERP_DEMO_LOAD=true -e COOP_ERP_ROLE=web -e SPRING_PROFILES_ACTIVE=web -e SERVER_PORT=8099 backend
 	@echo "demo data loaded: the users and the storyline are in docs/DEMO.md (password: demo)"
+
+# Demo phase 3 (docs/DEMO.md): a till sale at Kuliyapitiya town shop without an Android device.
+# The till simulator of the test sources enrols a demo till with the demo users, sells three items
+# by barcode through the sync contract, and prints the shop's stock before and after. Needs the
+# stack (make up) and the demo (make demo-data). Each run is one more sale.
+demo-till-sale:
+	cd backend && ./gradlew --no-daemon -q :app:demoTillSale
 
 urls:
 	@echo ""

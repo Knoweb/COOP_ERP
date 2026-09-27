@@ -25,6 +25,7 @@ final class DemoCast {
     static final UUID FEDERATION_WAREHOUSE = id("000000000101");
     static final UUID D101_WAREHOUSE = id("000000000111");
     static final UUID D102_WAREHOUSE = id("000000000121");
+    static final UUID M101_WAREHOUSE = id("000000000131");
     static final UUID M101_TOWN_SHOP = id("000000000132");
     static final UUID M101_HETTIPOLA_SHOP = id("000000000133");
     static final UUID M102_SHOP = id("000000000142");
@@ -43,7 +44,9 @@ final class DemoCast {
     static final Actor D102_BUYER = actor("d102-buyer", "000000000221", D102, null);
     static final Actor D102_STORES = actor("d102-stores", "000000000222", D102, D102_WAREHOUSE);
     static final Actor D102_ACCOUNTS = actor("d102-accounts", "000000000223", D102, null);
+    static final Actor M101_BUYER = actor("m101-buyer", "000000000231", M101, null);
     static final Actor M101_MANAGER = actor("m101-manager", "000000000232", M101, null);
+    static final Actor M101_SHOP_STAFF = actor("m101-shop", "000000000233", M101, M101_TOWN_SHOP);
     static final Actor M102_MANAGER = actor("m102-manager", "000000000242", M102, null);
     static final Actor M103_MANAGER = actor("m103-manager", "000000000252", M103, null);
 
