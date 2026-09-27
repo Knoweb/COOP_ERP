@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -292,16 +293,19 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         UUID current = activeRelationship(APRIL);
         kernel.reset();
         ScopeContext seller = withFreshMfa(DISTRIBUTOR);
+        // The new terms start on a day to come (CR-21A-2: never before today).
+        LocalDate from = nextMonth();
 
-        UUID next = amend.handle(raiseLimit(current, "5000000.00", JULY, "RENEGOTIATED"), seller);
+        UUID next = amend.handle(raiseLimit(current, "5000000.00", from, "RENEGOTIATED"), seller);
 
         // The old row is closed the day before and keeps its terms; the new row carries the limit.
         Map<String, Object> old = row(current);
-        assertThat(old.get("effective_to").toString()).isEqualTo("2026-06-30");
+        assertThat(old.get("effective_to").toString())
+                .isEqualTo(from.minusDays(1).toString());
         assertThat((BigDecimal) old.get("credit_limit")).isEqualByComparingTo("3000000.00");
         assertThat(old.get("status")).isEqualTo("ACTIVE");
         Map<String, Object> amended = row(next);
-        assertThat(amended.get("effective_from").toString()).isEqualTo("2026-07-01");
+        assertThat(amended.get("effective_from").toString()).isEqualTo(from.toString());
         assertThat(amended.get("effective_to")).isNull();
         assertThat((BigDecimal) amended.get("credit_limit")).isEqualByComparingTo("5000000.00");
         assertThat(amended.get("status")).isEqualTo("ACTIVE");
@@ -313,7 +317,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents().get(0)).isInstanceOfSatisfying(RelationshipAmended.class, e -> {
             assertThat(e.relationshipId()).isEqualTo(next);
             assertThat(e.previousRelationshipId()).isEqualTo(current);
-            assertThat(e.effectiveFrom()).isEqualTo(JULY);
+            assertThat(e.effectiveFrom()).isEqualTo(from);
         });
         assertThat(kernel.committedEvents().get(1)).isInstanceOfSatisfying(CreditLimitChanged.class, e -> {
             assertThat(e.relationshipId()).isEqualTo(next);
@@ -322,10 +326,84 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         });
 
         // M4 reads the limit in force on each date.
-        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, JULY.minusDays(1), own(DISTRIBUTOR)))
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, from.minusDays(1), own(DISTRIBUTOR)))
                 .hasValueSatisfying(r -> assertThat(r.relationshipId()).isEqualTo(current));
-        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, JULY, own(DISTRIBUTOR)))
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, from, own(DISTRIBUTOR)))
                 .hasValueSatisfying(r -> assertThat(r.relationshipId()).isEqualTo(next));
+    }
+
+    // ---- CR-21A-2: no backdating, and a row that has not started is replaced ------------------
+
+    @Test
+    void anAmendmentDatedBeforeTodayIsRefusedAndWhatWasInForceStaysAsItWas() {
+        UUID current = activeRelationship(APRIL);
+        Map<String, Object> before = row(current);
+        kernel.reset();
+
+        assertThatThrownBy(() -> amend.handle(
+                        new AmendRelationshipTerms(
+                                current, today().minusDays(1), null, null, 45, null, null, null, "LATE", null),
+                        own(DISTRIBUTOR)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
+                        .isEqualTo("m1.relationship.effective_from_in_past"));
+
+        assertThat(row(current)).isEqualTo(before);
+        assertThat(count()).isEqualTo(1);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aRowThatHasNotStartedIsCorrectedOnItsFirstDayAndTheCorrectionIsWhatIsInForce() {
+        LocalDate nextMonth = nextMonth();
+        UUID r1 = activeRelationship(APRIL);
+        UUID r2 = amend.handle(
+                new AmendRelationshipTerms(r1, nextMonth, null, null, 45, null, null, null, "TERMS", null),
+                own(DISTRIBUTOR));
+        kernel.reset();
+
+        // 45 days was a typo for 60: corrected from R2's own first day, before that day comes.
+        UUID r3 = amend.handle(
+                new AmendRelationshipTerms(r2, nextMonth, null, null, 60, null, null, null, "TYPO", null),
+                own(DISTRIBUTOR));
+
+        Map<String, Object> replaced = row(r2);
+        assertThat(replaced.get("status")).isEqualTo("REPLACED");
+        assertThat(replaced.get("effective_from").toString()).isEqualTo(nextMonth.toString());
+        assertThat(replaced.get("effective_to"))
+                .as("the replaced row keeps its range")
+                .isNull();
+        assertThat(((Number) replaced.get("payment_terms_days")).intValue()).isEqualTo(45);
+        Map<String, Object> correction = row(r3);
+        assertThat(correction.get("status")).isEqualTo("ACTIVE");
+        assertThat(correction.get("effective_from").toString()).isEqualTo(nextMonth.toString());
+        assertThat(correction.get("effective_to")).isNull();
+        assertThat(row(r1).get("effective_to").toString())
+                .as("the row in force today is not touched")
+                .isEqualTo(nextMonth.minusDays(1).toString());
+
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("RELATIONSHIP_AMENDED");
+            assertThat(a.subject().id()).isEqualTo(r3);
+            assertThat(a.reason()).isEqualTo("TYPO");
+        });
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOfSatisfying(RelationshipAmended.class, e -> {
+            assertThat(e.relationshipId()).isEqualTo(r3);
+            assertThat(e.previousRelationshipId()).isEqualTo(r2);
+            assertThat(e.effectiveFrom()).isEqualTo(nextMonth);
+        });
+        assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, nextMonth, own(SOCIETY)))
+                .hasValueSatisfying(r -> assertThat(r.relationshipId()).isEqualTo(r3));
+        assertThat(queries.listRelationships(RelationshipSide.SELLER, own(DISTRIBUTOR)))
+                .extracting(RelationshipView::status)
+                .containsExactlyInAnyOrder("ACTIVE", "REPLACED", "ACTIVE");
+
+        // A REPLACED row is history: it is amended no more.
+        assertThatThrownBy(() -> amend.handle(
+                        new AmendRelationshipTerms(r2, nextMonth, null, null, 30, null, null, null, "AGAIN", null),
+                        own(DISTRIBUTOR)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m1.relationship.not_active"));
     }
 
     @Test
@@ -334,11 +412,12 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         Map<String, Object> before = row(current);
         kernel.reset();
 
-        assertThatThrownBy(() -> amend.handle(raiseLimit(current, "5000000.00", JULY, null), withFreshMfa(DISTRIBUTOR)))
+        assertThatThrownBy(() ->
+                        amend.handle(raiseLimit(current, "5000000.00", nextMonth(), null), withFreshMfa(DISTRIBUTOR)))
                 .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
                         .isEqualTo("m1.relationship.reason_required"));
         ScopeContext stale = scope(DISTRIBUTOR, PolicyClass.OWN, clock.instant().minus(Duration.ofHours(1)));
-        assertThatThrownBy(() -> amend.handle(raiseLimit(current, "5000000.00", JULY, "RENEGOTIATED"), stale))
+        assertThatThrownBy(() -> amend.handle(raiseLimit(current, "5000000.00", nextMonth(), "RENEGOTIATED"), stale))
                 .isInstanceOfSatisfying(
                         ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("mfa.required"));
 
@@ -378,7 +457,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
     @Test
     void suspendingOneRowSuspendsTheLaterRowsOfThePairToo() {
         // R1 [Apr, end of this month] and R2 [next month, open] after an amendment dated next month.
-        LocalDate nextMonth = LocalDate.now(clock).plusMonths(1).withDayOfMonth(1);
+        LocalDate nextMonth = nextMonth();
         UUID r1 = activeRelationship(APRIL);
         UUID r2 = amend.handle(
                 new AmendRelationshipTerms(r1, nextMonth, null, null, 45, null, null, null, "TERMS", null),
@@ -400,7 +479,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRowALaterRowHasReplacedIsAmendedOnTheLatestRowOnly() {
-        LocalDate nextMonth = LocalDate.now(clock).plusMonths(1).withDayOfMonth(1);
+        LocalDate nextMonth = nextMonth();
         UUID r1 = activeRelationship(APRIL);
         UUID r2 = amend.handle(
                 new AmendRelationshipTerms(r1, nextMonth, null, null, 45, null, null, null, "TERMS", null),
@@ -409,8 +488,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         kernel.reset();
 
         assertThatThrownBy(() -> amend.handle(
-                        new AmendRelationshipTerms(
-                                r1, LocalDate.now(clock), null, null, 60, null, null, null, "FIX", null),
+                        new AmendRelationshipTerms(r1, today(), null, null, 60, null, null, null, "FIX", null),
                         own(DISTRIBUTOR)))
                 .isInstanceOfSatisfying(ProblemException.class, e -> {
                     assertThat(e.messageId()).isEqualTo("m1.relationship.not_latest");
@@ -544,7 +622,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
     @Test
     void randomEffectiveRangesNeverEscapeThePreCheck() {
         Random random = new Random(20260925L);
-        LocalDate base = LocalDate.of(2026, 1, 1);
+        LocalDate base = today().minusMonths(3);
         for (int i = 0; i < 40; i++) {
             LocalDate from = base.plusDays(random.nextInt(365));
             LocalDate to = random.nextBoolean() ? null : from.plusDays(random.nextInt(200));
@@ -638,17 +716,40 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         // step-up address (19A section 2, K-02).
         ResponseEntity<Map> limit = post(
                 "/v1/party/relationships/" + id + "/amend",
-                Map.of("effectiveFrom", "2026-07-01", "creditLimit", 5000000, "reasonCode", "RENEGOTIATED"),
+                Map.of("effectiveFrom", nextMonth().toString(), "creditLimit", 5000000, "reasonCode", "RENEGOTIATED"),
                 DISTRIBUTOR);
         assertThat(limit.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(limit.getBody()).containsEntry("code", "mfa.required");
 
         ResponseEntity<Map> terms = post(
                 "/v1/party/relationships/" + id + "/amend",
-                Map.of("effectiveFrom", "2026-07-01", "paymentTermsDays", 45, "reasonCode", "TERMS_REVIEW"),
+                Map.of("effectiveFrom", nextMonth().toString(), "paymentTermsDays", 45, "reasonCode", "TERMS_REVIEW"),
                 DISTRIBUTOR);
         assertThat(terms.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(terms.getBody()).containsEntry("paymentTermsDays", 45).containsEntry("effectiveFrom", "2026-07-01");
+        assertThat(terms.getBody())
+                .containsEntry("paymentTermsDays", 45)
+                .containsEntry("effectiveFrom", nextMonth().toString());
+
+        // CR-21A-2 over HTTP: the row that has not started is corrected on its first day, and the
+        // answer of a replaced row carries the slice's new status value.
+        String laterRow = (String) terms.getBody().get("relationshipId");
+        ResponseEntity<Map> corrected = post(
+                "/v1/party/relationships/" + laterRow + "/amend",
+                Map.of("effectiveFrom", nextMonth().toString(), "paymentTermsDays", 60, "reasonCode", "TYPO"),
+                DISTRIBUTOR);
+        assertThat(corrected.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<Map> replacedRow = http.exchange(
+                "/v1/party/relationships/" + laterRow,
+                HttpMethod.GET,
+                new HttpEntity<>(headers(DISTRIBUTOR, "OWN")),
+                Map.class);
+        assertThat(replacedRow.getBody()).containsEntry("status", "REPLACED");
+        ResponseEntity<Map> backdated = post(
+                "/v1/party/relationships/" + corrected.getBody().get("relationshipId") + "/amend",
+                Map.of("effectiveFrom", today().minusDays(1).toString(), "paymentTermsDays", 30, "reasonCode", "LATE"),
+                DISTRIBUTOR);
+        assertThat(backdated.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(backdated.getBody()).containsEntry("code", "m1.relationship.effective_from_not_after");
 
         ResponseEntity<Map> overlap = post(
                 "/v1/party/relationships",
@@ -678,6 +779,16 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
     }
 
     // ---- helpers --------------------------------------------------------------------------------
+
+    /** Today as the amendment handler sees it: the calendar date in Colombo, the business time zone. */
+    private LocalDate today() {
+        return LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"));
+    }
+
+    /** The first day of next month: a day to come, whatever day the test runs on. */
+    private LocalDate nextMonth() {
+        return today().plusMonths(1).withDayOfMonth(1);
+    }
 
     private UUID activeRelationship(LocalDate from) {
         UUID id = open.handle(openTo(SOCIETY, PRICE_LIST, from, null), own(DISTRIBUTOR));

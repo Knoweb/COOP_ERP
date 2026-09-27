@@ -7,7 +7,7 @@ are reserved per lane before the lanes start.
 
 Below `V0010` are the baseline and what it still needed (`V0001` to `V0006`). Taken so far:
 `V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0032` (K-05, scoped inbox claims), `V0050` (K-07
-documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0055` (K-07 review: no line joins an issued document, REVERSES once by index, the ENTITY series in a shop scope, `party_read` per the template, the gap check against the highest number), `V0058` (K-09 review, attachment status transitions), `V0059` (K-10 review, `notification_pending`; lane C because it references `notification_log`), `V0060` (CR-19A-7 revised, `object_upload`, the upload ledger of `ObjectStorage`; lane C, attachments), `V0061` (decisions of 27 September: `system_identity` and `kernel.system_entity()`, the Federation named in SQL; a shop-scoped session reads and writes only its own location's documents), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`), `V0081` (K-08 review: the enrolment code remembers the key it was spent with), `V0082` (K-08 decisions of 27 September: `sync_sequence_gap`, the audited sequence reset of doc 32 section 8; `location_snapshot_version.purged_through_version` and `kernel.change_log_purge`, the change-log retention of DR-4).
+documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0055` (K-07 review: no line joins an issued document, REVERSES once by index, the ENTITY series in a shop scope, `party_read` per the template, the gap check against the highest number), `V0058` (K-09 review, attachment status transitions), `V0059` (K-10 review, `notification_pending`; lane C because it references `notification_log`), `V0060` (CR-19A-7 revised, `object_upload`, the upload ledger of `ObjectStorage`; lane C, attachments), `V0061` (decisions of 27 September: `system_identity` and `kernel.system_entity()`, the Federation named in SQL; a shop-scoped session reads and writes only its own location's documents), `V0063` (decisions of 27 September, CR-19A-8: `notification_pending` sealed, the clean-up mark `object_deleted_at` on `document_attachment` and `object_upload`, `document_attachment.settled_at`), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`), `V0081` (K-08 review: the enrolment code remembers the key it was spent with), `V0082` (K-08 decisions of 27 September: `sync_sequence_gap`, the audited sequence reset of doc 32 section 8; `location_snapshot_version.purged_through_version` and `kernel.change_log_purge`, the change-log retention of DR-4).
 
 The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
 19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.
@@ -153,3 +153,19 @@ every module, as K-09 holds them for `document_attachment`:
 The policies are the template's without a location column; `RlsMatrixIntegrationTest` covers the
 table with no exception, `SchemaRulesIntegrationTest` pins its UPDATE grant to the six settling
 columns, and `ObjectStoragePostgresIntegrationTest` proves the rules.
+
+## Decisions of 27 September 2026 (CR-19A-8, `V0063`)
+
+- **`kernel.notification_pending` holds nothing in clear.** The recipient and the placeholders of
+  a QUEUED notification are sealed by the application (AES-256-GCM, `PendingSeal`) under
+  `coop-erp.notification.pending-key`, a key the database never sees; the row keeps `sealed` and
+  `key_id` until the notification is settled, then both are set to null. The clear columns of
+  `V0059` are dropped.
+- **A failed upload's file is deleted after a retention.** The nightly job `attachment-cleanup`
+  deletes the object of a FAILED `document_attachment` or `object_upload` row settled more than
+  `attachment.failed_retention_days` ago and marks the row `object_deleted_at`. The transition
+  triggers let that mark be the one change a settled row admits, once, on a FAILED row only; a
+  COMPLETE or VERIFIED object is never deleted by the kernel. `document_attachment.settled_at` is
+  written by the verifier, and the retention counts from it (from the upload window for a row
+  settled before `V0063`). `SchemaRulesIntegrationTest` pins the ledger's UPDATE grant with the
+  mark included.

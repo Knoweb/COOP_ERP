@@ -242,9 +242,11 @@ class IssuanceProtocol implements DocumentIssuance {
      * transaction. A document without a location (an entity-level order or discount) takes
      * the date of the location the issuer acts at (kept as a defence: since kernel V0061 a
      * location-scoped session can store only documents at its own location); an issuer acting
-     * entity-wide has none, and
-     * the document then takes the calendar date in the business time zone, a deviation from
-     * 19A section 13 recorded in docs/PROGRESS.md until an entity has a business date of its own.
+     * entity-wide has none, and the document then takes the calendar date in the business time
+     * zone. Decided 27 September 2026 on the architect's delegation (CR-19A-8): an entity has no
+     * day close, so its business date is the calendar date in the business time zone; a document
+     * that concerns one location (a GRN, a count, a write-off, a discrepancy raised on a GRN)
+     * names that location and takes its date; an entity-level ORD, INV, CN, DN2 or PRC needs none.
      */
     private LocalDate businessDateFor(DocumentRecord draft, ScopeContext ctx, Instant issuedAt) {
         if (draft.locationId() != null) {

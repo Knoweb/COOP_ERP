@@ -66,6 +66,11 @@ public class MemoryObjectStore implements ObjectStore {
         objects.put(key, bytes.clone());
     }
 
+    @Override
+    public void delete(String key) {
+        objects.remove(key);
+    }
+
     public static String sha256(byte[] bytes) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));

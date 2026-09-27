@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +24,7 @@ import lk.coopfed.knoweb.m1party.api.AmendRelationshipTerms;
 import lk.coopfed.knoweb.m1party.api.CreditLimitChanged;
 import lk.coopfed.knoweb.m1party.api.RelationshipAmended;
 import lk.coopfed.knoweb.m1party.api.TradePriceListCheck;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +34,18 @@ import org.springframework.transaction.annotation.Transactional;
  * is closed the day before the new terms start and a new ACTIVE row carries them. The old
  * row's terms are never edited; its closing date is the only thing that changes on it.
  *
- * <p>Only the latest row of the pair is amended, and the new terms may start on any day after
- * that row's first day, as 21A section 6 writes the guard: whether an amendment may be dated
- * before today (it changes what LookupRelationship answers for past dates) is the question of
- * CR-21A-2, not decided here.
+ * <p>Only the latest row of the pair is amended. The dates (CR-21A-2, accepted 27 September
+ * 2026):
+ *
+ * <ul>
+ *   <li>the new terms start after that row's first day (21A section 6) and never before today,
+ *       the calendar date in the business time zone: what LookupRelationship answers for a day
+ *       that has begun never changes, so M4's orders, due dates and exposure of that day keep
+ *       the terms they were accepted under (item 1);
+ *   <li>a row whose first day is still to come is corrected by an amendment dated exactly on
+ *       that first day: the row becomes REPLACED (never in force, kept as the record) and the
+ *       new ACTIVE row takes its whole range (item 2).
+ * </ul>
  *
  * <p>A change of the credit limit needs more than {@code prt.relationship.amend}: the caller
  * must also hold {@code bil.creditlimit.change} and have presented a second factor recently.
@@ -61,6 +72,7 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
     private final Optional<PermissionResolver> permissions;
     private final ConfigRegistry config;
     private final Clock clock;
+    private final ZoneId businessZone;
     private final AuditFacade audit;
     private final EventPublisher events;
 
@@ -70,6 +82,7 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
             Optional<PermissionResolver> permissions,
             ConfigRegistry config,
             Clock clock,
+            @Value("${coop-erp.business-timezone}") String businessZone,
             AuditFacade audit,
             EventPublisher events) {
         this.repository = repository;
@@ -77,6 +90,7 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
         this.permissions = permissions;
         this.config = config;
         this.clock = clock;
+        this.businessZone = ZoneId.of(businessZone);
         this.audit = audit;
         this.events = events;
     }
@@ -95,14 +109,24 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
         current = RelationshipRules.lockedForSeller(repository, scope, current);
         requireActive(current);
 
-        // 3. the new terms start after the current row's first day, and while it still runs.
+        // 3. the new terms start after the current row's first day, not before today, and while
+        //    the current row still runs; or, for a row that has not started, exactly on its first
+        //    day, which replaces it (CR-21A-2).
         if (command.effectiveFrom() == null) {
             throw new ProblemException("request.field.required", Map.of("field", "effectiveFrom"));
         }
-        if (!command.effectiveFrom().isAfter(current.effectiveFrom())) {
+        LocalDate today = LocalDate.ofInstant(clock.instant(), businessZone);
+        boolean replacesUnstartedRow = current.effectiveFrom().isAfter(today)
+                && command.effectiveFrom().equals(current.effectiveFrom());
+        if (!replacesUnstartedRow && !command.effectiveFrom().isAfter(current.effectiveFrom())) {
             throw new ProblemException(
                     "m1.relationship.effective_from_not_after",
                     Map.of("currentEffectiveFrom", current.effectiveFrom().toString()));
+        }
+        if (command.effectiveFrom().isBefore(today)) {
+            throw new ProblemException(
+                    "m1.relationship.effective_from_in_past",
+                    Map.of("effectiveFrom", command.effectiveFrom().toString(), "today", today.toString()));
         }
         if (current.effectiveTo() != null && command.effectiveFrom().isAfter(current.effectiveTo())) {
             throw new ProblemException(
@@ -158,10 +182,15 @@ class AmendRelationshipTermsHandler implements Handles<AmendRelationshipTerms, U
 
         Map<String, Object> currentBefore = current.auditState();
 
-        // mutation: close the current row, then insert the next. In this order, because the
-        // exclusion constraint is checked row by row, not at commit.
+        // mutation: close (or replace) the current row, then insert the next. In this order,
+        // because the exclusion constraint is checked row by row, not at commit. A replaced row
+        // keeps its range; the next row takes the same one (amendedFrom copies the end).
         Relationship next = current.amendedFrom(Ids.next(), after, command.effectiveFrom());
-        current.closeBefore(command.effectiveFrom());
+        if (replacesUnstartedRow) {
+            current.replace();
+        } else {
+            current.closeBefore(command.effectiveFrom());
+        }
         try {
             repository.saveAndFlush(current);
             repository.saveAndFlush(next);

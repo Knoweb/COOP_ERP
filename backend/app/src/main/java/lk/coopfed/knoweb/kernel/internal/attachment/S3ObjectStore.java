@@ -20,6 +20,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -181,6 +182,14 @@ class S3ObjectStore implements ObjectStore {
                         .contentLength((long) bytes.length)
                         .build(),
                 RequestBody.fromBytes(bytes));
+    }
+
+    @Override
+    public void delete(String key) {
+        requireConfigured();
+        // S3 answers a delete of a missing key with success: the clean-up may repeat.
+        client.deleteObject(
+                DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 
     private void requireConfigured() {

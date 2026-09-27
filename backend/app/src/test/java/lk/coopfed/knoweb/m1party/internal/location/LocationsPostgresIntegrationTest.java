@@ -273,6 +273,29 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).isEmpty();
     }
 
+    @Test
+    void aPositionIsRegisteredAtAShopInAnyStatus() {
+        // Decided 27 September 2026 (CR-21A-5 item 2): 21A section 6 says only "location SHOP".
+        // Onboarding needs positions at a PLANNED shop (doc 21 flow 6.1: a shop activates only
+        // with a primary till), and a DORMANT shop being made ready to reopen may need a lane
+        // before it reactivates. The status is set directly here: the life cycle is the next test's.
+        String[] statuses = {"PLANNED", "ONBOARDING", "ACTIVE", "DORMANT"};
+        for (int i = 0; i < statuses.length; i++) {
+            UUID shop = registerShop("P0" + i);
+            superuserJdbc().update("update party.location set status = ? where location_id = ?", statuses[i], shop);
+            kernel.reset();
+
+            UUID position = registerPosition.handle(new RegisterTillPosition(shop, 1), own(MPCS));
+
+            assertThat(status(shop)).as("the shop's status is not changed").isEqualTo(statuses[i]);
+            assertThat(audit("POSITION_REGISTERED"))
+                    .as(statuses[i])
+                    .singleElement()
+                    .satisfies(record -> assertThat(record.subject().id()).isEqualTo(position));
+            assertThat(events(TillPositionRegistered.class)).as(statuses[i]).hasSize(1);
+        }
+    }
+
     // ---- the life cycle of doc 21 section 4.3 -------------------------------------------------
 
     @Test

@@ -52,7 +52,10 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
      * V0010): a role assignment is revoked by deleting it (21A section 6, RevokeRole: "the one
      * DELETE M1 performs; audited"), a role's permission set is replaced (AmendRole), and an
      * entity removes a separation-of-duties pair it added itself. None is a document, a ledger
-     * or an audit row. Adding a table here is a design decision, not a fix for a red test.
+     * or an audit row. CR-21A-3 (accepted 27 September 2026) settled the three: each is a current
+     * fact whose history is its audit record, and a table may join this list only when its
+     * implementation guide names the command that deletes from it. Adding a table here is a
+     * design decision, not a fix for a red test.
      */
     static final Set<String> DELETE_BY_DESIGN =
             Set.of("security.user_role", "security.role_permission", "security.sod_pair");
@@ -78,7 +81,8 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
     /**
      * The kernel's upload ledger (kernel V0060, CR-19A-7): protected like every table, and app_rw
      * may change only what a renewal and a settlement change. The key, the module, the owner, the
-     * type and the creation time of an upload are nobody's to change.
+     * type and the creation time of an upload are nobody's to change; the clean-up's mark of a
+     * deleted object (kernel V0063) is the one change a settled row admits.
      */
     @Test
     void theObjectLedgerIsProtectedAndOnlyItsSettlingColumnsAreUpdatable() {
@@ -98,7 +102,13 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
                 String.class);
         assertThat(updatable)
                 .containsExactly(
-                        "content_hash", "content_length", "failure", "settled_at", "status", "upload_expires_at");
+                        "content_hash",
+                        "content_length",
+                        "failure",
+                        "object_deleted_at",
+                        "settled_at",
+                        "status",
+                        "upload_expires_at");
         assertThat(db.queryForObject(
                         "select has_table_privilege('app_rw', 'kernel.object_upload', 'DELETE')", Boolean.class))
                 .isFalse();

@@ -428,7 +428,7 @@ export interface paths {
         put?: never;
         /**
          * Amend the terms of an ACTIVE relationship from a date
-         * @description Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE row carries the new terms; the answer is the new row. A term left out keeps its current value. A credit_limit change additionally requires bil.creditlimit.change with a fresh second factor (mfa.required when stale). Codes: m1.relationship.not_found, m1.relationship.not_active, m1.relationship.not_seller, m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end, m1.relationship.credit_limit_permission_required, mfa.required, m1.relationship.reason_required, m1.relationship.terms_unchanged, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
+         * @description Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE row carries the new terms; the answer is the new row. effectiveFrom is after the current row's first day and never before today (CR-21A-2). A row whose first day is still to come is corrected by an amendment dated exactly on that first day: the row becomes REPLACED and the new row takes its whole range. A term left out keeps its current value. A credit_limit change additionally requires bil.creditlimit.change with a fresh second factor (mfa.required when stale). Codes: m1.relationship.not_found, m1.relationship.not_active, m1.relationship.not_seller, m1.relationship.effective_from_not_after, m1.relationship.effective_from_in_past, m1.relationship.effective_from_after_end, m1.relationship.credit_limit_permission_required, mfa.required, m1.relationship.reason_required, m1.relationship.terms_unchanged, m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
          */
         post: operations["amendRelationshipTerms"];
         delete?: never;
@@ -1108,7 +1108,7 @@ export interface components {
             /** @enum {string} */
             allocationRule: "FCFS" | "PRO_RATA" | "QUOTA";
             /** @enum {string} */
-            status: "DRAFT" | "ACTIVE" | "SUSPENDED";
+            status: "DRAFT" | "ACTIVE" | "SUSPENDED" | "REPLACED";
             /** Format: date */
             effectiveFrom: string;
             /** Format: date */

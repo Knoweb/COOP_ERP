@@ -40,4 +40,10 @@ interface ObjectStore {
 
     /** Stores bytes the backend produced itself (a thumbnail) under the key, replacing any. */
     void put(String key, String contentType, byte[] bytes);
+
+    /**
+     * Removes the object, for the clean-up of an upload that failed verification (kernel V0063);
+     * an object that is not there is not an error, so a run that stopped half-way can repeat.
+     */
+    void delete(String key);
 }

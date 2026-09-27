@@ -86,7 +86,7 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
                         "gov.role.manage",
                         "gov.user.manage",
                         "prt.location.view",
-                        "prt.location.manage",
+                        "prt.location.register",
                         "sys.device.view"),
                 federation,
                 null);
@@ -99,14 +99,14 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
                         "gov.role.manage",
                         "gov.user.manage",
                         "prt.location.view",
-                        "prt.location.manage",
+                        "prt.location.register",
                         "sys.device.view",
                         "prt.position.manage",
-                        "sys.device.manage"),
+                        "sys.device.enrol"),
                 mpcs,
                 null);
         // The society's own rule: whoever registers till positions does not also enrol devices.
-        fx.pair(mpcs, "prt.position.manage", "sys.device.manage", "ROLE");
+        fx.pair(mpcs, "prt.position.manage", "sys.device.enrol", "ROLE");
 
         shopKeeper = fx.user(mpcs);
         stranger = fx.user(otherMpcs);
@@ -145,10 +145,10 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
 
         // 3. The guardrails: a permission the administrator does not hold, and a ROLE-mode pair.
         assertRefused(
-                clone(templateId, "prt.location.view", "sys.device.view", "prt.relationship.manage"),
+                clone(templateId, "prt.location.view", "sys.device.view", "prt.relationship.open"),
                 "m1.role.permission_not_held");
         assertRefused(
-                clone(templateId, "prt.location.view", "sys.device.view", "prt.position.manage", "sys.device.manage"),
+                clone(templateId, "prt.location.view", "sys.device.view", "prt.position.manage", "sys.device.enrol"),
                 "m1.role.sod_conflict");
 
         // 4. The clone, with one duty added, remembers the template version it was made from.
@@ -197,7 +197,7 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
         call(
                 HttpMethod.PUT,
                 "/v1/security/roles/" + templateId + "/permissions",
-                Map.of("permissions", items("prt.location.view", "prt.location.manage", "sys.device.view")),
+                Map.of("permissions", items("prt.location.view", "prt.location.register", "sys.device.view")),
                 federationAdmin,
                 federation,
                 HttpStatus.OK);
@@ -215,7 +215,7 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
         assertThat(diff.get("templateVersionSeen").asInt()).isEqualTo(1);
         assertThat(diff.get("templateVersion").asInt()).isEqualTo(2);
         assertThat(diff.get("templateUpdated").asBoolean()).isTrue();
-        assertThat(texts(diff.get("onlyInTemplate"))).containsExactly("prt.location.manage");
+        assertThat(texts(diff.get("onlyInTemplate"))).containsExactly("prt.location.register");
         assertThat(texts(diff.get("onlyInRole"))).containsExactly("prt.position.manage");
 
         // 8. The administrator takes the template's change, keeping the duty the society added.
@@ -226,7 +226,7 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
                                 "permissions",
                                 items(
                                         "prt.location.view",
-                                        "prt.location.manage",
+                                        "prt.location.register",
                                         "sys.device.view",
                                         "prt.position.manage"),
                                 "adoptTemplateVersion",
@@ -252,8 +252,8 @@ class BuildingARoleForAShopScenarioIntegrationTest extends PostgresIntegrationTe
                         e -> assertThat(((RoleChanged) e).change()).isEqualTo(RoleChanged.CREATED),
                         e -> assertThat(((RoleChanged) e).roleId()).isEqualTo(roleId),
                         e -> assertThat(e).isEqualTo(new RoleAssigned(roleId, shopKeeper, mpcs, shop)),
-                        e -> assertThat(((RoleChanged) e).permissionsAdded()).containsExactly("prt.location.manage"),
-                        e -> assertThat(((RoleChanged) e).permissionsAdded()).containsExactly("prt.location.manage"));
+                        e -> assertThat(((RoleChanged) e).permissionsAdded()).containsExactly("prt.location.register"),
+                        e -> assertThat(((RoleChanged) e).permissionsAdded()).containsExactly("prt.location.register"));
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .containsExactly("ROLE_CHANGED", "ROLE_CHANGED", "ROLE_ASSIGNED", "ROLE_CHANGED", "ROLE_CHANGED");

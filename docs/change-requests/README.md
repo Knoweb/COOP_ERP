@@ -32,11 +32,15 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-19A-5` — see 17A above; also `GRANT SELECT, UPDATE (published_at) ON kernel.event_outbox TO app_relay` and a policy stating the relay reads every entity's events.
 - `CR-19A-6` — `CommandHandler.INTERNAL` for a handler with no operation of its own, called only inside the caller's transaction; accepted with the guard rails of pull request #138.
 - `CR-19A-7` — accepted as revised: the kernel keeps an upload ledger (`kernel.object_upload`) and enforces the K-09 rules once for every module that owns objects without a document, rather than generalising `document_attachment`.
+- `CR-19A-8` — seven kernel decisions: a notification retry's recipient and placeholders sealed under a key outside the database (also doc 19 §7); the upload URL's validity and the verifier's schedule as configuration (§9); a nightly clean-up of failed uploads' files after a retention (§9, §12; also doc 18 part C); NFC on every String, no `I18nText` (§6); no provider adapter in the kernel (§10); a document with no location takes the calendar date in the business time zone (§13; also doc 18 part C and 24A for DISC); the A4 renderer is K-06b, before M3-10 (§6; `docs/PLAN_TO_M2.md`).
 
 ### 21A (M1 Party, Tenancy and Security Implementation Guide)
 
-- `CR-21A-1` item 2, first half only (the rest of the request is still raised) — the kernel names the Federation: `kernel.system_entity()` (kernel V0061) from `coop-erp.system.entity-id`; folding `party.federation_identity` into it is `docs/PLAN_TO_M2.md` task 6.11.
+- `CR-21A-1` — accepted as revised: the permission catalogue of §3.3 verb by verb plus `gov.entity.suspend` and one read code per aggregate (the four coarse `manage` codes retired, `gov.audit.review` and its self-review pair added); AppointResponsibleOfficer keeps `gov.user.manage`; 422 for every business rule (§5, and 17A §4.3); §6 says a handler repeats a shape rule only where the command also arrives by another path. Item 2: the kernel names the Federation, `kernel.system_entity()` (kernel V0061, #142; folding `party.federation_identity` into it is `docs/PLAN_TO_M2.md` task 6.11); 17A §6.3 adopts `fed_admin`; 18 Part F lists `party.entity_party_directory` (and `party.federation_identity` until 6.11).
+- `CR-21A-2` — AmendRelationshipTerms never before today; a row not yet started is corrected on its first day and becomes REPLACED (also doc 18 Part A, doc 21 §4.2).
+- `CR-21A-3` — option 1: `user_role`, `role_permission` and `sod_pair` keep their audited deletes (§6; also 17A §6.2 and 18 Part F).
 - `CR-21A-4` — `LocationFilter` (m1party's frozen query package) gains an optional `entityId`, needed by 22A's `listLocations(entity)`.
+- `CR-21A-5` — BulkRegister is all or none (also doc 21 §5.1's "commit per row"); a till position is registered at a shop in any status.
 
 ### 28A (M8 Reporting Implementation Guide)
 

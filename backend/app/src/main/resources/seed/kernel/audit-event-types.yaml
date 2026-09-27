@@ -73,6 +73,16 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: Upload of a module's object missing, too large or with another hash than announced
+  # Decided 27 Sep 2026 (CR-19A-8): the attachment-cleanup job deletes a failed upload's file
+  # after attachment.failed_retention_days; the row stays and records when.
+  - code: ATTACHMENT_OBJECT_DELETED
+    severity: INFO
+    offline_capturable: false
+    description_en: File of an attachment that failed verification deleted after its retention
+  - code: OBJECT_DELETED
+    severity: INFO
+    offline_capturable: false
+    description_en: File of a module's object that failed verification deleted after its retention
   # K-10: notifications.
   - code: NOTIFICATION_FAILED
     severity: ALERT
