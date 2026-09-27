@@ -48,7 +48,20 @@ class PartyQueriesImplTest {
     @SuppressWarnings("unchecked")
     void partyGetEntityUsesNamesOnlyDirectory() {
         EntityView partyView = new EntityView(
-                TARGET_ENTITY_ID, null, null, "MPCS 301", null, null, null, null, null, null, null, null, null, null);
+                TARGET_ENTITY_ID,
+                null,
+                null,
+                "MPCS 301",
+                null,
+                null,
+                null,
+                "VAT-301",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
 
         when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of(partyView));
 
@@ -61,7 +74,9 @@ class PartyQueriesImplTest {
 
         assertThat(sql.getValue()).contains("party.entity_party_directory");
 
-        assertThat(sql.getValue()).doesNotContain("vat_registration_no");
+        // CR-21A-6: the directory (and so PARTY visibility) now carries the VAT number a trading
+        // counterparty is entitled to see on a tax invoice.
+        assertThat(sql.getValue()).contains("vat_registration_no");
 
         assertThat(result.entityId()).isEqualTo(TARGET_ENTITY_ID);
 
@@ -73,7 +88,7 @@ class PartyQueriesImplTest {
 
         assertThat(result.registrationNo()).isNull();
 
-        assertThat(result.vatRegistrationNo()).isNull();
+        assertThat(result.vatRegistrationNo()).isEqualTo("VAT-301");
 
         assertThat(result.district()).isNull();
 
@@ -82,6 +97,63 @@ class PartyQueriesImplTest {
         assertThat(result.dataGovernanceSignedOn()).isNull();
 
         assertThat(result.status()).isNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void ownGetEntityFallsBackToTheCounterpartyDirectoryForAnotherEntity() {
+        EntityView directoryView = new EntityView(
+                TARGET_ENTITY_ID,
+                null,
+                null,
+                "Distributor 301",
+                null,
+                null,
+                null,
+                "VAT-301",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        // First call: the own-scope read of party.entity (RLS shows only the caller's own row,
+        // so a counterparty's row comes back empty). Second call: the directory fallback.
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of())
+                .thenReturn(List.of(directoryView));
+
+        EntityView result =
+                queries.getEntity(TARGET_ENTITY_ID, scope(PolicyClass.OWN)).orElseThrow();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+        verify(jdbc, org.mockito.Mockito.times(2)).query(sql.capture(), any(RowMapper.class), any(Object[].class));
+
+        List<String> statements = sql.getAllValues();
+
+        assertThat(statements.get(0)).contains("from party.entity");
+
+        assertThat(statements.get(1)).contains("party.entity_party_directory");
+
+        assertThat(result.legalNameEn()).isEqualTo("Distributor 301");
+
+        assertThat(result.vatRegistrationNo()).isEqualTo("VAT-301");
+
+        assertThat(result.entityCode()).isNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void ownGetEntityOfAnUnrelatedEntityStaysEmpty() {
+        // Neither the own-scope read of party.entity nor the directory fallback finds a row:
+        // row-level security keeps an unrelated entity invisible either way.
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        assertThat(queries.getEntity(TARGET_ENTITY_ID, scope(PolicyClass.OWN))).isEmpty();
+
+        verify(jdbc, org.mockito.Mockito.times(2)).query(anyString(), any(RowMapper.class), any(Object[].class));
     }
 
     @Test
