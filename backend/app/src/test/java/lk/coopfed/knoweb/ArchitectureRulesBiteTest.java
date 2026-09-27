@@ -111,6 +111,16 @@ class ArchitectureRulesBiteTest {
     }
 
     @Test
+    void jobScopeRuleCatchesAnEntitysScopeTakenOutsideAScheduledJob() {
+        assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.borrow");
+        String report = ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule()
+                .evaluate(FIXTURES)
+                .getFailureReport()
+                .toString();
+        assertTrue(!report.contains("BorrowsAnEntitysScope.job "), report);
+    }
+
+    @Test
     void internalCommandRuleCatchesAControllerThatReachesOne() {
         assertViolation(ArchitectureTests.webDoesNotUseInternalCommandsRule(), "ControllerReachingAnInternalCommand");
     }

@@ -33,8 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
  * local override (DR-5, allowed); the barcode, when given, an ACTIVE code of the SKU the caller
  * can see; a type of the register's {@code m2.image.content_types}; a SHA-256 of 64 hex digits;
  * no other image of the caller for the same SKU and barcode still waiting for its upload.
- * Mutation: a PENDING row whose object key is the kernel's ({@link ObjectStorage#keyOf}) and a
- * pre-signed PUT under the register's size and type limits (CR-19A-7).
+ * Mutation: a PENDING row whose object key is the kernel's ({@link ObjectStorage#keyOf}, anchored
+ * on this module) and a pre-signed PUT under the register's size and type limits, with the
+ * announced hash, which the kernel records PENDING in its upload ledger in this transaction and
+ * compares with the stored bytes when the thumbnail job asks it to verify (CR-19A-7, as revised).
  *
  * <p>"One active per key" (22A section 6) is kept when the image becomes ACTIVE: SettleImage
  * retires the caller's earlier ACTIVE image of the same key in the same transaction, so a till
@@ -46,7 +48,6 @@ public class AttachImageHandler implements Handles<AttachImage, ImageUpload> {
 
     static final String AUDIT_ATTACHED = "IMAGE_ATTACHED";
     static final String CONTENT_TYPES = "m2.image.content_types";
-    static final String MODULE = "m2catalogue";
 
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
 
@@ -125,10 +126,10 @@ public class AttachImageHandler implements Handles<AttachImage, ImageUpload> {
         }
 
         UUID imageId = Ids.next();
-        String key = ObjectStorage.keyOf(MODULE, scope.entityId(), imageId);
+        String key = ObjectStorage.keyOf(AttachImageHandler.class, scope.entityId(), imageId);
         // The kernel holds the size and the type to the register's attachment limits and signs
         // them into the URL; nothing is written before it has answered.
-        ObjectStorage.PresignedPut put = storage.presignPut(key, contentType, command.contentLength(), scope);
+        ObjectStorage.PresignedPut put = storage.presignPut(key, contentType, command.contentLength(), hash, scope);
 
         jdbc.update(
                 """

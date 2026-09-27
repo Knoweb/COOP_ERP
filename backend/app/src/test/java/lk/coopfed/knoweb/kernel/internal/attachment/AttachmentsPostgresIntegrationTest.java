@@ -3,18 +3,13 @@ package lk.coopfed.knoweb.kernel.internal.attachment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import lk.coopfed.knoweb.kernel.api.AttachmentCompleted;
 import lk.coopfed.knoweb.kernel.api.Attachments;
@@ -23,7 +18,6 @@ import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentOrigin;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.Ids;
-import lk.coopfed.knoweb.kernel.api.ObjectStorage;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
@@ -32,10 +26,7 @@ import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -54,7 +45,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * type are limited by the register; a counterparty is told it does not own the document; a
  * read URL of anything but an image is a download.
  */
-@Import(AttachmentsPostgresIntegrationTest.MemoryStore.class)
+@Import(MemoryObjectStore.class)
 class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID OWNER = UUID.fromString("0190a900-0000-7000-8000-000000000001");
@@ -68,13 +59,10 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
     AttachmentVerifier verifier;
 
     @Autowired
-    ObjectStorage objectStorage;
-
-    @Autowired
     DocumentBaseRepository documents;
 
     @Autowired
-    MemoryStore store;
+    MemoryObjectStore store;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -382,63 +370,6 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                         attachmentId);
     }
 
-    @Test
-    void aModulesOwnObjectIsPresignedVerifiedReadAndWrittenUnderTheSameLimits() {
-        // CR-19A-7: an object whose owner is no document (an M2 image of a SKU).
-        UUID imageId = Ids.next();
-        String key = ObjectStorage.keyOf("m2catalogue", OWNER, imageId);
-        assertThat(key).isEqualTo("objects/m2catalogue/" + OWNER + "/" + imageId);
-
-        ObjectStorage.PresignedPut put = objectStorage.presignPut(key, "image/png", 12L, scope(OWNER));
-        assertThat(put.objectKey()).isEqualTo(key);
-        assertThat(put.url().toString()).contains(key).contains("length=12");
-        assertThat(put.expiresAt()).isAfter(java.time.Instant.now().minusSeconds(60));
-        // Asking again for the same key is a new URL for the same object (idempotent per id).
-        assertThat(objectStorage.presignPut(key, "image/png", 12L, scope(OWNER)).objectKey())
-                .isEqualTo(key);
-
-        // The register's limits hold as for a document's attachment.
-        assertThatThrownBy(() -> objectStorage.presignPut(key, "text/html", null, scope(OWNER)))
-                .isInstanceOf(ProblemException.class)
-                .hasMessageContaining("attachment.content_type_not_allowed");
-        assertThatThrownBy(() -> objectStorage.presignPut(key, "image/png", 1L << 40, scope(OWNER)))
-                .isInstanceOf(ProblemException.class)
-                .hasMessageContaining("attachment.too_large");
-        // A module names only module keys: never a document's attachment.
-        assertThatThrownBy(() -> objectStorage.presignPut(
-                        "attachments/" + OWNER + "/" + documentId + "/" + imageId, "image/png", null, scope(OWNER)))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        byte[] bytes = "a product photo".getBytes(StandardCharsets.UTF_8);
-        assertThat(objectStorage.verify(key, sha256(bytes), scope(OWNER)).outcome())
-                .isEqualTo(ObjectStorage.Outcome.MISSING);
-
-        store.objects.put(key, bytes);
-        ObjectStorage.Verification verified =
-                objectStorage.verify(key, sha256(bytes).toUpperCase(), scope(OWNER));
-        assertThat(verified.outcome()).isEqualTo(ObjectStorage.Outcome.VERIFIED);
-        assertThat(verified.sha256Hex()).isEqualTo(sha256(bytes));
-        assertThat(verified.size()).isEqualTo(bytes.length);
-        assertThat(objectStorage
-                        .verify(key, sha256("other".getBytes(StandardCharsets.UTF_8)), scope(OWNER))
-                        .outcome())
-                .isEqualTo(ObjectStorage.Outcome.HASH_MISMATCH);
-
-        store.objects.put(key, new byte[6 * 1024 * 1024]);
-        assertThat(objectStorage.verify(key, null, scope(OWNER)).outcome()).isEqualTo(ObjectStorage.Outcome.TOO_LARGE);
-
-        store.objects.put(key, bytes);
-        assertThat(objectStorage.read(key, scope(OWNER))).isEqualTo(bytes);
-
-        objectStorage.write(key + "/thumb.png", "image/png", new byte[] {1, 2, 3});
-        assertThat(store.objects.get(key + "/thumb.png")).containsExactly(1, 2, 3);
-        assertThat(objectStorage.presignGet(key + "/thumb.png", "image/png").toString())
-                .isEqualTo("memory://get/" + key + "/thumb.png");
-
-        // Nothing of this is a row or an audit record of the kernel: the module keeps both.
-        assertThat(kernel.committedAudit()).isEmpty();
-    }
-
     private static DocumentRecord draft(UUID id) {
         return new DocumentRecord(
                 id,
@@ -501,54 +432,5 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                     entity.toString());
             return work.get();
         });
-    }
-
-    /** Objects in a map: what the verifier asks of a store, without a store. */
-    @TestConfiguration(proxyBeanMethods = false)
-    static class MemoryStore implements ObjectStore {
-
-        final Map<String, byte[]> objects = new ConcurrentHashMap<>();
-
-        @Bean
-        @Primary
-        ObjectStore memoryObjectStore() {
-            return this;
-        }
-
-        @Override
-        public URI presignPut(String key, String contentType, Long contentLength, Duration validFor) {
-            return URI.create("memory://put/" + key + "?type=" + contentType
-                    + (contentLength == null ? "" : "&length=" + contentLength));
-        }
-
-        @Override
-        public URI presignGet(String key, String contentType, Duration validFor) {
-            boolean image = contentType != null && contentType.startsWith("image/");
-            return URI.create("memory://get/" + key + (image ? "" : "?disposition=attachment"));
-        }
-
-        @Override
-        public Optional<Long> head(String key) {
-            return Optional.ofNullable(objects.get(key)).map(bytes -> (long) bytes.length);
-        }
-
-        @Override
-        public String sha256Hex(String key) {
-            return sha256(objects.get(key));
-        }
-
-        @Override
-        public byte[] read(String key, long maxBytes) {
-            byte[] bytes = objects.get(key);
-            if (bytes == null || bytes.length > maxBytes) {
-                throw new IllegalStateException("No object " + key + " within " + maxBytes + " bytes");
-            }
-            return bytes.clone();
-        }
-
-        @Override
-        public void put(String key, String contentType, byte[] bytes) {
-            objects.put(key, bytes.clone());
-        }
     }
 }

@@ -64,6 +64,15 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: Attachment upload missing or its hash did not match
+  # CR-19A-7: the upload ledger of the objects a module owns (kernel.object_upload).
+  - code: OBJECT_VERIFIED
+    severity: INFO
+    offline_capturable: false
+    description_en: Upload of a module's object verified after its upload window
+  - code: OBJECT_FAILED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Upload of a module's object missing, too large or with another hash than announced
   # K-10: notifications.
   - code: NOTIFICATION_FAILED
     severity: ALERT
