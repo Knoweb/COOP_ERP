@@ -320,6 +320,8 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-04 | M5 PickBatches; several buyers on one note | With M5's picking; with multi-party routes | – |
 | M4-05 | Local-supply GRN; till GRN bundle and post-ingest hook (K-08-F4); ReverseGrn; GRN CLOSED | Before shops receive from local suppliers or at the till; before a GRN is reversed | `grn.confirmed.v1` is frozen |
 | M4-05 | `whs.grn.confirm` for warehouses; items not on the drop | Before warehouse receipts need their own permission | `shop.grn.confirm` serves both |
+| M4-08 | Invoice disputes; credit and debit notes; consolidation; buyer-side postings; e-invoice; PARTY masking views | Before invoices are corrected, consolidated or submitted | M4-06, M4-07 wholly deferred |
+| M4-08 | The buyer's VAT number on the invoice | When M1's party projection carries the VAT number (architect) | Recorded empty when not visible |
 
 ## Phase 7 — decisions only the architect can take
 
