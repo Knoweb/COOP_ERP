@@ -17,11 +17,13 @@ public class ImageSettings {
 
     static final String BATCH_SIZE = "m2.image.thumbnail.batch_size";
     static final String THUMBNAIL_PX = "m2.image.thumbnail_px";
+    static final String THUMBNAIL_MAX_KB = "m2.image.thumbnail_max_kb";
     static final String MAX_PIXELS = "m2.image.max_pixels";
     static final String UPLOAD_WINDOW_HOURS = "m2.image.upload_window_hours";
 
     /** The job's limits, read together. */
-    public record Limits(int batchSize, int thumbnailPx, long maxPixels, Duration uploadWindow) {}
+    public record Limits(
+            int batchSize, int thumbnailPx, int thumbnailMaxBytes, long maxPixels, Duration uploadWindow) {}
 
     private final ConfigRegistry config;
 
@@ -34,6 +36,7 @@ public class ImageSettings {
         return new Limits(
                 config.getInt(BATCH_SIZE, scope, 100),
                 config.getInt(THUMBNAIL_PX, scope, 128),
+                config.getInt(THUMBNAIL_MAX_KB, scope, 10) * 1024,
                 config.getInt(MAX_PIXELS, scope, 40_000_000),
                 Duration.ofHours(config.getInt(UPLOAD_WINDOW_HOURS, scope, 24)));
     }

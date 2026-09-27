@@ -35,6 +35,10 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     private static final UUID MPCS_B = UUID.fromString("00000000-0000-0000-0000-0000000002b1");
     private static final UUID TAX_CATEGORY = UUID.fromString("00000000-0000-0000-0000-0000000002c1");
 
+    /** The codes of the tag assignments the caller reads, joined to the tags it reads (V0007). */
+    private static final String TAGS_ASSIGNED =
+            "select t.tag_code from catalogue.sku_tag st join catalogue.tag t on t.tag_id = st.tag_id";
+
     private final UUID sharedSku = Ids.next();
     private final UUID localSkuOfA = Ids.next();
     private final UUID localSkuOfB = Ids.next();
@@ -61,9 +65,11 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                 localSkuOfA,
                 MPCS_A);
         admin.update(
-                "insert into catalogue.tag (tag_code, name_en, governed, owner_entity_id)"
-                        + " values ('t-local-a', 'Mine', false, ?), ('t-local-a2', 'Mine too', false, ?)",
+                "insert into catalogue.tag (tag_id, tag_code, name_en, governed, owner_entity_id)"
+                        + " values (?, 't-local-a', 'Mine', false, ?), (?, 't-local-a2', 'Mine too', false, ?)",
+                Ids.next(),
                 MPCS_A,
+                Ids.next(),
                 MPCS_A);
         // V0003: what an entity wrote on the Federation's SHARED item stays its own, except a
         // factory barcode, which everyone may read; the Federation's own rows are everyone's.
@@ -82,7 +88,9 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                 sharedSku,
                 MPCS_A);
         admin.update(
-                "insert into catalogue.sku_tag (sku_id, tag_code, owner_entity_id) values (?, 'core-range', ?), (?, 't-local-a', ?)",
+                "insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id) values"
+                        + " (?, (select tag_id from catalogue.tag where tag_code = 'core-range' and governed), ?),"
+                        + " (?, (select tag_id from catalogue.tag where tag_code = 't-local-a'), ?)",
                 sharedSku,
                 FEDERATION,
                 sharedSku,
@@ -166,15 +174,13 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                 MPCS_B,
                 "OWN",
                 () -> jdbc.queryForList("select uom_code from catalogue.sku_uom_conversion", String.class));
-        List<String> tagsForB =
-                inScope(MPCS_B, "OWN", () -> jdbc.queryForList("select tag_code from catalogue.sku_tag", String.class));
+        List<String> tagsForB = inScope(MPCS_B, "OWN", () -> jdbc.queryForList(TAGS_ASSIGNED, String.class));
 
         assertThat(conversionsForB).as("the Federation's CASE, not A's DOZ").containsExactly("CASE");
         assertThat(tagsForB)
                 .as("the Federation's governed tag, not A's local tag")
                 .containsExactly("core-range");
-        assertThat(inScope(
-                        MPCS_A, "OWN", () -> jdbc.queryForList("select tag_code from catalogue.sku_tag", String.class)))
+        assertThat(inScope(MPCS_A, "OWN", () -> jdbc.queryForList(TAGS_ASSIGNED, String.class)))
                 .containsExactlyInAnyOrder("core-range", "t-local-a");
     }
 
@@ -237,6 +243,125 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void twoEntitiesDefineTheSameLocalCodeAndTheFederationAGovernedOneBesideThem() {
+        // CR-22A-1 (V0007): the key is the code within its owner. A's "t-local-a" is in place
+        // (arrange), and B, which cannot see it, defines its own without meeting A's key.
+        assertThat(inScope(MPCS_B, "OWN", () -> insertLocalTag(Ids.next(), "t-local-a", MPCS_B)))
+                .isEqualTo(1);
+        assertThat(inScope(MPCS_B, "OWN", () -> count("catalogue.tag where tag_code = 't-local-a'")))
+                .as("A's tag stays hidden from B")
+                .isZero();
+        assertThat(inScope(FEDERATION, "OWN", () -> insertGovernedTag(Ids.next(), "t-local-a")))
+                .as("a governed code an entity took first as a local one")
+                .isEqualTo(1);
+
+        // Within one owner, and among governed tags, the code is still unique.
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertLocalTag(Ids.next(), "t-local-a", MPCS_A)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("tag_code_per_owner");
+        assertThatThrownBy(() -> inScope(FEDERATION, "OWN", () -> insertGovernedTag(Ids.next(), "core-range")))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("tag_code_per_owner");
+    }
+
+    @Test
+    void aGovernedTagIsWrittenByTheFederationOnly() {
+        // 22A section 6, DefineTag: "governed tags F only" (V0007 governed_write, governed_update).
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertGovernedTag(Ids.next(), "t-gov")))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() -> inScope(FEDERATION, "FEDERATION_VIEW", () -> insertGovernedTag(Ids.next(), "t-gov")))
+                .as("the Federation's read-only view writes nothing")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThat(inScope(FEDERATION, "OWN", () -> insertGovernedTag(Ids.next(), "t-gov")))
+                .isEqualTo(1);
+
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.tag (tag_id, tag_code, name_en, governed) values (?, 't-gov', 'Gov', true)",
+                        Ids.next());
+        String rename = "update catalogue.tag set name_en = 'Renamed' where tag_code = 't-gov'";
+        assertThat(inScope(MPCS_A, "OWN", () -> jdbc.update(rename))).isZero();
+        assertThat(inScope(FEDERATION, "OWN", () -> jdbc.update(rename))).isEqualTo(1);
+        assertThatThrownBy(() -> inScope(
+                        FEDERATION,
+                        "OWN",
+                        () -> jdbc.update(
+                                "update catalogue.tag set governed = false, owner_entity_id = ? where tag_code = 't-gov'",
+                                MPCS_A)))
+                .as("a governed tag is not handed to an entity")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+    }
+
+    @Test
+    void anEntityCannotPutAnotherEntitysLocalTagOnItsItem() {
+        // The foreign key finds the tag without row-level security; own_write (V0007) asks for a
+        // governed tag or the caller's own.
+        UUID tagOfB = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.tag (tag_id, tag_code, name_en, governed, owner_entity_id)"
+                                + " values (?, 't-local-b', 'B', false, ?)",
+                        tagOfB,
+                        MPCS_B);
+
+        assertThatThrownBy(() -> inScope(
+                        MPCS_A,
+                        "OWN",
+                        () -> jdbc.update(
+                                "insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id) values (?, ?, ?)",
+                                localSkuOfA,
+                                tagOfB,
+                                MPCS_A)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThat(inScope(MPCS_B, "OWN", () -> insertTag(localSkuOfB, "t-local-b", MPCS_B)))
+                .as("B's own tag on B's item")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void aSupplierIsReadByOthersOnlyOnceABatchCitesIt() {
+        // Decided 27 September 2026 (V0007 cited_read): the owner reads its suppliers, everyone
+        // else the supplier of a batch, which is global identity (doc 22 section 3.7, B-03).
+        UUID supplier = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.supplier (supplier_id, owner_entity_id, name) values (?, ?, 'Acme')",
+                        supplier,
+                        MPCS_A);
+        String read = "catalogue.supplier where supplier_id = '" + supplier + "'";
+
+        assertThat(inScope(MPCS_A, "OWN", () -> count(read))).isEqualTo(1);
+        assertThat(inScope(MPCS_B, "OWN", () -> count(read)))
+                .as("nobody's batch cites it yet")
+                .isZero();
+        assertThat(inScope(FEDERATION, "FEDERATION_VIEW", () -> count(read))).isEqualTo(1);
+
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.batch (batch_id, sku_id, supplier_id, batch_no, printed_mrp, owner_entity_id)"
+                                + " values (?, ?, ?, 'B-ACME-1', 500.00, ?)",
+                        Ids.next(),
+                        sharedSku,
+                        supplier,
+                        MPCS_A);
+
+        assertThat(inScope(MPCS_B, "OWN", () -> count(read)))
+                .as("the supplier of a batch B can read")
+                .isEqualTo(1);
+        assertThat(inScope(null, "NONE", () -> count(read))).isZero();
+    }
+
+    @Test
     void theSameBatchCannotBeRegisteredTwiceAndACorrectionKeepsItsIdentity() {
         // V0003: catalogue.batch_key, one identity per (sku, supplier, batch_no), whatever the
         // partition and whoever registers it.
@@ -296,7 +421,7 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aSupplierIsWrittenByItsOwnerAndReadByEveryScope() {
+    void aSupplierIsWrittenByItsOwnerOnlyAndNeverChanged() {
         UUID supplier = Ids.next();
         int inserted = inScope(
                 MPCS_A,
@@ -501,12 +626,31 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
                 owner);
     }
 
+    /** Assigns the tag of that code the caller sees (V0007: an assignment names its tag by id). */
     private int insertTag(UUID skuId, String tagCode, UUID owner) {
         return jdbc.update(
-                "insert into catalogue.sku_tag (sku_id, tag_code, owner_entity_id) values (?, ?, ?)",
+                "insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id)"
+                        + " select ?, t.tag_id, ? from catalogue.tag t where t.tag_code = ?",
                 skuId,
+                owner,
+                tagCode);
+    }
+
+    private int insertLocalTag(UUID tagId, String tagCode, UUID owner) {
+        return jdbc.update(
+                "insert into catalogue.tag (tag_id, tag_code, name_en, governed, owner_entity_id)"
+                        + " values (?, ?, 'Local', false, ?)",
+                tagId,
                 tagCode,
                 owner);
+    }
+
+    private int insertGovernedTag(UUID tagId, String tagCode) {
+        return jdbc.update(
+                "insert into catalogue.tag (tag_id, tag_code, name_en, governed, owner_entity_id)"
+                        + " values (?, ?, 'Governed', true, null)",
+                tagId,
+                tagCode);
     }
 
     private int insertBatch(UUID batchId, UUID skuId, String batchNo, UUID corrects, UUID owner) {
