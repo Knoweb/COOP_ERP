@@ -10,6 +10,7 @@ import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.NumberingService;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
@@ -30,7 +31,14 @@ import org.springframework.transaction.annotation.Transactional;
  * kept. Flags: {@code LOCATION_MISMATCH} (the document names another location than the device's
  * shop; the receipt is kept at the shop the device is enrolled at), {@code SESSION_UNKNOWN} (no
  * session with that id has arrived: a receipt can overtake its session in a batch retry, or the
- * session was lost), {@code NO_LINES}.
+ * session was lost), {@code NO_LINES}, {@code DUPLICATE_NUMBER} (another receipt of the same
+ * series already has this number: both are kept, and an ALERT audit record
+ * {@code RECEIPT_NUMBER_DUPLICATED} names the other document).
+ *
+ * <p>Every receipt raises its series' high-water mark in the kernel
+ * ({@link NumberingService#observeDeviceNumber}, doc 32 section 8), so a till that gets the
+ * position's series later (a re-enrolment, a replacement) continues after the highest number
+ * central has applied instead of starting again at 1.
  *
  * <p>Guards (the shape a till cannot send if it follows the contract, not business rules): the
  * device's OWN scope at its shop ({@code m6.scope.device_required}); a document id and an issue
@@ -47,15 +55,20 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
 
     static final String AUDIT_RECORDED = "RECEIPT_RECORDED";
     static final String AUDIT_FLAGGED = "RECEIPT_FLAGGED";
+    static final String AUDIT_DUPLICATE = "RECEIPT_NUMBER_DUPLICATED";
+    static final String FLAG_DUPLICATE = "DUPLICATE_NUMBER";
+    static final String MESSAGE_DUPLICATE = "m6.receipt.duplicate_number";
 
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final NumberingService numbering;
 
-    RecordReceiptHandler(JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+    RecordReceiptHandler(JdbcTemplate jdbc, AuditFacade audit, EventPublisher events, NumberingService numbering) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
+        this.numbering = numbering;
     }
 
     @Override
@@ -79,6 +92,23 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
         }
         if (command.lines().isEmpty()) {
             flags.add("NO_LINES");
+        }
+
+        // Central keeps the series' high-water mark from what the tills send (doc 32 section 8),
+        // so a till newly given this position's series starts after the highest number applied.
+        // The update's row lock also serialises two receipts of one series for the check below.
+        List<UUID> sameNumber = List.of();
+        if (command.seriesId() != null && command.docNumber() != null) {
+            numbering.observeDeviceNumber(command.seriesId(), command.docNumber());
+            sameNumber = jdbc.queryForList(
+                    "select document_id from pos.receipt where series_id = ? and doc_number = ? and document_id <> ?",
+                    UUID.class,
+                    command.seriesId(),
+                    command.docNumber(),
+                    command.documentId());
+            if (!sameNumber.isEmpty()) {
+                flags.add(FLAG_DUPLICATE);
+            }
         }
 
         jdbc.update(
@@ -151,6 +181,23 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
                     Map.of("flags", flags),
                     scope,
                     "Applied and flagged: " + String.join(", ", flags));
+        }
+        if (!sameNumber.isEmpty()) {
+            // Two documents under one number break the series' uniqueness (24B): an ALERT for a
+            // person, kept apart from the REVIEW flag record so that it reaches the alert list.
+            Map<String, Object> duplicate = new LinkedHashMap<>();
+            duplicate.put("messageId", MESSAGE_DUPLICATE);
+            duplicate.put("seriesId", command.seriesId());
+            duplicate.put("docNumber", command.docNumberDisplay());
+            duplicate.put("otherDocumentIds", sameNumber);
+            duplicate.put("deviceId", scope.deviceId() != null ? scope.deviceId() : command.deviceId());
+            audit.record(
+                    AUDIT_DUPLICATE,
+                    Subject.of("receipt", command.documentId()),
+                    null,
+                    duplicate,
+                    scope,
+                    "Applied and flagged: another receipt already has number " + command.docNumberDisplay());
         }
         events.publish(new ReceiptRecorded(
                 command.documentId(),
