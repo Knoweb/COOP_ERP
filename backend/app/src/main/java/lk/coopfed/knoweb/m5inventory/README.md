@@ -2,7 +2,7 @@
 
 The living guide of the module (AGENTS.md): where stock is and what it cost, by location, batch and condition. Once code exists, this file and the tests supersede 25A for day-to-day work; every deviation from the guide is listed at the end with its reason. Read `hello/README.md` first: its six rules apply here unchanged.
 
-Built so far, for the demo (Phase 1: the Federation selling to a distributor): M5-01 (schema) and M5-02 (the ledger). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
+Built so far, for the demo (Phase 1: the Federation selling to a distributor): M5-01 (schema), M5-02 (the ledger) and M5-04 (the queries, and M5's answer to M2's lot questions). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
 
 ## The one rule
 
@@ -37,6 +37,21 @@ Per (entity, SKU): an intake at cost (RECEIPT, OPENING_BALANCE, REPACK_PRODUCE) 
 
 `stock_movement`: SELECT and INSERT only. `stock_lot`: SELECT, INSERT and UPDATE of `qty_on_hand`, `last_movement_seq`, `negative_since`, `negative_acknowledged_at` only, so a lot's identity and acquisition cost never change. `entity_sku_cost`, `movement_sequence`: UPDATE of their counters only. Nothing is ever deleted (`InventorySchemaIntegrationTest`). Row-level security follows the template on every table (`RlsMatrixIntegrationTest` covers them by their owner column): a shop session reads and writes its own shop's rows; `entity_sku_cost` has no location, since a shop's sale moves the entity's average.
 
+## The reads (M5-04; 25A sections 5 and 7)
+
+`query.InventoryQueries` (`internal/availability/InventoryQueriesImpl`), read-only, in the caller's scope under row-level security:
+
+| Query | Answer |
+|---|---|
+| `balances(location, sku?, includeZero)` | The lots of a location; GOOD lots with stock first, in FEFO order: `fefoRank` 1 is the lot to sell or pick first, ranked by expiry (none last), then by when it was received, then its id; DAMAGED, empty and negative lots have no rank. `GET /v1/inventory/locations/{id}/balances` (`inv.stock.view`): the unit cost only for an owner's user, never for a till or a read-only class. |
+| `availability(locations, skus)` | Per requested pair: the GOOD lots with stock, never a negative lot, less the undispatched reservations of issued delivery notes (with M5-03); zero where there is nothing. `GET /v1/inventory/availability` (`inv.stock.view`). |
+| `pickBatches`, `inStockBatches` | The GOOD lots with stock in FEFO order, at one location or several (M4's delivery note, M3's authoring checks). |
+| `skusWithLots`, `entityAverageCost`, `lotsConsumed(grn)` | M2's assortment; the caller entity's average; whether anything but the GRN's own receipt moved a lot it received into since (M4's ReverseGrn). |
+
+**M2's questions** (`m2catalogue.api.InventoryLotQuery`, 22A section 6) are answered by `internal/availability/LotQuestionsForCatalogue` from the lots: `hasAnyLot(sku)` (a lot of the SKU exists anywhere) and `holdsLotOf(batch, entity)`. M2 asks them in its caller's scope about lots that scope need not read, so each is a `SECURITY DEFINER` function of `V0002` that answers yes or no and shows nothing. M2's stand-in `RegistrationLotQuery` and its test were deleted in the same pull request, as M2 planned; `InventoryQueriesPostgresIntegrationTest` proves CorrectBatch against real lots (a lot holder that did not register the batch corrects it, an entity without a lot is refused).
+
+M3 and M4 have no stub to replace: M3 on main is still the scaffold, M4 is being built by another lane and calls `InventoryQueries` directly.
+
 ## Tests
 
 | Test | What it proves |
@@ -45,6 +60,8 @@ Per (entity, SKU): an intake at cost (RECEIPT, OPENING_BALANCE, REPACK_PRODUCE) 
 | `CostServiceTest` | Doc 13 scenario 3 (9,500 / 49 = 193.88); mixed receipts; the average after an oversell; 5,000 random sequences: the average never negative and within the costs of what came in, the quantity the sum of the movements; a replay gives the same row. |
 | `LedgerServicePostgresIntegrationTest` | What a posting writes, audits and publishes; the average on issue and re-averaging; oversell, `lot.negative.v1` and its clearing; the lot a sale creates; dense numbering; the database guards with nothing committed; a shop session held to its shop; the ledger refused outside a command; and **balance equals the sum of movements under random interleavings**: four threads posting random receipts, sales, write-offs and count adjustments at once, then every lot equal to the sum of its movements, the entity quantity to the sum of all, the average to one replayed from scratch in commit order, and the sequence dense. |
 | `InventorySchemaIntegrationTest` | The grants above; the movement partitions exist ahead of the calendar with row-level security forced. |
+| `InventoryQueriesPostgresIntegrationTest` | The FEFO rank (expiry, none last; damaged and empty lots unranked), availability without negative or damaged lots and for every pair, pick order, in-stock batches, SKUs with lots, the entity average, LotsConsumed; the reads by scope; M2's questions and CorrectBatch against real lots. |
+| `InventoryHttpPostgresIntegrationTest` | The two operations through HTTP: the owner's balances with batch number, expiry, rank and cost; the Federation view without the cost; another entity sees nothing; availability; a request problem. |
 
 ## Deviations from 25A, with reasons
 
@@ -53,3 +70,4 @@ Per (entity, SKU): an intake at cost (RECEIPT, OPENING_BALANCE, REPACK_PRODUCE) 
 3. **Property tests without jqwik.** jqwik is not in the build; `CostServiceTest` runs 5,000 generated cases on a fixed seed (25A section 9's count), and the interleaving property runs against PostgreSQL with concurrent postings.
 4. **The average on an intake when the entity holds nothing or owes stock** is the intake's cost (above); 25A writes the formula only.
 5. **Tables of later tickets are not in V0001**: recipes, the policy tables, count and expiry tasks, pick lists, the loss categories and the document extensions come with the tickets that use them, each in a migration of its own, so no table exists that no code writes.
+6. **Demo scope of M5-04**: the slice has the two reads the demo needs (balances, availability); the stock card (`/skus/{id}/movements`), the availability cache of 30 seconds and the PARTY callers' "live or end of day" mode (25A section 7) are deferred (`docs/PLAN_TO_M2.md`, "Deferred after the demo"). M4 reads availability in the seller's own scope, which needs none of them.
