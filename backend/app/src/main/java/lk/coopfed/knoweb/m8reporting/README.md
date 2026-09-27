@@ -2,7 +2,7 @@
 
 The living guide of the module (AGENTS.md): the read side. Projections built from the events of the other modules, the reports read from them, and the dashboard. Once code exists, this file and the tests supersede 28A for day-to-day work; every deviation from the guide is listed at the end with its reason. Read `hello/README.md` first: its rules apply here, with the one exemption below.
 
-Built so far, for the demo (phase 4, "administration and reporting for administration"): M8-01 (the projection base) with the stock position as its sample projection (M8-04, part). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
+Built so far, for the demo (phase 4, "administration and reporting for administration"): M8-01 (the projection base) with the stock position as its sample projection (M8-03, part). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
 
 ## The one rule
 

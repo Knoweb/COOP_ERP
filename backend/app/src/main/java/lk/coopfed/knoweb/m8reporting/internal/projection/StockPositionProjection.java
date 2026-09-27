@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The stock position (28A section 3, {@code stock_position}; M8-04, the part the demo needs):
+ * The stock position (28A section 3, {@code stock_position}; M8-03, the part the demo needs):
  * the quantity of each lot, by location, batch and condition, from M5's {@code stock.moved.v1}
  * (payload: movementId, ownerEntityId, locationId, stockLotId, batchId, skuId, condition,
  * movementType, qtyDelta, unitCostAtMovement, lotQtyOnHand, documentId, source, movementSeq).
