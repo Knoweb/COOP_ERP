@@ -12,6 +12,8 @@ export type LotBalance = components["schemas"]["LotBalanceResponse"];
 export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
+export type Transfer = components["schemas"]["TransferResponse"];
+export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 
@@ -73,6 +75,26 @@ export function useInventoryApi() {
       async sign(id: string, idempotencyKey: string): Promise<OpeningBalance> {
         const { data } = await api.POST("/v1/inventory/opening-balances/{openingBalanceId}/sign", {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async transfers(locationId: string): Promise<Transfer[]> {
+        const { data } = await api.GET("/v1/inventory/transfers", { params: { query: { locationId } } });
+        return data ?? [];
+      },
+
+      async issueTransfer(request: IssueTransferRequest, idempotencyKey: string): Promise<Transfer> {
+        const { data } = await api.POST("/v1/inventory/transfers", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async receiveTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
+        const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
         });
         return data!;
       },

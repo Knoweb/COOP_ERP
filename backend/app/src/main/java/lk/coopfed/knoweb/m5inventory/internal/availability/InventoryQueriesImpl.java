@@ -19,6 +19,7 @@ import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
+import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -270,6 +271,65 @@ class InventoryQueriesImpl implements InventoryQueries {
                         openingBalanceId)
                 .stream()
                 .findFirst();
+    }
+
+    @Override
+    public Optional<TransferView> transfer(UUID transferId, ScopeContext scope) {
+        return transfersWhere("t.transfer_id = ?", transferId).stream().findFirst();
+    }
+
+    @Override
+    public List<TransferView> transfers(UUID locationId, ScopeContext scope) {
+        return transfersWhere("(t.location_id = ? or t.to_location_id = ?)", locationId, locationId);
+    }
+
+    /**
+     * Transfers with their receipt, if any: RECEIVED when the destination wrote its receipt row,
+     * IN_TRANSIT until then (the two halves are two rows; V0004).
+     */
+    private List<TransferView> transfersWhere(String condition, Object... args) {
+        return jdbc.query(
+                """
+                select t.transfer_id, t.location_id, t.to_location_id, t.issued_by, t.issued_at,
+                       r.received_by, r.received_at, r.transfer_id is not null as received
+                  from inventory.transfer t
+                  left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                 where """
+                        + " " + condition
+                        + " order by t.issued_at desc, t.transfer_id",
+                (rs, n) -> {
+                    UUID id = rs.getObject("transfer_id", UUID.class);
+                    OffsetDateTime issued = rs.getObject("issued_at", OffsetDateTime.class);
+                    OffsetDateTime received = rs.getObject("received_at", OffsetDateTime.class);
+                    return new TransferView(
+                            id,
+                            rs.getObject("location_id", UUID.class),
+                            rs.getObject("to_location_id", UUID.class),
+                            rs.getBoolean("received") ? "RECEIVED" : "IN_TRANSIT",
+                            rs.getObject("issued_by", UUID.class),
+                            issued == null ? null : issued.toInstant(),
+                            rs.getObject("received_by", UUID.class),
+                            received == null ? null : received.toInstant(),
+                            transferLines(id));
+                },
+                args);
+    }
+
+    private List<TransferView.Line> transferLines(UUID transferId) {
+        return jdbc.query(
+                """
+                select line_no, batch_id, sku_id, qty, unit_cost
+                  from inventory.transfer_line
+                 where transfer_id = ?
+                 order by line_no
+                """,
+                (rs, n) -> new TransferView.Line(
+                        rs.getInt("line_no"),
+                        rs.getObject("batch_id", UUID.class),
+                        rs.getObject("sku_id", UUID.class),
+                        rs.getBigDecimal("qty"),
+                        rs.getBigDecimal("unit_cost")),
+                transferId);
     }
 
     private static Array uuids(java.sql.Connection connection, Collection<UUID> ids) throws SQLException {

@@ -56,4 +56,10 @@ public interface InventoryQueries {
 
     /** An opening balance of the caller's with its lines. */
     Optional<OpeningBalanceView> openingBalance(UUID openingBalanceId, ScopeContext scope);
+
+    /** A transfer of the caller's, seen from its source or its destination, with its lines. */
+    Optional<TransferView> transfer(UUID transferId, ScopeContext scope);
+
+    /** The transfers leaving or arriving at a location, newest first, with their lines. */
+    List<TransferView> transfers(UUID locationId, ScopeContext scope);
 }
