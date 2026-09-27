@@ -21,6 +21,7 @@ import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m2catalogue.query.TaxCategoryView;
+import lk.coopfed.knoweb.m2catalogue.query.TaxRateView;
 import lk.coopfed.knoweb.m2catalogue.query.UomView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -93,6 +94,37 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                         rs.getString("name_en"),
                         rs.getString("name_si"),
                         rs.getString("name_ta")));
+    }
+
+    @Override
+    public Optional<TaxRateView> taxRateInForce(UUID skuId, LocalDate onDate, ScopeContext scope) {
+        if (skuId == null || onDate == null || scope == null || !scope.hasActiveScope()) {
+            return Optional.empty();
+        }
+        return jdbc
+                .query(
+                        """
+                        select s.sku_id, c.tax_category_id, c.code, r.rate_percent, r.effective_from
+                        from catalogue.sku s
+                        join catalogue.tax_category c on c.tax_category_id = s.tax_category_id
+                        join catalogue.tax_rate r on r.tax_category_id = c.tax_category_id
+                        where s.sku_id = ?
+                          and r.effective_from <= ?
+                          and (r.effective_to is null or r.effective_to >= ?)
+                        order by r.effective_from desc
+                        limit 1
+                        """,
+                        (rs, row) -> new TaxRateView(
+                                rs.getObject("sku_id", UUID.class),
+                                rs.getObject("tax_category_id", UUID.class),
+                                rs.getString("code"),
+                                rs.getBigDecimal("rate_percent"),
+                                rs.getObject("effective_from", LocalDate.class)),
+                        skuId,
+                        onDate,
+                        onDate)
+                .stream()
+                .findFirst();
     }
 
     @Override

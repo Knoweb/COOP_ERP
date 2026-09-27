@@ -27,12 +27,11 @@ import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
-import lk.coopfed.knoweb.m2catalogue.query.SkuView;
+import lk.coopfed.knoweb.m2catalogue.query.TaxRateView;
 import lk.coopfed.knoweb.m4trading.api.InvoiceIssued;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
 import lk.coopfed.knoweb.m4trading.api.JournalPostingsReady;
 import lk.coopfed.knoweb.m4trading.api.Posting;
-import lk.coopfed.knoweb.m4trading.api.TaxRates;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingDocuments;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingGuards;
@@ -49,7 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
  * IssueInvoice (24A section 6). Guards, in order: the seller's entity-wide OWN scope; at least one
  * GRN; each a CONFIRMED GRN received from the caller, all of one buyer under one relationship, none
  * invoiced before (an advisory lock per GRN serialises two invoices of it); the seller's VAT number
- * (M1); per line a VAT rate in force for the item's tax category ({@link TaxRates}).
+ * (M1); per line the VAT rate in force for the item's tax category on the tax point
+ * ({@link CatalogueQueries#taxRateInForce}; 22A sections 3 and 7).
  *
  * <p>The InvoiceBuilder: one line per GRN line with something received, at the received quantity
  * and the trade price the GRN line carries (the relationship's tier at the ordered quantity, DR-2),
@@ -73,7 +73,6 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
     private final PartyQueries parties;
     private final RelationshipQueries relationships;
     private final CatalogueQueries catalogue;
-    private final TaxRates taxRates;
     private final PostingMapper postings;
     private final TradingClock clock;
     private final AuditFacade audit;
@@ -88,7 +87,6 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
             PartyQueries parties,
             RelationshipQueries relationships,
             CatalogueQueries catalogue,
-            TaxRates taxRates,
             PostingMapper postings,
             TradingClock clock,
             AuditFacade audit,
@@ -101,7 +99,6 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
         this.parties = parties;
         this.relationships = relationships;
         this.catalogue = catalogue;
-        this.taxRates = taxRates;
         this.postings = postings;
         this.clock = clock;
         this.audit = audit;
@@ -177,11 +174,15 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 if (line.receivedQty().signum() <= 0) {
                     continue;
                 }
-                SkuView sku = catalogue
-                        .getSku(line.skuId(), scope)
-                        .orElseThrow(
-                                () -> new ProblemException("m4.order.sku_not_found", Map.of("skuId", line.skuId())));
-                BigDecimal rate = taxRates.ratePercent(sku.taxCategoryId(), taxPoint, scope)
+                if (catalogue.getSku(line.skuId(), scope).isEmpty()) {
+                    throw new ProblemException("m4.order.sku_not_found", Map.of("skuId", line.skuId()));
+                }
+                // The rate of the item's own tax category at the invoice's tax point (22A sections
+                // 3 and 7): an EXEMPT or ZERO rated item gives 0; a rate published to apply after
+                // the tax point does not.
+                BigDecimal rate = catalogue
+                        .taxRateInForce(line.skuId(), taxPoint, scope)
+                        .map(TaxRateView::ratePercent)
                         .orElseThrow(() ->
                                 new ProblemException("m4.invoice.tax_rate_missing", Map.of("skuId", line.skuId())));
                 BigDecimal price = line.unitCost() == null ? BigDecimal.ZERO : line.unitCost();
