@@ -9,6 +9,7 @@ top to bottom direction
 !include <C4/C4_Component>
 
 Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
+  Component(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, "M8 Reporting Pipeline", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M3PricingRules, "M3 Pricing & Rules", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "M5 Inventory, Costing, Repack & Loss", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.Demodata, "Demo data", $techn="Module", $descr="", $tags="", $link="")
@@ -18,7 +19,7 @@ Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApp
   Component(CoopErpApplication.CoopErpApplication.Hellotemplatemodule, "Hello (template module)", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "M1 Party, Tenancy & Security", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M2CatalogueBatch, "M2 Catalogue & Batch", $techn="Module", $descr="", $tags="", $link="")
-  Component(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, "M8 Reporting Pipeline", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.M6PointofSale, "M6 Point of Sale", $techn="Module", $descr="", $tags="", $link="")
 }
 
 Rel(CoopErpApplication.CoopErpApplication.Demodata, CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "uses", $techn="", $tags="", $link="")
@@ -41,6 +42,7 @@ Rel(CoopErpApplication.CoopErpApplication.M4TradingDocuments, CoopErpApplication
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M2CatalogueBatch, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M6PointofSale, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M8ReportingPipeline, CoopErpApplication.CoopErpApplication.PlatformKernel, "depends on", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.PlatformKernel, CoopErpApplication.CoopErpApplication.Engine, "depends on", $techn="", $tags="", $link="")
 

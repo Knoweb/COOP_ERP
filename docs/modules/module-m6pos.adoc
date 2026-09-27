@@ -1,0 +1,14 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`lk.coopfed.knoweb.m6pos`
+|Spring components
+|_Services_
+
+* `l.c.k.m.query.PosQueries` (via `l.c.k.m.internal.query.PosQueriesImpl`)
+|Bean references
+|* `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
+* `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
+|===
