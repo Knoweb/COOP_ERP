@@ -90,6 +90,12 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 
 **The GRN contract is frozen** (24A section 10): `grn.confirmed.v1` and `GrnLineConfirmed` do not change without a change request; M5 and M6 bind to them.
 
+## Invoices (M4-08)
+
+| Command | Permission | Guards, in order | Effect | Audit, event |
+|---|---|---|---|---|
+| IssueInvoice | `bil.invoice.issue` | seller entity-wide OWN; GRNs; each CONFIRMED, received from the caller, one buyer and relationship, not invoiced; seller VAT number; a VAT rate per line | lines at received qty × the GRN line's trade price, VAT per line; seller's ENTITY series of INV; `doc_invoice` | INVOICE_ISSUED; `invoice.issued.v1`, `journal.postings_ready.v1` (`PostingMapper`, seller side) |
+
 Shared pieces in `internal/document`: `TradingClock` (today in the business zone, a state history row), `TradingSeries`, `TradingGuards`, `TradingDocuments` (draft header and line builders). `internal/queries/OrderStatus` derives the status the screens show. Only a `@CommandHandler` class writes (ArchitectureTests), so the handlers hold their own SQL.
 
 ## Deviations from the implementation guide

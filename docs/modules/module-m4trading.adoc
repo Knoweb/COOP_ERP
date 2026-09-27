@@ -7,6 +7,7 @@
 
 * `l.c.k.m.query.DeliveryQueries` (via `l.c.k.m.internal.queries.DeliveryQueriesImpl`)
 * `l.c.k.m.query.GrnQueries` (via `l.c.k.m.internal.queries.GrnQueriesImpl`)
+* `l.c.k.m.query.InvoiceQueries` (via `l.c.k.m.internal.queries.InvoiceQueriesImpl`)
 * `l.c.k.m.query.OrderQueries` (via `l.c.k.m.internal.queries.OrderQueriesImpl`)
 
 _Others_
