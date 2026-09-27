@@ -1,0 +1,5 @@
+audit_event_types:
+  - code: INVENTORY_STOCK_LOT_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Inventory stock lot registered
