@@ -91,6 +91,12 @@ class GrnHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         String number = confirm.handle(new ConfirmGrn(grnId), buyerAt(SHOP));
 
         assertThat(number).isEqualTo("D4B-GRN-0000001"); // no LOCATION series registered in the fixture
+        // The shop's session cannot read the buyer's own order row, yet the GRN knows the
+        // relationship (from the seller's allocation), which the invoice needs (M4-11).
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select relationship_id from trading.doc_grn where document_id = ?", UUID.class, grnId))
+                .isEqualTo(TradingFixture.RELATIONSHIP);
         GrnView grn = grns.getGrn(grnId, buyerAt(SHOP)).orElseThrow();
         assertThat(grn.status()).isEqualTo("CONFIRMED");
         assertThat(grn.discrepancyId()).isNull();

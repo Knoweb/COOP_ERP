@@ -338,6 +338,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/invoices/{invoiceId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's invoice (M4-11)
+         * @description The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity is refused (report.scope_mismatch).
+         */
+        get: operations["getInvoicePrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -613,6 +635,12 @@ export interface components {
             lineTotal: number;
             /** Format: uuid */
             grnLineId?: string;
+        };
+        InvoicePrintResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** Format: uri */
+            url: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1232,6 +1260,38 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getInvoicePrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePrintResponse"];
+                };
+            };
+            /** @description m4.invoice.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
         };
     };
 }
