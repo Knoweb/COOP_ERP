@@ -11,13 +11,14 @@ import partyMessages from "../../modules/m1party/party.messages.json" with { typ
 import catalogueMessages from "../../modules/m2catalogue/catalogue.messages.json" with { type: "json" };
 import inventoryMessages from "../../modules/m5inventory/inventory.messages.json" with { type: "json" };
 import tradingMessages from "../../modules/m4trading/trading.messages.json" with { type: "json" };
+import reportingMessages from "../../modules/m8reporting/reporting.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
 
 type Catalogue = Record<Locale, Record<string, string>>;
 
-const SHELL_MESSAGES: Catalogue = {
+export const SHELL_MESSAGES: Catalogue = {
   en: {
     "shell.lang_fallback": "Not translated yet; shown in English",
     "shell.auth.signing_in": "Signing you in …",
@@ -218,13 +219,14 @@ const SHELL_MESSAGES: Catalogue = {
   }
 };
 
-const MODULE_CATALOGUES: Catalogue[] = [
+export const MODULE_CATALOGUES: Catalogue[] = [
   helloMessages,
   pricingMessages,
   partyMessages,
   catalogueMessages,
   inventoryMessages,
   tradingMessages,
+  reportingMessages,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];
 

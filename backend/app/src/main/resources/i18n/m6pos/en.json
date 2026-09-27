@@ -1,0 +1,6 @@
+{
+  "m6.scope.device_required": "A till’s facts are applied at the shop of the till that sent them",
+  "m6.receipt.malformed": "The receipt from the till has no document id or issue time",
+  "m6.session.malformed": "The till session has no id or time",
+  "m6.receipt.duplicate_number": "Another receipt of the same till series already has this number; both receipts are kept for review"
+}

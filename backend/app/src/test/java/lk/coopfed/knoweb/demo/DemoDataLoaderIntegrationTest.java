@@ -64,8 +64,10 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("primary tills", 4L)
                 .containsEntry("published trade lists", 3L)
                 .containsEntry("active relationships", 5L)
-                .containsEntry("posted opening balances", 3L)
-                .containsEntry("lots", 120L);
+                .containsEntry("posted opening balances", 4L)
+                .containsEntry("lots", 200L)
+                .containsEntry("received transfers to the town shop", 1L)
+                .containsEntry("lots with stock at the town shop", 40L);
         if (first.total() > 0) {
             // A fresh database: the loader went through the handlers, which audited and published.
             assertThat(kernel.committedAudit()).isNotEmpty();
@@ -138,6 +140,18 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         counts.put(
                 "lots",
                 count(admin, "select count(*) from inventory.stock_lot where location_id::text like '0190f0de-%'"));
+        counts.put(
+                "received transfers to the town shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.transfer_receipt where location_id = ?::uuid",
+                        DemoCast.M101_TOWN_SHOP.toString()));
+        counts.put(
+                "lots with stock at the town shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.stock_lot where location_id = ?::uuid and qty_on_hand > 0",
+                        DemoCast.M101_TOWN_SHOP.toString()));
         counts.put(
                 "audit of the demo users",
                 count(admin, "select count(*) from kernel.audit_event where actor_user_id::text like '0190f0de-%'"));

@@ -1,0 +1,1 @@
+- **Extracts** are produced with `pdftotext -layout -enc UTF-8 -eol unix`, not bare `-layout`: on Windows the bare form wrote Latin-1 with every dash as an invalid UTF-8 byte.

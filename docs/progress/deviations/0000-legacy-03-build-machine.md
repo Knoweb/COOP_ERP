@@ -1,0 +1,1 @@
+- **Build machine** used for this session has no JDK, Docker, Node or make on PATH, so the Checkpoint 2 proof cannot run on it as it stands.

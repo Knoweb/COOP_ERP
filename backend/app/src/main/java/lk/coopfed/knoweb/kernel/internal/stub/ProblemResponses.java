@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 /**
  * Turns a {@link ProblemException} into an RFC 9457 problem document (17A section 4.4).
  * The error code is the message id: a stable string the web client can test for, and the
- * key of the translated text in i18n/{en,si,ta}.json.
+ * key of the translated text in i18n/<module>/{en,si,ta}.json.
  *
  * <pre>
  *   { "status": 422, "code": "hello.greeting.duplicate",

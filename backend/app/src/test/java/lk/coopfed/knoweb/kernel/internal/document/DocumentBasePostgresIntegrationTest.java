@@ -155,6 +155,31 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).hasSize(1).first().isInstanceOf(SeriesHolderChanged.class);
     }
 
+    @Test
+    void aNumberADeviceIssuedRaisesTheSeriesButNeverLowersIt() {
+        UUID seriesId = inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        kernel.reset();
+
+        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(seriesId, 5)))
+                .isTrue();
+        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(seriesId, 3)))
+                .isFalse();
+        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(seriesId, 5)))
+                .isFalse();
+        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(Ids.next(), 9)))
+                .isFalse();
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select next_number from kernel.numbering_series where series_id = ?",
+                                Long.class,
+                                seriesId))
+                .isEqualTo(6L);
+        // Derived from the applied document, whose own audit names the number.
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
     // ---- issuance ----------------------------------------------------------------------------
 
     @Test

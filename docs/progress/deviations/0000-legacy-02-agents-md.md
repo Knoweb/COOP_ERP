@@ -1,0 +1,1 @@
+- **AGENTS.md** lists nine module packages; 17A §2 and the repository also carry `m10procurement` as a reserved package.

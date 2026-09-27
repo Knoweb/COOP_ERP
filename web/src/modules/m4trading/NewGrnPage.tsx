@@ -71,24 +71,33 @@ export function NewGrnPage() {
     enabled: batchIds.length > 0
   });
 
+  // The rows start from the drop once; the seller's batches, which arrive later, fill only the
+  // batch fields still empty, never a count the receiver has already typed.
+  const dropKey = drop?.dropId;
   useEffect(() => {
     if (drop) {
-      setRows(
-        rowsOf(drop).map((row) => {
-          const batch = batches.data?.find((found) => found.skuId === row.skuId)?.batch;
-          return batch
-            ? {
-                ...row,
-                batchNo: batch.batchNo,
-                expiryDate: batch.expiryDate ?? "",
-                printedMrp: batch.printedMrp !== undefined && batch.printedMrp !== null ? String(batch.printedMrp) : ""
-              }
-            : row;
-        })
-      );
+      setRows((current) => (current.length > 0 ? current : rowsOf(drop)));
     }
-    // The drop is an object of the cached note, the same one until the note is read again.
-  }, [drop, batches.data]);
+  }, [dropKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!batches.data) {
+      return;
+    }
+    setRows((current) =>
+      current.map((row) => {
+        const batch = batches.data.find((found) => found.skuId === row.skuId)?.batch;
+        if (!batch || row.batchNo !== "") {
+          return row;
+        }
+        return {
+          ...row,
+          batchNo: batch.batchNo,
+          expiryDate: row.expiryDate || (batch.expiryDate ?? ""),
+          printedMrp: row.printedMrp || (batch.printedMrp !== undefined && batch.printedMrp !== null ? String(batch.printedMrp) : "")
+        };
+      })
+    );
+  }, [batches.data, rows.length]);
 
   const capture = useMutation({
     mutationFn: () => api.captureGrn(grnRequest(dropId, drop!.shipToLocationId, rows), key.current()),

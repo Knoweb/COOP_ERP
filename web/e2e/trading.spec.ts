@@ -79,7 +79,12 @@ test("the Federation sells to D101: order, acceptance, delivery note, dispatch, 
   await page.getByRole("link", { name: textOf(receiver, "trading.grn.new") }).click();
   const received = page.getByLabel(textOf(receiver, "trading.column.received"));
   await expect(received).toHaveCount(2);
+  // The seller's batches fill the batch fields once read (M2); count after that, as a person would.
+  for (const batch of await page.getByLabel(textOf(receiver, "trading.column.batch")).all()) {
+    await expect(batch).not.toHaveValue("");
+  }
   await received.nth(1).fill("38");
+  await expect(received.nth(1)).toHaveValue("38");
   await expect(page.getByText(textOf(receiver, "trading.grn.short"), { exact: true })).toBeVisible();
   await page.getByRole("button", { name: textOf(receiver, "trading.grn.capture") }).click();
   await expect(page).toHaveURL(/\/trading\/grns\/[0-9a-f-]{36}$/);

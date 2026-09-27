@@ -35,11 +35,13 @@ class ProblemResponsesTest {
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
-        "en | The printout is too large (5,000 bytes, at most 4,000)",
-        "si | මුද්‍රණය ඉතා විශාල ය (බයිට් 5,000, උපරිමය 4,000)",
-        "ta | அச்சுப்பிரதி மிகப் பெரியது (5,000 பைட்டுகள், அதிகபட்சம் 4,000)"
-    })
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "en | The printout is too large (5,000 bytes, at most 4,000)",
+                "si | මුද්‍රණය ඉතා විශාල ය (බයිට් 5,000, උපරිමය 4,000)",
+                "ta | அச்சுப்பிரதி மிகப் பெரியது (5,000 பைட்டுகள், அதிகபட்சம் 4,000)"
+            })
     void severalNamedPlaceholdersAreFilled(String language, String title) {
         ProblemDetail problem = responses.toProblem(
                 new ProblemException("report.too_large", Map.of("size", 5000, "maxBytes", 4000)),
@@ -53,8 +55,8 @@ class ProblemResponsesTest {
     @ParameterizedTest
     @CsvSource({"en", "si", "ta"})
     void aProblemWithoutParametersStillAnswers(String language) {
-        ProblemDetail problem = responses.toProblem(
-                new ProblemException("scope.required"), Locale.forLanguageTag(language));
+        ProblemDetail problem =
+                responses.toProblem(new ProblemException("scope.required"), Locale.forLanguageTag(language));
 
         assertThat(problem.getStatus()).isEqualTo(400);
         assertThat(problem.getTitle()).isNotBlank();
