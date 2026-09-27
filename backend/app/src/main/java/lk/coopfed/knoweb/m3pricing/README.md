@@ -9,6 +9,7 @@ The living guide of the module (AGENTS.md): with the tests and the seed files it
 | M3-01, M3-02 (JVM) | The engine: `Money`, `Quantity`, `Tax`, `Rounding`, the model, `PricingSnapshotIndex`, `PriceResolver`, `RuleEvaluator`, `BasketResolver`, `TradePriceResolver` | `backend/shared-engine` (package `lk.coopfed.knoweb.engine`) |
 | M3-03 | `pricing.price_list` and `pricing.price_list_line` with RLS, the trade-list seeds | `db/migration/m3pricing/V0003__price_lists.sql`, `seed/m3pricing/` |
 | M3-04 | TRADE price lists: create, draft a new version, set lines (tiers), publish; the trade price of an order line; M3's answer to M1's `TradePriceListCheck` | `internal/list`, `internal/queries`, `internal/relationship`, `web/PricingController` |
+| M3-10 (one of seven) | The trade price list screen (doc 30 section 5.3) | `web/src/modules/m3pricing` |
 
 Not built yet: rules (M3-05), control prices (M3-06), MRP policy and adjustment types (M3-07), reviews (M3-08), the snapshot contributor and labels (M3-09), the other screens (M3-10), the freeze (M3-11).
 
