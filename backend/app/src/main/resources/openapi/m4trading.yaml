@@ -277,6 +277,148 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/delivery-notes:
+
+    get:
+      tags: [Delivery]
+      operationId: listDeliveryNotes
+      summary: The delivery notes the caller's entity sent (SELLER) or is to receive (BUYER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The delivery notes, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Delivery]
+      operationId: createDeliveryNote
+      summary: Draft a delivery note of accepted order lines, in drops
+      description: >
+        Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer,
+        m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch,
+        m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation.
+      x-permission: del.note.draft
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeliveryNoteRequest'
+      responses:
+        '201':
+          description: The draft delivery note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/delivery-notes/{deliveryNoteId}:
+
+    parameters:
+      - $ref: '#/components/parameters/DeliveryNoteId'
+
+    get:
+      tags: [Delivery]
+      operationId: getDeliveryNote
+      summary: One delivery note the caller's entity sent or is to receive
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The delivery note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '404':
+          description: m4.delivery.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/delivery-notes/{deliveryNoteId}/issue:
+
+    parameters:
+      - $ref: '#/components/parameters/DeliveryNoteId'
+
+    post:
+      tags: [Delivery]
+      operationId: issueDeliveryNote
+      summary: Issue a draft delivery note from the seller's series
+      description: >
+        Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_draft,
+        m4.delivery.exceeds_allocation, m4.delivery.order_not_accepted.
+      x-permission: del.note.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The issued delivery note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/delivery-notes/{deliveryNoteId}/dispatch:
+
+    parameters:
+      - $ref: '#/components/parameters/DeliveryNoteId'
+
+    post:
+      tags: [Delivery]
+      operationId: dispatchDeliveryNote
+      summary: The vehicle leaves with an issued delivery note
+      description: >
+        Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_issued,
+        m4.delivery.vehicle_required, m4.delivery.driver_required.
+      x-permission: del.note.dispatch
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchRequest'
+      responses:
+        '200':
+          description: The delivery note in transit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -286,6 +428,14 @@ components:
     OrderId:
       in: path
       name: orderId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    DeliveryNoteId:
+      in: path
+      name: deliveryNoteId
       required: true
       schema:
         type: string
@@ -457,5 +607,158 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+
+    CreateDeliveryNoteRequest:
+      type: object
+      required: [drops]
+      properties:
+        vehicleRef:
+          type: string
+          maxLength: 40
+        driverName:
+          type: string
+          maxLength: 120
+        routeRef:
+          type: string
+          maxLength: 40
+        drops:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/DropRequest'
+
+    DropRequest:
+      type: object
+      required: [shipToLocationId, billToEntityId, lines]
+      properties:
+        shipToLocationId:
+          type: string
+          format: uuid
+        billToEntityId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/DeliveryLineRequest'
+
+    DeliveryLineRequest:
+      type: object
+      required: [orderLineId, qty]
+      properties:
+        orderLineId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+        batchId:
+          type: string
+          format: uuid
+
+    DispatchRequest:
+      type: object
+      properties:
+        vehicleRef:
+          type: string
+          maxLength: 40
+        driverUserId:
+          type: string
+          format: uuid
+        driverName:
+          type: string
+          maxLength: 120
+
+    DeliveryNoteResponse:
+      type: object
+      required: [deliveryNoteId, status, sellerEntityId, buyerEntityId, drops]
+      properties:
+        deliveryNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, ISSUED, IN_TRANSIT, CLOSED]
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        vehicleRef:
+          type: string
+        driverName:
+          type: string
+        dispatchedAt:
+          type: string
+          format: date-time
+        issuedAt:
+          type: string
+          format: date-time
+        drops:
+          type: array
+          items:
+            $ref: '#/components/schemas/DropResponse'
+
+    DropResponse:
+      type: object
+      required: [dropId, seq, shipToLocationId, billToEntityId, orderIds, status, lines]
+      properties:
+        dropId:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+        shipToLocationId:
+          type: string
+          format: uuid
+        billToEntityId:
+          type: string
+          format: uuid
+        orderIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        status:
+          type: string
+          enum: [PLANNED, RECEIVED]
+        grnId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryLineResponse'
+
+    DeliveryLineResponse:
+      type: object
+      required: [lineId, lineNo, orderId, orderLineId, skuId, uomCode, dispatchedQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        orderId:
+          type: string
+          format: uuid
+        orderLineId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        dispatchedQty:
+          type: number
 
     # @@SCHEMAS@@

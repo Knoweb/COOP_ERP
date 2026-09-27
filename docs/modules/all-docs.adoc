@@ -29,10 +29,6 @@ include::module-m2catalogue.adoc[]
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]
 
-== M4 Trading Documents
-plantuml::module-m4trading.puml[,,format=svg]
-include::module-m4trading.adoc[]
-
 == M5 Inventory, Costing, Repack & Loss
 plantuml::module-m5inventory.puml[,,format=svg]
 include::module-m5inventory.adoc[]
@@ -40,4 +36,8 @@ include::module-m5inventory.adoc[]
 == Demo data
 plantuml::module-demo.puml[,,format=svg]
 include::module-demo.adoc[]
+
+== M4 Trading Documents
+plantuml::module-m4trading.puml[,,format=svg]
+include::module-m4trading.adoc[]
 

@@ -313,6 +313,9 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-02 | Paging of ListOrders; cancelling the undispatched remainder of a partly fulfilled order | Before order volumes grow; before partial deliveries are cancelled | – |
 | M4-03 | LockClockJob and ORDER_LOCKED; OverrideLockWindow; RecordOrderAdjustment; BackorderReviewJob | Before lock windows are enforced by a clock and changed by the seller | LOCKED is derived from `lock_at` on read |
 | M4-03 | Allocation across competing open orders; the PRO_RATA and QUOTA rules | When M5 answers availability net of reservations | FCFS per order against the M5 seam |
+| M4-04 | RecordProofOfDelivery, MarkDropUndelivered (driver API) | Before drivers record deliveries | – |
+| M4-04 | DropSnapshotContributor and the change-log of expected drops to shops | Before a till receives against expected lines (with K-08-F4) | – |
+| M4-04 | M5 PickBatches; several buyers on one note | With M5's picking; with multi-party routes | – |
 
 ## Phase 7 — decisions only the architect can take
 
