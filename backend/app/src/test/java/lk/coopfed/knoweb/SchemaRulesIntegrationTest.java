@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       because a test of module A does not look at the tables of module B;</li>
  *   <li>the application role {@code app_rw} may not DELETE or TRUNCATE anywhere, and may not
  *       create objects (AGENTS.md; 17A section 6.2: "no DELETE anywhere for app_rw"), with the
- *       three exceptions of {@link #DELETE_BY_DESIGN};</li>
+ *       four exceptions of {@link #DELETE_BY_DESIGN};</li>
  * </ul>
  *
  * A table every tenant may read (a reference table) still needs a policy; it says so
@@ -56,9 +56,15 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
      * fact whose history is its audit record, and a table may join this list only when its
      * implementation guide names the command that deletes from it. Adding a table here is a
      * design decision, not a fix for a red test.
+     *
+     * <p>pricing.price_list_line (M3-04, decided 27 September 2026 on the architect's delegation):
+     * 23A section 7 names SetLines, "upsert draft lines", which replaces the lines of a DRAFT
+     * list; a removed draft line is deleted. The trigger pricing.line_of_a_draft refuses the
+     * delete of a line whose list is not a draft, so a published line is never deleted, and
+     * SetLines audits PRICELIST_LINES_SET and publishes price_list.lines_set.v1.
      */
     static final Set<String> DELETE_BY_DESIGN =
-            Set.of("security.user_role", "security.role_permission", "security.sod_pair");
+            Set.of("security.user_role", "security.role_permission", "security.sod_pair", "pricing.price_list_line");
 
     @Test
     void theSchemasAreTheTwelveOfTheDesign() {

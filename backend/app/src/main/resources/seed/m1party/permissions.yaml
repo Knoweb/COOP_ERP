@@ -111,14 +111,25 @@ permissions:
     description_en: "Suspend, reinstate and retire devices"
     scope: "ENTITY"
     requires_mfa: true
-  - code: "prc.price_list.read"
+  # M3 Pricing & Rules (23A section 3.1, "appended to the catalogue file"). The scaffolder's two
+  # placeholders (prc.price_list.read and .register) are replaced by the codes of the guide that
+  # M3-04 uses, plus prc.pricelist.view for the reads (the guide names no read code; as M2's
+  # cat.sku.view, CR-22A-3). The other codes of 23A section 3.1 arrive with their tickets.
+  - code: "prc.pricelist.view"
     module: "m3pricing"
-    description_en: "View price lists"
+    description_en: "View price lists and trade prices"
     scope: "ENTITY"
-  - code: "prc.price_list.register"
+  - code: "prc.pricelist.author"
     module: "m3pricing"
-    description_en: "Register price lists"
+    description_en: "Draft price lists and set their lines"
     scope: "ENTITY"
+  # "mfa for TRADE via handler" (23A section 3.1): only TRADE lists are built so far, so the
+  # handler asks for the second factor on every publication.
+  - code: "prc.pricelist.publish"
+    module: "m3pricing"
+    description_en: "Publish price lists"
+    scope: "ENTITY"
+    requires_mfa: true
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes

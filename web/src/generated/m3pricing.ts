@@ -4,36 +4,127 @@
  */
 
 export interface paths {
-    "/v1/pricing/price-lists": {
+    "/v1/pricing/lists": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** The price lists visible in the caller's scope, newest first */
+        /**
+         * The price list versions visible in the caller's scope, by name, newest version first
+         * @description The owner sees its lists; the buyer of a relationship sees the published versions of the TRADE list the relationship binds; the Federation view sees every list.
+         */
         get: operations["listPriceLists"];
         put?: never;
         /**
-         * Register a price list for the caller's entity
-         * @description Codes this operation can answer with 422: pricing.price_list.text_required (a text of spaces only), pricing.price_list.duplicate, idempotency.request_mismatch. A request that does not match the schema below (no textEn, a text over 200 characters) is 400 request.invalid.
+         * Create a price list, version 1, as a draft of the caller's entity
+         * @description Codes this operation can answer with 422: m3.price_list.kind_not_available (only TRADE is available so far), scope.invalid (not an entity-wide OWN scope), request.field.required.
          */
-        post: operations["registerPriceList"];
+        post: operations["createPriceList"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/pricing/price-lists/{id}": {
+    "/v1/pricing/lists/{listId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        /** One version of a price list with its lines */
+        get: operations["getPriceList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/lists/{listId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draft the next version of a published list
+         * @description The new version starts with no lines. Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_published, m3.price_list.draft_exists, scope.invalid.
+         */
+        post: operations["draftNewVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/lists/{listId}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the lines of a draft
+         * @description Answers one outcome per line, in the order given. The lines are stored only when every line is accepted (saved true); a refused line carries its reason (a message id: m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing, .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete). An accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+         */
+        put: operations["setLines"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/lists/{listId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a draft from a date; the previous published version is superseded
+         * @description A second factor is required (TRADE). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, m3.price_list.apply_from_past, m3.price_list.no_lines, m3.price_list.lines_invalid, scope.invalid.
+         */
+        post: operations["publishPriceList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/resolve/trade": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** One price list */
-        get: operations["getPriceList"];
+        /**
+         * The trade price of an order line under a relationship (tax-exclusive, per unit)
+         * @description 23A section 5 writes this as a POST; it changes nothing, so it is a GET here and needs no Idempotency-Key. The tier is the highest not above the quantity (the ordered quantity).
+         */
+        get: operations["resolveTradePrice"];
         put?: never;
         post?: never;
         delete?: never;
@@ -46,26 +137,104 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        RegisterPriceListRequest: {
-            textEn: string;
-            textSi?: string | null;
-            textTa?: string | null;
+        CreatePriceListRequest: {
+            /** @enum {string} */
+            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            name: string;
+        };
+        PublishPriceListRequest: {
+            /**
+             * Format: date
+             * @description The first business date the version applies
+             */
+            applyFrom: string;
+        };
+        SetLinesRequest: {
+            lines: components["schemas"]["PriceListLineInput"][];
+        };
+        PriceListLineInput: {
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            /** @description The quantity from which the price applies; 0 is the base price */
+            tierFromQty: number;
+            /** @description Unit price (tax-exclusive for TRADE) with at most four decimals */
+            price: number;
+        };
+        SetLinesResponse: {
+            saved: boolean;
+            outcomes: components["schemas"]["LineOutcome"][];
+        };
+        LineOutcome: {
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            tierFromQty: number;
+            ok: boolean;
+            /** @description The message id of the refusal */
+            reason?: string | null;
+            /** @description The message id of a review raised on an accepted line */
+            review?: string | null;
         };
         PriceListResponse: {
             /** Format: uuid */
-            id: string;
-            textEn: string;
-            /** @description null when not translated; show textEn with the EN tag */
-            textSi?: string | null;
-            /** @description null when not translated; show textEn with the EN tag */
-            textTa?: string | null;
-            /** @enum {string} */
-            status: "REGISTERED";
+            priceListId: string;
             /**
-             * Format: date-time
-             * @description An instant in UTC (ends in Z). Convert to local time on the screen only.
+             * Format: uuid
+             * @description The id of version 1 that a relationship binds
              */
+            rootPriceListId: string;
+            /** Format: uuid */
+            ownerEntityId?: string;
+            /** @enum {string} */
+            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            name: string;
+            version: number;
+            /** Format: uuid */
+            sourceVersionId?: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "PUBLISHED" | "SUPERSEDED" | "WITHDRAWN";
+            /** Format: date */
+            applyFrom?: string | null;
+            /** Format: date-time */
+            publishedAt?: string | null;
+            /** Format: date-time */
             createdAt: string;
+        };
+        PriceListLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            tierFromQty: number;
+            price: number;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+        };
+        PriceListDetailResponse: {
+            list: components["schemas"]["PriceListResponse"];
+            lines: components["schemas"]["PriceListLineResponse"][];
+        };
+        TradePriceResponse: {
+            /** Format: uuid */
+            relationshipId: string;
+            /**
+             * Format: uuid
+             * @description The version the price was read from
+             */
+            priceListId: string;
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            tierFromQty: number;
+            /** @description Per unit and tax-exclusive with four decimals */
+            unitPrice: number;
+            engineVersion: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -124,14 +293,17 @@ export type $defs = Record<string, never>;
 export interface operations {
     listPriceLists: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: "TRADE" | "RETAIL" | "ADVISORY";
+                status?: "DRAFT" | "PUBLISHED" | "SUPERSEDED" | "WITHDRAWN";
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Price lists of the caller's scope; an empty list when there is no active scope */
+            /** @description The versions */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -142,7 +314,7 @@ export interface operations {
             };
         };
     };
-    registerPriceList: {
+    createPriceList: {
         parameters: {
             query?: never;
             header: {
@@ -154,14 +326,14 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterPriceListRequest"];
+                "application/json": components["schemas"]["CreatePriceListRequest"];
             };
         };
         responses: {
-            /** @description Registered */
+            /** @description Created */
             201: {
                 headers: {
-                    /** @description Address of the new price list */
+                    /** @description Address of the new version */
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -178,13 +350,109 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                listId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The price list */
+            /** @description The version and its lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListDetailResponse"];
+                };
+            };
+            /** @description No such list, or the caller's scope may not see it (the two look the same on purpose) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    draftNewVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new draft version */
+            201: {
+                headers: {
+                    /** @description Address of the new version */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    setLines: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description The outcome of each line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetLinesResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    publishPriceList: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                listId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishPriceListRequest"];
+            };
+        };
+        responses: {
+            /** @description The published version */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -193,7 +461,35 @@ export interface operations {
                     "application/json": components["schemas"]["PriceListResponse"];
                 };
             };
-            /** @description No such price list, or the caller's scope may not see it (the two look the same on purpose) */
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    resolveTradePrice: {
+        parameters: {
+            query: {
+                relationshipId: string;
+                skuId: string;
+                uom: string;
+                qty: number;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The price */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradePriceResponse"];
+                };
+            };
+            /** @description No visible relationship, no bound list in force, or no line for the SKU and unit */
             404: {
                 headers: {
                     [name: string]: unknown;
