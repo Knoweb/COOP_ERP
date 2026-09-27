@@ -298,6 +298,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The invoices the caller's entity issued (SELLER) or received (BUYER) */
+        get: operations["listInvoices"];
+        put?: never;
+        /**
+         * Issue a tax invoice from confirmed GRNs of one buyer
+         * @description Problems: m4.invoice.grns_required, m4.invoice.grn_unknown, m4.invoice.grn_not_confirmed, m4.invoice.one_buyer, m4.invoice.grn_invoiced, m4.invoice.seller_vat_missing, m4.invoice.tax_rate_missing, m4.invoice.nothing_received.
+         */
+        post: operations["issueInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices/{invoiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        /** One invoice the caller's entity issued or received */
+        get: operations["getInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -521,6 +561,51 @@ export interface components {
             unitCost?: number;
             /** Format: uuid */
             batchId?: string;
+        };
+        IssueInvoiceRequest: {
+            grnIds: string[];
+        };
+        InvoiceResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            docNumber?: string;
+            status: string;
+            /** Format: uuid */
+            relationshipId?: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            sellerVatNo?: string;
+            buyerVatNo?: string;
+            grnIds: string[];
+            /** Format: date */
+            taxPointDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            netAmount: number;
+            taxAmount: number;
+            grossAmount: number;
+            lines: components["schemas"]["InvoiceLineResponse"][];
+        };
+        InvoiceLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            qty: number;
+            unitPrice: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            /** Format: uuid */
+            grnLineId?: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1057,6 +1142,89 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listInvoices: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoices, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    issueInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueInvoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued invoice */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            /** @description m4.invoice.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
 }
