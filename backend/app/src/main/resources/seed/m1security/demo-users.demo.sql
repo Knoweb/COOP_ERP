@@ -119,30 +119,30 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000331'::uuid, ARRAY[
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'whs.grn.confirm', 'shop.grn.confirm',
             'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prt.relationship.view', 'inv.stock.view',
-            'prt.location.view']),
+            'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign']),
         -- society manager: the second signature (countersign), the shops and their tills
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view',
-            'rpt.report.run', 'rpt.export.run']),
+            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
         ('0190f0de-0000-7000-8000-000000000342'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view',
-            'rpt.report.run', 'rpt.export.run']),
+            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
         ('0190f0de-0000-7000-8000-000000000352'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view',
-            'rpt.report.run', 'rpt.export.run']),
+            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
-            'inv.stock.view', 'cat.sku.view', 'prt.location.view'])
+            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code

@@ -187,6 +187,25 @@ public final class TillSimulator {
         }
     }
 
+    /** Where the device token comes from; the test identity provider's unless a real one is given. */
+    private java.util.function.Supplier<HttpHeaders> auth;
+
+    /**
+     * From now on each call carries these headers (a device token from a real identity provider,
+     * for the demo against the local stack), instead of the test provider's.
+     */
+    public TillSimulator authenticatedBy(java.util.function.Supplier<HttpHeaders> headers) {
+        this.auth = headers;
+        return this;
+    }
+
+    /** The enrolment answer's next_device_seq: a till enrolled again goes on from where central is. */
+    public TillSimulator startingAt(long nextDeviceSeq) {
+        this.nextSeq = nextDeviceSeq;
+        this.lastAcknowledged = nextDeviceSeq - 1;
+        return this;
+    }
+
     // ============================================================ selling (doc 26; 26A sections 6 and 8)
 
     /** A line rung up at the counter: a scanned barcode, a quantity and the price the till charged. */
@@ -212,6 +231,12 @@ public final class TillSimulator {
         this.tillPositionId = position;
         this.seriesId = series;
         this.numberPrefix = prefix;
+        return this;
+    }
+
+    /** The series' next number as the enrolment answer gave it. */
+    public TillSimulator numberingFrom(long nextNumber) {
+        this.nextReceiptNumber = nextNumber;
         return this;
     }
 
@@ -600,7 +625,7 @@ public final class TillSimulator {
     // ---- HTTP ----
 
     private ResponseEntity<String> send(HttpMethod method, String path, Object body) {
-        HttpHeaders headers = TestIdentityProvider.deviceHeaders(deviceId);
+        HttpHeaders headers = auth == null ? TestIdentityProvider.deviceHeaders(deviceId) : auth.get();
         headers.setContentType(MediaType.APPLICATION_JSON);
         if (method == HttpMethod.POST) {
             headers.set("Idempotency-Key", UUID.randomUUID().toString());
