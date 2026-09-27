@@ -32,7 +32,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What a seller can allocate today of the given items, in each item's base unit */
+        /**
+         * What a seller can allocate today of the given items, in each item's base unit
+         * @description M5's availability over the seller's active warehouses. Row-level security lets only the seller read its own stock: asked by anyone else, every item answers 0.
+         */
         get: operations["sellerAvailability"];
         put?: never;
         post?: never;
@@ -161,7 +164,7 @@ export interface paths {
         put?: never;
         /**
          * Draft a delivery note of accepted order lines, in drops
-         * @description Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer, m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch, m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation.
+         * @description Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer, m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch, m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation, m4.delivery.from_location_unknown.
          */
         post: operations["createDeliveryNote"];
         delete?: never;
@@ -375,6 +378,11 @@ export interface components {
             reason: string;
         };
         CreateDeliveryNoteRequest: {
+            /**
+             * Format: uuid
+             * @description The seller's warehouse the goods leave from (optional)
+             */
+            fromLocationId?: string;
             vehicleRef?: string;
             driverName?: string;
             routeRef?: string;
@@ -410,6 +418,8 @@ export interface components {
             sellerEntityId: string;
             /** Format: uuid */
             buyerEntityId: string;
+            /** Format: uuid */
+            fromLocationId?: string;
             vehicleRef?: string;
             driverName?: string;
             /** Format: date-time */
