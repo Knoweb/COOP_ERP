@@ -128,7 +128,7 @@ class LocationsPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.update("delete from security.app_user where user_id = ?", OPERATOR);
         admin.update("delete from security.role where role_id = ?", ROLE);
         admin.execute("truncate table party.device, party.till_position, party.location, party.entity_relationship,"
-                + " party.entity_party_directory, party.federation_identity, party.entity cascade");
+                + " party.entity_party_directory, party.entity cascade");
         insertEntity(admin, MPCS, "M905", "ACTIVE");
         insertEntity(admin, OTHER, "M906", "ACTIVE");
         insertEntity(admin, SUSPENDED, "M907", "SUSPENDED");

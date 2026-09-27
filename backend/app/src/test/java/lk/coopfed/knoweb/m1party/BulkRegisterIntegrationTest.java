@@ -43,14 +43,15 @@ class BulkRegisterIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void theFederationExists() {
         JdbcTemplate admin = superuserJdbc();
-        admin.execute("truncate table party.entity_relationship, party.entity_party_directory,"
-                + " party.federation_identity, party.entity cascade");
+        admin.execute(
+                "truncate table party.entity_relationship, party.entity_party_directory," + " party.entity cascade");
         admin.update(
                 "insert into party.entity (entity_id, entity_code, entity_type, legal_name_en) values (?, ?, ?, ?)",
                 FEDERATION,
                 "FED001",
                 "FEDERATION",
                 "Cooperative Federation");
+        theDatabaseNamesTheFederation(FEDERATION);
     }
 
     @Test

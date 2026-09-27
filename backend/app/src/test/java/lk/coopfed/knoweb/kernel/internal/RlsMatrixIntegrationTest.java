@@ -48,6 +48,10 @@ import org.junit.jupiter.api.Test;
  * location column, one more row entity-wide (or at location 2 when a location is required);
  * entity B has one row at its own location whose counterparty is A; entity C has one row and
  * trades with nobody.
+ *
+ * <p>On a table with a location, three more cells (PLAN_TO_M2 6.12): OWN at location 1 cannot
+ * insert at location 2 of its own entity, nor with no location, nor move its row to location 2;
+ * the entity-wide OWN session inserts at location 2.
  */
 class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
 
@@ -75,7 +79,13 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         INSERT,
         UPDATE,
         DELETE,
-        MOVE
+        MOVE,
+        /** An insert at location 2, in a scope at location 1 or entity-wide (PLAN_TO_M2 6.12). */
+        INSERT_AT_ANOTHER_LOCATION,
+        /** An insert with no location, in a scope at location 1. */
+        INSERT_WITHOUT_LOCATION,
+        /** The row at location 1 moved to location 2, in a scope at location 1. */
+        MOVE_TO_ANOTHER_LOCATION
     }
 
     /** A scope, as the customizer would set it; {@code forgot} is a transaction with none. */
@@ -174,6 +184,12 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             }
             // OWN moving its own row to entity B: WITH CHECK refuses it.
             case MOVE -> REFUSED;
+            // A shop writes only at its own location (doc 18 section 3.7, M-05; PLAN_TO_M2 6.12):
+            // own_write and own_update's WITH CHECK carry own_read's location line. An
+            // entity-wide session writes at any location of its entity.
+            case INSERT_AT_ANOTHER_LOCATION ->
+                shape.granted().contains("INSERT") && scope.is("OWN") && scope.location() == null ? DONE : REFUSED;
+            case INSERT_WITHOUT_LOCATION, MOVE_TO_ANOTHER_LOCATION -> REFUSED;
         };
     }
 
@@ -279,7 +295,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             // kernel.document does not (kernel V0061): a shop reads its own documents only.
             new Departure(
                     "kernel.numbering_series",
-                    "own_read and own_update admit a NULL location (the ENTITY series) at a location scope",
+                    "own_read, own_update and own_write admit a NULL location (the ENTITY series) at a location scope",
                     RlsMatrixIntegrationTest::entityWideRowsAtALocation),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
@@ -316,6 +332,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
      * so that cell stays the template's REFUSED.
      */
     private static String entityWideRowsAtALocation(Check check) {
+        // A shop creates the ENTITY series its document draws from (kernel V0064).
+        if (check.op() == Op.INSERT_WITHOUT_LOCATION) {
+            return DONE;
+        }
         return check.op() == Op.SELECT
                         && check.scope().is("OWN")
                         && check.scope().location() != null
@@ -462,6 +482,35 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     foreign.key(),
                     asApp(st, own, () -> st.executeUpdate(columns.insert(B, null, null)) == 1 ? DONE : HIDDEN));
 
+            // A shop at location 1 inserts at location 2 of its own entity, or with no location;
+            // the entity-wide session inserts at location 2. Only on a table with a location.
+            if (shape.hasLocation()) {
+                Scope atShop = scopes.stream()
+                        .filter(s -> "OWN(A@1)".equals(s.name()))
+                        .findFirst()
+                        .orElseThrow();
+                for (Scope scope : List.of(own, atShop)) {
+                    Check elsewhere = new Check(Op.INSERT_AT_ANOTHER_LOCATION, scope, "at location 2");
+                    expected.put(elsewhere.key(), expect(shape, elsewhere, null, exceptions));
+                    actual.put(
+                            elsewhere.key(),
+                            asApp(
+                                    st,
+                                    scope,
+                                    () -> st.executeUpdate(columns.insert(A, LOCATION_2, null)) == 1 ? DONE : HIDDEN));
+                }
+                if (!shape.locationRequired()) {
+                    Check nowhere = new Check(Op.INSERT_WITHOUT_LOCATION, atShop, "with no location");
+                    expected.put(nowhere.key(), expect(shape, nowhere, null, exceptions));
+                    actual.put(
+                            nowhere.key(),
+                            asApp(
+                                    st,
+                                    atShop,
+                                    () -> st.executeUpdate(columns.insert(A, null, null)) == 1 ? DONE : HIDDEN));
+                }
+            }
+
             Map<String, String> tids = new LinkedHashMap<>();
             for (Row row : rows) {
                 try (ResultSet rs = st.executeQuery(columns.insert(row.owner(), row.location(), row.counterparty())
@@ -531,6 +580,24 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                                             == 1
                                     ? DONE
                                     : HIDDEN));
+            if (shape.hasLocation()) {
+                Scope atShop = scopes.stream()
+                        .filter(s -> "OWN(A@1)".equals(s.name()))
+                        .findFirst()
+                        .orElseThrow();
+                Check relocate = new Check(Op.MOVE_TO_ANOTHER_LOCATION, atShop, mine.label());
+                expected.put(relocate.key(), expect(shape, relocate, mine, exceptions));
+                actual.put(
+                        relocate.key(),
+                        asApp(
+                                st,
+                                atShop,
+                                () -> st.executeUpdate("update " + table + " t set location_id = '" + LOCATION_2
+                                                        + "' where " + where(tids.get(mine.label())))
+                                                == 1
+                                        ? DONE
+                                        : HIDDEN));
+            }
 
             List<String> mismatches = new ArrayList<>();
             expected.forEach((key, want) -> {

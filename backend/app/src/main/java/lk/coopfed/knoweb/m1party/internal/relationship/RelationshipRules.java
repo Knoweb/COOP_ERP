@@ -1,7 +1,9 @@
 package lk.coopfed.knoweb.m1party.internal.relationship;
 
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +34,17 @@ final class RelationshipRules {
     private static final String EXCLUSION_VIOLATION = "23P01";
 
     private RelationshipRules() {}
+
+    /**
+     * "Today" for a relationship: the calendar date in the business time zone
+     * ({@code coop-erp.business-timezone}, Colombo), never the UTC date. A relationship belongs to
+     * an entity and no location, so it has no location business date to ask ({@code BusinessDate}
+     * takes a location); the amendment and the suspension read the same day from here, so that
+     * between midnight and 05:30 in Colombo they do not disagree about which day it is.
+     */
+    static LocalDate businessToday(Clock clock, ZoneId businessZone) {
+        return LocalDate.ofInstant(clock.instant(), businessZone);
+    }
 
     /**
      * The caller acts for its own entity, entity-wide: the relationship is the entity's, not a

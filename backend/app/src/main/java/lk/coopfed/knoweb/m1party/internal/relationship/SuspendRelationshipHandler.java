@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m1party.internal.relationship;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +17,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.RelationshipSuspended;
 import lk.coopfed.knoweb.m1party.api.SuspendRelationship;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,13 +41,19 @@ class SuspendRelationshipHandler implements Handles<SuspendRelationship, UUID> {
 
     private final RelationshipRepository repository;
     private final Clock clock;
+    private final ZoneId businessZone;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     SuspendRelationshipHandler(
-            RelationshipRepository repository, Clock clock, AuditFacade audit, EventPublisher events) {
+            RelationshipRepository repository,
+            Clock clock,
+            @Value("${coop-erp.business-timezone}") String businessZone,
+            AuditFacade audit,
+            EventPublisher events) {
         this.repository = repository;
         this.clock = clock;
+        this.businessZone = ZoneId.of(businessZone);
         this.audit = audit;
         this.events = events;
     }
@@ -71,9 +79,10 @@ class SuspendRelationshipHandler implements Handles<SuspendRelationship, UUID> {
         RelationshipRules.requireReason(command.reasonCode());
 
         // The rows to suspend: the one named, and every other ACTIVE row of the pair in force
-        // today or later, each locked so a concurrent amendment waits for this to commit. The
-        // date is the UTC calendar day; a row that ended late yesterday is left alone either way.
-        LocalDate today = LocalDate.now(clock);
+        // today or later, each locked so a concurrent amendment waits for this to commit. Today is
+        // the amendment's today, in the business time zone: at 00:30 in Colombo the UTC date is
+        // still yesterday, and a row that ended yesterday would be suspended with the rest.
+        LocalDate today = RelationshipRules.businessToday(clock, businessZone);
         List<Relationship> rows = new ArrayList<>();
         rows.add(relationship);
         for (Relationship other : repository.activeOnOrAfterForUpdate(
