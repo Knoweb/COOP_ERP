@@ -3,6 +3,7 @@ templates:
     name_en: "Federation Viewer"
     role_class: "FEDERATION_VIEW"
     permissions:
+      - "rpt.report.run"
       - "gov.entity.view"
       - "prt.relationship.view"
       - "prt.location.view"
@@ -22,6 +23,8 @@ templates:
     name_en: "Entity Administrator"
     role_class: "OWN"
     permissions:
+      - "rpt.report.run"
+      - "rpt.export.run"
       - "gov.user.manage"
       - "gov.user.view"
       - "gov.role.manage"
@@ -72,6 +75,8 @@ templates:
     name_en: "Trading Buyer"
     role_class: "OWN"
     permissions:
+      - "rpt.report.run"
+      - "rpt.export.run"
       - "trd.document.view"
       - "cat.sku.view"
       - "prt.relationship.view"
@@ -83,6 +88,8 @@ templates:
     name_en: "Trading Seller"
     role_class: "OWN"
     permissions:
+      - "rpt.report.run"
+      - "rpt.export.run"
       - "trd.document.view"
       - "cat.sku.view"
       - "prt.relationship.view"
