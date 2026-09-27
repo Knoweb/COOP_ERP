@@ -10,19 +10,32 @@ import { messages } from "./shell/i18n/messages";
 import type { Locale } from "./shell/i18n/messages";
 import type { ModuleDefinition } from "./shell/modules/ModuleDefinition";
 
-// The shell reads the signed-in user through useSession(); the tests decide who that is.
+// The shell reads the signed-in user through useSession() and what they may see through
+// usePermissions() (the server's resolved set, GET /v1/session); the tests decide both.
 let session: Session | null = null;
 vi.mock("./shell/auth/session", () => ({ useSession: () => session }));
+let permissions: string[] = [];
+vi.mock("./shell/auth/PermissionsContext", () => ({
+  usePermissions: () => ({ policyClass: session?.policyClass ?? "NONE", permissions, failed: false })
+}));
+
+/** What the server would resolve for each development role of the local stack (seed/m1security/users.dev.sql). */
+const RESOLVED: Record<string, string[]> = {
+  "mpcs-admin": ["hello.greeting.read", "hello.greeting.register"],
+  cashier: ["hello.greeting.read"],
+  "a-role-nobody-defined": []
+};
 
 function signedInAs(role: string, language: Locale = "en"): Session {
+  permissions = RESOLVED[role] ?? [];
   return {
     userId: "u-1", displayName: "Test User", entityId: "0190f000-0000-7000-8000-000000000002",
-    policyClass: "OWN", language, roles: [role]
+    policyClass: "OWN", language
   };
 }
 
 // Two modules of the test's own, so that these tests say nothing about what hello contains.
-// Their permissions are hello's, because those are what the temporary role map knows.
+// Their permissions are hello's, because those are what the resolved sets above carry.
 const greetings: ModuleDefinition = {
   id: "greetings",
   routes: [{ path: "greetings", element: <p>the greetings page</p> }],

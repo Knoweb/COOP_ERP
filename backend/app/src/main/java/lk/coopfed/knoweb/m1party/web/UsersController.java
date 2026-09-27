@@ -2,13 +2,9 @@ package lk.coopfed.knoweb.m1party.web;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
-import lk.coopfed.knoweb.kernel.api.PermissionResolver;
-import lk.coopfed.knoweb.kernel.api.PolicyClass;
-import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.CreateUser;
 import lk.coopfed.knoweb.m1party.api.CredentialResetResult;
@@ -26,7 +22,6 @@ import lk.coopfed.knoweb.m1party.web.generated.UserPage;
 import lk.coopfed.knoweb.m1party.web.generated.UserReasonRequest;
 import lk.coopfed.knoweb.m1party.web.generated.UserResponse;
 import lk.coopfed.knoweb.m1party.web.generated.UsersApi;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,16 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class UsersController implements UsersApi {
 
-    private static final String VIEW = "gov.user.view";
-
     private final Handles<CreateUser, UUID> createUser;
     private final Handles<UpdateUser, UUID> updateUser;
     private final Handles<ResetCredential, CredentialResetResult> resetCredential;
     private final Handles<DeactivateUser, UUID> deactivateUser;
     private final UserQueries queries;
     private final CurrentScope currentScope;
-    private final PermissionResolver permissions;
-    private final boolean enforcePermissions;
 
     UsersController(
             Handles<CreateUser, UUID> createUser,
@@ -51,32 +42,13 @@ class UsersController implements UsersApi {
             Handles<ResetCredential, CredentialResetResult> resetCredential,
             Handles<DeactivateUser, UUID> deactivateUser,
             UserQueries queries,
-            CurrentScope currentScope,
-            PermissionResolver permissions,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
+            CurrentScope currentScope) {
         this.createUser = createUser;
         this.updateUser = updateUser;
         this.resetCredential = resetCredential;
         this.deactivateUser = deactivateUser;
         this.queries = queries;
         this.currentScope = currentScope;
-        this.permissions = permissions;
-        this.enforcePermissions = enforcePermissions;
-    }
-
-    /**
-     * The reads declare x-permission gov.user.view, and no command interceptor runs for a read, so the
-     * controller checks it (the pattern of M2's CatalogueController): for the OWN class (the
-     * read-only classes resolve no permission; row-level security is what limits them), and only
-     * when enforcement is on, as for commands (coop-erp.security.enforce-permissions).
-     */
-    private void requireView(ScopeContext scope) {
-        if (!enforcePermissions || scope == null || scope.policyClass() != PolicyClass.OWN) {
-            return;
-        }
-        if (!permissions.allows(scope, VIEW)) {
-            throw new ProblemException("permission.denied", Map.of("permission", VIEW));
-        }
     }
 
     @Override
@@ -134,7 +106,6 @@ class UsersController implements UsersApi {
     @Override
     public ResponseEntity<UserResponse> getUser(UUID userId) {
         ScopeContext scope = currentScope.get();
-        requireView(scope);
         return queries.getUser(userId, scope)
                 .map(UsersController::toResponse)
                 .map(ResponseEntity::ok)
@@ -144,7 +115,6 @@ class UsersController implements UsersApi {
     @Override
     public ResponseEntity<UserPage> listUsers(String status, String userKind, UUID cursor, Integer limit) {
         ScopeContext scope = currentScope.get();
-        requireView(scope);
         lk.coopfed.knoweb.m1party.query.UserPage page =
                 queries.listUsers(new UserFilter(status, userKind, cursor, limit), scope);
         List<UserResponse> items =

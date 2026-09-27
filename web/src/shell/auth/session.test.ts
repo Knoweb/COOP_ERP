@@ -10,19 +10,20 @@ function token(claims: Record<string, unknown>): string {
 }
 
 describe("the session read from an access token", () => {
-  it("carries who the user is, the home entity, the policy class, the language and the roles", () => {
+  it("carries who the user is, the home entity, the policy class and the language, and not the roles", () => {
     const session = sessionFromAccessToken(token({
       sub: "u-1", name: "සුනිල් පෙරේරා", preferred_username: "mpcs-admin",
       ent: "0190f000-0000-7000-8000-000000000002", cls: "OWN", lang: "si", roles: ["mpcs-admin"]
     }));
 
+    // No roles: what the user may do comes from the server's resolved set (GET /v1/session),
+    // never from a claim of the token.
     expect(session).toEqual({
       userId: "u-1",
       displayName: "සුනිල් පෙරේරා",          // decoded as UTF-8, not as Latin-1
       entityId: "0190f000-0000-7000-8000-000000000002",
       policyClass: "OWN",
-      language: "si",
-      roles: ["mpcs-admin"]
+      language: "si"
     });
   });
 
@@ -36,7 +37,6 @@ describe("the session read from an access token", () => {
     expect(session.entityId).toBeNull();
     expect(session.policyClass).toBe("NONE");   // the server then shows nothing
     expect(session.language).toBeNull();        // the shell then uses English
-    expect(session.roles).toEqual([]);
   });
 
   it("refuses something that is not a token", () => {

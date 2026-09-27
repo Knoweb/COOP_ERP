@@ -54,6 +54,43 @@ class ScopeFilterHoldsTest {
     }
 
     @Test
+    void anExternalCallerMayNameAGrantedEntityAndNoOther() {
+        // A regulator's nominal scope is its home entity; it may name the entity of its grant,
+        // entity-wide, and no location of it and no third entity (CR-19A-9).
+        ScopeContext regulator = new ScopeContext(
+                UUID.randomUUID(),
+                null,
+                E,
+                List.of(new Scope(E, null)),
+                null,
+                PolicyClass.EXTERNAL_TIMEBOXED,
+                Set.of(F),
+                null,
+                Locale.ENGLISH,
+                UUID.randomUUID());
+        assertThat(ScopeFilter.holds(regulator, new Scope(E, null), OWNERS)).isTrue();
+        assertThat(ScopeFilter.holds(regulator, new Scope(F, null), OWNERS)).isTrue();
+        assertThat(ScopeFilter.holds(regulator, new Scope(F, F_SHOP), OWNERS)).isFalse();
+        assertThat(ScopeFilter.holds(regulator, new Scope(UUID.randomUUID(), null), OWNERS))
+                .isFalse();
+        // The same entities mean nothing to an OWN caller without the assignment.
+        assertThat(ScopeFilter.holds(holding(new Scope(E, null)), new Scope(F, null), OWNERS))
+                .isFalse();
+    }
+
+    @Test
+    void theSessionReadIsTheOneCallAllowedWithoutChoosingAmongSeveralScopes() {
+        ScopeContext two = holding(new Scope(E, null), new Scope(F, null));
+        assertThat(ScopeFilter.isSessionRead("GET", "/v1/session")).isTrue();
+        assertThat(ScopeFilter.isSessionRead("GET", "/v1/session/")).isFalse();
+        assertThat(ScopeFilter.isSessionRead("POST", "/v1/session")).isFalse();
+        org.assertj.core.api.Assertions.assertThatCode(() -> ScopeFilter.validate(two, OWNERS, true))
+                .doesNotThrowAnyException();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ScopeFilter.validate(two, OWNERS, false))
+                .hasMessageContaining("scope.required");
+    }
+
+    @Test
     void aShopHolderActsAtItsShopAndNowhereElse() {
         ScopeContext shopOnly = holding(new Scope(E, E_SHOP));
         assertThat(ScopeFilter.holds(shopOnly, new Scope(E, E_SHOP), OWNERS)).isTrue();

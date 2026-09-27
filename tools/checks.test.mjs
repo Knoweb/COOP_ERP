@@ -995,6 +995,21 @@ test(
 );
 
 test(
+  "x-permission authenticated is for a GET of the caller's own facts, never a command (CR-19A-9)",
+  () => {
+    assert.deepEqual(
+      readSlices({ session: "paths:\n  /v1/session:\n    get:\n      x-permission: authenticated\n" }).problems,
+      []
+    );
+    one(
+      readSlices({ session: "paths:\n  /v1/session:\n    post:\n      x-permission: authenticated\n" }).problems,
+      /x-permission "authenticated" on a mutating operation/
+    );
+    one(handler('@CommandHandler(permission = "authenticated")'), /"authenticated" on a command handler/);
+  }
+);
+
+test(
   "the real slices and handlers pass",
   () => {
     execFileSync(

@@ -9,7 +9,10 @@
 //   3. a @CommandHandler's permission is neither a quoted code nor CommandHandler.INTERNAL: a
 //      constant or an expression is a value this check cannot read, so it would escape rule 2;
 //   4. an operation of a slice carries x-permission "internal": an internal command has no
-//      operation (CR-19A-6), and nobody holds a permission of that name.
+//      operation (CR-19A-6), and nobody holds a permission of that name;
+//   5. x-permission "authenticated" (any signed-in principal; CR-19A-9) is on anything but a
+//      GET, or on a @CommandHandler: it is for a read of the caller's own facts (the session)
+//      and never lets a command through.
 //
 // Run through `make test`; standard library only. The functions are exported for
 // tools/checks.test.mjs.
@@ -17,8 +20,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { operationsOf } from "./check-slices.mjs";
 
 export const PLACEHOLDER = "todo.";
+
+/** The one x-permission that is no code of the catalogue: any signed-in principal, on a GET (kernel SliceOperations.AUTHENTICATED). */
+export const AUTHENTICATED = "authenticated";
 
 /** What CommandHandler.INTERNAL holds (kernel.api.CommandHandler). */
 export const INTERNAL = "internal";
@@ -45,6 +52,14 @@ export function readSlices(slices) {
   for (const [module, text] of Object.entries(slices)) {
     const permissions = [...text.matchAll(/^\s*x-permission:\s*["']?([^\s"'#]+)/gm)].map((m) => m[1]);
     sliceOf[module] = new Set(permissions);
+    for (const operation of operationsOf(text)) {
+      if (operation.permission === AUTHENTICATED && operation.method !== "get") {
+        problems.push(
+          `openapi/${module}.yaml:${operation.line} ${operation.method.toUpperCase()} ${operation.path}: x-permission "${AUTHENTICATED}"`
+            + ` on a mutating operation; it admits any signed-in principal and is for a read of the caller's own facts (CR-19A-9)`
+        );
+      }
+    }
     for (const permission of sliceOf[module]) {
       if (permission.startsWith(PLACEHOLDER)) {
         problems.push(`openapi/${module}.yaml: x-permission "${permission}" is a scaffold placeholder; use the code from the module's guide`);
@@ -97,6 +112,8 @@ export function problemsOfHandlerSource(where, module, source, sliceOf) {
     const permission = value.slice(1, -1);
     if (permission === INTERNAL) {
       problems.push(`${where}: permission "${INTERNAL}" written as a string; write CommandHandler.INTERNAL`);
+    } else if (permission === AUTHENTICATED) {
+      problems.push(`${where}: permission "${AUTHENTICATED}" on a command handler; a command needs a permission of the catalogue (CR-19A-9)`);
     } else if (permission.startsWith(PLACEHOLDER)) {
       problems.push(`${where}: permission "${permission}" is a scaffold placeholder; use the code from the module's guide`);
     } else if (!sliceOf[module]) {

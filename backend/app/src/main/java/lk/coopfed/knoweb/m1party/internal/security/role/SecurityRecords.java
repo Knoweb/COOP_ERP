@@ -63,7 +63,7 @@ class SecurityRecords {
         }
     }
 
-    record UserRow(UUID userId, UUID homeEntityId, String status) {}
+    record UserRow(UUID userId, UUID homeEntityId, String status, String userKind) {}
 
     record Assignment(UUID userId, UUID roleId, UUID scopeEntityId, UUID scopeLocationId) {}
 
@@ -193,11 +193,12 @@ class SecurityRecords {
         }
         return jdbc
                 .query(
-                        "select user_id, home_entity_id, status from security.app_user where user_id = ?",
+                        "select user_id, home_entity_id, status, user_kind from security.app_user where user_id = ?",
                         (rs, i) -> new UserRow(
                                 rs.getObject("user_id", UUID.class),
                                 rs.getObject("home_entity_id", UUID.class),
-                                rs.getString("status")),
+                                rs.getString("status"),
+                                rs.getString("user_kind")),
                         userId)
                 .stream()
                 .findFirst();

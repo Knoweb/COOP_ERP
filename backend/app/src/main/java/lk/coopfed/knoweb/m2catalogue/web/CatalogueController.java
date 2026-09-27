@@ -4,7 +4,6 @@ import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
-import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
@@ -26,7 +25,6 @@ import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuPageResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,20 +35,16 @@ class CatalogueController implements CatalogueApi {
     private final DefineConversionHandler conversions;
     private final CatalogueQueries queries;
     private final CurrentScope currentScope;
-    private final ViewPermission view;
 
     CatalogueController(
             SkuCommandRouter commands,
             DefineConversionHandler conversions,
             CatalogueQueries queries,
-            CurrentScope currentScope,
-            PermissionResolver permissions,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
+            CurrentScope currentScope) {
         this.commands = commands;
         this.conversions = conversions;
         this.queries = queries;
         this.currentScope = currentScope;
-        this.view = new ViewPermission(permissions, enforcePermissions);
     }
 
     @Override
@@ -73,7 +67,6 @@ class CatalogueController implements CatalogueApi {
             String q, String lang, String status, Integer offset, Integer limit) {
 
         ScopeContext scope = currentScope.get();
-        requireView(scope);
 
         SkuFilter filter = new SkuFilter(status, q, lang, offset, limit);
 
@@ -90,7 +83,6 @@ class CatalogueController implements CatalogueApi {
     @Override
     public ResponseEntity<SkuResponse> getSku(UUID skuId) {
         ScopeContext scope = currentScope.get();
-        requireView(scope);
 
         return queries.getSku(skuId, scope)
                 .map(CatalogueController::toResponse)
@@ -98,9 +90,7 @@ class CatalogueController implements CatalogueApi {
                 .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", skuId)));
     }
 
-    private void requireView(ScopeContext scope) {
-        view.require(scope);
-    }
+    private void requireView(ScopeContext scope) {}
 
     @Override
     public ResponseEntity<Void> defineConversion(UUID skuId, String idempotencyKey, DefineConversionRequest request) {

@@ -60,12 +60,11 @@ public class ScopeFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         ScopeContext scope;
+        String path = request.getRequestURI().substring(request.getContextPath().length());
         try {
             scope = currentScope.get();
-            validate(scope, locations::ownerOf);
-            validatePrincipal(
-                    scope,
-                    request.getRequestURI().substring(request.getContextPath().length()));
+            validate(scope, locations::ownerOf, isSessionRead(request.getMethod(), path));
+            validatePrincipal(scope, path);
         } catch (ProblemException e) {
             // A filter runs outside the DispatcherServlet, so no @ControllerAdvice sees this:
             // without the answer written here a wrong scope header is a 500, not a problem.
@@ -95,11 +94,20 @@ public class ScopeFilter extends OncePerRequestFilter {
     }
 
     static void validate(ScopeContext scope, Function<UUID, Optional<UUID>> ownerOf) {
+        validate(scope, ownerOf, false);
+    }
+
+    /**
+     * @param scopeMayBeUnnamed true for the one operation a caller holding several scopes may
+     *                          call without choosing one: the session read, which is how a
+     *                          client learns the scopes it may choose from (CR-19A-9)
+     */
+    static void validate(ScopeContext scope, Function<UUID, Optional<UUID>> ownerOf, boolean scopeMayBeUnnamed) {
         if (scope == null) {
             throw new ProblemException("scope.invalid");
         }
 
-        if (scope.activeScope() == null && scope.scopes().size() > 1) {
+        if (scope.activeScope() == null && scope.scopes().size() > 1 && !scopeMayBeUnnamed) {
             throw new ProblemException("scope.required");
         }
 
@@ -117,6 +125,14 @@ public class ScopeFilter extends OncePerRequestFilter {
      */
     static boolean holds(ScopeContext scope, Scope active, Function<UUID, Optional<UUID>> ownerOf) {
         if (scope.scopes().contains(active)) {
+            return true;
+        }
+        if (scope.policyClass() == PolicyClass.EXTERNAL_TIMEBOXED
+                && active.locationId() == null
+                && scope.grantedEntities().contains(active.entityId())) {
+            // A regulator may name the entity it inspects as its active scope (doc 21 flow 6.5);
+            // it need not: its home entity is its nominal scope, and ext_view reads the granted
+            // entities whichever is named. Decided 27 September 2026 (CR-19A-9).
             return true;
         }
         return active.locationId() != null
@@ -146,8 +162,13 @@ public class ScopeFilter extends OncePerRequestFilter {
     }
 
     private static final String SYNC = "/v1/sync/";
+    private static final String SESSION = "/v1/session";
 
-    static boolean isDeviceOperation(String path) {
+    static boolean isSessionRead(String method, String path) {
+        return "GET".equalsIgnoreCase(method) && SESSION.equals(path);
+    }
+
+    public static boolean isDeviceOperation(String path) {
         return path.startsWith(SYNC)
                 && !isEnrolment(path)
                 && !path.endsWith("/enrolment-codes")

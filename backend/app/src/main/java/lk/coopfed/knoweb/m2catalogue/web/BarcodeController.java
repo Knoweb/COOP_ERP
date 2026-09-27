@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
-import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.LinkBarcodeToBatch;
@@ -22,7 +21,6 @@ import lk.coopfed.knoweb.m2catalogue.web.generated.LookupResult;
 import lk.coopfed.knoweb.m2catalogue.web.generated.LookupResultFallback;
 import lk.coopfed.knoweb.m2catalogue.web.generated.RegisterBarcodeRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.Symbology;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,22 +33,18 @@ class BarcodeController implements BarcodeApi {
     private final LinkBarcodeToBatchHandler link;
     private final CatalogueQueries queries;
     private final CurrentScope currentScope;
-    private final ViewPermission view;
 
     BarcodeController(
             RegisterBarcodeHandler register,
             RetireBarcodeHandler retire,
             LinkBarcodeToBatchHandler link,
             CatalogueQueries queries,
-            CurrentScope currentScope,
-            PermissionResolver permissions,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
+            CurrentScope currentScope) {
         this.register = register;
         this.retire = retire;
         this.link = link;
         this.queries = queries;
         this.currentScope = currentScope;
-        this.view = new ViewPermission(permissions, enforcePermissions);
     }
 
     @Override
@@ -99,7 +93,6 @@ class BarcodeController implements BarcodeApi {
             String barcode, String gtin, String lot, LocalDate expiry, Symbology symbology, UUID locationId) {
 
         ScopeContext scope = currentScope.get();
-        view.require(scope);
 
         BarcodeLookup lookup = new BarcodeLookup(
                 barcode, gtin, lot, expiry, symbology == null ? null : symbology.getValue(), locationId);

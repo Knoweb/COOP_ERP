@@ -9,8 +9,7 @@ const session: Session = {
   displayName: "cashier",
   entityId: "0190f000-0000-7000-8000-000000000002",
   policyClass: "OWN",
-  language: "ta",
-  roles: ["cashier"]
+  language: "ta"
 };
 
 /** A client whose network is this function; returns what was sent. */
