@@ -21,6 +21,11 @@
 #     batch_id, or a fresh UUID); the effect is idempotent by database state as doc 32 S3
 #     requires, so any instance answers a resend the same way.
 #   - A request body may be gzip-compressed (Content-Encoding: gzip, doc 32 S6).
+#   - operationId enrolTill (renamed from enrolDevice on the M1 freeze review, 27 September
+#     2026): m1party.yaml already has an operationId "enrolDevice" of its own (an administrator
+#     enrolling a device, with a user token); tools/check-slices.mjs enforces unique
+#     operationIds across every slice, as 29A section 7 step 2 requires for the doc 33 bundle,
+#     and this slice is 0.1.0, not frozen, so it is the one that moves.
 # After changing this file run `make gen-clients` and commit web/src/generated/sync.ts.
 openapi: 3.1.0
 info:
@@ -56,7 +61,7 @@ paths:
   /v1/sync/devices/{device_id}/enrol:
     post:
       tags: [Sync]
-      operationId: enrolDevice
+      operationId: enrolTill
       summary: The device presents its enrolment code once and receives its credential (doc 32 section 8)
       description: >
         Called without a token: the enrolment code is the credential of this one call. The
