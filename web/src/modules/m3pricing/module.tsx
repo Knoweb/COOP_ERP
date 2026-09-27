@@ -1,5 +1,5 @@
 // What the pricing module tells the shell about itself: its screens, its navigation entries and
-// the permissions that open them (17A section 7).
+// the permissions that open them (17A section 7). It is listed once in ../registry.ts; the
 // shell builds the router and the navigation from there, so a module never edits the shell.
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
