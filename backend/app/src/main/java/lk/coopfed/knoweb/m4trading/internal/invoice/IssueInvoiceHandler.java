@@ -153,8 +153,10 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 .map(EntityView::vatRegistrationNo)
                 .filter(vat -> !vat.isBlank())
                 .orElseThrow(() -> new ProblemException("m4.invoice.seller_vat_missing"));
-        // The buyer's VAT number is not readable by the seller (M1 gives a counterparty its names
-        // only, entity_party_directory); recorded when visible, empty otherwise (M4-08 deviation).
+        // The buyer's VAT number, from M1's counterparty view (CR-21A-6): the seller's own-scope
+        // read of party.entity finds no row for the buyer, so PartyQueriesImpl.getEntity falls
+        // back to the directory a trading counterparty is entitled to read, which now carries the
+        // VAT number too. Empty when the buyer's relationship is not (or no longer) active.
         UUID buyerId = buyer;
         String buyerVat = parties.getEntity(buyerId, scope)
                 .map(EntityView::vatRegistrationNo)
