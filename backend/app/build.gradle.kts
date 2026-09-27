@@ -179,6 +179,9 @@ dependencies {
     // K-06: ICU MessageFormat, NFC, collation-aware helpers and LATN digits (19A section 6).
     implementation(libs.icu4j)
 
+    // K-06b: the A4 renderer fills Thymeleaf templates (19A section 6); Chromium prints them on the worker.
+    implementation(libs.thymeleaf)
+
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.flywaydb:flyway-core")
@@ -202,6 +205,7 @@ dependencies {
     testImplementation(libs.spring.modulith.starter.test)
 
     testImplementation(libs.archunit.junit5)
+    testImplementation(libs.pdfbox)
     testImplementation(libs.spring.modulith.docs)
 
     // Integration tests run against a real PostgreSQL 16 in Docker, because row-level security
@@ -226,13 +230,22 @@ dependencies {
 // `./gradlew :app:jib` and has no daemon, leaves the flag off.
 val jibBaseImage = project.property("jibBaseImage") as String
 val jibFromDaemon = providers.gradleProperty("jibFromDaemon").map { it.toBoolean() }.getOrElse(false)
+// K-06b: -PjibWorker=true builds the worker image instead, the same application on a base that
+// carries Chromium for the A4 renderer (infra/worker-image/Dockerfile, built by `make image` into
+// the local daemon as coop-erp/worker-base:dev). Only the worker role renders (decided 27 Sep
+// 2026, PR #145), so the web and ingest image stays without a browser.
+val jibWorker = providers.gradleProperty("jibWorker").map { it.toBoolean() }.getOrElse(false)
 
 jib {
     from {
-        image = if (jibFromDaemon) "docker://$jibBaseImage" else jibBaseImage
+        image = when {
+            jibWorker -> "docker://coop-erp/worker-base:dev"
+            jibFromDaemon -> "docker://$jibBaseImage"
+            else -> jibBaseImage
+        }
     }
     to {
-        image = "coop-erp/backend:dev"
+        image = if (jibWorker) "coop-erp/backend-worker:dev" else "coop-erp/backend:dev"
     }
     container {
         mainClass = "lk.coopfed.knoweb.CoopErpApplication"

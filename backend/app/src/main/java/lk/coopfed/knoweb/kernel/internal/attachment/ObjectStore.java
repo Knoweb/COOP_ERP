@@ -9,7 +9,7 @@ import java.util.Optional;
  * pre-signed GET, and the two questions the verifier asks. One implementation speaks S3
  * ({@link S3ObjectStore}); the tests keep objects in memory.
  */
-interface ObjectStore {
+public interface ObjectStore {
 
     /**
      * @param contentLength the exact size the client declared, signed into the URL so the store

@@ -65,9 +65,16 @@ help:
 # nothing changed: only the layer that holds the project classes is rebuilt.
 # Docker pulls the base image first and Jib reads it from the daemon; the reason is in
 # backend/app/build.gradle.kts.
+#
+# K-06b: two images. coop-erp/backend:dev (web, ingest) on the plain JRE, and
+# coop-erp/backend-worker:dev, the same application on infra/worker-image (the JRE and a
+# headless Chromium for the A4 renderer). The local stack runs web and worker in one container,
+# so compose starts the worker image. The Chromium layer is cached by Docker after the first build.
 image:
 	docker pull --quiet $(JIB_BASE)
+	docker build --quiet --tag coop-erp/worker-base:dev infra/worker-image
 	cd backend && ./gradlew :app:jibDockerBuild -PjibFromDaemon=true --console=plain
+	cd backend && ./gradlew :app:jibDockerBuild -PjibWorker=true --console=plain
 
 # --wait blocks until every service reports healthy, so when this returns the database is
 # migrated (the backend runs Flyway at start) and the dev realm is imported.

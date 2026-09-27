@@ -83,6 +83,11 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: File of a module's object that failed verification deleted after its retention
+  # K-06b: the A4 renderer (19A section 6).
+  - code: REPORT_RENDERED
+    severity: INFO
+    offline_capturable: false
+    description_en: A document rendered to PDF and stored
   # K-10: notifications.
   - code: NOTIFICATION_FAILED
     severity: ALERT

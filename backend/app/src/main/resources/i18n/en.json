@@ -396,5 +396,21 @@
   "m5.opening.not_signed": "The entity must sign the opening balance before it is countersigned",
   "m5.opening.countersigner_is_signer": "The person who signed for the entity cannot also countersign",
   "m5.opening.user_required": "An opening balance is signed by a person",
-  "m5.opening.entity_unknown": "The entity of the opening balance was not found"
+  "m5.opening.entity_unknown": "The entity of the opening balance was not found",
+  "report.renderer_unavailable": "Printing runs on the worker; this server cannot print",
+  "report.template_invalid": "The print template name is not valid",
+  "report.template_unknown": "There is no print template {templateId}",
+  "report.scope_mismatch": "This printout belongs to another organisation than the one you are working in",
+  "report.too_large": "The printout is too large ({size} bytes, at most {maxBytes})",
+  "report.timeout": "The printout took longer than {seconds} seconds and was stopped",
+  "report.failed": "The printout could not be produced; try again",
+  "report.document.number": "Number",
+  "report.document.date": "Date",
+  "report.document.from": "From",
+  "report.document.to": "To",
+  "report.document.line_no": "No.",
+  "report.document.item": "Item",
+  "report.document.quantity": "Quantity",
+  "report.document.unit_price": "Unit price",
+  "report.document.amount": "Amount"
 }
