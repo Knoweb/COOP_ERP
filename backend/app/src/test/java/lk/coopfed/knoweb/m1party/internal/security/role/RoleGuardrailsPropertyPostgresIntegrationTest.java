@@ -50,16 +50,16 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
 
     private static final List<String> CODES = List.of(
             "prt.location.view",
-            "prt.location.manage",
+            "prt.location.register",
             "sys.device.view",
-            "sys.device.manage",
+            "sys.device.enrol",
             "prt.position.manage",
             "prt.relationship.view",
-            "prt.relationship.manage");
+            "prt.relationship.open");
 
     private static final List<List<String>> ROLE_PAIRS = List.of(
-            RoleRules.ordered("prt.position.manage", "sys.device.manage"),
-            RoleRules.ordered("prt.location.manage", "prt.relationship.manage"),
+            RoleRules.ordered("prt.position.manage", "sys.device.enrol"),
+            RoleRules.ordered("prt.location.register", "prt.relationship.open"),
             RoleRules.ordered("prt.relationship.view", "sys.device.view"));
 
     @Autowired
@@ -185,12 +185,12 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
 
         // A pair in ROLE mode for the first society: the view of a location and the management
         // of devices, both of which its roles below carry, so that generated assignments hit it.
-        List<String> pair = RoleRules.ordered("prt.location.view", "sys.device.manage");
+        List<String> pair = RoleRules.ordered("prt.location.view", "sys.device.enrol");
         fx.pair(first, pair.get(0), pair.get(1), "ROLE");
 
         Set<String> admins = Set.of(
-                "gov.role.manage", "prt.location.view", "sys.device.view", "sys.device.manage", "prt.position.manage");
-        Set<String> managers = Set.of("gov.role.manage", "prt.location.view", "sys.device.manage");
+                "gov.role.manage", "prt.location.view", "sys.device.view", "sys.device.enrol", "prt.position.manage");
+        Set<String> managers = Set.of("gov.role.manage", "prt.location.view", "sys.device.enrol");
         // Two location-scoped grantors, one per shop of the first society: a shop manager
         // assigns at their own shop alone, and sees the assignments at their shop and the
         // entity-wide ones, never a sibling shop's.
@@ -214,7 +214,7 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         for (Object[] spec : new Object[][] {
             {first, new String[] {"prt.location.view"}},
             {first, new String[] {"sys.device.view", "prt.position.manage"}},
-            {first, new String[] {"sys.device.manage"}},
+            {first, new String[] {"sys.device.enrol"}},
             {second, new String[] {"prt.location.view"}},
             {null, new String[] {"prt.location.view"}}
         }) {

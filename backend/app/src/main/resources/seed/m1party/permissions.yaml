@@ -1,3 +1,11 @@
+# The M1 catalogue follows 21A section 3.3 verb by verb (CR-21A-1 item 1, accepted as revised on
+# 27 September 2026): no coarse "manage" code stands for several commands. Beside 21A's list, M1
+# keeps gov.entity.suspend (suspend and reinstate; not every clerk who registers may suspend)
+# and one read code per aggregate (gov.entity.view, gov.user.view, prt.relationship.view,
+# prt.location.view, sys.device.view), because every query of the slice names the permission it
+# needs. A code taken out of this file is also removed from existing databases by a migration
+# (m1security V0014 retired gov.entity.manage, prt.relationship.manage, prt.location.manage and
+# sys.device.manage), because the seed loader only ever inserts.
 permissions:
   - code: "gov.entity.register"
     module: "m1party"
@@ -12,11 +20,6 @@ permissions:
   - code: "gov.entity.suspend"
     module: "m1party"
     description_en: "Suspend and reinstate federation-managed entities"
-    scope: "FEDERATION"
-    requires_mfa: true
-  - code: "gov.entity.manage"
-    module: "m1party"
-    description_en: "Register and suspend entities"
     scope: "FEDERATION"
     requires_mfa: true
   - code: "gov.entity.view"
@@ -42,9 +45,9 @@ permissions:
     description_en: "Grant timeboxed access to external regulators"
     scope: "FEDERATION"
     requires_mfa: true
-  - code: "prt.relationship.manage"
+  - code: "gov.audit.review"
     module: "m1party"
-    description_en: "Manage trading relationships and credit limits"
+    description_en: "Review the audit trail of the entity"
     scope: "ENTITY"
   - code: "prt.relationship.view"
     module: "m1party"
@@ -72,10 +75,6 @@ permissions:
     description_en: "Change the credit limit of a trading relationship"
     scope: "ENTITY"
     requires_mfa: true
-  - code: "prt.location.manage"
-    module: "m1party"
-    description_en: "Register and update locations"
-    scope: "ENTITY"
   - code: "prt.location.view"
     module: "m1party"
     description_en: "View location details"
@@ -98,11 +97,6 @@ permissions:
     module: "m1party"
     description_en: "Register and retire till positions"
     scope: "ENTITY"
-  - code: "sys.device.manage"
-    module: "m1party"
-    description_en: "Enrol and suspend devices"
-    scope: "ENTITY"
-    requires_mfa: true
   - code: "sys.device.view"
     module: "m1party"
     description_en: "View device status"

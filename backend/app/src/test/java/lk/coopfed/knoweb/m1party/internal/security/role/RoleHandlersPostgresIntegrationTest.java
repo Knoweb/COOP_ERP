@@ -58,7 +58,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         "gov.role.manage",
         "gov.user.manage",
         "prt.location.view",
-        "prt.location.manage",
+        "prt.location.register",
         "sys.device.view",
         "prt.position.manage"
     };
@@ -314,7 +314,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         @Test
         void nobodyGrantsAPermissionTheyDoNotHold() {
             refused(
-                    () -> createRole.handle(named("esc", perms("prt.location.view", "sys.device.manage")), asAdmin()),
+                    () -> createRole.handle(named("esc", perms("prt.location.view", "sys.device.enrol")), asAdmin()),
                     "m1.role.permission_not_held");
         }
 
@@ -683,7 +683,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Test
         void assigningIsGrantingSoTheGrantorMustHoldEveryPermission() {
-            UUID roleId = fx.role(mpcs, "prt.location.view", "sys.device.manage");
+            UUID roleId = fx.role(mpcs, "prt.location.view", "sys.device.enrol");
             refused(
                     () -> assignRole.handle(new AssignRole(clerk, roleId, null), asAdmin()),
                     "m1.role.permission_not_held");
@@ -823,15 +823,15 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Test
         void anEntityAddsAPairOfItsOwn() {
-            UUID pairId =
-                    setSodPair.handle(new SetSodPair("sys.device.view", "prt.location.manage", "INSTANCE"), asAdmin());
+            UUID pairId = setSodPair.handle(
+                    new SetSodPair("sys.device.view", "prt.location.register", "INSTANCE"), asAdmin());
 
             Map<String, Object> row = superuserJdbc()
                     .queryForMap(
                             "select permission_a, permission_b, mode, owner_entity_id from security.sod_pair where sod_pair_id = ?",
                             pairId);
             assertThat(row)
-                    .containsEntry("permission_a", "prt.location.manage")
+                    .containsEntry("permission_a", "prt.location.register")
                     .containsEntry("permission_b", "sys.device.view")
                     .containsEntry("mode", "INSTANCE")
                     .containsEntry("owner_entity_id", mpcs);
@@ -841,16 +841,16 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             });
             assertThat(kernel.committedEvents())
                     .containsExactly(
-                            new SodPairChanged(pairId, "prt.location.manage", "sys.device.view", "INSTANCE", false));
+                            new SodPairChanged(pairId, "prt.location.register", "sys.device.view", "INSTANCE", false));
         }
 
         @Test
         void anEntityRaisesAPairToRoleModeWhenNobodyHoldsBoth() {
             UUID pairId =
-                    setSodPair.handle(new SetSodPair("prt.relationship.manage", "sys.device.view", "ROLE"), asAdmin());
+                    setSodPair.handle(new SetSodPair("prt.relationship.open", "sys.device.view", "ROLE"), asAdmin());
             assertThat(kernel.committedEvents())
                     .containsExactly(
-                            new SodPairChanged(pairId, "prt.relationship.manage", "sys.device.view", "ROLE", false));
+                            new SodPairChanged(pairId, "prt.relationship.open", "sys.device.view", "ROLE", false));
         }
 
         @Test
@@ -912,7 +912,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Test
         void anEntityRemovesItsOwnPairAndNeverAFederationDefault() {
-            UUID own = fx.pair(mpcs, "prt.location.manage", "sys.device.view", "INSTANCE");
+            UUID own = fx.pair(mpcs, "prt.location.register", "sys.device.view", "INSTANCE");
             UUID federationDefault = fx.pair(null, "prt.relationship.view", "sys.device.view", "INSTANCE");
 
             refused(() -> removeSodPair.handle(new RemoveSodPair(federationDefault), asAdmin()), "m1.sod.not_owner");
@@ -925,7 +925,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                     .isZero();
             assertThat(kernel.committedEvents())
                     .containsExactly(
-                            new SodPairChanged(own, "prt.location.manage", "sys.device.view", "INSTANCE", true));
+                            new SodPairChanged(own, "prt.location.register", "sys.device.view", "INSTANCE", true));
         }
     }
 

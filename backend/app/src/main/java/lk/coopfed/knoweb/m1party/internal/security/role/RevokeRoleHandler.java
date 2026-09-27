@@ -20,7 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * RevokeRole (21A section 6): deletes the assignment, "the one DELETE M1 performs; audited".
+ * RevokeRole (21A section 6): deletes the assignment, "the one DELETE M1 performs; audited"
+ * (one of three since CR-21A-3, with AmendRole's role_permission and RemoveSodPair's sod_pair).
  * The audit record keeps what the row was. The event names the user, so the kernel's
  * permission cache forgets that user's permissions and the next command is checked against
  * what is left (PermissionCacheInvalidator).

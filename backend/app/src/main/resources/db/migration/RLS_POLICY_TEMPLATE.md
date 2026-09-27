@@ -95,8 +95,10 @@ Three cases the template does not cover, and what does:
   the migrator is a member): a role, not a variable.
 - **The Federation acting on rows it does not own** (registering an entity, activating it):
   the guard in the handler decides (`FederationCaller` in M1 is the example), and the
-  `federation_*` policies of `party.entity` carry it in SQL. That is the fifth class
-  `CR-21A-1` item 2 asks 17A to adopt.
+  `federation_*` policies of `party.entity` carry it in SQL. That is the fifth class,
+  `fed_admin`, which `CR-21A-1` item 2 (accepted 27 September 2026) adds to 17A section 6.3:
+  a `federation_*` policy is written only where the implementation guide says the Federation
+  administers rows it does not own, and the handler guard stays.
 - **A user's own rows regardless of tenant** (the idempotency key): a policy on
   `app.user_id`, which the customizer sets for the request's user (kernel `V0010`).
 

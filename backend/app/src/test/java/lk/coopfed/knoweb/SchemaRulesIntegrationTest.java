@@ -52,7 +52,10 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
      * V0010): a role assignment is revoked by deleting it (21A section 6, RevokeRole: "the one
      * DELETE M1 performs; audited"), a role's permission set is replaced (AmendRole), and an
      * entity removes a separation-of-duties pair it added itself. None is a document, a ledger
-     * or an audit row. Adding a table here is a design decision, not a fix for a red test.
+     * or an audit row. CR-21A-3 (accepted 27 September 2026) settled the three: each is a current
+     * fact whose history is its audit record, and a table may join this list only when its
+     * implementation guide names the command that deletes from it. Adding a table here is a
+     * design decision, not a fix for a red test.
      */
     static final Set<String> DELETE_BY_DESIGN =
             Set.of("security.user_role", "security.role_permission", "security.sod_pair");
