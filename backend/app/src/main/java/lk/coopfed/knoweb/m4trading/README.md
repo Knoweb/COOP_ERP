@@ -61,13 +61,15 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 - **M4-05 GRN**: `doc_grn*`, `doc_discrepancy*`; `grn.captured/confirmed.v1`, `discrepancy.raised.v1`; M2's `BatchRegistration` inside the confirmation.
 - **M4-08 invoices**: `doc_invoice`, `posting_map`; `invoice.issued.v1`, `journal.postings_ready.v1`; `TaxRates`.
 
-## Orders (M4-02)
+## Orders (M4-02, M4-03)
 
 | Command | Permission | Guards, in order | Effect | Audit, event |
 |---|---|---|---|---|
 | CreateOrder | `ord.order.draft` | buyer entity-wide OWN; seller not the buyer; ACTIVE relationship today (M1); ETA not past; lines; per line a tradable item (M2), its base unit, qty > 0 | kernel draft (lines at the indicative `TradePricing` price), `doc_order`, `doc_order_line` | ORDER_CREATED, `order.created.v1` |
 | SubmitOrder | `ord.order.submit` | owner's DRAFT; relationship ACTIVE; ≥ 1 line (ORD validator) | buyer's ENTITY series (`TradingSeries`), issued, ISSUED to SUBMITTED | ORDER_SUBMITTED, `order.submitted.v1` |
 | CancelOrder | `ord.order.submit` | owner's DRAFT or SUBMITTED; not rejected; nothing fulfilled; reason | CANCELLED; `cancelled_qty` = request | ORDER_CANCELLED, `order.cancelled.v1` |
+| AcceptOrder | `ord.order.accept` | seller entity-wide OWN; order placed with the caller; SUBMITTED, undecided; relationship ACTIVE; ETA not past; overrides on known lines with a reason, ≤ open request, ≤ available; a trade price per line | `allocation_run`, `order_allocation` ACCEPTED (ETA, `lock_at` = ETA day start − lock hours), `order_allocation_line` (allocated = min(open, available) or the override; tier price) | ORDER_ACCEPTED, `order.accepted.v1`, `order.allocated.v1` |
+| RejectOrder | `ord.order.accept` | as AcceptOrder's first three; reason | `order_allocation` REJECTED | ORDER_REJECTED, `order.rejected.v1` |
 
 Shared pieces in `internal/document`: `TradingClock` (today in the business zone, a state history row), `TradingSeries`, `TradingGuards`, `TradingDocuments` (draft header and line builders). `internal/queries/OrderStatus` derives the status the screens show. Only a `@CommandHandler` class writes (ArchitectureTests), so the handlers hold their own SQL.
 

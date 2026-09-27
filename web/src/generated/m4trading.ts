@@ -105,6 +105,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/orders/{orderId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller accepts a submitted order with a committed ETA and its allocations
+         * @description Problems: m4.order.not_found, m4.order.not_seller, m4.order.not_submitted, m4.order.already_decided, m4.order.relationship_inactive, m4.order.eta_past, m4.order.line_unknown, m4.order.allocation_invalid, m4.order.allocation_exceeds_request, m4.order.allocation_exceeds_available, m4.order.price_missing.
+         */
+        post: operations["acceptOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/orders/{orderId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller refuses a submitted order, with a reason
+         * @description Problems: m4.order.not_found, m4.order.not_seller, m4.order.not_submitted, m4.order.already_decided.
+         */
+        post: operations["rejectOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -172,6 +216,17 @@ export interface components {
             /** Format: uuid */
             skuId: string;
             availableQty: number;
+        };
+        AcceptOrderRequest: {
+            /** Format: date */
+            committedEta: string;
+            overrides?: components["schemas"]["AllocationOverride"][];
+        };
+        AllocationOverride: {
+            /** Format: uuid */
+            lineId: string;
+            allocatedQty: number;
+            reason: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -383,6 +438,68 @@ export interface operations {
         };
         responses: {
             /** @description The cancelled order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    acceptOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The accepted order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The rejected order */
             200: {
                 headers: {
                     [name: string]: unknown;

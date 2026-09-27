@@ -207,6 +207,76 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/orders/{orderId}/accept:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    post:
+      tags: [Order]
+      operationId: acceptOrder
+      summary: The seller accepts a submitted order with a committed ETA and its allocations
+      description: >
+        Problems: m4.order.not_found, m4.order.not_seller, m4.order.not_submitted,
+        m4.order.already_decided, m4.order.relationship_inactive, m4.order.eta_past,
+        m4.order.line_unknown, m4.order.allocation_invalid, m4.order.allocation_exceeds_request,
+        m4.order.allocation_exceeds_available, m4.order.price_missing.
+      x-permission: ord.order.accept
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptOrderRequest'
+      responses:
+        '200':
+          description: The accepted order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/orders/{orderId}/reject:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    post:
+      tags: [Order]
+      operationId: rejectOrder
+      summary: The seller refuses a submitted order, with a reason
+      description: >
+        Problems: m4.order.not_found, m4.order.not_seller, m4.order.not_submitted,
+        m4.order.already_decided.
+      x-permission: ord.order.accept
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+      responses:
+        '200':
+          description: The rejected order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -358,5 +428,34 @@ components:
           format: uuid
         availableQty:
           type: number
+
+    AcceptOrderRequest:
+      type: object
+      required: [committedEta]
+      properties:
+        committedEta:
+          type: string
+          format: date
+        overrides:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/AllocationOverride'
+
+    AllocationOverride:
+      type: object
+      required: [lineId, allocatedQty, reason]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        allocatedQty:
+          type: number
+          minimum: 0
+          maximum: 99999999999
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 200
 
     # @@SCHEMAS@@
