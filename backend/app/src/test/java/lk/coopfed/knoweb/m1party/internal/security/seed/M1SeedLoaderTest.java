@@ -34,11 +34,11 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
 
     // The catalogue of M1 (22 after CR-21A-1 retired the four coarse manage codes and added
     // gov.audit.review), bil.creditlimit.change of M4, the three of M3 (M3-04: prc.pricelist.view,
-    // .author, .publish) and the 13 of M2 (22A section 3.1 plus cat.sku.view and cat.tag.govern,
-    // CR-22A-3) and the 19 of M5 (25A section 3.1, inv.stock.view, inv.stock.receive): the number of `- code:`
-    // lines in permissions.yaml.
-    private static final int PERMISSIONS = 58;
-    private static final int ROLE_TEMPLATES = 4;
+    // .author, .publish), the 13 of M2 (22A section 3.1 plus cat.sku.view and cat.tag.govern,
+    // CR-22A-3), the 28 of M4 (24A section 3.1 plus trd.document.view, CR-24A-1) and the 19 of M5
+    // (25A section 3.1, inv.stock.view, inv.stock.receive): the number of `- code:` lines in permissions.yaml.
+    private static final int PERMISSIONS = 86;
+    private static final int ROLE_TEMPLATES = 6;
     private static final int SOD_PAIRS = 2;
 
     /** The codes CR-21A-1 item 1 retired; m1security V0014 removes them from older databases. */

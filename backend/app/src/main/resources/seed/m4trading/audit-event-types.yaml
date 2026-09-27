@@ -1,0 +1,116 @@
+# M4 Trading Documents: the audit event types of the handler specifications (24A section 6;
+# doc 24 section 4, column "Audit"). Loaded by the kernel's AuditEventTypeSeedLoader, which reads
+# every seed/*/audit-event-types.yaml. The guide names no severity; every type is INFO until the
+# review queues of doc 19 say otherwise. Codes are at most 40 characters. ORDER_CREATED,
+# DN_CREATED and GRN_CAPTURED are ours: every command audits (AGENTS.md), and the guide names no
+# code for the drafts.
+audit_event_types:
+  - code: ORDER_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Order drafted by the buyer
+
+  - code: ORDER_SUBMITTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Order submitted and numbered from the buyer series
+
+  - code: ORDER_ACCEPTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Order accepted by the seller with allocations and a committed ETA
+
+  - code: ORDER_ALLOCATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Allocation run recorded for an order
+
+  - code: ORDER_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Order rejected by the seller
+
+  - code: ORDER_CANCELLED
+    severity: INFO
+    offline_capturable: false
+    description_en: Undispatched remainder of an order cancelled
+
+  - code: ORDER_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Order amended by the buyer before the lock
+
+  - code: ORDER_LOCKED
+    severity: INFO
+    offline_capturable: false
+    description_en: Order locked at the lock time
+
+  - code: ORDER_LOCK_OVERRIDDEN
+    severity: INFO
+    offline_capturable: false
+    description_en: Order lock window overridden by the seller
+
+  - code: ORDER_FULFILLED
+    severity: INFO
+    offline_capturable: false
+    description_en: Every allocated quantity of the order is on an issued delivery note
+
+  - code: DN_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Delivery note drafted by the seller
+
+  - code: DN_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Delivery note issued from the seller series
+
+  - code: DN_DISPATCHED
+    severity: INFO
+    offline_capturable: false
+    description_en: Delivery note dispatched with a vehicle and a driver
+
+  - code: DN_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: Delivery note closed, every drop terminal
+
+  - code: DROP_DELIVERED
+    severity: INFO
+    offline_capturable: true
+    description_en: Proof of delivery recorded for a drop
+
+  - code: DROP_UNDELIVERED
+    severity: INFO
+    offline_capturable: true
+    description_en: Drop marked undelivered with a reason
+
+  - code: GRN_CAPTURED
+    severity: INFO
+    offline_capturable: true
+    description_en: Goods received note captured as a draft
+
+  - code: GRN_CONFIRMED
+    severity: INFO
+    offline_capturable: true
+    description_en: Goods received note confirmed, ownership transferred
+
+  - code: GRN_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: Goods received note closed without variance
+
+  - code: GRN_REVERSED
+    severity: INFO
+    offline_capturable: false
+    description_en: Goods received note reversed within the window
+
+  - code: DISCREPANCY_RAISED
+    severity: INFO
+    offline_capturable: false
+    description_en: Discrepancy raised by a goods received note confirmation
+
+  - code: INVOICE_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Tax invoice issued from confirmed goods received notes

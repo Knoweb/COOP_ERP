@@ -523,3 +523,127 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  # M4 Trading Documents (24A section 3.1, "seed/m4/config.yaml"; doc 24 section 7): the defaults
+  # of doc 24 DR-1 to DR-6 as doc 10 F-09 and A-03 assume them. Configuration, so a different
+  # answer from the Federation admins is a value, not a code change.
+  - key: trading.availability_mode
+    value_type: STRING
+    schema: { enum: [INDICATIVE, LIVE] }
+    description_en: What a buyer sees of the seller's stock when drafting an order, indicative or live
+    description_si: ඇණවුමක් කෙටුම්පත් කිරීමේදී ගැනුම්කරුට විකුණුම්කරුගේ තොගය පෙනෙන ආකාරය, දළ හෝ සජීවී
+    description_ta: ஆணையை வரைவு செய்யும்போது வாங்குபவர் விற்பவரின் இருப்பை எப்படிக் காண்கிறார், தோராயமா நேரடியா
+    default: "INDICATIVE"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.backorder_review_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: The age of an unallocated backorder after which the seller is asked to review it
+    description_si: වෙන් නොකළ පසු-ඇණවුමක් විකුණුම්කරු සමාලෝචනය කළ යුතු වයස, දින වලින්
+    description_ta: ஒதுக்கப்படாத பின்னாணையை விற்பவர் மறுஆய்வு செய்ய வேண்டிய வயது, நாட்களில்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.grn_reversal_hours
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 168 }
+    description_en: How long after confirmation a goods received note may still be reversed
+    description_si: තහවුරු කිරීමෙන් පසු භාණ්ඩ ලැබීමේ සටහනක් ආපසු හැරවිය හැකි කාලය, පැය වලින්
+    description_ta: உறுதிப்படுத்திய பின் பொருள் பெறுகைக் குறிப்பை எவ்வளவு நேரம் திரும்பப் பெறலாம், மணிநேரங்களில்
+    default: 24
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.claim_window_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: How many days after a goods received note is confirmed a claim may still be raised
+    description_si: භාණ්ඩ ලැබීමේ සටහනක් තහවුරු කළ පසු හිමිකම් ඉල්ලීමක් කළ හැකි දින ගණන
+    description_ta: பொருள் பெறுகைக் குறிப்பு உறுதிப்படுத்திய பின் உரிமைகோரல் எழுப்பக்கூடிய நாட்கள்
+    default: 14
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.escalation_grace_days
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 90 }
+    description_en: The days after a discrepancy window ends before it is escalated to the Federation arbiter
+    description_si: විෂමතා කාල සීමාව අවසන් වූ පසු සම්මේලන බේරුම්කරු වෙත යොමු කිරීමට පෙර දින ගණන
+    description_ta: முரண்பாட்டுச் சாளரம் முடிந்த பின் கூட்டமைப்பு நடுவருக்கு அனுப்பும் முன் நாட்கள்
+    default: 3
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.invoice_consolidation
+    value_type: STRING
+    schema: { enum: [PER_GRN, PER_DN] }
+    description_en: Whether an invoice follows each goods received note or one delivery note across its drops
+    description_si: ඉන්වොයිසිය එක් එක් භාණ්ඩ ලැබීමේ සටහන අනුවද, නැතහොත් බෙදාහැරීමේ සටහනක සියලු නැවතුම් එකට අනුවද
+    description_ta: விலைப்பட்டியல் ஒவ்வொரு பொருள் பெறுகைக் குறிப்பையும் பின்பற்றுமா அல்லது ஒரு விநியோகக் குறிப்பின் எல்லா நிறுத்தங்களையும் சேர்க்குமா
+    default: "PER_GRN"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.exposure_warn_thresholds
+    value_type: JSON
+    description_en: The percentages of the credit limit at which an exposure warning is raised
+    description_si: ණය සීමාවේ කුමන ප්‍රතිශතවලදී නිරාවරණ අනතුරු ඇඟවීමක් කරන්නේද
+    description_ta: கடன் வரம்பின் எந்த சதவீதங்களில் வெளிப்பாட்டு எச்சரிக்கை எழுப்பப்படும்
+    default: "[80, 100]"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.statement_frequency
+    value_type: STRING
+    schema: { enum: [WEEKLY, MONTHLY] }
+    description_en: How often a statement of account is generated for a relationship
+    description_si: වෙළඳ සබඳතාවකට ගිණුම් ප්‍රකාශයක් ජනනය කරන වාර ගණන
+    description_ta: வர்த்தக உறவுக்கு கணக்கு அறிக்கை எவ்வளவு அடிக்கடி உருவாக்கப்படும்
+    default: "MONTHLY"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: trading.tier_basis
+    value_type: STRING
+    schema: { enum: [ORDERED_QTY, DELIVERED_QTY] }
+    description_en: Which quantity picks the volume tier of a trade price
+    description_si: වෙළඳ මිලේ පරිමා ස්ථරය තෝරන ප්‍රමාණය කුමක්ද
+    description_ta: வர்த்தக விலையின் அளவு அடுக்கை எந்த அளவு தேர்ந்தெடுக்கிறது
+    default: "ORDERED_QTY"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m4trading
+  # The demo answers of the M3, M2 and M5 questions M4 asks (api.TradePricing, api.TaxRates,
+  # api.InventoryAvailability; m4trading README). They go when the real modules answer.
+  - key: m4.demo.trade_price
+    value_type: DECIMAL
+    schema: { minimum: 0.0001, maximum: 99999999.9999 }
+    description_en: The trade price per unit every item is priced at until M3 answers (demo only)
+    description_si: M3 පිළිතුරු දෙන තෙක් සෑම භාණ්ඩයක්ම මිල කරන ඒකක වෙළඳ මිල (ආදර්ශනයට පමණි)
+    description_ta: M3 பதிலளிக்கும் வரை ஒவ்வொரு பொருளுக்கும் விலையிடப்படும் அலகு வர்த்தக விலை (செயல்விளக்கத்திற்கு மட்டும்)
+    default: "100.0000"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: m4.demo.vat_rate_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 100 }
+    description_en: The VAT rate applied to every invoice line until M2 answers the rate in force (demo only)
+    description_si: M2 බලාත්මක අනුපාතය දෙන තෙක් සෑම ඉන්වොයිසි පේළියකටම යොදන වැට් අනුපාතය (ආදර්ශනයට පමණි)
+    description_ta: M2 நடைமுறை விகிதத்தைத் தரும் வரை ஒவ்வொரு விலைப்பட்டியல் வரிக்கும் பயன்படுத்தப்படும் VAT விகிதம் (செயல்விளக்கத்திற்கு மட்டும்)
+    default: "18"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m4trading
+  - key: m4.demo.availability_qty
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 99999999999.999 }
+    description_en: The quantity of every item a seller is taken to have available until M5 answers (demo only)
+    description_si: M5 පිළිතුරු දෙන තෙක් විකුණුම්කරු සතුව ඇතැයි සලකන සෑම භාණ්ඩයකම ප්‍රමාණය (ආදර්ශනයට පමණි)
+    description_ta: M5 பதிலளிக்கும் வரை விற்பவரிடம் இருப்பதாகக் கொள்ளப்படும் ஒவ்வொரு பொருளின் அளவு (செயல்விளக்கத்திற்கு மட்டும்)
+    default: "1000000.000"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m4trading
