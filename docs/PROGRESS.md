@@ -2,7 +2,7 @@
 
 Updated after every ticket, in the same commit. Three headings: Done, Next, Deviations. A person or tool arriving cold reads `AGENTS.md`, then `docs/README.md`, then this file, and can continue.
 
-Last updated: 27 September 2026, branch `feat/m4-04-delivery-notes` (stacked on `feat/m4-03-acceptance`).
+Last updated: 27 September 2026, branch `feat/m4-04-delivery-notes` (on `main` after #157).
 
 ## Done
 
