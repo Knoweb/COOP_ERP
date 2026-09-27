@@ -156,7 +156,7 @@ public class JwtClaimsMapper {
         UUID homeEntity = uuid(jwt, HOME_ENTITY);
         PolicyClass policyClass = policyClass(jwt);
         List<Scope> scopes = scopes(jwt, user, homeEntity, policyClass);
-        Scope active = narrowed(active(activeEntity, activeLocation), scopes);
+        Scope active = active(activeEntity, activeLocation);
 
         return new ScopeContext(
                 user,
@@ -199,24 +199,6 @@ public class JwtClaimsMapper {
             return null;
         }
         return new Scope(entityId, parseUuid(location, null));
-    }
-
-    /**
-     * A client that names only the entity (the web client does: it knows the token's entity and
-     * nothing of the assignments until it has read the session) acts for a user whose one scope
-     * in that entity is a location, such as the stores of one warehouse (the demo's fed-stores).
-     * That entity-wide scope is not held, so every request, the session read too, would be
-     * refused. The user can mean only the one place they hold, so the active scope is narrowed
-     * to it; with none or several places it stays as asked and the scope check decides.
-     */
-    static Scope narrowed(Scope asked, List<Scope> held) {
-        if (asked == null || asked.locationId() != null || held.contains(asked)) {
-            return asked;
-        }
-        List<Scope> places = held.stream()
-                .filter(scope -> scope.entityId().equals(asked.entityId()) && scope.locationId() != null)
-                .toList();
-        return places.size() == 1 ? places.get(0) : asked;
     }
 
     private static PolicyClass policyClass(Jwt jwt) {

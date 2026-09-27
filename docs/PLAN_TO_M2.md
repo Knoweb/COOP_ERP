@@ -321,7 +321,6 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-05 | `whs.grn.confirm` for warehouses; items not on the drop | Before warehouse receipts need their own permission | `shop.grn.confirm` serves both |
 | M4-11 | The other screens of 24A section 8 (amend, lock override, discrepancy, claim, statement, exposure); allocation overrides at acceptance; several drops or orders on one note; M5's pick list on the note | After the demo, with M4-06, M4-07, M4-09, M4-10 | Screens of the demo path are built |
 | M4-11 | M1's counterparty read of receiving locations (CR-24A-2 option 1); the buyer's masked view of the seller's availability | Before a note serves several buyers, or a buyer changes its delivery place after ordering | The order carries the delivery location meanwhile |
-| K-02 (fix) | The shell's scope banner and scope switcher from `GET /v1/session` (the active scope and the scopes held), so a user scoped to one place sees that place | With the scope switcher | The server narrows to the one place held |
 | M4-08 | Invoice disputes; credit and debit notes; consolidation; buyer-side postings; e-invoice; PARTY masking views | Before invoices are corrected, consolidated or submitted | M4-06, M4-07 wholly deferred |
 | M4-08 | The buyer's VAT number on the invoice | When M1's party projection carries the VAT number (architect) | Recorded empty when not visible |
 
