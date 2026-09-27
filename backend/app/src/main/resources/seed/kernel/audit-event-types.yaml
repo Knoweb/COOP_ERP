@@ -103,3 +103,8 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: Central holds less of a device than the device was acknowledged; resend requested
+  # K-08 decisions of 27 September 2026: the sequence reset of doc 32 section 8 ("raises ALERT").
+  - code: SYNC_SEQUENCE_RESET
+    severity: ALERT
+    offline_capturable: false
+    description_en: An administrator moved a device's sync cursor past numbers it lost; the gap is recorded

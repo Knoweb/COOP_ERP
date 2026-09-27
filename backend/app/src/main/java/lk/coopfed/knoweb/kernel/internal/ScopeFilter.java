@@ -130,8 +130,9 @@ public class ScopeFilter extends OncePerRequestFilter {
      * K-08: which principal may call which path (doc 32 section 9; 19A section 2). The till's sync
      * operations take a device token and nothing else, and a device token opens nothing but them:
      * a till's credential is on a machine in a shop, and it must not reach the back office's API.
-     * Two sync operations are not the device's: an administrator issues the enrolment code (a user
-     * token), and the enrolment itself is called before the device holds any token.
+     * Three sync operations are not the device's: an administrator issues the enrolment code and
+     * resets a device's sequence (doc 32 section 8; a user token), and the enrolment itself is
+     * called before the device holds any token.
      */
     static void validatePrincipal(ScopeContext scope, String path) {
         boolean device = scope.policyClass() == PolicyClass.DEVICE;
@@ -147,7 +148,10 @@ public class ScopeFilter extends OncePerRequestFilter {
     private static final String SYNC = "/v1/sync/";
 
     static boolean isDeviceOperation(String path) {
-        return path.startsWith(SYNC) && !isEnrolment(path) && !path.endsWith("/enrolment-codes");
+        return path.startsWith(SYNC)
+                && !isEnrolment(path)
+                && !path.endsWith("/enrolment-codes")
+                && !path.endsWith("/sequence-reset");
     }
 
     private static boolean isEnrolment(String path) {

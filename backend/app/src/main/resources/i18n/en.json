@@ -256,6 +256,8 @@
   "sync.enrolment.device_not_enrollable": "This device cannot be given an enrolment code in its current status",
   "sync.location_mismatch": "A device may only read its own location",
   "sync.sequence_gap": "Events are missing before this batch; resend from the expected sequence",
+  "sync.sequence_reset.device_not_enrolled": "This device is not one of your entity’s devices enrolled for sync",
+  "sync.sequence_reset.not_forward": "The new start must be above the sequence central expects next; a device that restarted from a lower number is enrolled again instead",
   "sync.rate_limited": "Central is busy or this till has sent too much at once; it will try again shortly",
   "token.invalid": "Your sign-in is not valid or has expired; sign in again",
   "m2.sku.code_generation_failed": "A unique SKU code could not be generated",

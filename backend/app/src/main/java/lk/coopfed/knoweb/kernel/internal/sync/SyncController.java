@@ -25,6 +25,8 @@ import lk.coopfed.knoweb.kernel.sync.web.generated.HeartbeatResponse;
 import lk.coopfed.knoweb.kernel.sync.web.generated.Instruction;
 import lk.coopfed.knoweb.kernel.sync.web.generated.PresignRequest;
 import lk.coopfed.knoweb.kernel.sync.web.generated.PresignResponse;
+import lk.coopfed.knoweb.kernel.sync.web.generated.SequenceGap;
+import lk.coopfed.knoweb.kernel.sync.web.generated.SequenceResetRequest;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SeriesAssignment;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SigningKey;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SnapshotDelta;
@@ -50,6 +52,7 @@ class SyncController implements SyncApi {
     private final CurrentScope currentScope;
     private final DeviceDirectory directory;
     private final EnrolmentService enrolment;
+    private final SequenceReset sequenceReset;
     private final BatchIngestor ingestor;
     private final HeartbeatService heartbeats;
     private final ChangeLogReader changeLog;
@@ -66,6 +69,7 @@ class SyncController implements SyncApi {
             CurrentScope currentScope,
             DeviceDirectory directory,
             EnrolmentService enrolment,
+            SequenceReset sequenceReset,
             BatchIngestor ingestor,
             HeartbeatService heartbeats,
             ChangeLogReader changeLog,
@@ -80,6 +84,7 @@ class SyncController implements SyncApi {
         this.currentScope = currentScope;
         this.directory = directory;
         this.enrolment = enrolment;
+        this.sequenceReset = sequenceReset;
         this.ingestor = ingestor;
         this.heartbeats = heartbeats;
         this.changeLog = changeLog;
@@ -135,6 +140,25 @@ class SyncController implements SyncApi {
                         new SigningKey(signer.keyId(), SigningKey.AlgorithmEnum.ED25519, signer.publicKeyBase64()))
                 .positionNo(device.positionNo());
         return ResponseEntity.ok(body);
+    }
+
+    @Override
+    public ResponseEntity<SequenceGap> resetDeviceSequence(
+            UUID deviceId, String idempotencyKey, SequenceResetRequest sequenceResetRequest) {
+        ScopeContext admin = currentScope.get();
+        // M1's device, read outside the transaction as the enrolment code does; the reset checks
+        // that it is of the administrator's entity.
+        DeviceRecord device = directory.findFresh(deviceId).orElse(null);
+        SequenceReset.Gap gap = sequenceReset.reset(
+                admin,
+                device,
+                sequenceResetRequest.getNewStartSeq(),
+                sequenceResetRequest.getReasonCode(),
+                sequenceResetRequest.getReasonText(),
+                idempotencyKey,
+                settings.inFlightTimeout(admin));
+        return ResponseEntity.ok(
+                new SequenceGap(gap.gapId(), gap.deviceId(), gap.fromSeq(), gap.toSeq(), gap.recordedAt()));
     }
 
     @Override

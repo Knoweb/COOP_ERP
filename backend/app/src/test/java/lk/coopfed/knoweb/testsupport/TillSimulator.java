@@ -112,6 +112,7 @@ public final class TillSimulator {
     private final TreeMap<Long, TillEvent> outbox = new TreeMap<>();
     private long nextSeq = 1;
     private long lastAcknowledged = 0;
+    private String appVersion = "1.0.0";
 
     // ---- the snapshot ----
     private long snapshotVersion = 0;
@@ -147,6 +148,25 @@ public final class TillSimulator {
 
     public UUID deviceId() {
         return deviceId;
+    }
+
+    /** The application version the till reports from now on (doc 31: the floor is compared with it). */
+    public TillSimulator runningVersion(String version) {
+        this.appVersion = version;
+        return this;
+    }
+
+    /**
+     * The till's local database lost its unacknowledged outbox rows (doc 32 section 7, "till outbox
+     * lost"): the counter survives, the rows central still asks for do not. Only the sequence
+     * reset of an administrator (doc 32 section 8) lets it upload again.
+     *
+     * @return how many events were lost
+     */
+    public int loseUnsentEvents() {
+        int lost = outbox.size();
+        outbox.clear();
+        return lost;
     }
 
     // ================================================================= the outbox (doc 32 section 3)
@@ -194,7 +214,7 @@ public final class TillSimulator {
             events.add(json.convertValue(event, new TypeReference<Map<String, Object>>() {}));
         }
         long first = outbox.firstKey();
-        SyncBatch batch = new SyncBatch(UUID.randomUUID(), first, first + events.size() - 1, "1.0.0", events)
+        SyncBatch batch = new SyncBatch(UUID.randomUUID(), first, first + events.size() - 1, appVersion, events)
                 .snapshotVersionInUse(snapshotVersion)
                 .deviceClock(Instant.now());
         ResponseEntity<String> answer = send(HttpMethod.POST, "/v1/sync/devices/" + deviceId + "/batches", batch);
@@ -237,7 +257,7 @@ public final class TillSimulator {
 
     /** Doc 32 section 6: the till reports and learns the snapshot version. */
     public HeartbeatResponse heartbeat() {
-        Heartbeat report = new Heartbeat("1.0.0")
+        Heartbeat report = new Heartbeat(appVersion)
                 .snapshotVersion(snapshotVersion)
                 .pendingEventCount(outbox.size())
                 .lastAcknowledgedSeq(lastAcknowledged)
