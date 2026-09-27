@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.UUID;
-import lk.coopfed.knoweb.m2catalogue.internal.image.MemoryObjectStorage;
+import lk.coopfed.knoweb.kernel.internal.attachment.MemoryObjectStore;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** attachImage and retireImage through the HTTP contract of the slice (22A section 5; M2-06). */
-@Import(MemoryObjectStorage.class)
+@Import(MemoryObjectStore.class)
 class ImageHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e690-0000-7000-8000-000000000002");
@@ -59,6 +59,7 @@ class ImageHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     void clean() {
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table catalogue.sku cascade");
+        admin.execute("delete from kernel.object_upload where owner_module = 'm2catalogue'");
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
 

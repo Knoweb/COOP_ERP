@@ -12,6 +12,7 @@ import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -76,6 +77,18 @@ public class SystemScope {
 
     @Transactional
     public <T> T inScope(ScopeContext scope, Supplier<T> work) {
+        return work.get();
+    }
+
+    /**
+     * As {@link #inScope}, but always in a new transaction on a connection of its own, committed
+     * when the work returns. The scope customizer sets the scope on the connection it is given and
+     * never restores it, so {@link #inScope} called inside a caller's transaction would leave the
+     * caller's connection in this scope; the kernel's object ledger (CR-19A-7) is read and settled
+     * this way from wherever a module calls it.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public <T> T inOwnTransaction(ScopeContext scope, Supplier<T> work) {
         return work.get();
     }
 }

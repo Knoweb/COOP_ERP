@@ -367,7 +367,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         List<String> tables = ownedTables();
         assertThat(tables)
                 .as("discovery found the owned tables")
-                .contains("kernel.document", "party.location", "hello.greeting");
+                .contains("kernel.document", "party.location", "hello.greeting", "kernel.object_upload");
         List<String> known = tables.stream().toList();
         assertThat(EXCEPTIONS.stream().filter(Departure::mustExist))
                 .as("every exception names a table that exists")

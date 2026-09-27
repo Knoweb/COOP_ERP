@@ -22,10 +22,12 @@ import org.springframework.stereotype.Component;
  *
  * <p>Every run: the PENDING images whose pre-signed PUT has expired (read with a federation-wide
  * view, at most {@code m2.image.thumbnail.batch_size}), oldest first. For each, in the OWN scope
- * of the entity that attached it:
+ * of the entity that attached it, the kernel verifies the upload and settles its own ledger row
+ * (CR-19A-7, as revised: the kernel keeps the window, the hash and the settled-once rule), and:
  * <ul>
+ *   <li>the kernel still sees a valid PUT URL ({@code PENDING}): left for the next run;
  *   <li>nothing uploaded: left PENDING until {@code m2.image.upload_window_hours} after it was
- *       attached, then FAILED;
+ *       attached (or until the kernel settled the upload as missing), then FAILED;
  *   <li>larger than {@code attachment.max_bytes}, or another hash than announced: FAILED;
  *   <li>not an image the JDK reads, or more than {@code m2.image.max_pixels}: FAILED;
  *   <li>otherwise a PNG thumbnail of at most {@code m2.image.thumbnail_px} pixels is written
@@ -92,11 +94,29 @@ class ThumbnailJob {
     /** One image; true when it was settled (ACTIVE or FAILED), false when it stays PENDING. */
     boolean process(ImageRow row, ScopeContext owner) {
         ImageSettings.Limits limits = settings.limits(owner);
-        ObjectStorage.Verification verification = storage.verify(row.objectKeyFull(), row.contentHash(), owner);
+        ObjectStorage.Verification verification;
+        try {
+            verification = storage.verify(row.objectKeyFull(), owner);
+        } catch (ProblemException unknown) {
+            if (!"object.not_found".equals(unknown.messageId())) {
+                throw unknown;
+            }
+            // The kernel authorised no upload under this key (an image attached before its
+            // upload ledger existed, kernel V0060): nothing can ever be verified for it.
+            settle.handle(SettleImage.fail(row.imageId(), "no upload recorded by the kernel"), owner);
+            return true;
+        }
 
         switch (verification.outcome()) {
+            case PENDING -> {
+                // The kernel's ledger still sees a valid PUT URL: not yet.
+                return false;
+            }
             case MISSING -> {
-                if (row.createdAt().plus(limits.uploadWindow()).isAfter(clock.instant())) {
+                // Settled MISSING: the kernel will issue no new URL for this key, so waiting is
+                // pointless; otherwise wait for M2's own window.
+                if (!verification.settled()
+                        && row.createdAt().plus(limits.uploadWindow()).isAfter(clock.instant())) {
                     return false;
                 }
                 settle.handle(SettleImage.fail(row.imageId(), "not uploaded within " + limits.uploadWindow()), owner);
@@ -125,7 +145,7 @@ class ThumbnailJob {
                     return true;
                 }
                 String thumbKey = row.objectKeyFull() + THUMB_SUFFIX;
-                storage.write(thumbKey, Thumbnailer.CONTENT_TYPE, thumbnail);
+                storage.write(thumbKey, Thumbnailer.CONTENT_TYPE, thumbnail, owner);
                 settle.handle(SettleImage.activate(row.imageId(), thumbKey), owner);
                 return true;
             }
