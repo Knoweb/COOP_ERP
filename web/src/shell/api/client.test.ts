@@ -2,7 +2,7 @@ import createClient from "openapi-fetch";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { paths } from "../../generated/hello";
 import type { Session } from "../auth/session";
-import { ApiProblem, apiMiddleware } from "./client";
+import { ApiProblem, SCOPE_UNNAMED, apiMiddleware } from "./client";
 
 const session: Session = {
   userId: "0190f000-0000-7000-8000-0000000000aa",
@@ -57,6 +57,23 @@ describe("the API client", () => {
 
     expect(sent[0].headers.get("X-Scope-Entity")).toBe(session.entityId);
     expect(sent[0].headers.get("X-Scope-Location")).toBe(locationId);
+  });
+
+  it("sends no scope on a request marked unnamed, and not the mark either", async () => {
+    const sent: Request[] = [];
+    const fetch = vi.fn(async (request: Request) => {
+      sent.push(request);
+      return json(200, []);
+    });
+    const client = createClient<paths>({ baseUrl: "http://api.test", fetch });
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, locationId: "somewhere" })));
+
+    await client.GET("/v1/hello/greetings", { headers: { [SCOPE_UNNAMED]: "1" } });
+
+    expect(sent[0].headers.get("X-Scope-Entity")).toBeNull();
+    expect(sent[0].headers.get("X-Scope-Location")).toBeNull();
+    expect(sent[0].headers.get(SCOPE_UNNAMED)).toBeNull();
+    expect(sent[0].headers.get("Authorization")).toBe("Bearer the-token");
   });
 
   const stepUpRequired = () =>

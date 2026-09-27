@@ -104,5 +104,14 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(asBuyer.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(asBuyer.getBody().get("docNumber").asText()).isEqualTo("D4S-INV-0000001");
         assertThat(asBuyer.getBody().get("lines")).hasSize(2);
+
+        // Nothing printed yet (no worker in this test): the Print link is not ready (M4-11).
+        ResponseEntity<JsonNode> print = http.exchange(
+                "/v1/trading/invoices/" + invoiceId + "/print",
+                HttpMethod.GET,
+                new HttpEntity<>(headers(SELLER_USER, SELLER)),
+                JsonNode.class);
+        assertThat(print.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(String.valueOf(print.getBody())).contains("m4.invoice.print_not_ready");
     }
 }

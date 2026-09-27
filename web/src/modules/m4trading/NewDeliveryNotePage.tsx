@@ -180,7 +180,9 @@ export function NewDeliveryNotePage() {
         <div>
           <button
             type="submit"
-            disabled={create.isPending || !fromLocationId || !o.deliverToLocationId || !rows.some((row) => Number(row.qty) > 0)}
+            disabled={
+              create.isPending || !fromLocationId || !lots.isSuccess || !o.deliverToLocationId || !rows.some((row) => Number(row.qty) > 0)
+            }
           >
             {t("trading.note.create").text}
           </button>

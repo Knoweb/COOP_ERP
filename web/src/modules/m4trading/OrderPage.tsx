@@ -175,7 +175,7 @@ export function OrderPage() {
               {t("trading.field.committed_eta").text}
               <input type="date" min={businessToday()} value={eta} onChange={(event) => setEta(event.target.value)} />
             </label>
-            <button type="button" disabled={accept.isPending || !eta} onClick={() => accept.mutate()}>
+            <button type="button" disabled={accept.isPending || !eta || relationship.isLoading} onClick={() => accept.mutate()}>
               {t("trading.order.accept").text}
             </button>
             <button type="button" onClick={() => setAsking("reject")}>

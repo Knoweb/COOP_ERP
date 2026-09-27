@@ -1,0 +1,13 @@
+# M8 Reporting: the audit event types of the commands built so far (28A section 7). Loaded by the
+# kernel's AuditEventTypeSeedLoader, which reads every seed/*/audit-event-types.yaml. The
+# projections audit nothing (module README: a projection row copies facts already audited).
+audit_event_types:
+  - code: REPORT_RUN_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A report was requested as an A4 PDF
+
+  - code: REPORT_RUN_COMPLETED
+    severity: INFO
+    offline_capturable: false
+    description_en: A requested report was printed, or could not be
