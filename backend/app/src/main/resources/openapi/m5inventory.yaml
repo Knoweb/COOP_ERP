@@ -1,0 +1,112 @@
+# M5 Inventory, Costing, Repack & Loss API slice (25A section 5).
+#
+# The reads of 25A section 7 that the demo needs: a location's balances by lot, with the FEFO
+# rank, and the availability of SKUs at locations. Every operation names its permission in
+# x-permission; the kernel checks it for every GET (ReadPermissionInterceptor). The unit cost is
+# in a balance only for an owner's user, never for a till and never for a read-only class
+# (25A section 5: "unitCost? (OWN only)"; section 9: "till-scoped balances carry no cost").
+# After changing this file run `sh tools/gen-clients.sh` and commit web/src/generated/m5inventory.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP M5 Inventory API
+  version: 0.1.0
+paths:
+  /v1/inventory/locations/{locationId}/balances:
+    get:
+      tags: [Inventory]
+      operationId: listBalances
+      summary: The lots of one location, GOOD lots in FEFO order first
+      description: >
+        Lots with a quantity other than zero, unless includeZero. fefoRank ranks the GOOD lots
+        with stock by expiry (none last) and then by when they were received; it is absent on a
+        DAMAGED, empty or negative lot. A location the caller's scope does not read answers an
+        empty list.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: includeZero
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: The lots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LotBalanceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/availability:
+    get:
+      tags: [Inventory]
+      operationId: getAvailability
+      summary: What can be sold or allocated, per location and SKU
+      description: >
+        The GOOD lots with stock at each location, less what issued delivery notes have
+        reserved there and not yet dispatched (doc 25 section 3.4). A negative lot never counts.
+        One row per requested location and SKU, zero when there is nothing.
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationIds
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items: { type: string, format: uuid }
+        - in: query
+          name: skuIds
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 500
+            items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Availability per location and SKU
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AvailabilityResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+components:
+  schemas:
+    LotBalanceResponse:
+      type: object
+      required: [stockLotId, locationId, skuId, batchId, condition, qtyOnHand, negative]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qtyOnHand: { type: number }
+        fefoRank: { type: integer }
+        negative: { type: boolean }
+        unitCost:
+          type: number
+          description: The lot's acquisition cost; only for a user of the owning entity, never for a till
+    AvailabilityResponse:
+      type: object
+      required: [locationId, skuId, available]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        available: { type: number }
