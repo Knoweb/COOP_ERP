@@ -104,6 +104,7 @@ abstract class SyncIntegrationTest extends PostgresIntegrationTest {
                 "kernel.sync_quarantine",
                 "kernel.device_heartbeat",
                 "kernel.device_enrolment_code",
+                "kernel.sync_sequence_gap",
                 "kernel.device_sync_cursor",
                 "kernel.change_log",
                 "kernel.location_snapshot_version",

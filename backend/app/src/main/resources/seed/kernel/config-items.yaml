@@ -351,6 +351,18 @@ config_items:
     default: "0.0.0"
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # The grace of doc 31 section 6: a till below a raised floor keeps syncing, with a notice, for
+  # this long after the floor rose above its version; then its uploads are refused (426). One
+  # floor for the fleet (decided 27 September 2026): M1's assignment guard reads it too.
+  - key: sync.app_version_floor.grace
+    value_type: DURATION
+    schema: { minimum: "PT0S", maximum: "PT2160H" }
+    description_en: How long a till below a raised application floor may keep syncing before it must update (doc 31)
+    description_si: ඉහළ නංවන ලද යෙදුම් පතුලට පහළ මුදල් ලේඛනයකට යාවත්කාලීන කිරීමට පෙර සමමුහුර්ත කළ හැකි කාලය
+    description_ta: உயர்த்தப்பட்ட பயன்பாட்டு அடிமட்டத்திற்குக் கீழுள்ள பணப்பெட்டி புதுப்பிக்கும் முன் ஒத்திசைக்கக்கூடிய காலம்
+    default: "PT336H"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   - key: sync.clock_drift.review_after
     value_type: DURATION
     schema: { minimum: "PT15M", maximum: "PT24H" }

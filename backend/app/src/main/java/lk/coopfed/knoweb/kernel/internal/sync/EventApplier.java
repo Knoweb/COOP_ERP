@@ -16,6 +16,8 @@ import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.kernel.api.SyncAnomaly;
+import lk.coopfed.knoweb.kernel.internal.audit.DeviceAuditWriter;
+import lk.coopfed.knoweb.kernel.internal.audit.DeviceAuditWriter.DeviceAudit;
 import lk.coopfed.knoweb.kernel.internal.document.BundleHash;
 import lk.coopfed.knoweb.kernel.internal.event.DeviceEventWriter;
 import lk.coopfed.knoweb.kernel.internal.event.DeviceEventWriter.DeviceEvent;
@@ -43,6 +45,12 @@ import org.springframework.stereotype.Component;
  *                    content gives (doc 32 section 7)
  * </pre>
  *
+ * <p>The till's own audit rows (the {@code audit.*} family of doc 32 section 3.1) are applied here
+ * too, into the kernel's audit log, in the same transaction ({@link #auditRow}): the design names
+ * the kernel audit store as their handler, and a row that cannot be read (no catalogue type the
+ * till may record offline, no subject) is quarantined as SCHEMA like any other malformed event,
+ * never dropped.
+ *
  * A business rule is never a reason: a sale that happened is applied and flagged by the module
  * that applies it (S4). That is the consumer's work, after this.
  */
@@ -66,18 +74,31 @@ class EventApplier {
             "repack.executed",
             "transfer.issued");
 
+    /** The till's audit rows (doc 32 section 3.1, "audit.*"), by the first segment of the type. */
+    static final String AUDIT_FAMILY = "audit.";
+
+    /** An audit catalogue code (doc 18 part D; the facade's rule). */
+    private static final Pattern AUDIT_TYPE_CODE = Pattern.compile("[A-Z][A-Z0-9_]{0,39}");
+
     private static final Pattern EVENT_TYPE = Pattern.compile("[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+\\.v[1-9][0-9]*");
 
     private final JdbcTemplate jdbc;
     private final DeviceEventWriter outbox;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final DeviceAuditWriter deviceAudit;
 
-    EventApplier(JdbcTemplate jdbc, DeviceEventWriter outbox, AuditFacade audit, EventPublisher events) {
+    EventApplier(
+            JdbcTemplate jdbc,
+            DeviceEventWriter outbox,
+            AuditFacade audit,
+            EventPublisher events,
+            DeviceAuditWriter deviceAudit) {
         this.jdbc = jdbc;
         this.outbox = outbox;
         this.audit = audit;
         this.events = events;
+        this.deviceAudit = deviceAudit;
     }
 
     /** A reason to refuse one event, found while reading it. */
@@ -144,6 +165,9 @@ class EventApplier {
                     aggregateId = uuid(payload.get("document"), "document_id", false);
                 }
             }
+            DeviceAudit auditRow = eventType.startsWith(AUDIT_FAMILY)
+                    ? auditRow(device, record, seq, eventId, occurredAt, occurredLocal, event, payload)
+                    : null;
 
             jdbc.update(
                     """
@@ -157,6 +181,9 @@ class EventApplier {
                     eventId,
                     eventType,
                     batchId);
+            if (auditRow != null) {
+                deviceAudit.write(auditRow);
+            }
             String aggregateType = text(event, "aggregate_type");
             outbox.write(new DeviceEvent(
                     eventId,
@@ -179,6 +206,73 @@ class EventApplier {
             return quarantine(
                     device, record, batchId, seq, eventId, eventType, refused.reason, refused.getMessage(), raw);
         }
+    }
+
+    /**
+     * The audit row a till sent (doc 18 part D; 26A section 3, the till's audit_event): the
+     * catalogue code in {@code event_type_code}, the subject, and what the row may carry beside
+     * them. Its id is the event's, its time the till's, its actor the operator of the envelope,
+     * its device and sequence the ones it arrived with.
+     */
+    private DeviceAudit auditRow(
+            ScopeContext device,
+            DeviceRecord record,
+            long seq,
+            UUID eventId,
+            Instant occurredAt,
+            LocalDateTime occurredLocal,
+            JsonNode event,
+            JsonNode payload)
+            throws Refused {
+        String code = text(payload, "event_type_code");
+        if (code == null || !AUDIT_TYPE_CODE.matcher(code).matches()) {
+            throw new Refused("SCHEMA", "an audit row without a catalogue event_type_code");
+        }
+        if (!deviceAudit.offlineCapturable(code)) {
+            throw new Refused("SCHEMA", "the audit type " + code + " is not one a till may record offline");
+        }
+        String subjectTable = text(payload, "subject_table");
+        if (subjectTable == null || subjectTable.isBlank() || subjectTable.length() > 40) {
+            throw new Refused("SCHEMA", "an audit row needs subject_table, at most 40 characters");
+        }
+        UUID subjectId = uuid(payload, "subject_id", true);
+        String reasonCode = text(payload, "reason_code");
+        if (reasonCode != null && reasonCode.length() > 40) {
+            throw new Refused("SCHEMA", "reason_code is longer than 40 characters");
+        }
+        UUID position = uuid(payload, "till_position_id", false);
+        return new DeviceAudit(
+                eventId,
+                code,
+                occurredAt,
+                occurredLocal,
+                record.ownerEntityId(),
+                record.locationId(),
+                uuid(event, "actor_user_id", false),
+                record.deviceId(),
+                position == null ? record.tillPositionId() : position,
+                subjectTable,
+                subjectId,
+                uuid(payload, "document_id", false),
+                state(payload, "before_state"),
+                state(payload, "after_state"),
+                reasonCode,
+                text(payload, "reason_text"),
+                uuid(payload, "witness_user_id", false),
+                seq,
+                orElse(uuid(event, "correlation_id", false), device.correlationId()));
+    }
+
+    /** A before or after state: absent, or a JSON object. */
+    private static String state(JsonNode payload, String name) throws Refused {
+        JsonNode value = payload.get(name);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isObject()) {
+            throw new Refused("SCHEMA", name + " is not an object");
+        }
+        return value.toString();
     }
 
     private Ack.Outcome quarantine(

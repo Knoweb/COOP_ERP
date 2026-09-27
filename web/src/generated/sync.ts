@@ -55,9 +55,29 @@ export interface paths {
         put?: never;
         /**
          * Upload a contiguous run of till events in device sequence order (doc 32 section 3)
-         * @description One batch in flight per device. The answer is the acknowledgement: last_applied_seq is authoritative, everything at or below it is durably at central. A batch that starts at or below the cursor is a replay and is answered from state (DUPLICATE) without applying anything twice; resending the same batch_id returns the same acknowledgement. An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap (params.expected_seq: resend from there), 409 sync.batch_in_flight (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent (the events are not first_seq..last_seq), 426 sync.app_below_floor, 429 sync.rate_limited (params.retry_after in seconds: the device's batches per minute or bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403 for the device (see the Refused response).
+         * @description One batch in flight per device. The answer is the acknowledgement: last_applied_seq is authoritative, everything at or below it is durably at central. A batch that starts at or below the cursor is a replay and is answered from state (DUPLICATE) without applying anything twice; resending the same batch_id returns the same acknowledgement. An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap (params.expected_seq: resend from there), 409 sync.batch_in_flight (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent (the events are not first_seq..last_seq), 426 sync.app_below_floor (the application is below sync.app_version_floor and its grace, sync.app_version_floor.grace, is over; params.floor and params.grace_ended_at; within the grace the batch is taken and the acknowledgement carries a FLOOR_NOTICE, doc 31 section 6), 429 sync.rate_limited (params.retry_after in seconds: the device's batches per minute or bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403 for the device (see the Refused response).
          */
         post: operations["uploadBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/devices/{device_id}/sequence-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a device's cursor past sequence numbers it can no longer send (an administrator, doc 32 section 8)
+         * @description The recovery procedure of doc 32 sections 7 and 8 for a till whose outbox was lost or corrupted: it keeps being answered 409 sync.sequence_gap because the rows central asks for no longer exist on it. An administrator of the device's entity, with a user token, names the first sequence the device will send from now on and a reason code; the numbers from the cursor's expected_seq up to new_start_seq - 1 are recorded as a documented gap (never received), the cursor moves to new_start_seq - 1, and an ALERT audit record and sync.sequence_reset.v1 are raised. Forward only: a device whose sequence restarted below the cursor is enrolled again instead. A retry with the same Idempotency-Key is answered with the gap it recorded. Codes: 403 permission.denied, 401 mfa.required, 409 sync.batch_in_flight (a batch of the device is being ingested), 422 sync.sequence_reset.device_not_enrolled, 422 sync.sequence_reset.not_forward (params.expected_seq).
+         */
+        post: operations["resetDeviceSequence"];
         delete?: never;
         options?: never;
         head?: never;
@@ -160,6 +180,34 @@ export interface components {
             enrolment_code: string;
             hardware_serial: string;
             app_version: string;
+        };
+        SequenceResetRequest: {
+            /**
+             * Format: int64
+             * @description The first sequence the device will send from now on; above the cursor's expected_seq
+             */
+            new_start_seq: number;
+            /** @description Why the device cannot produce expected_seq, e.g. OUTBOX_LOST, DATABASE_CORRUPTED */
+            reason_code: string;
+            reason_text?: string | null;
+        };
+        SequenceGap: {
+            /** Format: uuid */
+            gap_id: string;
+            /** Format: uuid */
+            device_id: string;
+            /**
+             * Format: int64
+             * @description The first sequence number central will never receive
+             */
+            from_seq: number;
+            /**
+             * Format: int64
+             * @description The last one; the cursor now stands here and the next batch starts at to_seq + 1
+             */
+            to_seq: number;
+            /** Format: date-time */
+            recorded_at: string;
         };
         EnrolmentResponse: {
             /** Format: uuid */
@@ -648,6 +696,40 @@ export interface operations {
             413: components["responses"]["Refused"];
             426: components["responses"]["Refused"];
             429: components["responses"]["Refused"];
+        };
+    };
+    resetDeviceSequence: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The device; for a device operation, the dev claim of the token */
+                device_id: components["parameters"]["DeviceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SequenceResetRequest"];
+            };
+        };
+        responses: {
+            /** @description The gap recorded; the device's next batch starts at to_seq + 1 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SequenceGap"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["Refused"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["RuleBroken"];
         };
     };
     heartbeat: {

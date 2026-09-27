@@ -16,7 +16,9 @@
 #     sync.device_token_not_allowed). So x-permission on a device operation is not a
 #     permission of the catalogue that a role could hold: "sync.device" names the device
 #     principal itself. The enrolment exchange is called before the device holds any token;
-#     its enrolment code is its credential ("sync.enrolment_code").
+#     its enrolment code is its credential ("sync.enrolment_code"). Two operations are an
+#     administrator's, with a user token and a permission of the catalogue: issuing an
+#     enrolment code and the sequence reset of doc 32 section 8 (sys.device.enrol).
 #   - Mutating operations carry the Idempotency-Key like every other (the till sends the
 #     batch_id, or a fresh UUID); the effect is idempotent by database state as doc 32 S3
 #     requires, so any instance answers a resend the same way.
@@ -106,7 +108,10 @@ paths:
         it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap
         (params.expected_seq: resend from there), 409 sync.batch_in_flight
         (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent
-        (the events are not first_seq..last_seq), 426 sync.app_below_floor, 429
+        (the events are not first_seq..last_seq), 426 sync.app_below_floor (the application is
+        below sync.app_version_floor and its grace, sync.app_version_floor.grace, is over;
+        params.floor and params.grace_ended_at; within the grace the batch is taken and the
+        acknowledgement carries a FLOOR_NOTICE, doc 31 section 6), 429
         sync.rate_limited (params.retry_after in seconds: the device's batches per minute or
         bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403
         for the device (see the Refused response).
@@ -131,6 +136,43 @@ paths:
         '413': { $ref: '#/components/responses/Refused' }
         '426': { $ref: '#/components/responses/Refused' }
         '429': { $ref: '#/components/responses/Refused' }
+  /v1/sync/devices/{device_id}/sequence-reset:
+    post:
+      tags: [Sync]
+      operationId: resetDeviceSequence
+      summary: Move a device's cursor past sequence numbers it can no longer send (an administrator, doc 32 section 8)
+      description: >
+        The recovery procedure of doc 32 sections 7 and 8 for a till whose outbox was lost or
+        corrupted: it keeps being answered 409 sync.sequence_gap because the rows central asks
+        for no longer exist on it. An administrator of the device's entity, with a user token,
+        names the first sequence the device will send from now on and a reason code; the numbers
+        from the cursor's expected_seq up to new_start_seq - 1 are recorded as a documented gap
+        (never received), the cursor moves to new_start_seq - 1, and an ALERT audit record and
+        sync.sequence_reset.v1 are raised. Forward only: a device whose sequence restarted below
+        the cursor is enrolled again instead. A retry with the same Idempotency-Key is answered
+        with the gap it recorded. Codes: 403 permission.denied, 401 mfa.required, 409
+        sync.batch_in_flight (a batch of the device is being ingested), 422
+        sync.sequence_reset.device_not_enrolled, 422 sync.sequence_reset.not_forward
+        (params.expected_seq).
+      x-permission: sys.device.enrol
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SequenceResetRequest' }
+      responses:
+        '200':
+          description: The gap recorded; the device's next batch starts at to_seq + 1
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SequenceGap' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/sync/devices/{device_id}/heartbeat:
     post:
       tags: [Sync]
@@ -301,6 +343,37 @@ components:
         enrolment_code: { type: string, minLength: 1, maxLength: 64 }
         hardware_serial: { type: string, minLength: 1, maxLength: 64 }
         app_version: { type: string, minLength: 1, maxLength: 20 }
+    SequenceResetRequest:
+      type: object
+      required: [new_start_seq, reason_code]
+      properties:
+        new_start_seq:
+          type: integer
+          format: int64
+          minimum: 2
+          description: The first sequence the device will send from now on; above the cursor's expected_seq
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          description: Why the device cannot produce expected_seq, e.g. OUTBOX_LOST, DATABASE_CORRUPTED
+        reason_text: { type: [string, 'null'], maxLength: 500 }
+    SequenceGap:
+      type: object
+      required: [gap_id, device_id, from_seq, to_seq, recorded_at]
+      properties:
+        gap_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        from_seq:
+          type: integer
+          format: int64
+          description: The first sequence number central will never receive
+        to_seq:
+          type: integer
+          format: int64
+          description: The last one; the cursor now stands here and the next batch starts at to_seq + 1
+        recorded_at: { type: string, format: date-time }
     EnrolmentResponse:
       type: object
       required: [device_id, owner_entity_id, location_id, till_position_id, primary_till, credential,
