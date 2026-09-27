@@ -5,8 +5,8 @@
 import { Outlet } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 import { hasAnyPermission } from "../auth/permissions";
+import type { PermissionSet } from "../auth/permissions";
 import { RequirePermission } from "../auth/RequirePermission";
-import type { Session } from "../auth/session";
 import type { ModuleDefinition, NavItem } from "./ModuleDefinition";
 
 /**
@@ -45,9 +45,9 @@ function guarded(route: RouteObject, module: ModuleDefinition): RouteObject {
 }
 
 /** The navigation entries this user may see, in the order of the registry. */
-export function navItemsFor(modules: ModuleDefinition[], session: Pick<Session, "roles" | "policyClass">): NavItem[] {
+export function navItemsFor(modules: ModuleDefinition[], permissions: PermissionSet): NavItem[] {
   return modules
-    .filter((module) => hasAnyPermission(session, module.requiredPermissions))
+    .filter((module) => hasAnyPermission(permissions, module.requiredPermissions))
     .flatMap((module) => module.navItems);
 }
 

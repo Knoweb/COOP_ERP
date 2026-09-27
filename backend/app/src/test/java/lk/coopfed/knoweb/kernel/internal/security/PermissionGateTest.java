@@ -78,7 +78,67 @@ class PermissionGateTest {
         assertThatCode(() -> gate.require(scope(null), " ")).doesNotThrowAnyException();
     }
 
+    @Test
+    void aCommandRunsInTheOwnClassOnlyWhateverTheResolverSays() {
+        // CR-19A-9: a read code and a command code may be one string (gov.external.grant), and a
+        // FEDERATION_VIEW caller resolves every read; the class rule keeps it from the command.
+        when(permissions.allows(any(), eq(PERMISSION))).thenReturn(true);
+
+        PermissionGate gate = new PermissionGate(permissions, stepUp, true, "");
+
+        assertThatCode(() -> gate.require(scope(null, PolicyClass.OWN), PERMISSION))
+                .doesNotThrowAnyException();
+        for (PolicyClass readOnly : List.of(
+                PolicyClass.FEDERATION_VIEW, PolicyClass.EXTERNAL_TIMEBOXED, PolicyClass.PARTY, PolicyClass.NONE)) {
+            assertThatThrownBy(() -> gate.require(scope(null, readOnly), PERMISSION))
+                    .as(readOnly.name())
+                    .isInstanceOf(ProblemException.class)
+                    .hasMessageContaining("permission.denied");
+        }
+    }
+
+    @Test
+    void aReadPassesWhenTheCallerHoldsItsCodeInAnyClass() {
+        when(permissions.allows(any(), eq("cat.sku.view"))).thenReturn(true);
+        when(permissions.allows(any(), eq("gov.user.view"))).thenReturn(false);
+
+        PermissionGate gate = new PermissionGate(permissions, stepUp, true, "");
+
+        for (PolicyClass policyClass : List.of(PolicyClass.OWN, PolicyClass.EXTERNAL_TIMEBOXED)) {
+            assertThatCode(() -> gate.requireRead(scope(null, policyClass), "cat.sku.view"))
+                    .doesNotThrowAnyException();
+            assertThatThrownBy(() -> gate.requireRead(scope(null, policyClass), "gov.user.view"))
+                    .isInstanceOf(ProblemException.class)
+                    .hasMessageContaining("permission.denied");
+        }
+    }
+
+    @Test
+    void aReadAsksForNoSecondFactorAndTheSessionReadForNoPermission() {
+        when(permissions.allows(any(), eq(PERMISSION))).thenReturn(true);
+        when(permissions.requiresMfa(PERMISSION)).thenReturn(true);
+
+        PermissionGate gate = new PermissionGate(permissions, stepUp, true, "");
+
+        assertThatCode(() -> gate.requireRead(scope(null), PERMISSION)).doesNotThrowAnyException();
+        assertThatCode(() -> gate.requireRead(scope(null, PolicyClass.NONE), SliceOperations.AUTHENTICATED))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void withEnforcementOffAWouldBeRefusedReadPasses() {
+        when(permissions.allows(any(), any())).thenReturn(false);
+
+        PermissionGate gate = new PermissionGate(permissions, stepUp, false, "");
+
+        assertThatCode(() -> gate.requireRead(scope(null), "cat.sku.view")).doesNotThrowAnyException();
+    }
+
     private static ScopeContext scope(Instant mfaAt) {
+        return scope(mfaAt, PolicyClass.OWN);
+    }
+
+    private static ScopeContext scope(Instant mfaAt, PolicyClass policyClass) {
         Scope active = new Scope(UUID.randomUUID(), null);
         return new ScopeContext(
                 UUID.randomUUID(),
@@ -86,8 +146,8 @@ class PermissionGateTest {
                 active.entityId(),
                 List.of(active),
                 active,
-                PolicyClass.OWN,
-                Set.of(),
+                policyClass,
+                policyClass == PolicyClass.EXTERNAL_TIMEBOXED ? Set.of(UUID.randomUUID()) : Set.of(),
                 mfaAt,
                 Locale.ENGLISH,
                 Ids.next());

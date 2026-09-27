@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The resolver and the separation-of-duties helper over M1's tables (19A section 3, "Tests"):
  * the union over roles never yields a permission absent from every role; an entity-wide
  * assignment applies at every location and a location assignment there alone; a read-only
- * class resolves to nothing; the cache empties on the role and user events; a permission
+ * classes resolve by their own rule (CR-19A-9); the cache empties on the role and user events; a permission
  * flagged for MFA says so; an INSTANCE pair refuses the same person and admits another.
  */
 class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest {
@@ -164,20 +164,19 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
     }
 
     @Test
-    void aReadOnlyClassResolvesToNothing() {
+    void theReadOnlyClassesResolveByTheirOwnRule() {
+        // CR-19A-9: FEDERATION_VIEW holds every read of every slice and none of its rows'
+        // commands; an EXTERNAL_TIMEBOXED caller without a current grant, and NONE, hold nothing.
+        Set<String> fedView = resolver.resolve(readOnly(PolicyClass.FEDERATION_VIEW));
+        assertThat(fedView).contains("prt.location.view", "cat.sku.view").doesNotContain("prt.location.manage");
+        assertThat(resolver.resolve(readOnly(PolicyClass.EXTERNAL_TIMEBOXED))).isEmpty();
+        assertThat(resolver.resolve(readOnly(PolicyClass.NONE))).isEmpty();
+    }
+
+    private static ScopeContext readOnly(PolicyClass policyClass) {
         Scope active = new Scope(ENTITY, null);
-        ScopeContext fedView = new ScopeContext(
-                ADMIN,
-                null,
-                ENTITY,
-                List.of(active),
-                active,
-                PolicyClass.FEDERATION_VIEW,
-                Set.of(),
-                null,
-                Locale.ENGLISH,
-                Ids.next());
-        assertThat(resolver.resolve(fedView)).isEmpty();
+        return new ScopeContext(
+                ADMIN, null, ENTITY, List.of(active), active, policyClass, Set.of(), null, Locale.ENGLISH, Ids.next());
     }
 
     @Test

@@ -4,6 +4,7 @@ import { IntlProvider } from "react-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { oidcConfig } from "./shell/auth/oidc";
+import { PermissionsProvider } from "./shell/auth/PermissionsContext";
 import { RequireLogin } from "./shell/auth/RequireLogin";
 import { useSession } from "./shell/auth/session";
 import { chooseLocale, messages } from "./shell/i18n/messages";
@@ -40,7 +41,10 @@ export function App() {
       <Localised>
         <RequireLogin>
           <QueryClientProvider client={queryClient}>
-            <Pages />
+            {/* What the user may see, read from the server once per token (doc 30 section 3). */}
+            <PermissionsProvider>
+              <Pages />
+            </PermissionsProvider>
           </QueryClientProvider>
         </RequireLogin>
       </Localised>

@@ -83,7 +83,7 @@ export function operationsOf(sliceText) {
 function toOperation(block) {
   const text = block.lines.join("\n");
   const operationId = text.match(/^\s*operationId:\s*["']?([^\s"'#]+)/m)?.[1] ?? null;
-  const hasPermission = /^\s*x-permission:\s*\S/m.test(text);
+  const permission = text.match(/^\s*x-permission:\s*["']?([^\s"'#]+)/m)?.[1] ?? null;
   const hasIdempotencyKey = IDEMPOTENCY_KEY_PATTERN.test(text);
 
   return {
@@ -91,7 +91,8 @@ function toOperation(block) {
     path: block.path,
     line: block.startLine,
     operationId,
-    hasPermission,
+    permission,
+    hasPermission: permission !== null,
     hasIdempotencyKey
   };
 }

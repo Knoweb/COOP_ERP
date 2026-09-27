@@ -84,14 +84,24 @@ final class SecurityFixture {
     }
 
     UUID user(UUID homeEntity, String status) {
+        return user(homeEntity, "BACK_OFFICE", status);
+    }
+
+    /** An EXTERNAL user (a regulator or auditor) of the entity, ACTIVE. */
+    UUID externalUser(UUID homeEntity) {
+        return user(homeEntity, "EXTERNAL", "ACTIVE");
+    }
+
+    UUID user(UUID homeEntity, String kind, String status) {
         UUID id = Ids.next();
         admin.update(
                 "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
-                        + " values (?, ?, ?, ?, 'BACK_OFFICE', ?)",
+                        + " values (?, ?, ?, ?, ?, ?)",
                 id,
                 homeEntity,
                 "u-" + id,
                 "User " + id,
+                kind,
                 status);
         users.add(id);
         return id;

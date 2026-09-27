@@ -1,38 +1,27 @@
 // What the signed-in user may see. The navigation, the route guard and a screen that hides a
 // button all ask here, through hasPermission() or useHasPermission(); nothing else in the web
-// client looks at roles.
+// client looks at permissions, and nothing at all looks at the token's roles.
 //
 // This decides what is SHOWN, never what is ALLOWED. The server checks the permission on
 // every request and stays the authority (doc 30 section 3: "every action button also handles
 // the server's permission denial gracefully"). Hiding a button is a courtesy to the user, not
 // a security measure.
+//
+// Where the set comes from (doc 30 section 3, "visibility from the resolved permission set";
+// decided 27 September 2026, CR-19A-9): the kernel resolves the permissions of the user in the
+// active scope (19A K-03b, PermissionResolver) and hands them to the client through
+// GET /v1/session (openapi/session.yaml). PermissionsContext.tsx reads it once per token; the
+// functions below only look at what it returned. The temporary role map that stood here until
+// then is gone: a role the map did not know held nothing, and the map had to be edited by hand.
 
-import { useSession } from "./session";
-import type { Session } from "./session";
+import type { PolicyClass } from "./session";
+import { usePermissions } from "./PermissionsContext";
 
-/** In the temporary map below: this role holds every permission. */
-const EVERY_PERMISSION = "*";
-
-/**
- * TEMPORARY, until the server hands the shell the resolved permission set.
- *
- * The real rule (doc 19 section 3; doc 30 section 3, "visibility from the resolved permission
- * set"): a role is a set of permissions, maintained as data in M1, and the kernel resolves the
- * permissions of a user in a scope (19A K-03b, `PermissionResolver`). The resolver exists on
- * the server, but no operation of any slice hands its answer to a client yet, and the token
- * of the dev realm (infra/compose/realm-dev.json) carries `roles` only. So until that read
- * exists the three development roles are given their permissions here, by hand.
- *
- * That read replaces this map; the functions below keep their signatures, so no caller
- * changes. Do not add production roles here, and do not grow this into a rule engine.
- *
- * fed-admin holds everything, so that a freshly scaffolded module shows up for one
- * development user without anybody editing the shell.
- */
-const TEMPORARY_DEV_ROLE_PERMISSIONS: Record<string, string[]> = {
-  "fed-admin": [EVERY_PERMISSION],
-  "mpcs-admin": ["hello.greeting.read", "hello.greeting.register"],
-  cashier: ["hello.greeting.read"]
+/** The resolved permission set of a user, with the class that says whether commands are open at all. */
+export type PermissionSet = {
+  policyClass: PolicyClass;
+  /** The permission codes the server resolved for the active scope. */
+  permissions: readonly string[];
 };
 
 /**
@@ -46,31 +35,30 @@ function isRead(permission: string): boolean {
 }
 
 /**
- * Does this user hold the permission? A role the map does not know holds nothing.
+ * Does this user hold the permission? A code the server did not return is not held.
  *
- * The one rule of the server the shell can mirror without the resolved set: only the OWN
- * class runs a command (19A section 3, `PermissionResolver`: "the read-only classes run no
- * command"). So a user in FEDERATION_VIEW, PARTY or EXTERNAL_TIMEBOXED is shown the reads
- * their roles give and no command, whatever the map says; before this, fed-admin (a
- * FEDERATION_VIEW user) was offered the register form and refused only on submit.
+ * One rule of the server is mirrored here as well, so that a screen never offers a command
+ * the server would refuse by class alone: only the OWN class runs a command (19A section 3;
+ * kernel PermissionGate). A user in FEDERATION_VIEW or EXTERNAL_TIMEBOXED is shown the reads
+ * the server resolved and no command, even where a read and a command share one code.
  */
-export function hasPermission(session: Pick<Session, "roles" | "policyClass">, permission: string): boolean {
-  if (session.policyClass !== "OWN" && !isRead(permission)) {
+export function hasPermission(set: PermissionSet, permission: string): boolean {
+  if (set.policyClass !== "OWN" && !isRead(permission)) {
     return false;
   }
-  return session.roles.some((role) => {
-    const granted = TEMPORARY_DEV_ROLE_PERMISSIONS[role] ?? [];
-    return granted.includes(EVERY_PERMISSION) || granted.includes(permission);
-  });
+  return set.permissions.includes(permission);
 }
 
 /** Does this user hold at least one of them? An empty list asks for nothing, so: yes. */
-export function hasAnyPermission(session: Pick<Session, "roles" | "policyClass">, permissions: string[]): boolean {
-  return permissions.length === 0 || permissions.some((permission) => hasPermission(session, permission));
+export function hasAnyPermission(set: PermissionSet, permissions: string[]): boolean {
+  return permissions.length === 0 || permissions.some((permission) => hasPermission(set, permission));
 }
 
-/** For a screen: `const canRegister = useHasPermission("hello.greeting.register")`. */
+/**
+ * For a screen: `const canRegister = useHasPermission("hello.greeting.register")`. False while
+ * the set is still being read: a button appears when the answer is known, never before.
+ */
 export function useHasPermission(permission: string): boolean {
-  const session = useSession();
-  return session !== null && hasPermission(session, permission);
+  const set = usePermissions();
+  return set !== null && hasPermission(set, permission);
 }
