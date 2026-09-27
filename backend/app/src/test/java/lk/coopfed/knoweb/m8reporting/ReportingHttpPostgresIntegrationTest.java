@@ -214,13 +214,14 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 get("/v1/reporting/reports/stock-position/data", as(BUYER)).getBody();
         assertThat(report.get("rows")).hasSize(2);
         assertThat(report.get("columns")).extracting(c -> c.get("key").asText()).contains("value");
-        assertThat(report.get("totals").get("qty").decimalValue()).isEqualByComparingTo("14");
-        assertThat(report.get("totals").get("value").decimalValue()).isEqualByComparingTo("1263.50");
+        assertThat(new BigDecimal(report.get("totals").get("qty").asText())).isEqualByComparingTo("14");
+        assertThat(new BigDecimal(report.get("totals").get("value").asText())).isEqualByComparingTo("1263.50");
 
         JsonNode oneShop = get("/v1/reporting/reports/stock-position/data?locationId=" + shop, as(BUYER))
                 .getBody();
         assertThat(oneShop.get("rows")).hasSize(1);
-        assertThat(oneShop.get("rows").get(0).get("qty").decimalValue()).isEqualByComparingTo("4");
+        assertThat(new BigDecimal(oneShop.get("rows").get(0).get("qty").asText()))
+                .isEqualByComparingTo("4");
 
         // The seller is the buyer's counterparty, not the owner of its stock: nothing.
         assertThat(get("/v1/reporting/reports/stock-position/data", as(SELLER))
@@ -232,7 +233,7 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         JsonNode view = get("/v1/reporting/reports/stock-position/data", federationView())
                 .getBody();
         assertThat(view.get("rows")).hasSize(2);
-        assertThat(view.get("totals").get("value").decimalValue()).isEqualByComparingTo("1263.50");
+        assertThat(new BigDecimal(view.get("totals").get("value").asText())).isEqualByComparingTo("1263.50");
     }
 
     @Test
@@ -243,8 +244,8 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(report.get("rows")).as("party %s", party).hasSize(1);
             JsonNode row = report.get("rows").get(0);
             assertThat(row.get("date").asText()).isEqualTo(today.toString());
-            assertThat(row.get("qty").decimalValue()).isEqualByComparingTo("10");
-            assertThat(row.get("value").decimalValue()).isEqualByComparingTo("902.50");
+            assertThat(new BigDecimal(row.get("qty").asText())).isEqualByComparingTo("10");
+            assertThat(new BigDecimal(row.get("value").asText())).isEqualByComparingTo("902.50");
             assertThat(report.get("freshness").isNull()).isFalse();
         }
         assertThat(get(url, as(OTHER)).getBody().get("rows")).isEmpty();
@@ -265,8 +266,8 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .getBody();
         assertThat(report.get("rows")).hasSize(1);
         assertThat(report.get("rows").get(0).get("number").asText()).isEqualTo("F-INV-1");
-        assertThat(report.get("totals").get("gross").decimalValue()).isEqualByComparingTo("1064.95");
-        assertThat(report.get("totals").get("tax").decimalValue()).isEqualByComparingTo("162.45");
+        assertThat(new BigDecimal(report.get("totals").get("gross").asText())).isEqualByComparingTo("1064.95");
+        assertThat(new BigDecimal(report.get("totals").get("tax").asText())).isEqualByComparingTo("162.45");
     }
 
     @Test
