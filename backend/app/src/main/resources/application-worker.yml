@@ -9,3 +9,12 @@ management:
   health:
     rabbit:
       enabled: true
+
+# K-06b: the A4 renderer (19A section 6). Only the worker image carries Chromium
+# (infra/worker-image sets CHROMIUM_PATH), so only this role renders; elsewhere
+# A4Renderer.render answers report.renderer_unavailable. The limits are register items
+# (report.render.*).
+coop-erp:
+  report:
+    enabled: true
+    chromium-path: ${CHROMIUM_PATH:chromium}
