@@ -38,8 +38,8 @@ public record ProjectionEvent(String type, UUID eventId, UUID ownerEntityId, Ins
         return uuid(payload, field);
     }
 
-    public String text(String field) {
-        return text(payload, field);
+    public String string(String field) {
+        return string(payload, field);
     }
 
     public BigDecimal decimal(String field) {
@@ -47,21 +47,21 @@ public record ProjectionEvent(String type, UUID eventId, UUID ownerEntityId, Ins
     }
 
     public LocalDate date(String field) {
-        String value = text(field);
+        String value = string(field);
         return value == null ? null : LocalDate.parse(value);
     }
 
     public Instant instant(String field) {
-        String value = text(field);
+        String value = string(field);
         return value == null ? null : Instant.parse(value);
     }
 
     public static UUID uuid(JsonNode node, String field) {
-        String value = text(node, field);
+        String value = string(node, field);
         return value == null ? null : UUID.fromString(value);
     }
 
-    public static String text(JsonNode node, String field) {
+    public static String string(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() ? null : value.asText();
     }
