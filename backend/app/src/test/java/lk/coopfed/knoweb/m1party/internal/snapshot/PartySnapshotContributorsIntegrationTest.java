@@ -37,7 +37,7 @@ class PartySnapshotContributorsIntegrationTest extends PostgresIntegrationTest {
     /** A permission the seed marks offline_allowed, and one it does not. */
     static final String OFFLINE = "prt.location.view";
 
-    static final String ONLINE_ONLY = "prt.location.manage";
+    static final String ONLINE_ONLY = "prt.location.register";
 
     @Autowired
     ShopSnapshotContributor shop;

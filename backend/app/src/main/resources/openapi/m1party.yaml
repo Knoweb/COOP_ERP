@@ -10,12 +10,17 @@
 # change, the slice's shape unchanged). CR-21A-4 is the first such change-request: LocationFilter
 # gained entityId with no REST shape change, so info.version stays 1.0.0 and x-change-request
 # names it.
+#
+# 1.1.0 (CR-21A-2, accepted 27 September 2026): RelationshipResponse.status gains REPLACED, a
+# row corrected before its first day came, and amendRelationshipTerms refuses a date before
+# today (m1.relationship.effective_from_in_past). Additive: no operation, field or permission
+# was removed or renamed.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
-  version: 1.0.0
-  x-change-request: CR-21A-4
+  version: 1.1.0
+  x-change-request: CR-21A-2
 
 paths:
 
@@ -1004,11 +1009,15 @@ paths:
       summary: Amend the terms of an ACTIVE relationship from a date
       description: >
         Effective-dated: the current row is closed the day before effectiveFrom and a new ACTIVE
-        row carries the new terms; the answer is the new row. A term left out keeps its current
+        row carries the new terms; the answer is the new row. effectiveFrom is after the current
+        row's first day and never before today (CR-21A-2). A row whose first day is still to come
+        is corrected by an amendment dated exactly on that first day: the row becomes REPLACED
+        and the new row takes its whole range. A term left out keeps its current
         value. A credit_limit change additionally requires bil.creditlimit.change with a fresh
         second factor (mfa.required when stale). Codes: m1.relationship.not_found,
         m1.relationship.not_active, m1.relationship.not_seller,
-        m1.relationship.effective_from_not_after, m1.relationship.effective_from_after_end,
+        m1.relationship.effective_from_not_after, m1.relationship.effective_from_in_past,
+        m1.relationship.effective_from_after_end,
         m1.relationship.credit_limit_permission_required, mfa.required,
         m1.relationship.reason_required, m1.relationship.terms_unchanged,
         m1.relationship.allocation_rule_invalid, m1.relationship.overlap.
@@ -2681,7 +2690,7 @@ components:
           enum: [FCFS, PRO_RATA, QUOTA]
         status:
           type: string
-          enum: [DRAFT, ACTIVE, SUSPENDED]
+          enum: [DRAFT, ACTIVE, SUSPENDED, REPLACED]
         effectiveFrom:
           type: string
           format: date

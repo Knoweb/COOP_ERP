@@ -9,7 +9,8 @@ import java.util.UUID;
  * relationship's history is several rows of one seller and buyer, each effective-dated; an
  * amendment never edits a row's terms, it closes the row and opens the next.
  *
- * @param status DRAFT, ACTIVE or SUSPENDED
+ * @param status DRAFT, ACTIVE, SUSPENDED or REPLACED (a row corrected before its first day came,
+ *     never in force; CR-21A-2)
  */
 public record RelationshipView(
         UUID relationshipId,
