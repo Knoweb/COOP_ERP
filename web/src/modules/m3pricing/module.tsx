@@ -4,21 +4,21 @@
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { PricingPage } from "./PricingPage";
+import { TradePriceListPage } from "./TradePriceListPage";
 
 export const pricingModule: ModuleDefinition = {
   id: "pricing",
 
+  // doc 30 section 5.3, "Trade price list": the lists, then one version with its lines.
   routes: [
-    {
-      path: "pricing",
-      element: <PricingPage />
-    }
+    { path: "pricing", element: <PricingPage /> },
+    { path: "pricing/lists/:listId", element: <TradePriceListPage /> }
   ],
 
   // The label is a message id of pricing.messages.json, never literal text.
   navItems: [{ labelId: "pricing.nav", to: "/pricing" }],
 
-  // The same codes as the x-permission of openapi/m3pricing.yaml. A user with at least one of
-  // them sees the module; the page itself hides what the user may not do (PricingPage.tsx).
+  // x-permissions of openapi/m3pricing.yaml, read from the session's resolved set (PR #144). A
+  // user with one of them sees the module; the pages hide what the user may not do.
   requiredPermissions: ["prc.pricelist.view", "prc.pricelist.author"]
 };
