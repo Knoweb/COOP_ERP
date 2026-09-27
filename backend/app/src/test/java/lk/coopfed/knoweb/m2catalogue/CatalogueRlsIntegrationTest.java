@@ -28,7 +28,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
 
-    private static final UUID FEDERATION = UUID.fromString("00000000-0000-0000-0000-0000000002f1");
+    // The Federation the database names (kernel.system_entity(), kernel V0061): only its SKUs
+    // are SHARED to everyone (m2catalogue V0006).
+    private static final UUID FEDERATION = TEST_FEDERATION;
     private static final UUID MPCS_A = UUID.fromString("00000000-0000-0000-0000-0000000002a1");
     private static final UUID MPCS_B = UUID.fromString("00000000-0000-0000-0000-0000000002b1");
     private static final UUID TAX_CATEGORY = UUID.fromString("00000000-0000-0000-0000-0000000002c1");
@@ -400,6 +402,50 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(own).isEqualTo(1);
         assertThat(other).isZero();
+    }
+
+    /**
+     * m2catalogue V0006 (decided 27 September 2026 on the architect's delegation): a SHARED row is
+     * everyone's only when the Federation owns it. A society's row marked SHARED behind the
+     * handlers (FederationCaller) is read by its owner alone, and so are its children.
+     */
+    @Test
+    void aSocietysRowMarkedSharedIsNotPublished() {
+        UUID smuggled = Ids.next();
+        insertSku(superuserJdbc(), smuggled, "T-SMUGGLED", MPCS_A, "SHARED");
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id)"
+                                + " values ('4791234567920', 'EAN13', ?, 'EA', ?)",
+                        smuggled,
+                        MPCS_A);
+
+        assertThat(inScope(MPCS_B, "OWN", this::visibleSkus)).containsExactlyInAnyOrder(sharedSku, localSkuOfB);
+        assertThat(inScope(
+                        MPCS_B,
+                        "OWN",
+                        () -> jdbc.queryForList(
+                                "select barcode from catalogue.sku_barcode where sku_id = ?", String.class, smuggled)))
+                .isEmpty();
+        assertThat(inScope(MPCS_A, "OWN", this::visibleSkus)).contains(smuggled);
+    }
+
+    @Test
+    void onlyTheFederationWritesARowShared() {
+        assertThatThrownBy(() -> inScope(MPCS_A, "OWN", () -> insertSku(jdbc, Ids.next(), "T-SH-A", MPCS_A, "SHARED")))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() -> inScope(
+                        MPCS_A,
+                        "OWN",
+                        () -> jdbc.update("update catalogue.sku set status = 'SHARED' where sku_id = ?", localSkuOfA)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+
+        int federation = inScope(FEDERATION, "OWN", () -> insertSku(jdbc, Ids.next(), "T-SH-F", FEDERATION, "SHARED"));
+        assertThat(federation).isEqualTo(1);
     }
 
     @Test

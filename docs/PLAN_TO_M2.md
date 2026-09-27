@@ -142,6 +142,8 @@ Before M2-01, confirm or accept the 22A §11 assumptions: deactivation sell-thro
 | 6.7 | Till track: spike 1 (local DB, counter, power loss) and the doc 32 conformance suite against the simulator | K-08 | Doc 20 §6 Track B |
 | 6.8 | Resolve the register's two missing supporting documents (numbering RFC, tax-advisor briefing): locate or strike | Register housekeeping | PROGRESS.md Deviations |
 | 6.9 | Update `docs/PROGRESS.md` after every ticket; module READMEs from M1-01 and M2-01 on | Continuous | AGENTS.md |
+| 6.10 | One name for the Federation in SQL: M1's `federation_*` policies on `party.entity` and the m1security functions that read `party.federation_identity` read `kernel.system_entity()` (kernel V0061) instead; the table and its trigger are dropped in an m1party migration; the M1 tests that register a Federation of their own set `coop-erp.system.entity-id` to it. About one day, M1's developer | Kernel V0061 (merged); before a second Federation-administered table | Decision of 27 Sep 2026 (PROGRESS Deviations, "The Federation is unknown to the database"); CR-21A-1 item 2 |
+| 6.11 | The template's `own_write` has no location line: a shop-scoped session may insert a row at another location of its own entity (it cannot read it back). `kernel.document` has the line since kernel V0061; decide whether the template gains it for every table with a location, and give `RlsMatrixIntegrationTest` an "insert at another location" cell | Before M4's first table | Found while deciding the shop-session documents, 27 Sep 2026 (branch `feat/decisions-rls-federation`) |
 
 ## Part B — running the plan in parallel with a larger team
 
