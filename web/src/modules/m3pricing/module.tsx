@@ -1,5 +1,5 @@
 // What the pricing module tells the shell about itself: its screens, its navigation entries and
-// the permissions that open them (17A section 7). It is listed once in ../registry.ts; the
+// the permissions that open them (17A section 7).
 // shell builds the router and the navigation from there, so a module never edits the shell.
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
@@ -20,5 +20,5 @@ export const pricingModule: ModuleDefinition = {
 
   // The same codes as the x-permission of openapi/m3pricing.yaml. A user with at least one of
   // them sees the module; the page itself hides what the user may not do (PricingPage.tsx).
-  requiredPermissions: ["prc.price_list.read", "prc.price_list.register"]
+  requiredPermissions: ["prc.pricelist.view", "prc.pricelist.author"]
 };
