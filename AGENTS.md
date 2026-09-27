@@ -46,7 +46,7 @@ backend/app/src/main/java/lk/coopfed/knoweb/
   kernel/            layer 0 — used by all modules, changed only by the platform pair
   hello/             the template module; `make new-module` copies it
   m1party/ m2catalogue/ m3pricing/ m4trading/ m5inventory/ m6pos/ m7customers/ m8reporting/ m9integration/
-backend/app/src/main/resources/db/migration/<module>/   openapi/<module>.yaml   seed/<module>/   i18n/{en,si,ta}.json
+backend/app/src/main/resources/db/migration/<module>/   openapi/<module>.yaml   seed/<module>/   i18n/<module>/{en,si,ta}.json
 backend/shared-engine/                                   pure Kotlin: money, tax, price resolution, rules, envelope, counters
 web/src/shell/  web/src/modules/<module>/  web/src/generated/
 till/app/ till/core/ till/peripherals/ till/sync/
@@ -65,7 +65,7 @@ Each module package: `api/` (published: command records, query interfaces, event
 - Never put a phone number, NIC, password, PIN or token in an event payload, log line or audit row.
 - Never reject a fact uploaded by a till for a business reason; apply it and flag it.
 - Never hard-code a price, threshold, window or limit; it is a configuration item (`ConfigRegistry`) or a data table.
-- Every user-visible string is a message id with `en`, `si`, `ta` translations; a missing one fails the build.
+- Every user-visible string is a message id with `en`, `si`, `ta` translations; a missing one fails the build. The backend ids live in the owning module's own files, `backend/app/src/main/resources/i18n/<module>/{en,si,ta}.json` (the kernel's in `i18n/kernel/`), never in another module's: the kernel merges the folders at start, and `tools/check-i18n.mjs` checks each folder, refuses an id in two modules and a file outside a folder. The web ids live in `web/src/modules/<module>/<schema>.messages.json`.
 - Every mutating operation carries an `Idempotency-Key` and an `x-permission` in its OpenAPI slice that matches the `@CommandHandler` annotation.
 - The shape of a request (`required`, `maxLength`, `minimum`, `format` ...) lives in the OpenAPI schema and the kernel enforces it (400 `request.invalid`); a handler guards business rules only, and any rule that must also hold for a command that does not arrive over HTTP (till sync, a job) is a guard as well. `hello/README.md` is the worked example.
 - Every command handler: guards → mutation → `audit.record(...)` → `events.publish(...)`, in one `@Transactional` method, in that order. Nothing else.

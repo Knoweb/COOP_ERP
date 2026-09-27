@@ -8,7 +8,7 @@
 // society; the development realm has neither, so they are proved by the integration tests.
 
 import { expect, test } from "@playwright/test";
-import backendSinhala from "../../backend/app/src/main/resources/i18n/si.json" with { type: "json" };
+import backendSinhala from "../../backend/app/src/main/resources/i18n/m5inventory/si.json" with { type: "json" };
 import { MPCS_ADMIN, openSignedIn, textOf } from "./support/stack";
 
 const WAREHOUSE = "0190f000-0000-7000-8000-000000000102";

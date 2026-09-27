@@ -11,7 +11,7 @@ import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 
 /**
  * The ledger's guards that need no database (25A section 6.1). Each failure is a message id of
- * {@code i18n/*.json}; a unit test covers every one.
+ * {@code i18n/m5inventory/*.json}; a unit test covers every one.
  */
 final class LedgerGuards {
 
