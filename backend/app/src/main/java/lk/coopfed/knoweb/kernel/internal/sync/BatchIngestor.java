@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.sync.DeviceDirectory.DeviceRecord;
@@ -29,7 +30,8 @@ import org.springframework.stereotype.Component;
  * left is, in the order of the document:
  *
  * <pre>
- *   1  the batch's shape and limits (DR-1), the application floor (426)
+ *   1  the batch's shape and limits (DR-1), the application floor: below it after its grace,
+ *      426; below it within the grace, accepted with a FLOOR_NOTICE (doc 31 section 6)
  *   2  claim the cursor: one batch in flight per device on any instance (409)
  *   3  compare with the cursor: the same batch again (its stored acknowledgement), a gap (409 with
  *      expected_seq), a replay (answered from state), or new events to apply
@@ -62,16 +64,19 @@ class BatchIngestor {
 
     private final IngestTransactions transactions;
     private final SyncSettings settings;
+    private final AppVersionFloor floors;
     private final Clock clock;
 
-    BatchIngestor(IngestTransactions transactions, SyncSettings settings, Clock clock) {
+    BatchIngestor(IngestTransactions transactions, SyncSettings settings, AppVersionFloor floors, Clock clock) {
         this.transactions = transactions;
         this.settings = settings;
+        this.floors = floors;
         this.clock = clock;
     }
 
     Ack ingest(ScopeContext device, DeviceRecord record, BatchInput batch) {
         checkShape(device, batch);
+        AppVersionFloor.Standing floor = checkFloor(device, batch);
 
         Claim claim;
         try {
@@ -92,19 +97,24 @@ class BatchIngestor {
             case StoredAck stored -> {
                 Completed now = transactions.current(device);
                 yield ack(
-                        batch, stored.stored().lastAppliedSeq(), stored.stored().outcomes(), now);
+                        batch, stored.stored().lastAppliedSeq(), stored.stored().outcomes(), now, floor);
             }
             case InFlight inFlight -> throw inFlight(inFlight.batchId());
             case Gap gap -> throw new ProblemException("sync.sequence_gap", Map.of("expected_seq", gap.expectedSeq()));
             case Replay replay -> {
                 List<Ack.Outcome> outcomes = transactions.fromState(device, batch.firstSeq(), batch.lastSeq());
-                yield ack(batch, replay.lastAppliedSeq(), outcomes, transactions.current(device));
+                yield ack(batch, replay.lastAppliedSeq(), outcomes, transactions.current(device), floor);
             }
-            case Claimed claimed -> applyNewEvents(device, record, batch, claimed.lastAppliedSeq());
+            case Claimed claimed -> applyNewEvents(device, record, batch, claimed.lastAppliedSeq(), floor);
         };
     }
 
-    private Ack applyNewEvents(ScopeContext device, DeviceRecord record, BatchInput batch, long lastApplied) {
+    private Ack applyNewEvents(
+            ScopeContext device,
+            DeviceRecord record,
+            BatchInput batch,
+            long lastApplied,
+            AppVersionFloor.Standing floor) {
         List<Ack.Outcome> outcomes = new ArrayList<>(batch.events().size());
         int duplicates = 0;
         int applied = 0;
@@ -144,7 +154,7 @@ class BatchIngestor {
                     applied,
                     duplicates,
                     quarantined);
-            return ack(batch, completed.lastAppliedSeq(), outcomes, completed);
+            return ack(batch, completed.lastAppliedSeq(), outcomes, completed, floor);
         } catch (IngestTransactions.ClaimLost lost) {
             throw inFlight(lost.holder);
         } catch (RuntimeException failure) {
@@ -180,19 +190,44 @@ class BatchIngestor {
         if (count > maxEvents || batch.wireBytes() > maxBytes) {
             throw new ProblemException("sync.batch_too_large", Map.of("max_events", maxEvents, "max_bytes", maxBytes));
         }
-        String floor = settings.appVersionFloor(device);
-        if (!AppVersions.atLeast(batch.appVersion(), floor)) {
-            throw new ProblemException("sync.app_below_floor", Map.of("floor", floor));
-        }
     }
 
-    private Ack ack(BatchInput batch, long lastAppliedSeq, List<Ack.Outcome> outcomes, Completed state) {
+    /**
+     * Doc 32 section 3.3 step 1, "below floor after grace: 426 with reason". Within the grace the
+     * batch is taken and the acknowledgement carries a FLOOR_NOTICE, which the till shows its
+     * supervisor (doc 31 section 6). Selling never stops: the till keeps its outbox either way.
+     */
+    private AppVersionFloor.Standing checkFloor(ScopeContext device, BatchInput batch) {
+        AppVersionFloor.Standing floor = floors.standing(batch.appVersion(), device);
+        if (floor.afterGrace()) {
+            throw new ProblemException(
+                    "sync.app_below_floor",
+                    Map.of(
+                            "floor",
+                            floor.floor(),
+                            "grace_ended_at",
+                            floor.graceEndsAt().toString()));
+        }
+        return floor;
+    }
+
+    private Ack ack(
+            BatchInput batch,
+            long lastAppliedSeq,
+            List<Ack.Outcome> outcomes,
+            Completed state,
+            AppVersionFloor.Standing floor) {
         Instant now = clock.instant();
         Long offset = batch.deviceClock() == null
                 ? null
                 : Duration.between(batch.deviceClock(), now).toMillis();
-        List<Ack.Instruction> instructions =
-                state.resendFrom() == null ? List.of() : List.of(Ack.Instruction.resendFrom(state.resendFrom()));
+        List<Ack.Instruction> instructions = new ArrayList<>();
+        if (state.resendFrom() != null) {
+            instructions.add(Ack.Instruction.resendFrom(state.resendFrom()));
+        }
+        if (floor.below()) {
+            instructions.add(Ack.Instruction.floorNotice(floor.floor()));
+        }
         return new Ack(batch.batchId(), lastAppliedSeq, outcomes, now, offset, state.snapshotVersion(), instructions);
     }
 

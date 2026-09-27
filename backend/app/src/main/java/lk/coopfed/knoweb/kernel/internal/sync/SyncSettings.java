@@ -52,12 +52,25 @@ class SyncSettings {
         return config.getOrDefault("sync.app_version_floor", scope, "0.0.0");
     }
 
+    /** Doc 31 section 6: how long a device below a raised floor keeps syncing (default 14 days). */
+    Duration appVersionFloorGrace(ScopeContext scope) {
+        return config.getDuration("sync.app_version_floor.grace", scope, Duration.ofDays(14));
+    }
+
     Duration clockDriftReviewAfter(ScopeContext scope) {
         return config.getDuration("sync.clock_drift.review_after", scope, Duration.ofMinutes(10));
     }
 
     Duration changeLogRetention(ScopeContext scope) {
         return config.getDuration("sync.change_log.retention", scope, Duration.ofDays(30));
+    }
+
+    /**
+     * Doc 32 DR-4 applied to the log itself: the nightly purge keeps at least this much, never
+     * less than the retention a delta may reach back.
+     */
+    Duration changeLogRetentionFederationWide() {
+        return config.getDuration("sync.change_log.retention", null, Duration.ofDays(30));
     }
 
     Duration enrolmentCodeTtl(ScopeContext scope) {
