@@ -4,13 +4,15 @@
 //
 // M4-11 (demo scope, doc 30 section 5.4; 24A section 8): the trading desk with the buyer's
 // requisition book and the seller's order desk, the order card (submit, accept, reject), the
-// delivery note (draft, issue, dispatch) and the goods received note (count, confirm). The other
-// screens of 24A section 8 follow after the demo (docs/PLAN_TO_M2.md, "Deferred after the demo").
+// delivery note (draft, issue, dispatch), the goods received note (count, confirm) and the
+// invoice (issue, read, print). The other screens of 24A section 8 follow after the demo
+// (docs/PLAN_TO_M2.md, "Deferred after the demo").
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { DeliveryNotePage } from "./DeliveryNotePage";
 import { GrnPage } from "./GrnPage";
+import { InvoicePage } from "./InvoicePage";
 import { NewDeliveryNotePage } from "./NewDeliveryNotePage";
 import { NewGrnPage } from "./NewGrnPage";
 import { NewOrderPage } from "./NewOrderPage";
@@ -48,7 +50,8 @@ export const tradingModule: ModuleDefinition = {
         </RequirePermission>
       )
     },
-    { path: "trading/grns/:grnId", element: <GrnPage /> }
+    { path: "trading/grns/:grnId", element: <GrnPage /> },
+    { path: "trading/invoices/:invoiceId", element: <InvoicePage /> }
   ],
 
   // The label is a message id of trading.messages.json, never literal text.
@@ -63,6 +66,7 @@ export const tradingModule: ModuleDefinition = {
     "del.note.draft",
     "del.note.issue",
     "del.note.dispatch",
-    "shop.grn.confirm"
+    "shop.grn.confirm",
+    "bil.invoice.issue"
   ]
 };

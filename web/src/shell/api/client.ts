@@ -36,6 +36,9 @@ export { problemOf, STEP_UP_REQUIRED, type Problem };
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/** Put on a request (as a header) to send it without the scope headers; see apiMiddleware. */
+export const SCOPE_UNNAMED = "X-Client-Scope-Unnamed";
+
 /**
  * An error answer of the API. `problem.code` is a stable message id a screen may test for;
  * `problem.title` is already in the user's language, so a screen shows it as it is.
@@ -90,10 +93,15 @@ export function apiMiddleware(getContext: () => RequestContext): Middleware {
       const { accessToken, locale, session, locationId } = getContext();
       request.headers.set("Authorization", `Bearer ${accessToken}`);
       request.headers.set("Accept-Language", locale);
-      if (session.entityId) {
+      // A request marked SCOPE_UNNAMED names no scope and lets the server take the only one
+      // the user holds (the session read of a user scoped to one place); the mark itself is
+      // not sent.
+      const unnamed = request.headers.has(SCOPE_UNNAMED);
+      request.headers.delete(SCOPE_UNNAMED);
+      if (session.entityId && !unnamed) {
         request.headers.set("X-Scope-Entity", session.entityId);
       }
-      if (locationId) {
+      if (locationId && !unnamed) {
         request.headers.set("X-Scope-Location", locationId);
       }
       if (MUTATING.has(request.method)) {

@@ -14,6 +14,7 @@
 // security filters every query by the scope of the verified token.
 
 import { createContext, useMemo, type ReactNode } from "react";
+import { usePermissions } from "../auth/PermissionsContext";
 import { useSession } from "../auth/session";
 import type { PolicyClass, Session } from "../auth/session";
 
@@ -27,7 +28,7 @@ export type Scope = {
   entityName: string | null;
   /** The end of the entity id, enough to tell two entities apart on the screen; null without an entity. */
   entityShortId: string | null;
-  /** The location the scope is narrowed to; always null for now (no claim carries one): the whole entity. */
+  /** The location the scope is narrowed to: the one place of a user who holds one place only, as the session read names it; null for the whole entity. */
   locationId: string | null;
   policyClass: PolicyClass;
   /**
@@ -53,12 +54,12 @@ export type ScopeState = {
 const SHORT_ID_LENGTH = 8;
 
 /** The scopes a session gives. A plain function, so that it can be tested without a browser. */
-export function scopesOf(session: Pick<Session, "entityId" | "policyClass">): ScopeState {
+export function scopesOf(session: Pick<Session, "entityId" | "policyClass">, locationId: string | null = null): ScopeState {
   const active: Scope = {
     entityId: session.entityId,
     entityName: null,
     entityShortId: session.entityId ? session.entityId.slice(-SHORT_ID_LENGTH) : null,
-    locationId: null,
+    locationId,
     policyClass: session.policyClass,
     seesData: session.entityId !== null && session.policyClass !== "NONE"
   };
@@ -75,7 +76,11 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
   const policyClass = session?.policyClass ?? "NONE";
 
   // Worked out again only when the entity or the class changes, not on every token renewal.
-  const state = useMemo(() => scopesOf({ entityId, policyClass }), [entityId, policyClass]);
+  // A user who holds one place only acts there: the session read names it (PermissionsContext).
+  const active = usePermissions()?.activeScope;
+  const locationId = active && active.entityId === entityId ? (active.locationId ?? null) : null;
+
+  const state = useMemo(() => scopesOf({ entityId, policyClass }, locationId), [entityId, policyClass, locationId]);
 
   return <ScopeContext.Provider value={state}>{children}</ScopeContext.Provider>;
 }

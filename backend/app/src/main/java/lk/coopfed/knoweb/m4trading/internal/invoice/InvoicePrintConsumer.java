@@ -9,8 +9,10 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.Formats;
+import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.RecordInvoicePrint;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,7 +23,8 @@ import org.springframework.stereotype.Component;
  * {@code invoice.issued.v1} on the worker role, where Chromium runs, fills the kernel's generic
  * {@code document-a4} template with the invoice and stores the PDF under the seller (the event's
  * owner, whose OWN scope the consumer framework gives). The kernel audits REPORT_RENDERED and
- * publishes report.rendered.v1; a template of M4's own and a link on the invoice are deferred.
+ * publishes report.rendered.v1; the PDF's key is kept on the invoice by RecordInvoicePrint (M4-11),
+ * from which the invoice screen's Print button gets a link. A template of M4's own is deferred.
  * Registered only where rendering is switched on ({@code coop-erp.report.enabled}, the worker).
  */
 @Component
@@ -35,20 +38,29 @@ class InvoicePrintConsumer {
     private final A4Renderer renderer;
     private final Formats formats;
     private final Messages messages;
+    private final Handles<RecordInvoicePrint, Void> record;
 
-    InvoicePrintConsumer(InvoiceQueries invoices, A4Renderer renderer, Formats formats, Messages messages) {
+    InvoicePrintConsumer(
+            InvoiceQueries invoices,
+            A4Renderer renderer,
+            Formats formats,
+            Messages messages,
+            Handles<RecordInvoicePrint, Void> record) {
         this.invoices = invoices;
         this.renderer = renderer;
         this.formats = formats;
         this.messages = messages;
+        this.record = record;
     }
 
     @EventConsumer(types = INVOICE_ISSUED, consumer = CONSUMER)
     public void onInvoiceIssued(JsonNode payload, ScopeContext scope) {
         UUID invoiceId = UUID.fromString(payload.path("invoiceId").asText());
-        invoices.getInvoice(invoiceId, scope)
-                .ifPresent(invoice ->
-                        renderer.render(A4Renderer.DOCUMENT_A4, model(invoice, scope), scope.locale(), scope));
+        invoices.getInvoice(invoiceId, scope).ifPresent(invoice -> {
+            A4Renderer.Rendered pdf =
+                    renderer.render(A4Renderer.DOCUMENT_A4, model(invoice, scope), scope.locale(), scope);
+            record.handle(new RecordInvoicePrint(invoiceId, pdf.objectKey()), scope);
+        });
     }
 
     Map<String, Object> model(InvoiceView invoice, ScopeContext scope) {

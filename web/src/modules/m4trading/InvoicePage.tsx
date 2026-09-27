@@ -1,0 +1,165 @@
+import { Link, useParams } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
+import { useScope } from "../../shell/scope/useScope";
+import { DocumentHeader } from "../../shell/components/DocumentHeader";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { EntityName, SkuLabel } from "./labels";
+import { useTradingApi } from "./tradingApi";
+import { errorText } from "./tradingView";
+
+/**
+ * One tax invoice (24A section 8, "Invoice", demo scope; M4-08): the seller's invoice built from
+ * the buyer's confirmed goods received notes, each line at the tier price with its VAT, and the
+ * totals. Both parties read it; it leads to the GRNs and the delivery note it came from. The
+ * seller's Print opens the A4 PDF the worker printed (a fresh pre-signed link each time); the
+ * buyer's printed copy is deferred (the PDF is stored under the seller).
+ */
+export function InvoicePage() {
+  const { invoiceId = "" } = useParams();
+  const t = useT();
+  const formatDate = useFormatDate();
+  const api = useTradingApi();
+  const scope = useScope();
+
+  const invoice = useQuery({ queryKey: ["trading", "invoice", invoiceId], queryFn: () => api.invoice(invoiceId) });
+  const firstGrn = invoice.data?.grnIds[0];
+  const grn = useQuery({
+    queryKey: ["trading", "grn", firstGrn],
+    queryFn: () => api.grn(firstGrn!),
+    enabled: firstGrn !== undefined,
+    retry: false
+  });
+  const print = useMutation({ mutationFn: () => api.invoicePrint(invoiceId) });
+  // The tab is opened in the click itself, so a popup blocker lets it through, and is sent to
+  // the PDF once the link arrives.
+  const openPrint = () => {
+    const tab = window.open("about:blank", "_blank");
+    print.mutate(undefined, {
+      onSuccess: (url) => {
+        if (tab) {
+          tab.location.href = url;
+        } else {
+          window.location.assign(url);
+        }
+      },
+      onError: () => tab?.close()
+    });
+  };
+
+  if (invoice.isLoading) {
+    return <main className="shell-page">{t("trading.loading").text}</main>;
+  }
+  if (invoice.isError || !invoice.data) {
+    return (
+      <main className="shell-page">
+        <p role="alert">{errorText(invoice.error, t("trading.error.not_found").text)}</p>
+        <Link to="/trading">{t("trading.back").text}</Link>
+      </main>
+    );
+  }
+
+  const inv = invoice.data;
+  const isSeller = inv.sellerEntityId === scope.entityId;
+
+  return (
+    <main className="shell-page">
+      <Link to="/trading">{t("trading.back").text}</Link>
+      <DocumentHeader
+        code={inv.docNumber ?? t("trading.order.draft_number").text}
+        title={t("trading.invoice.title").text}
+        state={{ look: "issued", label: t("trading.invoice.status.ISSUED").text }}
+        facts={[
+          { label: t("trading.column.seller").text, value: <EntityName entityId={inv.sellerEntityId} /> },
+          { label: t("trading.invoice.seller_vat").text, value: inv.sellerVatNo },
+          { label: t("trading.column.buyer").text, value: <EntityName entityId={inv.buyerEntityId} /> },
+          { label: t("trading.invoice.buyer_vat").text, value: inv.buyerVatNo },
+          { label: t("trading.invoice.tax_point").text, value: formatDate(inv.taxPointDate) },
+          { label: t("trading.invoice.due").text, value: formatDate(inv.dueDate) },
+          {
+            label: t("trading.grns.title").text,
+            value: (
+              <>
+                {inv.grnIds.map((id, index) => (
+                  <Link key={id} to={`/trading/grns/${id}`}>
+                    {index === 0 && grn.data?.docNumber ? grn.data.docNumber : t("trading.grn.open").text}
+                  </Link>
+                ))}
+              </>
+            )
+          },
+          {
+            label: t("trading.note.title").text,
+            value: grn.data?.deliveryNoteId && (
+              <Link to={`/trading/delivery-notes/${grn.data.deliveryNoteId}`}>{t("trading.note.open").text}</Link>
+            )
+          }
+        ]}
+      >
+        {isSeller && (
+          <button type="button" disabled={print.isPending} onClick={openPrint}>
+            {t("trading.invoice.print").text}
+          </button>
+        )}
+      </DocumentHeader>
+      {print.isError && <p role="alert">{errorText(print.error, t("trading.error.generic").text)}</p>}
+
+      <table>
+        <thead>
+          <tr>
+            <th>{t("trading.column.item").text}</th>
+            <th>{t("trading.column.unit").text}</th>
+            <th>{t("trading.column.qty").text}</th>
+            <th>{t("trading.column.tier_price").text}</th>
+            <th>{t("trading.invoice.vat_rate").text}</th>
+            <th>{t("trading.invoice.vat").text}</th>
+            <th>{t("trading.column.amount").text}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {inv.lines.map((line) => (
+            <tr key={line.lineId}>
+              <td>
+                <SkuLabel skuId={line.skuId} />
+              </td>
+              <td>{line.uomCode}</td>
+              <td>{line.qty}</td>
+              <td>
+                <MoneyDisplay amount={line.unitPrice} />
+              </td>
+              <td>{line.taxRatePercent}</td>
+              <td>
+                <MoneyDisplay amount={line.taxAmount} />
+              </td>
+              <td>
+                <MoneyDisplay amount={line.lineTotal} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <dl className="document-header__facts" style={{ marginTop: "var(--space-3)" }}>
+        <div className="document-header__fact">
+          <dt>{t("trading.invoice.net").text}</dt>
+          <dd>
+            <MoneyDisplay amount={inv.netAmount} />
+          </dd>
+        </div>
+        <div className="document-header__fact">
+          <dt>{t("trading.invoice.vat").text}</dt>
+          <dd>
+            <MoneyDisplay amount={inv.taxAmount} />
+          </dd>
+        </div>
+        <div className="document-header__fact">
+          <dt>{t("trading.invoice.gross").text}</dt>
+          <dd>
+            <MoneyDisplay amount={inv.grossAmount} size="total" />
+          </dd>
+        </div>
+      </dl>
+    </main>
+  );
+}

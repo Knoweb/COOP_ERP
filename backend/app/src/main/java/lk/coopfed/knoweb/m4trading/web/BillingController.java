@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.m4trading.web;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -13,6 +14,7 @@ import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.web.generated.BillingApi;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoiceLineResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.InvoicePrintResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoiceResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueInvoiceRequest;
 import org.springframework.http.ResponseEntity;
@@ -25,11 +27,14 @@ class BillingController implements BillingApi {
     private final IssueInvoiceHandler issue;
     private final InvoiceQueries queries;
     private final CurrentScope currentScope;
+    private final A4Renderer renderer;
 
-    BillingController(IssueInvoiceHandler issue, InvoiceQueries queries, CurrentScope currentScope) {
+    BillingController(
+            IssueInvoiceHandler issue, InvoiceQueries queries, CurrentScope currentScope, A4Renderer renderer) {
         this.issue = issue;
         this.queries = queries;
         this.currentScope = currentScope;
+        this.renderer = renderer;
     }
 
     @Override
@@ -50,6 +55,15 @@ class BillingController implements BillingApi {
         return ResponseEntity.ok(queries.listInvoices(OrderQueries.Role.valueOf(role), currentScope.get()).stream()
                 .map(BillingController::toResponse)
                 .toList());
+    }
+
+    @Override
+    public ResponseEntity<InvoicePrintResponse> getInvoicePrint(UUID invoiceId) {
+        ScopeContext scope = currentScope.get();
+        read(invoiceId, scope);
+        String objectKey = queries.printObjectKey(invoiceId, scope)
+                .orElseThrow(() -> new ProblemException("m4.invoice.print_not_ready"));
+        return ResponseEntity.ok(new InvoicePrintResponse(invoiceId, renderer.presignGet(objectKey, scope)));
     }
 
     private InvoiceResponse read(UUID invoiceId, ScopeContext scope) {
