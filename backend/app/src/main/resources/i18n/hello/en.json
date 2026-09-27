@@ -1,0 +1,7 @@
+{
+  "hello.greeting.duplicate": "This greeting is already registered",
+  "hello.greeting.text_required": "Enter the greeting in English",
+  "hello.register": "Register greeting",
+  "hello.registered": "Greeting registered",
+  "hello.title": "Greetings"
+}

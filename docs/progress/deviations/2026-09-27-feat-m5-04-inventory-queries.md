@@ -1,0 +1,1 @@
+- **Deferred for the demo, M5-04 (27 Sep, branch `feat/m5-04-inventory-queries`):** the stock card operation, the 30-second availability cache and the PARTY availability mode of 25A section 7; M4 reads availability in the seller's own scope, which needs none of them. `inv.stock.view` joins `cat.sku.view` in the Federation Viewer, Regulator and Entity Administrator templates.

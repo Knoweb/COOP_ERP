@@ -18,7 +18,7 @@ export type Locale = "en" | "si" | "ta";
 
 type Catalogue = Record<Locale, Record<string, string>>;
 
-const SHELL_MESSAGES: Catalogue = {
+export const SHELL_MESSAGES: Catalogue = {
   en: {
     "shell.lang_fallback": "Not translated yet; shown in English",
     "shell.auth.signing_in": "Signing you in …",
@@ -219,7 +219,7 @@ const SHELL_MESSAGES: Catalogue = {
   }
 };
 
-const MODULE_CATALOGUES: Catalogue[] = [
+export const MODULE_CATALOGUES: Catalogue[] = [
   helloMessages,
   pricingMessages,
   partyMessages,

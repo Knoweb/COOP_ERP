@@ -111,6 +111,33 @@ class IcuMessagesTest {
     }
 
     @Test
+    void theModuleFilesOfALanguageAreMergedIntoOneCatalogue() {
+        IcuMessages modules = new IcuMessages(mapper, "i18n-fixtures/modules/");
+        assertThat(modules.t("one.a", Locale.forLanguageTag("si"))).isEqualTo("one si");
+        assertThat(modules.t("two.b", Locale.forLanguageTag("ta"))).isEqualTo("two ta");
+        // The real catalogues are module folders too: an id of the kernel and one of M1.
+        IcuMessages real = new IcuMessages(mapper);
+        assertThat(real.text("request.invalid", Locale.ENGLISH).fallback()).isFalse();
+        assertThat(real.text("hello.greeting.duplicate", Locale.forLanguageTag("ta"))
+                        .fallback())
+                .isFalse();
+    }
+
+    @Test
+    void aModuleWithoutOneLanguageFileStopsTheStart() {
+        assertThatThrownBy(() -> new IcuMessages(mapper, "i18n-fixtures/missing-language/"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("i18n-fixtures/missing-language/two/si.json is not on the class path");
+    }
+
+    @Test
+    void anIdInTwoModulesStopsTheStart() {
+        assertThatThrownBy(() -> new IcuMessages(mapper, "i18n-fixtures/twice/"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Message id one.a is in both");
+    }
+
+    @Test
     void aMissingCatalogueFileStopsTheStart() {
         assertThatThrownBy(() -> new IcuMessages(mapper, "i18n-fixtures/nowhere/"))
                 .isInstanceOf(IllegalStateException.class)

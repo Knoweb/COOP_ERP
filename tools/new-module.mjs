@@ -12,8 +12,9 @@
 // PLURAL  optional; the default adds s, es or ies to the last word
 //
 // It copies the backend package, migration, OpenAPI slice, seed file, integration test and
-// web module of hello, renaming as it goes, and registers the new module in the four shared
-// files a module has to appear in: the three i18n catalogues, web/src/modules/registry.ts
+// web module of hello, renaming as it goes, writes the module's own message catalogues
+// (i18n/<module>/{en,si,ta}.json, from hello's), and registers the new module in the two shared
+// files a module has to appear in: web/src/modules/registry.ts
 // (the list the shell builds the router and the navigation from) and
 // web/src/shell/i18n/messages.ts. It never overwrites anything: if a target already exists
 // it stops before writing a single file.
@@ -280,7 +281,7 @@ The copy compiles and its integration tests pass, but it is still a greeting wit
 2. **The table.** \`db/migration/${n.name}/V0001__${n.entity}.sql\` has the columns of a greeting. Replace them with the DDL of your guide (section 3). Keep the row-level security block and the narrow grants; add the location clause to \`own_read\` if the table has a \`location_id\`.
 3. **The slice.** \`openapi/${n.name}.yaml\`: replace the operations with those of your guide (section 5). The slice comes first: the build generates the Java interface \`${n.Schema}Api\` and the request and response classes from it (package \`${n.name}.web.generated\`, never edited, never committed), and \`${n.Schema}Controller\` stops compiling until it implements what the slice says. Then run \`make gen-clients\` and commit the web client. Write the shape of each request in its schema (\`required\`, \`maxLength\`, \`minimum\` ...): the kernel enforces it and answers 400 \`request.invalid\`, so the handler guards business rules only (hello/README.md, "Shape in the slice, rules in the handler"). Refer to \`common.yaml\` for the Idempotency-Key header and the 400 and 422 responses; \`OpenApiSliceRulesTest\` checks the rules every slice obeys.
 4. **Handler, entity, queries.** Follow the handler specifications of your guide (section 6). One handler per command, each with its audit event and domain event.
-5. **Messages.** The ids \`${n.schema}.*\` in \`i18n/{en,si,ta}.json\` and in \`web/src/modules/${n.name}/${n.schema}.messages.json\` still carry the greeting texts. Replace the English, and have the Sinhala and Tamil translated; a missing language fails the build.
+5. **Messages.** The ids \`${n.schema}.*\` in \`i18n/${n.name}/{en,si,ta}.json\` and in \`web/src/modules/${n.name}/${n.schema}.messages.json\` still carry the greeting texts. Replace the English, and have the Sinhala and Tamil translated; a missing language fails the build.
 6. **Tests.** \`${n.Schema}ModuleIntegrationTest\` proves isolation, grants, the command pipeline and the time rule for the copied table. Keep those four groups; rewrite the cases for your aggregate.
 7. **Dependencies.** Add the modules your guide names to \`allowedDependencies\` in \`package-info.java\`.
 8. **The event type** is \`${n.entity}.registered.v1\`. Use the names of your guide.
@@ -300,18 +301,19 @@ const WEB_MESSAGES = "web/src/shell/i18n/messages.ts";
 const IMPORT_MARKER = "// new-module:import";
 const ENTRY_MARKER = "// new-module:entry";
 
-/** The edited content of the five shared files, as { target, content }. */
+/** The module's three catalogues and the two shared files it registers in, as { target, content }. */
 export function sharedEdits(root, n) {
   const edits = [];
 
-  // Backend message ids: every hello id gets a twin under the new prefix, texts unchanged.
+  // Backend message ids: the module's own i18n/<module>/{en,si,ta}.json, every hello id with a
+  // twin under the new prefix, texts unchanged. One folder per module, so no other module's file
+  // is touched (a folder that exists already keeps its ids and gains the new ones).
   for (const language of ["en", "si", "ta"]) {
-    const target = `${I18N_DIR}/${language}.json`;
-    const catalogue = JSON.parse(read(path.join(root, target)));
-    for (const [id, text] of Object.entries(catalogue)) {
-      if (id.startsWith("hello.")) {
-        catalogue[rename(id, n, "data")] = text;
-      }
+    const target = `${I18N_DIR}/${n.name}/${language}.json`;
+    const existing = path.join(root, target);
+    const catalogue = fs.existsSync(existing) ? JSON.parse(read(existing)) : {};
+    for (const [id, text] of Object.entries(JSON.parse(read(path.join(root, `${I18N_DIR}/hello/${language}.json`))))) {
+      catalogue[rename(id, n, "data")] = text;
     }
     const sorted = Object.fromEntries(Object.entries(catalogue).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
     edits.push({ target, content: `${JSON.stringify(sorted, null, 2)}\n` });

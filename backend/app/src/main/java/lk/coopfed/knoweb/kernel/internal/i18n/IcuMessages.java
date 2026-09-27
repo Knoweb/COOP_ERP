@@ -7,10 +7,13 @@ import com.ibm.icu.util.ULocale;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import org.slf4j.Logger;
@@ -18,11 +21,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 /**
  * The catalogue on ICU MessageFormat (19A section 6), replacing the 17A stub on
- * java.text.MessageFormat. The three files {@code i18n/{en,si,ta}.json} are read at start; a
+ * java.text.MessageFormat. Each module has its three files {@code i18n/<module>/{en,si,ta}.json},
+ * merged per language at start; a
  * missing or broken one stops the start, because answering every Sinhala user with message
  * ids because of one stray comma is the kind of fault nobody notices until a shop calls.
  *
@@ -70,7 +76,7 @@ public class IcuMessages implements Messages {
     IcuMessages(ObjectMapper mapper, String folder, boolean strictMissingIds) {
         this.strictMissingIds = strictMissingIds;
         for (String language : LANGUAGES) {
-            catalogues.put(language, load(mapper, folder + language + ".json"));
+            catalogues.put(language, load(mapper, folder, language));
         }
     }
 
@@ -109,11 +115,68 @@ public class IcuMessages implements Messages {
         return new Text(value, fallback);
     }
 
-    private static Map<String, String> load(ObjectMapper mapper, String path) {
-        ClassPathResource resource = new ClassPathResource(path);
-        if (!resource.exists()) {
-            throw new IllegalStateException("Message catalogue " + path + " is not on the class path");
+    /**
+     * One language: the file {@code <folder><language>.json} if there is one, merged with
+     * {@code <folder><module>/<language>.json} of every module folder. Each module keeps its own
+     * files so that two branches adding ids to two modules never edit the same file. A module
+     * folder without this language, or an id in two files, stops the start; so does a language
+     * with no file at all.
+     */
+    private static Map<String, String> load(ObjectMapper mapper, String folder, String language) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        Map<String, String> ownerOf = new HashMap<>();
+        String root = folder + language + ".json";
+        boolean found = false;
+        if (new ClassPathResource(root).exists()) {
+            addAll(merged, ownerOf, readFile(mapper, new ClassPathResource(root), root), root);
+            found = true;
         }
+        for (String module : moduleFolders(folder)) {
+            String path = folder + module + "/" + language + ".json";
+            ClassPathResource resource = new ClassPathResource(path);
+            if (!resource.exists()) {
+                throw new IllegalStateException("Message catalogue " + path + " is not on the class path");
+            }
+            addAll(merged, ownerOf, readFile(mapper, resource, path), path);
+            found = true;
+        }
+        if (!found) {
+            throw new IllegalStateException("Message catalogue " + root + " is not on the class path");
+        }
+        return merged;
+    }
+
+    private static void addAll(
+            Map<String, String> merged, Map<String, String> ownerOf, Map<String, String> file, String path) {
+        for (Map.Entry<String, String> entry : file.entrySet()) {
+            String before = ownerOf.putIfAbsent(entry.getKey(), path);
+            if (before != null) {
+                throw new IllegalStateException(
+                        "Message id " + entry.getKey() + " is in both " + before + " and " + path);
+            }
+            merged.put(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /** The module folders under {@code folder}: every folder that holds at least one language file. */
+    private static Set<String> moduleFolders(String folder) {
+        Set<String> modules = new TreeSet<>();
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        for (String language : LANGUAGES) {
+            try {
+                for (Resource resource : resolver.getResources("classpath*:" + folder + "*/" + language + ".json")) {
+                    String url = resource.getURL().toString();
+                    String parent = url.substring(0, url.lastIndexOf('/'));
+                    modules.add(parent.substring(parent.lastIndexOf('/') + 1));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Message catalogues under " + folder + " cannot be listed", e);
+            }
+        }
+        return modules;
+    }
+
+    private static Map<String, String> readFile(ObjectMapper mapper, Resource resource, String path) {
         try (InputStream in = resource.getInputStream()) {
             return mapper.readValue(in, new TypeReference<>() {});
         } catch (IOException e) {

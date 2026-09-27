@@ -1,0 +1,1 @@
+- **Sprint 0 work done before the handover** by the platform pair (16 Sep, PRs #1 to #6): parts of S0-02 (app, three profiles, health endpoint), S0-03 (kernel `api` interfaces and in-memory stubs), S0-04 (per-module Flyway runner, baseline migration) and S0-05 (architecture tests, pipeline scripts). Each is partial; see Deviations.

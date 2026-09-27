@@ -1,0 +1,1 @@
+- **Deferred for the demo, M3-10 trade price list screen (27 Sep, branch `feat/m3-10-trade-price-list-screen`):** the Playwright flows of 23A section 9 (draft with an over-ceiling line, publish; these wait for M3-06's ceiling anyway); the other six screens of 23A section 8; the screen was checked by type check, lint and unit tests, not in a browser against the running stack.

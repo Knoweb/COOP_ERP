@@ -24,6 +24,8 @@ import {
 import {
   messageIdsUsedIn,
   problemsOfCatalogues,
+  problemsOfModules,
+  readModuleCatalogues,
   problemsOfJavaSources
 } from "./check-i18n.mjs";
 
@@ -45,6 +47,10 @@ import {
 import {
   problemsOfFrozenContract
 } from "./check-frozen-contracts.mjs";
+
+import {
+  buildIndex
+} from "./progress-index.mjs";
 
 import {
   operationsOf,
@@ -548,6 +554,37 @@ test(
       ),
       /^ta\.json: no text for a\.b/
     );
+  }
+);
+
+test(
+  "per module: an id in en only, in one module, is refused and named with its module",
+  () => {
+    const root = tempDir();
+    for (const language of ["en", "si", "ta"]) {
+      write(root, `kernel/${language}.json`, JSON.stringify({ "request.invalid": "x" }));
+      write(root, `m4trading/${language}.json`, JSON.stringify(
+        language === "en" ? { "m4.order.a": "x", "m4.order.only_en": "y" } : { "m4.order.a": "x" }
+      ));
+    }
+    const modules = readModuleCatalogues(root);
+    const problems = problemsOfModules(modules);
+    assert.deepEqual(problems, [
+      "m4trading/si.json: no text for m4.order.only_en",
+      "m4trading/ta.json: no text for m4.order.only_en"
+    ]);
+    // A module folder without a language file: every id of it is missing in that language.
+    fs.rmSync(path.join(root, "kernel", "ta.json"));
+    one(problemsOfModules(readModuleCatalogues(root)).filter((p) => p.startsWith("kernel/")), /^kernel\/ta\.json: no text for request\.invalid/);
+  }
+);
+
+test(
+  "per module: an id in two modules, and a catalogue file outside a module folder, are refused",
+  () => {
+    const both = { en: { "a.b": "x" }, si: { "a.b": "x" }, ta: { "a.b": "x" } };
+    one(problemsOfModules({ kernel: both, m1party: both }), /^m1party: a\.b is also in kernel/);
+    one(problemsOfModules({ kernel: both }, ["en.json"]), /^en\.json: a catalogue file outside a module folder/);
   }
 );
 
@@ -1277,5 +1314,27 @@ test(
         stdio: "pipe"
       }
     );
+  }
+);
+
+// ---- progress entries (one file per entry, 28 September 2026) ----------------------------------
+
+test(
+  "progress entries join in date order under the three headings; a badly named entry is refused",
+  () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "progress-"));
+    fs.mkdirSync(path.join(dir, "done"));
+    fs.mkdirSync(path.join(dir, "deviations"));
+    fs.writeFileSync(path.join(dir, "done", "2026-09-28-feat-b.md"), "- **B.** second\n");
+    fs.writeFileSync(path.join(dir, "done", "2026-09-27-feat-a.md"), "- **A.** first\n");
+    fs.writeFileSync(path.join(dir, "NEXT.md"), "- the plan\n");
+    fs.writeFileSync(path.join(dir, "deviations", "2026-09-27-x.md"), "- **X.** why\n");
+    const good = buildIndex(dir);
+    assert.deepEqual(good.problems, []);
+    assert.ok(good.text.indexOf("first") < good.text.indexOf("second"));
+    assert.ok(good.text.indexOf("## Next") < good.text.indexOf("## Deviations"));
+    fs.writeFileSync(path.join(dir, "deviations", "Bad Name.md"), "no bullet\n");
+    assert.equal(buildIndex(dir).problems.length, 2);
+    assert.deepEqual(buildIndex(path.join(repo, "docs", "progress")).problems, []);
   }
 );

@@ -21,8 +21,8 @@ A check fails when the title does not have that form.
 
 ## Deviations from the guides
 
-<!-- Anything built differently from 17A, 19A or the module guide, with the reason, and the line
-you added to docs/PROGRESS.md. A design that is wrong is a change request in
+<!-- Anything built differently from 17A, 19A or the module guide, with the reason, and the
+file you added under docs/progress/deviations/. A design that is wrong is a change request in
 docs/change-requests/, not a local fix. Write "None" when there are none. -->
 
 ## Needs the architect

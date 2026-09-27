@@ -1,0 +1,1 @@
+- **Document update (18 Sep).** Register v0.5 (Word, live, `docs/requirements/`), 18 v0.3.1, 14 and 22A added, 00_Start_Here v1.1, doc 10 v0.4 with `docs/DECISIONS_PENDING.md` as its Markdown source; extracts regenerated; CR-00_Start_Here-1 raised. Commits `ee32343` to `500102a`. Both Drive folders match the repository file for file.

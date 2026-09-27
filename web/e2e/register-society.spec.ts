@@ -7,7 +7,7 @@
 // catalogue, the file the server itself answers from.
 
 import { expect, test } from "@playwright/test";
-import backendEnglish from "../../backend/app/src/main/resources/i18n/en.json" with { type: "json" };
+import backendEnglish from "../../backend/app/src/main/resources/i18n/m1party/en.json" with { type: "json" };
 import { FED_ADMIN, FED_OFFICER, openSignedIn, textOf } from "./support/stack";
 
 // The register is insert-only and the stack is not reset between runs, so every run registers
