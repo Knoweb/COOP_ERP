@@ -11,8 +11,7 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
  * @param lines how many counted lines were posted
  */
 public record OpeningBalancePosted(
-        UUID openingBalanceId, UUID ownerEntityId, UUID locationId, UUID documentId, int lines)
-        implements DomainEvent {
+        UUID openingBalanceId, UUID ownerEntityId, UUID locationId, UUID documentId, int lines) implements DomainEvent {
 
     public static final String TYPE = "opening_balance.posted.v1";
 }

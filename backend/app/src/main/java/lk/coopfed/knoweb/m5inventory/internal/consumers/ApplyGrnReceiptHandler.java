@@ -90,14 +90,21 @@ class ApplyGrnReceiptHandler implements Handles<ApplyGrnReceipt, Integer> {
                 AUDIT_RECEIVED,
                 Subject.of("document", command.grnId()),
                 null,
-                Map.of("grnId", command.grnId(), "locationId", command.receiverLocationId(), "movements", movements.size()),
+                Map.of(
+                        "grnId",
+                        command.grnId(),
+                        "locationId",
+                        command.receiverLocationId(),
+                        "movements",
+                        movements.size()),
                 scope);
-        events.publish(new StockReceived(
-                command.grnId(), scope.entityId(), command.receiverLocationId(), movements.size()));
+        events.publish(
+                new StockReceived(command.grnId(), scope.entityId(), command.receiverLocationId(), movements.size()));
         return movements.size();
     }
 
-    private static Movement receipt(ApplyGrnReceipt command, ApplyGrnReceipt.Line line, LotCondition condition, BigDecimal qty) {
+    private static Movement receipt(
+            ApplyGrnReceipt command, ApplyGrnReceipt.Line line, LotCondition condition, BigDecimal qty) {
         return new Movement(
                 command.receiverLocationId(),
                 line.batchId(),
@@ -116,7 +123,9 @@ class ApplyGrnReceiptHandler implements Handles<ApplyGrnReceipt, Integer> {
                 && damaged.signum() >= 0
                 && damaged.compareTo(received) <= 0
                 && (received.signum() == 0
-                        || (line.batchId() != null && line.unitCost() != null && line.unitCost().signum() >= 0));
+                        || (line.batchId() != null
+                                && line.unitCost() != null
+                                && line.unitCost().signum() >= 0));
         if (!valid) {
             throw new ProblemException("m5.grn.line_invalid", Map.of("lineId", String.valueOf(line.lineId())));
         }

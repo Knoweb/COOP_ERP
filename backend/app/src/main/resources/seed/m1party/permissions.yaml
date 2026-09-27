@@ -186,6 +186,12 @@ permissions:
     module: "m5inventory"
     description_en: "View stock balances, availability and movements"
     scope: "ENTITY"
+  # Not in 25A section 3.1: the permission of the GRN receipt the system applies from
+  # grn.confirmed.v1 (run with no user, so not checked) and of the read of what a GRN received.
+  - code: "inv.stock.receive"
+    module: "m5inventory"
+    description_en: "See the stock a confirmed goods received note put into the location"
+    scope: "ENTITY"
   - code: "inv.count.schedule"
     module: "m5inventory"
     description_en: "Schedule stock counts and acknowledge negative lots"
