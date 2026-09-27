@@ -215,8 +215,139 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/transfers:
+    get:
+      tags: [Inventory]
+      operationId: listTransfers
+      summary: The transfers leaving or arriving at a location, newest first
+      description: >
+        A session at the source sees the transfers it sent, a session at the destination the ones
+        addressed to it; an entity-wide user both. Status IN_TRANSIT until the destination
+        receives, then RECEIVED.
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The transfers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+    post:
+      tags: [Inventory]
+      operationId: issueTransfer
+      summary: Send stock from one location of the entity to another (issue and dispatch)
+      description: >
+        The stock leaves the source as TRANSFER_OUT and is in transit until the destination
+        receives it. Codes this operation can answer with 422: m5.scope.own_required,
+        m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid,
+        m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found,
+        m5.transfer.insufficient_stock.
+      x-permission: inv.transfer.issue
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueTransferRequest' }
+      responses:
+        '201':
+          description: Issued, in status IN_TRANSIT
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/transfers/{transferId}:
+    get:
+      tags: [Inventory]
+      operationId: getTransfer
+      summary: One transfer with its lines
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: transferId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The transfer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '404':
+          description: No such transfer, or the caller's scope may not see it
+  /v1/inventory/transfers/{transferId}/receive:
+    post:
+      tags: [Inventory]
+      operationId: receiveTransfer
+      summary: The destination receives the transfer in full
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
+        m5.transfer.not_destination, m5.transfer.already_received.
+      x-permission: shop.transfer.receive
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: transferId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Received
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
+    IssueTransferRequest:
+      type: object
+      required: [fromLocationId, toLocationId, lines]
+      properties:
+        fromLocationId: { type: string, format: uuid }
+        toLocationId: { type: string, format: uuid }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/TransferLineRequest' }
+    TransferLineRequest:
+      type: object
+      required: [batchId, qty]
+      properties:
+        batchId: { type: string, format: uuid }
+        qty: { type: number, exclusiveMinimum: 0 }
+    TransferResponse:
+      type: object
+      required: [transferId, fromLocationId, toLocationId, status, lines]
+      properties:
+        transferId: { type: string, format: uuid }
+        fromLocationId: { type: string, format: uuid }
+        toLocationId: { type: string, format: uuid }
+        status: { type: string, enum: [IN_TRANSIT, RECEIVED] }
+        issuedBy: { type: string, format: uuid }
+        issuedAt: { type: string, format: date-time }
+        receivedBy: { type: string, format: uuid }
+        receivedAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/TransferLineResponse' }
+    TransferLineResponse:
+      type: object
+      required: [lineNo, batchId, skuId, qty]
+      properties:
+        lineNo: { type: integer }
+        batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        qty: { type: number }
     MovementResponse:
       type: object
       required: [movementId, locationId, skuId, batchId, condition, movementType, qtyDelta, documentId, movementSeq]

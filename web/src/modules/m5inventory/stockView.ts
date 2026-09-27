@@ -1,6 +1,16 @@
 import { ApiProblem } from "../../shell/api/client";
 import type { ChipState } from "../../shell/components/StateChip";
-import type { OpeningBalance, OpeningBalanceLineRequest } from "./inventoryApi";
+import type { IssueTransferRequest, LotBalance, OpeningBalance, OpeningBalanceLineRequest } from "./inventoryApi";
+
+/**
+ * The lines of a transfer from the quantities typed against the source's lots (keyed by batch):
+ * a blank, zero or unreadable quantity sends nothing of that lot.
+ */
+export function transferLinesOf(lots: LotBalance[], quantities: Record<string, string>): IssueTransferRequest["lines"] {
+  return lots
+    .map((lot) => ({ batchId: lot.batchId, qty: Number((quantities[lot.batchId] ?? "").trim()) }))
+    .filter((line) => Number.isFinite(line.qty) && line.qty > 0);
+}
 
 /** The look of an opening balance's state (doc 30 section 2.2): being prepared, signed once, posted. */
 export function chipOf(status: OpeningBalance["status"]): ChipState {

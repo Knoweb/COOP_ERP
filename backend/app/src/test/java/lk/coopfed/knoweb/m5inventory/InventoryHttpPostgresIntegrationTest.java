@@ -225,6 +225,50 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aTransferIsIssuedListedReadAndReceivedOverHttp() {
+        UUID shop = fixture.location(MPCS, "SHOP");
+
+        ResponseEntity<JsonNode> issued = post(
+                "/v1/inventory/transfers",
+                java.util.Map.of(
+                        "fromLocationId", warehouse.toString(),
+                        "toLocationId", shop.toString(),
+                        "lines", List.of(java.util.Map.of("batchId", batch.toString(), "qty", 5))),
+                USER);
+        assertThat(issued.getStatusCode()).as(String.valueOf(issued.getBody())).isEqualTo(HttpStatus.CREATED);
+        assertThat(issued.getBody().get("status").asText()).isEqualTo("IN_TRANSIT");
+        String id = issued.getBody().get("transferId").asText();
+
+        HttpHeaders headers = TestIdentityProvider.entityWideHeaders(USER, MPCS);
+        JsonNode listed =
+                get("/v1/inventory/transfers?locationId=" + shop, headers).getBody();
+        assertThat(listed).hasSize(1);
+        assertThat(listed.get(0).get("lines").get(0).get("qty").decimalValue()).isEqualByComparingTo("5");
+
+        ResponseEntity<JsonNode> received = post("/v1/inventory/transfers/" + id + "/receive", null, USER);
+        assertThat(received.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(received.getBody().get("status").asText()).isEqualTo("RECEIVED");
+
+        ResponseEntity<JsonNode> again = post("/v1/inventory/transfers/" + id + "/receive", null, USER);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(again.getBody().get("code").asText()).isEqualTo("m5.transfer.already_received");
+
+        assertThat(get("/v1/inventory/transfers/" + id, headers)
+                        .getBody()
+                        .get("status")
+                        .asText())
+                .isEqualTo("RECEIVED");
+        assertThat(get("/v1/inventory/transfers/" + Ids.next(), headers).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(get("/v1/inventory/locations/" + shop + "/balances", headers)
+                        .getBody()
+                        .get(0)
+                        .get("qtyOnHand")
+                        .decimalValue())
+                .isEqualByComparingTo("5");
+    }
+
+    @Test
     void theReceiptOfAGrnAndThePickListOfADeliveryNoteAreRead() {
         HttpHeaders headers = TestIdentityProvider.entityWideHeaders(USER, MPCS);
 
