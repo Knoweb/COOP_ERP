@@ -68,6 +68,23 @@ audit_event_types:
     offline_capturable: false
     description_en: Item image attached
 
+  # M2-06: the three codes of the image's later life, which 22A section 6 folds into
+  # IMAGE_ATTACHED ("on upload event: verify hash, ThumbnailJob, ACTIVE") and RetireImage.
+  - code: IMAGE_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Item image verified, thumbnail made and shown
+
+  - code: IMAGE_FAILED
+    severity: INFO
+    offline_capturable: false
+    description_en: Item image upload failed verification
+
+  - code: IMAGE_RETIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Item image retired
+
   - code: TAG_DEFINED
     severity: INFO
     offline_capturable: false

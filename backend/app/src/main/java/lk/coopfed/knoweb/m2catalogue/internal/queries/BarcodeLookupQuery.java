@@ -26,8 +26,8 @@ import org.springframework.stereotype.Component;
  * through shared_read today (a finding against M2-01), so the SQL keeps INTERNAL rows to the
  * caller's own entity itself; a factory code is federation-wide (B-I2).
  *
- * <p>sell_through comes from location_assortment (M2-09) and thumbKey from sku_image (M2-06);
- * until those tables exist the answer is false and null. The per-instance cache of 22A section
+ * <p>thumbKey comes from sku_image (M2-06, {@link #thumbKey}); sell_through comes from location_assortment (M2-09);
+ * until that table exists the answer is false. The per-instance cache of 22A section
  * 7 is not here yet either (see the module README).
  */
 @Component
@@ -47,13 +47,14 @@ class BarcodeLookupQuery {
             boolean hasPrintedMrp,
             boolean soldByWeight,
             String uomCode,
-            UUID batchId) {}
+            UUID batchId,
+            String barcode) {}
 
     private static final String SELECT_HIT =
             """
             select s.sku_id, s.sku_code, s.short_name_en, s.short_name_si, s.short_name_ta,
                    s.base_uom_code, s.has_printed_mrp, s.sold_by_weight,
-                   b.uom_code, b.batch_id
+                   b.uom_code, b.batch_id, b.barcode
             from catalogue.sku_barcode b
             join catalogue.sku s on s.sku_id = b.sku_id
             where b.status = 'ACTIVE'
@@ -102,7 +103,7 @@ class BarcodeLookupQuery {
             Optional<LookupResult.BatchRef> batch = hit.batchId() != null
                     ? batchById(hit.batchId())
                     : (lot != null ? batchByLot(hit.skuId(), lot, expiry) : Optional.empty());
-            return Optional.of(result(hit, batch.orElse(null)));
+            return Optional.of(result(hit, batch.orElse(null), scope.entityId()));
         }
 
         // 2): the GTIN of a 2D code registered under any factory symbology (a GTIN-14 with
@@ -113,7 +114,7 @@ class BarcodeLookupQuery {
                 Hit hit = byGtin.get();
                 Optional<LookupResult.BatchRef> batch =
                         lot != null ? batchByLot(hit.skuId(), lot, expiry) : Optional.empty();
-                return Optional.of(result(hit, batch.orElse(null)));
+                return Optional.of(result(hit, batch.orElse(null), scope.entityId()));
             }
         }
 
@@ -197,7 +198,34 @@ class BarcodeLookupQuery {
                 .findFirst();
     }
 
-    private LookupResult result(Hit hit, LookupResult.BatchRef batch) {
+    /**
+     * The thumbnail the caller's tills show (M2-06; doc 22 section 3.4, DR-5): the caller's own
+     * ACTIVE image before anyone else's (its local override of a SHARED item, or its own item's
+     * image), and an image of the scanned pack before the item's general one. Row-level security
+     * shows the caller its own images and the SKU owner's images of a SHARED item, never another
+     * entity's override.
+     */
+    Optional<String> thumbKey(UUID skuId, String barcode, UUID entityId) {
+        return jdbc
+                .query(
+                        """
+                        select object_key_thumb
+                        from catalogue.sku_image
+                        where sku_id = ? and status = 'ACTIVE'
+                          and (barcode is null or barcode = ?)
+                        order by case when owner_entity_id = ? then 0 else 1 end,
+                                 case when barcode is not null then 0 else 1 end
+                        limit 1
+                        """,
+                        (rs, row) -> rs.getString("object_key_thumb"),
+                        skuId,
+                        barcode,
+                        entityId)
+                .stream()
+                .findFirst();
+    }
+
+    private LookupResult result(Hit hit, LookupResult.BatchRef batch, UUID entityId) {
         BigDecimal factor = hit.uomCode().equals(hit.baseUomCode())
                 ? BigDecimal.ONE
                 : factorInForce(hit.skuId(), hit.uomCode()).orElse(null);
@@ -216,7 +244,7 @@ class BarcodeLookupQuery {
                 hit.uomCode(),
                 factor,
                 batch,
-                null,
+                thumbKey(hit.skuId(), hit.barcode(), entityId).orElse(null),
                 false,
                 hit.hasPrintedMrp(),
                 hit.soldByWeight());
@@ -233,7 +261,8 @@ class BarcodeLookupQuery {
                 rs.getBoolean("has_printed_mrp"),
                 rs.getBoolean("sold_by_weight"),
                 rs.getString("uom_code"),
-                rs.getObject("batch_id", UUID.class));
+                rs.getObject("batch_id", UUID.class),
+                rs.getString("barcode"));
     }
 
     private static LookupResult.BatchRef mapBatch(ResultSet rs, int row) throws SQLException {

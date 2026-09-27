@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
@@ -19,6 +20,7 @@ import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries.AudienceKind;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries.NotificationRule;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.event.CacheFanoutListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -37,7 +39,7 @@ import org.springframework.stereotype.Component;
  * M1 and M7.
  */
 @Component
-class NotificationDispatcher {
+class NotificationDispatcher implements CacheFanoutListener {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationDispatcher.class);
 
@@ -131,10 +133,11 @@ class NotificationDispatcher {
     }
 
     /**
-     * The active rules of an event type for the event's entity, cached (19A section 10). The
-     * change event reaches one instance of the competing consumers only, so every entry also
-     * expires after {@code notification.rules.cache_seconds}: that bounds how long another
-     * instance matches against a rule M9 has changed.
+     * The active rules of an event type for the event's entity, cached (19A section 10). M9's
+     * change event empties the cache on every instance through the per-instance fan-out
+     * ({@link #published}); every entry also expires after
+     * {@code notification.rules.cache_seconds}, the backstop for an instance the broker did not
+     * reach.
      */
     private List<NotificationRule> activeRules(NotificationRuleQueries queries, String eventType, ScopeContext scope) {
         Instant now = clock.instant();
@@ -149,6 +152,22 @@ class NotificationDispatcher {
             cache.put(key, new CachedRules(loaded, now));
         }
         return loaded;
+    }
+
+    @Override
+    public Set<String> eventTypes() {
+        return Set.of(RULE_CHANGED);
+    }
+
+    /**
+     * M9's change event on this instance (CacheFanoutListener): the shared consumer queue hands
+     * {@link #onEvent} to one instance only, and the rule cache lives on every instance.
+     */
+    @Override
+    public void published(String eventType, JsonNode payload) {
+        if (RULE_CHANGED.equals(eventType)) {
+            cache.clear();
+        }
     }
 
     /** Forgets every cached rule (the change event, and tests). */

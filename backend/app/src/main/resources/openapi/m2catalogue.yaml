@@ -488,6 +488,112 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  # Images (22A section 5; M2-06). The client PUTs the bytes to the returned URL; the thumbnail
+  # job verifies the upload after the URL has expired, makes the thumbnail and shows the image.
+  /v1/catalogue/skus/{skuId}/images:
+
+    post:
+      tags: [Image]
+      operationId: attachImage
+      summary: Attach an image to a SKU and get a pre-signed PUT for its bytes
+      description: >
+        The SKU's owner attaches its image; any entity may attach a local override of a SHARED
+        SKU, shown on its own tills only (doc 22 DR-5). The image is PENDING until the thumbnail
+        job has verified the upload (size, hash) and made the thumbnail; it then replaces the
+        caller's earlier image of the same SKU and barcode. Problems: m2.sku.not_found,
+        m2.sku.owner_mismatch, m2.image.sku_inactive, m2.image.barcode_unknown,
+        m2.image.content_type_not_allowed, m2.image.hash_invalid, m2.image.pending_exists,
+        attachment.content_type_not_allowed, attachment.too_large.
+      x-permission: cat.image.manage
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachImageRequest'
+
+      responses:
+        '201':
+          description: The image, PENDING, and where to upload it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageUploadResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.sku.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/skus/{skuId}/images/{imageId}:
+
+    delete:
+      tags: [Image]
+      operationId: retireImage
+      summary: Retire one of the caller's own images of the SKU
+      description: >
+        A PENDING or ACTIVE image of the caller becomes RETIRED; retiring a local override
+        brings the SKU owner's image back on the caller's tills. Problems: m2.sku.not_found,
+        m2.image.not_found, m2.image.not_retirable.
+      x-permission: cat.image.manage
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - in: path
+          name: imageId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      responses:
+        '204':
+          description: Image retired
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '404':
+          description: m2.sku.not_found or m2.image.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
   /v1/catalogue/skus/{skuId}/barcodes/{barcode}/link:
 
     post:
@@ -1109,6 +1215,61 @@ components:
           description: Set when the code identifies one batch of the SKU
           type: string
           format: uuid
+
+
+    AttachImageRequest:
+      type: object
+      required:
+        - contentType
+        - sha256Hex
+
+      properties:
+
+        barcode:
+          description: The pack the image shows, an ACTIVE barcode of the SKU; absent for the item
+          type: string
+          minLength: 1
+          maxLength: 48
+
+        contentType:
+          description: One of the register's m2.image.content_types (image/jpeg, image/png)
+          type: string
+          minLength: 3
+          maxLength: 100
+
+        contentLength:
+          description: The exact size in bytes, signed into the URL; at most attachment.max_bytes
+          type: integer
+          format: int64
+          minimum: 1
+
+        sha256Hex:
+          description: SHA-256 of the bytes, lower-case hex; the upload is verified against it
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+
+
+    ImageUploadResponse:
+      type: object
+      required:
+        - imageId
+        - uploadUrl
+        - expiresAt
+
+      properties:
+
+        imageId:
+          type: string
+          format: uuid
+
+        uploadUrl:
+          description: PUT the bytes here with the same Content-Type (and Content-Length when given)
+          type: string
+          format: uri
+
+        expiresAt:
+          type: string
+          format: date-time
 
 
     LinkBarcodeToBatchRequest:

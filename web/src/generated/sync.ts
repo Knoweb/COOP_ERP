@@ -55,7 +55,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a contiguous run of till events in device sequence order (doc 32 section 3)
-         * @description One batch in flight per device. The answer is the acknowledgement: last_applied_seq is authoritative, everything at or below it is durably at central. A batch that starts at or below the cursor is a replay and is answered from state (DUPLICATE) without applying anything twice; resending the same batch_id returns the same acknowledgement. An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap (params.expected_seq: resend from there), 409 sync.batch_in_flight (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent (the events are not first_seq..last_seq), 426 sync.app_below_floor, 403 for the device (see the Refused response).
+         * @description One batch in flight per device. The answer is the acknowledgement: last_applied_seq is authoritative, everything at or below it is durably at central. A batch that starts at or below the cursor is a replay and is answered from state (DUPLICATE) without applying anything twice; resending the same batch_id returns the same acknowledgement. An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap (params.expected_seq: resend from there), 409 sync.batch_in_flight (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent (the events are not first_seq..last_seq), 426 sync.app_below_floor, 429 sync.rate_limited (params.retry_after in seconds: the device's batches per minute or bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403 for the device (see the Refused response).
          */
         post: operations["uploadBatch"];
         delete?: never;
@@ -113,7 +113,7 @@ export interface paths {
         };
         /**
          * The snapshot delta since a version, or the pointer to the full snapshot (doc 32 section 5.2)
-         * @description Per table, the upserted rows and the tombstones from since+1 to the current version, with the rows as the owning modules' snapshot contributors give them; the pointer to the latest full snapshot file when since is 0 or older than the change-log retention. Not served yet: the snapshot builder and its contributors are the second part of K-08 and this answers 501 sync.snapshot.unavailable until then. The change log itself is readable at /changes.
+         * @description Per table, the upserted rows and the tombstones from since+1 to the current version, with the rows as the owning modules' snapshot contributors give them. When since is 0 or absent, ahead of central, or older than the change-log retention (sync.change_log.retention, doc 32 DR-4), the answer is the full snapshot instead: full_snapshot_required is true and tables holds every row of every snapshot table, to replace what the device holds. Either answer is one version, read at one point in time, and is applied whole (doc 32 S5): the device stages it, checks the signed manifest and each table's hash, and swaps it in with the version in one local transaction. A row with apply_from later than the shop's business date is held until that day's open. The change log itself is readable at /changes. The location must be the device's own (403 sync.location_mismatch).
          */
         get: operations["getSnapshot"];
         put?: never;
@@ -415,12 +415,44 @@ export interface components {
             since?: number | null;
             /** Format: int64 */
             version: number;
+            /** @description True when tables is the full snapshot, which replaces every table the device holds */
             full_snapshot_required: boolean;
+            /** @description Reserved for the pre-built full snapshot file in object storage (doc 32 section 5.2); null while the full snapshot is served in tables. */
             full_snapshot_url?: string | null;
-            /** @description Per table, upserts and tombstones */
-            tables?: {
+            /** @description A change in this delta was marked urgent (a control price, a permission revoked) */
+            urgent: boolean;
+            /** @description Per snapshot table (sku, operator, location ...), the upserts and the tombstones */
+            tables: {
+                [key: string]: components["schemas"]["SnapshotTable"];
+            };
+            /** @description The manifest as signed, JSON text with sorted keys: location_id, since, version, full, and per table the number of upserts and tombstones and the table's sha256. The hash of a table is SHA-256 (hex) over its lines joined by a newline, the upserts sorted by the text of row_id then the tombstones likewise: "U <row_id> <apply_from or -> <data>" with data as JSON with keys sorted at every level and no whitespace, and "D <row_id> <apply_from or ->". */
+            manifest: string;
+            /** @description Ed25519 signature (base64) over the UTF-8 bytes of manifest, by the key of the enrolment answer */
+            signature: string;
+            key_id: string;
+        };
+        SnapshotTable: {
+            upserts: components["schemas"]["SnapshotRow"][];
+            tombstones: components["schemas"]["SnapshotTombstone"][];
+        };
+        SnapshotRow: {
+            /** Format: uuid */
+            row_id: string;
+            /**
+             * Format: date
+             * @description Held until this business date (doc 32 section 5.2)
+             */
+            apply_from?: string | null;
+            /** @description The row as its module gives it; decimals are text */
+            data: {
                 [key: string]: unknown;
             };
+        };
+        SnapshotTombstone: {
+            /** Format: uuid */
+            row_id: string;
+            /** Format: date */
+            apply_from?: string | null;
         };
         PresignRequest: {
             /** Format: uuid */
@@ -469,7 +501,7 @@ export interface components {
         };
     };
     responses: {
-        /** @description A problem document. 403 sync.device_token_required (a user token on a device operation), sync.device_mismatch (the path names another device), sync.location_mismatch, sync.device_unknown, sync.device_not_active, sync.device_not_enrolled (no enrolment yet), sync.device_suspended and sync.device_retired (params.revoke is the signed revoke instruction: the device wipes its caches and locks, doc 32 section 9), sync.enrolment.code_invalid; 413 sync.batch_too_large; 426 sync.app_below_floor; 501 sync.snapshot.unavailable. */
+        /** @description A problem document. 403 sync.device_token_required (a user token on a device operation), sync.device_mismatch (the path names another device), sync.location_mismatch, sync.device_unknown, sync.device_not_active, sync.device_not_enrolled (no enrolment yet), sync.device_suspended and sync.device_retired (params.revoke is the signed revoke instruction: the device wipes its caches and locks, doc 32 section 9), sync.enrolment.code_invalid; 413 sync.batch_too_large; 426 sync.app_below_floor; 429 sync.rate_limited with params.retry_after (seconds). */
         Refused: {
             headers: {
                 [name: string]: unknown;
@@ -615,6 +647,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["Refused"];
             426: components["responses"]["Refused"];
+            429: components["responses"]["Refused"];
         };
     };
     heartbeat: {
@@ -700,8 +733,8 @@ export interface operations {
                     "application/json": components["schemas"]["SnapshotDelta"];
                 };
             };
+            400: components["responses"]["RequestProblem"];
             403: components["responses"]["Refused"];
-            501: components["responses"]["Refused"];
         };
     };
     presignAttachment: {

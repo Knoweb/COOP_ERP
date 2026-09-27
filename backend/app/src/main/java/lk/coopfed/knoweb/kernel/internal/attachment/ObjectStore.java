@@ -30,4 +30,14 @@ interface ObjectStore {
 
     /** SHA-256 of the object's bytes, lower-case hex; the object must exist. */
     String sha256Hex(String key);
+
+    /**
+     * The object's bytes, for a module that processes what was uploaded (M2's thumbnails,
+     * CR-19A-7). The object must exist; one larger than {@code maxBytes} is refused without
+     * being held in memory.
+     */
+    byte[] read(String key, long maxBytes);
+
+    /** Stores bytes the backend produced itself (a thumbnail) under the key, replacing any. */
+    void put(String key, String contentType, byte[] bytes);
 }

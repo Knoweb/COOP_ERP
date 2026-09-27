@@ -85,19 +85,7 @@ class AttachmentService implements Attachments {
             ScopeContext ctx) {
         requireTransaction();
 
-        if (contentType == null || !CONTENT_TYPE.matcher(contentType).matches()) {
-            throw new ProblemException(
-                    "attachment.content_type_invalid", Map.of("contentType", String.valueOf(contentType)));
-        }
-        if (!allowedContentTypes(ctx).contains(contentType)) {
-            throw new ProblemException("attachment.content_type_not_allowed", Map.of("contentType", contentType));
-        }
-
-        long maxBytes = maxBytes(ctx);
-        if (contentLength != null && (contentLength < 1 || contentLength > maxBytes)) {
-            throw new ProblemException(
-                    "attachment.too_large", Map.of("contentLength", contentLength, "maxBytes", maxBytes));
-        }
+        checkUpload(contentType, contentLength, ctx);
 
         String hash = sha256Hex == null ? null : sha256Hex.strip().toLowerCase();
 
@@ -210,6 +198,27 @@ class AttachmentService implements Attachments {
                         attachmentId)
                 .stream()
                 .findFirst();
+    }
+
+    /** The register's limits on what may be uploaded, for a document's attachment and a module's object alike. */
+    void checkUpload(String contentType, Long contentLength, ScopeContext ctx) {
+        if (contentType == null || !CONTENT_TYPE.matcher(contentType).matches()) {
+            throw new ProblemException(
+                    "attachment.content_type_invalid", Map.of("contentType", String.valueOf(contentType)));
+        }
+        if (!allowedContentTypes(ctx).contains(contentType)) {
+            throw new ProblemException("attachment.content_type_not_allowed", Map.of("contentType", contentType));
+        }
+
+        long maxBytes = maxBytes(ctx);
+        if (contentLength != null && (contentLength < 1 || contentLength > maxBytes)) {
+            throw new ProblemException(
+                    "attachment.too_large", Map.of("contentLength", contentLength, "maxBytes", maxBytes));
+        }
+    }
+
+    Duration presignFor() {
+        return presignFor;
     }
 
     private Set<String> allowedContentTypes(ScopeContext ctx) {

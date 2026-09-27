@@ -44,13 +44,15 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0004 (M2-05): the correction policies that admit the trigger batch_correction.
             Map.entry("batch", with("own_update", "shared_read", "correction_read", "correction_supersede")),
             Map.entry("batch_key", with("own_update", "shared_read", "correction_read", "correction_repoint")),
-            Map.entry("supplier", with("authenticated_read")));
+            Map.entry("supplier", with("authenticated_read")),
+            // V0005 (M2-06): the images; own_write follows the SKU, shared_read the SKU owner's rows.
+            Map.entry("sku_image", with("own_update", "shared_read")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
 
     @Test
-    void theCatalogueSchemaHoldsTheTablesOfM201() {
+    void theCatalogueSchemaHoldsTheTablesOfItsTickets() {
         List<String> tables = superuserJdbc()
                 .queryForList(
                         """
@@ -99,10 +101,10 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
                         """
                 select tablename, with_check from pg_policies
                  where schemaname = 'catalogue' and policyname = 'own_write'
-                   and tablename in ('sku_uom_conversion', 'sku_barcode', 'sku_tag')
+                   and tablename in ('sku_uom_conversion', 'sku_barcode', 'sku_tag', 'sku_image')
                 """);
 
-        assertThat(policies).hasSize(3);
+        assertThat(policies).hasSize(4);
         for (Map<String, Object> policy : policies) {
             assertThat((String) policy.get("with_check"))
                     .as(policy.get("tablename") + ".own_write")
@@ -174,6 +176,12 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         // V0004: a supplier is registered, never changed by the application (22A section 6).
         assertThat(may(db, "supplier", "INSERT")).isTrue();
         assertThat(may(db, "supplier", "UPDATE")).isFalse();
+        // V0005: an image changes its status and, once, its thumbnail key; never its object or hash.
+        assertThat(may(db, "sku_image", "UPDATE")).isFalse();
+        assertThat(mayUpdateColumn(db, "sku_image", "status")).isTrue();
+        assertThat(mayUpdateColumn(db, "sku_image", "object_key_thumb")).isTrue();
+        assertThat(mayUpdateColumn(db, "sku_image", "object_key_full")).isFalse();
+        assertThat(mayUpdateColumn(db, "sku_image", "content_hash")).isFalse();
     }
 
     @Test

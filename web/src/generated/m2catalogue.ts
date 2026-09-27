@@ -156,6 +156,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/skus/{skuId}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an image to a SKU and get a pre-signed PUT for its bytes
+         * @description The SKU's owner attaches its image; any entity may attach a local override of a SHARED SKU, shown on its own tills only (doc 22 DR-5). The image is PENDING until the thumbnail job has verified the upload (size, hash) and made the thumbnail; it then replaces the caller's earlier image of the same SKU and barcode. Problems: m2.sku.not_found, m2.sku.owner_mismatch, m2.image.sku_inactive, m2.image.barcode_unknown, m2.image.content_type_not_allowed, m2.image.hash_invalid, m2.image.pending_exists, attachment.content_type_not_allowed, attachment.too_large.
+         */
+        post: operations["attachImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/images/{imageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire one of the caller's own images of the SKU
+         * @description A PENDING or ACTIVE image of the caller becomes RETIRED; retiring a local override brings the SKU owner's image back on the caller's tills. Problems: m2.sku.not_found, m2.image.not_found, m2.image.not_retirable.
+         */
+        delete: operations["retireImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/skus/{skuId}/barcodes/{barcode}/link": {
         parameters: {
             query?: never;
@@ -362,6 +402,30 @@ export interface components {
              * @description Set when the code identifies one batch of the SKU
              */
             batchId?: string;
+        };
+        AttachImageRequest: {
+            /** @description The pack the image shows, an ACTIVE barcode of the SKU; absent for the item */
+            barcode?: string;
+            /** @description One of the register's m2.image.content_types (image/jpeg, image/png) */
+            contentType: string;
+            /**
+             * Format: int64
+             * @description The exact size in bytes, signed into the URL; at most attachment.max_bytes
+             */
+            contentLength?: number;
+            /** @description SHA-256 of the bytes, lower-case hex; the upload is verified against it */
+            sha256Hex: string;
+        };
+        ImageUploadResponse: {
+            /** Format: uuid */
+            imageId: string;
+            /**
+             * Format: uri
+             * @description PUT the bytes here with the same Content-Type (and Content-Length when given)
+             */
+            uploadUrl: string;
+            /** Format: date-time */
+            expiresAt: string;
         };
         LinkBarcodeToBatchRequest: {
             symbology: components["schemas"]["Symbology"];
@@ -812,6 +876,81 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             /** @description m2.sku.not_found or m2.barcode.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    attachImage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachImageRequest"];
+            };
+        };
+        responses: {
+            /** @description The image, PENDING, and where to upload it */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploadResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireImage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+                imageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image retired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found or m2.image.not_found */
             404: {
                 headers: {
                     [name: string]: unknown;

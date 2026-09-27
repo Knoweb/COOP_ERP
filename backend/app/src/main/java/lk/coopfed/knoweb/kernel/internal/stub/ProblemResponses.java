@@ -40,6 +40,8 @@ public class ProblemResponses {
             Map.entry("m2.barcode.not_found", HttpStatus.NOT_FOUND),
             // M2-05: a batch that is not there, as the slice says.
             Map.entry("m2.batch.not_found", HttpStatus.NOT_FOUND),
+            // M2-06: an image the caller has no row for, as the slice says.
+            Map.entry("m2.image.not_found", HttpStatus.NOT_FOUND),
             // K-02: a token the resource server refuses, and a second factor that is not fresh
             // enough for the action (19A section 2: step-up is 401 with the provider's address).
             Map.entry("token.invalid", HttpStatus.UNAUTHORIZED),
@@ -64,7 +66,7 @@ public class ProblemResponses {
             Map.entry("sync.batch_inconsistent", HttpStatus.BAD_REQUEST),
             Map.entry("sync.batch_too_large", HttpStatus.PAYLOAD_TOO_LARGE),
             Map.entry("sync.app_below_floor", HttpStatus.UPGRADE_REQUIRED),
-            Map.entry("sync.snapshot.unavailable", HttpStatus.NOT_IMPLEMENTED));
+            Map.entry("sync.rate_limited", HttpStatus.TOO_MANY_REQUESTS));
 
     private final Messages messages;
 

@@ -114,4 +114,30 @@ class S3ObjectStoreIntegrationTest {
         // Not an image: the store is told to serve it as a download.
         assertThat(read.headers().firstValue("Content-Disposition")).contains("attachment");
     }
+
+    @Test
+    void theBackendWritesAndReadsAnObjectOfItsOwnWithinALimit() throws Exception {
+        // CR-19A-7: a module stores what it derives (a thumbnail) and reads what was uploaded.
+        String key = "objects/m2catalogue/test/" + System.nanoTime() + "/thumb.png";
+        byte[] bytes = "a thumbnail".getBytes(StandardCharsets.UTF_8);
+
+        store.put(key, "image/png", bytes);
+
+        assertThat(store.head(key)).contains((long) bytes.length);
+        assertThat(store.read(key, bytes.length)).isEqualTo(bytes);
+        // One byte under the object's size: refused, without the bytes being handed out.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.read(key, bytes.length - 1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("larger than");
+
+        HttpResponse<byte[]> read = HttpClient.newHttpClient()
+                .send(
+                        HttpRequest.newBuilder(store.presignGet(key, "image/png", Duration.ofMinutes(5)))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(read.statusCode()).isEqualTo(200);
+        assertThat(read.body()).isEqualTo(bytes);
+        assertThat(read.headers().firstValue("Content-Type")).contains("image/png");
+    }
 }
