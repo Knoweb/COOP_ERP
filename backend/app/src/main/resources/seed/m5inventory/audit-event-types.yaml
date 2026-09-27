@@ -17,3 +17,33 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A negative stock lot came back to zero or above
+
+  - code: STOCK_RECEIVED
+    severity: INFO
+    offline_capturable: false
+    description_en: A confirmed goods received note was put into the receiver's stock
+
+  - code: PICK_LIST_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: An issued delivery note reserved the seller's lots on a pick list
+
+  - code: PICK_LIST_DISPATCHED
+    severity: INFO
+    offline_capturable: false
+    description_en: A delivery note's picked stock left the seller's lots in transit
+
+  - code: OPB_PREPARED
+    severity: INFO
+    offline_capturable: false
+    description_en: An opening stock balance was prepared
+
+  - code: OPB_SIGNED_ENTITY
+    severity: INFO
+    offline_capturable: false
+    description_en: An opening stock balance was signed for the entity
+
+  - code: OPB_POSTED
+    severity: INFO
+    offline_capturable: false
+    description_en: An opening stock balance was countersigned and posted to stock

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<!--
+  document-a4: the kernel's generic A4 trading document (K-06b). The model is described in
+  README.md beside this file. Every value is escaped (th:text); amounts come formatted by the
+  module (Formats), so the template does no arithmetic.
+-->
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${lang}">
+<head>
+<title th:text="${data.title}">Document</title>
+<style>
+  .top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #222; padding-bottom: 6mm; }
+  .issuer { font-weight: 700; font-size: 13pt; }
+  .issuer-lines { font-size: 9pt; color: #333; white-space: pre-line; }
+  h1 { font-size: 18pt; margin: 0 0 2mm 0; text-align: right; }
+  .meta { text-align: right; font-size: 9.5pt; }
+  .meta span { display: inline-block; min-width: 28mm; color: #555; }
+  .parties { display: flex; gap: 10mm; margin: 6mm 0; }
+  .party { flex: 1; border: 1px solid #bbb; padding: 3mm; }
+  .party h2 { font-size: 9pt; color: #555; margin: 0 0 1mm 0; font-weight: 400; }
+  .party .who { font-weight: 700; }
+  .party .lines { white-space: pre-line; font-size: 9pt; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  th { background: #eee; text-align: left; font-size: 9pt; padding: 2mm; border-bottom: 1px solid #999; }
+  td { padding: 2mm; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr { break-inside: avoid; }
+  .num { text-align: right; white-space: nowrap; }
+  .totals { margin-top: 4mm; margin-left: auto; width: 45%; }
+  .totals td { border: none; padding: 1mm 2mm; }
+  .totals tr.grand td { font-weight: 700; border-top: 2px solid #222; }
+  .notes { margin-top: 8mm; font-size: 9pt; white-space: pre-line; }
+  .footer { margin-top: 10mm; font-size: 8pt; color: #666; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div th:if="${data.issuer}">
+      <div class="issuer" th:text="${data.issuer.title}">Issuer</div>
+      <div class="issuer-lines" th:text="${data.issuer.lines}"></div>
+    </div>
+    <div th:unless="${data.issuer}"></div>
+    <div>
+      <h1 th:text="${data.title}">Document</h1>
+      <div class="meta" th:if="${data.number}"><span th:text="#{report.document.number}">Number</span> <b th:text="${data.number}"></b></div>
+      <div class="meta" th:if="${data.date}"><span th:text="#{report.document.date}">Date</span> <b th:text="${data.date}"></b></div>
+      <div class="meta" th:each="ref : ${data.references}"><span th:text="${ref.label}"></span> <b th:text="${ref.value}"></b></div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="party" th:if="${data.from}">
+      <h2 th:text="#{report.document.from}">From</h2>
+      <div class="who" th:text="${data.from.title}"></div>
+      <div class="lines" th:text="${data.from.lines}"></div>
+    </div>
+    <div class="party" th:if="${data.to}">
+      <h2 th:text="#{report.document.to}">To</h2>
+      <div class="who" th:text="${data.to.title}"></div>
+      <div class="lines" th:text="${data.to.lines}"></div>
+    </div>
+  </div>
+
+  <table th:if="${data.lines}">
+    <thead>
+      <tr>
+        <th th:text="#{report.document.line_no}">#</th>
+        <th th:text="#{report.document.item}">Item</th>
+        <th class="num" th:text="#{report.document.quantity}">Quantity</th>
+        <th class="num" th:text="#{report.document.unit_price}">Unit price</th>
+        <th class="num" th:text="#{report.document.amount}">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="line, it : ${data.lines}">
+        <td th:text="${it.count}">1</td>
+        <td th:text="${line.description}"></td>
+        <td class="num" th:text="${line.quantity}"></td>
+        <td class="num" th:text="${line.unitPrice}"></td>
+        <td class="num" th:text="${line.amount}"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals" th:if="${data.totals}">
+    <tr th:each="total, it : ${data.totals}" th:classappend="${it.last} ? 'grand'">
+      <td th:text="${total.label}"></td>
+      <td class="num" th:text="${total.value}"></td>
+    </tr>
+  </table>
+
+  <div class="notes" th:if="${data.notes}" th:text="${data.notes}"></div>
+  <div class="footer" th:if="${data.footer}" th:text="${data.footer}"></div>
+</body>
+</html>

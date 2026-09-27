@@ -188,6 +188,246 @@
       "realmRoles": ["cashier"]
     },
     {
+      "id": "0190f0de-0000-7000-8000-000000000201",
+      "username": "fed-steward",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-steward@coop-erp.test",
+      "firstName": "Nirmala",
+      "lastName": "Perera",
+      "attributes": {
+        "locale": ["en"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000202",
+      "username": "fed-pricing",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-pricing@coop-erp.test",
+      "firstName": "Suresh",
+      "lastName": "Fernando",
+      "attributes": {
+        "locale": ["en"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000203",
+      "username": "fed-stores",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-stores@coop-erp.test",
+      "firstName": "Kamal",
+      "lastName": "Jayasinghe",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000204",
+      "username": "fed-sales",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-sales@coop-erp.test",
+      "firstName": "Tharindu",
+      "lastName": "Silva",
+      "attributes": {
+        "locale": ["en"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000205",
+      "username": "fed-accounts",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "fed-accounts@coop-erp.test",
+      "firstName": "Fathima",
+      "lastName": "Rizwan",
+      "attributes": {
+        "locale": ["en"],
+        "ent": ["0190f000-0000-7000-8000-000000000001"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000211",
+      "username": "d101-buyer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "d101-buyer@coop-erp.test",
+      "firstName": "Chaminda",
+      "lastName": "Rathnayake",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e1"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000212",
+      "username": "d101-stores",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "d101-stores@coop-erp.test",
+      "firstName": "Lasantha",
+      "lastName": "Herath",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e1"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000213",
+      "username": "d101-accounts",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "d101-accounts@coop-erp.test",
+      "firstName": "Dilani",
+      "lastName": "Wijesekara",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e1"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000221",
+      "username": "d102-buyer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "d102-buyer@coop-erp.test",
+      "firstName": "Kumaran",
+      "lastName": "Sivalingam",
+      "attributes": {
+        "locale": ["ta"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e2"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000222",
+      "username": "d102-stores",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "d102-stores@coop-erp.test",
+      "firstName": "Arun",
+      "lastName": "Thevarajah",
+      "attributes": {
+        "locale": ["ta"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e2"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000223",
+      "username": "d102-accounts",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "d102-accounts@coop-erp.test",
+      "firstName": "Priya",
+      "lastName": "Nadarajah",
+      "attributes": {
+        "locale": ["ta"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e2"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000231",
+      "username": "m101-buyer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m101-buyer@coop-erp.test",
+      "firstName": "Sandya",
+      "lastName": "Kumari",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e3"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000232",
+      "username": "m101-manager",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m101-manager@coop-erp.test",
+      "firstName": "Ruwan",
+      "lastName": "Dissanayake",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e3"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000233",
+      "username": "m101-shop",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m101-shop@coop-erp.test",
+      "firstName": "Malani",
+      "lastName": "Gunawardena",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e3"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000242",
+      "username": "m102-manager",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m102-manager@coop-erp.test",
+      "firstName": "Nimal",
+      "lastName": "Bandara",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e4"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000252",
+      "username": "m103-manager",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m103-manager@coop-erp.test",
+      "firstName": "Selvaraj",
+      "lastName": "Yogarajah",
+      "attributes": {
+        "locale": ["ta"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e5"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
       "username": "service-account-coop-erp-backend",
       "enabled": true,
       "serviceAccountClientId": "coop-erp-backend",

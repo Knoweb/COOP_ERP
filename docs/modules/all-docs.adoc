@@ -33,6 +33,10 @@ include::module-m3pricing.adoc[]
 plantuml::module-m5inventory.puml[,,format=svg]
 include::module-m5inventory.adoc[]
 
+== Demo data
+plantuml::module-demo.puml[,,format=svg]
+include::module-demo.adoc[]
+
 == M4 Trading Documents
 plantuml::module-m4trading.puml[,,format=svg]
 include::module-m4trading.adoc[]

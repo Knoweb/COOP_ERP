@@ -285,6 +285,35 @@ config_items:
     default: 500
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # K-06b: the A4 renderer (19A section 6; DR-3). Chromium on the worker renders a template to PDF;
+  # these bound one rendering, so a runaway template or a stuck browser cannot hold a worker.
+  - key: report.render.timeout_seconds
+    value_type: INTEGER
+    schema: { minimum: 5, maximum: 600 }
+    description_en: The longest one PDF rendering may take before the browser is stopped, in seconds
+    description_si: බ්‍රවුසරය නැවැත්වීමට පෙර එක් PDF නිර්මාණයකට ගත හැකි දිගම කාලය, තත්පර වලින්
+    description_ta: உலாவி நிறுத்தப்படுவதற்கு முன் ஒரு PDF உருவாக்கம் எடுக்கக்கூடிய அதிகபட்ச நேரம், வினாடிகளில்
+    default: 60
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: report.render.max_bytes
+    value_type: INTEGER
+    schema: { minimum: 10240, maximum: 104857600 }
+    description_en: The largest PDF one rendering may produce, in bytes; a larger one is refused and not stored
+    description_si: එක් නිර්මාණයකට සෑදිය හැකි විශාලතම PDF ගොනුව, බයිට් වලින්; ඊට වඩා විශාල එකක් ප්‍රතික්ෂේප කර ගබඩා නොකෙරේ
+    description_ta: ஒரு உருவாக்கம் தரக்கூடிய மிகப்பெரிய PDF, பைட்டுகளில்; அதைவிடப் பெரியது மறுக்கப்பட்டு சேமிக்கப்படாது
+    default: 10485760
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: report.render.max_html_bytes
+    value_type: INTEGER
+    schema: { minimum: 1024, maximum: 52428800 }
+    description_en: The largest page of HTML a template may produce before it is rendered, in bytes
+    description_si: නිර්මාණයට පෙර අච්චුවකට සෑදිය හැකි විශාලතම HTML පිටුව, බයිට් වලින්
+    description_ta: உருவாக்கத்திற்கு முன் ஒரு வார்ப்புரு தரக்கூடிய மிகப்பெரிய HTML பக்கம், பைட்டுகளில்
+    default: 5242880
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
   # K-08: the sync gateway (doc 32; 19A section 8). The batch limits and the chunk size are doc 32
   # DR-1 and DR-5, the change-log retention DR-4: proposed values, to be settled after the load
   # test (spike 5), so they are configuration and not constants.

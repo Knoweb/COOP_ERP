@@ -84,8 +84,224 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/AvailabilityResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/receipts/{grnId}:
+    get:
+      tags: [Inventory]
+      operationId: getReceipt
+      summary: The movements a confirmed GRN put into the receiver's stock
+      description: >
+        M5 applies grn.confirmed.v1 in the receiver's scope (the permission inv.stock.receive is
+        that command's; the system runs it with no user). An empty list until it is applied, and
+        for a GRN the caller's scope does not see.
+      x-permission: inv.stock.receive
+      parameters:
+        - in: path
+          name: grnId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The receipt movements
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MovementResponse' }
+  /v1/inventory/pick-lists/{deliveryNoteId}:
+    get:
+      tags: [Inventory]
+      operationId: getPickList
+      summary: The pick list of an issued delivery note, FEFO lots per line
+      x-permission: whs.pick
+      parameters:
+        - in: path
+          name: deliveryNoteId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The pick list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PickListResponse' }
+        '404':
+          description: No pick list for this delivery note, or the caller's scope may not see it
+  /v1/inventory/opening-balances:
+    post:
+      tags: [Inventory]
+      operationId: prepareOpeningBalance
+      summary: Prepare the opening stock of a location, with batch data and cost
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope,
+        m5.opening.location_has_stock, m5.opening.already_open, m5.opening.lines_required,
+        m5.opening.line_invalid, m5.batch.not_found.
+      x-permission: inv.opening.prepare
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrepareOpeningBalanceRequest' }
+      responses:
+        '201':
+          description: Prepared, in status DRAFT
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/{openingBalanceId}:
+    get:
+      tags: [Inventory]
+      operationId: getOpeningBalance
+      summary: One opening balance with its lines
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: openingBalanceId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The opening balance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '404':
+          description: No such opening balance, or the caller's scope may not see it
+  /v1/inventory/opening-balances/{openingBalanceId}/sign:
+    post:
+      tags: [Inventory]
+      operationId: signOpeningBalance
+      summary: The entity's officer signs the counted stock
+      description: >
+        Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found,
+        m5.opening.not_draft; mfa.required when the second factor is not fresh.
+      x-permission: inv.opening.sign
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: openingBalanceId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Signed, in status SIGNED_ENTITY
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/opening-balances/{openingBalanceId}/countersign:
+    post:
+      tags: [Inventory]
+      operationId: countersignOpeningBalance
+      summary: The Federation's officer countersigns; the OPB is issued and the stock posted
+      description: >
+        Codes this operation can answer with 422: m5.opening.user_required, m5.opening.not_found,
+        m5.opening.not_signed, m5.opening.countersigner_is_signer, m5.opening.location_has_stock,
+        m5.opening.entity_unknown; mfa.required when the second factor is not fresh.
+      x-permission: inv.opening.countersign
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: openingBalanceId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Posted, with the OPB document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpeningBalanceResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
+    MovementResponse:
+      type: object
+      required: [movementId, locationId, skuId, batchId, condition, movementType, qtyDelta, documentId, movementSeq]
+      properties:
+        movementId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        movementType: { type: string }
+        qtyDelta: { type: number }
+        unitCostAtMovement: { type: number }
+        documentId: { type: string, format: uuid }
+        documentLineId: { type: string, format: uuid }
+        movementSeq: { type: integer, format: int64 }
+        occurredAt: { type: string, format: date-time }
+    PickListResponse:
+      type: object
+      required: [pickListId, deliveryNoteId, status, lines]
+      properties:
+        pickListId: { type: string, format: uuid }
+        deliveryNoteId: { type: string, format: uuid }
+        status: { type: string, enum: [OPEN, DISPATCHED] }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/PickResponse' }
+    PickResponse:
+      type: object
+      required: [deliveryLineId, skuId, qty]
+      properties:
+        deliveryLineId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid, description: 'absent on the short part of a line' }
+        stockLotId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        qty: { type: number }
+    PrepareOpeningBalanceRequest:
+      type: object
+      required: [locationId, lines]
+      properties:
+        locationId: { type: string, format: uuid }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items: { $ref: '#/components/schemas/OpeningBalanceLineRequest' }
+    OpeningBalanceLineRequest:
+      type: object
+      description: >
+        A batch M2 knows (batchId), or the batch as counted (skuId with batchNo, expiryDate and
+        printedMrp as the item requires), which the prepare registers in M2 (M5-12).
+      required: [qty, unitCost]
+      properties:
+        batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchNo: { type: string, maxLength: 40 }
+        expiryDate: { type: string, format: date }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        qty: { type: number, exclusiveMinimum: 0 }
+        unitCost: { type: number, minimum: 0 }
+    OpeningBalanceResponse:
+      type: object
+      required: [openingBalanceId, locationId, status, lines]
+      properties:
+        openingBalanceId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        status: { type: string, enum: [DRAFT, SIGNED_ENTITY, POSTED] }
+        preparedBy: { type: string, format: uuid }
+        signedEntityBy: { type: string, format: uuid }
+        countersignedBy: { type: string, format: uuid }
+        documentId: { type: string, format: uuid }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/OpeningBalanceLineResponse' }
+    OpeningBalanceLineResponse:
+      type: object
+      required: [lineNo, batchId, skuId, condition, qty, unitCost]
+      properties:
+        lineNo: { type: integer }
+        batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qty: { type: number }
+        unitCost: { type: number }
     LotBalanceResponse:
       type: object
       required: [stockLotId, locationId, skuId, batchId, condition, qtyOnHand, negative]
