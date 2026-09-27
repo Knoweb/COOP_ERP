@@ -149,6 +149,40 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void anOpeningBalanceLineCanCarryItsBatchAsCountedOverHttp() {
+        fixture.entity(MPCS, "M5HT", "MPCS");
+        UUID store = fixture.location(MPCS, "WAREHOUSE");
+
+        ResponseEntity<JsonNode> prepared = post(
+                "/v1/inventory/opening-balances",
+                java.util.Map.of(
+                        "locationId",
+                        store.toString(),
+                        "lines",
+                        List.of(java.util.Map.of(
+                                "skuId",
+                                sku.toString(),
+                                "batchNo",
+                                "HTTP-OB-1",
+                                "expiryDate",
+                                "2027-12-31",
+                                "printedMrp",
+                                250,
+                                "qty",
+                                3,
+                                "unitCost",
+                                40))),
+                USER);
+
+        assertThat(prepared.getStatusCode())
+                .as(String.valueOf(prepared.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        JsonNode line = prepared.getBody().get("lines").get(0);
+        assertThat(line.get("skuId").asText()).isEqualTo(sku.toString());
+        assertThat(line.get("batchId").asText()).isNotBlank();
+    }
+
+    @Test
     void anOpeningBalanceIsPreparedSignedAndCountersignedOverHttp() {
         fixture.entity(MPCS, "M5HT", "MPCS");
         UUID shop = fixture.location(MPCS, "SHOP");
