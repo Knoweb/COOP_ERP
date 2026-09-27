@@ -1,0 +1,1 @@
+- **A change-log table no contributor serves is left out of the delta and logged as an error (27 Sep, same branch):** rather than refusing the till's download, which would stop it at that version. The version still advances; the producers of M3, M5 and M7 must ship with their contributors.

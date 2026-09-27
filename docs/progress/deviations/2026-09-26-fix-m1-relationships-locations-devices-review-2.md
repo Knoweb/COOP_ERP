@@ -1,0 +1,1 @@
+- **`SetPrimaryTill` takes `outboxLossRecorded`, which 21A sections 5 and 6 do not name (26 Sep, same branch):** the drained-or-loss-recorded rule 21A section 6.1 writes for AssignDeviceToPosition applies to every counter transfer, and naming a new primary till transfers the shop's counters; the flag is the same as the assignment's, optional and false by default.

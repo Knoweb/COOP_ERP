@@ -1,0 +1,1 @@
+- **`sku_barcode` UPDATE narrowed further than the finding asked (26 Sep, branch `fix/m2-01-schema-review`):** the review named `tax_rate` and `sku_uom_conversion`; `sku_barcode (status, batch_id)` follows the same reading of 22A section 6 (RetireBarcode, LinkBarcodeToBatch) and closes the re-pointing of a barcode to another SKU that a whole-row grant allowed.

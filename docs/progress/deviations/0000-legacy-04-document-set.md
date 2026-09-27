@@ -1,0 +1,1 @@
+- **Document set:** the register lists two supporting documents (Document_Numbering_RFC, Numbering_Scheme_Tax_Advisor_Briefing) that are in neither the Drive baseline folder nor the repository. Docs 34 to 40 are unwritten; ADR-37 to ADR-50 are not yet in doc 09; glossary 12 lacks the design terms; the Markdown-to-PDF render script has not been chosen.

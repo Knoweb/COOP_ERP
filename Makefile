@@ -35,7 +35,7 @@ COMPOSE_TWO := $(COMPOSE) -f $(COMPOSE_DIR)/compose.two.yml
 SEED_DIR    := backend/app/src/main/resources/seed
 JIB_BASE    := $(shell sed -n "s/^jibBaseImage=//p" backend/gradle.properties)
 
-.PHONY: help image up up-2 down reset migrate seed demo-data urls build test test-int format coverage hooks lint-ci gen-clients check-generated new-module test-scaffold smoke e2e
+.PHONY: help image up up-2 down reset migrate seed demo-data urls build test test-int format coverage hooks lint-ci gen-clients check-generated progress new-module test-scaffold smoke e2e
 
 help:
 	@echo "make up           start the local stack, migrate, seed, print URLs and dev logins"
@@ -59,6 +59,7 @@ help:
 	@echo "make e2e          Playwright tests in a browser against the running stack (make up first)"
 	@echo "make gen-clients  regenerate web/src/generated from every OpenAPI slice"
 	@echo "make check-generated  fail when the committed clients or module diagrams are stale"
+	@echo "make progress     write build/PROGRESS.md: every entry of docs/progress in one page to read"
 	@echo "make new-module NAME=m2catalogue SCHEMA=catalogue ENTITY=sku   (DRY_RUN=1 to preview)"
 	@echo "make test-scaffold scaffold a throwaway module and prove everything still passes (clean tree only)"
 
@@ -177,6 +178,7 @@ test:
 	node tools/check-permissions.mjs
 	node tools/check-slices.mjs
 	node tools/check-frozen-contracts.mjs
+	node tools/progress-index.mjs
 	cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm test
 
 # The tests tagged "integration": the whole application against a real PostgreSQL 16 that
@@ -255,6 +257,11 @@ check-generated:
 # what it would do. ENTITY is the first aggregate of the module, lowercase with underscores:
 # sku, price_list, tax_category. The copy's permissions are placeholders (todo....) that
 # `make test` refuses until you replace them with the codes of the module's guide.
+# docs/progress holds one file per entry, so two branches never edit the same file; this joins
+# them into one page to read. The page is a build output and is never committed.
+progress:
+	node tools/progress-index.mjs
+
 new-module:
 	node tools/new-module.mjs --name "$(NAME)" --schema "$(SCHEMA)" --entity "$(ENTITY)" $(if $(PLURAL),--plural "$(PLURAL)") $(if $(DRY_RUN),--dry-run)
 	$(if $(DRY_RUN),,sh tools/gen-clients.sh)
