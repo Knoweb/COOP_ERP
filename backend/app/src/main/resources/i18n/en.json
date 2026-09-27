@@ -437,5 +437,12 @@
   "report.document.item": "Item",
   "report.document.quantity": "Quantity",
   "report.document.unit_price": "Unit price",
-  "report.document.amount": "Amount"
+  "report.document.amount": "Amount",
+  "m4.invoice.print.title": "Tax invoice",
+  "m4.invoice.print.due": "Due date",
+  "m4.invoice.print.seller_vat": "Seller VAT number",
+  "m4.invoice.print.buyer_vat": "Buyer VAT number",
+  "m4.invoice.print.net": "Net amount",
+  "m4.invoice.print.vat": "VAT",
+  "m4.invoice.print.gross": "Total"
 }

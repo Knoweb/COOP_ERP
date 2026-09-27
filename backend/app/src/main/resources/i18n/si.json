@@ -437,5 +437,12 @@
   "report.document.item": "අයිතමය",
   "report.document.quantity": "ප්‍රමාණය",
   "report.document.unit_price": "ඒකක මිල",
-  "report.document.amount": "මුදල"
+  "report.document.amount": "මුදල",
+  "m4.invoice.print.title": "බදු ඉන්වොයිසිය",
+  "m4.invoice.print.due": "ගෙවිය යුතු දිනය",
+  "m4.invoice.print.seller_vat": "විකුණුම්කරුගේ වැට් අංකය",
+  "m4.invoice.print.buyer_vat": "ගැනුම්කරුගේ වැට් අංකය",
+  "m4.invoice.print.net": "ශුද්ධ මුදල",
+  "m4.invoice.print.vat": "වැට්",
+  "m4.invoice.print.gross": "මුළු මුදල"
 }

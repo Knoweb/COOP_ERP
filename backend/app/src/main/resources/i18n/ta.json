@@ -437,5 +437,12 @@
   "report.document.item": "பொருள்",
   "report.document.quantity": "அளவு",
   "report.document.unit_price": "அலகு விலை",
-  "report.document.amount": "தொகை"
+  "report.document.amount": "தொகை",
+  "m4.invoice.print.title": "வரி விலைப்பட்டியல்",
+  "m4.invoice.print.due": "செலுத்த வேண்டிய தேதி",
+  "m4.invoice.print.seller_vat": "விற்பனையாளர் VAT எண்",
+  "m4.invoice.print.buyer_vat": "வாங்குபவர் VAT எண்",
+  "m4.invoice.print.net": "நிகர தொகை",
+  "m4.invoice.print.vat": "VAT",
+  "m4.invoice.print.gross": "மொத்தம்"
 }

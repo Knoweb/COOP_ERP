@@ -30,6 +30,9 @@ _Others_
 * `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.m.query.PricingQueries` (in M3 Pricing & Rules)
 * `l.c.k.m.query.InventoryQueries` (in M5 Inventory, Costing, Repack & Loss)
+* `l.c.k.k.api.A4Renderer` (in Platform Kernel)
+* `l.c.k.k.api.Formats` (in Platform Kernel)
+* `l.c.k.k.api.Messages` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
