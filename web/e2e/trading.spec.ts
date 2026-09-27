@@ -52,6 +52,11 @@ test("the Federation sells to D101: order, acceptance, delivery note, dispatch, 
   // 6. Delivery note: fed-sales drafts it from the accepted order and issues it.
   await page.getByRole("link", { name: textOf(sales, "trading.note.new") }).click();
   await page.getByLabel(textOf(sales, "trading.field.from_location")).selectOption(FED_WAREHOUSE);
+  // Each line leaves from the first lot in FEFO order there, once the warehouse's stock is read.
+  await expect(page.getByLabel(textOf(sales, "trading.column.batch"))).toHaveCount(2);
+  for (const batch of await page.getByLabel(textOf(sales, "trading.column.batch")).all()) {
+    await expect(batch).not.toHaveValue("");
+  }
   await page.getByRole("button", { name: textOf(sales, "trading.note.create") }).click();
   await expect(page).toHaveURL(/\/trading\/delivery-notes\/[0-9a-f-]{36}$/);
   await page.getByRole("button", { name: textOf(sales, "trading.note.issue") }).click();
