@@ -2,7 +2,7 @@
 
 The living guide of the module (AGENTS.md): the read side. Projections built from the events of the other modules, the reports read from them, and the dashboard. Once code exists, this file and the tests supersede 28A for day-to-day work; every deviation from the guide is listed at the end with its reason. Read `hello/README.md` first: its rules apply here, with the one exemption below.
 
-Built so far, for the demo (phase 4, "administration and reporting for administration"): M8-01 (the projection base) with the stock position as its sample projection (M8-03, part), the trading projections (M8-04, part), and three reports with CSV, A4 print and the dashboard (M8-06 and M8-07, demo part). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
+Built so far, for the demo (phase 4, "administration and reporting for administration"): M8-01 (the projection base) with the stock position as its sample projection (M8-03, part), the trading projections (M8-04, part), three reports with CSV, A4 print and the dashboard (M8-06 and M8-07, demo part), and their web screens (M8-09, demo part). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
 
 ## The one rule
 
@@ -86,11 +86,16 @@ Each answer carries its columns (key, message id, kind TEXT, DATE, QTY or MONEY)
 
 Permissions `rpt.report.run` and `rpt.export.run` (28A section 3.1) are in `seed/m1party/permissions.yaml`, in the Federation Viewer (read only), Entity Administrator, Trading Buyer and Trading Seller templates, and in the demo's sales, accounts, distributor and society manager roles (`seed/m1security/demo-users.demo.sql`).
 
+## Web screens (`web/src/modules/m8reporting`)
+
+The navigation entry "Reports" shows for a user holding `rpt.report.run` or `rpt.export.run` (the shell reads the session's permissions). **Dashboard** (`/reporting`): the tiles with their values (money through `MoneyDisplay`), the data's freshness, a link from a tile to its report, and the list of reports with the decision each supports. **Report** (`/reporting/reports/{id}`): the parameters the definition takes (a period, opening on the month so far; a location, "all" by default), the rows with the server's totals, dates and money formatted by the shell and nothing added up in the browser; with `rpt.export.run`, "Download CSV" (fetched with the token, saved as the server names it) and "Print (A4 PDF)", which requests a run in the user's language and asks for it every two seconds until it is READY (a link to the PDF) or FAILED. The texts are in `reporting.messages.json`; the report, column and tile names the API answers with are the backend's `m8.*` ids with the same texts, so screen and PDF agree.
+
 ## Tests
 
 | Test | What it proves |
 |---|---|
 | `ReportingHttpPostgresIntegrationTest` | Every operation over HTTP: the three definitions; the stock position for its owner with the value, by location, nothing for the counterparty, everything with the value for the Federation view; trade by distributor for both parties and nobody else, in and out of the period; the invoices with their totals; the period and unknown-report refusals (422); the CSV header in English and its rows; the dashboard of seller, buyer and a third entity; a print run REQUESTED, audited and published, not visible to another entity; a run without its period refused with nothing committed. |
+| `web/src/modules/m8reporting/reportView.test.ts` | The default period, the parameters sent per definition, the CSV file name, the numeric columns. |
 | `ReportRunPostgresIntegrationTest` | The worker with a stand-in renderer: the report printed with `m8-report` in the run's language (Tamil title), READY with the key, audited and published, a second outcome refused; a renderer failure recorded FAILED with its message id; an unknown run; the request guards (no user, unknown report, a language outside the catalogue) commit nothing; the print model formats cells and totals. |
 | `TradeProjectionPostgresIntegrationTest` (with `TradeFlows`) | Rebuild equivalence over five sets of twelve random order flows (submitted only, rejected or cancelled, in transit, received and invoiced) with redeliveries; one whole flow leaves one row per event on its owner's side with the counterparty, the business date in Colombo, the accepted and received volume and the invoice totals. |
 | `StockPositionProjectionPostgresIntegrationTest` | Rebuild equivalence over five random streams of 60 movements (two entities, three locations each, two sources, redeliveries); a late or repeated movement changes nothing; an event of another type is ignored; a delivery in another entity's scope is refused by row-level security; nothing is audited or published. |
