@@ -355,5 +355,21 @@
   "m5.opening.not_signed": "ප්‍රති-අත්සන් කිරීමට පෙර ආයතනය ආරම්භක ශේෂය අත්සන් කළ යුතුය",
   "m5.opening.countersigner_is_signer": "ආයතනය වෙනුවෙන් අත්සන් කළ පුද්ගලයාට ප්‍රති-අත්සන් ද කළ නොහැක",
   "m5.opening.user_required": "ආරම්භක ශේෂයක් අත්සන් කරන්නේ පුද්ගලයෙකි",
-  "m5.opening.entity_unknown": "ආරම්භක ශේෂයේ ආයතනය හමු නොවීය"
+  "m5.opening.entity_unknown": "ආරම්භක ශේෂයේ ආයතනය හමු නොවීය",
+  "report.renderer_unavailable": "මුද්‍රණය ක්‍රියාත්මක වන්නේ වැඩ සේවාදායකයේ ය; මෙම සේවාදායකයට මුද්‍රණය කළ නොහැක",
+  "report.template_invalid": "මුද්‍රණ අච්චුවේ නම වලංගු නැත",
+  "report.template_unknown": "{templateId} නමින් මුද්‍රණ අච්චුවක් නැත",
+  "report.scope_mismatch": "මෙම මුද්‍රණය ඔබ වැඩ කරන සංවිධානයට නොව වෙනත් සංවිධානයකට අයත් ය",
+  "report.too_large": "මුද්‍රණය ඉතා විශාල ය (බයිට් {size}, උපරිමය {maxBytes})",
+  "report.timeout": "මුද්‍රණයට තත්පර {seconds} කට වඩා ගත වූ බැවින් එය නවත්වන ලදී",
+  "report.failed": "මුද්‍රණය සෑදිය නොහැකි විය; නැවත උත්සාහ කරන්න",
+  "report.document.number": "අංකය",
+  "report.document.date": "දිනය",
+  "report.document.from": "යවන්නා",
+  "report.document.to": "ලබන්නා",
+  "report.document.line_no": "අංකය",
+  "report.document.item": "අයිතමය",
+  "report.document.quantity": "ප්‍රමාණය",
+  "report.document.unit_price": "ඒකක මිල",
+  "report.document.amount": "මුදල"
 }

@@ -64,10 +64,11 @@ jobs:
           trivy sbom  "${common[@]}" -o scan/backend.json backend/app/build/reports/cyclonedx/bom.json
           trivy fs    "${common[@]}" -o scan/web.json web/pnpm-lock.yaml
           trivy image "${common[@]}" --pkg-types os -o scan/image.json coop-erp/backend:dev
+          trivy image "${common[@]}" --pkg-types os -o scan/worker-image.json coop-erp/backend-worker:dev
 
       - name: Report, and keep the security issue up to date
         run: |
-          node tools/vulnerability-report.mjs scan/backend.json scan/web.json scan/image.json > report.md
+          node tools/vulnerability-report.mjs scan/backend.json scan/web.json scan/image.json scan/worker-image.json > report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
           count=$(head -1 report.md | sed -n 's/^<!-- findings: \([0-9]*\) -->$/\1/p')
 

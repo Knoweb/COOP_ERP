@@ -181,7 +181,9 @@ services:
   # start, so "the backend is healthy" also means "the database is migrated".
   # The image is built by Jib (`make image`, which `make up` runs first); compose never builds it.
   backend:
-    image: coop-erp/backend:dev
+    # The worker image (K-06b): this container runs the worker role too, and the worker renders
+    # PDFs with the Chromium only that image carries (infra/worker-image).
+    image: coop-erp/backend-worker:dev
     pull_policy: never          # a local image: never look for it in a registry
     environment:
       COOP_ERP_ROLE: web,worker
