@@ -37,7 +37,7 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
     // .author, .publish), the 13 of M2 (22A section 3.1 plus cat.sku.view and cat.tag.govern,
     // CR-22A-3), the 28 of M4 (24A section 3.1 plus trd.document.view, CR-24A-1) and the 19 of M5
     // (25A section 3.1, inv.stock.view, inv.stock.receive): the number of `- code:` lines in permissions.yaml.
-    private static final int PERMISSIONS = 86;
+    private static final int PERMISSIONS = 87;
     private static final int ROLE_TEMPLATES = 6;
     private static final int SOD_PAIRS = 2;
 

@@ -187,6 +187,159 @@ public final class TillSimulator {
         }
     }
 
+    // ============================================================ selling (doc 26; 26A sections 6 and 8)
+
+    /** A line rung up at the counter: a scanned barcode, a quantity and the price the till charged. */
+    public record Sale(String barcode, java.math.BigDecimal qty, java.math.BigDecimal unitPrice) {}
+
+    private UUID ownerEntityId;
+    private UUID tillPositionId;
+    private UUID seriesId;
+    private String numberPrefix;
+    private long nextReceiptNumber = 1;
+    private UUID operator = UUID.randomUUID();
+    private UUID sessionId;
+    private java.math.BigDecimal sessionFloat = java.math.BigDecimal.ZERO;
+    private java.math.BigDecimal cashTaken = java.math.BigDecimal.ZERO;
+
+    /**
+     * Who the till sells as: its entity, its position and the receipt series it holds (the RCT
+     * series of its till position, doc 24B; a real till learns it at enrolment), and the prefix
+     * its receipt numbers print with.
+     */
+    public TillSimulator sellsAs(UUID entity, UUID position, UUID series, String prefix) {
+        this.ownerEntityId = entity;
+        this.tillPositionId = position;
+        this.seriesId = series;
+        this.numberPrefix = prefix;
+        return this;
+    }
+
+    /** The cashier signs in and opens a session with a float (doc 26 section 4.2): till_session.opened.v1. */
+    public UUID openSession(java.math.BigDecimal floatAmount) {
+        sessionId = UUID.randomUUID();
+        sessionFloat = floatAmount;
+        cashTaken = java.math.BigDecimal.ZERO;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("session_id", sessionId.toString());
+        payload.put("till_position_id", String.valueOf(tillPositionId));
+        payload.put("operator_user_id", operator.toString());
+        payload.put("business_date", businessDate.toString());
+        payload.put("opened_at", Instant.now().toString());
+        payload.put("float_amount", floatAmount.toPlainString());
+        record("till_session.opened.v1", payload);
+        return sessionId;
+    }
+
+    /**
+     * The three-tap sale: scan each barcode, take cash, complete. The item is found in the live
+     * snapshot's {@code sku} table by its barcode (M2's contributor puts them inside the row); the
+     * batch is left to central (the snapshot carries no lots yet), which deducts FEFO. The receipt
+     * is numbered from the till's own series and uploaded as the bundle receipt.issued.v1 with its
+     * content hash (doc 32 section 3.1).
+     *
+     * @return the receipt's document id
+     */
+    public UUID sell(List<Sale> sales) {
+        if (sessionId == null || seriesId == null) {
+            throw new IllegalStateException("Open a session and say what the till sells as first");
+        }
+        UUID documentId = UUID.randomUUID();
+        long number = nextReceiptNumber++;
+        long seq = nextSeq;
+        List<Map<String, Object>> lines = new ArrayList<>();
+        java.math.BigDecimal gross = java.math.BigDecimal.ZERO;
+        int lineNo = 1;
+        for (Sale sale : sales) {
+            UUID sku = skuOfBarcode(sale.barcode());
+            java.math.BigDecimal total =
+                    sale.qty().multiply(sale.unitPrice()).setScale(2, java.math.RoundingMode.HALF_UP);
+            gross = gross.add(total);
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("line_no", lineNo++);
+            line.put("sku_id", sku.toString());
+            line.put("uom_code", "EA");
+            line.put("qty", sale.qty().toPlainString());
+            line.put("unit_price", sale.unitPrice().toPlainString());
+            line.put("tax_amount", "0.00");
+            line.put("line_total", total.toPlainString());
+            lines.add(line);
+        }
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("document_id", documentId.toString());
+        document.put("doc_type_code", "RCT");
+        document.put("series_id", seriesId.toString());
+        document.put("doc_number", number);
+        document.put("doc_number_display", numberPrefix + "-" + number);
+        document.put("owner_entity_id", String.valueOf(ownerEntityId));
+        document.put("location_id", locationId.toString());
+        document.put("till_position_id", String.valueOf(tillPositionId));
+        document.put("device_id", deviceId.toString());
+        document.put("issued_at", Instant.now().toString());
+        document.put("business_date", businessDate.toString());
+        document.put("operator_user_id", operator.toString());
+        document.put("currency", "LKR");
+        document.put("net_amount", gross.toPlainString());
+        document.put("tax_amount", "0.00");
+        document.put("gross_amount", gross.toPlainString());
+        document.put("origin", "OFFLINE");
+        document.put("device_seq", seq);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("document", document);
+        payload.put("lines", lines);
+        payload.put("tenders", List.of(Map.of("seq", 1, "kind", "CASH", "amount", gross.toPlainString())));
+        payload.put("session_id", sessionId.toString());
+        cashTaken = cashTaken.add(gross);
+
+        // The content hash by the kernel's rule (doc 18: SHA-256 over the canonical header and
+        // lines), so that the gateway accepts the bundle; the conformance cases of the hash are
+        // the gateway's own tests.
+        String hash = lk.coopfed.knoweb.kernel.internal.document.BundleHash.of(
+                json.valueToTree(document), json.valueToTree(lines));
+        payload.put("content_hash", hash);
+        long recorded = nextSeq++;
+        outbox.put(
+                recorded,
+                new TillEvent(UUID.randomUUID(), "receipt.issued.v1", recorded, Instant.now(), payload)
+                        .actorUserId(operator)
+                        .aggregateType("receipt")
+                        .aggregateId(documentId)
+                        .contentHash(hash));
+        return documentId;
+    }
+
+    /** Blind close (doc 26 section 4.2): the cashier counts, the till works out the variance. */
+    public void closeSession(java.math.BigDecimal counted) {
+        java.math.BigDecimal expected = sessionFloat.add(cashTaken);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("session_id", sessionId.toString());
+        payload.put("till_position_id", String.valueOf(tillPositionId));
+        payload.put("operator_user_id", operator.toString());
+        payload.put("business_date", businessDate.toString());
+        payload.put("closed_at", Instant.now().toString());
+        payload.put("counted_cash", counted.toPlainString());
+        payload.put("expected_cash", expected.toPlainString());
+        payload.put("variance", counted.subtract(expected).toPlainString());
+        record("till_session.closed.v1", payload);
+        sessionId = null;
+    }
+
+    /** The SKU of a barcode in the live snapshot, as the till's scan layer finds it. */
+    @SuppressWarnings("unchecked")
+    private UUID skuOfBarcode(String barcode) {
+        for (Map.Entry<UUID, Map<String, Object>> sku : table("sku").entrySet()) {
+            Object barcodes = sku.getValue().get("barcodes");
+            if (barcodes instanceof List<?> list) {
+                for (Object entry : list) {
+                    if (entry instanceof Map<?, ?> row && barcode.equals(((Map<String, Object>) row).get("barcode"))) {
+                        return sku.getKey();
+                    }
+                }
+            }
+        }
+        throw new IllegalArgumentException("No item with barcode " + barcode + " in the snapshot");
+    }
+
     public int pending() {
         return outbox.size();
     }
