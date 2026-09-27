@@ -370,6 +370,7 @@
   "m4.delivery.exceeds_allocation": "ප්‍රමාණය වෙන් කළ සහ තවම නොයැවූ ප්‍රමාණයට වඩා වැඩි ය",
   "m4.delivery.not_draft": "බෙදාහැරීමේ සටහන දැනටමත් නිකුත් කර ඇත",
   "m4.delivery.not_issued": "යැවිය හැක්කේ නිකුත් කළ බෙදාහැරීමේ සටහනක් පමණි",
+  "m4.delivery.not_at_location": "මෙම බෙදාහැරීමේ සටහන පිටත් වන්නේ ඔබ සේවය කරන ගබඩාවෙන් නොවේ",
   "m4.delivery.vehicle_required": "යැවීමට පෙර වාහනය සඳහන් කරන්න",
   "m4.delivery.driver_required": "යැවීමට පෙර රියදුරා සඳහන් කරන්න",
   "m4.grn.not_found": "භාණ්ඩ ලැබීමේ සටහන හමු නොවීය",

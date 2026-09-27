@@ -113,6 +113,7 @@ Every difference between the schema as migrated and 24A section 3, and between t
 16. **Availability is the seller's own (M4-05)**: M5's lots and M1's locations are read under the caller's row-level security, so a buyer cannot see a seller's availability; the endpoint answers 0 for another entity until a masked read exists.
 15. **One GRN per drop, of the drop's items only (M4-05)**; the uncounted item of a drop is received as zero, so a short delivery is always a line of the discrepancy.
 17. **The buyer names the delivery location on its order (M4-11, CR-24A-2)**: `doc_order.deliver_to_location_id` (V0002), optional, one of the buyer's own locations (`m4.order.deliver_to_unknown`). The seller cannot read the buyer's locations (item 13), so the delivery note screen takes each drop's ship-to and bill-to from the order; CreateDeliveryNote's contract is unchanged.
+18. **Dispatch at the warehouse (M4-11)**: DispatchDeliveryNote takes the seller's OWN scope entity-wide or at the location the note leaves from (`x-scope: LOCATION`; `m4.delivery.not_at_location`), so the stores of that warehouse, in a session scoped there, dispatch (the demo's `fed-stores`). M4-04 asked for an entity-wide scope.
 
 ## Screens (M4-11, demo scope)
 

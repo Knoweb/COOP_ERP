@@ -227,7 +227,7 @@ export interface paths {
         put?: never;
         /**
          * The vehicle leaves with an issued delivery note
-         * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_issued, m4.delivery.vehicle_required, m4.delivery.driver_required.
+         * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_at_location, m4.delivery.not_issued, m4.delivery.vehicle_required, m4.delivery.driver_required.
          */
         post: operations["dispatchDeliveryNote"];
         delete?: never;

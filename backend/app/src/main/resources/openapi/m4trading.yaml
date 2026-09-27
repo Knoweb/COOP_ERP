@@ -398,10 +398,10 @@ paths:
       operationId: dispatchDeliveryNote
       summary: The vehicle leaves with an issued delivery note
       description: >
-        Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_issued,
+        Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_at_location, m4.delivery.not_issued,
         m4.delivery.vehicle_required, m4.delivery.driver_required.
       x-permission: del.note.dispatch
-      x-scope: ENTITY
+      x-scope: LOCATION
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
       requestBody:

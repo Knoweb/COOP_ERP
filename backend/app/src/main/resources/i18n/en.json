@@ -370,6 +370,7 @@
   "m4.delivery.exceeds_allocation": "The quantity is more than is allocated and not yet dispatched",
   "m4.delivery.not_draft": "The delivery note has already been issued",
   "m4.delivery.not_issued": "Only an issued delivery note can be dispatched",
+  "m4.delivery.not_at_location": "This delivery note leaves from another warehouse than the one you work at",
   "m4.delivery.vehicle_required": "Name the vehicle before dispatch",
   "m4.delivery.driver_required": "Name the driver before dispatch",
   "m4.grn.not_found": "The goods received note was not found",
