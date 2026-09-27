@@ -97,6 +97,7 @@ class DeliveryQueriesImpl implements DeliveryQueries {
                 status,
                 (UUID) row.get("seller_entity_id"),
                 (UUID) row.get("buyer_entity_id"),
+                header.locationId(),
                 (String) row.get("vehicle_ref"),
                 (String) row.get("driver_name"),
                 row.get("dispatched_at") instanceof Timestamp ts ? ts.toInstant() : (Instant) null,

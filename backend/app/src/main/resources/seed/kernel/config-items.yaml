@@ -586,8 +586,8 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m4trading
-  # The demo answers of the M2 and M5 questions M4 asks (api.TaxRates, api.InventoryAvailability;
-  # m4trading README). They go when the real modules answer; M3 answers the price (M4-04).
+  # The demo answer of the M2 question M4 asks (api.TaxRates; m4trading README). It goes when M2
+  # answers the rate in force; M3 answers the price (M4-04), M5 the availability (M4-05).
   - key: m4.demo.vat_rate_percent
     value_type: DECIMAL
     schema: { minimum: 0, maximum: 100 }
@@ -596,15 +596,5 @@ config_items:
     description_ta: M2 நடைமுறை விகிதத்தைத் தரும் வரை ஒவ்வொரு விலைப்பட்டியல் வரிக்கும் பயன்படுத்தப்படும் VAT விகிதம் (செயல்விளக்கத்திற்கு மட்டும்)
     default: "18"
     scope_kind: FEDERATION
-    change_permission: sys.config.manage
-    module: m4trading
-  - key: m4.demo.availability_qty
-    value_type: DECIMAL
-    schema: { minimum: 0, maximum: 99999999999.999 }
-    description_en: The quantity of every item a seller is taken to have available until M5 answers (demo only)
-    description_si: M5 පිළිතුරු දෙන තෙක් විකුණුම්කරු සතුව ඇතැයි සලකන සෑම භාණ්ඩයකම ප්‍රමාණය (ආදර්ශනයට පමණි)
-    description_ta: M5 பதிலளிக்கும் வரை விற்பவரிடம் இருப்பதாகக் கொள்ளப்படும் ஒவ்வொரு பொருளின் அளவு (செயல்விளக்கத்திற்கு மட்டும்)
-    default: "1000000.000"
-    scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m4trading

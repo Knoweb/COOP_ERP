@@ -20,6 +20,7 @@ import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m4trading.api.CreateDeliveryNote;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteCreated;
 import lk.coopfed.knoweb.m4trading.internal.delivery.AllocatedLines.AllocatedLine;
@@ -37,7 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
  * quantity; the note's lines of one order line together no more than its allocated and not yet
  * dispatched quantity. That the ship-to shop belongs to the bill-to entity is not checked here: the
  * seller cannot read the buyer's locations (m1party own_read), so the receiver's GRN, captured at
- * one of its own shops, is where a wrong ship-to shows.
+ * one of its own shops, is where a wrong ship-to shows. A warehouse the goods leave from, when
+ * named, is one of the caller's own locations; it is the kernel header's location.
  *
  * <p>Mutation: the kernel draft (one line per delivered line at the order's tier price, the
  * order line as its reference line), {@code doc_delivery}, {@code doc_delivery_drop},
@@ -53,6 +55,7 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
     private final DocumentBaseRepository documents;
     private final AllocatedLines allocated;
     private final DeliveryReads reads;
+    private final PartyQueries parties;
     private final AuditFacade audit;
     private final EventPublisher events;
 
@@ -61,12 +64,14 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
             DocumentBaseRepository documents,
             AllocatedLines allocated,
             DeliveryReads reads,
+            PartyQueries parties,
             AuditFacade audit,
             EventPublisher events) {
         this.jdbc = jdbc;
         this.documents = documents;
         this.allocated = allocated;
         this.reads = reads;
+        this.parties = parties;
         this.audit = audit;
         this.events = events;
     }
@@ -83,6 +88,12 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
             throw new ProblemException("m4.delivery.drops_required");
         }
         UUID buyer = TradingGuards.required(command.drops().get(0).billToEntityId(), "billToEntityId");
+        if (command.fromLocationId() != null
+                && parties.getLocation(command.fromLocationId(), scope)
+                        .filter(location -> seller.equals(location.ownerEntityId()))
+                        .isEmpty()) {
+            throw new ProblemException("m4.delivery.from_location_unknown");
+        }
 
         UUID noteId = Ids.next();
         List<DocumentLineRecord> kernelLines = new ArrayList<>();
@@ -148,7 +159,8 @@ public class CreateDeliveryNoteHandler implements Handles<CreateDeliveryNote, UU
         }
 
         documents.save(
-                TradingDocuments.draft(noteId, DeliveryReads.DN, seller, buyer, null, scope.userId(), null, null));
+                TradingDocuments.draft(
+                        noteId, DeliveryReads.DN, seller, buyer, command.fromLocationId(), scope.userId(), null, null));
         documents.saveLines(noteId, kernelLines);
         jdbc.update(
                 """

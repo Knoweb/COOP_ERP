@@ -91,6 +91,9 @@ paths:
       tags: [Order]
       operationId: sellerAvailability
       summary: What a seller can allocate today of the given items, in each item's base unit
+      description: >
+        M5's availability over the seller's active warehouses. Row-level security lets only the
+        seller read its own stock: asked by anyone else, every item answers 0.
       x-permission: trd.document.view
       parameters:
         - in: query
@@ -310,7 +313,7 @@ paths:
       description: >
         Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer,
         m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch,
-        m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation.
+        m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation, m4.delivery.from_location_unknown.
       x-permission: del.note.draft
       x-scope: ENTITY
       parameters:
@@ -729,6 +732,10 @@ components:
       type: object
       required: [drops]
       properties:
+        fromLocationId:
+          description: The seller's warehouse the goods leave from (optional)
+          type: string
+          format: uuid
         vehicleRef:
           type: string
           maxLength: 40
@@ -804,6 +811,9 @@ components:
           type: string
           format: uuid
         buyerEntityId:
+          type: string
+          format: uuid
+        fromLocationId:
           type: string
           format: uuid
         vehicleRef:
