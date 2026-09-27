@@ -216,6 +216,11 @@
   "notification.channel_unknown": "No adapter is registered for this notification channel",
   "notification.recipient_required": "A notification needs a recipient",
   "permission.denied": "Your role does not allow this action",
+  "pricing.price_list.duplicate": "This greeting is already registered",
+  "pricing.price_list.text_required": "Enter the greeting in English",
+  "pricing.register": "Register greeting",
+  "pricing.registered": "Greeting registered",
+  "pricing.title": "Greetings",
   "request.field.format": "This is not in the expected format",
   "request.field.invalid": "This value is not valid",
   "request.field.required": "This is required",
@@ -310,7 +315,6 @@
   "m2.image.upload_open": "The image upload link is still valid; the image is processed after it expires",
   "m2.supplier.not_active": "The supplier is not active",
   "m2.supplier.name_taken": "A supplier with this name is already registered",
-<<<<<<< HEAD
   "m4.party.entity_not_found": "The trading entity was not found",
   "m4.order.not_found": "The order was not found",
   "m4.order.not_buyer": "Only the buyer can change this order",
@@ -325,8 +329,7 @@
   "m4.order.qty_not_positive": "The quantity must be more than zero",
   "m4.order.not_draft": "The order has already been submitted",
   "m4.order.not_cancellable": "The order can no longer be cancelled",
-  "m4.order.dispatched": "Part of the order has already been dispatched"
-=======
+  "m4.order.dispatched": "Part of the order has already been dispatched",
   "m3.price_list.kind_not_available": "Only trade price lists can be created so far",
   "m3.price_list.not_found": "The price list could not be found",
   "m3.price_list.not_trade": "The price list is not a trade price list",
@@ -347,5 +350,4 @@
   "m3.price_list.line.tier_base_missing": "The tiers of an item start at quantity 0, the base price",
   "m3.price_list.line.tiers_not_ascending": "The tiers of an item must rise",
   "m3.price_list.review.above_mrp": "The trade price is above the lowest printed MRP of the item; it will be reviewed"
->>>>>>> feat/m4-01-trading-scaffold
 }
