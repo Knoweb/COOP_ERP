@@ -230,10 +230,17 @@ public final class DemoTillSale {
     private final Map<String, String> skus = new LinkedHashMap<>();
 
     private String skuOf(Item item, HttpHeaders headers) {
+        // The catalogue search matches names and codes, not barcodes: find the item by its
+        // English name, which the demo loader keeps unique.
         return skus.computeIfAbsent(item.barcode(), barcode -> {
-            JsonNode page = call(HttpMethod.GET, "/v1/catalogue/skus?q=" + barcode + "&limit=1", null, headers);
-            JsonNode first = page.path("items").path(0);
-            return first.path("skuId").asText();
+            String q = java.net.URLEncoder.encode(item.nameEn(), java.nio.charset.StandardCharsets.UTF_8);
+            JsonNode page = call(HttpMethod.GET, "/v1/catalogue/skus?q=" + q + "&limit=20", null, headers);
+            for (JsonNode sku : page.path("items")) {
+                if (item.nameEn().equals(sku.path("nameEn").asText())) {
+                    return sku.path("skuId").asText();
+                }
+            }
+            return "";
         });
     }
 

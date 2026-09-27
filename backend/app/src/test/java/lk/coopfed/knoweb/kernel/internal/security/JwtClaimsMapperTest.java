@@ -178,6 +178,16 @@ class JwtClaimsMapperTest {
                         .map(jwt(Map.of("sub", USER.toString(), "auth_time", at)), null, null, null, null)
                         .mfaAt())
                 .isEqualTo(Instant.ofEpochSecond(at));
+        // A password-grant token has no auth_time: on the development realm its iat is the fresh
+        // password sign-in; anywhere else a token without auth_time has no second factor.
+        Instant signedIn = Instant.now().minusSeconds(30).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        assertThat(development
+                        .map(jwt(Map.of("sub", USER.toString(), "iat", signedIn)), null, null, null, null)
+                        .mfaAt())
+                .isEqualTo(signedIn);
+        assertThat(mapper.map(jwt(Map.of("sub", USER.toString(), "iat", signedIn)), null, null, null, null)
+                        .mfaAt())
+                .isNull();
     }
 
     @Test

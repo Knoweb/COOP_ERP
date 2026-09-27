@@ -250,6 +250,12 @@ public class JwtClaimsMapper {
             return explicit;
         }
         Instant authTime = instantClaim(jwt.getClaim(AUTH_TIME));
+        if (authTime == null && passwordReauthCounts) {
+            // A development realm only: a token from the password grant (scripts, the smoke test,
+            // make demo-till-sale) carries no auth_time, and the password was checked when the
+            // token was issued, so iat is the moment of that fresh password sign-in.
+            authTime = instantClaim(jwt.getClaim("iat"));
+        }
         if (authTime == null) {
             return null;
         }
