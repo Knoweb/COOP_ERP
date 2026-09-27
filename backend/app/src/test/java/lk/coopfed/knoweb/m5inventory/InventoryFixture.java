@@ -93,6 +93,11 @@ public final class InventoryFixture {
             admin.update("delete from catalogue.batch where batch_id = ?", batch);
         }
         for (UUID sku : skus) {
+            // A test may have corrected a batch: its replacement is a batch of the same item.
+            admin.update(
+                    "delete from catalogue.batch_key where batch_id in (select batch_id from catalogue.batch where sku_id = ?)",
+                    sku);
+            admin.update("delete from catalogue.batch where sku_id = ?", sku);
             admin.update("delete from catalogue.sku where sku_id = ?", sku);
         }
         for (UUID location : locations) {
