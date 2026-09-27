@@ -44,8 +44,8 @@ public class EnrolmentStore {
     /**
      * The permission of the catalogue that lets an administrator enrol a device (M1's
      * EnrolDevice and AssignDeviceToPosition, 21A section 6): the code is the other half of the
-     * same workflow, so it asks for the same permission; sys.device.manage stays unused for the
-     * catalogue freeze (M1-06).
+     * same workflow, so it asks for the same permission (the coarse sys.device.manage was
+     * retired by CR-21A-1, m1security V0014).
      */
     static final String PERMISSION = "sys.device.enrol";
 

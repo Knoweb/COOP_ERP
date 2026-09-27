@@ -1,9 +1,13 @@
+# Federation defaults (owner NULL). The second pair is 21A section 3.3's self-review guard:
+# whoever reviews an entity's audit trail is not the one who manages its users. It replaced a
+# pair over the retired gov.entity.manage (CR-21A-1 item 1, 27 September 2026; m1security V0014
+# removes the old row from existing databases).
 pairs:
   - id: "01921319-dfc4-7264-b580-c11df5ed4c53"
     permission_a: "gov.role.manage"
     permission_b: "gov.user.manage"
     mode: "INSTANCE"
-  - id: "0192131a-0518-7ba6-8f3a-965a956edb3b"
-    permission_a: "gov.entity.manage"
-    permission_b: "gov.external.grant"
+  - id: "01998f2a-3c41-7d5e-8b62-4a1f0c9e7d23"
+    permission_a: "gov.audit.review"
+    permission_b: "gov.user.manage"
     mode: "INSTANCE"

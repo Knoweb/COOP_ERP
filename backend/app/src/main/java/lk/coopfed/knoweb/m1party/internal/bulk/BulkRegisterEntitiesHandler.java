@@ -33,9 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
  * single registration ({@link EntityRegistrar}), written, audited and published here, in this
  * one transaction: one audit record and one {@code entity.registered.v1} per entity.
  *
- * <p>All or none, by design: a register of legal entities is corrected in the file and sent
- * again, and an operator never has to work out which half of a file went in. The report says
- * which rows and why, in file order, with a message id per problem for the screen to show.
+ * <p>All or none, by design (CR-21A-5 item 1, accepted 27 September 2026, where 21A section 6
+ * and doc 21 section 5.1 say "commit per row"): a register of legal entities is corrected in the
+ * file and sent again, an operator never has to work out which half of a file went in, and an
+ * entity, once registered, is never deleted, so a half-committed wrong file could not be taken
+ * back. The report says which rows and why, in file order, with a message id per problem for
+ * the screen to show.
  */
 @Service
 @CommandHandler(permission = "gov.entity.register")

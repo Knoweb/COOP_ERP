@@ -35,6 +35,9 @@ public class Relationship implements Persistable<UUID> {
     static final String STATUS_ACTIVE = "ACTIVE";
     static final String STATUS_SUSPENDED = "SUSPENDED";
 
+    /** A row corrected before its first day came (CR-21A-2): never in force, kept as the record. */
+    static final String STATUS_REPLACED = "REPLACED";
+
     static final String DEFAULT_ALLOCATION_RULE = "FCFS";
     static final short DEFAULT_DISCREPANCY_WINDOW_DAYS = 7;
     static final short DEFAULT_ORDER_LOCK_HOURS = 24;
@@ -198,6 +201,11 @@ public class Relationship implements Persistable<UUID> {
 
     void suspend() {
         this.status = STATUS_SUSPENDED;
+    }
+
+    /** Takes a row that has not started out of force; its terms and range stay as they were. */
+    void replace() {
+        this.status = STATUS_REPLACED;
     }
 
     boolean isDraft() {
