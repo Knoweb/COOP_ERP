@@ -6,6 +6,7 @@
 |_Services_
 
 * `l.c.k.m.query.DeliveryQueries` (via `l.c.k.m.internal.queries.DeliveryQueriesImpl`)
+* `l.c.k.m.query.GrnQueries` (via `l.c.k.m.internal.queries.GrnQueriesImpl`)
 * `l.c.k.m.query.OrderQueries` (via `l.c.k.m.internal.queries.OrderQueriesImpl`)
 
 _Others_
@@ -20,10 +21,13 @@ _Others_
 * `l.c.k.k.api.DocumentIssuance` (in Platform Kernel)
 * `l.c.k.k.api.NumberingService` (in Platform Kernel)
 * `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
-* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
-* `l.c.k.m.query.PricingQueries` (in M3 Pricing & Rules)
+* `l.c.k.k.api.BusinessDate` (in Platform Kernel)
+* `l.c.k.k.api.DocumentLinks` (in Platform Kernel)
 * `l.c.k.m.query.RelationshipQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.m.query.CatalogueQueries` (in M2 Catalogue & Batch)
+* `l.c.k.m.api.BatchRegistration` (in M2 Catalogue & Batch)
+* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
+* `l.c.k.m.query.PricingQueries` (in M3 Pricing & Rules)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
