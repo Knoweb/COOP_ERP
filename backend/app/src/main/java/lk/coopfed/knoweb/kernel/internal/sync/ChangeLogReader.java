@@ -68,6 +68,11 @@ public class ChangeLogReader {
         // till enrolled before anything was published to its shop has nothing to download, and
         // "full snapshot required" would send it to an endpoint with nothing to serve.
         boolean full = (since == 0 && current > 0) || since > current;
+        // The nightly purge (kernel V0082) cut the log at a version: a device below it would see
+        // a delta with holes.
+        if (!full && since < current && since < SnapshotBuilder.purgedThrough(jdbc, location)) {
+            full = true;
+        }
         if (!full && since < current) {
             Timestamp oldestNeeded = jdbc.queryForObject(
                     "select min(recorded_at) from kernel.change_log where location_id = ? and version > ?",

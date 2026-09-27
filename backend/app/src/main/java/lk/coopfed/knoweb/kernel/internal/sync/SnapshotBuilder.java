@@ -238,10 +238,17 @@ public class SnapshotBuilder {
         return versions.isEmpty() ? 0 : versions.getFirst();
     }
 
-    /** As the change-log reader decides it: the oldest entry the device needs is past the retention. */
+    /**
+     * As the change-log reader decides it: the log no longer holds everything after the device's
+     * version, because the nightly purge cut it there (kernel V0082), or the oldest entry the
+     * device needs is past the retention.
+     */
     private boolean olderThanRetention(UUID location, long since, long current, Duration retention) {
         if (since >= current) {
             return false;
+        }
+        if (since < purgedThrough(jdbc, location)) {
+            return true;
         }
         Timestamp oldestNeeded = jdbc.queryForObject(
                 "select min(recorded_at) from kernel.change_log where location_id = ? and version > ?",
@@ -250,6 +257,15 @@ public class SnapshotBuilder {
                 since);
         return oldestNeeded == null
                 || oldestNeeded.toInstant().isBefore(clock.instant().minus(retention));
+    }
+
+    /** How far the nightly purge cut the location's change log (ChangeLogPurgeJob); 0 when never. */
+    static long purgedThrough(JdbcTemplate jdbc, UUID location) {
+        List<Long> purged = jdbc.queryForList(
+                "select purged_through_version from kernel.location_snapshot_version where location_id = ?",
+                Long.class,
+                location);
+        return purged.isEmpty() ? 0 : purged.getFirst();
     }
 
     private boolean urgentBetween(UUID location, long since, long current) {
