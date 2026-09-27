@@ -26,7 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /** Every guard of DefineConversion (22A section 6) with its failing case, and what it audits and publishes. */
 class DefineConversionHandlerPostgresIntegrationTest extends PostgresIntegrationTest {
 
-    private static final UUID FEDERATION = UUID.fromString("0190e640-0000-7000-8000-000000000001");
+    private static final UUID FEDERATION = TEST_FEDERATION; // only its SHARED rows are published (m2catalogue V0006)
     private static final UUID MPCS = UUID.fromString("0190e640-0000-7000-8000-000000000002");
     private static final UUID OTHER_MPCS = UUID.fromString("0190e640-0000-7000-8000-000000000003");
     private static final UUID USER = UUID.fromString("0190e640-0000-7000-8000-000000000010");

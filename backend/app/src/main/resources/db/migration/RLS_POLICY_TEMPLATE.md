@@ -98,7 +98,11 @@ Three cases the template does not cover, and what does:
   `federation_*` policies of `party.entity` carry it in SQL. That is the fifth class,
   `fed_admin`, which `CR-21A-1` item 2 (accepted 27 September 2026) adds to 17A section 6.3:
   a `federation_*` policy is written only where the implementation guide says the Federation
-  administers rows it does not own, and the handler guard stays.
+  administers rows it does not own, and the handler guard stays. A policy that must know which entity is the Federation
+  asks `(SELECT kernel.system_entity())` (kernel `V0061`: the copy of
+  `coop-erp.system.entity-id` the platform writes on every start; NULL, so admitting nothing,
+  when none is configured), never a session variable. `catalogue.sku` is the example: only the
+  Federation's rows are SHARED (m2catalogue `V0006`).
 - **A user's own rows regardless of tenant** (the idempotency key): a policy on
   `app.user_id`, which the customizer sets for the request's user (kernel `V0010`).
 

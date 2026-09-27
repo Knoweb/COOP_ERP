@@ -15,6 +15,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 - `CR-17A-1` — the problem document's field list (`errors`, `FieldProblem`); the message id is carried by `code`, not `type`.
 - `CR-17A-2` — Spring Boot 3.5 / Spring Modulith 1.4 (17A §3 says 3.3 / 1.2); applied in the repository (#55).
 - `CR-19A-5` — a login user `coop_relay` (member of `app_relay` only) and its own small data source; 17A §6's role line needs the same wording as 19A §5.
+- `CR-17A-3` — the policy template's `own_*` test the class OWN, and `party_read` carries the location line on the owner's side only (also 19A §1); every write policy of `app_rw` is checked for the class by `OwnPoliciesTestTheClassIntegrationTest`.
 
 ### 18 (Core Data Model)
 
@@ -34,7 +35,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 
 ### 21A (M1 Party, Tenancy and Security Implementation Guide)
 
-- `CR-21A-1` — accepted as revised: the permission catalogue of §3.3 verb by verb plus `gov.entity.suspend` and one read code per aggregate (the four coarse `manage` codes retired, `gov.audit.review` and its self-review pair added); AppointResponsibleOfficer keeps `gov.user.manage`; 422 for every business rule (§5, and 17A §4.3); §6 says a handler repeats a shape rule only where the command also arrives by another path. Also 17A §6.3 (`fed_admin`) and 18 Part F (`party.federation_identity`, `party.entity_party_directory`).
+- `CR-21A-1` — accepted as revised: the permission catalogue of §3.3 verb by verb plus `gov.entity.suspend` and one read code per aggregate (the four coarse `manage` codes retired, `gov.audit.review` and its self-review pair added); AppointResponsibleOfficer keeps `gov.user.manage`; 422 for every business rule (§5, and 17A §4.3); §6 says a handler repeats a shape rule only where the command also arrives by another path. Item 2: the kernel names the Federation, `kernel.system_entity()` (kernel V0061, #142; folding `party.federation_identity` into it is `docs/PLAN_TO_M2.md` task 6.11); 17A §6.3 adopts `fed_admin`; 18 Part F lists `party.entity_party_directory` (and `party.federation_identity` until 6.11).
 - `CR-21A-2` — AmendRelationshipTerms never before today; a row not yet started is corrected on its first day and becomes REPLACED (also doc 18 Part A, doc 21 §4.2).
 - `CR-21A-3` — option 1: `user_role`, `role_permission` and `sod_pair` keep their audited deletes (§6; also 17A §6.2 and 18 Part F).
 - `CR-21A-4` — `LocationFilter` (m1party's frozen query package) gains an optional `entityId`, needed by 22A's `listLocations(entity)`.
