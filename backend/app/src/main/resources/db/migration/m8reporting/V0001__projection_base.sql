@@ -1,5 +1,5 @@
 -- M8-01: the projection base (28A sections 3 and 6; doc 28 sections 3 and 4), with the first
--- projection, the stock position (M8-04, part), as the sample the equivalence harness runs on.
+-- projection, the stock position (M8-03, part), as the sample the equivalence harness runs on.
 --
 --   projection_state   per projection and entity: the last event applied
 --   stock_position     one row per (location, batch, condition), from stock.moved.v1

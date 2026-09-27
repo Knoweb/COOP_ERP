@@ -6,7 +6,9 @@ import static lk.coopfed.knoweb.m4trading.TradingFixture.DRAFT_SKU;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RELATIONSHIP;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER_WAREHOUSE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.STRANGER;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.WAREHOUSE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyerAt;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.seller;
@@ -138,6 +140,8 @@ class OrderHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> create.handle(order(SELLER, new CreateOrder.Line(RICE, "CASE", new BigDecimal("5"))), buyer()),
                 "m4.order.uom_invalid");
         refused(() -> create.handle(order(SELLER, line(RICE, "0")), buyer()), "m4.order.qty_not_positive");
+        refused(() -> create.handle(deliverTo(SELLER_WAREHOUSE), buyer()), "m4.order.deliver_to_unknown");
+        refused(() -> create.handle(deliverTo(UUID.randomUUID()), buyer()), "m4.order.deliver_to_unknown");
         refused(() -> create.handle(order(SELLER, line(RICE, "5")), buyerAt(TradingFixture.SHOP)), "scope.invalid");
 
         assertThat(orders.listOrders(OrderQueries.Role.BUYER, null, buyer())).isEmpty();
@@ -235,7 +239,26 @@ class OrderHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).isEmpty();
     }
 
+    @Test
+    void theBuyerNamesWhereTheGoodsGoAndTheSellerReadsIt() {
+        UUID orderId = create.handle(deliverTo(WAREHOUSE), buyer());
+
+        assertThat(orders.getOrder(orderId, buyer()).orElseThrow().deliverToLocationId())
+                .isEqualTo(WAREHOUSE);
+        submit.handle(new SubmitOrder(orderId), buyer());
+        assertThat(orders.getOrder(orderId, seller()).orElseThrow().deliverToLocationId())
+                .isEqualTo(WAREHOUSE);
+        assertThat(kernel.committedAudit())
+                .filteredOn(record -> "ORDER_CREATED".equals(record.eventType()))
+                .singleElement()
+                .satisfies(record -> assertThat(String.valueOf(record.after())).contains(WAREHOUSE.toString()));
+    }
+
     // ---- helpers -----------------------------------------------------------------------------
+
+    private static CreateOrder deliverTo(UUID location) {
+        return new CreateOrder(SELLER, null, null, List.of(line(RICE, "5")), location);
+    }
 
     private static CreateOrder twoLines() {
         return new CreateOrder(SELLER, today().plusDays(3), "first order", List.of(line(RICE, "10"), line(DHAL, "4")));

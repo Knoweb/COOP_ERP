@@ -1,0 +1,189 @@
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useT } from "../../shell/i18n/useT";
+import { useHasPermission } from "../../shell/auth/permissions";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { StateChip } from "../../shell/components/StateChip";
+import { EntityName } from "./labels";
+import { useTradingApi, type Side } from "./tradingApi";
+import { deliveryChip, errorText, grnChip, orderChip } from "./tradingView";
+
+/**
+ * The trading desk (doc 30 section 5.4; 24A section 8, demo scope): one page with the registers a
+ * user's job needs, each shown only to a user holding its permission. The buyer's requisition
+ * book (own orders), the seller's order desk (orders received), the seller's delivery notes and
+ * the receiver's incoming deliveries and goods received notes.
+ */
+export function TradingPage() {
+  const t = useT();
+  const canOrder = useHasPermission("ord.order.draft");
+  const canAccept = useHasPermission("ord.order.accept");
+  const canDraftNote = useHasPermission("del.note.draft");
+  const canIssueNote = useHasPermission("del.note.issue");
+  const canDispatch = useHasPermission("del.note.dispatch");
+  const canReceive = useHasPermission("shop.grn.confirm");
+
+  return (
+    <main className="shell-page">
+      <h1>{t("trading.title").text}</h1>
+      {canOrder && (
+        <section>
+          <h2>{t("trading.book.title").text}</h2>
+          <p>
+            <Link to="/trading/orders/new">{t("trading.order.new").text}</Link>
+          </p>
+          <OrderRegister role="BUYER" />
+        </section>
+      )}
+      {canAccept && (
+        <section>
+          <h2>{t("trading.desk.title").text}</h2>
+          <OrderRegister role="SELLER" />
+        </section>
+      )}
+      {(canDraftNote || canIssueNote || canDispatch) && (
+        <section>
+          <h2>{t("trading.notes.title").text}</h2>
+          <DeliveryRegister role="SELLER" />
+        </section>
+      )}
+      {canReceive && (
+        <section>
+          <h2>{t("trading.incoming.title").text}</h2>
+          <DeliveryRegister role="BUYER" />
+          <h2>{t("trading.grns.title").text}</h2>
+          <GrnRegister />
+        </section>
+      )}
+    </main>
+  );
+}
+
+function OrderRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const orders = useQuery({ queryKey: ["trading", "orders", role], queryFn: () => api.orders(role) });
+
+  if (orders.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (orders.isError) {
+    return <p role="alert">{errorText(orders.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!orders.data?.length) {
+    return <p>{t("trading.orders.empty").text}</p>;
+  }
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{t("trading.column.number").text}</th>
+          <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+          <th>{t("trading.column.status").text}</th>
+          <th>{t("trading.column.amount").text}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {orders.data.map((order) => (
+          <tr key={order.orderId}>
+            <td>
+              <Link to={`/trading/orders/${order.orderId}`}>{order.docNumber ?? t("trading.order.draft_number").text}</Link>
+            </td>
+            <td>
+              <EntityName entityId={role === "BUYER" ? order.sellerEntityId : order.buyerEntityId} />
+            </td>
+            <td>
+              <StateChip state={orderChip(order.status)} label={t(`trading.order.status.${order.status}`).text} />
+            </td>
+            <td>
+              <MoneyDisplay amount={order.netAmount} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function DeliveryRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const notes = useQuery({ queryKey: ["trading", "notes", role], queryFn: () => api.deliveryNotes(role) });
+
+  if (notes.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (notes.isError) {
+    return <p role="alert">{errorText(notes.error, t("trading.error.generic").text)}</p>;
+  }
+  const rows = (notes.data ?? []).filter((note) => role === "SELLER" || note.status !== "DRAFT");
+  if (rows.length === 0) {
+    return <p>{t("trading.notes.empty").text}</p>;
+  }
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{t("trading.column.number").text}</th>
+          <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+          <th>{t("trading.column.status").text}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((note) => (
+          <tr key={note.deliveryNoteId}>
+            <td>
+              <Link to={`/trading/delivery-notes/${note.deliveryNoteId}`}>{note.docNumber ?? t("trading.order.draft_number").text}</Link>
+            </td>
+            <td>
+              <EntityName entityId={role === "BUYER" ? note.sellerEntityId : note.buyerEntityId} />
+            </td>
+            <td>
+              <StateChip state={deliveryChip(note.status)} label={t(`trading.note.status.${note.status}`).text} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function GrnRegister() {
+  const t = useT();
+  const api = useTradingApi();
+  const grns = useQuery({ queryKey: ["trading", "grns", "BUYER"], queryFn: () => api.grns("BUYER") });
+
+  if (grns.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (grns.isError) {
+    return <p role="alert">{errorText(grns.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!grns.data?.length) {
+    return <p>{t("trading.grns.empty").text}</p>;
+  }
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{t("trading.column.number").text}</th>
+          <th>{t("trading.column.seller").text}</th>
+          <th>{t("trading.column.status").text}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {grns.data.map((grn) => (
+          <tr key={grn.grnId}>
+            <td>
+              <Link to={`/trading/grns/${grn.grnId}`}>{grn.docNumber ?? t("trading.order.draft_number").text}</Link>
+            </td>
+            <td>{grn.sellerEntityId && <EntityName entityId={grn.sellerEntityId} />}</td>
+            <td>
+              <StateChip state={grnChip(grn.status)} label={t(`trading.grn.status.${grn.status}`).text} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
