@@ -81,7 +81,21 @@ public final class ChromiumPdf {
                             System.getProperty("os.name").startsWith("Windows") ? "NUL" : "/dev/null")))
                     .redirectErrorStream(true)
                     .redirectOutput(dir.resolve("chromium.log").toFile());
-            builder.environment().putAll(Map.of("HOME", dir.toString()));
+            // A clean environment: the browser inherits no session bus, display or proxy of the
+            // JVM's (on the pipeline's runner an inherited session bus kept it from ever exiting),
+            // and a HOME it can write, which Chromium needs to start at all as user 10001.
+            Map<String, String> env = builder.environment();
+            String path = env.get("PATH");
+            String systemRoot = env.get("SystemRoot");
+            env.clear();
+            if (path != null) {
+                env.put("PATH", path);
+            }
+            if (systemRoot != null) {
+                env.put("SystemRoot", systemRoot);
+            }
+            env.put("HOME", dir.toString());
+            env.put("TMPDIR", dir.toString());
             Process process = builder.start();
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);
