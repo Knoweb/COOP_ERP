@@ -37,18 +37,16 @@ final class Names {
         if (id == null) {
             return "";
         }
-        return entities.computeIfAbsent(id, key -> party.getEntity(key, scope)
-                .map(this::name)
-                .orElseGet(() -> shortId(key)));
+        return entities.computeIfAbsent(
+                id, key -> party.getEntity(key, scope).map(this::name).orElseGet(() -> shortId(key)));
     }
 
     String location(UUID id) {
         if (id == null) {
             return "";
         }
-        return locations.computeIfAbsent(id, key -> party.getLocation(key, scope)
-                .map(this::name)
-                .orElseGet(() -> shortId(key)));
+        return locations.computeIfAbsent(
+                id, key -> party.getLocation(key, scope).map(this::name).orElseGet(() -> shortId(key)));
     }
 
     String skuCode(UUID id) {
@@ -78,11 +76,12 @@ final class Names {
     }
 
     private String pick(String en, String si, String ta) {
-        String chosen = switch (scope.lang()) {
-            case "si" -> si;
-            case "ta" -> ta;
-            default -> en;
-        };
+        String chosen =
+                switch (scope.lang()) {
+                    case "si" -> si;
+                    case "ta" -> ta;
+                    default -> en;
+                };
         return chosen == null || chosen.isBlank() ? (en == null ? "" : en) : chosen;
     }
 

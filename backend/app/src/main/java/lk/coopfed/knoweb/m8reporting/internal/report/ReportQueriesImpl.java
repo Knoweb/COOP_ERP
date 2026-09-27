@@ -109,7 +109,8 @@ class ReportQueriesImpl implements ReportingQueries {
     /** The report and its period guards, for the report and for a run request alike. */
     static Definition definition(String reportId) {
         return ReportCatalogue.find(reportId)
-                .orElseThrow(() -> new ProblemException("m8.report.unknown", Map.of("reportId", String.valueOf(reportId))));
+                .orElseThrow(
+                        () -> new ProblemException("m8.report.unknown", Map.of("reportId", String.valueOf(reportId))));
     }
 
     static void checkPeriod(Definition definition, ReportParameters parameters) {
@@ -229,7 +230,9 @@ class ReportQueriesImpl implements ReportingQueries {
 
     private Instant freshness(String projection) {
         Timestamp latest = jdbc.queryForObject(
-                "select max(last_event_at) from reporting.projection_state where name = ?", Timestamp.class, projection);
+                "select max(last_event_at) from reporting.projection_state where name = ?",
+                Timestamp.class,
+                projection);
         return latest == null ? null : latest.toInstant();
     }
 

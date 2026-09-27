@@ -4,7 +4,6 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
@@ -54,8 +53,8 @@ class CompleteReportRunHandler implements Handles<CompleteReportRun, String> {
                         command.runId())
                 .stream()
                 .findFirst()
-                .orElseThrow(() -> new ProblemException(
-                        "m8.run.not_found", Map.of("runId", String.valueOf(command.runId()))));
+                .orElseThrow(() ->
+                        new ProblemException("m8.run.not_found", Map.of("runId", String.valueOf(command.runId()))));
         if (!"REQUESTED".equals(run.get("status"))) {
             throw new ProblemException("m8.run.not_open");
         }
@@ -78,9 +77,15 @@ class CompleteReportRunHandler implements Handles<CompleteReportRun, String> {
         if (command.errorCode() != null) {
             after.put("errorCode", command.errorCode());
         }
-        audit.record(AUDIT_COMPLETED, Subject.of("report_run", command.runId()), Map.of("status", "REQUESTED"), after, scope);
+        audit.record(
+                AUDIT_COMPLETED,
+                Subject.of("report_run", command.runId()),
+                Map.of("status", "REQUESTED"),
+                after,
+                scope);
         String reportId = (String) run.get("report_id");
-        events.publish(new ReportRunCompleted(command.runId(), reportId, status, command.objectKey(), command.errorCode()));
+        events.publish(
+                new ReportRunCompleted(command.runId(), reportId, status, command.objectKey(), command.errorCode()));
         return status;
     }
 }

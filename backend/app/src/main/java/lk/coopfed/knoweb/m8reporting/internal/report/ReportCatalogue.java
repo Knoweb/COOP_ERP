@@ -23,7 +23,12 @@ final class ReportCatalogue {
     static final String MONEY = "MONEY";
 
     record Definition(
-            String reportId, String titleId, String decisionId, boolean period, boolean location, List<Column> columns) {
+            String reportId,
+            String titleId,
+            String decisionId,
+            boolean period,
+            boolean location,
+            List<Column> columns) {
 
         ReportDefinitionView view() {
             return new ReportDefinitionView(reportId, titleId, decisionId, period, location);

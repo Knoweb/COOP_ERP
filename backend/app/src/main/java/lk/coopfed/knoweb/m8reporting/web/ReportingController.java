@@ -2,13 +2,11 @@ package lk.coopfed.knoweb.m8reporting.web;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
-import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
@@ -72,7 +70,7 @@ class ReportingController implements ReportingApi {
                                 DashboardTile.KindEnum.fromValue(tile.kind()))
                         .drillReportId(tile.drillReportId()))
                 .toList());
-        response.setFreshness(offset(dashboard.freshness()));
+        response.setFreshness(dashboard.freshness());
         return ResponseEntity.ok(response);
     }
 
@@ -96,8 +94,8 @@ class ReportingController implements ReportingApi {
                         .toList(),
                 table.rows(),
                 table.totals(),
-                offset(table.generatedAt()));
-        response.setFreshness(offset(table.freshness()));
+                table.generatedAt());
+        response.setFreshness(table.freshness());
         return ResponseEntity.ok(response);
     }
 
@@ -145,18 +143,14 @@ class ReportingController implements ReportingApi {
                 run.reportId(),
                 ReportRunResponse.StatusEnum.fromValue(run.status()),
                 run.language(),
-                offset(run.requestedAt()));
+                run.requestedAt());
         response.setErrorCode(run.errorCode());
-        response.setCompletedAt(offset(run.completedAt()));
+        response.setCompletedAt(run.completedAt());
         A4Renderer pdf = renderer.getIfAvailable();
         if (run.objectKey() != null && pdf != null) {
             // presignGet works on every role (the worker stored the PDF); a fresh link each time.
             response.setDownloadUrl(pdf.presignGet(run.objectKey(), scope));
         }
         return response;
-    }
-
-    private static OffsetDateTime offset(java.time.Instant instant) {
-        return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
     }
 }

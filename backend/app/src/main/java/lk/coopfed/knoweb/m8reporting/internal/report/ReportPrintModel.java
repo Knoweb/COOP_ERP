@@ -45,10 +45,7 @@ class ReportPrintModel {
             data.put(
                     "subtitle",
                     messages.t(
-                            "m8.print.period",
-                            locale,
-                            formats.date(parameters.from()),
-                            formats.date(parameters.to())));
+                            "m8.print.period", locale, formats.date(parameters.from()), formats.date(parameters.to())));
         }
         data.put("generated", messages.t("m8.print.generated", locale, formats.dateTime(table.generatedAt())));
         if (table.freshness() != null) {

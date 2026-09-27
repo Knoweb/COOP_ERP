@@ -230,7 +230,7 @@ components:
         reportId: { type: string }
         status: { type: string, enum: [REQUESTED, READY, FAILED] }
         language: { type: string }
-        errorCode: { type: string, description: The renderer's message id, when FAILED }
+        errorCode: { type: string, description: 'The renderer''s message id, when FAILED' }
         downloadUrl: { type: string, format: uri, description: 'A pre-signed link to the PDF, when READY' }
         requestedAt: { type: string, format: date-time }
         completedAt: { type: string, format: date-time }

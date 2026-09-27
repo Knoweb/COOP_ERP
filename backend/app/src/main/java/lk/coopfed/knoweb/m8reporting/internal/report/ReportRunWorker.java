@@ -52,9 +52,10 @@ class ReportRunWorker {
     public void onRequested(JsonNode payload, ScopeContext scope) {
         UUID runId = UUID.fromString(payload.path("runId").asText());
         String reportId = payload.path("reportId").asText();
-        ScopeContext inLanguage = withLocale(scope, Locale.forLanguageTag(payload.path("language").asText("en")));
-        ReportParameters parameters = new ReportParameters(
-                date(payload, "from"), date(payload, "to"), uuid(payload, "reportLocationId"));
+        ScopeContext inLanguage =
+                withLocale(scope, Locale.forLanguageTag(payload.path("language").asText("en")));
+        ReportParameters parameters =
+                new ReportParameters(date(payload, "from"), date(payload, "to"), uuid(payload, "reportLocationId"));
         String objectKey = null;
         String errorCode = null;
         try {
