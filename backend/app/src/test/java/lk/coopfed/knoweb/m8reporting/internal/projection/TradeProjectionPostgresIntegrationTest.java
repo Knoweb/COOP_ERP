@@ -31,7 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The trading projections (M8-06 in part) against the payloads of M4's event records: rebuild
+ * The trading projections (M8-04 in part) against the payloads of M4's event records: rebuild
  * equivalence over random trading flows first (28A section 9), then what one flow leaves.
  */
 class TradeProjectionPostgresIntegrationTest extends PostgresIntegrationTest {

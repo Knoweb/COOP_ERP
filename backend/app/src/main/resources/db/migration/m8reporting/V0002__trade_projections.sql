@@ -1,5 +1,5 @@
 -- The trading projections of the demo (28A section 3, trade_document_fact; doc 28 section 3:
--- "M4 events -> trade documents by relationship, status and value"), M8-06 in part.
+-- "M4 events -> trade documents by relationship, status and value"), M8-04 in part.
 --
 --   trade_document_event   one row per trading event on a document: submitted, accepted,
 --                          rejected, cancelled, dispatched, confirmed (GRN), issued (invoice)
