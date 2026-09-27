@@ -154,7 +154,7 @@ public final class TradingFixture {
                 """,
                 id,
                 code,
-                PostgresIntegrationTestFederation.ID,
+                owner,
                 status,
                 code,
                 code,

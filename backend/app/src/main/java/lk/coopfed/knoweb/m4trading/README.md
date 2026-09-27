@@ -61,6 +61,16 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 - **M4-05 GRN**: `doc_grn*`, `doc_discrepancy*`; `grn.captured/confirmed.v1`, `discrepancy.raised.v1`; M2's `BatchRegistration` inside the confirmation.
 - **M4-08 invoices**: `doc_invoice`, `posting_map`; `invoice.issued.v1`, `journal.postings_ready.v1`; `TaxRates`.
 
+## Orders (M4-02)
+
+| Command | Permission | Guards, in order | Effect | Audit, event |
+|---|---|---|---|---|
+| CreateOrder | `ord.order.draft` | buyer entity-wide OWN; seller not the buyer; ACTIVE relationship today (M1); ETA not past; lines; per line a tradable item (M2), its base unit, qty > 0 | kernel draft (lines at the indicative `TradePricing` price), `doc_order`, `doc_order_line` | ORDER_CREATED, `order.created.v1` |
+| SubmitOrder | `ord.order.submit` | owner's DRAFT; relationship ACTIVE; ≥ 1 line (ORD validator) | buyer's ENTITY series (`TradingSeries`), issued, ISSUED to SUBMITTED | ORDER_SUBMITTED, `order.submitted.v1` |
+| CancelOrder | `ord.order.submit` | owner's DRAFT or SUBMITTED; not rejected; nothing fulfilled; reason | CANCELLED; `cancelled_qty` = request | ORDER_CANCELLED, `order.cancelled.v1` |
+
+Shared pieces in `internal/document`: `TradingClock` (today in the business zone, a state history row), `TradingSeries`, `TradingGuards`, `TradingDocuments` (draft header and line builders). `internal/queries/OrderStatus` derives the status the screens show. Only a `@CommandHandler` class writes (ArchitectureTests), so the handlers hold their own SQL.
+
 ## Deviations from the implementation guide
 
 Every difference between the schema as migrated and 24A section 3, and between the handlers and 24A sections 5 and 6, with the reason. Items 1 to 5 are recorded in `docs/change-requests/CR-24A-1.md`, decided 27 September 2026 on the architect's delegation.
@@ -75,3 +85,5 @@ Every difference between the schema as migrated and 24A section 3, and between t
 8. **The three questions to M3, M2 and M5 are interfaces of `api`** (`TradePricing`, `TaxRates`, `InventoryAvailability`), answered for the demo from the register; 24A section 4 names `m3pricing::query` and `m5inventory::query`, which do not exist yet, and M2 publishes no tax query.
 9. **`doc_grn` has `relationship_id`** (the relationship the delivery was made under, kept for the invoice and the cost basis) and a CHECK that a GRN names a drop or a supplier, never both; `doc_order_line` and `doc_delivery_line` carry `document_id` for the header policy (24A's `doc_delivery_line` keys on the drop only).
 10. **Two role templates, "Trading Buyer" and "Trading Seller"**: 24A section 3.1 seeds permissions only; the demo's staff need roles that hold them.
+11. **Order lines in the base unit only (M4-02)**: M2 publishes no unit conversion query yet, so CreateOrder refuses another unit (`m4.order.uom_invalid`) until it does.
+12. **CancelOrder cancels a whole order before any dispatch (M4-02)**: 24A cancels the undispatched remainder; the demo refuses once anything is fulfilled (`m4.order.dispatched`).
