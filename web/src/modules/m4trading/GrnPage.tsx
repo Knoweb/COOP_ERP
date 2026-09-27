@@ -29,6 +29,9 @@ export function GrnPage() {
   const queryClient = useQueryClient();
   const canConfirm = useHasPermission("shop.grn.confirm");
   const canInvoice = useHasPermission("bil.invoice.issue");
+  // The stock a GRN moved is M5's, read with the receiving permission (inv.stock.receive); a
+  // buyer who may not receive is not shown it, rather than being refused (403) on every visit.
+  const canSeeStock = useHasPermission("inv.stock.receive");
   const navigate = useNavigate();
   const invoiceKey = useIdempotencyKey();
   const key = useIdempotencyKey();
@@ -36,10 +39,18 @@ export function GrnPage() {
   const grn = useQuery({ queryKey: ["trading", "grn", grnId], queryFn: () => api.grn(grnId) });
   const confirmed = grn.data?.status === "CONFIRMED";
   const receiving = grn.data?.receiverEntityId === scope.entityId;
+  // The seller cannot read the buyer's warehouse (CR-24A-2): it names it from the order the
+  // GRN's drop delivered, whose delivery point the order kept (V0004).
+  const note = useQuery({
+    queryKey: ["trading", "delivery-note", grn.data?.deliveryNoteId],
+    queryFn: () => api.deliveryNote(grn.data!.deliveryNoteId!),
+    enabled: grn.data !== undefined && !receiving && !!grn.data.deliveryNoteId,
+    retry: false
+  });
   const receipt = useQuery({
     queryKey: ["trading", "receipt", grnId],
     queryFn: () => api.receipt(grnId),
-    enabled: confirmed && receiving,
+    enabled: confirmed && receiving && canSeeStock,
     retry: false,
     // M5 applies grn.confirmed.v1 after the commit: ask again until the movements are there.
     refetchInterval: (query) => (query.state.status === "success" && query.state.data?.length === 0 ? 2000 : false)
@@ -86,6 +97,7 @@ export function GrnPage() {
 
   const g = grn.data;
   const isReceiver = g.receiverEntityId === scope.entityId;
+  const dropOrderId = note.data?.drops.find((drop) => drop.dropId === g.dropId)?.orderIds[0] ?? null;
 
   return (
     <main className="shell-page">
@@ -96,7 +108,10 @@ export function GrnPage() {
         state={{ look: grnChip(g.status), label: t(`trading.grn.status.${g.status}`).text }}
         facts={[
           { label: t("trading.column.seller").text, value: g.sellerEntityId && <EntityName entityId={g.sellerEntityId} /> },
-          { label: t("trading.field.receive_at").text, value: <LocationName locationId={g.receiverLocationId} /> },
+          {
+            label: t("trading.field.receive_at").text,
+            value: <LocationName locationId={g.receiverLocationId} own={isReceiver} orderId={dropOrderId} />
+          },
           {
             label: t("trading.note.title").text,
             value: g.deliveryNoteId && <Link to={`/trading/delivery-notes/${g.deliveryNoteId}`}>{t("trading.note.open").text}</Link>
@@ -159,7 +174,7 @@ export function GrnPage() {
         </section>
       )}
 
-      {confirmed && isReceiver && (
+      {confirmed && isReceiver && canSeeStock && (
         <section style={{ marginTop: "var(--space-3)" }}>
           <h2>{t("trading.grn.stock_moved").text}</h2>
           {receipt.data && receipt.data.length === 0 && <p>{t("trading.grn.stock_pending").text}</p>}

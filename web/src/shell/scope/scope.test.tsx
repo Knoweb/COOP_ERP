@@ -17,13 +17,24 @@ vi.mock("../auth/session", () => ({ useSession: () => session }));
 
 // The entity's name (M1, gov.entity.view) comes through the resolved permission set and the
 // party API; the tests decide both without a server.
-let permissions: { policyClass: string; permissions: string[]; activeScope?: null } | null = null;
+let permissions: {
+  policyClass: string;
+  permissions: string[];
+  activeScope?: { entityId: string; locationId?: string | null } | null;
+} | null = null;
 vi.mock("../auth/PermissionsContext", () => ({ usePermissions: () => permissions }));
 
 let entityApi: ReturnType<typeof vi.fn>;
+const clientOptions: unknown[] = [];
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, useApiClient: () => ({ GET: entityApi }) };
+  return {
+    ...actual,
+    useApiClient: (options?: unknown) => {
+      clientOptions.push(options);
+      return { GET: entityApi };
+    }
+  };
 });
 
 function signedIn(overrides: Partial<Session>): Session {
@@ -145,6 +156,19 @@ describe("ScopeBanner", () => {
     renderBanner("si");
 
     await waitFor(() => expect(screen.getByRole("region").textContent).toContain("රිදිගම බ.ස.ස"));
+  });
+
+  it("reads the entity at the one place a user holds, so a stores user is not refused (400 scope.invalid)", async () => {
+    const warehouse = "0190f000-0000-7000-8000-000000000101";
+    session = signedIn({});
+    permissions = { policyClass: "OWN", permissions: ["gov.entity.view"], activeScope: { entityId: MPCS, locationId: warehouse } };
+    entityApi = vi.fn(async () => ({ data: { entityId: MPCS, legalNameEn: "Ridigama MPCS" } }));
+    clientOptions.length = 0;
+    renderBanner();
+
+    await waitFor(() => expect(screen.getByRole("region").textContent).toContain("Ridigama MPCS"));
+    // The provider is outside its own context: its client is told the location it worked out.
+    expect(clientOptions).toContainEqual({ locationId: warehouse });
   });
 
   it("keeps the short id when the reader has no gov.entity.view, without asking the server", () => {

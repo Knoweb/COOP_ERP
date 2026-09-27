@@ -5,6 +5,7 @@ import static lk.coopfed.knoweb.m4trading.TradingFixture.BUYER_USER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER_USER;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.WAREHOUSE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -50,6 +51,8 @@ class OrderHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         SELLER.toString(),
                         "requestedEta",
                         TradingFixture.today().plusDays(2).toString(),
+                        "deliverToLocationId",
+                        WAREHOUSE.toString(),
                         "lines",
                         List.of(Map.of("skuId", RICE.toString(), "uomCode", "EA", "qty", 12))),
                 headers(BUYER_USER, BUYER));
@@ -74,6 +77,11 @@ class OrderHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(asSeller.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(asSeller.getBody()).hasSize(1);
         assertThat(asSeller.getBody().get(0).get("status").asText()).isEqualTo("SUBMITTED");
+        // The seller reads the buyer's delivery point from the order (DeliveryPointResponse, V0004).
+        assertThat(asSeller.getBody().get(0).get("deliverTo").get("code").asText())
+                .isEqualTo("W1");
+        assertThat(asSeller.getBody().get(0).get("deliverTo").get("nameEn").asText())
+                .isEqualTo("W1");
 
         ResponseEntity<JsonNode> availability = http.exchange(
                 "/v1/trading/orders/availability?sellerId=" + SELLER + "&skuIds=" + RICE,

@@ -15,6 +15,9 @@ import java.util.UUID;
  * @param netAmount the indicative value of the order at the prices resolved when it was drafted
  * @param deliverToLocationId the buyer's location the goods go to, as the buyer named it (M4-11,
  *     CR-24A-2); null when it named none
+ * @param deliverTo what the buyer's delivery location was called when the order was drafted,
+ *     copied in the buyer's session (V0004), so the seller, who may not read the buyer's
+ *     locations, reads its name too; null when the order names no location
  */
 public record OrderView(
         UUID orderId,
@@ -31,7 +34,11 @@ public record OrderView(
         BigDecimal netAmount,
         String notes,
         List<OrderLineView> lines,
-        UUID deliverToLocationId) {
+        UUID deliverToLocationId,
+        DeliveryPoint deliverTo) {
+
+    /** A location as the order names it: a snapshot taken at drafting, never changed after. */
+    public record DeliveryPoint(String code, String nameEn, String nameSi, String nameTa, String address) {}
 
     /**
      * @param indicativePrice the trade price per unit resolved when the order was drafted

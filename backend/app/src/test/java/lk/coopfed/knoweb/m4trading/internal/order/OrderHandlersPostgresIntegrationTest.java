@@ -248,6 +248,10 @@ class OrderHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         submit.handle(new SubmitOrder(orderId), buyer());
         assertThat(orders.getOrder(orderId, seller()).orElseThrow().deliverToLocationId())
                 .isEqualTo(WAREHOUSE);
+        // The seller may not read the buyer's location (party.location, own_read) and names it from
+        // the order's snapshot, taken in the buyer's session when the order was drafted (V0004).
+        assertThat(orders.getOrder(orderId, seller()).orElseThrow().deliverTo())
+                .isEqualTo(new OrderView.DeliveryPoint("W1", "W1", null, null, null));
         assertThat(kernel.committedAudit())
                 .filteredOn(record -> "ORDER_CREATED".equals(record.eventType()))
                 .singleElement()

@@ -7,7 +7,7 @@ import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { EntityOption, inLocale } from "./labels";
+import { EntityOption, inLocale, skuText } from "./labels";
 import { useTradingApi, type Sku } from "./tradingApi";
 import { businessToday, errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
 
@@ -62,7 +62,7 @@ export function NewOrderPage() {
     setRows((current) =>
       current.some((row) => row.skuId === sku.skuId)
         ? current
-        : [...current, { skuId: sku.skuId, label: `${sku.skuCode} ${sku.nameEn}`, uomCode: sku.baseUomCode, qty: "" }]
+        : [...current, { skuId: sku.skuId, label: skuText(sku, locale), uomCode: sku.baseUomCode, qty: "" }]
     );
   const send = (event: FormEvent) => {
     event.preventDefault();

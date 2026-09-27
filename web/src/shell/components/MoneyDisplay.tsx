@@ -19,7 +19,8 @@ type MoneyDisplayProps = {
  * How the digits are made, and why the client never rounds: formatMoneyDigits in
  * shell/i18n/formats.ts. This component adds the currency, the sign and the accessibility.
  *
- *   - The currency mark is a message ("Rs {amount}"), so each language writes it its own way.
+ *   - The currency mark is a message ("Rs {amount}"), and it is "Rs" in every language: doc 19
+ *     section 5.1, as the kernel formats money since PR #127. Only the spoken negative is words.
  *   - A negative amount shows a real minus sign (U+2212, as wide as a digit), not a hyphen.
  *     Screen readers do not agree on how to read that sign, and some skip it, which would turn
  *     a debt into a credit. So the visible text is hidden from them and they get the sentence

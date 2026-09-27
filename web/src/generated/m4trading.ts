@@ -414,7 +414,16 @@ export interface components {
             notes?: string;
             /** Format: uuid */
             deliverToLocationId?: string;
+            deliverTo?: components["schemas"]["DeliveryPointResponse"];
             lines: components["schemas"]["OrderLineResponse"][];
+        };
+        /** @description The buyer's delivery location as it was when the order was drafted: its code, names and address, copied in the buyer's session, so that the seller, who may not read the buyer's locations, can name it (CR-24A-2 as revised). Never changed after. */
+        DeliveryPointResponse: {
+            code: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+            address?: string;
         };
         OrderLineResponse: {
             /** Format: uuid */

@@ -114,7 +114,7 @@ export function OrderPage() {
         facts={[
           { label: t("trading.column.buyer").text, value: <EntityName entityId={o.buyerEntityId} /> },
           { label: t("trading.column.seller").text, value: <EntityName entityId={o.sellerEntityId} /> },
-          { label: t("trading.field.deliver_to").text, value: o.deliverToLocationId && <LocationName locationId={o.deliverToLocationId} /> },
+          { label: t("trading.field.deliver_to").text, value: o.deliverToLocationId && <LocationName locationId={o.deliverToLocationId} own={isBuyer} known={o.deliverTo} /> },
           { label: t("trading.field.committed_eta").text, value: o.committedEta && formatDate(o.committedEta) },
           { label: t("trading.column.amount").text, value: <MoneyDisplay amount={o.netAmount} /> },
           { label: t("trading.field.reject_reason").text, value: o.rejectReasonCode }

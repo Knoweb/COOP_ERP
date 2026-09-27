@@ -130,7 +130,9 @@ export function problemsOfHandlerSource(where, module, source, sliceOf) {
  * useHasPermission("..."), and in <RequirePermission anyOf={[...]}>. A wrong code there breaks
  * nothing loudly: the navigation entry or the button is simply hidden from everybody, because
  * nobody holds a permission that does not exist. So every permission-shaped string of a web
- * module must be an x-permission of that module's slice.
+ * module must be an x-permission of that module's slice, or, for a screen that also reads another
+ * module's API (the GRN card shows the stock M5 moved), of that other module's slice: the code
+ * must be one an operation carries, whichever slice carries it.
  */
 function problemsOfWebModules(webModules, sliceOf) {
   const problems = [];
@@ -152,8 +154,8 @@ function problemsOfWebModules(webModules, sliceOf) {
       for (const permission of named) {
         if (permission.startsWith(PLACEHOLDER)) {
           problems.push(`${where}: permission "${permission}" is a scaffold placeholder; use the code from the module's guide`);
-        } else if (!sliceOf[module]?.has(permission)) {
-          problems.push(`${where}: permission "${permission}" is not the x-permission of any operation in openapi/${module}.yaml, so nobody holds it and what it guards is hidden from everybody`);
+        } else if (!sliceOf[module]?.has(permission) && !Object.values(sliceOf).some((codes) => codes.has(permission))) {
+          problems.push(`${where}: permission "${permission}" is not the x-permission of any operation in openapi/${module}.yaml or another slice, so nobody holds it and what it guards is hidden from everybody`);
         }
       }
     }

@@ -51,6 +51,7 @@ class PartyQueriesImpl implements PartyQueries {
             """
             select
                 entity_id,
+                entity_code,
                 legal_name_en,
                 legal_name_si,
                 legal_name_ta,
@@ -422,7 +423,7 @@ class PartyQueriesImpl implements PartyQueries {
 
         return new EntityView(
                 rs.getObject("entity_id", UUID.class),
-                null,
+                rs.getString("entity_code"),
                 null,
                 rs.getString("legal_name_en"),
                 rs.getString("legal_name_si"),

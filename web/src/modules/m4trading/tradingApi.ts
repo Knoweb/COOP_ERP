@@ -11,6 +11,7 @@ import type { components as pricingComponents, paths as pricingPaths } from "../
 import type { components as inventoryComponents, paths as inventoryPaths } from "../../generated/m5inventory";
 
 export type Order = components["schemas"]["OrderResponse"];
+export type DeliveryPoint = components["schemas"]["DeliveryPointResponse"];
 export type OrderLine = components["schemas"]["OrderLineResponse"];
 export type OrderStatus = components["schemas"]["OrderStatus"];
 export type CreateOrderRequest = components["schemas"]["CreateOrderRequest"];

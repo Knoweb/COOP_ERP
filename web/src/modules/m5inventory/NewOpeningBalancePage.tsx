@@ -2,7 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
+import { inLocale, skuText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useInventoryApi, type Sku } from "./inventoryApi";
@@ -17,6 +19,7 @@ import { errorText, lineOf, rowReady, type CountedRow } from "./stockView";
  */
 export function NewOpeningBalancePage() {
   const t = useT();
+  const { locale } = useIntl();
   const api = useInventoryApi();
   const navigate = useNavigate();
   const key = useIdempotencyKey();
@@ -41,7 +44,7 @@ export function NewOpeningBalancePage() {
   const add = (sku: Sku) =>
     setRows((current) => [
       ...current,
-      { skuId: sku.skuId, label: `${sku.skuCode} ${sku.nameEn}`, batchNo: "", expiryDate: "", printedMrp: "", qty: "", unitCost: "", condition: "GOOD" }
+      { skuId: sku.skuId, label: skuText(sku, locale), batchNo: "", expiryDate: "", printedMrp: "", qty: "", unitCost: "", condition: "GOOD" }
     ]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -124,6 +127,7 @@ export function NewOpeningBalancePage() {
 /** Finds catalogue items in use (LOCAL or SHARED) by code or name, and adds the one chosen as a line. */
 function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
   const t = useT();
+  const { locale } = useIntl();
   const api = useInventoryApi();
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Sku[] | null>(null);
@@ -150,7 +154,7 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
           {found.map((sku) => (
             <li key={sku.skuId}>
               <button type="button" onClick={() => onPick(sku)}>
-                {t("inventory.add_item", undefined, { code: sku.skuCode, name: sku.nameEn }).text}
+                {t("inventory.add_item", undefined, { code: sku.skuCode, name: inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa) }).text}
               </button>
             </li>
           ))}

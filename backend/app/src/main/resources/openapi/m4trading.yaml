@@ -784,10 +784,31 @@ components:
         deliverToLocationId:
           type: string
           format: uuid
+        deliverTo:
+          $ref: '#/components/schemas/DeliveryPointResponse'
         lines:
           type: array
           items:
             $ref: '#/components/schemas/OrderLineResponse'
+
+    DeliveryPointResponse:
+      type: object
+      description: >
+        The buyer's delivery location as it was when the order was drafted: its code, names and
+        address, copied in the buyer's session, so that the seller, who may not read the buyer's
+        locations, can name it (CR-24A-2 as revised). Never changed after.
+      required: [code, nameEn]
+      properties:
+        code:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        address:
+          type: string
 
     OrderLineResponse:
       type: object

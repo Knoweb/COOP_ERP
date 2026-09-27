@@ -47,14 +47,18 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       let data;
       try {
-        ({ data } = await api.GET("/v1/session"));
+        // Asked with no scope, the server takes the one scope the user holds: the whole entity,
+        // or the one place of a user who holds one place only (the stores of one warehouse), for
+        // whom naming the entity alone would be refused (400 scope.invalid, in the console of
+        // every page load before 28 September 2026).
+        ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
       } catch (error) {
-        // A user whose only scope is one place holds no entity-wide scope, so naming the entity
-        // alone is refused; asked with no scope, the server takes the one they hold.
-        if (!(error instanceof ApiProblem && error.problem.code === "scope.invalid")) {
+        // A user who holds several scopes is asked to choose one (scope.required): the entity
+        // of the token, until the scope switcher exists (ScopeContext.tsx).
+        if (!(error instanceof ApiProblem && error.problem.code === "scope.required")) {
           throw error;
         }
-        ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
+        ({ data } = await api.GET("/v1/session"));
       }
       if (!data) {
         throw new Error("GET /v1/session answered without a body");
