@@ -1,0 +1,22 @@
+# The journal-posting map of M4 (24A section 3.1; doc 24 section 3.9): for a document type and a
+# line kind, which account role is debited and credited on each side, and which amount of the
+# line it takes. Account roles, mapped to a chart of accounts when the accounting system is
+# chosen (J-02); the roles are as seeded until an accountant reviews them (doc 10 A-01).
+# Loaded on every start by M4SeedLoader as the migrator, upserted by its key.
+#
+#   doc     the document type code of kernel.document_type
+#   line    GOODS, ADJUSTMENT, CHARGE, RECEIPT, REVERSAL
+#   side    SELLER or BUYER: whose books the posting is in
+#   amount  net, tax, cost, applied: which amount of the line the posting takes
+posting_map:
+  - { doc: INV, line: GOODS,      side: SELLER, debit: RECEIVABLE,   credit: REVENUE,      amount: net }
+  - { doc: INV, line: GOODS,      side: SELLER, debit: RECEIVABLE,   credit: VAT_OUTPUT,   amount: tax }
+  - { doc: INV, line: ADJUSTMENT, side: SELLER, debit: RECEIVABLE,   credit: REVENUE,      amount: net }
+  - { doc: GRN, line: GOODS,      side: BUYER,  debit: INVENTORY,    credit: GRN_ACCRUAL,  amount: cost }
+  - { doc: INV, line: GOODS,      side: BUYER,  debit: GRN_ACCRUAL,  credit: PAYABLE,      amount: net }
+  - { doc: INV, line: GOODS,      side: BUYER,  debit: VAT_INPUT,    credit: PAYABLE,      amount: tax }
+  - { doc: CN,  line: GOODS,      side: SELLER, debit: REVENUE,      credit: RECEIVABLE,   amount: net }
+  - { doc: CN,  line: GOODS,      side: SELLER, debit: VAT_OUTPUT,   credit: RECEIVABLE,   amount: tax }
+  - { doc: DN2, line: CHARGE,     side: SELLER, debit: RECEIVABLE,   credit: OTHER_INCOME, amount: net }
+  - { doc: PRC, line: RECEIPT,    side: SELLER, debit: BANK_OR_CASH, credit: RECEIVABLE,   amount: applied }
+  - { doc: PRC, line: REVERSAL,   side: SELLER, debit: RECEIVABLE,   credit: BANK_OR_CASH, amount: applied }
