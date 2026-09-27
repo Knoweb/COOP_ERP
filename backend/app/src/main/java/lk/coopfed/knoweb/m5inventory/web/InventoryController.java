@@ -12,17 +12,21 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
+import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.InventoryApi;
+import lk.coopfed.knoweb.m5inventory.web.generated.IssueTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.LotBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.MovementResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceLineResponse;
@@ -30,6 +34,8 @@ import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -50,6 +56,8 @@ class InventoryController implements InventoryApi {
     private final Handles<PrepareOpeningBalance, UUID> prepare;
     private final Handles<SignOpeningBalance, UUID> sign;
     private final Handles<CountersignOpeningBalance, UUID> countersign;
+    private final Handles<IssueTransfer, UUID> issueTransfer;
+    private final Handles<ReceiveTransfer, UUID> receiveTransfer;
 
     InventoryController(
             InventoryQueries queries,
@@ -57,13 +65,71 @@ class InventoryController implements InventoryApi {
             CurrentScope currentScope,
             Handles<PrepareOpeningBalance, UUID> prepare,
             Handles<SignOpeningBalance, UUID> sign,
-            Handles<CountersignOpeningBalance, UUID> countersign) {
+            Handles<CountersignOpeningBalance, UUID> countersign,
+            Handles<IssueTransfer, UUID> issueTransfer,
+            Handles<ReceiveTransfer, UUID> receiveTransfer) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
         this.prepare = prepare;
         this.sign = sign;
         this.countersign = countersign;
+        this.issueTransfer = issueTransfer;
+        this.receiveTransfer = receiveTransfer;
+    }
+
+    // ---- transfers (M5-09) ----------------------------------------------------------------
+
+    @Override
+    public ResponseEntity<List<TransferResponse>> listTransfers(UUID locationId) {
+        return ResponseEntity.ok(queries.transfers(locationId, currentScope.get()).stream()
+                .map(InventoryController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<TransferResponse> getTransfer(UUID transferId) {
+        return queries.transfer(transferId, currentScope.get())
+                .map(InventoryController::toResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<TransferResponse> issueTransfer(String idempotencyKey, IssueTransferRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID id = issueTransfer.handle(
+                new IssueTransfer(
+                        request.getFromLocationId(),
+                        request.getToLocationId(),
+                        request.getLines().stream()
+                                .map(l -> new IssueTransfer.Line(l.getBatchId(), l.getQty()))
+                                .toList()),
+                scope);
+        return ResponseEntity.created(URI.create("/v1/inventory/transfers/" + id))
+                .body(toResponse(queries.transfer(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<TransferResponse> receiveTransfer(String idempotencyKey, UUID transferId) {
+        ScopeContext scope = currentScope.get();
+        receiveTransfer.handle(new ReceiveTransfer(transferId), scope);
+        return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
+    }
+
+    private static TransferResponse toResponse(TransferView t) {
+        return new TransferResponse(
+                        t.transferId(),
+                        t.fromLocationId(),
+                        t.toLocationId(),
+                        TransferResponse.StatusEnum.fromValue(t.status()),
+                        t.lines().stream()
+                                .map(l -> new TransferLineResponse(l.lineNo(), l.batchId(), l.skuId(), l.qty()))
+                                .toList())
+                .issuedBy(t.issuedBy())
+                .issuedAt(t.issuedAt())
+                .receivedBy(t.receivedBy())
+                .receivedAt(t.receivedAt());
     }
 
     // ---- reads ----------------------------------------------------------------------------
