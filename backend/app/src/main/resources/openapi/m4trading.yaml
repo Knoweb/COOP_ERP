@@ -61,7 +61,7 @@ paths:
       summary: Draft an order to a seller the caller's entity trades with
       description: >
         Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past,
-        m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
+        m4.order.deliver_to_unknown, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
         m4.order.uom_invalid, m4.order.qty_not_positive.
       x-permission: ord.order.draft
       x-scope: ENTITY
@@ -91,6 +91,9 @@ paths:
       tags: [Order]
       operationId: sellerAvailability
       summary: What a seller can allocate today of the given items, in each item's base unit
+      description: >
+        M5's availability over the seller's active warehouses. Row-level security lets only the
+        seller read its own stock: asked by anyone else, every item answers 0.
       x-permission: trd.document.view
       parameters:
         - in: query
@@ -277,6 +280,377 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/delivery-notes:
+
+    get:
+      tags: [Delivery]
+      operationId: listDeliveryNotes
+      summary: The delivery notes the caller's entity sent (SELLER) or is to receive (BUYER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The delivery notes, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Delivery]
+      operationId: createDeliveryNote
+      summary: Draft a delivery note of accepted order lines, in drops
+      description: >
+        Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer,
+        m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch,
+        m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation, m4.delivery.from_location_unknown.
+      x-permission: del.note.draft
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeliveryNoteRequest'
+      responses:
+        '201':
+          description: The draft delivery note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/delivery-notes/{deliveryNoteId}:
+
+    parameters:
+      - $ref: '#/components/parameters/DeliveryNoteId'
+
+    get:
+      tags: [Delivery]
+      operationId: getDeliveryNote
+      summary: One delivery note the caller's entity sent or is to receive
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The delivery note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '404':
+          description: m4.delivery.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/delivery-notes/{deliveryNoteId}/issue:
+
+    parameters:
+      - $ref: '#/components/parameters/DeliveryNoteId'
+
+    post:
+      tags: [Delivery]
+      operationId: issueDeliveryNote
+      summary: Issue a draft delivery note from the seller's series
+      description: >
+        Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_draft,
+        m4.delivery.exceeds_allocation, m4.delivery.order_not_accepted.
+      x-permission: del.note.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The issued delivery note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/delivery-notes/{deliveryNoteId}/dispatch:
+
+    parameters:
+      - $ref: '#/components/parameters/DeliveryNoteId'
+
+    post:
+      tags: [Delivery]
+      operationId: dispatchDeliveryNote
+      summary: The vehicle leaves with an issued delivery note
+      description: >
+        Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_at_location, m4.delivery.not_issued,
+        m4.delivery.vehicle_required, m4.delivery.driver_required.
+      x-permission: del.note.dispatch
+      x-scope: LOCATION
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchRequest'
+      responses:
+        '200':
+          description: The delivery note in transit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/grns:
+
+    get:
+      tags: [Grn]
+      operationId: listGrns
+      summary: The GRNs the caller's entity received (BUYER) or that were received from it (SELLER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The GRNs, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GrnResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Grn]
+      operationId: captureGrn
+      summary: Count a delivery note drop at one of the receiver's locations
+      description: >
+        Problems: m4.grn.location_unknown, m4.grn.drop_unknown, m4.grn.not_receiver,
+        m4.grn.location_mismatch, m4.grn.drop_already_captured, m4.grn.lines_required,
+        m4.grn.sku_not_on_drop, m4.grn.line_duplicate, m4.grn.uom_invalid, m4.grn.line_quantities.
+      x-permission: shop.grn.confirm
+      x-scope: LOCATION
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureGrnRequest'
+      responses:
+        '201':
+          description: The draft GRN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrnResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/grns/{grnId}:
+
+    parameters:
+      - $ref: '#/components/parameters/GrnId'
+
+    get:
+      tags: [Grn]
+      operationId: getGrn
+      summary: One GRN the caller's entity received or that was received from it
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The GRN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrnResponse'
+        '404':
+          description: m4.grn.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/grns/{grnId}/confirm:
+
+    parameters:
+      - $ref: '#/components/parameters/GrnId'
+
+    post:
+      tags: [Grn]
+      operationId: confirmGrn
+      summary: Confirm a GRN, the pivot where ownership passes; raises a discrepancy on a variance
+      description: >
+        Problems: m4.grn.not_found, m4.grn.not_receiver, m4.grn.not_draft, m4.grn.mrp_required,
+        m4.grn.expiry_required, document.series_device_held (a shop whose GRN series a till holds
+        receives at the till).
+      x-permission: shop.grn.confirm
+      x-scope: LOCATION
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The confirmed GRN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrnResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/invoices:
+
+    get:
+      tags: [Billing]
+      operationId: listInvoices
+      summary: The invoices the caller's entity issued (SELLER) or received (BUYER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The invoices, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Billing]
+      operationId: issueInvoice
+      summary: Issue a tax invoice from confirmed GRNs of one buyer
+      description: >
+        Problems: m4.invoice.grns_required, m4.invoice.grn_unknown, m4.invoice.grn_not_confirmed,
+        m4.invoice.one_buyer, m4.invoice.grn_invoiced, m4.invoice.seller_vat_missing,
+        m4.invoice.tax_rate_missing, m4.invoice.nothing_received.
+      x-permission: bil.invoice.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueInvoiceRequest'
+      responses:
+        '201':
+          description: The issued invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/invoices/{invoiceId}:
+
+    parameters:
+      - in: path
+        name: invoiceId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Billing]
+      operationId: getInvoice
+      summary: One invoice the caller's entity issued or received
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          description: m4.invoice.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/invoices/{invoiceId}/print:
+
+    parameters:
+      - in: path
+        name: invoiceId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Billing]
+      operationId: getInvoicePrint
+      summary: A fresh link to the printed A4 copy of the seller's invoice (M4-11)
+      description: >
+        The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it
+        has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity
+        is refused (report.scope_mismatch).
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoicePrintResponse'
+        '404':
+          description: m4.invoice.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -286,6 +660,22 @@ components:
     OrderId:
       in: path
       name: orderId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    DeliveryNoteId:
+      in: path
+      name: deliveryNoteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    GrnId:
+      in: path
+      name: grnId
       required: true
       schema:
         type: string
@@ -325,6 +715,10 @@ components:
         notes:
           type: string
           maxLength: 500
+        deliverToLocationId:
+          description: One of the buyer's own locations, where the goods are to be delivered (CR-24A-2)
+          type: string
+          format: uuid
         lines:
           type: array
           minItems: 1
@@ -387,6 +781,9 @@ components:
           type: number
         notes:
           type: string
+        deliverToLocationId:
+          type: string
+          format: uuid
         lines:
           type: array
           items:
@@ -457,5 +854,395 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+
+    CreateDeliveryNoteRequest:
+      type: object
+      required: [drops]
+      properties:
+        fromLocationId:
+          description: The seller's warehouse the goods leave from (optional)
+          type: string
+          format: uuid
+        vehicleRef:
+          type: string
+          maxLength: 40
+        driverName:
+          type: string
+          maxLength: 120
+        routeRef:
+          type: string
+          maxLength: 40
+        drops:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/DropRequest'
+
+    DropRequest:
+      type: object
+      required: [shipToLocationId, billToEntityId, lines]
+      properties:
+        shipToLocationId:
+          type: string
+          format: uuid
+        billToEntityId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/DeliveryLineRequest'
+
+    DeliveryLineRequest:
+      type: object
+      required: [orderLineId, qty]
+      properties:
+        orderLineId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+        batchId:
+          type: string
+          format: uuid
+
+    DispatchRequest:
+      type: object
+      properties:
+        vehicleRef:
+          type: string
+          maxLength: 40
+        driverUserId:
+          type: string
+          format: uuid
+        driverName:
+          type: string
+          maxLength: 120
+
+    DeliveryNoteResponse:
+      type: object
+      required: [deliveryNoteId, status, sellerEntityId, buyerEntityId, drops]
+      properties:
+        deliveryNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, ISSUED, IN_TRANSIT, CLOSED]
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        fromLocationId:
+          type: string
+          format: uuid
+        vehicleRef:
+          type: string
+        driverName:
+          type: string
+        dispatchedAt:
+          type: string
+          format: date-time
+        issuedAt:
+          type: string
+          format: date-time
+        drops:
+          type: array
+          items:
+            $ref: '#/components/schemas/DropResponse'
+
+    DropResponse:
+      type: object
+      required: [dropId, seq, shipToLocationId, billToEntityId, orderIds, status, lines]
+      properties:
+        dropId:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+        shipToLocationId:
+          type: string
+          format: uuid
+        billToEntityId:
+          type: string
+          format: uuid
+        orderIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        status:
+          type: string
+          enum: [PLANNED, RECEIVED]
+        grnId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryLineResponse'
+
+    DeliveryLineResponse:
+      type: object
+      required: [lineId, lineNo, orderId, orderLineId, skuId, uomCode, dispatchedQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        orderId:
+          type: string
+          format: uuid
+        orderLineId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        dispatchedQty:
+          type: number
+
+    CaptureGrnRequest:
+      type: object
+      required: [dropId, locationId, lines]
+      properties:
+        dropId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        receivedOn:
+          type: string
+          format: date
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/GrnLineRequest'
+
+    GrnLineRequest:
+      type: object
+      required: [skuId, receivedQty]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+          maxLength: 10
+        receivedQty:
+          type: number
+          minimum: 0
+          maximum: 99999999999
+        damagedQty:
+          type: number
+          minimum: 0
+          maximum: 99999999999
+        batchNo:
+          type: string
+          maxLength: 40
+        manufactureDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        printedMrp:
+          type: number
+          minimum: 0
+          maximum: 999999999999
+
+    GrnResponse:
+      type: object
+      required: [grnId, status, receiverEntityId, receiverLocationId, lines]
+      properties:
+        grnId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, CONFIRMED]
+        receiverEntityId:
+          type: string
+          format: uuid
+        receiverLocationId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        dropId:
+          type: string
+          format: uuid
+        deliveryNoteId:
+          type: string
+          format: uuid
+        receivedOn:
+          type: string
+          format: date
+        confirmedAt:
+          type: string
+          format: date-time
+        discrepancyId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/GrnLineResponse'
+
+    GrnLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, receivedQty, damagedQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        expectedQty:
+          type: number
+        receivedQty:
+          type: number
+        damagedQty:
+          type: number
+        batchNo:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        printedMrp:
+          type: number
+        unitCost:
+          type: number
+        batchId:
+          type: string
+          format: uuid
+
+    IssueInvoiceRequest:
+      type: object
+      required: [grnIds]
+      properties:
+        grnIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+
+    InvoiceResponse:
+      type: object
+      required: [invoiceId, status, sellerEntityId, buyerEntityId, grnIds, taxPointDate, dueDate, netAmount,
+        taxAmount, grossAmount, lines]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        sellerVatNo:
+          type: string
+        buyerVatNo:
+          type: string
+        grnIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        taxPointDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        issuedAt:
+          type: string
+          format: date-time
+        netAmount:
+          type: number
+        taxAmount:
+          type: number
+        grossAmount:
+          type: number
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineResponse'
+
+    InvoiceLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, qty, unitPrice, taxRatePercent, taxAmount, lineTotal]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        qty:
+          type: number
+        unitPrice:
+          type: number
+        taxRatePercent:
+          type: number
+        taxAmount:
+          type: number
+        lineTotal:
+          type: number
+        grnLineId:
+          type: string
+          format: uuid
+
+    InvoicePrintResponse:
+      type: object
+      required: [invoiceId, url]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
 
     # @@SCHEMAS@@

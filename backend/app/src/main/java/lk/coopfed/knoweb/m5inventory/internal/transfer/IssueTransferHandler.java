@@ -1,0 +1,204 @@
+package lk.coopfed.knoweb.m5inventory.internal.transfer;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.EventPublisher;
+import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
+import lk.coopfed.knoweb.m2catalogue.query.BatchView;
+import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
+import lk.coopfed.knoweb.m5inventory.api.LotCondition;
+import lk.coopfed.knoweb.m5inventory.api.Movement;
+import lk.coopfed.knoweb.m5inventory.api.MovementType;
+import lk.coopfed.knoweb.m5inventory.api.PostMovements;
+import lk.coopfed.knoweb.m5inventory.api.PostedMovement;
+import lk.coopfed.knoweb.m5inventory.api.StockLedger;
+import lk.coopfed.knoweb.m5inventory.api.TransferIssued;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * IssueTransfer (25A section 6.3, "same entity; availability at source; issuance; TRANSFER_OUT at
+ * cost"; doc 25 flow 6.6), at demo scope: issue and dispatch in one step. The stock leaves the
+ * source as TRANSFER_OUT at the entity average and is in transit, still the entity's, until the
+ * destination receives it ({@link ReceiveTransferHandler}).
+ *
+ * <p>Guards, in order: an OWN scope ({@code m5.scope.own_required}); the source one of the scope
+ * entity's locations that the scope reads ({@code m5.location.not_in_scope}); the destination
+ * another location of the same entity that the scope reads ({@code m5.transfer.same_location},
+ * {@code m5.transfer.destination_invalid}): inv.transfer.issue is an ENTITY permission (25A
+ * section 3.1), so the issuer is an entity-wide user, and a session held to the source cannot
+ * see the destination; at least one line ({@code m5.transfer.lines_required}); each line a batch
+ * and a quantity above zero with at most three decimals ({@code m5.transfer.line_invalid}), the
+ * batch known to M2 ({@code m5.batch.not_found}), and the source's GOOD lot of it holding the
+ * quantity ({@code m5.transfer.insufficient_stock}: stock that is not there is not sent).
+ *
+ * <p>Mutation: the transfer and its lines, all at the source location (the source's rows); the
+ * ledger's TRANSFER_OUT movements there, citing the transfer. Audit {@code TRANSFER_ISSUED}; event
+ * {@code transfer.issued.v1}. The XFR document of 25A is deferred for the demo: the movements cite
+ * the transfer's id (README, deviation 13).
+ */
+@Service
+@CommandHandler(permission = "inv.transfer.issue")
+class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
+
+    static final String AUDIT_ISSUED = "TRANSFER_ISSUED";
+
+    private final TransferStore store;
+    private final PartyQueries party;
+    private final BatchQueries batches;
+    private final StockLedger ledger;
+    private final JdbcTemplate jdbc;
+    private final AuditFacade audit;
+    private final EventPublisher events;
+
+    IssueTransferHandler(
+            TransferStore store,
+            PartyQueries party,
+            BatchQueries batches,
+            StockLedger ledger,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
+        this.store = store;
+        this.party = party;
+        this.batches = batches;
+        this.ledger = ledger;
+        this.jdbc = jdbc;
+        this.audit = audit;
+        this.events = events;
+    }
+
+    @Override
+    @Transactional
+    public UUID handle(IssueTransfer command, ScopeContext scope) {
+        if (scope == null || scope.policyClass() != PolicyClass.OWN || scope.entityId() == null) {
+            throw new ProblemException("m5.scope.own_required");
+        }
+        UUID from = command.fromLocationId();
+        UUID to = command.toLocationId();
+        if (!entityLocation(from, scope)) {
+            throw new ProblemException("m5.location.not_in_scope", Map.of("locationId", String.valueOf(from)));
+        }
+        if (from.equals(to)) {
+            throw new ProblemException("m5.transfer.same_location");
+        }
+        if (!entityLocation(to, scope)) {
+            throw new ProblemException("m5.transfer.destination_invalid", Map.of("locationId", String.valueOf(to)));
+        }
+        if (command.lines() == null || command.lines().isEmpty()) {
+            throw new ProblemException("m5.transfer.lines_required");
+        }
+        for (IssueTransfer.Line line : command.lines()) {
+            requireLine(line);
+        }
+        List<UUID> skus = new ArrayList<>();
+        Map<UUID, BigDecimal> perBatch = new LinkedHashMap<>();
+        for (IssueTransfer.Line line : command.lines()) {
+            BatchView batch = batches.getBatch(line.batchId(), scope)
+                    .orElseThrow(() -> new ProblemException("m5.batch.not_found", Map.of("batchId", line.batchId())));
+            skus.add(batch.skuId());
+            perBatch.merge(line.batchId(), line.qty(), BigDecimal::add);
+        }
+        perBatch.forEach((batch, qty) -> {
+            if (store.goodOnHand(from, batch).compareTo(qty) < 0) {
+                throw new ProblemException("m5.transfer.insufficient_stock", Map.of("batchId", batch));
+            }
+        });
+
+        UUID id = Ids.next();
+        jdbc.update(
+                "insert into inventory.transfer (transfer_id, owner_entity_id, location_id, to_location_id, issued_by)"
+                        + " values (?, ?, ?, ?, ?)",
+                id,
+                scope.entityId(),
+                from,
+                to,
+                scope.userId());
+        List<UUID> lineIds = new ArrayList<>();
+        List<Movement> movements = new ArrayList<>();
+        for (IssueTransfer.Line line : command.lines()) {
+            UUID lineId = Ids.next();
+            lineIds.add(lineId);
+            movements.add(new Movement(
+                    from,
+                    line.batchId(),
+                    LotCondition.GOOD,
+                    MovementType.TRANSFER_OUT,
+                    line.qty().negate(),
+                    null,
+                    lineId));
+        }
+        List<PostedMovement> posted = ledger.post(new PostMovements(id, null, null, movements), scope);
+        for (int i = 0; i < command.lines().size(); i++) {
+            IssueTransfer.Line line = command.lines().get(i);
+            jdbc.update(
+                    """
+                    insert into inventory.transfer_line
+                        (line_id, transfer_id, owner_entity_id, location_id, to_location_id, line_no, batch_id, sku_id,
+                         qty, unit_cost)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    lineIds.get(i),
+                    id,
+                    scope.entityId(),
+                    from,
+                    to,
+                    i + 1,
+                    line.batchId(),
+                    skus.get(i),
+                    line.qty(),
+                    posted.get(i).unitCostAtMovement());
+        }
+
+        audit.record(
+                AUDIT_ISSUED,
+                Subject.of("transfer", id),
+                null,
+                Map.of(
+                        "fromLocationId",
+                        from,
+                        "toLocationId",
+                        to,
+                        "status",
+                        "IN_TRANSIT",
+                        "lines",
+                        command.lines().size()),
+                scope);
+        events.publish(new TransferIssued(
+                id, scope.entityId(), from, to, command.lines().size()));
+        return id;
+    }
+
+    /** A location of the scope entity that the scope reads (M1). */
+    private boolean entityLocation(UUID location, ScopeContext scope) {
+        return location != null
+                && party.getLocation(location, scope)
+                        .filter(l -> scope.entityId().equals(l.ownerEntityId()))
+                        .isPresent();
+    }
+
+    private static void requireLine(IssueTransfer.Line line) {
+        boolean valid = line != null
+                && line.batchId() != null
+                && line.qty() != null
+                && line.qty().signum() > 0
+                && line.qty().stripTrailingZeros().scale() <= 3;
+        if (!valid) {
+            throw new ProblemException("m5.transfer.line_invalid");
+        }
+    }
+}

@@ -35,7 +35,18 @@
     "inventory.opening.status.POSTED": "Posted",
     "inventory.opening.sign": "Sign",
     "inventory.opening.countersign": "Countersign and post",
-    "inventory.opening.countersign.other_person": "Another person than the signer countersigns."
+    "inventory.opening.countersign.other_person": "Another person than the signer countersigns.",
+    "inventory.transfer.link": "Transfers",
+    "inventory.transfer.title": "Transfers",
+    "inventory.transfer.list": "In transit and received",
+    "inventory.transfer.none": "No transfers leave or arrive at this location.",
+    "inventory.transfer.status.IN_TRANSIT": "In transit",
+    "inventory.transfer.status.RECEIVED": "Received",
+    "inventory.transfer.receive": "Receive",
+    "inventory.transfer.send": "Send stock to another location",
+    "inventory.transfer.destination": "To",
+    "inventory.transfer.qty_to_send": "Quantity to send",
+    "inventory.transfer.issue": "Send"
   },
   "si": {
     "inventory.nav": "තොගය",
@@ -73,7 +84,18 @@
     "inventory.opening.status.POSTED": "පොත්ගත කළ",
     "inventory.opening.sign": "අත්සන් කරන්න",
     "inventory.opening.countersign": "ප්‍රති අත්සන් කර පොත්ගත කරන්න",
-    "inventory.opening.countersign.other_person": "අත්සන් කළ අයට වඩා වෙනත් අයෙකු ප්‍රති අත්සන් කරයි."
+    "inventory.opening.countersign.other_person": "අත්සන් කළ අයට වඩා වෙනත් අයෙකු ප්‍රති අත්සන් කරයි.",
+    "inventory.transfer.link": "මාරු කිරීම්",
+    "inventory.transfer.title": "මාරු කිරීම්",
+    "inventory.transfer.list": "ගමනේ සහ ලැබුණු",
+    "inventory.transfer.none": "මෙම ස්ථානයෙන් පිටවන හෝ පැමිණෙන මාරු කිරීම් නැත.",
+    "inventory.transfer.status.IN_TRANSIT": "ගමනේ",
+    "inventory.transfer.status.RECEIVED": "ලැබුණි",
+    "inventory.transfer.receive": "ලබා ගන්න",
+    "inventory.transfer.send": "වෙනත් ස්ථානයකට තොග යවන්න",
+    "inventory.transfer.destination": "වෙත",
+    "inventory.transfer.qty_to_send": "යැවිය යුතු ප්‍රමාණය",
+    "inventory.transfer.issue": "යවන්න"
   },
   "ta": {
     "inventory.nav": "இருப்பு",
@@ -111,6 +133,17 @@
     "inventory.opening.status.POSTED": "பதிவானது",
     "inventory.opening.sign": "கையொப்பமிடு",
     "inventory.opening.countersign": "எதிர்க் கையொப்பமிட்டுப் பதிவு செய்",
-    "inventory.opening.countersign.other_person": "கையொப்பமிட்டவர் அல்லாத வேறொருவர் எதிர்க் கையொப்பமிடுவார்."
+    "inventory.opening.countersign.other_person": "கையொப்பமிட்டவர் அல்லாத வேறொருவர் எதிர்க் கையொப்பமிடுவார்.",
+    "inventory.transfer.link": "இடமாற்றங்கள்",
+    "inventory.transfer.title": "இடமாற்றங்கள்",
+    "inventory.transfer.list": "வழியில் உள்ளவை மற்றும் பெறப்பட்டவை",
+    "inventory.transfer.none": "இந்த இடத்திலிருந்து புறப்படும் அல்லது வரும் இடமாற்றங்கள் இல்லை.",
+    "inventory.transfer.status.IN_TRANSIT": "வழியில்",
+    "inventory.transfer.status.RECEIVED": "பெறப்பட்டது",
+    "inventory.transfer.receive": "பெறு",
+    "inventory.transfer.send": "வேறொரு இடத்துக்கு இருப்பை அனுப்பு",
+    "inventory.transfer.destination": "சேருமிடம்",
+    "inventory.transfer.qty_to_send": "அனுப்ப வேண்டிய அளவு",
+    "inventory.transfer.issue": "அனுப்பு"
   }
 }

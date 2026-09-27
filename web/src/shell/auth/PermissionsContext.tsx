@@ -13,7 +13,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../api/client";
+import { ApiProblem, SCOPE_UNNAMED, useApiClient } from "../api/client";
 import type { paths } from "../../generated/session";
 import type { PermissionSet } from "./permissions";
 import { useSession } from "./session";
@@ -21,6 +21,11 @@ import { useSession } from "./session";
 export type PermissionsState = PermissionSet & {
   /** True when the read failed: the set is empty because nothing is known, not because nothing is held. */
   failed: boolean;
+  /**
+   * The scope the server resolved the set in. For a user who holds one place only (the stores of
+   * one warehouse) it names that location, which the ScopeProvider then sends on every request.
+   */
+  activeScope?: { entityId: string; locationId?: string | null } | null;
 };
 
 /** null while the set is being read; a provider is always there inside RequireLogin (App.tsx). */
@@ -40,7 +45,17 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: false,
     retry: 1,
     queryFn: async () => {
-      const { data } = await api.GET("/v1/session");
+      let data;
+      try {
+        ({ data } = await api.GET("/v1/session"));
+      } catch (error) {
+        // A user whose only scope is one place holds no entity-wide scope, so naming the entity
+        // alone is refused; asked with no scope, the server takes the one they hold.
+        if (!(error instanceof ApiProblem && error.problem.code === "scope.invalid")) {
+          throw error;
+        }
+        ({ data } = await api.GET("/v1/session", { headers: { [SCOPE_UNNAMED]: "1" } }));
+      }
       if (!data) {
         throw new Error("GET /v1/session answered without a body");
       }
@@ -50,7 +65,12 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const state = useMemo<PermissionsState | null>(() => {
     if (query.data) {
-      return { policyClass: query.data.policyClass, permissions: query.data.permissions, failed: false };
+      return {
+        policyClass: query.data.policyClass,
+        permissions: query.data.permissions,
+        failed: false,
+        activeScope: query.data.activeScope ?? null
+      };
     }
     if (query.isError) {
       return { policyClass: session?.policyClass ?? "NONE", permissions: [], failed: true };

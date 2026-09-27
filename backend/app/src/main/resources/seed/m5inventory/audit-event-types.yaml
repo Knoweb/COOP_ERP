@@ -47,3 +47,28 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: An opening stock balance was countersigned and posted to stock
+
+  - code: TRANSFER_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock left a location for another location of the entity and is in transit
+
+  - code: TRANSFER_RECEIVED
+    severity: INFO
+    offline_capturable: false
+    description_en: A transfer was received in full at its destination
+
+  - code: STOCK_SOLD
+    severity: INFO
+    offline_capturable: false
+    description_en: A till receipt's sales were deducted from the shop's lots
+
+  - code: SALE_WITHOUT_LOT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till sold from a batch the shop held no lot of; the lot was created at the entity average
+
+  - code: SALE_LINE_UNRESOLVED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till receipt line named no batch the shop could deduct from and was not posted

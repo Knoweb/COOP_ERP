@@ -78,7 +78,7 @@ class OrderHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         ResponseEntity<JsonNode> availability = http.exchange(
                 "/v1/trading/orders/availability?sellerId=" + SELLER + "&skuIds=" + RICE,
                 HttpMethod.GET,
-                new HttpEntity<>(headers(BUYER_USER, BUYER)),
+                new HttpEntity<>(headers(SELLER_USER, SELLER)),
                 JsonNode.class);
         assertThat(availability.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(availability.getBody().get(0).get("availableQty").decimalValue())

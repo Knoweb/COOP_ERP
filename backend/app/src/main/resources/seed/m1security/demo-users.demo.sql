@@ -75,40 +75,46 @@ WITH job (role_id, codes) AS (
             'prt.location.view']),
         -- Federation sales: accepts orders, issues delivery notes
         ('0190f0de-0000-7000-8000-000000000304'::uuid, ARRAY[
-            'trd.document.view', 'ord.order.accept', 'del.note.draft', 'del.note.issue', 'cat.sku.view',
-            'prt.relationship.view', 'prc.pricelist.view', 'inv.stock.view']),
+            'trd.document.view', 'ord.order.accept', 'del.note.draft', 'del.note.issue', 'cat.sku.view', 'gov.entity.view', 'prt.location.view',
+            'prt.relationship.view', 'prc.pricelist.view', 'inv.stock.view',
+            'rpt.report.run', 'rpt.export.run']),
         -- Federation accounts: invoices, and the second signature on the opening balance
         ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.creditnote.issue', 'bil.debitnote.issue',
             'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
-            'prt.relationship.view', 'cat.sku.view']),
+            'prt.relationship.view', 'cat.sku.view',
+            'rpt.report.run', 'rpt.export.run']),
         -- distributor commercial: buys from the Federation, prices and sells to its societies
         ('0190f0de-0000-7000-8000-000000000311'::uuid, ARRAY[
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'ord.order.accept', 'del.note.draft',
             'del.note.issue', 'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prc.pricelist.author',
             'prc.pricelist.publish', 'prt.relationship.view', 'prt.relationship.open', 'prt.relationship.activate',
-            'prt.relationship.amend', 'gov.entity.view', 'inv.stock.view']),
+            'prt.relationship.amend', 'gov.entity.view', 'inv.stock.view', 'prt.location.view',
+            'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000321'::uuid, ARRAY[
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'ord.order.accept', 'del.note.draft',
             'del.note.issue', 'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prc.pricelist.author',
             'prc.pricelist.publish', 'prt.relationship.view', 'prt.relationship.open', 'prt.relationship.activate',
-            'prt.relationship.amend', 'gov.entity.view', 'inv.stock.view']),
+            'prt.relationship.amend', 'gov.entity.view', 'inv.stock.view', 'prt.location.view',
+            'rpt.report.run', 'rpt.export.run']),
         -- distributor stores: receives (GRN), holds the opening stock, dispatches to societies
         ('0190f0de-0000-7000-8000-000000000312'::uuid, ARRAY[
-            'whs.grn.confirm', 'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign',
+            'whs.grn.confirm', 'shop.grn.confirm', 'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign',
             'whs.pick', 'del.note.draft', 'del.note.dispatch', 'trd.document.view', 'cat.sku.view', 'prt.location.view']),
         ('0190f0de-0000-7000-8000-000000000322'::uuid, ARRAY[
-            'whs.grn.confirm', 'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign',
+            'whs.grn.confirm', 'shop.grn.confirm', 'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign',
             'whs.pick', 'del.note.draft', 'del.note.dispatch', 'trd.document.view', 'cat.sku.view', 'prt.location.view']),
         -- distributor accounts
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
             'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
-            'cat.sku.view']),
+            'cat.sku.view',
+            'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
             'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
-            'cat.sku.view']),
+            'cat.sku.view',
+            'rpt.report.run', 'rpt.export.run']),
         -- society buyer
         ('0190f0de-0000-7000-8000-000000000331'::uuid, ARRAY[
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'whs.grn.confirm', 'shop.grn.confirm',
@@ -119,17 +125,20 @@ WITH job (role_id, codes) AS (
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
-            'cat.sku.view']),
+            'cat.sku.view',
+            'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000342'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
-            'cat.sku.view']),
+            'cat.sku.view',
+            'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000352'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
-            'cat.sku.view']),
+            'cat.sku.view',
+            'rpt.report.run', 'rpt.export.run']),
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',

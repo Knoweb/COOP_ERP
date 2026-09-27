@@ -25,19 +25,27 @@ include::module-m1party.adoc[]
 plantuml::module-m2catalogue.puml[,,format=svg]
 include::module-m2catalogue.adoc[]
 
+== M6 Point of Sale
+plantuml::module-m6pos.puml[,,format=svg]
+include::module-m6pos.adoc[]
+
 == M3 Pricing & Rules
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]
-
-== M4 Trading Documents
-plantuml::module-m4trading.puml[,,format=svg]
-include::module-m4trading.adoc[]
 
 == M5 Inventory, Costing, Repack & Loss
 plantuml::module-m5inventory.puml[,,format=svg]
 include::module-m5inventory.adoc[]
 
+== M8 Reporting Pipeline
+plantuml::module-m8reporting.puml[,,format=svg]
+include::module-m8reporting.adoc[]
+
 == Demo data
 plantuml::module-demo.puml[,,format=svg]
 include::module-demo.adoc[]
+
+== M4 Trading Documents
+plantuml::module-m4trading.puml[,,format=svg]
+include::module-m4trading.adoc[]
 

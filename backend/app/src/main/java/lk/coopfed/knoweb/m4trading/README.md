@@ -12,7 +12,7 @@ M4 records the inter-entity flow from order to settlement: order, delivery note,
 |---|---|
 | `api/` | The published contract: the event records of the document families the demo builds (`order.*`, `delivery_note.*`, `grn.*`, `discrepancy.raised.v1`, `invoice.issued.v1`, `journal.postings_ready.v1`) with their value records, published in M4-01 so that M5's consumers can bind to them; and the three questions M4 asks of modules not built yet, `TradePricing` (M3), `TaxRates` (M2), `InventoryAvailability` (M5). Command records arrive with their tickets. |
 | `query/` | The read-only queries of doc 24 section 5.2, with their tickets. |
-| `internal/integration/` | The demo answers to the three questions, from the configuration register: `DemoTradePricing` (`m4.demo.trade_price`), `DemoTaxRates` (`m4.demo.vat_rate_percent`), `DemoInventoryAvailability` (`m4.demo.availability_qty`). Each is deleted in the pull request that lands the real module's query. |
+| `internal/integration/` | The answers to the three questions: `M3TradePricing` (M3's `PricingQueries.resolveTradePrice`, since M4-04), `M5InventoryAvailability` (M5's `InventoryQueries.availability` over the seller's active warehouses, since M4-05); for the demo, from the configuration register, `DemoTaxRates` (`m4.demo.vat_rate_percent`), deleted when M2 publishes the rate in force. |
 | `internal/seed/M4SeedLoader` | Loads `seed/m4trading/posting-map.yaml` into `trading.posting_map` on start, as the migrator (the arrangement of `M1SeedLoader` and `M2SeedLoader`), upserted by key. |
 | `resources/db/migration/m4trading/V0001__trading.sql` | The tables of M4-01 (below), their row-level security and grants. |
 | `resources/seed/m4trading/` | `posting-map.yaml` (doc 24 section 3.9), `audit-event-types.yaml` (the codes of 24A section 6 the demo tickets use). |
@@ -51,7 +51,7 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 | `posting-map.yaml` | `trading.posting_map` | upserted by (type, line kind, side, debit, credit); the amount source follows the file |
 | `audit-event-types.yaml` | `kernel.audit_event_type` | the audit codes of 24A section 6 used by the demo tickets, all INFO |
 | `seed/m1party/permissions.yaml` | `security.permission` | the 28 `m4trading` codes (`M1SeedLoaderTest` counts them) |
-| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.trade_price`, `m4.demo.vat_rate_percent`, `m4.demo.availability_qty` |
+| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.vat_rate_percent` (`m4.demo.trade_price` until M4-04, `m4.demo.availability_qty` until M4-05) |
 
 ## What the next tickets build on
 
@@ -71,6 +71,33 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 | AcceptOrder | `ord.order.accept` | seller entity-wide OWN; order placed with the caller; SUBMITTED, undecided; relationship ACTIVE; ETA not past; overrides on known lines with a reason, ≤ open request, ≤ available; a trade price per line | `allocation_run`, `order_allocation` ACCEPTED (ETA, `lock_at` = ETA day start − lock hours), `order_allocation_line` (allocated = min(open, available) or the override; tier price) | ORDER_ACCEPTED, `order.accepted.v1`, `order.allocated.v1` |
 | RejectOrder | `ord.order.accept` | as AcceptOrder's first three; reason | `order_allocation` REJECTED | ORDER_REJECTED, `order.rejected.v1` |
 
+## Delivery notes (M4-04)
+
+| Command | Permission | Guards, in order | Effect | Audit, event |
+|---|---|---|---|---|
+| CreateDeliveryNote | `del.note.draft` | seller entity-wide OWN; drops with ship-to, bill-to, lines; one buyer; per line an order line the caller accepted, not cancelled, billed to its buyer, qty > 0, within allocated − fulfilled | kernel draft (lines at the tier price, the order line as reference), `doc_delivery`, drops, lines | DN_CREATED, `delivery_note.created.v1` |
+| IssueDeliveryNote | `del.note.issue` | owner's DRAFT; allocated − fulfilled re-checked under lock | seller's ENTITY series of DN, issued; `fulfilled_qty` raised | DN_ISSUED, `delivery_note.issued.v1` |
+| DispatchDeliveryNote | `del.note.dispatch` | owner's ISSUED; vehicle; driver | vehicle, driver, `dispatched_at`; ISSUED to IN_TRANSIT | DN_DISPATCHED, `delivery_note.dispatched.v1` |
+
+`internal/integration/M3TradePricing` answers `TradePricing` from M3's `PricingQueries.resolveTradePrice` since M4-04 (the register's demo price is gone).
+
+## Goods received notes (M4-05)
+
+| Command | Permission | Guards, in order | Effect | Audit, event |
+|---|---|---|---|---|
+| CaptureGrn | `shop.grn.confirm` | receiver OWN (entity-wide or at the location); own location; drop of an issued note billed to the caller, shipped there, not yet captured; lines of items on the drop, once, delivered unit, 0 ≤ damaged ≤ received | kernel draft at the location, `doc_grn`, `doc_grn_line` (expected from the drop; uncounted items received as 0) | GRN_CAPTURED, `grn.captured.v1` |
+| ConfirmGrn | `shop.grn.confirm` | owner's DRAFT at its location; MRP and expiry where M2 needs them | LOCATION series of a shop or ENTITY series; DRAFT → ISSUED → CONFIRMED; M2 RegisterBatch per line received (internal command, same transaction); batch id and cost on the line; on a variance the DISC document at the GRN's location, RAISED, DISPUTES link | GRN_CONFIRMED, DISCREPANCY_RAISED; `grn.confirmed.v1` (frozen), `discrepancy.raised.v1` |
+
+**The GRN contract is frozen** (24A section 10): `grn.confirmed.v1` and `GrnLineConfirmed` do not change without a change request; M5 and M6 bind to them.
+
+## Invoices (M4-08)
+
+| Command | Permission | Guards, in order | Effect | Audit, event |
+|---|---|---|---|---|
+| IssueInvoice | `bil.invoice.issue` | seller entity-wide OWN; GRNs; each CONFIRMED, received from the caller, one buyer and relationship, not invoiced; seller VAT number; a VAT rate per line | lines at received qty × the GRN line's trade price, VAT per line; seller's ENTITY series of INV; `doc_invoice` | INVOICE_ISSUED; `invoice.issued.v1`, `journal.postings_ready.v1` (`PostingMapper`, seller side) |
+
+`InvoicePrintConsumer` (worker role only, `coop-erp.report.enabled`) prints every issued invoice through the kernel's `A4Renderer` and its `document-a4` template (K-06b).
+
 Shared pieces in `internal/document`: `TradingClock` (today in the business zone, a state history row), `TradingSeries`, `TradingGuards`, `TradingDocuments` (draft header and line builders). `internal/queries/OrderStatus` derives the status the screens show. Only a `@CommandHandler` class writes (ArchitectureTests), so the handlers hold their own SQL.
 
 ## Deviations from the implementation guide
@@ -89,3 +116,14 @@ Every difference between the schema as migrated and 24A section 3, and between t
 10. **Two role templates, "Trading Buyer" and "Trading Seller"**: 24A section 3.1 seeds permissions only; the demo's staff need roles that hold them.
 11. **Order lines in the base unit only (M4-02)**: M2 publishes no unit conversion query yet, so CreateOrder refuses another unit (`m4.order.uom_invalid`) until it does.
 12. **CancelOrder cancels a whole order before any dispatch (M4-02)**: 24A cancels the undispatched remainder; the demo refuses once anything is fulfilled (`m4.order.dispatched`).
+13. **The seller does not check that a drop's ship-to shop belongs to its bill-to entity (M4-04)**: it cannot read the buyer's locations (m1party `own_read`); CaptureGrn, at a location of the receiver's own, is where a wrong ship-to shows.
+14. **CaptureGrn and ConfirmGrn carry `shop.grn.confirm` for every location (M4-05)**: 24A resolves `shop.grn.confirm | whs.grn.confirm` by location type; a handler has one permission, so the warehouse code waits until the demo is past.
+16. **Availability is the seller's own (M4-05)**: M5's lots and M1's locations are read under the caller's row-level security, so a buyer cannot see a seller's availability; the endpoint answers 0 for another entity until a masked read exists.
+15. **One GRN per drop, of the drop's items only (M4-05)**; the uncounted item of a drop is received as zero, so a short delivery is always a line of the discrepancy.
+17. **The buyer names the delivery location on its order (M4-11, CR-24A-2)**: `doc_order.deliver_to_location_id` (V0002), optional, one of the buyer's own locations (`m4.order.deliver_to_unknown`). The seller cannot read the buyer's locations (item 13), so the delivery note screen takes each drop's ship-to and bill-to from the order; CreateDeliveryNote's contract is unchanged.
+18. **Dispatch at the warehouse (M4-11)**: DispatchDeliveryNote takes the seller's OWN scope entity-wide or at the location the note leaves from (`x-scope: LOCATION`; `m4.delivery.not_at_location`), so the stores of that warehouse, in a session scoped there, dispatch (the demo's `fed-stores`). M4-04 asked for an entity-wide scope.
+19. **The printed invoice is found again through the invoice (M4-11)**: `InvoicePrintConsumer` runs RecordInvoicePrint (`bil.invoice.issue`, in the seller's scope) after rendering, which keeps the PDF's object key in `doc_invoice.print_object_key` (V0003; INVOICE_PRINTED, `invoice.printed.v1`); `GET /v1/trading/invoices/{id}/print` answers a fresh pre-signed link from it, `m4.invoice.print_not_ready` until then. The PDF is the seller's, so the buyer's copy waits (PLAN_TO_M2).
+
+## Screens (M4-11, demo scope)
+
+`web/src/modules/m4trading` (doc 30 section 5.4, 24A section 8): `/trading` (the desk: the buyer's orders, the seller's order desk, the delivery notes sent, the deliveries on their way and the GRNs, each shown by permission), `/trading/orders/new` (the requisition book: seller from the ACTIVE relationships, delivery location, items with the tier price of M3's `resolve/trade`), `/trading/orders/:id` (submit, cancel; the seller's availability, accept with a delivery date, reject with a reason; allocation and tier price once accepted), `/trading/delivery-notes/new?orderId=` (warehouse, vehicle, driver, open quantity and FEFO batch per line), `/trading/delivery-notes/:id` (issue, dispatch, receive), `/trading/grns/new?deliveryNoteId=&dropId=` (count, short lines, batch prefilled from M2), `/trading/grns/:id` (confirm, the receipt movements from M5, the stock position; the seller issues the invoice), `/trading/invoices/:id` (lines with VAT, totals, links to the GRN and the delivery note, the seller's Print). Every text is a message of `trading.messages.json`; the pure logic is in `tradingView.ts` with its tests.

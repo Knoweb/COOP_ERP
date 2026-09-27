@@ -16,7 +16,7 @@ export interface paths {
         put?: never;
         /**
          * Draft an order to a seller the caller's entity trades with
-         * @description Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
+         * @description Problems: m4.order.seller_is_buyer, m4.order.relationship_inactive, m4.order.eta_past, m4.order.deliver_to_unknown, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
          */
         post: operations["createOrder"];
         delete?: never;
@@ -32,7 +32,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What a seller can allocate today of the given items, in each item's base unit */
+        /**
+         * What a seller can allocate today of the given items, in each item's base unit
+         * @description M5's availability over the seller's active warehouses. Row-level security lets only the seller read its own stock: asked by anyone else, every item answers 0.
+         */
         get: operations["sellerAvailability"];
         put?: never;
         post?: never;
@@ -149,6 +152,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/delivery-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The delivery notes the caller's entity sent (SELLER) or is to receive (BUYER) */
+        get: operations["listDeliveryNotes"];
+        put?: never;
+        /**
+         * Draft a delivery note of accepted order lines, in drops
+         * @description Problems: m4.delivery.drops_required, m4.delivery.lines_required, m4.delivery.one_buyer, m4.delivery.order_line_unknown, m4.delivery.order_not_accepted, m4.delivery.bill_to_mismatch, m4.delivery.qty_not_positive, m4.delivery.exceeds_allocation, m4.delivery.from_location_unknown.
+         */
+        post: operations["createDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/delivery-notes/{deliveryNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        /** One delivery note the caller's entity sent or is to receive */
+        get: operations["getDeliveryNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/delivery-notes/{deliveryNoteId}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a draft delivery note from the seller's series
+         * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_draft, m4.delivery.exceeds_allocation, m4.delivery.order_not_accepted.
+         */
+        post: operations["issueDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/delivery-notes/{deliveryNoteId}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The vehicle leaves with an issued delivery note
+         * @description Problems: m4.delivery.not_found, m4.delivery.not_seller, m4.delivery.not_at_location, m4.delivery.not_issued, m4.delivery.vehicle_required, m4.delivery.driver_required.
+         */
+        post: operations["dispatchDeliveryNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/grns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The GRNs the caller's entity received (BUYER) or that were received from it (SELLER) */
+        get: operations["listGrns"];
+        put?: never;
+        /**
+         * Count a delivery note drop at one of the receiver's locations
+         * @description Problems: m4.grn.location_unknown, m4.grn.drop_unknown, m4.grn.not_receiver, m4.grn.location_mismatch, m4.grn.drop_already_captured, m4.grn.lines_required, m4.grn.sku_not_on_drop, m4.grn.line_duplicate, m4.grn.uom_invalid, m4.grn.line_quantities.
+         */
+        post: operations["captureGrn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/grns/{grnId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        /** One GRN the caller's entity received or that was received from it */
+        get: operations["getGrn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/grns/{grnId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a GRN, the pivot where ownership passes; raises a discrepancy on a variance
+         * @description Problems: m4.grn.not_found, m4.grn.not_receiver, m4.grn.not_draft, m4.grn.mrp_required, m4.grn.expiry_required, document.series_device_held (a shop whose GRN series a till holds receives at the till).
+         */
+        post: operations["confirmGrn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The invoices the caller's entity issued (SELLER) or received (BUYER) */
+        get: operations["listInvoices"];
+        put?: never;
+        /**
+         * Issue a tax invoice from confirmed GRNs of one buyer
+         * @description Problems: m4.invoice.grns_required, m4.invoice.grn_unknown, m4.invoice.grn_not_confirmed, m4.invoice.one_buyer, m4.invoice.grn_invoiced, m4.invoice.seller_vat_missing, m4.invoice.tax_rate_missing, m4.invoice.nothing_received.
+         */
+        post: operations["issueInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices/{invoiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        /** One invoice the caller's entity issued or received */
+        get: operations["getInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices/{invoiceId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's invoice (M4-11)
+         * @description The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity is refused (report.scope_mismatch).
+         */
+        get: operations["getInvoicePrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -164,6 +375,11 @@ export interface components {
             /** Format: date */
             requestedEta?: string;
             notes?: string;
+            /**
+             * Format: uuid
+             * @description One of the buyer's own locations, where the goods are to be delivered (CR-24A-2)
+             */
+            deliverToLocationId?: string;
             lines: components["schemas"]["OrderLineRequest"][];
         };
         OrderLineRequest: {
@@ -196,6 +412,8 @@ export interface components {
             rejectReasonCode?: string;
             netAmount?: number;
             notes?: string;
+            /** Format: uuid */
+            deliverToLocationId?: string;
             lines: components["schemas"]["OrderLineResponse"][];
         };
         OrderLineResponse: {
@@ -227,6 +445,202 @@ export interface components {
             lineId: string;
             allocatedQty: number;
             reason: string;
+        };
+        CreateDeliveryNoteRequest: {
+            /**
+             * Format: uuid
+             * @description The seller's warehouse the goods leave from (optional)
+             */
+            fromLocationId?: string;
+            vehicleRef?: string;
+            driverName?: string;
+            routeRef?: string;
+            drops: components["schemas"]["DropRequest"][];
+        };
+        DropRequest: {
+            /** Format: uuid */
+            shipToLocationId: string;
+            /** Format: uuid */
+            billToEntityId: string;
+            lines: components["schemas"]["DeliveryLineRequest"][];
+        };
+        DeliveryLineRequest: {
+            /** Format: uuid */
+            orderLineId: string;
+            qty: components["schemas"]["Quantity"];
+            /** Format: uuid */
+            batchId?: string;
+        };
+        DispatchRequest: {
+            vehicleRef?: string;
+            /** Format: uuid */
+            driverUserId?: string;
+            driverName?: string;
+        };
+        DeliveryNoteResponse: {
+            /** Format: uuid */
+            deliveryNoteId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "ISSUED" | "IN_TRANSIT" | "CLOSED";
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            fromLocationId?: string;
+            vehicleRef?: string;
+            driverName?: string;
+            /** Format: date-time */
+            dispatchedAt?: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            drops: components["schemas"]["DropResponse"][];
+        };
+        DropResponse: {
+            /** Format: uuid */
+            dropId: string;
+            seq: number;
+            /** Format: uuid */
+            shipToLocationId: string;
+            /** Format: uuid */
+            billToEntityId: string;
+            orderIds: string[];
+            /** @enum {string} */
+            status: "PLANNED" | "RECEIVED";
+            /** Format: uuid */
+            grnId?: string;
+            lines: components["schemas"]["DeliveryLineResponse"][];
+        };
+        DeliveryLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            orderId: string;
+            /** Format: uuid */
+            orderLineId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            dispatchedQty: number;
+        };
+        CaptureGrnRequest: {
+            /** Format: uuid */
+            dropId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date */
+            receivedOn?: string;
+            lines: components["schemas"]["GrnLineRequest"][];
+        };
+        GrnLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            uomCode?: string;
+            receivedQty: number;
+            damagedQty?: number;
+            batchNo?: string;
+            /** Format: date */
+            manufactureDate?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+        };
+        GrnResponse: {
+            /** Format: uuid */
+            grnId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "CONFIRMED";
+            /** Format: uuid */
+            receiverEntityId: string;
+            /** Format: uuid */
+            receiverLocationId: string;
+            /** Format: uuid */
+            sellerEntityId?: string;
+            /** Format: uuid */
+            dropId?: string;
+            /** Format: uuid */
+            deliveryNoteId?: string;
+            /** Format: date */
+            receivedOn?: string;
+            /** Format: date-time */
+            confirmedAt?: string;
+            /** Format: uuid */
+            discrepancyId?: string;
+            lines: components["schemas"]["GrnLineResponse"][];
+        };
+        GrnLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            expectedQty?: number;
+            receivedQty: number;
+            damagedQty: number;
+            batchNo?: string;
+            /** Format: date */
+            expiryDate?: string;
+            printedMrp?: number;
+            unitCost?: number;
+            /** Format: uuid */
+            batchId?: string;
+        };
+        IssueInvoiceRequest: {
+            grnIds: string[];
+        };
+        InvoiceResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            docNumber?: string;
+            status: string;
+            /** Format: uuid */
+            relationshipId?: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            sellerVatNo?: string;
+            buyerVatNo?: string;
+            grnIds: string[];
+            /** Format: date */
+            taxPointDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            netAmount: number;
+            taxAmount: number;
+            grossAmount: number;
+            lines: components["schemas"]["InvoiceLineResponse"][];
+        };
+        InvoiceLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            qty: number;
+            unitPrice: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            /** Format: uuid */
+            grnLineId?: string;
+        };
+        InvoicePrintResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** Format: uri */
+            url: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -275,6 +689,8 @@ export interface components {
     };
     parameters: {
         OrderId: string;
+        DeliveryNoteId: string;
+        GrnId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -509,6 +925,372 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDeliveryNotes: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery notes, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    createDeliveryNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeliveryNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft delivery note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDeliveryNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            /** @description m4.delivery.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    issueDeliveryNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issued delivery note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    dispatchDeliveryNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deliveryNoteId: components["parameters"]["DeliveryNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchRequest"];
+            };
+        };
+        responses: {
+            /** @description The delivery note in transit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listGrns: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The GRNs, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    captureGrn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureGrnRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft GRN */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getGrn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The GRN */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"];
+                };
+            };
+            /** @description m4.grn.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirmGrn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                grnId: components["parameters"]["GrnId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The confirmed GRN */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrnResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listInvoices: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoices, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    issueInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueInvoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued invoice */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            /** @description m4.invoice.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getInvoicePrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePrintResponse"];
+                };
+            };
+            /** @description m4.invoice.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             422: components["responses"]["RuleBroken"];
         };
     };

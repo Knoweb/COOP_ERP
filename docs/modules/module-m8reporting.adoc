@@ -1,0 +1,19 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`lk.coopfed.knoweb.m8reporting`
+|Spring components
+|_Services_
+
+* `l.c.k.m.query.ReportingQueries` (via `l.c.k.m.internal.report.ReportQueriesImpl`)
+|Bean references
+|* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
+* `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.Messages` (in Platform Kernel)
+* `l.c.k.k.api.Formats` (in Platform Kernel)
+* `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
+* `l.c.k.m.query.CatalogueQueries` (in M2 Catalogue & Batch)
+* `l.c.k.k.api.A4Renderer` (in Platform Kernel)
+* `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
+|===
