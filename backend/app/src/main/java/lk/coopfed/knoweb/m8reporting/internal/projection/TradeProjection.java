@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The trading projections of the demo (28A section 3, trade_document_fact, and doc 28 section
- * 3; M8-06 in part): {@code trade_document_event}, one row per trading event on a document, and
+ * 3; M8-04 in part): {@code trade_document_event}, one row per trading event on a document, and
  * {@code trade_line_fact}, the lines that carry volume, from M4's events (the field names of
  * M4's event records: OrderSubmitted, OrderAccepted, OrderRejected, OrderCancelled,
  * DeliveryNoteDispatched, GrnConfirmed, InvoiceIssued).
