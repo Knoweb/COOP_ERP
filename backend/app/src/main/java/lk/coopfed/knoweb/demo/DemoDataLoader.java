@@ -48,11 +48,15 @@ import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
 import lk.coopfed.knoweb.m5inventory.api.PrepareOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
 import lk.coopfed.knoweb.m5inventory.api.SignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.query.LotBalance;
+import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -107,6 +111,8 @@ public class DemoDataLoader {
     private final Handles<PrepareOpeningBalance, UUID> prepareOpeningBalance;
     private final Handles<SignOpeningBalance, UUID> signOpeningBalance;
     private final Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance;
+    private final Handles<IssueTransfer, UUID> issueTransfer;
+    private final Handles<ReceiveTransfer, UUID> receiveTransfer;
     private final PartyQueries party;
     private final RelationshipQueries relationships;
     private final CatalogueQueries catalogue;
@@ -133,6 +139,8 @@ public class DemoDataLoader {
             Handles<PrepareOpeningBalance, UUID> prepareOpeningBalance,
             Handles<SignOpeningBalance, UUID> signOpeningBalance,
             Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance,
+            Handles<IssueTransfer, UUID> issueTransfer,
+            Handles<ReceiveTransfer, UUID> receiveTransfer,
             PartyQueries party,
             RelationshipQueries relationships,
             CatalogueQueries catalogue,
@@ -154,6 +162,8 @@ public class DemoDataLoader {
         this.prepareOpeningBalance = prepareOpeningBalance;
         this.signOpeningBalance = signOpeningBalance;
         this.countersignOpeningBalance = countersignOpeningBalance;
+        this.issueTransfer = issueTransfer;
+        this.receiveTransfer = receiveTransfer;
         this.party = party;
         this.relationships = relationships;
         this.catalogue = catalogue;
@@ -185,6 +195,10 @@ public class DemoDataLoader {
         for (Distributor distributor : DemoCast.DISTRIBUTORS) {
             openingStock(distributor.stores(), distributor.accounts(), items, skus, false);
         }
+        // Phase 3, the shop: Kuliyapitiya MPCS holds stock at its stores and sends some to its
+        // town shop, whose till sells it (make demo-till-sale).
+        societyStock(items, skus);
+        shopStockByTransfer();
 
         Report report = new Report(Map.copyOf(counts));
         log.info("Demo data: {} commands issued {}", report.total(), report.commands());
@@ -431,6 +445,77 @@ public class DemoDataLoader {
         count("SignOpeningBalance");
         countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(countersigner));
         count("CountersignOpeningBalance");
+    }
+
+    // ---- M5, phase 3: the society's stores stock and a transfer to its town shop ---------------------
+
+    /**
+     * Kuliyapitiya MPCS's opening stock at its stores (W01): a tenth of a distributor's quantity of
+     * each item, at the distributor's price (what the society paid). Prepared and signed by the
+     * society buyer, countersigned by the society manager.
+     */
+    private void societyStock(List<Item> items, Map<String, UUID> skus) {
+        Actor buyer = DemoCast.M101_BUYER;
+        ScopeContext scope = scopeOf(buyer);
+        if (!inventory.skusWithLots(DemoCast.M101_WAREHOUSE, scope).isEmpty()) {
+            return;
+        }
+        LocalDate today = today();
+        List<OpeningBalanceLine> lines = new ArrayList<>();
+        for (Item item : items) {
+            BigDecimal tenth = item.distributorQty().divide(BigDecimal.TEN, 0, java.math.RoundingMode.DOWN);
+            BigDecimal qty = tenth.signum() > 0 ? tenth : BigDecimal.ONE;
+            String batchNo = item.batchTracked() ? "DEMO-" + today.getYear() + "-" + item.lineNo() : null;
+            LocalDate expiry = item.expiryTracked() ? today.plusDays(item.shelfLifeDays()) : null;
+            lines.add(new OpeningBalanceLine(
+                    null,
+                    LotCondition.GOOD,
+                    qty,
+                    item.distributorPrice(),
+                    skus.get(item.nameEn()),
+                    batchNo,
+                    expiry,
+                    item.hasPrintedMrp() ? item.printedMrp() : null));
+        }
+        UUID balance = prepareOpeningBalance.handle(new PrepareOpeningBalance(DemoCast.M101_WAREHOUSE, lines), scope);
+        count("PrepareOpeningBalance");
+        signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
+        count("SignOpeningBalance");
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(DemoCast.M101_MANAGER));
+        count("CountersignOpeningBalance");
+    }
+
+    /**
+     * The society manager sends half of every GOOD lot at the stores to the town shop (M5-09), and
+     * the shop's own staff member receives it at the shop: each writes only its own location's rows.
+     * Skipped when a transfer to the shop exists; one left in transit is received.
+     */
+    private void shopStockByTransfer() {
+        ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
+        ScopeContext shop = scopeOf(DemoCast.M101_SHOP_STAFF);
+        List<TransferView> existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
+        if (existing.isEmpty()) {
+            List<IssueTransfer.Line> lines = new ArrayList<>();
+            for (LotBalance lot : inventory.balances(DemoCast.M101_WAREHOUSE, null, false, manager)) {
+                if (!"GOOD".equals(lot.condition()) || lot.qtyOnHand().signum() <= 0) {
+                    continue;
+                }
+                BigDecimal half = lot.qtyOnHand().divide(BigDecimal.valueOf(2), 0, java.math.RoundingMode.DOWN);
+                lines.add(new IssueTransfer.Line(lot.batchId(), half.signum() > 0 ? half : lot.qtyOnHand()));
+            }
+            if (lines.isEmpty()) {
+                return;
+            }
+            issueTransfer.handle(new IssueTransfer(DemoCast.M101_WAREHOUSE, DemoCast.M101_TOWN_SHOP, lines), manager);
+            count("IssueTransfer");
+            existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
+        }
+        for (TransferView transfer : existing) {
+            if ("IN_TRANSIT".equals(transfer.status()) && DemoCast.M101_TOWN_SHOP.equals(transfer.toLocationId())) {
+                receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), shop);
+                count("ReceiveTransfer");
+            }
+        }
     }
 
     // ---- helpers -----------------------------------------------------------------------------------

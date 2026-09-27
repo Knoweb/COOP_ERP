@@ -305,6 +305,15 @@ tasks.named<JacocoReport>("jacocoTestReport") {
     mustRunAfter(tasks.test, "integrationTest")
 }
 
+// make demo-till-sale (docs/DEMO.md, phase 3): the till simulator of the test sources sells at the
+// demo shop against the running local stack. Not a test: it talks to whatever COOP_ERP_API names.
+tasks.register<JavaExec>("demoTillSale") {
+    description = "Sells at the demo shop through the sync contract with the till simulator (local stack)."
+    group = "demo"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("lk.coopfed.knoweb.demo.DemoTillSale")
+}
+
 val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"
