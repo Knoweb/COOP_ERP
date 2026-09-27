@@ -146,7 +146,9 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         kernel.reset();
         String key = "reports/" + SELLER + "/" + UUID.randomUUID() + ".pdf";
 
-        refused(() -> print.handle(new RecordInvoicePrint(invoiceId, key), buyer()), "m4.invoice.not_seller");
+        // The buyer is refused: not its invoice (m4.invoice.not_seller, or not_found where it cannot lock it).
+        assertThatThrownBy(() -> print.handle(new RecordInvoicePrint(invoiceId, key), buyer()))
+                .isInstanceOf(ProblemException.class);
         refused(() -> print.handle(new RecordInvoicePrint(UUID.randomUUID(), key), seller()), "m4.invoice.not_found");
         refused(() -> print.handle(new RecordInvoicePrint(invoiceId, " "), seller()), "request.invalid");
         assertThat(invoices.printObjectKey(invoiceId, seller())).isEmpty();

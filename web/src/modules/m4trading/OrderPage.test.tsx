@@ -18,6 +18,7 @@ let current: Order;
 const api = {
   order: vi.fn(async () => current),
   sellerAvailability: vi.fn(async () => ({ [SKU]: 500 })),
+  relationship: vi.fn(async () => ({ orderLockHoursBeforeEta: 48 })),
   submitOrder: vi.fn(async () => current),
   acceptOrder: vi.fn(async () => current),
   rejectOrder: vi.fn(async () => current),

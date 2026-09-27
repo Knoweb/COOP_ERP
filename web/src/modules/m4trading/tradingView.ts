@@ -25,6 +25,18 @@ export function businessToday(now: Date = new Date()): string {
   return now.toLocaleDateString("en-CA", { timeZone: BUSINESS_TIME_ZONE });
 }
 
+/**
+ * The first delivery date an acceptance can take without the order locking at once: the order
+ * locks `lockHours` before the start of its delivery day (AcceptOrder, M4-03), so the date is
+ * the first whole day after that many hours from today. The hours are the relationship's
+ * (M1 `orderLockHoursBeforeEta`), never a number of the screen's.
+ */
+export function firstOpenEta(today: string, lockHours: number): string {
+  const date = new Date(`${today}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + Math.ceil(Math.max(0, lockHours) / 24) + 1);
+  return date.toISOString().slice(0, 10);
+}
+
 /** The look of an order's state (doc 30 section 2.1): being written, in force, or ended without effect. */
 export function orderChip(status: OrderStatus): ChipState {
   if (status === "DRAFT") {

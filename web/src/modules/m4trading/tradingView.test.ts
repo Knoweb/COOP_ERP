@@ -6,6 +6,7 @@ import {
   canDeliver,
   countReady,
   deliveryRequest,
+  firstOpenEta,
   grnRequest,
   isShort,
   lineAmount,
@@ -88,6 +89,12 @@ describe("the order desk and the delivery note", () => {
     expect(orderChip("CANCELLED")).toBe("void");
     expect(orderChip("SUBMITTED")).toBe("issued");
     expect(orderChip("PARTIALLY_FULFILLED")).toBe("issued");
+  });
+
+  it("proposes the first delivery date that does not lock the order at once", () => {
+    expect(firstOpenEta("2026-09-27", 0)).toBe("2026-09-28");
+    expect(firstOpenEta("2026-09-27", 24)).toBe("2026-09-29");
+    expect(firstOpenEta("2026-09-30", 48)).toBe("2026-10-03");
   });
 
   it("opens what is allocated and not yet on an issued note", () => {
