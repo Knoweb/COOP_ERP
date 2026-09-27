@@ -2,12 +2,6 @@ package lk.coopfed.knoweb.engine
 
 import java.math.RoundingMode
 import java.time.LocalDate
-import lk.coopfed.knoweb.engine.model.Basket
-import lk.coopfed.knoweb.engine.model.BasketResult
-import lk.coopfed.knoweb.engine.model.CapReason
-import lk.coopfed.knoweb.engine.model.LineResult
-import lk.coopfed.knoweb.engine.model.TenderKind
-import lk.coopfed.knoweb.engine.snapshot.PricingSnapshotIndex
 
 /** Steps 1 to 7 of doc 23 section 3.5 for a whole receipt (23A section 6, BasketResolver). */
 object BasketResolver {
