@@ -204,17 +204,31 @@ await check(
     const firstUpstream = firstResponse.headers.get("x-upstream");
     const first = await json(firstResponse);
 
-    const retryResponse = await register(text, key, headers);
-    const retryUpstream = retryResponse.headers.get("x-upstream");
-    const retry = await json(retryResponse);
-
     expect(firstResponse.status === 201, `first HTTP ${firstResponse.status}: ${JSON.stringify(first)}`);
-    expect(retryResponse.status === 201, `retry HTTP ${retryResponse.status}: ${JSON.stringify(retry)}`);
-    expect(first.id && first.id === retry.id, `first ${first.id}, retry ${retry.id ?? JSON.stringify(retry)}`);
+
+    // Round robin alone does not send the retry to the other instance: nginx's own compose
+    // healthcheck goes through the same upstream every five seconds, and when it lands between
+    // our two requests the retry comes back to the first instance. So we replay until the other
+    // instance answers; every replay on the way must also return the same greeting.
+    const seen = [];
+    let retryUpstream = firstUpstream;
+    for (let attempt = 0; attempt < (TWO_INSTANCES ? 6 : 1); attempt++) {
+      const retryResponse = await register(text, key, headers);
+      retryUpstream = retryResponse.headers.get("x-upstream");
+      const retry = await json(retryResponse);
+      seen.push(retryUpstream);
+
+      expect(retryResponse.status === 201, `retry HTTP ${retryResponse.status}: ${JSON.stringify(retry)}`);
+      expect(first.id && first.id === retry.id, `first ${first.id}, retry ${retry.id ?? JSON.stringify(retry)}`);
+
+      if (!TWO_INSTANCES || retryUpstream !== firstUpstream) {
+        break;
+      }
+    }
 
     if (TWO_INSTANCES) {
       expect(firstUpstream && retryUpstream, "missing X-Upstream header");
-      expect(firstUpstream !== retryUpstream, `retry stayed on ${firstUpstream}`);
+      expect(firstUpstream !== retryUpstream, `every retry stayed on ${firstUpstream}: ${seen.join(", ")}`);
     }
   }
 );
