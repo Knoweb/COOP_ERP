@@ -311,6 +311,8 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-02 | AmendOrder, order versions and re-acceptance (24A section 6) | Before a buyer changes a submitted order | – |
 | M4-02 | Order lines in a unit other than the base unit | When M2 publishes a conversion query | `m4.order.uom_invalid` until then |
 | M4-02 | Paging of ListOrders; cancelling the undispatched remainder of a partly fulfilled order | Before order volumes grow; before partial deliveries are cancelled | – |
+| M4-03 | LockClockJob and ORDER_LOCKED; OverrideLockWindow; RecordOrderAdjustment; BackorderReviewJob | Before lock windows are enforced by a clock and changed by the seller | LOCKED is derived from `lock_at` on read |
+| M4-03 | Allocation across competing open orders; the PRO_RATA and QUOTA rules | When M5 answers availability net of reservations | FCFS per order against the M5 seam |
 
 ## Phase 7 — decisions only the architect can take
 

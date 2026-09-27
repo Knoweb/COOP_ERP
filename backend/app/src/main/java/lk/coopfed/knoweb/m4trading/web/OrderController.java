@@ -8,15 +8,20 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.AcceptOrder;
 import lk.coopfed.knoweb.m4trading.api.CancelOrder;
 import lk.coopfed.knoweb.m4trading.api.CreateOrder;
 import lk.coopfed.knoweb.m4trading.api.InventoryAvailability;
+import lk.coopfed.knoweb.m4trading.api.RejectOrder;
 import lk.coopfed.knoweb.m4trading.api.SubmitOrder;
+import lk.coopfed.knoweb.m4trading.internal.order.AcceptOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.CancelOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.CreateOrderHandler;
+import lk.coopfed.knoweb.m4trading.internal.order.RejectOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.SubmitOrderHandler;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.OrderView;
+import lk.coopfed.knoweb.m4trading.web.generated.AcceptOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreateOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderApi;
@@ -34,6 +39,8 @@ class OrderController implements OrderApi {
     private final CreateOrderHandler create;
     private final SubmitOrderHandler submit;
     private final CancelOrderHandler cancel;
+    private final AcceptOrderHandler accept;
+    private final RejectOrderHandler reject;
     private final OrderQueries queries;
     private final InventoryAvailability availability;
     private final CurrentScope currentScope;
@@ -42,12 +49,16 @@ class OrderController implements OrderApi {
             CreateOrderHandler create,
             SubmitOrderHandler submit,
             CancelOrderHandler cancel,
+            AcceptOrderHandler accept,
+            RejectOrderHandler reject,
             OrderQueries queries,
             InventoryAvailability availability,
             CurrentScope currentScope) {
         this.create = create;
         this.submit = submit;
         this.cancel = cancel;
+        this.accept = accept;
+        this.reject = reject;
         this.queries = queries;
         this.availability = availability;
         this.currentScope = currentScope;
@@ -77,6 +88,25 @@ class OrderController implements OrderApi {
     public ResponseEntity<OrderResponse> cancelOrder(String idempotencyKey, UUID orderId, ReasonRequest request) {
         ScopeContext scope = currentScope.get();
         cancel.handle(new CancelOrder(orderId, request.getReasonCode(), request.getReasonText()), scope);
+        return ResponseEntity.ok(read(orderId, scope));
+    }
+
+    @Override
+    public ResponseEntity<OrderResponse> acceptOrder(String idempotencyKey, UUID orderId, AcceptOrderRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<AcceptOrder.LineOverride> overrides = request.getOverrides() == null
+                ? List.of()
+                : request.getOverrides().stream()
+                        .map(o -> new AcceptOrder.LineOverride(o.getLineId(), o.getAllocatedQty(), o.getReason()))
+                        .toList();
+        accept.handle(new AcceptOrder(orderId, request.getCommittedEta(), overrides), scope);
+        return ResponseEntity.ok(read(orderId, scope));
+    }
+
+    @Override
+    public ResponseEntity<OrderResponse> rejectOrder(String idempotencyKey, UUID orderId, ReasonRequest request) {
+        ScopeContext scope = currentScope.get();
+        reject.handle(new RejectOrder(orderId, request.getReasonCode(), request.getReasonText()), scope);
         return ResponseEntity.ok(read(orderId, scope));
     }
 

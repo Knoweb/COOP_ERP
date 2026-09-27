@@ -107,6 +107,46 @@ class OrderHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void theSellerAcceptsOneOrderAndRejectsAnother() {
+        String first = submittedOrder();
+        String second = submittedOrder();
+
+        ResponseEntity<JsonNode> accepted = post(
+                "/v1/trading/orders/" + first + "/accept",
+                Map.of("committedEta", TradingFixture.today().plusDays(2).toString()),
+                headers(SELLER_USER, SELLER));
+        assertThat(accepted.getStatusCode())
+                .as(String.valueOf(accepted.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(accepted.getBody().get("status").asText()).isEqualTo("ACCEPTED");
+        assertThat(accepted.getBody().get("lines").get(0).get("allocatedQty").decimalValue())
+                .isEqualByComparingTo("12");
+
+        ResponseEntity<JsonNode> rejected = post(
+                "/v1/trading/orders/" + second + "/reject",
+                Map.of("reasonCode", "NO_STOCK"),
+                headers(SELLER_USER, SELLER));
+        assertThat(rejected.getStatusCode())
+                .as(String.valueOf(rejected.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(rejected.getBody().get("status").asText()).isEqualTo("REJECTED");
+    }
+
+    private String submittedOrder() {
+        ResponseEntity<JsonNode> created = post(
+                "/v1/trading/orders",
+                Map.of(
+                        "sellerEntityId",
+                        SELLER.toString(),
+                        "lines",
+                        List.of(Map.of("skuId", RICE.toString(), "qty", 12))),
+                headers(BUYER_USER, BUYER));
+        String orderId = created.getBody().get("orderId").asText();
+        post("/v1/trading/orders/" + orderId + "/submit", null, headers(BUYER_USER, BUYER));
+        return orderId;
+    }
+
+    @Test
     void aBrokenRuleIsAProblemDocument() {
         ResponseEntity<JsonNode> refused = post(
                 "/v1/trading/orders",
