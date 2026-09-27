@@ -2,7 +2,7 @@
 
 Updated after every ticket, in the same commit. Three headings: Done, Next, Deviations. A person or tool arriving cold reads `AGENTS.md`, then `docs/README.md`, then this file, and can continue.
 
-Last updated: 27 September 2026, branch `feat/m4-02-orders` (stacked on `feat/m4-01-trading-scaffold`).
+Last updated: 27 September 2026, branch `feat/m4-02-orders` (on `main` after #152).
 
 ## Done
 
