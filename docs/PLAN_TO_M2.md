@@ -306,3 +306,9 @@ The gain comes from four things: four streams in wave 1 instead of one pair, fou
 9. Whether M2 may start against an early publication of the M1 contract (slice and `api` package reviewed after M1-02) or only at the final M1-13 freeze.
 10. One set of `i18n` files with sorted, module-prefixed keys, or per-module files by change request against 17A; and who supplies the Sinhala and Tamil text.
 11. Whether a Postgres-only compose profile and a mock server for the web stream are added to 17A's tooling.
+
+## Deferred after the demo
+
+Work left out of the demo-minimal build of 27 September 2026 (the architect's priority: a working demo of phase 1), one line per item; each is also a Deviation in `docs/PROGRESS.md`.
+
+- **M3-02 rest** (M3, with the till track): the golden-basket JSON fixtures and the Android parity harness; the FREE_ITEM rule kind; ceiling unit conversion (with M3-06). Before M6 links the engine.
