@@ -20,5 +20,5 @@ export const pricingModule: ModuleDefinition = {
 
   // The same codes as the x-permission of openapi/m3pricing.yaml. A user with at least one of
   // them sees the module; the page itself hides what the user may not do (PricingPage.tsx).
-  requiredPermissions: ["prc.price_list.read", "prc.price_list.register"]
+  requiredPermissions: ["prc.pricelist.view", "prc.pricelist.author"]
 };

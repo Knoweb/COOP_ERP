@@ -305,10 +305,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "integration.webhook",
                     "the scaffolded copy of hello.greeting: no ext_view yet",
                     RlsMatrixIntegrationTest::externalReadsNothing,
-                    false),
-            // TODO(M3 price list): pricing.price_list has no ext_view.
-            // party.entity has its ext_view since m1party V0010 and follows the template.
-            new Departure("pricing.price_list", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing));
+                    false)
+            // pricing.price_list and price_list_line follow the template since m3pricing V0003
+            // (M3-03); beyond it, buyer_read admits the buyer of a relationship that binds the list,
+            // which no made-up row is. party.entity has its ext_view since m1party V0010.
+            );
 
     private static String everyClassButNoneReadsEverything(Check check) {
         return check.op() == Op.SELECT

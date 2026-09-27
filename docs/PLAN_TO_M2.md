@@ -319,3 +319,4 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 Work left out of the demo-minimal build of 27 September 2026 (the architect's priority: a working demo of phase 1), one line per item; each is also a Deviation in `docs/PROGRESS.md`.
 
 - **M3-02 rest** (M3, with the till track): the golden-basket JSON fixtures and the Android parity harness; the FREE_ITEM rule kind; ceiling unit conversion (with M3-06). Before M6 links the engine.
+- **M3-04 rest** (M3): RETAIL and ADVISORY lists (after M3-06); carry-forward and closure of the previous version's lines; WithdrawDraft; `pricing.review_raised.v1` for a trade price above the lowest MRP; trade lines in units other than the base unit (needs an M2 query of a SKU's conversions); the RETAIL publish fan-out to the snapshot change log.
