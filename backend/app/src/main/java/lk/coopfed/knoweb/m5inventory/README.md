@@ -2,7 +2,7 @@
 
 The living guide of the module (AGENTS.md): where stock is and what it cost, by location, batch and condition. Once code exists, this file and the tests supersede 25A for day-to-day work; every deviation from the guide is listed at the end with its reason. Read `hello/README.md` first: its six rules apply here unchanged.
 
-Built so far, for the demo (Phase 1: the Federation selling to a distributor): M5-01 (schema), M5-02 (the ledger), M5-04 (the queries, and M5's answer to M2's lot questions), M5-03 (the GRN and delivery consumers) and M5-10 (opening balances). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
+Built so far, for the demo (Phase 1: the Federation selling to a distributor): M5-01 (schema), M5-02 (the ledger), M5-04 (the queries, and M5's answer to M2's lot questions), M5-03 (the GRN and delivery consumers), M5-10 (opening balances) and, for phase 3 (the shop), M5-09 (transfers). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
 
 ## The one rule
 
@@ -72,6 +72,21 @@ Reads: `GET /v1/inventory/receipts/{grnId}` (`inv.stock.receive`) and `GET /v1/i
 
 **The web screens (M5-12, demo scope; doc 30 section 5.5):** `/inventory` shows a location's lots (M1's location list; item names from M2) with FEFO rank, cost when the server sends it, and the availability of each item there; `/inventory/opening/new` prepares an opening balance; `/inventory/opening/:id` signs and countersigns it.
 
+## Transfers (M5-09 at demo scope; 25A section 6.3, doc 25 flow 6.6)
+
+An internal transfer moves stock between two locations of one entity (a society's warehouse to one of its shops). It never changes the owner and never moves the entity average.
+
+| Step | Who | Writes (all at their own location) |
+|---|---|---|
+| `POST /v1/inventory/transfers` (`inv.transfer.issue`, ENTITY) → `IssueTransferHandler` | an entity-wide user of the entity | `transfer` and `transfer_line` rows at the **source**; TRANSFER_OUT per line at the source, at the entity average, which the line keeps as its cost. Audit `TRANSFER_ISSUED`; `transfer.issued.v1`. Status IN_TRANSIT. |
+| `POST /v1/inventory/transfers/{id}/receive` (`shop.transfer.receive`, LOCATION) → `ReceiveTransferHandler` | the **destination's** session (a shop user), or an entity-wide user | one `transfer_receipt` row at the **destination**; TRANSFER_IN per line there at the line's cost. Audit `TRANSFER_RECEIVED`; `transfer.received.v1`. Status RECEIVED. |
+
+**The own-location write rule (PR #148).** "Receiving a transfer must not update the source-side rows from the destination's session": nothing is updated at all. The transfer has two halves in two insert-only tables (`V0004`): the issue is the source's rows, the receipt is the destination's row, and the status is derived (RECEIVED when the receipt row exists). Each side reads the other half through an extra SELECT policy in the owner's OWN scope: `dest_read` on `transfer` and `transfer_line` (`to_location_id` is the session's location) and `source_read` on `transfer_receipt` (`from_location_id` is). The issuer is entity-wide because inv.transfer.issue is an ENTITY permission (25A section 3.1); a session held to the source cannot see the destination in M1 and is refused `m5.transfer.destination_invalid`. A session at the source reads the transfer but cannot receive it (`m5.transfer.not_destination`); a sibling shop does not see it.
+
+Guards: `m5.scope.own_required`, `m5.location.not_in_scope`, `m5.transfer.same_location`, `m5.transfer.destination_invalid`, `m5.transfer.lines_required`, `m5.transfer.line_invalid`, `m5.batch.not_found`, `m5.transfer.insufficient_stock` (the source's GOOD lot of the batch holds less); `m5.transfer.not_found`, `m5.transfer.not_destination`, `m5.transfer.already_received`. Reads: `GET /v1/inventory/transfers?locationId=` (leaving or arriving, newest first) and `GET /v1/inventory/transfers/{id}` (`inv.stock.view`). Screen: `/inventory/transfers` (send from the chosen location, receive at it).
+
+Deferred for the demo (`docs/PLAN_TO_M2.md`): the XFR document and its LOCATION series (the movements cite the transfer id), a separate dispatch step, cancel before receipt, a short receipt with its ADJ draft, `TransferRequestConsumer` (M4's lateral request), the till's `transfer.received.v1` bundle (`TransferReceiptHook`), `TransferOverdueJob` and `inventory.transfer_receipt_days`, the snapshot's expected transfers.
+
 ## Tests
 
 | Test | What it proves |
@@ -83,7 +98,8 @@ Reads: `GET /v1/inventory/receipts/{grnId}` (`inv.stock.receive`) and `GET /v1/i
 | `InventoryQueriesPostgresIntegrationTest` | The FEFO rank (expiry, none last; damaged and empty lots unranked), availability without negative or damaged lots and for every pair, pick order, in-stock batches, SKUs with lots, the entity average, LotsConsumed; the reads by scope; M2's questions and CorrectBatch against real lots. |
 | `ConsumersPostgresIntegrationTest` | The demo chain from M4's payloads: the Federation's stock reserved FEFO by a delivery note, dispatched out of its lots, received with a damaged unit into the distributor's lots at the trade price; redeliveries applied once; a short pick; every guard with nothing committed. |
 | `OpeningBalancePostgresIntegrationTest` | Prepare, sign, countersign by another person: the OPB document numbered from the entity's series, the lots and average; a second balance refused; every guard. |
-| `InventoryHttpPostgresIntegrationTest` | Every operation through HTTP (the opening balance's three commands and read, the receipt and pick list reads); first the two reads: the owner's balances with batch number, expiry, rank and cost; the Federation view without the cost; another entity sees nothing; availability; a request problem. |
+| `TransferPostgresIntegrationTest` | The warehouse sends, the shop's own session receives: quantities, the cost carried, the entity average unchanged, the status from each side, every row the shop wrote at the shop; every guard of both commands with nothing committed. |
+| `InventoryHttpPostgresIntegrationTest` | Every operation through HTTP (the transfer's two commands and two reads too) (the opening balance's three commands and read, the receipt and pick list reads); first the two reads: the owner's balances with batch number, expiry, rank and cost; the Federation view without the cost; another entity sees nothing; availability; a request problem. |
 
 ## Deviations from 25A, with reasons
 
@@ -99,3 +115,4 @@ Reads: `GET /v1/inventory/receipts/{grnId}` (`inv.stock.receive`) and `GET /v1/i
 10. **Quantities on a delivery note are taken in the item's base unit**; the conversion of a line's unit (M2) is deferred.
 11. **The opening balance's draft and signatures live in `inventory.opening_balance`**, and the OPB document is issued on countersign (the moment 25A section 4.7 issues it), instead of the `doc_opening_balance` extension of a stored draft document. The "location ONBOARDING" guard is not applied (the demo loads active locations); the "no movements at the location" guard is. The countersignature is given in the owning entity's scope by a person other than the signer; a Federation officer countersigning from the Federation's own scope is deferred.
 12. **New events** not in doc 25 section 5.3: `stock.received.v1`, `pick_list.created.v1`, `pick_list.dispatched.v1`, `opening_balance.changed.v1` (prepared and signed); each handler publishes one, as every handler must.
+13. **A transfer is two insert-only halves, not one XFR document row** (`V0004`): 25A extends an XFR document (`doc_transfer`) with dispatch and receipt columns on one row, which the destination would update, against the own-location write rule of PR #148. The issue (source) and the receipt (destination) are rows of their own, the status is derived, and the movements cite the transfer id until the XFR document is issued (deferred). Issue and dispatch are one step.

@@ -47,3 +47,13 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: An opening stock balance was countersigned and posted to stock
+
+  - code: TRANSFER_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Stock left a location for another location of the entity and is in transit
+
+  - code: TRANSFER_RECEIVED
+    severity: INFO
+    offline_capturable: false
+    description_en: A transfer was received in full at its destination

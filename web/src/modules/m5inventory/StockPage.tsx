@@ -39,6 +39,7 @@ export function StockPage() {
       <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", marginBottom: "var(--space-3)" }}>
         <LocationPicker value={locationId} onChange={setLocationId} />
         {canPrepare && <Link to="/inventory/opening/new">{t("inventory.opening.new").text}</Link>}
+        <Link to="/inventory/transfers">{t("inventory.transfer.link").text}</Link>
       </div>
 
       {balances.isLoading && <p>{t("inventory.loading").text}</p>}
