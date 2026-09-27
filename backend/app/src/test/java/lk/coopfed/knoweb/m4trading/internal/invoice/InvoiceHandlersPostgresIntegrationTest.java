@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
@@ -24,6 +25,7 @@ import lk.coopfed.knoweb.m4trading.api.InvoicePrinted;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
 import lk.coopfed.knoweb.m4trading.api.JournalPostingsReady;
 import lk.coopfed.knoweb.m4trading.api.RecordInvoicePrint;
+import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
 import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.ConfirmGrnHandler;
 import lk.coopfed.knoweb.m4trading.query.DeliveryQueries;
@@ -63,6 +65,9 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     DeliveryQueries deliveries;
 
+    @Autowired
+    TradingClock clock;
+
     private UUID grnId;
 
     @BeforeEach
@@ -95,10 +100,16 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         InvoiceView invoice = invoices.getInvoice(invoiceId, buyer()).orElseThrow();
         assertThat(invoice.docNumberDisplay()).isEqualTo("D4S-INV-0000001");
-        // 8 x 120 + 4 x 80 = 1280.00; VAT at the register's 18 % (m4.demo.vat_rate_percent).
+        // 8 x 120 + 4 x 80 = 1280.00. VAT by each item's tax category at the tax point (M2's
+        // taxRateInForce): rice standard 18 % of 960.00 = 172.80, dhal EXEMPT 0 % of 320.00.
         assertThat(invoice.netAmount()).isEqualByComparingTo("1280.00");
-        assertThat(invoice.taxAmount()).isEqualByComparingTo("230.40");
-        assertThat(invoice.grossAmount()).isEqualByComparingTo("1510.40");
+        assertThat(invoice.taxAmount()).isEqualByComparingTo("172.80");
+        assertThat(invoice.grossAmount()).isEqualByComparingTo("1452.80");
+        assertThat(invoice.lines())
+                .extracting(l -> l.skuId() + " "
+                        + l.taxRatePercent().stripTrailingZeros().toPlainString() + " "
+                        + l.taxAmount().toPlainString())
+                .containsExactlyInAnyOrder(RICE + " 18 172.80", DHAL + " 0 0.00");
         assertThat(invoice.sellerVatNo()).isEqualTo("209876543-7000");
         // CR-21A-6: the buyer's VAT number, read through M1's counterparty view now that it
         // carries it (an active relationship between SELLER and BUYER; TradingFixture.arrange).
@@ -114,7 +125,7 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(events(InvoiceIssued.class)).singleElement().satisfies(event -> {
             assertThat(event.buyerEntityId()).isEqualTo(BUYER);
             assertThat(event.buyerVatNo()).isEqualTo("109876543-7000");
-            assertThat(event.grossAmount()).isEqualByComparingTo("1510.40");
+            assertThat(event.grossAmount()).isEqualByComparingTo("1452.80");
             assertThat(event.contentHash()).hasSize(64);
         });
         assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
@@ -122,11 +133,56 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(event.postings())
                     .extracting(posting ->
                             posting.creditRole() + "=" + posting.amount().toPlainString())
-                    .containsExactlyInAnyOrder("REVENUE=1280.00", "VAT_OUTPUT=230.40");
+                    .containsExactlyInAnyOrder("REVENUE=1280.00", "VAT_OUTPUT=172.80");
         });
 
         kernel.reset();
         refused(() -> issue.handle(new IssueInvoice(List.of(grnId)), seller()), "m4.invoice.grn_invoiced");
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aRatePublishedToApplyAfterTheTaxPointDoesNotApply() {
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        LocalDate taxPoint = clock.today();
+        // The standard rate closes at the tax point and 25 % applies from the day after.
+        superuserJdbc()
+                .update(
+                        "update catalogue.tax_rate set effective_to = ? where tax_category_id = ?",
+                        taxPoint,
+                        TradingFixture.TAX_CATEGORY);
+        superuserJdbc()
+                .update(
+                        """
+                        insert into catalogue.tax_rate (tax_category_id, rate_percent, effective_from, owner_entity_id)
+                        select tax_category_id, 25.00, ?, owner_entity_id from catalogue.tax_category
+                        where tax_category_id = ?
+                        """,
+                        taxPoint.plusDays(1),
+                        TradingFixture.TAX_CATEGORY);
+        kernel.reset();
+
+        UUID invoiceId = issue.handle(new IssueInvoice(List.of(grnId)), seller());
+
+        InvoiceView invoice = invoices.getInvoice(invoiceId, seller()).orElseThrow();
+        assertThat(invoice.taxAmount()).isEqualByComparingTo("172.80");
+        assertThat(invoice.lines())
+                .filteredOn(l -> l.skuId().equals(RICE))
+                .singleElement()
+                .satisfies(l -> assertThat(l.taxRatePercent()).isEqualByComparingTo("18"));
+    }
+
+    @Test
+    void anItemWhoseCategoryHasNoRateOnTheTaxPointIsRefused() {
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        superuserJdbc()
+                .update(
+                        "update catalogue.tax_rate set effective_from = ? where tax_category_id = ?",
+                        clock.today().plusDays(1),
+                        TradingFixture.TAX_CATEGORY);
+        kernel.reset();
+        refused(() -> issue.handle(new IssueInvoice(List.of(grnId)), seller()), "m4.invoice.tax_rate_missing");
+        assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
     }
 

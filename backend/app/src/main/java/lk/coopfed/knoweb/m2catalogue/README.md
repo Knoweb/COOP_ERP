@@ -154,6 +154,8 @@ A product image helps a cashier recognise an item (doc 22 section 3.4). The Fede
 
 The catalogue screens (`web/src/modules/m2catalogue`, doc 30 section 5.2) needed three reads 22A section 7 does not list: `GET /v1/catalogue/reference` (units and tax categories, `CatalogueQueries.units` and `taxCategories`), `GET /v1/catalogue/skus/{skuId}/conversions` and `GET /v1/catalogue/skus/{skuId}/barcodes` (`conversions`, `barcodes`). All are `cat.sku.view` and read under the caller's scope, so catalogue RLS decides what comes back: a SKU the scope does not see answers an empty list. Every query method takes the `ScopeContext`, because `ScopeConnectionCustomizer` sets the RLS settings from that argument; a method without it runs as scope class NONE and reads nothing.
 
+**The rate in force (28 Sep).** `CatalogueQueries.taxRateInForce(skuId, onDate, scope)` answers 22A section 7's rate question for a SKU on a date: the SKU's tax category and the `catalogue.tax_rate` row whose `effective_from`..`effective_to` covers the date (EXEMPT and ZERO rated carry a 0 % row, so they answer 0). It is an in-process query with no HTTP operation; M4's IssueInvoice asks it at the invoice's tax point. Tax categories and rates are `authenticated_read`, so any scope that sees the SKU reads its rate; the SKU itself is read under catalogue RLS, and a SKU the scope does not see answers empty.
+
 ## What the next tickets build on
 
 - **M2-02 SKU aggregate**: `catalogue.sku` with its indexes and policies; the units and tax categories a SKU cites are seeded; `SKU_*` audit codes are in place; permissions `cat.sku.create`, `cat.sku.create_local`, `cat.sku.deactivate`. Adds the first operations to the slice and the first `api` records.

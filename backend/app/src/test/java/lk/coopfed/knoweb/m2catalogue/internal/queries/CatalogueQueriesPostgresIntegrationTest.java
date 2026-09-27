@@ -44,6 +44,8 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID TAX_CATEGORY = UUID.fromString("0190e610-0000-7000-8000-000000000100");
 
+    private static final UUID EXEMPT_CATEGORY = UUID.fromString("0190e610-0000-7000-8000-000000000101");
+
     @Autowired
     CreateLocalSkuHandler createLocal;
 
@@ -97,6 +99,8 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.tax_rate where tax_category_id = ?", EXEMPT_CATEGORY);
+        admin.update("delete from catalogue.tax_category where tax_category_id = ?", EXEMPT_CATEGORY);
     }
 
     @Test
@@ -128,6 +132,60 @@ class CatalogueQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(federation.items())
                 .extracting(SkuView::skuId)
                 .containsExactlyInAnyOrder(mineDraft, mineLocal, theirDraft);
+    }
+
+    @Test
+    void theRateInForceIsTheSkusCategoryRateEffectiveOnTheDate() {
+        UUID sku = createLocal.handle(new CreateSku(details("Taxed", null, null, Map.of())), own(MPCS));
+        JdbcTemplate admin = superuserJdbc();
+        admin.update(
+                """
+                insert into catalogue.tax_rate (tax_category_id, rate_percent, effective_from, effective_to, owner_entity_id)
+                values (?, 10.00, date '2024-01-01', date '2026-06-30', ?), (?, 12.00, date '2026-07-01', null, ?)
+                """,
+                TAX_CATEGORY,
+                FEDERATION,
+                TAX_CATEGORY,
+                FEDERATION);
+
+        // The owner's OWN scope reads the rate (tax_rate is authenticated_read): the row covering the day.
+        assertThat(queries.taxRateInForce(sku, java.time.LocalDate.of(2026, 6, 30), own(MPCS)))
+                .hasValueSatisfying(rate -> {
+                    assertThat(rate.taxCategoryId()).isEqualTo(TAX_CATEGORY);
+                    assertThat(rate.taxCategoryCode()).isEqualTo("M2QRY");
+                    assertThat(rate.ratePercent()).isEqualByComparingTo("10");
+                });
+        assertThat(queries.taxRateInForce(sku, java.time.LocalDate.of(2026, 7, 1), own(MPCS)))
+                .hasValueSatisfying(rate -> assertThat(rate.ratePercent()).isEqualByComparingTo("12"));
+        // No rate yet on the day, and a SKU the scope cannot see: empty.
+        assertThat(queries.taxRateInForce(sku, java.time.LocalDate.of(2023, 12, 31), own(MPCS)))
+                .isEmpty();
+        assertThat(queries.taxRateInForce(sku, java.time.LocalDate.of(2026, 7, 1), own(OTHER)))
+                .isEmpty();
+    }
+
+    @Test
+    void anExemptSkuAnswersZero() {
+        // An EXEMPT category carries a 0 % row, as seed/m2catalogue/tax.yaml seeds it (doc 22 section 3.6).
+        JdbcTemplate admin = superuserJdbc();
+        admin.update(
+                "insert into catalogue.tax_category (tax_category_id, code, name_en, owner_entity_id)"
+                        + " values (?, 'M2EXM', 'M2 exempt', ?) on conflict do nothing",
+                EXEMPT_CATEGORY,
+                FEDERATION);
+        admin.update(
+                "insert into catalogue.tax_rate (tax_category_id, rate_percent, effective_from, owner_entity_id)"
+                        + " values (?, 0.00, date '2000-01-01', ?)",
+                EXEMPT_CATEGORY,
+                FEDERATION);
+        UUID sku = createLocal.handle(new CreateSku(details("Rice", null, null, Map.of())), own(MPCS));
+        admin.update("update catalogue.sku set tax_category_id = ? where sku_id = ?", EXEMPT_CATEGORY, sku);
+
+        assertThat(queries.taxRateInForce(sku, java.time.LocalDate.of(2026, 9, 28), own(MPCS)))
+                .hasValueSatisfying(rate -> {
+                    assertThat(rate.taxCategoryCode()).isEqualTo("M2EXM");
+                    assertThat(rate.ratePercent()).isEqualByComparingTo("0");
+                });
     }
 
     @Test

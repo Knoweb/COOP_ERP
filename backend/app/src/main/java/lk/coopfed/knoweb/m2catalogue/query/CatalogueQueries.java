@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m2catalogue.query;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,14 @@ public interface CatalogueQueries {
 
     /** The tax categories every scope reads (22A section 3.1), for the SKU editor's picker (M2-10). */
     List<TaxCategoryView> taxCategories(ScopeContext scope);
+
+    /**
+     * The VAT rate in force for a SKU on a date (22A sections 3 and 7): the SKU's tax category and
+     * its rate effective on that date (an invoice's tax point). Empty when the SKU is not visible in
+     * the scope or its category has no rate on that date. Tax categories and rates are read by every
+     * authenticated scope (authenticated_read), so a seller pricing its own invoice reads them.
+     */
+    Optional<TaxRateView> taxRateInForce(UUID skuId, LocalDate onDate, ScopeContext scope);
 
     /** The conversions of a SKU visible in the scope (catalogue RLS); empty otherwise. */
     List<ConversionView> conversions(UUID skuId, ScopeContext scope);
