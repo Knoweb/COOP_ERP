@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.kernel.internal.notification;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,8 +20,8 @@ import org.springframework.stereotype.Component;
 /**
  * The rows of {@code kernel.notification_log} (insert, claim, status update, the retry and
  * de-duplication reads) and of {@code kernel.notification_pending} (what a retry needs and the
- * log must not hold: the recipient and the placeholders, cleared once the notification is
- * settled).
+ * log must not hold: the recipient and the placeholders, sealed by {@link PendingSeal} and
+ * cleared once the notification is settled).
  */
 @Component
 class NotificationLog {
@@ -48,12 +49,17 @@ class NotificationLog {
             "notification_id, rule_id, event_id, owner_entity_id, recipient_hash, channel,"
                     + " template_id, language, status, attempts";
 
+    /** What is sealed into one row: the recipient and the placeholders, as JSON. */
+    record Held(String recipient, Map<String, Object> arguments) {}
+
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    private final PendingSeal seal;
 
-    NotificationLog(JdbcTemplate jdbc, ObjectMapper json) {
+    NotificationLog(JdbcTemplate jdbc, ObjectMapper json, PendingSeal seal) {
         this.jdbc = jdbc;
         this.json = json;
+        this.seal = seal;
     }
 
     /** The hash a recipient is stored as: the channel and the recipient, never the recipient itself. */
@@ -104,7 +110,10 @@ class NotificationLog {
         return inserted == 1;
     }
 
-    /** The recipient and the placeholders, kept beside the log until the notification is settled. */
+    /**
+     * The recipient and the placeholders, kept beside the log until the notification is settled,
+     * sealed (kernel V0063): the row holds ciphertext and the id of its key, neither in clear.
+     */
     void hold(
             UUID notificationId,
             UUID ownerEntityId,
@@ -113,41 +122,50 @@ class NotificationLog {
             String language,
             Map<String, Object> arguments,
             Instant now) {
+        PendingSeal.Sealed sealed = seal.seal(notificationId, toJson(new Held(recipient, arguments)));
         jdbc.update(
                 """
                 insert into kernel.notification_pending (
-                    notification_id, owner_entity_id, recipient, template_id, language, arguments, created_at
-                ) values (?, ?, ?, ?, ?, ?::jsonb, ?)
+                    notification_id, owner_entity_id, template_id, language, sealed, key_id, created_at
+                ) values (?, ?, ?, ?, ?, ?, ?)
                 """,
                 notificationId,
                 ownerEntityId,
-                recipient,
                 templateId,
                 language,
-                toJson(arguments),
+                sealed.bytes(),
+                sealed.keyId(),
                 Timestamp.from(now));
     }
 
-    /** What was held for the notification, or empty once cleared or never held. */
+    /** What was held for the notification, or empty once cleared, never held, or not to be opened here. */
     Optional<Pending> pending(UUID notificationId) {
-        return jdbc
+        record Stored(String templateId, String language, String keyId, byte[] sealed) {}
+        Optional<Stored> stored = jdbc
                 .query(
-                        "select recipient, template_id, language, arguments::text as arguments"
-                                + " from kernel.notification_pending where notification_id = ? and recipient is not null",
-                        (rs, rowNum) -> new Pending(
-                                rs.getString("recipient"),
+                        "select template_id, language, key_id, sealed from kernel.notification_pending"
+                                + " where notification_id = ? and sealed is not null",
+                        (rs, rowNum) -> new Stored(
                                 rs.getString("template_id"),
                                 rs.getString("language"),
-                                fromJson(rs.getString("arguments"))),
+                                rs.getString("key_id"),
+                                rs.getBytes("sealed")),
                         notificationId)
                 .stream()
                 .findFirst();
+        return stored.flatMap(row -> seal.open(notificationId, row.keyId(), row.sealed())
+                .map(this::fromJson)
+                .map(held -> new Pending(
+                        held.recipient(),
+                        row.templateId(),
+                        row.language(),
+                        held.arguments() == null ? Map.of() : held.arguments())));
     }
 
-    /** The notification is settled: the recipient and the placeholders are not kept a minute longer. */
+    /** The notification is settled: what was sealed is not kept a minute longer. */
     void clear(UUID notificationId, Instant now) {
         jdbc.update(
-                "update kernel.notification_pending set recipient = null, arguments = '{}'::jsonb, cleared_at = ?"
+                "update kernel.notification_pending set sealed = null, key_id = null, cleared_at = ?"
                         + " where notification_id = ? and cleared_at is null",
                 Timestamp.from(now),
                 notificationId);
@@ -267,19 +285,20 @@ class NotificationLog {
                 limit);
     }
 
-    private String toJson(Map<String, Object> arguments) {
+    private byte[] toJson(Held held) {
         try {
-            return json.writeValueAsString(arguments == null ? Map.of() : arguments);
+            return json.writeValueAsBytes(
+                    new Held(held.recipient(), held.arguments() == null ? Map.of() : held.arguments()));
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("The placeholders of a notification must be JSON values", e);
         }
     }
 
-    private Map<String, Object> fromJson(String text) {
+    private Held fromJson(byte[] bytes) {
         try {
-            return text == null ? Map.of() : json.readValue(text, new TypeReference<Map<String, Object>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("The stored placeholders of a notification are not JSON", e);
+            return json.readValue(bytes, new TypeReference<Held>() {});
+        } catch (IOException e) {
+            throw new IllegalStateException("A held notification opened to something that is not JSON", e);
         }
     }
 }

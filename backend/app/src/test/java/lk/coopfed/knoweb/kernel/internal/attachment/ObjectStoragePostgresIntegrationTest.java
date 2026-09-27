@@ -53,6 +53,9 @@ class ObjectStoragePostgresIntegrationTest extends PostgresIntegrationTest {
     MemoryObjectStore store;
 
     @Autowired
+    AttachmentCleanupJob cleanup;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     @Autowired
@@ -218,6 +221,51 @@ class ObjectStoragePostgresIntegrationTest extends PostgresIntegrationTest {
         // A failed object is read, derived and served from never.
         refused(() -> storage.read(wrongHash, own(OWNER)), "object.not_verified");
         refused(() -> storage.presignGet(wrongHash, "image/png", own(OWNER)), "object.not_verified");
+    }
+
+    @Test
+    void theCleanUpDeletesAFailedObjectAfterItsRetentionAndNeverAVerifiedOne() {
+        String wrongHash = ObjectStorage.keyOf(ObjectStoragePostgresIntegrationTest.class, OWNER, Ids.next());
+        verified(key);
+        inScope(OWNER, () -> presign(wrongHash));
+        store.objects.put(wrongHash, "other bytes".getBytes(StandardCharsets.UTF_8));
+        windowOver(wrongHash);
+        assertThat(storage.verify(wrongHash, own(OWNER)).outcome()).isEqualTo(Outcome.HASH_MISMATCH);
+        kernel.reset();
+
+        // Inside the retention the file is kept.
+        assertThat(cleanup.deleteFailedObjects()).isZero();
+        assertThat(store.objects).containsKey(wrongHash);
+
+        superuserJdbc()
+                .execute("begin; set local session_replication_role = replica;"
+                        + " update kernel.object_upload set settled_at = now() - interval '31 days'"
+                        + " where object_key in ('" + key + "', '" + wrongHash + "'); commit;");
+        assertThat(cleanup.deleteFailedObjects()).isEqualTo(1);
+        assertThat(store.objects).doesNotContainKey(wrongHash).containsKey(key);
+        assertThat(audit("OBJECT_DELETED"))
+                .extracting(KernelRecorder.AuditRecord::subject)
+                .containsExactly(lk.coopfed.knoweb.kernel.api.Subject.of(
+                        "object", UUID.fromString(wrongHash.substring(wrongHash.lastIndexOf('/') + 1))));
+        assertThat(ledger(wrongHash))
+                .containsEntry("status", "FAILED")
+                .containsEntry("failure", "HASH_MISMATCH")
+                .hasEntrySatisfying(
+                        "object_deleted_at", deletedAt -> assertThat(deletedAt).isNotNull());
+        assertThat(ledger(key)).containsEntry("status", "VERIFIED").containsEntry("object_deleted_at", null);
+
+        // Once: the next run finds nothing, and the mark itself never changes again.
+        kernel.reset();
+        assertThat(cleanup.deleteFailedObjects()).isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update("update kernel.object_upload set object_deleted_at = now() where object_key = ?", key))
+                .hasMessageContaining("object.immutable");
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update(
+                                "update kernel.object_upload set object_deleted_at = now() where object_key = ?",
+                                wrongHash))
+                .hasMessageContaining("object.immutable");
     }
 
     @Test

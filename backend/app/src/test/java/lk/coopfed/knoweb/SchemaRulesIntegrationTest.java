@@ -81,7 +81,8 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
     /**
      * The kernel's upload ledger (kernel V0060, CR-19A-7): protected like every table, and app_rw
      * may change only what a renewal and a settlement change. The key, the module, the owner, the
-     * type and the creation time of an upload are nobody's to change.
+     * type and the creation time of an upload are nobody's to change; the clean-up's mark of a
+     * deleted object (kernel V0063) is the one change a settled row admits.
      */
     @Test
     void theObjectLedgerIsProtectedAndOnlyItsSettlingColumnsAreUpdatable() {
@@ -101,7 +102,13 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
                 String.class);
         assertThat(updatable)
                 .containsExactly(
-                        "content_hash", "content_length", "failure", "settled_at", "status", "upload_expires_at");
+                        "content_hash",
+                        "content_length",
+                        "failure",
+                        "object_deleted_at",
+                        "settled_at",
+                        "status",
+                        "upload_expires_at");
         assertThat(db.queryForObject(
                         "select has_table_privilege('app_rw', 'kernel.object_upload', 'DELETE')", Boolean.class))
                 .isFalse();

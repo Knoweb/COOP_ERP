@@ -16,7 +16,8 @@ import lk.coopfed.knoweb.kernel.api.TextNormaliser;
  * <p>19A section 6 names a marker type {@code I18nText} for the converter to apply to. Every
  * String attribute is converted instead: a marker a module forgets on one column is exactly
  * the column that ends up with two spellings of one name, and NFC on a code is harmless.
- * Recorded as a deviation in docs/PROGRESS.md.
+ * Decided 27 September 2026 on the architect's delegation (CR-19A-8): kept on every String; 19A
+ * section 6 is to say so when it is re-issued, and no {@code I18nText} type is added.
  */
 @Converter(autoApply = true)
 public class NfcConverter implements AttributeConverter<String, String> {
