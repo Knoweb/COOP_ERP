@@ -76,7 +76,7 @@ public class TradeProjection extends Projection {
         JsonNode payload = event.payload();
 
         UUID documentId;
-        String number = event.text("docNumberDisplay");
+        String number = event.string("docNumberDisplay");
         UUID reference = null;
         BigDecimal net = null;
         BigDecimal tax = null;
