@@ -5,17 +5,31 @@
 import { useMemo } from "react";
 import { useApiClient } from "../../shell/api/client";
 import type { components, paths } from "../../generated/m3pricing";
+import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
 
 export type PriceList = components["schemas"]["PriceListResponse"];
 export type PriceListDetail = components["schemas"]["PriceListDetailResponse"];
 export type PriceListLineInput = components["schemas"]["PriceListLineInput"];
 export type SetLinesResponse = components["schemas"]["SetLinesResponse"];
+export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 
 export function usePricingApi() {
   const api = useApiClient<paths>();
+  // The SKU picker reads M2's published search (GET /v1/catalogue/skus); M3 owns no SKU data.
+  const catalogue = useApiClient<cataloguePaths>();
 
   return useMemo(
     () => ({
+      async searchSkus(q: string): Promise<Sku[]> {
+        const { data } = await catalogue.GET("/v1/catalogue/skus", { params: { query: { q, limit: 20 } } });
+        return data?.items ?? [];
+      },
+
+      async getSku(skuId: string): Promise<Sku | null> {
+        const { data } = await catalogue.GET("/v1/catalogue/skus/{skuId}", { params: { path: { skuId } } });
+        return data ?? null;
+      },
+
       async listPriceLists(kind?: PriceList["kind"]): Promise<PriceList[]> {
         const { data } = await api.GET("/v1/pricing/lists", { params: { query: { kind } } });
         return data ?? [];
@@ -58,6 +72,6 @@ export function usePricingApi() {
         return data!;
       }
     }),
-    [api]
+    [api, catalogue]
   );
 }
