@@ -10,14 +10,14 @@ M4 records the inter-entity flow from order to settlement: order, delivery note,
 
 | Path | What it holds |
 |---|---|
-| `api/` | The published contract: the event records of the document families the demo builds (`order.*`, `delivery_note.*`, `grn.*`, `discrepancy.raised.v1`, `invoice.issued.v1`, `journal.postings_ready.v1`) with their value records, published in M4-01 so that M5's consumers can bind to them; and the three questions M4 asks of modules not built yet, `TradePricing` (M3), `TaxRates` (M2), `InventoryAvailability` (M5). Command records arrive with their tickets. |
+| `api/` | The published contract: the event records of the document families the demo builds (`order.*`, `delivery_note.*`, `grn.*`, `discrepancy.raised.v1`, `invoice.issued.v1`, `journal.postings_ready.v1`) with their value records, published in M4-01 so that M5's consumers can bind to them; and the two questions M4 asked of modules not built yet, `TradePricing` (M3) and `InventoryAvailability` (M5). The VAT rate comes straight from M2's `CatalogueQueries.taxRateInForce` (the `TaxRates` question and its demo answer were removed on 28 Sep). Command records arrive with their tickets. |
 | `query/` | The read-only queries of doc 24 section 5.2, with their tickets. |
-| `internal/integration/` | The answers to the three questions: `M3TradePricing` (M3's `PricingQueries.resolveTradePrice`, since M4-04), `M5InventoryAvailability` (M5's `InventoryQueries.availability` over the seller's active warehouses, since M4-05); for the demo, from the configuration register, `DemoTaxRates` (`m4.demo.vat_rate_percent`), deleted when M2 publishes the rate in force. |
+| `internal/integration/` | The answers to the two questions: `M3TradePricing` (M3's `PricingQueries.resolveTradePrice`, since M4-04), `M5InventoryAvailability` (M5's `InventoryQueries.availability` over the seller's active warehouses, since M4-05). `DemoTaxRates` and `m4.demo.vat_rate_percent` are gone: the invoice asks M2's `CatalogueQueries.taxRateInForce` (28 Sep). |
 | `internal/seed/M4SeedLoader` | Loads `seed/m4trading/posting-map.yaml` into `trading.posting_map` on start, as the migrator (the arrangement of `M1SeedLoader` and `M2SeedLoader`), upserted by key. |
 | `resources/db/migration/m4trading/V0001__trading.sql` | The tables of M4-01 (below), their row-level security and grants. |
 | `resources/seed/m4trading/` | `posting-map.yaml` (doc 24 section 3.9), `audit-event-types.yaml` (the codes of 24A section 6 the demo tickets use). |
 | `resources/seed/m1party/permissions.yaml` | The 28 `m4trading` permissions at the end of M1's file (24A section 3.1's 27 and `trd.document.view`, CR-24A-1); `role-templates.yaml` gains "Trading Buyer" and "Trading Seller". |
-| `resources/seed/kernel/config-items.yaml` | The `trading.*` items of 24A section 3.1 (`seed/m4/config.yaml`) and the three `m4.demo.*` items, module `m4trading`. |
+| `resources/seed/kernel/config-items.yaml` | The `trading.*` items of 24A section 3.1 (`seed/m4/config.yaml`), module `m4trading` (the three `m4.demo.*` items are gone: the price since M4-04, the availability since M4-05, the VAT rate since 28 Sep). |
 | `resources/openapi/m4trading.yaml` | The slice; no operation until M4-02. |
 | `web/src/modules/m4trading/` | The module registration only: no route, no navigation entry, until M4-11. |
 | `src/test/.../m4trading/` | `TradingSchemaIntegrationTest` (tables, forced RLS, policies, grants by column), `TradingRlsIntegrationTest` (the matrix rows: an extension row follows its header, a shop session at its shop, the seller's allocation read by the buyer), `internal/seed/M4SeedLoaderTest`. |
@@ -51,7 +51,7 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 | `posting-map.yaml` | `trading.posting_map` | upserted by (type, line kind, side, debit, credit); the amount source follows the file |
 | `audit-event-types.yaml` | `kernel.audit_event_type` | the audit codes of 24A section 6 used by the demo tickets, all INFO |
 | `seed/m1party/permissions.yaml` | `security.permission` | the 28 `m4trading` codes (`M1SeedLoaderTest` counts them) |
-| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis`; `m4.demo.vat_rate_percent` (`m4.demo.trade_price` until M4-04, `m4.demo.availability_qty` until M4-05) |
+| `seed/kernel/config-items.yaml` | `kernel.config_item` | `trading.availability_mode`, `backorder_review_days`, `grn_reversal_hours`, `claim_window_days`, `escalation_grace_days`, `invoice_consolidation`, `exposure_warn_thresholds`, `statement_frequency`, `tier_basis` (`m4.demo.trade_price` until M4-04, `m4.demo.availability_qty` until M4-05, `m4.demo.vat_rate_percent` until 28 Sep) |
 
 ## What the next tickets build on
 
@@ -59,7 +59,7 @@ ORD from the buyer's ENTITY series; DN and INV from the seller's; GRN from the r
 - **M4-03 acceptance**: `allocation_run`, `order_allocation`, `order_allocation_line`; `order.accepted/allocated/rejected.v1`.
 - **M4-04 delivery notes**: `doc_delivery*`; `delivery_note.*`; the fulfilled quantity on the seller's allocation lines.
 - **M4-05 GRN**: `doc_grn*`, `doc_discrepancy*`; `grn.captured/confirmed.v1`, `discrepancy.raised.v1`; M2's `BatchRegistration` inside the confirmation.
-- **M4-08 invoices**: `doc_invoice`, `posting_map`; `invoice.issued.v1`, `journal.postings_ready.v1`; `TaxRates`.
+- **M4-08 invoices**: `doc_invoice`, `posting_map`; `invoice.issued.v1`, `journal.postings_ready.v1`; VAT per line from M2's `taxRateInForce` at the tax point (28 Sep).
 
 ## Orders (M4-02, M4-03)
 
@@ -111,7 +111,7 @@ Every difference between the schema as migrated and 24A section 3, and between t
 5. **`trd.document.view`** (ENTITY) is the permission of every read of the slice: the kernel checks a GET's `x-permission` (#144) and 24A section 3.1 names no read code. Beyond 24A's 27 codes.
 6. **The kernel's issuance lands every document on ISSUED**; a type whose first issued state has another name (ORD SUBMITTED, GRN CONFIRMED) moves there through `DocumentBaseRepository.addStateTransition` in the same transaction, so the history shows DRAFT to ISSUED to SUBMITTED. DN and INV stay ISSUED.
 7. **ORDER_CREATED, DN_CREATED and GRN_CAPTURED audit codes, and `order.created.v1`, `delivery_note.created.v1`**: 24A section 6 names no audit code or event for the drafts; every command audits and publishes (AGENTS.md).
-8. **The three questions to M3, M2 and M5 are interfaces of `api`** (`TradePricing`, `TaxRates`, `InventoryAvailability`), answered for the demo from the register; 24A section 4 names `m3pricing::query` and `m5inventory::query`, which do not exist yet, and M2 publishes no tax query.
+8. **The questions to M3 and M5 are interfaces of `api`** (`TradePricing`, `InventoryAvailability`), answered by M3's and M5's queries since M4-04 and M4-05. The VAT rate is not a question of `api` any more: the invoice asks M2's `CatalogueQueries.taxRateInForce` directly (24A section 4 allows `m2catalogue::query`; fixed 28 Sep after the demo invoice charged 18 % on an EXEMPT item).
 9. **`doc_grn` has `relationship_id`** (the relationship the delivery was made under, kept for the invoice and the cost basis) and a CHECK that a GRN names a drop or a supplier, never both; `doc_order_line` and `doc_delivery_line` carry `document_id` for the header policy (24A's `doc_delivery_line` keys on the drop only).
 10. **Two role templates, "Trading Buyer" and "Trading Seller"**: 24A section 3.1 seeds permissions only; the demo's staff need roles that hold them.
 11. **Order lines in the base unit only (M4-02)**: M2 publishes no unit conversion query yet, so CreateOrder refuses another unit (`m4.order.uom_invalid`) until it does.

@@ -615,15 +615,3 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m4trading
-  # The demo answer of the M2 question M4 asks (api.TaxRates; m4trading README). It goes when M2
-  # answers the rate in force; M3 answers the price (M4-04), M5 the availability (M4-05).
-  - key: m4.demo.vat_rate_percent
-    value_type: DECIMAL
-    schema: { minimum: 0, maximum: 100 }
-    description_en: The VAT rate applied to every invoice line until M2 answers the rate in force (demo only)
-    description_si: M2 බලාත්මක අනුපාතය දෙන තෙක් සෑම ඉන්වොයිසි පේළියකටම යොදන වැට් අනුපාතය (ආදර්ශනයට පමණි)
-    description_ta: M2 நடைமுறை விகிதத்தைத் தரும் வரை ஒவ்வொரு விலைப்பட்டியல் வரிக்கும் பயன்படுத்தப்படும் VAT விகிதம் (செயல்விளக்கத்திற்கு மட்டும்)
-    default: "18"
-    scope_kind: FEDERATION
-    change_permission: sys.config.manage
-    module: m4trading

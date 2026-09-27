@@ -93,7 +93,8 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 new HttpEntity<>(Map.of("grnIds", List.of(grnId.toString())), sellerHeaders),
                 JsonNode.class);
         assertThat(issued.getStatusCode()).as(String.valueOf(issued.getBody())).isEqualTo(HttpStatus.CREATED);
-        assertThat(issued.getBody().get("grossAmount").decimalValue()).isEqualByComparingTo("1793.60");
+        assertThat(issued.getBody().get("grossAmount").decimalValue())
+                .isEqualByComparingTo("1736.00"); // 1200 + 18 % of it on rice; dhal (320) EXEMPT
         String invoiceId = issued.getBody().get("invoiceId").asText();
 
         ResponseEntity<JsonNode> asBuyer = http.exchange(

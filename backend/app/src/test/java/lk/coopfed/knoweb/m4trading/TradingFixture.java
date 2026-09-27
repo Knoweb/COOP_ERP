@@ -29,6 +29,7 @@ public final class TradingFixture {
     public static final UUID BUYER_USER = UUID.fromString("0190f400-0000-7000-8000-000000000022");
     public static final UUID RELATIONSHIP = UUID.fromString("0190f400-0000-7000-8000-000000000031");
     public static final UUID TAX_CATEGORY = UUID.fromString("0190f400-0000-7000-8000-000000000041");
+    public static final UUID EXEMPT_CATEGORY = UUID.fromString("0190f400-0000-7000-8000-000000000042");
     public static final UUID RICE = UUID.fromString("0190f400-0000-7000-8000-000000000051");
     public static final UUID DHAL = UUID.fromString("0190f400-0000-7000-8000-000000000052");
     public static final UUID DRAFT_SKU = UUID.fromString("0190f400-0000-7000-8000-000000000053");
@@ -81,15 +82,12 @@ public final class TradingFixture {
                 PRICE_LIST);
         admin.update("insert into catalogue.uom (uom_code, name_en, is_weight) values ('EA', 'Each', false)"
                 + " on conflict do nothing");
-        admin.update(
-                """
-                insert into catalogue.tax_category (tax_category_id, code, name_en, owner_entity_id)
-                values (?, 'M4TRD', 'M4 trading tax', ?) on conflict do nothing
-                """,
-                TAX_CATEGORY,
-                PostgresIntegrationTestFederation.ID);
+        // Rice at a standard 18 %, dhal EXEMPT at 0 % (22A section 3; the invoice asks M2's
+        // taxRateInForce per line).
+        taxCategory(admin, TAX_CATEGORY, "M4TRD", "18.00");
+        taxCategory(admin, EXEMPT_CATEGORY, "M4EXM", "0.00");
         sku(admin, RICE, "M4-RICE", "SHARED", PostgresIntegrationTestFederation.ID);
-        sku(admin, DHAL, "M4-DHAL", "SHARED", PostgresIntegrationTestFederation.ID);
+        sku(admin, DHAL, "M4-DHAL", "SHARED", PostgresIntegrationTestFederation.ID, EXEMPT_CATEGORY);
         sku(admin, DRAFT_SKU, "M4-DRAFT", "DRAFT", BUYER);
         priceList(admin);
         stock(admin, RICE, STOCK);
@@ -133,7 +131,9 @@ public final class TradingFixture {
         admin.update("delete from catalogue.batch_key where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.batch where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.sku where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
-        admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.tax_rate where tax_category_id in (?, ?)", TAX_CATEGORY, EXEMPT_CATEGORY);
+        admin.update(
+                "delete from catalogue.tax_category where tax_category_id in (?, ?)", TAX_CATEGORY, EXEMPT_CATEGORY);
         admin.update("update pricing.price_list set status = 'DRAFT' where price_list_id = ?", PRICE_LIST);
         admin.update("delete from pricing.price_list_line where price_list_id = ?", PRICE_LIST);
         admin.update("delete from pricing.price_list where price_list_id = ?", PRICE_LIST);
@@ -217,6 +217,31 @@ public final class TradingFixture {
     }
 
     private static void sku(JdbcTemplate admin, UUID id, String code, String status, UUID owner) {
+        sku(admin, id, code, status, owner, TAX_CATEGORY);
+    }
+
+    private static void taxCategory(JdbcTemplate admin, UUID id, String code, String percent) {
+        admin.update(
+                """
+                insert into catalogue.tax_category (tax_category_id, code, name_en, owner_entity_id)
+                values (?, ?, ?, ?) on conflict do nothing
+                """,
+                id,
+                code,
+                code,
+                PostgresIntegrationTestFederation.ID);
+        admin.update("delete from catalogue.tax_rate where tax_category_id = ?", id);
+        admin.update(
+                """
+                insert into catalogue.tax_rate (tax_category_id, rate_percent, effective_from, owner_entity_id)
+                values (?, ?::numeric, date '2000-01-01', ?)
+                """,
+                id,
+                percent,
+                PostgresIntegrationTestFederation.ID);
+    }
+
+    private static void sku(JdbcTemplate admin, UUID id, String code, String status, UUID owner, UUID category) {
         admin.update(
                 """
                 insert into catalogue.sku (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si,
@@ -230,7 +255,7 @@ public final class TradingFixture {
                 code,
                 code,
                 code,
-                TAX_CATEGORY);
+                category);
     }
 
     /** The Federation of the test context (PostgresIntegrationTest.TEST_FEDERATION), which owns the SHARED items. */
