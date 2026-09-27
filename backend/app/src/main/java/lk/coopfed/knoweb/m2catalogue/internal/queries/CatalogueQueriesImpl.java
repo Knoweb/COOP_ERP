@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +13,15 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
+import lk.coopfed.knoweb.m2catalogue.query.BarcodeView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.ConversionView;
 import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
+import lk.coopfed.knoweb.m2catalogue.query.TaxCategoryView;
+import lk.coopfed.knoweb.m2catalogue.query.UomView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,6 +69,71 @@ class CatalogueQueriesImpl implements CatalogueQueries {
     @Override
     public Optional<LookupResult> lookupByBarcode(BarcodeLookup lookup, ScopeContext scope) {
         return barcodes.lookup(lookup, scope);
+    }
+
+    @Override
+    public List<UomView> units(ScopeContext scope) {
+        return jdbc.query(
+                "select uom_code, name_en, name_si, name_ta, is_weight from catalogue.uom order by uom_code",
+                (rs, row) -> new UomView(
+                        rs.getString("uom_code"),
+                        rs.getString("name_en"),
+                        rs.getString("name_si"),
+                        rs.getString("name_ta"),
+                        rs.getBoolean("is_weight")));
+    }
+
+    @Override
+    public List<TaxCategoryView> taxCategories(ScopeContext scope) {
+        return jdbc.query(
+                "select tax_category_id, code, name_en, name_si, name_ta from catalogue.tax_category order by code",
+                (rs, row) -> new TaxCategoryView(
+                        rs.getObject("tax_category_id", UUID.class),
+                        rs.getString("code"),
+                        rs.getString("name_en"),
+                        rs.getString("name_si"),
+                        rs.getString("name_ta")));
+    }
+
+    @Override
+    public List<ConversionView> conversions(UUID skuId, ScopeContext scope) {
+        if (skuId == null || scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        return jdbc.query(
+                """
+                select uom_code, factor_to_base, effective_from, effective_to
+                from catalogue.sku_uom_conversion
+                where sku_id = ?
+                order by uom_code, effective_from desc
+                """,
+                (rs, row) -> new ConversionView(
+                        rs.getString("uom_code"),
+                        rs.getBigDecimal("factor_to_base"),
+                        rs.getObject("effective_from", LocalDate.class),
+                        rs.getObject("effective_to", LocalDate.class)),
+                skuId);
+    }
+
+    @Override
+    public List<BarcodeView> barcodes(UUID skuId, ScopeContext scope) {
+        if (skuId == null || scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        return jdbc.query(
+                """
+                select barcode, symbology, uom_code, batch_id, status
+                from catalogue.sku_barcode
+                where sku_id = ?
+                order by status, barcode
+                """,
+                (rs, row) -> new BarcodeView(
+                        rs.getString("barcode"),
+                        rs.getString("symbology"),
+                        rs.getString("uom_code"),
+                        rs.getObject("batch_id", UUID.class),
+                        rs.getString("status")),
+                skuId);
     }
 
     @Override

@@ -150,6 +150,10 @@ A product image helps a cashier recognise an item (doc 22 section 3.4). The Fede
 
 **Configuration** (`seed/kernel/config-items.yaml`, module `m2catalogue`): `m2.image.content_types`, `m2.image.thumbnail_px`, `m2.image.thumbnail_max_kb`, `m2.image.max_pixels`, `m2.image.upload_window_hours`, `m2.image.thumbnail.batch_size` (100 per run); and the kernel's `attachment.max_bytes`, `attachment.content_types`.
 
+## Reads for the web screens (M2-10, demo part)
+
+The catalogue screens (`web/src/modules/m2catalogue`, doc 30 section 5.2) needed three reads 22A section 7 does not list: `GET /v1/catalogue/reference` (units and tax categories, `CatalogueQueries.units` and `taxCategories`), `GET /v1/catalogue/skus/{skuId}/conversions` and `GET /v1/catalogue/skus/{skuId}/barcodes` (`conversions`, `barcodes`). All are `cat.sku.view` and read under the caller's scope, so catalogue RLS decides what comes back: a SKU the scope does not see answers an empty list. Every query method takes the `ScopeContext`, because `ScopeConnectionCustomizer` sets the RLS settings from that argument; a method without it runs as scope class NONE and reads nothing.
+
 ## What the next tickets build on
 
 - **M2-02 SKU aggregate**: `catalogue.sku` with its indexes and policies; the units and tax categories a SKU cites are seeded; `SKU_*` audit codes are in place; permissions `cat.sku.create`, `cat.sku.create_local`, `cat.sku.deactivate`. Adds the first operations to the slice and the first `api` records.
