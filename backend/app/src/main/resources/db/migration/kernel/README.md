@@ -7,7 +7,7 @@ are reserved per lane before the lanes start.
 
 Below `V0010` are the baseline and what it still needed (`V0001` to `V0006`). Taken so far:
 `V0010` (K-03a idempotency), `V0030` and `V0031` (K-04 audit, K-05 events), `V0032` (K-05, scoped inbox claims), `V0050` (K-07
-documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0055` (K-07 review: no line joins an issued document, REVERSES once by index, the ENTITY series in a shop scope, `party_read` per the template, the gap check against the highest number), `V0058` (K-09 review, attachment status transitions), `V0059` (K-10 review, `notification_pending`; lane C because it references `notification_log`), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`).
+documents and numbering), `V0051` (K-12 jobs, K-13 business date), `V0052` (K-11 configuration), `V0053` (CR-17A-3, the class test on the ledger policies), `V0054` (K-10 notification log), `V0055` (K-07 review: no line joins an issued document, REVERSES once by index, the ENTITY series in a shop scope, `party_read` per the template, the gap check against the highest number), `V0058` (K-09 review, attachment status transitions), `V0059` (K-10 review, `notification_pending`; lane C because it references `notification_log`), `V0060` (CR-19A-7 revised, `object_upload`, the upload ledger of `ObjectStorage`; lane C, attachments), `V0080` (K-08 sync gateway, first part: `device_sync_cursor`, `sync_event`, `sync_quarantine`, `device_heartbeat`, `device_enrolment_code`, `location_snapshot_version`, `change_log`).
 
 The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section 6.3 completed by
 19A K-01, corrected by CR-17A-3); `RlsMatrixIntegrationTest` proves the five classes against it.
@@ -16,7 +16,7 @@ The policies every table carries are in `../RLS_POLICY_TEMPLATE.md` (17A section
 |---|---|---|---|
 | `V0010`â€“`V0029` | A, security | K-01 scope, K-02 identity, K-03 permissions | the PARTY policy template and the masking-view convention (section 1); the idempotency table (section 3) |
 | `V0030`â€“`V0049` | B, ledgers and events | K-04 audit, K-05 events, K-10 notifications | `audit_event`, `audit_event_type` (section 4); `event_outbox`, `event_inbox`, `central_source_seq` (section 5); `notification_log` (section 10) |
-| `V0050`â€“`V0079` | C, configuration, documents and jobs | K-11 config, K-12 scheduling, K-13 clock, K-07 documents, K-09 attachments | `config_item`, `config_value` (section 11); `scheduled_job`, `job_run`, `shedlock` (section 12); `document_type`, `numbering_series`, `document`, `document_line`, `document_link`, `document_state_history`, `document_attachment` (section 7) |
+| `V0050`â€“`V0079` | C, configuration, documents and jobs | K-11 config, K-12 scheduling, K-13 clock, K-07 documents, K-09 attachments | `config_item`, `config_value` (section 11); `scheduled_job`, `job_run`, `shedlock` (section 12); `document_type`, `numbering_series`, `document`, `document_line`, `document_link`, `document_state_history`, `document_attachment` (section 7); `object_upload` (section 9, CR-19A-7) |
 | `V0080` and up | D, language and sync | K-06 i18n, K-08 sync gateway | `message_catalogue` if the file catalogue is ever outgrown (section 6); `device_sync_cursor`, `sync_quarantine` and the change log (19A calls it `snapshot_change_log`; K-08 names it `change_log`, with `location_snapshot_version`, `sync_event`, `device_heartbeat` and `device_enrolment_code` beside it) (section 8) |
 
 Lane C is the widest range because it carries five tickets and the document base is seven
@@ -124,3 +124,32 @@ message goes there at once, and each consumer queue dead-letters to it after
 `x-delivery-limit` redeliveries. Claims are scoped to the event's owner entity
 (`V0032`).
 `Replayer` can republish archived events directly to one consumer queue.
+
+## CR-19A-7 the object upload ledger
+
+`kernel.object_upload` (`V0060`) is the kernel's half of an object a module owns without a
+document (M2's product images; the module keeps its business row, `catalogue.sku_image`).
+`kernel.api.ObjectStorage` writes and reads it; no module touches it. The rules it holds for
+every module, as K-09 holds them for `document_attachment`:
+
+- `presignPut` records the upload PENDING in the caller's transaction, in an OWN scope of the
+  entity in the key, under `attachment.content_types` and `attachment.max_bytes`; asking again
+  renews a PENDING row's window; a settled row gets no new URL (`object.not_pending`).
+- `verify` answers `PENDING` while the PUT URL is valid, then settles the row once, VERIFIED or
+  FAILED (MISSING only after `coop-erp.object-store.upload-window-hours`), audited
+  `OBJECT_VERIFIED` or `OBJECT_FAILED`. The trigger `object_upload_transition` lets only a
+  PENDING row change, and never its key, module, owner, type or creation time.
+- `write` stores only a derived object (the key plus one segment) of a VERIFIED object, under
+  the same limits; the original is never written (`object.not_derived`).
+- `read` needs the key's entity in scope; `presignGet` any scope with a class, because the module
+  decides who sees the object when it reads the key under its own policies. Both need the object
+  VERIFIED.
+- The module in the key comes from a class of the calling module (`ObjectStorage.keyOf(anchor,
+  ...)`), and every method refuses another module's key.
+- Outside `presignPut` the ledger is read and settled in a transaction of its own
+  (`SystemScope.inOwnTransaction`): the scope customizer sets a connection's scope and never
+  restores it, so the kernel never re-scopes the caller's connection.
+
+The policies are the template's without a location column; `RlsMatrixIntegrationTest` covers the
+table with no exception, `SchemaRulesIntegrationTest` pins its UPDATE grant to the six settling
+columns, and `ObjectStoragePostgresIntegrationTest` proves the rules.

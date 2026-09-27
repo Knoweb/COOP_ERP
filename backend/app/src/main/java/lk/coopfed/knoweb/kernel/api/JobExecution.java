@@ -29,6 +29,14 @@ public interface JobExecution {
      * The OWN scope of any entity, for a job that settles rows each entity owns in that entity's
      * name (M2's thumbnail job settles an image of the entity that attached it; CR-19A-7). No
      * user: the command's permission is not checked, as for {@link #systemScope()}.
+     *
+     * <p><strong>A job acts as that entity.</strong> The kernel cannot tell whether the entity came
+     * from a row the job's own module read (as it must) or from anywhere else, so this is a
+     * review rule as much as an API: pass only the {@code owner_entity_id} of a row the job read
+     * from its own module's tables, and act only on that row. What the build enforces
+     * ({@code ArchitectureTests.onlyScheduledJobsTakeAnEntitysScope}): only a method annotated
+     * {@link ScheduledJob} calls it, so no handler, controller or consumer borrows another
+     * entity's scope through it (CR-19A-7, accepted as revised on 27 September 2026).
      */
     default ScopeContext ownScopeOf(UUID entityId) {
         if (entityId == null) {

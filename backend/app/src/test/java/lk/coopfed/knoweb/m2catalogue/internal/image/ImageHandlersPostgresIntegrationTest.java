@@ -21,6 +21,7 @@ import lk.coopfed.knoweb.kernel.api.JobExecution;
 import lk.coopfed.knoweb.kernel.api.ObjectStorage;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.attachment.MemoryObjectStore;
 import lk.coopfed.knoweb.m2catalogue.api.AttachImage;
 import lk.coopfed.knoweb.m2catalogue.api.ImageAttached;
 import lk.coopfed.knoweb.m2catalogue.api.ImageFailed;
@@ -44,9 +45,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * AttachImage, RetireImage and the thumbnail job that settles an image (22A section 6; M2-06):
  * every guard with its failing case and nothing committed, what each step audits and publishes,
  * the thumbnail produced and keyed, one ACTIVE image per key, the local override of a SHARED
- * item (DR-5) as the till's lookup sees it, and a settled row that never changes again.
+ * item (DR-5) as the till's lookup sees it, and a settled row that never changes again. The
+ * kernel's own {@code ObjectStorage} runs, with its upload ledger (CR-19A-7, as revised); only the
+ * bytes are in memory.
  */
-@Import(MemoryObjectStorage.class)
+@Import(MemoryObjectStore.class)
 class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = UUID.fromString("0190e680-0000-7000-8000-000000000001");
@@ -73,7 +76,7 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     CatalogueQueries queries;
 
     @Autowired
-    MemoryObjectStorage storage;
+    MemoryObjectStore storage;
 
     private final UUID sharedSku = Ids.next();
     private final UUID localSkuOfA = Ids.next();
@@ -109,7 +112,7 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         storage.objects.clear();
         photo = image(640, 480);
-        photoHash = MemoryObjectStorage.sha256(photo);
+        photoHash = MemoryObjectStore.sha256(photo);
         kernel.reset();
     }
 
@@ -117,6 +120,7 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     void clean() {
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table catalogue.batch, catalogue.sku cascade");
+        admin.execute("delete from kernel.object_upload where owner_module = 'm2catalogue'");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
@@ -129,7 +133,7 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 new AttachImage(sharedSku, null, "image/JPEG", (long) photo.length, photoHash.toUpperCase()),
                 own(FEDERATION));
 
-        String key = ObjectStorage.keyOf("m2catalogue", FEDERATION, upload.imageId());
+        String key = ObjectStorage.keyOf(ImageHandlersPostgresIntegrationTest.class, FEDERATION, upload.imageId());
         assertThat(upload.uploadUrl().toString()).contains(key);
         assertThat(row(upload.imageId())).satisfies(row -> {
             assertThat(row.get("status")).isEqualTo("PENDING");
@@ -199,7 +203,7 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theJobVerifiesTheUploadMakesTheThumbnailAndShowsTheImage() throws IOException {
         ImageUpload upload = attach.handle(jpeg(sharedSku, null), own(FEDERATION));
-        String key = ObjectStorage.keyOf("m2catalogue", FEDERATION, upload.imageId());
+        String key = ObjectStorage.keyOf(ImageHandlersPostgresIntegrationTest.class, FEDERATION, upload.imageId());
         storage.objects.put(key, photo);
         kernel.reset();
 
@@ -287,7 +291,7 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         byte[] pdf = "%PDF-1.7 not a picture".getBytes(StandardCharsets.US_ASCII);
         ImageUpload notAnImage = attach.handle(
-                new AttachImage(localSkuOfA, null, "image/png", null, MemoryObjectStorage.sha256(pdf)), own(MPCS_A));
+                new AttachImage(localSkuOfA, null, "image/png", null, MemoryObjectStore.sha256(pdf)), own(MPCS_A));
         storage.objects.put(key(MPCS_A, notAnImage), pdf);
         windowOver(notAnImage.imageId());
         kernel.reset();
@@ -396,13 +400,19 @@ class ImageHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static String key(UUID owner, ImageUpload upload) {
-        return ObjectStorage.keyOf("m2catalogue", owner, upload.imageId());
+        return ObjectStorage.keyOf(ImageHandlersPostgresIntegrationTest.class, owner, upload.imageId());
     }
 
+    /** The PUT URL expired, as M2's row and the kernel's ledger both record it. */
     private static void windowOver(UUID imageId) {
         superuserJdbc()
                 .update(
                         "update catalogue.sku_image set upload_expires_at = now() - interval '1 minute' where image_id = ?",
+                        imageId);
+        superuserJdbc()
+                .update(
+                        "update kernel.object_upload set upload_expires_at = now() - interval '1 minute'"
+                                + " where object_key = (select object_key_full from catalogue.sku_image where image_id = ?)",
                         imageId);
     }
 

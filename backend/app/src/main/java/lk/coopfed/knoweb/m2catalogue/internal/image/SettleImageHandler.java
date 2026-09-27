@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
  * ACTIVE"), sent by {@link ThumbnailJob} in the OWN scope of the image's owner. Guards: an OWN
  * scope; the caller's own image, still PENDING ({@code m2.image.not_pending}: a retirement or
  * another run got there first); its pre-signed PUT expired ({@code m2.image.upload_open}: until
- * then the verified bytes could still be replaced, the K-09 rule). Mutation, when verified: the
+ * then the verified bytes could still be replaced, the K-09 rule; the kernel's upload ledger
+ * enforces it too since CR-19A-7 was revised, and this guard stays for a settle that does not
+ * come through the kernel's verification). Mutation, when verified: the
  * caller's earlier ACTIVE image of the same SKU and barcode RETIRED, this one ACTIVE with its
  * thumbnail (one ACTIVE per key); when not: FAILED.
  *

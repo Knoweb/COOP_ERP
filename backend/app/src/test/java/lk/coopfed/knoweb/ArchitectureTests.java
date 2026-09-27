@@ -771,4 +771,44 @@ class ArchitectureTests {
 
     /** Same prefix as PLACEHOLDER_PERMISSION_PREFIX in tools/new-module.mjs. */
     static final String SCAFFOLD_PLACEHOLDER = "todo.";
+
+    @Test
+    void onlyScheduledJobsTakeAnEntitysScope() { // CR-19A-7, as revised on 27 September 2026
+        ownScopeOfOnlyInScheduledJobsRule().check(CLASSES);
+    }
+
+    /**
+     * {@code JobExecution.ownScopeOf(entity)} is the OWN scope of any entity, without a user and
+     * without a permission check: a job that settles each row in its owner's name needs it (M2's
+     * thumbnail job). The kernel cannot tell where the entity came from, so the review rule is
+     * that a job passes only the owner of a row its own module read; what the build can hold is
+     * that nothing but the {@code @ScheduledJob} method itself calls it, so no handler,
+     * controller, consumer or helper borrows another entity's scope through a job's execution.
+     */
+    static ArchRule ownScopeOfOnlyInScheduledJobsRule() {
+        return classes()
+                .should(
+                        new ArchCondition<JavaClass>(
+                                "call JobExecution.ownScopeOf only from a method annotated @ScheduledJob") {
+                            @Override
+                            public void check(JavaClass javaClass, ConditionEvents events) {
+                                for (JavaMethodCall c : javaClass.getMethodCallsFromSelf()) {
+                                    if (c.getName().equals("ownScopeOf")
+                                            && c.getTargetOwner()
+                                                    .isAssignableTo(lk.coopfed.knoweb.kernel.api.JobExecution.class)
+                                            && !c.getOrigin()
+                                                    .isAnnotatedWith(lk.coopfed.knoweb.kernel.api.ScheduledJob.class)) {
+                                        events.add(SimpleConditionEvent.violated(
+                                                c,
+                                                javaClass.getName() + "."
+                                                        + c.getOrigin().getName()
+                                                        + " takes an entity's OWN scope through JobExecution.ownScopeOf"
+                                                        + " but is not a @ScheduledJob method; "
+                                                        + c.getSourceCodeLocation()));
+                                    }
+                                }
+                            }
+                        })
+                .allowEmptyShould(true);
+    }
 }
