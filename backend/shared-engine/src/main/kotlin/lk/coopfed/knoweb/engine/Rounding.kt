@@ -1,37 +1,21 @@
 package lk.coopfed.knoweb.engine
 
-import java.math.BigDecimal
 import java.math.RoundingMode
 
+/**
+ * Cash rounding (doc 23 section 3.5 step 7; G-10): a cash tender rounds the receipt total to
+ * the nearest rupee, half up (.49 down, .50 up); card and account tenders are exact. Rounding
+ * is a receipt-level field; lines are never touched.
+ */
 object Rounding {
 
-    /**
-     * Sprint 0 deterministic placeholder.
-     *
-     * The real legal/pricing rounding engine is implemented by M3/23A.
-     */
+    /** The receipt total a cash customer pays. */
     @JvmStatic
-    fun roundCash(value: Money): Money {
+    fun roundCash(value: Money): Money =
+        Money.rounded(value.amount.setScale(0, RoundingMode.HALF_UP))
 
-        val amount = value.amount
-
-        val whole =
-            amount.setScale(0, RoundingMode.DOWN)
-
-        val fraction =
-            amount.subtract(whole)
-
-        return if (
-            fraction >= BigDecimal("0.50")
-        ) {
-            Money.of(
-                whole
-                    .add(BigDecimal.ONE)
-                    .setScale(2)
-                    .toPlainString()
-            )
-        } else {
-            value
-        }
-    }
+    /** The adjustment the receipt records for a cash tender: rounded total minus total. */
+    @JvmStatic
+    fun toRupee(total: Money): Money =
+        roundCash(total) - total
 }
