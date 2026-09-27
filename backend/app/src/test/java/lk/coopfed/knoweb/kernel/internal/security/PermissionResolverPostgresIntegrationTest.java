@@ -104,7 +104,7 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
                 SHOP_ROLE,
                 ENTITY);
         admin.update(
-                "insert into security.role_permission (role_id, permission_code) values (?, 'prt.location.manage')",
+                "insert into security.role_permission (role_id, permission_code) values (?, 'prt.location.register')",
                 ENTITY_ROLE);
         admin.update(
                 "insert into security.role_permission (role_id, permission_code) values (?, 'prt.location.view')",
@@ -130,15 +130,18 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
                 SHOP);
         admin.update(
                 "insert into security.sod_pair (sod_pair_id, permission_a, permission_b, mode, owner_entity_id)"
-                        + " values ('0190a300-0000-7000-8000-000000000301', 'prt.location.manage', 'prt.location.view', 'INSTANCE', null)");
+                        + " values ('0190a300-0000-7000-8000-000000000301', 'prt.location.register', 'prt.location.view', 'INSTANCE', null)");
     }
 
     @Test
     void theUnionOverRolesInTheScopeAndNothingMore() {
         assertThat(inScope(ADMIN, ENTITY, null, () -> resolver.resolve(scope(ADMIN, ENTITY, null))))
-                .containsExactlyInAnyOrder("prt.location.manage", "prt.location.view");
+                .containsExactlyInAnyOrder("prt.location.register", "prt.location.view");
         assertThat(inScope(
-                        ADMIN, ENTITY, null, () -> resolver.allows(scope(ADMIN, ENTITY, null), "prt.location.manage")))
+                        ADMIN,
+                        ENTITY,
+                        null,
+                        () -> resolver.allows(scope(ADMIN, ENTITY, null), "prt.location.register")))
                 .isTrue();
         assertThat(inScope(ADMIN, ENTITY, null, () -> resolver.allows(scope(ADMIN, ENTITY, null), "sys.device.view")))
                 .isFalse();
@@ -150,7 +153,7 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
     @Test
     void anEntityAssignmentAppliesAtEveryLocationAndALocationAssignmentThereAlone() {
         assertThat(inScope(ADMIN, ENTITY, OTHER_SHOP, () -> resolver.resolve(scope(ADMIN, ENTITY, OTHER_SHOP))))
-                .contains("prt.location.manage");
+                .contains("prt.location.register");
         assertThat(inScope(CASHIER, ENTITY, SHOP, () -> resolver.resolve(scope(CASHIER, ENTITY, SHOP))))
                 .containsExactlyInAnyOrder("prt.location.view", "sys.device.view");
         assertThat(inScope(CASHIER, ENTITY, OTHER_SHOP, () -> resolver.resolve(scope(CASHIER, ENTITY, OTHER_SHOP))))
@@ -183,7 +186,7 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
 
         superuserJdbc()
                 .update(
-                        "delete from security.role_permission where role_id = ? and permission_code = 'prt.location.manage'",
+                        "delete from security.role_permission where role_id = ? and permission_code = 'prt.location.register'",
                         ENTITY_ROLE);
         // Still cached.
         assertThat(inScope(ADMIN, ENTITY, null, () -> resolver.resolve(scope(ADMIN, ENTITY, null))))
@@ -225,14 +228,14 @@ class PermissionResolverPostgresIntegrationTest extends PostgresIntegrationTest 
     @Test
     void anInstancePairRefusesTheSamePersonAndAdmitsAnother() {
         assertThatThrownBy(() -> inScope(ADMIN, ENTITY, null, () -> {
-                    sod.assertDistinct(scope(ADMIN, ENTITY, null), "prt.location.manage", "prt.location.view", ADMIN);
+                    sod.assertDistinct(scope(ADMIN, ENTITY, null), "prt.location.register", "prt.location.view", ADMIN);
                     return null;
                 }))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("sod.same_person");
 
         inScope(ADMIN, ENTITY, null, () -> {
-            sod.assertDistinct(scope(ADMIN, ENTITY, null), "prt.location.manage", "prt.location.view", CASHIER);
+            sod.assertDistinct(scope(ADMIN, ENTITY, null), "prt.location.register", "prt.location.view", CASHIER);
             // A pair nobody registered: no rule, no refusal.
             sod.assertDistinct(scope(ADMIN, ENTITY, null), "sys.device.view", "prt.location.view", ADMIN);
             return null;

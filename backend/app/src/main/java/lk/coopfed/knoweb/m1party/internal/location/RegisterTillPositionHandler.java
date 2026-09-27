@@ -25,6 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
  * there (retired positions keep theirs); insert; NumberingService.registerSeries(TILL_POSITION)
  * for every type numbered per till. This is M1-05's "done when": the series exist the moment the
  * position does, in the same transaction.
+ *
+ * <p>The shop may be in any status (CR-21A-5 item 2, accepted 27 September 2026): PLANNED and
+ * ONBOARDING because a shop activates only with a primary till (doc 21 flow 6.1), DORMANT
+ * because a shop made ready to reopen may need a lane before it reactivates.
  */
 @Service
 @CommandHandler(permission = "prt.position.manage")
