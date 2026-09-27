@@ -70,10 +70,15 @@ public final class ChromiumPdf {
                     // No --virtual-time-budget: it never ended on the pipeline's Linux Chrome. The
                     // fonts are data URIs, loaded before the load event the print waits for.
                     "--disable-crash-reporter",
+                    "--enable-logging=stderr",
                     "--disable-breakpad",
                     "--print-to-pdf=" + pdf.toAbsolutePath(),
                     page.toUri().toString());
             ProcessBuilder builder = new ProcessBuilder(command)
+                    // Nothing on standard input: a browser left holding the caller's input pipe
+                    // was seen never to exit on the pipeline's runner.
+                    .redirectInput(ProcessBuilder.Redirect.from(new java.io.File(
+                            System.getProperty("os.name").startsWith("Windows") ? "NUL" : "/dev/null")))
                     .redirectErrorStream(true)
                     .redirectOutput(dir.resolve("chromium.log").toFile());
             builder.environment().putAll(Map.of("HOME", dir.toString()));
