@@ -6,10 +6,10 @@ import kotlin.test.assertEquals
 class MoneyTest {
 
     @Test
-    fun cashRoundingParity() {
+    fun cashRoundsHalfUpToTheRupee() {
 
         assertEquals(
-            Money.of("100.49"),
+            Money.of("100.00"),
             Money.roundCash(
                 Money.of("100.49")
             )
