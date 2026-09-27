@@ -399,3 +399,16 @@ permissions:
     module: "m5inventory"
     description_en: "Pick delivery notes at the warehouse"
     scope: "ENTITY"
+  # M8 Reporting (28A section 3.1, "seed/m8/permissions.yaml (appended)"): the two codes the
+  # demo's reports need. rpt.report.run reads a report and the dashboard (28A also checks the
+  # audience per definition: deferred with the definitions as data); rpt.export.run takes a
+  # report away, as CSV or as an A4 PDF. rpt.definition.manage, sys.projection.rebuild and
+  # rpt.analyst.query arrive with their tickets.
+  - code: "rpt.report.run"
+    module: "m8reporting"
+    description_en: "View reports and the dashboard"
+    scope: "ENTITY"
+  - code: "rpt.export.run"
+    module: "m8reporting"
+    description_en: "Export a report as CSV or print it to PDF"
+    scope: "ENTITY"
