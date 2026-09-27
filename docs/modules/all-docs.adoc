@@ -25,10 +25,6 @@ include::module-m1party.adoc[]
 plantuml::module-m2catalogue.puml[,,format=svg]
 include::module-m2catalogue.adoc[]
 
-== M4 Trading Documents
-plantuml::module-m4trading.puml[,,format=svg]
-include::module-m4trading.adoc[]
-
 == M3 Pricing & Rules
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]
