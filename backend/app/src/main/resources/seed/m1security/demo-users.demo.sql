@@ -62,7 +62,7 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000301'::uuid, ARRAY[
             'cat.sku.view', 'cat.sku.create', 'cat.sku.create_local', 'cat.sku.promote', 'cat.sku.deactivate',
             'cat.barcode.manage', 'cat.image.manage', 'cat.tag.manage', 'cat.batch.correct', 'cat.supplier.manage',
-            'prc.pricelist.view', 'inv.stock.view']),
+            'prc.pricelist.view', 'inv.stock.view', 'prt.location.view', 'gov.entity.view']),
         -- Federation pricing: the trade price list and the relationships that trade on it
         ('0190f0de-0000-7000-8000-000000000302'::uuid, ARRAY[
             'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish',
@@ -72,7 +72,7 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000303'::uuid, ARRAY[
             'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign', 'whs.pick',
             'del.note.draft', 'del.note.dispatch', 'del.pod.record', 'trd.document.view', 'cat.sku.view',
-            'prt.location.view']),
+            'prt.location.view', 'gov.entity.view']),
         -- Federation sales: accepts orders, issues delivery notes
         ('0190f0de-0000-7000-8000-000000000304'::uuid, ARRAY[
             'trd.document.view', 'ord.order.accept', 'del.note.draft', 'del.note.issue', 'cat.sku.view', 'gov.entity.view', 'prt.location.view',
@@ -82,7 +82,7 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.creditnote.issue', 'bil.debitnote.issue',
             'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
-            'prt.relationship.view', 'cat.sku.view',
+            'prt.relationship.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         -- distributor commercial: buys from the Federation, prices and sells to its societies
         ('0190f0de-0000-7000-8000-000000000311'::uuid, ARRAY[
@@ -100,49 +100,49 @@ WITH job (role_id, codes) AS (
         -- distributor stores: receives (GRN), holds the opening stock, dispatches to societies
         ('0190f0de-0000-7000-8000-000000000312'::uuid, ARRAY[
             'whs.grn.confirm', 'shop.grn.confirm', 'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign',
-            'whs.pick', 'del.note.draft', 'del.note.dispatch', 'trd.document.view', 'cat.sku.view', 'prt.location.view']),
+            'whs.pick', 'del.note.draft', 'del.note.dispatch', 'trd.document.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view']),
         ('0190f0de-0000-7000-8000-000000000322'::uuid, ARRAY[
             'whs.grn.confirm', 'shop.grn.confirm', 'inv.stock.view', 'inv.stock.receive', 'inv.opening.prepare', 'inv.opening.sign',
-            'whs.pick', 'del.note.draft', 'del.note.dispatch', 'trd.document.view', 'cat.sku.view', 'prt.location.view']),
+            'whs.pick', 'del.note.draft', 'del.note.dispatch', 'trd.document.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view']),
         -- distributor accounts
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
             'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
-            'cat.sku.view',
+            'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
             'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
-            'cat.sku.view',
+            'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         -- society buyer
         ('0190f0de-0000-7000-8000-000000000331'::uuid, ARRAY[
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'whs.grn.confirm', 'shop.grn.confirm',
             'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prt.relationship.view', 'inv.stock.view',
-            'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign']),
+            'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign', 'gov.entity.view']),
         -- society manager: the second signature (countersign), the shops and their tills
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
-            'cat.sku.view',
+            'cat.sku.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
         ('0190f0de-0000-7000-8000-000000000342'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
-            'cat.sku.view',
+            'cat.sku.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
         ('0190f0de-0000-7000-8000-000000000352'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
-            'cat.sku.view',
+            'cat.sku.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
-            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view'])
+            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view', 'gov.entity.view'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code

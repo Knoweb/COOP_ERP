@@ -122,7 +122,7 @@ export function TransfersPage() {
       ))}
       {receive.isError && <p role="alert">{errorText(receive.error, t("inventory.error.generic").text)}</p>}
 
-      {canIssue && (
+      {canIssue && !locations.isError && (
         <section>
           <h2>{t("inventory.transfer.send").text}</h2>
           <label style={{ display: "grid", gap: "var(--space-half)" }}>

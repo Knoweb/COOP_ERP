@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { errorText } from "./stockView";
 import { useInventoryApi, type Location } from "./inventoryApi";
 
 function nameOf(location: Location, locale: string): string {
@@ -22,10 +23,18 @@ export function LocationPicker({ value, onChange }: { value: string; onChange: (
   const locations = useQuery({ queryKey: ["inventory", "locations"], queryFn: () => api.locations(), staleTime: Infinity });
 
   useEffect(() => {
-    if (!value && locations.data && locations.data.length > 0) {
+    // Preselects the caller's one location when the list holds exactly one; a caller with
+    // several picks for herself.
+    if (!value && locations.data && locations.data.length === 1) {
       onChange(locations.data[0].locationId);
     }
   }, [value, locations.data, onChange]);
+
+  if (locations.isError) {
+    // A 403 (permission.denied prt.location.view) or any other failure: an empty select would
+    // read as "you have no location", which is not what happened (bug seen live 28 Sep 2026).
+    return <p role="alert">{errorText(locations.error, t("inventory.location.list_refused").text)}</p>;
+  }
 
   return (
     <label style={{ display: "grid", gap: "var(--space-half)" }}>

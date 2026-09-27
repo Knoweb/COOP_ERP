@@ -25,6 +25,7 @@ templates:
     permissions:
       - "rpt.report.run"
       - "rpt.export.run"
+      - "gov.entity.view"
       - "gov.user.manage"
       - "gov.user.view"
       - "gov.role.manage"

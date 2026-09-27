@@ -1,6 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IntlProvider } from "react-intl";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "../auth/session";
 import { messages } from "../i18n/messages";
 import type { Locale } from "../i18n/messages";
@@ -14,17 +15,31 @@ const MPCS = "0190f000-0000-7000-8000-000000000002";
 let session: Session | null = null;
 vi.mock("../auth/session", () => ({ useSession: () => session }));
 
+// The entity's name (M1, gov.entity.view) comes through the resolved permission set and the
+// party API; the tests decide both without a server.
+let permissions: { policyClass: string; permissions: string[]; activeScope?: null } | null = null;
+vi.mock("../auth/PermissionsContext", () => ({ usePermissions: () => permissions }));
+
+let entityApi: ReturnType<typeof vi.fn>;
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
+  return { ...actual, useApiClient: () => ({ GET: entityApi }) };
+});
+
 function signedIn(overrides: Partial<Session>): Session {
   return { userId: "u-1", displayName: "Sunil Perera", entityId: MPCS, policyClass: "OWN", language: "en", ...overrides };
 }
 
 function renderBanner(locale: Locale = "en") {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <IntlProvider locale={locale} messages={messages[locale]}>
-      <ScopeProvider>
-        <ScopeBanner />
-      </ScopeProvider>
-    </IntlProvider>
+    <QueryClientProvider client={client}>
+      <IntlProvider locale={locale} messages={messages[locale]}>
+        <ScopeProvider>
+          <ScopeBanner />
+        </ScopeProvider>
+      </IntlProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -60,6 +75,10 @@ describe("the scope of a session", () => {
 });
 
 describe("ScopeBanner", () => {
+  beforeEach(() => {
+    permissions = { policyClass: "OWN", permissions: [] };
+    entityApi = vi.fn(async () => ({ data: null }));
+  });
   afterEach(cleanup);
 
   it("says who is acting for which entity, at which locations, in which class", () => {
@@ -103,6 +122,38 @@ describe("ScopeBanner", () => {
     renderBanner("si");
 
     expect(screen.getByRole("alert").textContent).toContain("ඔබට විෂය පථයක් නැත");
+  });
+
+  it("names the entity once the reader holds gov.entity.view, instead of the short id", async () => {
+    session = signedIn({});
+    permissions = { policyClass: "OWN", permissions: ["gov.entity.view"] };
+    entityApi = vi.fn(async () => ({
+      data: { entityId: MPCS, legalNameEn: "Ridigama MPCS", legalNameSi: "රිදිගම බ.ස.ස", legalNameTa: null }
+    }));
+    renderBanner();
+
+    await waitFor(() => expect(screen.getByRole("region").textContent).toContain("Ridigama MPCS"));
+    expect(screen.getByRole("region").textContent).not.toContain("Entity …00000002");
+  });
+
+  it("names the entity in the reader's language", async () => {
+    session = signedIn({});
+    permissions = { policyClass: "OWN", permissions: ["gov.entity.view"] };
+    entityApi = vi.fn(async () => ({
+      data: { entityId: MPCS, legalNameEn: "Ridigama MPCS", legalNameSi: "රිදිගම බ.ස.ස", legalNameTa: null }
+    }));
+    renderBanner("si");
+
+    await waitFor(() => expect(screen.getByRole("region").textContent).toContain("රිදිගම බ.ස.ස"));
+  });
+
+  it("keeps the short id when the reader has no gov.entity.view, without asking the server", () => {
+    session = signedIn({});
+    permissions = { policyClass: "OWN", permissions: [] };
+    renderBanner();
+
+    expect(screen.getByRole("region").textContent).toContain("Entity …00000002");
+    expect(entityApi).not.toHaveBeenCalled();
   });
 });
 
