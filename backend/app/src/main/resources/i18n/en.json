@@ -329,5 +329,12 @@
   "m4.order.qty_not_positive": "The quantity must be more than zero",
   "m4.order.not_draft": "The order has already been submitted",
   "m4.order.not_cancellable": "The order can no longer be cancelled",
-  "m4.order.dispatched": "Part of the order has already been dispatched"
+  "m4.order.dispatched": "Part of the order has already been dispatched",
+  "m4.order.not_submitted": "The order is not waiting for a decision of the seller",
+  "m4.order.already_decided": "The seller has already decided on this order",
+  "m4.order.line_unknown": "The line is not a line of this order",
+  "m4.order.allocation_invalid": "The allocated quantity cannot be negative",
+  "m4.order.allocation_exceeds_request": "The allocation is more than the buyer ordered",
+  "m4.order.allocation_exceeds_available": "The allocation is more than is available",
+  "m4.order.price_missing": "No trade price applies to this item under the relationship"
 }

@@ -329,5 +329,12 @@
   "m4.order.qty_not_positive": "ප්‍රමාණය බිංදුවට වඩා වැඩි විය යුතුය",
   "m4.order.not_draft": "ඇණවුම දැනටමත් ඉදිරිපත් කර ඇත",
   "m4.order.not_cancellable": "ඇණවුම තවදුරටත් අවලංගු කළ නොහැක",
-  "m4.order.dispatched": "ඇණවුමේ කොටසක් දැනටමත් යවා ඇත"
+  "m4.order.dispatched": "ඇණවුමේ කොටසක් දැනටමත් යවා ඇත",
+  "m4.order.not_submitted": "ඇණවුම විකුණුම්කරුගේ තීරණය සඳහා බලා සිටින්නේ නැත",
+  "m4.order.already_decided": "විකුණුම්කරු මෙම ඇණවුම පිළිබඳ දැනටමත් තීරණය කර ඇත",
+  "m4.order.line_unknown": "මෙම පේළිය මෙම ඇණවුමේ පේළියක් නොවේ",
+  "m4.order.allocation_invalid": "වෙන් කළ ප්‍රමාණය සෘණ විය නොහැක",
+  "m4.order.allocation_exceeds_request": "වෙන් කිරීම ගැනුම්කරු ඇණවුම් කළ ප්‍රමාණයට වඩා වැඩි ය",
+  "m4.order.allocation_exceeds_available": "වෙන් කිරීම ලබා ගත හැකි ප්‍රමාණයට වඩා වැඩි ය",
+  "m4.order.price_missing": "සබඳතාව යටතේ මෙම අයිතමයට වෙළඳ මිලක් අදාළ නොවේ"
 }
