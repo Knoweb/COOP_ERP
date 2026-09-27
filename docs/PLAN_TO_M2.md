@@ -142,6 +142,7 @@ Before M2-01, confirm or accept the 22A §11 assumptions: deactivation sell-thro
 | 6.7 | Till track: spike 1 (local DB, counter, power loss) and the doc 32 conformance suite against the simulator | K-08 | Doc 20 §6 Track B |
 | 6.8 | Resolve the register's two missing supporting documents (numbering RFC, tax-advisor briefing): locate or strike | Register housekeeping | PROGRESS.md Deviations |
 | 6.9 | Update `docs/PROGRESS.md` after every ticket; module READMEs from M1-01 and M2-01 on | Continuous | AGENTS.md |
+| 6.10 | Build a `GapCheckJob` (or extend `kernel.internal.document.GapCheck`'s pattern) over `kernel.event_outbox`, checking density of `(source, source_seq)` for **device** sources only, never for `central` (decided on the architect's delegation, 27 Sep 2026, `CR-19A-3`) | After K-05's relay is used by a real device track (no urgency before then) | `docs/change-requests/CR-19A-3.md`; 19A §7 |
 
 ## Part B — running the plan in parallel with a larger team
 
