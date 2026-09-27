@@ -15,5 +15,6 @@
 * `l.c.k.m.query.BatchQueries` (in M2 Catalogue & Batch)
 * `l.c.k.k.api.NumberingService` (in Platform Kernel)
 * `l.c.k.k.api.DocumentIssuance` (in Platform Kernel)
+* `l.c.k.m.api.BatchRegistration` (in M2 Catalogue & Batch)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===

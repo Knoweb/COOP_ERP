@@ -124,7 +124,11 @@ class InventoryController implements InventoryApi {
                                 ? LotCondition.GOOD
                                 : LotCondition.valueOf(line.getCondition().getValue()),
                         line.getQty(),
-                        line.getUnitCost()))
+                        line.getUnitCost(),
+                        line.getSkuId(),
+                        line.getBatchNo(),
+                        line.getExpiryDate(),
+                        line.getPrintedMrp()))
                 .toList();
         UUID id = prepare.handle(new PrepareOpeningBalance(request.getLocationId(), lines), scope);
         return ResponseEntity.created(URI.create("/v1/inventory/opening-balances/" + id))
