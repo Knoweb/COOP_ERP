@@ -88,6 +88,13 @@ export function useTradingApi() {
         return (data ?? []).filter((row) => row.status === "ACTIVE");
       },
 
+      async relationship(relationshipId: string): Promise<Relationship | null> {
+        const { data } = await party.GET("/v1/party/relationships/{relationshipId}", {
+          params: { path: { relationshipId } }
+        });
+        return data ?? null;
+      },
+
       async entity(entityId: string): Promise<Entity | null> {
         const { data } = await party.GET("/v1/party/entities/{entityId}", { params: { path: { entityId } } });
         return data ?? null;

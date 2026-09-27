@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
@@ -12,7 +12,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
-import { businessToday, canDeliver, errorText, orderChip } from "./tradingView";
+import { businessToday, canDeliver, errorText, firstOpenEta, orderChip } from "./tradingView";
 
 const CANCEL_REASONS = ["NOT_NEEDED", "WRONG_ITEMS", "OTHER"];
 const REJECT_REASONS = ["NO_STOCK", "NOT_SUPPLIED", "OTHER"];
@@ -38,7 +38,7 @@ export function OrderPage() {
   const acceptKey = useIdempotencyKey();
   const rejectKey = useIdempotencyKey();
   const [asking, setAsking] = useState<"cancel" | "reject" | null>(null);
-  const [eta, setEta] = useState(businessToday());
+  const [eta, setEta] = useState("");
 
   const order = useQuery({ queryKey: ["trading", "order", orderId], queryFn: () => api.order(orderId) });
   const isSeller = order.data !== undefined && order.data.sellerEntityId === scope.entityId;
@@ -49,6 +49,24 @@ export function OrderPage() {
     queryFn: () => api.sellerAvailability(order.data!.sellerEntityId, skuIds),
     enabled: deciding && skuIds.length > 0
   });
+  // The delivery date starts at the first one that does not lock the order at once.
+  const relationship = useQuery({
+    queryKey: ["trading", "relationship", order.data?.relationshipId],
+    queryFn: () => api.relationship(order.data!.relationshipId),
+    enabled: deciding,
+    retry: false
+  });
+  const lockHours = relationship.data?.orderLockHoursBeforeEta;
+  const requestedEta = order.data?.requestedEta ?? "";
+  useEffect(() => {
+    if (deciding) {
+      const earliest = firstOpenEta(businessToday(), lockHours ?? 0);
+      setEta((current) => {
+        const chosen = current || (requestedEta > earliest ? requestedEta : earliest);
+        return chosen < earliest ? earliest : chosen;
+      });
+    }
+  }, [deciding, lockHours, requestedEta]);
 
   type Reason = { code: string; text: string | null };
   const run = (key: { current: () => string; next: () => void }, call: (k: string, reason: Reason) => Promise<unknown>) => ({
