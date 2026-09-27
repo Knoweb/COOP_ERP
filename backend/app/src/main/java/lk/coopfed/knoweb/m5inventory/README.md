@@ -2,7 +2,7 @@
 
 The living guide of the module (AGENTS.md): where stock is and what it cost, by location, batch and condition. Once code exists, this file and the tests supersede 25A for day-to-day work; every deviation from the guide is listed at the end with its reason. Read `hello/README.md` first: its six rules apply here unchanged.
 
-Built so far, for the demo (Phase 1: the Federation selling to a distributor): M5-01 (schema), M5-02 (the ledger) and M5-04 (the queries, and M5's answer to M2's lot questions). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
+Built so far, for the demo (Phase 1: the Federation selling to a distributor): M5-01 (schema), M5-02 (the ledger), M5-04 (the queries, and M5's answer to M2's lot questions), M5-03 (the GRN and delivery consumers) and M5-10 (opening balances). The demo-minimal scope and what was deferred are in `docs/PROGRESS.md` and under "Deferred after the demo" in `docs/PLAN_TO_M2.md`.
 
 ## The one rule
 
@@ -52,6 +52,22 @@ Per (entity, SKU): an intake at cost (RECEIPT, OPENING_BALANCE, REPACK_PRODUCE) 
 
 M3 and M4 have no stub to replace: M3 on main is still the scaffold, M4 is being built by another lane and calls `InventoryQueries` directly.
 
+## M4's events (M5-03; 25A section 6.2)
+
+The consumers read M4's payloads as JSON and import nothing of M4: M4 depends on M5's `query` package, so a dependency back would be a cycle, and the payload is the contract (the field names of M4's `GrnConfirmed`, `DeliveryNoteIssued` and `DeliveryNoteDispatched` records, frozen at M4-05). The consumer framework delivers each event once, in the OWN scope of its owner, with no user; each consumer hands a command to a handler, which audits and publishes.
+
+| Event | Consumer | Effect |
+|---|---|---|
+| `grn.confirmed.v1` | `GrnConsumer` (`m5.receipts`) → `ApplyGrnReceiptHandler` | The receiver's lots: RECEIPT of `received − damaged` GOOD and `damaged` DAMAGED per line, at the line's unit cost (the trade price), citing the GRN; the entity average re-averaged. Ownership passed when the receiver confirmed the GRN (AGENTS.md idea 2). Audit `STOCK_RECEIVED`; `stock.received.v1`. A GRN already applied is not applied again. |
+| `delivery_note.issued.v1` | `DeliveryConsumer` (`m5.deliveries`) → `ReserveDeliveryHandler` | A pick list: per line, the seller's GOOD lots with free stock in FEFO order (only the named batch when the line names one), taken until the line is covered; a row with no lot for what is short. Availability subtracts the open picks. Audit `PICK_LIST_CREATED`; `pick_list.created.v1`. |
+| `delivery_note.dispatched.v1` | `DeliveryConsumer` → `DispatchDeliveryHandler` | The picked units leave the seller's lots as TRANSFER_OUT citing the delivery note: in transit and still the seller's (doc 24 A-03) until the buyer's GRN; the pick list DISPATCHED, the reservation over. Audit `PICK_LIST_DISPATCHED`; `pick_list.dispatched.v1`. |
+
+Reads: `GET /v1/inventory/receipts/{grnId}` (`inv.stock.receive`) and `GET /v1/inventory/pick-lists/{deliveryNoteId}` (`whs.pick`). The consumer-applied commands carry those codes: the system runs them with no user, so nothing is checked, and `tools/check-permissions.mjs` needs every handler's code on an operation of the slice.
+
+## The opening balance (M5-10 at demo scope; doc 25 section 4.7, flow 6.9)
+
+`POST /v1/inventory/opening-balances` (`inv.opening.prepare`): the counted lines of a location (batch, condition, quantity, cost), DRAFT; refused where stock has moved or another is being prepared. `/{id}/sign` (`inv.opening.sign`, MFA): SIGNED_ENTITY. `/{id}/countersign` (`inv.opening.countersign`, MFA), by another person: the entity's OPB series is registered where missing, the OPB document issued (kernel issuance, ENTITY series; M5 owns the type through `OpeningBalanceDocumentType`), the OPENING_BALANCE movements posted citing it (lots and entity average seeded), POSTED. This is how the demo loader puts stock in.
+
 ## Tests
 
 | Test | What it proves |
@@ -61,7 +77,9 @@ M3 and M4 have no stub to replace: M3 on main is still the scaffold, M4 is being
 | `LedgerServicePostgresIntegrationTest` | What a posting writes, audits and publishes; the average on issue and re-averaging; oversell, `lot.negative.v1` and its clearing; the lot a sale creates; dense numbering; the database guards with nothing committed; a shop session held to its shop; the ledger refused outside a command; and **balance equals the sum of movements under random interleavings**: four threads posting random receipts, sales, write-offs and count adjustments at once, then every lot equal to the sum of its movements, the entity quantity to the sum of all, the average to one replayed from scratch in commit order, and the sequence dense. |
 | `InventorySchemaIntegrationTest` | The grants above; the movement partitions exist ahead of the calendar with row-level security forced. |
 | `InventoryQueriesPostgresIntegrationTest` | The FEFO rank (expiry, none last; damaged and empty lots unranked), availability without negative or damaged lots and for every pair, pick order, in-stock batches, SKUs with lots, the entity average, LotsConsumed; the reads by scope; M2's questions and CorrectBatch against real lots. |
-| `InventoryHttpPostgresIntegrationTest` | The two operations through HTTP: the owner's balances with batch number, expiry, rank and cost; the Federation view without the cost; another entity sees nothing; availability; a request problem. |
+| `ConsumersPostgresIntegrationTest` | The demo chain from M4's payloads: the Federation's stock reserved FEFO by a delivery note, dispatched out of its lots, received with a damaged unit into the distributor's lots at the trade price; redeliveries applied once; a short pick; every guard with nothing committed. |
+| `OpeningBalancePostgresIntegrationTest` | Prepare, sign, countersign by another person: the OPB document numbered from the entity's series, the lots and average; a second balance refused; every guard. |
+| `InventoryHttpPostgresIntegrationTest` | Every operation through HTTP (the opening balance's three commands and read, the receipt and pick list reads); first the two reads: the owner's balances with batch number, expiry, rank and cost; the Federation view without the cost; another entity sees nothing; availability; a request problem. |
 
 ## Deviations from 25A, with reasons
 
@@ -71,3 +89,9 @@ M3 and M4 have no stub to replace: M3 on main is still the scaffold, M4 is being
 4. **The average on an intake when the entity holds nothing or owes stock** is the intake's cost (above); 25A writes the formula only.
 5. **Tables of later tickets are not in V0001**: recipes, the policy tables, count and expiry tasks, pick lists, the loss categories and the document extensions come with the tickets that use them, each in a migration of its own, so no table exists that no code writes.
 6. **Demo scope of M5-04**: the slice has the two reads the demo needs (balances, availability); the stock card (`/skus/{id}/movements`), the availability cache of 30 seconds and the PARTY callers' "live or end of day" mode (25A section 7) are deferred (`docs/PLAN_TO_M2.md`, "Deferred after the demo"). M4 reads availability in the seller's own scope, which needs none of them.
+7. **Pick list lines are rows, not jsonb** (25A section 3 keeps them as jsonb): availability sums the open picks per location and SKU.
+8. **The delivery note names no dispatching warehouse** (M4's `DeliveryNoteIssued` carries drops and lines only): the pick list takes each line from the seller's GOOD lots across all its locations in FEFO order. With one warehouse per seller in the demo this is the warehouse; M4 adding a `fromLocationId` would narrow it.
+9. **Dispatch posts TRANSFER_OUT at the seller**, the one existing movement type for stock leaving a location in transit; 25A names only the reservation at issue. The goods stay the seller's in transit (doc 24 A-03) and the GRN receives them at the buyer. The entity quantity drops at dispatch.
+10. **Quantities on a delivery note are taken in the item's base unit**; the conversion of a line's unit (M2) is deferred.
+11. **The opening balance's draft and signatures live in `inventory.opening_balance`**, and the OPB document is issued on countersign (the moment 25A section 4.7 issues it), instead of the `doc_opening_balance` extension of a stored draft document. The "location ONBOARDING" guard is not applied (the demo loads active locations); the "no movements at the location" guard is. The countersignature is given in the owning entity's scope by a person other than the signer; a Federation officer countersigning from the Federation's own scope is deferred.
+12. **New events** not in doc 25 section 5.3: `stock.received.v1`, `pick_list.created.v1`, `pick_list.dispatched.v1`, `opening_balance.changed.v1` (prepared and signed); each handler publishes one, as every handler must.
