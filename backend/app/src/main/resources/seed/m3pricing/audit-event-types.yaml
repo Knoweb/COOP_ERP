@@ -1,5 +1,20 @@
+# M3 Pricing & Rules: the audit event types of the handler specifications (23A section 7,
+# column "Audit"). Loaded by the kernel's AuditEventTypeSeedLoader, which reads every
+# seed/*/audit-event-types.yaml. Codes are at most 40 characters.
 audit_event_types:
-  - code: PRICING_PRICE_LIST_REGISTERED
+  - code: PRICELIST_DRAFTED
     severity: INFO
     offline_capturable: false
-    description_en: Price list registered
+    description_en: Price list drafted, or a new version drafted
+
+  # Not in 23A section 7 (doc 23 section 4.1: "draft edits unaudited until publish"): the build
+  # requires every command handler to audit (AGENTS.md), so SetLines records what it stored.
+  - code: PRICELIST_LINES_SET
+    severity: INFO
+    offline_capturable: false
+    description_en: Lines of a draft price list set
+
+  - code: PRICELIST_PUBLISHED
+    severity: INFO
+    offline_capturable: false
+    description_en: Price list published

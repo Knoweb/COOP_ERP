@@ -1,29 +1,35 @@
-# OpenAPI slice of the pricing module (17A sections 5 and 12). The slice is written first; the
-# controller and the web client follow it. Rules every slice obeys (AGENTS.md):
-#   - every operation names its permission in x-permission, and that string is the same as
-#     the permission on the @CommandHandler (or the query's permission)
-#   - every mutating operation requires the Idempotency-Key header
-#   - errors are RFC 9457 problem documents whose `code` is a message id
-#   - the shape of a request (required, minLength, maxLength, minimum ...) is written in the
-#     schema and nowhere else: the kernel enforces it; a business rule is a handler guard
-#   - what every slice shares (the Idempotency-Key header, the Problem schema) lives in
-#     common.yaml and is referred to, never copied
-#   - every operation has a tag: it names the generated Java interface (Pricing -> PricingApi)
-# After changing this file run `make gen-clients` and commit web/src/generated/m3pricing.ts.
+# OpenAPI slice of the pricing module (23A section 5). Built so far: TRADE price lists (M3-04)
+# and the trade price of an order line. The other operations of 23A section 5 arrive with their
+# tickets. Rules every slice obeys (AGENTS.md): x-permission on every operation, the same string
+# as the @CommandHandler; Idempotency-Key on every mutating operation; errors are problem
+# documents whose `code` is a message id; the shape of a request lives here and the kernel
+# enforces it. After changing this file run `make gen-clients` and commit web/src/generated/m3pricing.ts.
 openapi: 3.1.0
 info:
   title: COOP ERP Pricing API
-  version: 0.1.0
+  version: 0.2.0
 paths:
-  /v1/pricing/price-lists:
+  /v1/pricing/lists:
     get:
       tags: [Pricing]
       operationId: listPriceLists
-      summary: The price lists visible in the caller's scope, newest first
-      x-permission: prc.price_list.read
+      summary: The price list versions visible in the caller's scope, by name, newest version first
+      description: >
+        The owner sees its lists; the buyer of a relationship sees the published versions of the
+        TRADE list the relationship binds; the Federation view sees every list.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          schema: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [DRAFT, PUBLISHED, SUPERSEDED, WITHDRAWN] }
       responses:
         '200':
-          description: Price lists of the caller's scope; an empty list when there is no active scope
+          description: The versions
           content:
             application/json:
               schema:
@@ -31,73 +37,272 @@ paths:
                 items: { $ref: '#/components/schemas/PriceListResponse' }
     post:
       tags: [Pricing]
-      operationId: registerPriceList
-      summary: Register a price list for the caller's entity
+      operationId: createPriceList
+      summary: Create a price list, version 1, as a draft of the caller's entity
       description: >
-        Codes this operation can answer with 422: pricing.price_list.text_required (a text of
-        spaces only), pricing.price_list.duplicate, idempotency.request_mismatch. A request that
-        does not match the schema below (no textEn, a text over 200 characters) is 400
-        request.invalid.
-      x-permission: prc.price_list.register
+        Codes this operation can answer with 422: m3.price_list.kind_not_available (only TRADE is
+        available so far), scope.invalid (not an entity-wide OWN scope), request.field.required.
+      x-permission: prc.pricelist.author
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RegisterPriceListRequest' }
+            schema: { $ref: '#/components/schemas/CreatePriceListRequest' }
       responses:
         '201':
-          description: Registered
+          description: Created
           headers:
             Location:
-              description: Address of the new price list
+              description: Address of the new version
               schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PriceListResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
-  /v1/pricing/price-lists/{id}:
+  /v1/pricing/lists/{listId}:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
     get:
       tags: [Pricing]
       operationId: getPriceList
-      summary: One price list
-      x-permission: prc.price_list.read
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+      summary: One version of a price list with its lines
+      x-permission: prc.pricelist.view
       responses:
         '200':
-          description: The price list
+          description: The version and its lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListDetailResponse' }
+        '404':
+          description: No such list, or the caller's scope may not see it (the two look the same on purpose)
+  /v1/pricing/lists/{listId}/versions:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: draftNewVersion
+      summary: Draft the next version of a published list
+      description: >
+        The new version starts with no lines. Codes this operation can answer with 422:
+        m3.price_list.not_found, m3.price_list.not_published, m3.price_list.draft_exists,
+        scope.invalid.
+      x-permission: prc.pricelist.author
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: The new draft version
+          headers:
+            Location:
+              description: Address of the new version
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PriceListResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/lists/{listId}/lines:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [Pricing]
+      operationId: setLines
+      summary: Replace the lines of a draft
+      description: >
+        Answers one outcome per line, in the order given. The lines are stored only when every
+        line is accepted (saved true); a refused line carries its reason (a message id:
+        m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing,
+        .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete). An
+        accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the
+        SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with
+        422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+      x-permission: prc.pricelist.author
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetLinesRequest' }
+      responses:
+        '200':
+          description: The outcome of each line
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetLinesResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/lists/{listId}/publish:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: publishPriceList
+      summary: Publish a draft from a date; the previous published version is superseded
+      description: >
+        A second factor is required (TRADE). Codes this operation can answer with 422:
+        m3.price_list.not_found, m3.price_list.not_draft, m3.price_list.apply_from_past,
+        m3.price_list.no_lines, m3.price_list.lines_invalid, scope.invalid.
+      x-permission: prc.pricelist.publish
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublishPriceListRequest' }
+      responses:
+        '200':
+          description: The published version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceListResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/resolve/trade:
+    get:
+      tags: [Pricing]
+      operationId: resolveTradePrice
+      summary: The trade price of an order line under a relationship (tax-exclusive, per unit)
+      description: >
+        23A section 5 writes this as a POST; it changes nothing, so it is a GET here and needs no
+        Idempotency-Key. The tier is the highest not above the quantity (the ordered quantity).
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: relationshipId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uom
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: qty
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The price
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TradePriceResponse' }
         '404':
-          description: No such price list, or the caller's scope may not see it (the two look the same on purpose)
+          description: No visible relationship, no bound list in force, or no line for the SKU and unit
 components:
   schemas:
-    RegisterPriceListRequest:
+    CreatePriceListRequest:
       type: object
-      required: [textEn]
+      required: [kind, name]
       properties:
-        # The shape of the request. The kernel checks it before the controller runs and answers
-        # 400 request.invalid; the handler checks the business rules and answers 422.
-        textEn: { type: string, minLength: 1, maxLength: 200 }
-        textSi: { type: [string, 'null'], maxLength: 200 }
-        textTa: { type: [string, 'null'], maxLength: 200 }
+        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+    PublishPriceListRequest:
+      type: object
+      required: [applyFrom]
+      properties:
+        applyFrom: { type: string, format: date, description: The first business date the version applies }
+    SetLinesRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          maxItems: 5000
+          items: { $ref: '#/components/schemas/PriceListLineInput' }
+    PriceListLineInput:
+      type: object
+      required: [skuId, uomCode, tierFromQty, price]
+      properties:
+        skuId: { type: string, format: uuid }
+        uomCode: { type: string, minLength: 1, maxLength: 10 }
+        tierFromQty: { type: number, minimum: 0, description: The quantity from which the price applies; 0 is the base price }
+        price: { type: number, minimum: 0, description: Unit price (tax-exclusive for TRADE) with at most four decimals }
+    SetLinesResponse:
+      type: object
+      required: [saved, outcomes]
+      properties:
+        saved: { type: boolean }
+        outcomes:
+          type: array
+          items: { $ref: '#/components/schemas/LineOutcome' }
+    LineOutcome:
+      type: object
+      required: [skuId, uomCode, tierFromQty, ok]
+      properties:
+        skuId: { type: string, format: uuid }
+        uomCode: { type: string }
+        tierFromQty: { type: number }
+        ok: { type: boolean }
+        reason: { type: [string, 'null'], description: The message id of the refusal }
+        review: { type: [string, 'null'], description: The message id of a review raised on an accepted line }
     PriceListResponse:
       type: object
-      required: [id, textEn, status, createdAt]
+      required: [priceListId, rootPriceListId, kind, name, version, status, createdAt]
       properties:
-        id: { type: string, format: uuid }
-        textEn: { type: string }
-        textSi: { type: [string, 'null'], description: null when not translated; show textEn with the EN tag }
-        textTa: { type: [string, 'null'], description: null when not translated; show textEn with the EN tag }
-        status: { type: string, enum: [REGISTERED] }
-        createdAt:
-          type: string
-          format: date-time
-          description: An instant in UTC (ends in Z). Convert to local time on the screen only.
+        priceListId: { type: string, format: uuid }
+        rootPriceListId: { type: string, format: uuid, description: The id of version 1 that a relationship binds }
+        ownerEntityId: { type: string, format: uuid }
+        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        name: { type: string }
+        version: { type: integer }
+        sourceVersionId: { type: [string, 'null'], format: uuid }
+        status: { type: string, enum: [DRAFT, PUBLISHED, SUPERSEDED, WITHDRAWN] }
+        applyFrom: { type: [string, 'null'], format: date }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+    PriceListLineResponse:
+      type: object
+      required: [lineId, skuId, uomCode, tierFromQty, price, effectiveFrom]
+      properties:
+        lineId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        uomCode: { type: string }
+        tierFromQty: { type: number }
+        price: { type: number }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, 'null'], format: date }
+    PriceListDetailResponse:
+      type: object
+      required: [list, lines]
+      properties:
+        list: { $ref: '#/components/schemas/PriceListResponse' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/PriceListLineResponse' }
+    TradePriceResponse:
+      type: object
+      required: [relationshipId, priceListId, lineId, skuId, uomCode, tierFromQty, unitPrice, engineVersion]
+      properties:
+        relationshipId: { type: string, format: uuid }
+        priceListId: { type: string, format: uuid, description: The version the price was read from }
+        lineId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        uomCode: { type: string }
+        tierFromQty: { type: number }
+        unitPrice: { type: number, description: Per unit and tax-exclusive with four decimals }
+        engineVersion: { type: string }

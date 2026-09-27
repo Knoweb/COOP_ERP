@@ -1,4 +1,4 @@
-package lk.coopfed.knoweb.engine.model
+package lk.coopfed.knoweb.engine
 
 import java.math.BigDecimal
 import java.time.LocalDate

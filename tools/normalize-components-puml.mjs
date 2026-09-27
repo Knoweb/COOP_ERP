@@ -2,17 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The documenter writes the Rel lines of its PlantUML diagrams in an order that differs from run
-// to run. Sorting them in place makes `make check-generated` compare content, not luck. Every
-// diagram of docs/modules is sorted: components.puml and each module-<name>.puml, whose Rel lines
-// move the same way once a module depends on more than one other.
+// The Spring Modulith documenter writes the Rel lines of a diagram in an order that differs from
+// run to run. Sorting them makes `make check-generated` compare content, not luck. Every diagram
+// of docs/modules is sorted: components.puml and each module-<name>.puml (a module with several
+// dependencies, M3 since M3-04, showed the same flapping order in its own diagram).
 
 const toolsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(toolsDir, "..");
-const dir = path.join(repoRoot, "docs", "modules");
+const modulesDir = path.join(repoRoot, "docs", "modules");
 
-for (const name of fs.readdirSync(dir).filter((entry) => entry.endsWith(".puml")).sort()) {
-  normalise(path.join(dir, name));
+for (const name of fs.readdirSync(modulesDir).filter((file) => file.endsWith(".puml")).sort()) {
+  normalise(path.join(modulesDir, name));
 }
 
 function normalise(file) {
@@ -21,6 +21,7 @@ function normalise(file) {
   const hadFinalNewline = normalisedNewlines.endsWith("\n");
 
   const lines = normalisedNewlines.split("\n");
+
   if (hadFinalNewline) {
     lines.pop();
   }
@@ -49,7 +50,8 @@ function normalise(file) {
 
   const output = lines.join("\n") + (hadFinalNewline ? "\n" : "");
 
-  if (output !== normalisedNewlines) {
+  // Written only when the order changed, so an untouched diagram keeps its bytes.
+  if (output !== normalisedNewlines && output !== original) {
     fs.writeFileSync(file, output, "utf8");
   }
 }
