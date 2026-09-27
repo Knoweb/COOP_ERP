@@ -632,10 +632,21 @@ class ArchitectureTests {
      * JdbcTemplate. When 19A adds event consumers and scheduled jobs (projections in M8, for
      * example), their annotations join CommandHandler in the list of allowed writers here.
      */
+    /**
+     * The one exemption: M8's projections (28A section 6), read models that copy facts other
+     * modules' handlers already audited and published. A projection row is not a business fact
+     * of its own, and auditing each copy would double the audit log with nothing new (decided
+     * 27 September 2026 on the architect's delegation; m8reporting README). The package is
+     * named in full, so the exemption reaches nothing else.
+     */
+    static final String PROJECTIONS = "lk.coopfed.knoweb.m8reporting.internal.projection..";
+
     static ArchRule onlyHandlersWriteRule() {
         return noClasses()
                 .that()
                 .resideInAnyPackage(BUSINESS_PACKAGES)
+                .and()
+                .resideOutsideOfPackage(PROJECTIONS)
                 .and()
                 .areNotAnnotatedWith(CommandHandler.class)
                 .should(writeToTheDatabase())
