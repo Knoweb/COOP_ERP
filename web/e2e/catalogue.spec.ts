@@ -12,12 +12,15 @@ test("a new item is created as a draft, shared, and found by its Sinhala name", 
   const mark = unique();
   const nameEn = `E2E rice ${mark}`;
   const nameSi = `E2E සහල් ${mark}`;
+  // A shared item needs its name in all three languages (m2.sku.shared_translations_required).
+  const nameTa = `E2E அரிசி ${mark}`;
 
   await openSignedIn(page, FED_OFFICER, "/catalogue");
   await page.getByRole("link", { name: textOf(FED_OFFICER, "catalogue.new") }).click();
 
   await page.getByLabel(textOf(FED_OFFICER, "catalogue.field.name_en")).fill(nameEn);
   await page.getByLabel(textOf(FED_OFFICER, "catalogue.field.name_si")).fill(nameSi);
+  await page.getByLabel(textOf(FED_OFFICER, "catalogue.field.name_ta")).fill(nameTa);
   const tax = page.getByLabel(textOf(FED_OFFICER, "catalogue.field.tax_category"));
   await expect(tax.locator("option")).not.toHaveCount(1);
   await tax.selectOption({ index: 1 });
@@ -26,14 +29,14 @@ test("a new item is created as a draft, shared, and found by its Sinhala name", 
   // The card: the draft, with the Federation's way to share it.
   await expect(page).toHaveURL(/\/catalogue\/skus\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(nameEn);
-  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.status.DRAFT"))).toBeVisible();
+  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.status.DRAFT"), { exact: true })).toBeVisible();
   await page.getByRole("button", { name: textOf(FED_OFFICER, "catalogue.activate.shared") }).click();
-  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.status.SHARED"))).toBeVisible();
+  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.status.SHARED"), { exact: true })).toBeVisible();
 
   // The browser finds it by the Sinhala name.
   await page.getByRole("link", { name: textOf(FED_OFFICER, "catalogue.back") }).click();
   await page.getByLabel(textOf(FED_OFFICER, "catalogue.filter.search")).fill(nameSi);
   const row = page.getByRole("row", { name: new RegExp(nameEn) });
   await expect(row).toBeVisible();
-  await expect(row.getByText(textOf(FED_OFFICER, "catalogue.status.SHARED"))).toBeVisible();
+  await expect(row.getByText(textOf(FED_OFFICER, "catalogue.status.SHARED"), { exact: true })).toBeVisible();
 });
