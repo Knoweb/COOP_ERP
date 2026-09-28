@@ -21,6 +21,10 @@ The same nine-step shape as phase 1, one level down: D101 (Wayamba distributor) 
 - **VAT by tax category, not a flat rate**: an EXEMPT item (most raw foodstuffs in this catalogue) and a STD item on the same invoice are taxed differently, correctly, on the same document (fixed and proved 28 Sep — `docs/progress/done/2026-09-28-fix-invoice-vat-by-tax-category.md` if that entry name matches what is on `main`).
 - **Permissions per role, again**: `d101-buyer` both orders (from the Federation, phase 1) and sells (to M101, here) — the same person can hold two jobs, but each action is checked against what that command actually needs, not against "is this person important".
 
+## Credit limit and exposure
+
+Every relationship has a credit limit, set by the seller when it opens (M1). The buyer's exposure is what it owes on open invoices plus what the seller has accepted but not yet invoiced, less anything paid on account. `d102-buyer` (D102's commercial user): **Trading**, *Our buyers' accounts*: Point Pedro MPCS (M103) stands past 80 % of its Rs 27,000 limit, marked with a warning. Open its submitted order on the order desk: *Credit and exposure* shows the limit, the parts of the exposure, and what accepting takes it to, "over the credit limit" when it would. The order can still be accepted: the limit warns, it never blocks (ADR-12), and the acceptance tells the seller's accounts (`exposure.warning.v1`). The buyer sees the same account under *Our accounts with suppliers*. (A database loaded before this change keeps M103's old Rs 5,000,000 limit until the demo is reloaded from empty.)
+
 ## What can go wrong
 
 Same failure modes as phase 1 (see that file's "What can go wrong") — a missing relationship, an unaccepted order, an unfilled GRN line. Specific to this phase:
