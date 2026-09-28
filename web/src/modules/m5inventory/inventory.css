@@ -28,3 +28,10 @@
   list-style: none;
   padding: 0;
 }
+
+.inventory-control-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--target-gap);
+  margin-bottom: var(--space-3);
+}
