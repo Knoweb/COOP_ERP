@@ -175,7 +175,7 @@ jobs:
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -241,7 +241,7 @@ jobs:
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -310,7 +310,7 @@ jobs:
 
       - name: Did the till change?
         id: changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             till:
@@ -382,7 +382,7 @@ jobs:
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -428,7 +428,7 @@ jobs:
 
       # make e2e installs the web dependencies with pnpm, so the runner needs it.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -451,7 +451,7 @@ jobs:
       # (half a minute); it changes only with the Playwright version in the lockfile, so it is
       # kept between runs under that key. The system libraries it needs are installed anyway.
       - name: Cache the Playwright browser
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
@@ -519,7 +519,7 @@ jobs:
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -620,7 +620,7 @@ jobs:
 
       # make test also runs the web client's lint and tests, which need pnpm on the host.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
