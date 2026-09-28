@@ -71,4 +71,18 @@ public interface A4Renderer {
      *                          is not a report's)
      */
     URI presignGet(String objectKey, ScopeContext ctx);
+
+    /**
+     * A fresh pre-signed GET of a PDF another entity rendered, for a scope that is a party to the
+     * document it prints: the buyer printing the seller's tax invoice. Who may see the PDF is the
+     * calling module's decision, made when it read the document (and the key with it) under its
+     * own row-level security; this method checks only that the caller has an active scope and
+     * that the key is a report of {@code ownerEntityId}. A module calls it for the one key its
+     * visible document names, never for a key the caller supplies.
+     *
+     * @param ownerEntityId the entity the PDF was rendered under (the seller)
+     * @throws ProblemException {@code report.scope_mismatch} (no active scope, or a key that is not
+     *                          a report of {@code ownerEntityId})
+     */
+    URI presignGetOfParty(String objectKey, UUID ownerEntityId, ScopeContext ctx);
 }

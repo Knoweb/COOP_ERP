@@ -60,10 +60,19 @@ class BillingController implements BillingApi {
     @Override
     public ResponseEntity<InvoicePrintResponse> getInvoicePrint(UUID invoiceId) {
         ScopeContext scope = currentScope.get();
-        read(invoiceId, scope);
+        // The invoice is read under row-level security first: only its seller or its buyer sees it,
+        // anyone else gets m4.invoice.not_found and no link.
+        InvoiceView invoice =
+                queries.getInvoice(invoiceId, scope).orElseThrow(() -> new ProblemException("m4.invoice.not_found"));
         String objectKey = queries.printObjectKey(invoiceId, scope)
                 .orElseThrow(() -> new ProblemException("m4.invoice.print_not_ready"));
-        return ResponseEntity.ok(new InvoicePrintResponse(invoiceId, renderer.presignGet(objectKey, scope)));
+        if (invoice.sellerEntityId().equals(scope.entityId())) {
+            return ResponseEntity.ok(new InvoicePrintResponse(invoiceId, renderer.presignGet(objectKey, scope)));
+        }
+        // The buyer prints the same PDF, stored under the seller: the kernel is asked for the one key
+        // this invoice names, and checks that it is the seller's report.
+        return ResponseEntity.ok(new InvoicePrintResponse(
+                invoiceId, renderer.presignGetOfParty(objectKey, invoice.sellerEntityId(), scope)));
     }
 
     private InvoiceResponse read(UUID invoiceId, ScopeContext scope) {

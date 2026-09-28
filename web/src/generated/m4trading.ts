@@ -349,7 +349,7 @@ export interface paths {
         };
         /**
          * A fresh link to the printed A4 copy of the seller's invoice (M4-11)
-         * @description The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity is refused (report.scope_mismatch).
+         * @description The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it has, the answer is m4.invoice.print_not_ready. The PDF is stored under the seller; the buyer prints the same PDF through this invoice. Any other entity does not see the invoice (m4.invoice.not_found).
          */
         get: operations["getInvoicePrint"];
         put?: never;

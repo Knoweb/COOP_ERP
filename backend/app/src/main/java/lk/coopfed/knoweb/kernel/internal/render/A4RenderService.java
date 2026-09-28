@@ -177,15 +177,31 @@ class A4RenderService implements A4Renderer {
 
     @Override
     public URI presignGet(String objectKey, ScopeContext ctx) {
-        if (ctx == null
-                || ctx.entityId() == null
-                || objectKey == null
-                || !objectKey.startsWith("reports/" + ctx.entityId() + "/")
-                || !objectKey.endsWith(".pdf")
-                || objectKey.contains("..")) {
+        if (ctx == null || ctx.entityId() == null || !isReportOf(objectKey, ctx.entityId())) {
             throw new ProblemException("report.scope_mismatch", Map.of("objectKey", String.valueOf(objectKey)));
         }
         return store.presignGet(objectKey, CONTENT_TYPE, presignValidity);
+    }
+
+    @Override
+    public URI presignGetOfParty(String objectKey, UUID ownerEntityId, ScopeContext ctx) {
+        // The module read the document naming this key under its own row-level security; here
+        // only an active scope and the key's owner are checked.
+        if (ctx == null
+                || !ctx.hasActiveScope()
+                || ctx.policyClass() == PolicyClass.NONE
+                || ownerEntityId == null
+                || !isReportOf(objectKey, ownerEntityId)) {
+            throw new ProblemException("report.scope_mismatch", Map.of("objectKey", String.valueOf(objectKey)));
+        }
+        return store.presignGet(objectKey, CONTENT_TYPE, presignValidity);
+    }
+
+    private static boolean isReportOf(String objectKey, UUID entityId) {
+        return objectKey != null
+                && objectKey.startsWith("reports/" + entityId + "/")
+                && objectKey.endsWith(".pdf")
+                && !objectKey.contains("..");
     }
 
     /** The template filled, with the kernel's head put first: charset, policy, page size, fonts. */

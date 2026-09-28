@@ -241,5 +241,10 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
         public URI presignGet(String objectKey, ScopeContext ctx) {
             return URI.create("http://objects.test/" + objectKey);
         }
+
+        @Override
+        public URI presignGetOfParty(String objectKey, UUID ownerEntityId, ScopeContext ctx) {
+            return URI.create("http://objects.test/" + objectKey);
+        }
     }
 }
