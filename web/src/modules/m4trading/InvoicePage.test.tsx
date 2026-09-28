@@ -79,11 +79,16 @@ describe("the invoice", () => {
     open.mockRestore();
   }, 15000);
 
-  it("gives the buyer no Print: the PDF is the seller's", async () => {
+  it("gives the buyer Print too: the same A4 PDF, reached through the invoice", async () => {
     state.entityId = BUYER;
+    const tab = { location: { href: "" }, close: vi.fn() };
+    const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
     renderInvoice();
 
-    expect(await screen.findByRole("heading", { name: text("trading.invoice.title") })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: text("trading.invoice.print") })).toBeNull();
-  });
+    fireEvent.click(await screen.findByRole("button", { name: text("trading.invoice.print") }, { timeout: 10000 }));
+
+    await waitFor(() => expect(tab.location.href).toBe("http://storage.local/reports/x.pdf"));
+    expect(open).toHaveBeenCalledOnce();
+    open.mockRestore();
+  }, 15000);
 });

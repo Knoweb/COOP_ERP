@@ -8,6 +8,7 @@ import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER_USER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SHOP;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.STRANGER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.internal.attachment.MemoryObjectStore;
 import lk.coopfed.knoweb.m4trading.api.CaptureGrn;
 import lk.coopfed.knoweb.m4trading.api.ConfirmGrn;
 import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
@@ -35,7 +37,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /** The invoice operations of the slice (24A section 5) over HTTP: issue from a confirmed GRN, read by both parties. */
-@Import(TradingFlow.class)
+@Import({TradingFlow.class, MemoryObjectStore.class})
 class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
@@ -114,5 +116,40 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 JsonNode.class);
         assertThat(print.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(String.valueOf(print.getBody())).contains("m4.invoice.print_not_ready");
+
+        // Once the worker has printed it (the key it records, under the seller), the seller and the
+        // buyer both get a link to the same PDF; an entity that is not a party gets nothing.
+        String objectKey = "reports/" + SELLER + "/" + UUID.randomUUID() + ".pdf";
+        superuserJdbc()
+                .update(
+                        "update trading.doc_invoice set print_object_key = ? where document_id = ?::uuid",
+                        objectKey,
+                        invoiceId);
+
+        ResponseEntity<JsonNode> sellerPrint = print(invoiceId, SELLER_USER, SELLER);
+        assertThat(sellerPrint.getStatusCode())
+                .as(String.valueOf(sellerPrint.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(sellerPrint.getBody().get("url").asText()).contains(objectKey);
+
+        ResponseEntity<JsonNode> buyerPrint = print(invoiceId, BUYER_USER, BUYER);
+        assertThat(buyerPrint.getStatusCode())
+                .as(String.valueOf(buyerPrint.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(buyerPrint.getBody().get("url").asText()).contains(objectKey);
+
+        ResponseEntity<JsonNode> strangerPrint = print(invoiceId, UUID.randomUUID(), STRANGER);
+        assertThat(strangerPrint.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(String.valueOf(strangerPrint.getBody()))
+                .contains("m4.invoice.not_found")
+                .doesNotContain(objectKey);
+    }
+
+    private ResponseEntity<JsonNode> print(String invoiceId, UUID user, UUID entity) {
+        return http.exchange(
+                "/v1/trading/invoices/" + invoiceId + "/print",
+                HttpMethod.GET,
+                new HttpEntity<>(headers(user, entity)),
+                JsonNode.class);
     }
 }

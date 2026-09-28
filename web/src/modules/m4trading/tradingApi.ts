@@ -94,7 +94,7 @@ export function useTradingApi() {
         return data!;
       },
 
-      /** A fresh link to the A4 PDF of the seller's invoice; refused until the worker printed it. */
+      /** A fresh link to the A4 PDF of the invoice, for its seller or its buyer; refused until the worker printed it. */
       async invoicePrint(invoiceId: string): Promise<string> {
         const { data } = await api.GET("/v1/trading/invoices/{invoiceId}/print", { params: { path: { invoiceId } } });
         return data!.url;
