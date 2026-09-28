@@ -197,6 +197,11 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
             assertThat(r.sessionId()).isEqualTo(session);
             assertThat(r.flags()).isEmpty();
             assertThat(r.lines()).hasSize(3);
+            assertThat(r.tenders()).singleElement().satisfies(t -> {
+                assertThat(t.kind()).isEqualTo("CASH");
+                assertThat(t.amount()).isEqualByComparingTo("3565.00");
+            });
+            assertThat(r.netAmount()).isEqualByComparingTo("3565.00");
         });
         assertThat(superuserJdbc()
                         .queryForMap(
@@ -233,6 +238,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .getBody();
         assertThat(receipts).hasSize(1);
         assertThat(receipts.get(0).get("docNumberDisplay").asText()).isEqualTo("M6S1-1-1");
+        assertThat(receipts.get(0).get("tenders").get(0).get("kind").asText()).isEqualTo("CASH");
         JsonNode sessions = http.exchange(
                         "/v1/pos/sessions?locationId=" + SHOP,
                         HttpMethod.GET,
