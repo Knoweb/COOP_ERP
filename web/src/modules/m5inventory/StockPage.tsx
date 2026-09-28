@@ -3,17 +3,12 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useHasPermission } from "../../shell/auth/permissions";
+import { PageHeader } from "../../shell/components/PageHeader";
 import { useInventoryApi } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 
-/**
- * The stock position of one location (doc 30 section 5.5; 25A section 8, "Stock position", demo
- * scope): every lot with stock by item, batch and condition, GOOD lots in FEFO order first, with
- * what can be sold or allocated of each item there. Cost shows only when the server sends it
- * (an owner's user). The way to load the opening stock of a location starts here.
- */
 export function StockPage() {
   const t = useT();
   const api = useInventoryApi();
@@ -25,59 +20,154 @@ export function StockPage() {
     queryFn: () => api.balances(locationId),
     enabled: locationId !== ""
   });
-  const skuIds = [...new Set((balances.data ?? []).map((lot) => lot.skuId))];
+
+  const skuIds = [
+    ...new Set((balances.data ?? []).map((lot) => lot.skuId))
+  ];
+
   const availability = useQuery({
     queryKey: ["inventory", "availability", locationId, skuIds.join(",")],
     queryFn: () => api.availability(locationId, skuIds),
     enabled: skuIds.length > 0
   });
-  const availableOf = (skuId: string) => availability.data?.find((row) => row.skuId === skuId)?.available;
+
+  const availableOf = (skuId: string) =>
+    availability.data?.find((row) => row.skuId === skuId)?.available;
 
   return (
     <main className="shell-page">
-      <h1>{t("inventory.title").text}</h1>
-      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", marginBottom: "var(--space-3)" }}>
-        <LocationPicker value={locationId} onChange={setLocationId} />
-        {canPrepare && <Link to="/inventory/opening/new">{t("inventory.opening.new").text}</Link>}
-        <Link to="/inventory/transfers">{t("inventory.transfer.link").text}</Link>
-      </div>
+      <PageHeader
+        icon="stock"
+        title={t("inventory.title").text}
+        actions={
+          <>
+            {canPrepare ? (
+              <Link
+                className="action-link"
+                to="/inventory/opening/new"
+              >
+                <span className="action-link__symbol" aria-hidden="true">
+                  +
+                </span>
+
+                <span>{t("inventory.opening.new").text}</span>
+              </Link>
+            ) : null}
+
+            <Link
+              className="action-link action-link--primary"
+              to="/inventory/transfers"
+            >
+              <span className="action-link__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 7h11v9H3V7Z" />
+                  <path d="M14 10h4l3 3v3h-7v-6Z" />
+                  <circle cx="7" cy="18" r="2" />
+                  <circle cx="18" cy="18" r="2" />
+                </svg>
+              </span>
+
+              <span>{t("inventory.transfer.link").text}</span>
+            </Link>
+          </>
+        }
+      />
+
+      <section className="modern-filter-panel modern-filter-panel--stock">
+        <div className="modern-location-picker">
+          <LocationPicker
+            value={locationId}
+            onChange={setLocationId}
+          />
+        </div>
+      </section>
 
       {balances.isLoading && <p>{t("inventory.loading").text}</p>}
-      {balances.isError && <p role="alert">{errorText(balances.error, t("inventory.error.generic").text)}</p>}
-      {balances.data?.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
+
+      {balances.isError && (
+        <p role="alert">
+          {errorText(
+            balances.error,
+            t("inventory.error.generic").text
+          )}
+        </p>
+      )}
+
+      {balances.data?.length === 0 && (
+        <p>{t("inventory.balances.empty").text}</p>
+      )}
+
       {balances.data && balances.data.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t("inventory.column.item").text}</th>
-              <th>{t("inventory.column.batch").text}</th>
-              <th>{t("inventory.column.expiry").text}</th>
-              <th>{t("inventory.column.condition").text}</th>
-              <th>{t("inventory.column.on_hand").text}</th>
-              <th>{t("inventory.column.fefo").text}</th>
-              <th>{t("inventory.column.available").text}</th>
-              <th>{t("inventory.column.unit_cost").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {balances.data.map((lot) => (
-              <tr key={lot.stockLotId}>
-                <td>
-                  <Link to={`/inventory/locations/${locationId}/skus/${lot.skuId}`}>
-                    <SkuLabel skuId={lot.skuId} />
-                  </Link>
-                </td>
-                <td>{isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")}</td>
-                <td>{lot.expiryDate ?? ""}</td>
-                <td>{t(`inventory.condition.${lot.condition}`).text}</td>
-                <td>{lot.qtyOnHand}</td>
-                <td>{lot.fefoRank ?? ""}</td>
-                <td>{availableOf(lot.skuId) ?? ""}</td>
-                <td>{lot.unitCost ?? ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <section className="modern-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
+              <thead>
+                <tr>
+                  <th>{t("inventory.column.item").text}</th>
+                  <th>{t("inventory.column.batch").text}</th>
+                  <th>{t("inventory.column.expiry").text}</th>
+                  <th>{t("inventory.column.condition").text}</th>
+                  <th>{t("inventory.column.on_hand").text}</th>
+                  <th>{t("inventory.column.fefo").text}</th>
+                  <th>{t("inventory.column.available").text}</th>
+                  <th>{t("inventory.column.unit_cost").text}</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {balances.data.map((lot) => (
+                  <tr key={lot.stockLotId}>
+                    <td>
+                      <Link
+                        className="entity-link"
+                        to={`/inventory/locations/${locationId}/skus/${lot.skuId}`}
+                      >
+                        <span className="entity-link__icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M4 7 12 3l8 4-8 4-8-4Z" />
+                            <path d="M4 7v10l8 4 8-4V7" />
+                          </svg>
+                        </span>
+
+                        <SkuLabel skuId={lot.skuId} />
+                      </Link>
+                    </td>
+
+                    <td>
+                      {isSyntheticBatchNo(lot.batchNo)
+                        ? t("inventory.field.batch_not_tracked").text
+                        : (lot.batchNo ?? "")}
+                    </td>
+
+                    <td>{lot.expiryDate ?? ""}</td>
+
+                    <td>
+                      <span className="condition-chip">
+                        {t(`inventory.condition.${lot.condition}`).text}
+                      </span>
+                    </td>
+
+                    <td className="numeric-cell">
+                      {lot.qtyOnHand}
+                    </td>
+
+                    <td className="numeric-cell">
+                      {lot.fefoRank ?? ""}
+                    </td>
+
+                    <td className="numeric-cell numeric-cell--strong">
+                      {availableOf(lot.skuId) ?? ""}
+                    </td>
+
+                    <td className="numeric-cell">
+                      {lot.unitCost ?? ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
     </main>
   );

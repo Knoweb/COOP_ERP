@@ -28,14 +28,35 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
     <ScopeProvider>
       <div className={training ? "shell shell--training" : "shell"}>
         <TrainingBadge active={training} />
-        <header className="shell-header">
-          <ScopeBanner />
-          <UserMenu />
-        </header>
-        {/* What became of the command a step-up interrupted; nothing, nearly always. */}
-        <StepUpReplay />
-        <Navigation modules={modules} />
-        <Outlet />
+        <div className="shell-layout">
+          <aside className="shell-sidebar">
+            <div className="shell-sidebar-brand">
+              <span className="brand-logo">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+              </span>
+              <span className="brand-text">COOPFED ERP</span>
+            </div>
+            <Navigation modules={modules} />
+          </aside>
+          <div className="shell-main">
+            <header className="shell-topbar">
+              <div className="shell-topbar-left">
+                <ScopeBanner />
+              </div>
+              <div className="shell-topbar-right">
+                <UserMenu />
+              </div>
+            </header>
+            <StepUpReplay />
+            <div className="shell-content-container">
+              <Outlet />
+            </div>
+          </div>
+        </div>
       </div>
     </ScopeProvider>
   );

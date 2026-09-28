@@ -1,0 +1,43 @@
+.party-filter-label {
+  display: block;
+  margin-bottom: var(--space-half);
+}
+
+.party-filter-input {
+  width: 100%;
+}
+
+.party-load-more {
+  margin-top: var(--space-2);
+}
+
+.party-form-row {
+  display: grid;
+  gap: var(--target-gap);
+}
+
+.party-form-row-margin {
+  display: grid;
+  gap: var(--target-gap);
+  margin-bottom: var(--space-3);
+}
+
+.party-alert-text {
+  color: var(--color-alert-text);
+  font-size: var(--font-size-sm);
+}
+
+.party-form-field {
+  display: grid;
+  gap: var(--space-half);
+}
+
+.party-table-full {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.party-error-list {
+  margin: 0;
+  padding-left: var(--space-2);
+}

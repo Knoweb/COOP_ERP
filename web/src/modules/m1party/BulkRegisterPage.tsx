@@ -61,7 +61,10 @@ export function BulkRegisterPage() {
   return (
     <main className="shell-page">
       <p>
-        <Link to="/party/societies">{t("party.back_to_register").text}</Link>
+        <Link className="back-link" to="/party/societies">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("party.back_to_register").text}
+      </Link>
       </p>
       <h1>{t("party.bulk.title").text}</h1>
       <p>{t("party.bulk.intro").text}</p>
@@ -69,8 +72,8 @@ export function BulkRegisterPage() {
         <code>{t("party.bulk.columns").text}</code>
       </p>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: "var(--target-gap)", marginBottom: "var(--space-3)" }}>
-        <label style={{ display: "grid", gap: "var(--space-half)" }}>
+      <form onSubmit={submit} className="party-form-row-margin">
+        <label className="party-form-field">
           {t("party.bulk.file").text}
           <input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
         </label>
@@ -95,7 +98,7 @@ function Report({ report }: { report: BulkValidationReport }) {
           ? t("party.bulk.registered", undefined, { count: report.registered }).text
           : t("party.bulk.rejected", undefined, { rejected: report.rejected, rows: report.rows }).text}
       </p>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <table className="party-table-full">
         <thead>
           <tr>
             <th scope="col" style={cell}>{t("party.bulk.col.line").text}</th>
@@ -114,7 +117,7 @@ function Report({ report }: { report: BulkValidationReport }) {
               <td style={cell}>{t(row.status === "OK" ? "party.bulk.row.ok" : "party.bulk.row.error").text}</td>
               <td style={cell}>
                 {row.problems.length > 0 && (
-                  <ul style={{ margin: 0, paddingLeft: "var(--space-2)" }}>
+                  <ul className="party-error-list">
                     {row.problems.map((problem) => (
                       <li key={`${problem.field}:${problem.code}`}>
                         {problem.field}: {t(`party.bulk.problem.${problem.code}`).text}

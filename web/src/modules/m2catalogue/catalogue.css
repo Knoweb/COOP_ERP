@@ -1,0 +1,45 @@
+.catalogue-header-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.catalogue-form-row {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.catalogue-action-bar {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.catalogue-section {
+  margin-top: var(--space-4);
+}
+
+.catalogue-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.catalogue-form-field {
+  display: grid;
+  gap: var(--space-half);
+}
+
+.catalogue-inline-field {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.catalogue-fieldset {
+  display: grid;
+  gap: var(--space-2);
+  border: none;
+  padding: 0;
+}

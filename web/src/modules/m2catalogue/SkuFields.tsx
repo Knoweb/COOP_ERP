@@ -1,6 +1,7 @@
 import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import "./catalogue.css";
 import { useCatalogueApi } from "./catalogueApi";
 import { languageOf, nameIn, type SkuForm } from "./skuView";
 
@@ -19,7 +20,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
   const reference = useQuery({ queryKey: ["catalogue", "reference"], queryFn: () => api.reference(), staleTime: Infinity });
 
   const text = (field: "nameEn" | "nameSi" | "nameTa", id: string, required = false) => (
-    <label style={{ display: "grid", gap: "var(--space-half)" }}>
+    <label className="catalogue-form-field">
       {t(id).text}
       <input
         type="text"
@@ -32,18 +33,18 @@ export function SkuFields({ form, onChange, disabled }: Props) {
     </label>
   );
   const flag = (field: "soldByWeight" | "batchTracked" | "expiryTracked" | "hasPrintedMrp", id: string) => (
-    <label style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+    <label className="catalogue-inline-field">
       <input type="checkbox" disabled={disabled} checked={form[field]} onChange={(event) => onChange({ [field]: event.target.checked })} />
       {t(id).text}
     </label>
   );
 
   return (
-    <fieldset disabled={disabled} style={{ display: "grid", gap: "var(--space-2)", border: "none", padding: 0 }}>
+    <fieldset disabled={disabled} className="catalogue-fieldset">
       {text("nameEn", "catalogue.field.name_en", true)}
       {text("nameSi", "catalogue.field.name_si")}
       {text("nameTa", "catalogue.field.name_ta")}
-      <label style={{ display: "grid", gap: "var(--space-half)" }}>
+      <label className="catalogue-form-field">
         {t("catalogue.field.unit").text}
         <select required value={form.baseUomCode} onChange={(event) => onChange({ baseUomCode: event.target.value })}>
           {(reference.data?.units ?? [{ uomCode: form.baseUomCode, nameEn: form.baseUomCode, weight: false }]).map((unit) => (
@@ -53,7 +54,7 @@ export function SkuFields({ form, onChange, disabled }: Props) {
           ))}
         </select>
       </label>
-      <label style={{ display: "grid", gap: "var(--space-half)" }}>
+      <label className="catalogue-form-field">
         {t("catalogue.field.tax_category").text}
         <select required value={form.taxCategoryId} onChange={(event) => onChange({ taxCategoryId: event.target.value })}>
           <option value="">{t("catalogue.field.choose").text}</option>

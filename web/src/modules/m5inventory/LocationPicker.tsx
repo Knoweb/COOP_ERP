@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import "./inventory.css";
 import { inLocale } from "../../shell/i18n/localName";
 import { errorText } from "./stockView";
 import { useInventoryApi, type Location } from "./inventoryApi";
@@ -32,7 +33,7 @@ export function LocationPicker({ value, onChange }: { value: string; onChange: (
   }
 
   return (
-    <label style={{ display: "grid", gap: "var(--space-half)" }}>
+    <label className="inventory-form-field">
       {t("inventory.field.location").text}
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         {(locations.data ?? []).map((location) => (

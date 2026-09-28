@@ -27,7 +27,10 @@ export function StockCardPage() {
   return (
     <main className="shell-page">
       <p>
-        <Link to="/inventory">{t("inventory.back").text}</Link>
+        <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       </p>
       <h1>{t("inventory.card.title").text}</h1>
       <p>

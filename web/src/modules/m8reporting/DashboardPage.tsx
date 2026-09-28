@@ -34,31 +34,18 @@ export function DashboardPage() {
               ? t("reporting.freshness", undefined, { when: formatInstant(dashboard.data.freshness) }).text
               : t("reporting.freshness.none").text}
           </p>
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 0,
-              display: "grid",
-              gap: "var(--space-2)",
-              gridTemplateColumns: "repeat(auto-fill, minmax(calc(var(--space-8) * 3), 1fr))"
-            }}
-          >
+          <ul className="modern-dashboard-tiles">
             {dashboard.data.tiles.map((tile) => (
-              <li
-                key={tile.tileId}
-                style={{
-                  border: "var(--border-width) solid var(--color-border)",
-                  padding: "var(--space-2)",
-                  display: "grid",
-                  gap: "var(--space-1)"
-                }}
-              >
-                <span>{t(tile.labelId).text}</span>
-                <strong style={{ fontSize: "var(--font-size-xl)" }}>
+              <li key={tile.tileId} className="modern-dashboard-tile">
+                <span className="modern-dashboard-tile__label">{t(tile.labelId).text}</span>
+                <span className="modern-dashboard-tile__value">
                   {tile.kind === "MONEY" ? <MoneyDisplay amount={tile.value} /> : tile.value}
-                </strong>
+                </span>
                 {tile.drillReportId && (
-                  <Link to={`/reporting/reports/${tile.drillReportId}`}>{t("reporting.dashboard.open").text}</Link>
+                  <Link className="modern-dashboard-tile__link" to={`/reporting/reports/${tile.drillReportId}`}>
+                    {t("reporting.dashboard.open").text}
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                  </Link>
                 )}
               </li>
             ))}
