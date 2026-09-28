@@ -425,6 +425,21 @@ class ArchitectureTests {
     }
 
     /**
+     * DEMO-02: only the demo loader may run work at a past moment. No module, controller or job
+     * reaches kernel.api.HistoricalTime, so there is no back-dating path from the API.
+     */
+    @Test
+    void onlyTheDemoLoaderMovesTheClockBack() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackages("lk.coopfed.knoweb.demo..", "lk.coopfed.knoweb.kernel..")
+                .should()
+                .dependOnClassesThat()
+                .areAssignableTo(lk.coopfed.knoweb.kernel.api.HistoricalTime.class)
+                .check(CLASSES);
+    }
+
+    /**
      * "An injectable Clock (UTC) everywhere; tests use a fixed clock" (19A section 13). A module
      * injects java.time.Clock and calls clock.instant(), or LocalDate.now(clock) and the like;
      * for a business date it asks kernel.api.BusinessDate. It never reads the wall clock itself:
