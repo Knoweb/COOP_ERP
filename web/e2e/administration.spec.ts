@@ -36,7 +36,7 @@ test("an administrator creates a user, gives a role at a location, and the user 
 
   // 2. The first password, shown once.
   await page.getByRole("button", { name: textOf(admin, "party.user.password") }).click();
-  const password = page.getByLabel(textOf(admin, "party.user.password.value"));
+  const password = page.locator("code").and(page.getByLabel(textOf(admin, "party.user.password.value")));
   await expect(password).toBeVisible();
   const temporaryPassword = (await password.textContent())?.trim() ?? "";
   expect(temporaryPassword).not.toBe("");
