@@ -318,7 +318,7 @@ function PriceCheck({ rows }: { rows: Row[] }) {
       <form onSubmit={submit} className="pricing-form-grid">
         <label className="pricing-form-field">
           {t("pricing.check.shop").text}
-          <select required value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+          <select aria-label={t("pricing.check.shop").text} required value={locationId} onChange={(event) => setLocationId(event.target.value)}>
             <option value="">{t("pricing.check.choose").text}</option>
             {shops.map((shop) => (
               <option key={shop.locationId} value={shop.locationId}>
@@ -329,7 +329,7 @@ function PriceCheck({ rows }: { rows: Row[] }) {
         </label>
         <label className="pricing-form-field">
           {t("pricing.column.item").text}
-          <select required value={skuId} onChange={(event) => setSkuId(event.target.value)}>
+          <select aria-label={t("pricing.column.item").text} required value={skuId} onChange={(event) => setSkuId(event.target.value)}>
             <option value="">{t("pricing.check.choose").text}</option>
             {rows.map((row, index) => {
               const sku = skus[index]?.data;
