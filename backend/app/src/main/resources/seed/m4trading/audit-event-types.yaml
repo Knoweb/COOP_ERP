@@ -119,3 +119,23 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The A4 copy of an issued tax invoice stored for printing
+
+  - code: INVOICE_DISPUTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The buyer disputed a tax invoice it received
+
+  - code: INVOICE_DISPUTE_RESOLVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The open dispute of a tax invoice closed by the seller or the buyer
+
+  - code: CREDIT_NOTE_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Credit note issued against a tax invoice, settling a discrepancy or chosen lines
+
+  - code: CREDIT_NOTE_PRINTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The A4 copy of an issued credit note stored for printing

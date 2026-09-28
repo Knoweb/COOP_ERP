@@ -78,6 +78,11 @@ export function grnChip(status: "DRAFT" | "CONFIRMED"): ChipState {
   return status === "DRAFT" ? "draft" : "issued";
 }
 
+/** An open discrepancy is a disagreement still to settle; a settled one is closed and in force. */
+export function discrepancyChip(status: "RAISED" | "SETTLED"): ChipState {
+  return status === "RAISED" ? "disputed" : "issued";
+}
+
 /** A line of the requisition book as the buyer types it; the quantity stays text until it is sent. */
 export type RequisitionRow = {
   skuId: string;

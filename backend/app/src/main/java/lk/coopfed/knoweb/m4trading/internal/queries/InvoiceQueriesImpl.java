@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m4trading.internal.queries;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -9,6 +10,8 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceDisputes;
+import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
@@ -26,10 +29,12 @@ class InvoiceQueriesImpl implements InvoiceQueries {
 
     private final JdbcTemplate jdbc;
     private final DocumentBaseRepository documents;
+    private final InvoiceDisputes disputes;
 
-    InvoiceQueriesImpl(JdbcTemplate jdbc, DocumentBaseRepository documents) {
+    InvoiceQueriesImpl(JdbcTemplate jdbc, DocumentBaseRepository documents, InvoiceDisputes disputes) {
         this.jdbc = jdbc;
         this.documents = documents;
+        this.disputes = disputes;
     }
 
     @Override
@@ -83,6 +88,35 @@ class InvoiceQueriesImpl implements InvoiceQueries {
                 .stream()
                 .filter(key -> key != null)
                 .findFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<InvoiceBalance> balance(UUID invoiceId, ScopeContext scope) {
+        if (invoiceId == null) {
+            return Optional.empty();
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select credited_amount, settled_amount from trading.doc_invoice where document_id = ?", invoiceId);
+        Optional<DocumentRecord> header = documents.findById(invoiceId);
+        if (rows.isEmpty() || header.isEmpty()) {
+            return Optional.empty();
+        }
+        BigDecimal credited = (BigDecimal) rows.get(0).get("credited_amount");
+        BigDecimal settled = (BigDecimal) rows.get(0).get("settled_amount");
+        BigDecimal gross = header.get().grossAmount() == null
+                ? BigDecimal.ZERO
+                : header.get().grossAmount();
+        Optional<InvoiceDisputes.Latest> dispute = disputes.latest(invoiceId);
+        boolean disputed = dispute.map(latest -> InvoiceDisputes.DISPUTED.equals(latest.action()))
+                .orElse(false);
+        return Optional.of(new InvoiceBalance(
+                invoiceId,
+                credited,
+                settled,
+                gross.subtract(credited).subtract(settled),
+                disputed,
+                disputed ? dispute.get().reason() : null));
     }
 
     private InvoiceView view(DocumentRecord header, Map<String, Object> row) {

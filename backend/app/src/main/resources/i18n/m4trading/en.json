@@ -71,5 +71,22 @@
   "m4.invoice.print.buyer_vat": "Buyer VAT number",
   "m4.invoice.print.net": "Net amount",
   "m4.invoice.print.vat": "VAT",
-  "m4.invoice.print.gross": "Total"
+  "m4.invoice.print.gross": "Total",
+  "m4.invoice.not_buyer": "Only the buyer of the invoice can dispute it",
+  "m4.invoice.disputed_already": "The invoice is already disputed",
+  "m4.invoice.not_disputed": "The invoice is not disputed",
+  "m4.discrepancy.not_found": "The discrepancy was not found",
+  "m4.creditnote.not_found": "The credit note was not found",
+  "m4.creditnote.not_seller": "Only the seller of the invoice can credit it",
+  "m4.creditnote.discrepancy_or_lines": "Name either the discrepancy to settle or the lines to credit, not both",
+  "m4.creditnote.discrepancy_not_invoiced": "The discrepancy is not on a goods received note of this invoice",
+  "m4.creditnote.discrepancy_settled": "The discrepancy is already settled",
+  "m4.creditnote.line_unknown": "The line is not a line of this invoice",
+  "m4.creditnote.qty_invalid": "Credit more than zero and no more than the invoice line",
+  "m4.creditnote.nothing_to_credit": "There is nothing to credit",
+  "m4.creditnote.print_not_ready": "The printed copy is not ready yet; try again in a moment",
+  "m4.creditnote.print.title": "Credit note",
+  "m4.creditnote.print.invoice": "Tax invoice",
+  "m4.creditnote.print.reason": "Reason",
+  "m4.creditnote.print.gross": "Total credited"
 }

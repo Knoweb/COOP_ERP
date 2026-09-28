@@ -5,12 +5,15 @@
 // M4-11 (demo scope, doc 30 section 5.4; 24A section 8): the trading desk with the buyer's
 // requisition book and the seller's order desk, the order card (submit, accept, reject), the
 // delivery note (draft, issue, dispatch), the goods received note (count, confirm) and the
-// invoice (issue, read, print). The other screens of 24A section 8 follow after the demo
+// invoice (issue, read, print, dispute), the discrepancy a short GRN raises and the credit note
+// that settles it (M4-08, 28 Sep). The other screens of 24A section 8 follow after the demo
 // (docs/PLAN_TO_M2.md, "Deferred after the demo").
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
+import { CreditNotePage } from "./CreditNotePage";
 import { DeliveryNotePage } from "./DeliveryNotePage";
+import { DiscrepancyPage } from "./DiscrepancyPage";
 import { GrnPage } from "./GrnPage";
 import { InvoicePage } from "./InvoicePage";
 import { NewDeliveryNotePage } from "./NewDeliveryNotePage";
@@ -51,7 +54,9 @@ export const tradingModule: ModuleDefinition = {
       )
     },
     { path: "trading/grns/:grnId", element: <GrnPage /> },
-    { path: "trading/invoices/:invoiceId", element: <InvoicePage /> }
+    { path: "trading/invoices/:invoiceId", element: <InvoicePage /> },
+    { path: "trading/discrepancies/:discrepancyId", element: <DiscrepancyPage /> },
+    { path: "trading/credit-notes/:creditNoteId", element: <CreditNotePage /> }
   ],
 
   // The label is a message id of trading.messages.json, never literal text.
@@ -67,6 +72,8 @@ export const tradingModule: ModuleDefinition = {
     "del.note.issue",
     "del.note.dispatch",
     "shop.grn.confirm",
-    "bil.invoice.issue"
+    "bil.invoice.issue",
+    "bil.invoice.dispute",
+    "bil.creditnote.issue"
   ]
 };

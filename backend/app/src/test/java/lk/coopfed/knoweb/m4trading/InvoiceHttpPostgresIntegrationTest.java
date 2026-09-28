@@ -145,6 +145,105 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .doesNotContain(objectKey);
     }
 
+    @Test
+    void aShortDeliveryIsSettledWithACreditNoteThatBothPartiesRead() {
+        UUID noteId = flow.dispatchedNote(SHOP);
+        UUID dropId = deliveries
+                .getDeliveryNote(noteId, buyer())
+                .orElseThrow()
+                .drops()
+                .get(0)
+                .dropId();
+        // 8 rice of 10: two short.
+        UUID grnId = capture.handle(
+                new CaptureGrn(
+                        dropId,
+                        SHOP,
+                        null,
+                        List.of(
+                                new CaptureGrn.Line(
+                                        RICE, "EA", new BigDecimal("8"), BigDecimal.ZERO, null, null, null, null),
+                                new CaptureGrn.Line(
+                                        DHAL, "EA", new BigDecimal("4"), BigDecimal.ZERO, null, null, null, null))),
+                buyer());
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        String invoiceId = post(
+                        "/v1/trading/invoices", Map.of("grnIds", List.of(grnId.toString())), SELLER_USER, SELLER)
+                .get("invoiceId")
+                .asText();
+
+        // The seller's accounts see the open discrepancy raised with it.
+        JsonNode open = get("/v1/trading/discrepancies?role=SELLER", SELLER_USER, SELLER);
+        assertThat(open).hasSize(1);
+        assertThat(open.get(0).get("status").asText()).isEqualTo("RAISED");
+        assertThat(open.get(0).get("invoiceId").asText()).isEqualTo(invoiceId);
+        String discrepancyId = open.get(0).get("discrepancyId").asText();
+
+        JsonNode note = post(
+                "/v1/trading/credit-notes",
+                Map.of("invoiceId", invoiceId, "discrepancyId", discrepancyId, "reason", "Two bags short"),
+                SELLER_USER,
+                SELLER);
+        assertThat(note.get("docNumber").asText()).isEqualTo("D4S-CN-0000001");
+        assertThat(note.get("grossAmount").decimalValue()).isEqualByComparingTo("283.20");
+        String creditNoteId = note.get("creditNoteId").asText();
+
+        // The buyer reads the discrepancy settled, the credit note, and the invoice net of it.
+        JsonNode settled = get("/v1/trading/discrepancies/" + discrepancyId, BUYER_USER, BUYER);
+        assertThat(settled.get("status").asText()).isEqualTo("SETTLED");
+        assertThat(settled.get("creditNoteId").asText()).isEqualTo(creditNoteId);
+        assertThat(get("/v1/trading/credit-notes/" + creditNoteId, BUYER_USER, BUYER)
+                        .get("lines"))
+                .hasSize(1);
+        JsonNode invoice = get("/v1/trading/invoices/" + invoiceId, BUYER_USER, BUYER);
+        assertThat(invoice.get("creditedAmount").decimalValue()).isEqualByComparingTo("283.20");
+        assertThat(invoice.get("amountDue").decimalValue()).isEqualByComparingTo("1169.60");
+        assertThat(invoice.get("creditNotes").get(0).get("creditNoteId").asText())
+                .isEqualTo(creditNoteId);
+
+        // The buyer disputes, the seller resolves.
+        assertThat(post("/v1/trading/invoices/" + invoiceId + "/dispute", Map.of("reason", "Short"), BUYER_USER, BUYER)
+                        .get("disputed")
+                        .asBoolean())
+                .isTrue();
+        assertThat(post("/v1/trading/invoices/" + invoiceId + "/resolve-dispute", Map.of(), SELLER_USER, SELLER)
+                        .get("disputed")
+                        .asBoolean())
+                .isFalse();
+
+        // Printed by the worker under the seller: the buyer's link reaches the same PDF.
+        String objectKey = "reports/" + SELLER + "/" + UUID.randomUUID() + ".pdf";
+        superuserJdbc()
+                .update(
+                        "update trading.doc_credit_note set print_object_key = ? where document_id = ?::uuid",
+                        objectKey,
+                        creditNoteId);
+        assertThat(get("/v1/trading/credit-notes/" + creditNoteId + "/print", BUYER_USER, BUYER)
+                        .get("url")
+                        .asText())
+                .contains(objectKey);
+    }
+
+    private JsonNode get(String path, UUID user, UUID entity) {
+        ResponseEntity<JsonNode> response =
+                http.exchange(path, HttpMethod.GET, new HttpEntity<>(headers(user, entity)), JsonNode.class);
+        assertThat(response.getStatusCode())
+                .as(String.valueOf(response.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        return response.getBody();
+    }
+
+    private JsonNode post(String path, Object body, UUID user, UUID entity) {
+        HttpHeaders headers = headers(user, entity);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<JsonNode> response =
+                http.exchange(path, HttpMethod.POST, new HttpEntity<>(body, headers), JsonNode.class);
+        assertThat(response.getStatusCode().is2xxSuccessful())
+                .as(String.valueOf(response.getBody()))
+                .isTrue();
+        return response.getBody();
+    }
+
     private ResponseEntity<JsonNode> print(String invoiceId, UUID user, UUID entity) {
         return http.exchange(
                 "/v1/trading/invoices/" + invoiceId + "/print",

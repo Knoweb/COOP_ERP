@@ -21,6 +21,8 @@ export type CreateDeliveryNoteRequest = components["schemas"]["CreateDeliveryNot
 export type Grn = components["schemas"]["GrnResponse"];
 export type CaptureGrnRequest = components["schemas"]["CaptureGrnRequest"];
 export type Invoice = components["schemas"]["InvoiceResponse"];
+export type CreditNote = components["schemas"]["CreditNoteResponse"];
+export type Discrepancy = components["schemas"]["DiscrepancyResponse"];
 export type Relationship =partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
@@ -97,6 +99,33 @@ export function useTradingApi() {
       /** A fresh link to the A4 PDF of the invoice, for its seller or its buyer; refused until the worker printed it. */
       async invoicePrint(invoiceId: string): Promise<string> {
         const { data } = await api.GET("/v1/trading/invoices/{invoiceId}/print", { params: { path: { invoiceId } } });
+        return data!.url;
+      },
+
+      async discrepancies(role: Side): Promise<Discrepancy[]> {
+        const { data } = await api.GET("/v1/trading/discrepancies", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async discrepancy(discrepancyId: string): Promise<Discrepancy> {
+        const { data } = await api.GET("/v1/trading/discrepancies/{discrepancyId}", {
+          params: { path: { discrepancyId } }
+        });
+        return data!;
+      },
+
+      async creditNote(creditNoteId: string): Promise<CreditNote> {
+        const { data } = await api.GET("/v1/trading/credit-notes/{creditNoteId}", {
+          params: { path: { creditNoteId } }
+        });
+        return data!;
+      },
+
+      /** A fresh link to the A4 PDF of the credit note, for its seller or its buyer; refused until the worker printed it. */
+      async creditNotePrint(creditNoteId: string): Promise<string> {
+        const { data } = await api.GET("/v1/trading/credit-notes/{creditNoteId}/print", {
+          params: { path: { creditNoteId } }
+        });
         return data!.url;
       },
 
@@ -241,6 +270,31 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/invoices", {
           params: { header: { "Idempotency-Key": key } },
           body: { grnIds }
+        });
+        return data!;
+      },
+
+      /** The seller settles the buyer's discrepancy with a credit note against the invoice of its GRN. */
+      async settleDiscrepancy(invoiceId: string, discrepancyId: string, reason: string, key: string): Promise<CreditNote> {
+        const { data } = await api.POST("/v1/trading/credit-notes", {
+          params: { header: { "Idempotency-Key": key } },
+          body: { invoiceId, discrepancyId, reason }
+        });
+        return data!;
+      },
+
+      async disputeInvoice(invoiceId: string, reason: string, key: string): Promise<Invoice> {
+        const { data } = await api.POST("/v1/trading/invoices/{invoiceId}/dispute", {
+          params: { path: { invoiceId }, header: { "Idempotency-Key": key } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      async resolveInvoiceDispute(invoiceId: string, key: string): Promise<Invoice> {
+        const { data } = await api.POST("/v1/trading/invoices/{invoiceId}/resolve-dispute", {
+          params: { path: { invoiceId }, header: { "Idempotency-Key": key } },
+          body: {}
         });
         return data!;
       },
