@@ -23,6 +23,9 @@ export type CaptureGrnRequest = components["schemas"]["CaptureGrnRequest"];
 export type Invoice = components["schemas"]["InvoiceResponse"];
 export type CreditNote = components["schemas"]["CreditNoteResponse"];
 export type Discrepancy = components["schemas"]["DiscrepancyResponse"];
+export type PaymentReceipt = components["schemas"]["PaymentReceiptResponse"];
+export type RecordPaymentReceiptRequest = components["schemas"]["RecordPaymentReceiptRequest"];
+export type Exposure = components["schemas"]["ExposureResponse"];
 export type Relationship =partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
@@ -127,6 +130,25 @@ export function useTradingApi() {
           params: { path: { creditNoteId } }
         });
         return data!.url;
+      },
+
+      /** The payments the caller's entity received (SELLER) or made (BUYER), with their reversals, newest first. */
+      async payments(role: Side): Promise<PaymentReceipt[]> {
+        const { data } = await api.GET("/v1/trading/payment-receipts", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async payment(receiptId: string): Promise<PaymentReceipt> {
+        const { data } = await api.GET("/v1/trading/payment-receipts/{receiptId}", {
+          params: { path: { receiptId } }
+        });
+        return data!;
+      },
+
+      /** The exposure of each relationship in which the caller sells (SELLER) or buys (BUYER), with its credit limit. */
+      async exposures(role: Side): Promise<Exposure[]> {
+        const { data } = await api.GET("/v1/trading/exposures", { params: { query: { role } } });
+        return data ?? [];
       },
 
       /** The ACTIVE relationships in which the caller's entity buys: the sellers it can order from. */
@@ -298,6 +320,27 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/invoices/{invoiceId}/resolve-dispute", {
           params: { path: { invoiceId }, header: { "Idempotency-Key": key } },
           body: {}
+        });
+        return data!;
+      },
+
+      /**
+       * The seller records a payment from a buyer. With no settlements it settles the buyer's open
+       * invoices oldest first, and what is left stays on the buyer's account.
+       */
+      async recordPayment(body: RecordPaymentReceiptRequest, key: string): Promise<PaymentReceipt> {
+        const { data } = await api.POST("/v1/trading/payment-receipts", {
+          params: { header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      /** The cheque of a receipt cleared, or bounced (which reverses the receipt and reopens its invoices). */
+      async chequeOutcome(receiptId: string, outcome: "CLEARED" | "BOUNCED", reason: string, key: string): Promise<PaymentReceipt> {
+        const { data } = await api.POST("/v1/trading/payment-receipts/{receiptId}/cheque-outcome", {
+          params: { path: { receiptId }, header: { "Idempotency-Key": key } },
+          body: { outcome, reason: reason.trim() === "" ? undefined : reason.trim() }
         });
         return data!;
       },

@@ -9,9 +9,11 @@ import { useScope } from "../../shell/scope/useScope";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { StateChip } from "../../shell/components/StateChip";
 import { EntityName, SkuLabel } from "./labels";
+import { PaymentEntry } from "./PaymentEntry";
 import { useTradingApi } from "./tradingApi";
-import { errorText } from "./tradingView";
+import { errorText, paymentStateChip } from "./tradingView";
 
 /**
  * One tax invoice (24A section 8, "Invoice", demo scope; M4-08): the seller's invoice built from
@@ -19,6 +21,8 @@ import { errorText } from "./tradingView";
  * totals. Both parties read it; it leads to the GRNs and the delivery note it came from. The
  * Print opens the A4 PDF the worker printed (a fresh pre-signed link each time), for the seller and
  * for the buyer alike: the PDF is stored under the seller and the buyer reaches it through this invoice.
+ * M4-07: what payments settled, the amount due and the payment state (open, part-paid, settled),
+ * the payments against it, and for the seller's accounts the form that records one against it.
  */
 export function InvoicePage() {
   const { invoiceId = "" } = useParams();
@@ -39,6 +43,7 @@ export function InvoicePage() {
   const scope = useScope();
   const queryClient = useQueryClient();
   const canDispute = useHasPermission("bil.invoice.dispute");
+  const canRecordPayment = useHasPermission("bil.payment.record");
   const [disputeReason, setDisputeReason] = useState("");
   const disputeKey = useIdempotencyKey();
   const resolveKey = useIdempotencyKey();
@@ -101,6 +106,9 @@ export function InvoicePage() {
   const inv = invoice.data;
   const isBuyer = inv.buyerEntityId === scope.entityId;
   const credited = (inv.creditedAmount ?? 0) > 0;
+  const paid = (inv.payments ?? []).length > 0;
+  const amountDue = inv.amountDue ?? inv.grossAmount;
+  const paymentState = inv.paymentState ?? "OPEN";
 
   return (
     <main className="shell-page">
@@ -121,6 +129,18 @@ export function InvoicePage() {
           { label: t("trading.invoice.seller_vat").text, value: inv.sellerVatNo },
           { label: t("trading.column.buyer").text, value: <EntityName entityId={inv.buyerEntityId} /> },
           { label: t("trading.invoice.buyer_vat").text, value: inv.buyerVatNo },
+          {
+            label: t("trading.column.payment_state").text,
+            value: <StateChip state={paymentStateChip(paymentState)} label={t(`trading.invoice.payment_state.${paymentState}`).text} />
+          },
+          {
+            label: t("trading.account.title").text,
+            value: (
+              <Link to={isBuyer ? `/trading/accounts/BUYER/${inv.sellerEntityId}` : `/trading/accounts/SELLER/${inv.buyerEntityId}`}>
+                {t("trading.accounts.open").text}
+              </Link>
+            )
+          },
           { label: t("trading.invoice.tax_point").text, value: formatDate(inv.taxPointDate) },
           { label: t("trading.invoice.due").text, value: formatDate(inv.dueDate) },
           {
@@ -200,26 +220,58 @@ export function InvoicePage() {
         <div className="document-header__fact">
           <dt>{t("trading.invoice.gross").text}</dt>
           <dd>
-            <MoneyDisplay amount={inv.grossAmount} size={credited ? undefined : "total"} />
+            <MoneyDisplay amount={inv.grossAmount} size={credited || paid ? undefined : "total"} />
           </dd>
         </div>
         {credited && (
-          <>
-            <div className="document-header__fact">
-              <dt>{t("trading.invoice.credited").text}</dt>
-              <dd>
-                <MoneyDisplay amount={inv.creditedAmount ?? 0} />
-              </dd>
-            </div>
-            <div className="document-header__fact">
-              <dt>{t("trading.invoice.amount_due").text}</dt>
-              <dd>
-                <MoneyDisplay amount={inv.amountDue ?? inv.grossAmount} size="total" />
-              </dd>
-            </div>
-          </>
+          <div className="document-header__fact">
+            <dt>{t("trading.invoice.credited").text}</dt>
+            <dd>
+              <MoneyDisplay amount={inv.creditedAmount ?? 0} />
+            </dd>
+          </div>
+        )}
+        {paid && (
+          <div className="document-header__fact">
+            <dt>{t("trading.invoice.settled").text}</dt>
+            <dd>
+              <MoneyDisplay amount={inv.settledAmount ?? 0} />
+            </dd>
+          </div>
+        )}
+        {(credited || paid) && (
+          <div className="document-header__fact">
+            <dt>{t("trading.invoice.amount_due").text}</dt>
+            <dd>
+              <MoneyDisplay amount={amountDue} size="total" />
+            </dd>
+          </div>
         )}
       </dl>
+
+      {paid && (
+        <section className="trading-section">
+          <h2>{t("trading.invoice.payments").text}</h2>
+          <ul>
+            {(inv.payments ?? []).map((payment) => (
+              <li key={payment.receiptId}>
+                <Link to={`/trading/payments/${payment.receiptId}`}>{payment.docNumber ?? t("trading.payment.title").text}</Link>{" "}
+                {payment.receivedOn && formatDate(payment.receivedOn)} <MoneyDisplay amount={payment.amount} />{" "}
+                {t(`trading.payment.status.${payment.status}`).text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {canRecordPayment && !isBuyer && amountDue > 0 && (
+        <PaymentEntry
+          key={amountDue}
+          buyerEntityId={inv.buyerEntityId}
+          invoiceId={inv.invoiceId}
+          amountDue={amountDue}
+        />
+      )}
 
       {(inv.creditNotes ?? []).length > 0 && (
         <section className="trading-section">

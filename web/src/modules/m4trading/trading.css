@@ -34,3 +34,8 @@
 .trading-section {
   margin-top: var(--space-3);
 }
+
+/* M4-09: the exposure past a threshold of the credit limit; a warning, never a block (ADR-12). */
+.trading-warning {
+  font-weight: 600;
+}

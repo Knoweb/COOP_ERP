@@ -108,9 +108,14 @@ public final class TradingFixture {
                 union select document_id from trading.doc_invoice
                 union select document_id from trading.doc_discrepancy
                 union select document_id from trading.doc_credit_note
+                union select document_id from trading.doc_payment_receipt
                 """,
                 UUID.class);
         for (String table : new String[] {
+            "cheque_outcome",
+            "payment_allocation",
+            "cheque",
+            "doc_payment_receipt",
             "invoice_dispute",
             "discrepancy_settlement",
             "doc_credit_note",
@@ -147,6 +152,10 @@ public final class TradingFixture {
 
     public static void clean(JdbcTemplate admin) {
         for (String table : new String[] {
+            "cheque_outcome",
+            "payment_allocation",
+            "cheque",
+            "doc_payment_receipt",
             "invoice_dispute",
             "discrepancy_settlement",
             "doc_credit_note",

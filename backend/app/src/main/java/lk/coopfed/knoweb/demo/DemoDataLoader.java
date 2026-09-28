@@ -120,9 +120,17 @@ public class DemoDataLoader {
     private final PricingQueries pricing;
     private final InventoryQueries inventory;
     private final DemoTradingHistory history;
+    private final DemoPayments payments;
     private final DemoCalendar calendar;
     private final Clock clock;
     private final ZoneId businessZone;
+
+    /**
+     * The credit limit of D102 to Point Pedro MPCS (M103): a little above the exposure its trading
+     * history leaves (DemoTradingHistory, lane D102-M103), so the order desk shows it past the
+     * first warning threshold (80 %). Warn only: nothing is blocked on credit (ADR-12).
+     */
+    static final BigDecimal M103_CREDIT_LIMIT = new BigDecimal("27000.00");
 
     private Map<String, Integer> counts;
 
@@ -150,6 +158,7 @@ public class DemoDataLoader {
             PricingQueries pricing,
             InventoryQueries inventory,
             DemoTradingHistory history,
+            DemoPayments payments,
             DemoCalendar calendar,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
@@ -176,6 +185,7 @@ public class DemoDataLoader {
         this.pricing = pricing;
         this.inventory = inventory;
         this.history = history;
+        this.payments = payments;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
     }
@@ -195,6 +205,8 @@ public class DemoDataLoader {
                 today.minusDays(DemoCalendar.SETUP_DAYS_AGO / 2), LocalTime.of(8, 0), this::hettipolaStockByTransfer);
         // DEMO-02: the trading history, orders to invoices at both tiers (DemoTradingHistory).
         history.load(items, skus, this::count);
+        // M4-07: the buyers paid some of it (DemoPayments).
+        payments.load(this::count);
 
         Report report = new Report(Map.copyOf(counts));
         log.info("Demo data: {} commands issued {}", report.total(), report.commands());
@@ -213,7 +225,10 @@ public class DemoDataLoader {
         for (Distributor distributor : DemoCast.DISTRIBUTORS) {
             UUID list = distributorPriceList(distributor, items, skus);
             for (UUID society : distributor.societies()) {
-                relationship(distributor.commercial(), society, list, new BigDecimal("5000000.00"), 30);
+                // M4-09: Point Pedro MPCS (M103) buys from D102 on a limit its history nearly
+                // reaches, so its exposure shows the warning (warn only, ADR-12).
+                BigDecimal limit = DemoCast.M103.equals(society) ? M103_CREDIT_LIMIT : new BigDecimal("5000000.00");
+                relationship(distributor.commercial(), society, list, limit, 30);
             }
         }
         openingStock(DemoCast.FED_STORES, DemoCast.FED_ACCOUNTS, items, skus, true);

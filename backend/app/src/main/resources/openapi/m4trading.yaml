@@ -900,6 +900,150 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/payment-receipts:
+
+    get:
+      tags: [Payment]
+      operationId: listPaymentReceipts
+      summary: The payments the caller's entity received (SELLER) or made (BUYER), newest first
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The receipts, with their reversals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Payment]
+      operationId: recordPaymentReceipt
+      summary: The seller records a payment received from a buyer and settles its invoices
+      description: >
+        With no settlements the payment settles the buyer's open, undisputed invoices oldest
+        first; what is left stays on the buyer's account (unapplied). Problems:
+        m4.payment.method_invalid, m4.payment.amount_invalid, m4.payment.received_in_future,
+        m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.invoice_invalid,
+        m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued,
+        m4.payment.exceeds_due, m4.payment.exceeds_receipt.
+      x-permission: bil.payment.record
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordPaymentReceiptRequest'
+      responses:
+        '201':
+          description: The issued receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    get:
+      tags: [Payment]
+      operationId: getPaymentReceipt
+      summary: One payment receipt, for its seller or its buyer
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}/cheque-outcome:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    post:
+      tags: [Payment]
+      operationId: recordChequeOutcome
+      summary: The cheque of a receipt cleared or bounced
+      description: >
+        A bounced cheque reverses the receipt (a PRC reversal) and reopens the invoices it settled.
+        Problems: m4.payment.outcome_invalid, m4.payment.not_found, m4.payment.not_seller,
+        m4.payment.not_cheque, m4.payment.outcome_recorded.
+      x-permission: bil.payment.record
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChequeOutcomeRequest'
+      responses:
+        '200':
+          description: The receipt, with the cheque's outcome (and its reversal when bounced)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/exposures:
+
+    get:
+      tags: [Payment]
+      operationId: listExposures
+      summary: The exposure of every relationship in which the caller's entity sells (SELLER) or buys (BUYER)
+      description: >
+        Open invoice balances plus accepted orders not yet invoiced, less payments held on
+        account, beside the relationship's credit limit. Computed when read; it warns, never blocks
+        (ADR-12).
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The exposures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExposureResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -941,6 +1085,14 @@ components:
     CreditNoteId:
       in: path
       name: creditNoteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ReceiptId:
+      in: path
+      name: receiptId
       required: true
       schema:
         type: string
@@ -1490,6 +1642,17 @@ components:
         amountDue:
           type: number
           description: The gross amount less what was credited and settled
+        settledAmount:
+          type: number
+          description: What payments settled of it, net of bounced cheques
+        paymentState:
+          type: string
+          enum: [OPEN, PART_PAID, SETTLED]
+        payments:
+          type: array
+          description: The receipts (and reversals) that settled part of it, oldest first
+          items:
+            $ref: '#/components/schemas/InvoicePaymentSummary'
         disputed:
           type: boolean
           description: The buyer disputes the invoice now
@@ -1785,5 +1948,208 @@ components:
         url:
           type: string
           format: uri
+
+    InvoicePaymentSummary:
+      type: object
+      required: [receiptId, status, amount]
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RECORDED, REVERSED, REVERSAL]
+        method:
+          type: string
+        receivedOn:
+          type: string
+          format: date
+        amount:
+          type: number
+          description: What this receipt settled of the invoice; negative on a reversal
+
+    RecordPaymentReceiptRequest:
+      type: object
+      required: [buyerEntityId, method, amount]
+      properties:
+        buyerEntityId:
+          type: string
+          format: uuid
+        method:
+          type: string
+          enum: [CASH, CHEQUE, TRANSFER, DEPOSIT]
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 999999999999.99
+        reference:
+          type: string
+          maxLength: 100
+          description: The bank reference, deposit slip or cash receipt book number
+        receivedOn:
+          type: string
+          format: date
+          description: When the money was received; today when left out
+        cheque:
+          $ref: '#/components/schemas/ChequeRequest'
+        settlements:
+          type: array
+          maxItems: 200
+          description: Chosen invoices and amounts; left out, the open invoices are settled oldest first
+          items:
+            $ref: '#/components/schemas/SettlementRequest'
+
+    ChequeRequest:
+      type: object
+      required: [bank, chequeNo, dated]
+      properties:
+        bank:
+          type: string
+          minLength: 1
+          maxLength: 100
+        chequeNo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        dated:
+          type: string
+          format: date
+
+    SettlementRequest:
+      type: object
+      required: [invoiceId, amount]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          exclusiveMinimum: 0
+
+    ChequeOutcomeRequest:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [CLEARED, BOUNCED]
+        reason:
+          type: string
+          maxLength: 500
+
+    PaymentReceiptResponse:
+      type: object
+      required: [receiptId, status, sellerEntityId, buyerEntityId, method, receivedOn, amount, unappliedAmount,
+        allocations]
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RECORDED, REVERSED, REVERSAL]
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        method:
+          type: string
+        reference:
+          type: string
+        receivedOn:
+          type: string
+          format: date
+        issuedAt:
+          type: string
+          format: date-time
+        amount:
+          type: number
+        unappliedAmount:
+          type: number
+          description: What stays on the buyer's account; zero once reversed
+        reversalOf:
+          type: string
+          format: uuid
+          description: On a reversal, the receipt it reverses
+        reversedBy:
+          type: string
+          format: uuid
+          description: On a reversed receipt, its reversal
+        reason:
+          type: string
+        cheque:
+          $ref: '#/components/schemas/ChequeResponse'
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationResponse'
+
+    ChequeResponse:
+      type: object
+      required: [bank, chequeNo, dated]
+      properties:
+        bank:
+          type: string
+        chequeNo:
+          type: string
+        dated:
+          type: string
+          format: date
+        outcome:
+          type: string
+          enum: [CLEARED, BOUNCED]
+        outcomeAt:
+          type: string
+          format: date-time
+
+    AllocationResponse:
+      type: object
+      required: [invoiceId, amount]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        amount:
+          type: number
+
+    ExposureResponse:
+      type: object
+      required: [relationshipId, sellerEntityId, buyerEntityId, openInvoices, acceptedNotInvoiced,
+        unappliedReceipts, amount, asOf]
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        creditLimit:
+          type: number
+          description: The relationship's credit limit (M1); absent when it sets none
+        openInvoices:
+          type: number
+        acceptedNotInvoiced:
+          type: number
+        unappliedReceipts:
+          type: number
+        amount:
+          type: number
+        warnThresholdPercent:
+          type: integer
+          description: The highest configured percentage of the limit the amount has reached
+        asOf:
+          type: string
+          format: date-time
 
     # @@SCHEMAS@@

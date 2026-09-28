@@ -10,9 +10,12 @@ import type {
   CreateDeliveryNoteRequest,
   CreateOrderRequest,
   DeliveryNote,
+  Exposure,
   Order,
   OrderLine,
-  OrderStatus
+  OrderStatus,
+  PaymentReceipt,
+  RecordPaymentReceiptRequest
 } from "./tradingApi";
 
 // A batch-less SKU still needs a batch row (M2-05, doc 22 section 3.7), so M2 registers a
@@ -81,6 +84,82 @@ export function grnChip(status: "DRAFT" | "CONFIRMED"): ChipState {
 /** An open discrepancy is a disagreement still to settle; a settled one is closed and in force. */
 export function discrepancyChip(status: "RAISED" | "SETTLED"): ChipState {
   return status === "RAISED" ? "disputed" : "issued";
+}
+
+/** An invoice is in force whatever its payments; one still owing is shown as a document still to close. */
+export function paymentStateChip(state: "OPEN" | "PART_PAID" | "SETTLED" | undefined): ChipState {
+  return state === "SETTLED" ? "issued" : "draft";
+}
+
+/** A receipt in force is issued; a bounced one and its reversal are kept for the record, void. */
+export function receiptChip(status: PaymentReceipt["status"]): ChipState {
+  return status === "RECORDED" ? "issued" : "void";
+}
+
+/** The exposure as a share of the credit limit, in whole percent; null when the relationship sets no limit. */
+export function percentOfLimit(amount: number, creditLimit: number | undefined | null): number | null {
+  if (creditLimit === undefined || creditLimit === null || creditLimit <= 0) {
+    return null;
+  }
+  return Math.round((amount / creditLimit) * 100);
+}
+
+/**
+ * What accepting an order would leave the exposure at: the order's value at its tier prices (what
+ * the acceptance adds, as the server's formula counts it) on top of today's exposure, and whether
+ * that passes the credit limit. It warns only: the server accepts it all the same (ADR-12).
+ */
+export function exposureAfter(
+  exposure: Pick<Exposure, "amount" | "creditLimit">,
+  orderValue: number
+): { amount: number; percent: number | null; overLimit: boolean } {
+  const amount = Math.round((exposure.amount + orderValue) * 100) / 100;
+  const limit = exposure.creditLimit;
+  return {
+    amount,
+    percent: percentOfLimit(amount, limit),
+    overLimit: limit !== undefined && limit !== null && limit > 0 && amount > limit
+  };
+}
+
+/** A payment as the seller's accounts type it; the amounts stay text until it is sent. */
+export type PaymentForm = {
+  method: "CASH" | "CHEQUE" | "TRANSFER" | "DEPOSIT";
+  amount: string;
+  reference: string;
+  receivedOn: string;
+  bank: string;
+  chequeNo: string;
+  chequeDated: string;
+};
+
+/** Ready to send: an amount above zero, and a cheque's bank, number and date when paid by cheque. */
+export function paymentReady(form: PaymentForm): boolean {
+  const amount = Number(form.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || form.receivedOn === "") {
+    return false;
+  }
+  return form.method !== "CHEQUE" || (form.bank.trim() !== "" && form.chequeNo.trim() !== "" && form.chequeDated !== "");
+}
+
+/**
+ * The request: against one invoice when `invoiceId` is given (the amount settles it, up to what is
+ * due), otherwise with no settlements, so the server settles the buyer's open invoices oldest first.
+ */
+export function paymentRequest(buyerEntityId: string, form: PaymentForm, invoiceId?: string): RecordPaymentReceiptRequest {
+  const amount = Number(form.amount);
+  return {
+    buyerEntityId,
+    method: form.method,
+    amount,
+    reference: form.reference.trim() === "" ? undefined : form.reference.trim(),
+    receivedOn: form.receivedOn,
+    cheque:
+      form.method === "CHEQUE"
+        ? { bank: form.bank.trim(), chequeNo: form.chequeNo.trim(), dated: form.chequeDated }
+        : undefined,
+    settlements: invoiceId ? [{ invoiceId, amount }] : undefined
+  };
 }
 
 /** A line of the requisition book as the buyer types it; the quantity stays text until it is sent. */

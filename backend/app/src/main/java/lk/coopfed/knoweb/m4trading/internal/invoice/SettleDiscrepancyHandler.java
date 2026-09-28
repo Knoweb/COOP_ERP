@@ -69,10 +69,12 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
     private final DocumentLinks links;
     private final TradingSeries series;
     private final PostingMapper postings;
+    private final InvoiceSettlements settlements;
     private final TradingClock clock;
     private final AuditFacade audit;
     private final EventPublisher events;
 
+    @SuppressWarnings("java:S107") // the collaborators of one handler specification
     SettleDiscrepancyHandler(
             JdbcTemplate jdbc,
             DocumentBaseRepository documents,
@@ -80,6 +82,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
             DocumentLinks links,
             TradingSeries series,
             PostingMapper postings,
+            InvoiceSettlements settlements,
             TradingClock clock,
             AuditFacade audit,
             EventPublisher events) {
@@ -89,6 +92,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
         this.links = links;
         this.series = series;
         this.postings = postings;
+        this.settlements = settlements;
         this.clock = clock;
         this.audit = audit;
         this.events = events;
@@ -186,6 +190,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                         documents.findByIdForUpdate(creditNoteId).orElseThrow(),
                         documents.findLines(creditNoteId),
                         scope);
+                settlements.requireDue(invoiceId, issued.grossAmount());
                 links.link(creditNoteId, invoiceId, LinkType.CREDITS, issued.grossAmount(), scope);
                 jdbc.update(
                         """

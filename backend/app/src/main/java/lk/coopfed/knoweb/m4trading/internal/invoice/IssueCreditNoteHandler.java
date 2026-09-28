@@ -60,9 +60,11 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
     private final DocumentLinks links;
     private final TradingSeries series;
     private final PostingMapper postings;
+    private final InvoiceSettlements settlements;
     private final AuditFacade audit;
     private final EventPublisher events;
 
+    @SuppressWarnings("java:S107") // the collaborators of one handler specification
     IssueCreditNoteHandler(
             JdbcTemplate jdbc,
             DocumentBaseRepository documents,
@@ -70,6 +72,7 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
             DocumentLinks links,
             TradingSeries series,
             PostingMapper postings,
+            InvoiceSettlements settlements,
             AuditFacade audit,
             EventPublisher events) {
         this.jdbc = jdbc;
@@ -78,6 +81,7 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
         this.links = links;
         this.series = series;
         this.postings = postings;
+        this.settlements = settlements;
         this.audit = audit;
         this.events = events;
     }
@@ -114,6 +118,8 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
         series.ensureEntitySeries(CN, scope);
         DocumentRecord issued = issuance.issue(
                 documents.findByIdForUpdate(creditNoteId).orElseThrow(), documents.findLines(creditNoteId), scope);
+        // Paid in part: no more than is still due is credited (m4.creditnote.exceeds_due).
+        settlements.requireDue(invoiceId, issued.grossAmount());
         links.link(creditNoteId, invoiceId, LinkType.CREDITS, issued.grossAmount(), scope);
         jdbc.update(
                 "insert into trading.doc_credit_note (document_id, invoice_document_id, reason) values (?, ?, ?)",
