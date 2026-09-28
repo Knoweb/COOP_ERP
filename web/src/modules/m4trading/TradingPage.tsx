@@ -6,7 +6,7 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { EntityName } from "./labels";
 import { useTradingApi, type Side } from "./tradingApi";
-import { deliveryChip, errorText, grnChip, orderChip } from "./tradingView";
+import { deliveryChip, discrepancyChip, errorText, grnChip, orderChip } from "./tradingView";
 
 /**
  * The trading desk (doc 30 section 5.4; 24A section 8, demo scope): one page with the registers a
@@ -23,6 +23,8 @@ export function TradingPage() {
   const canDispatch = useHasPermission("del.note.dispatch");
   const canReceive = useHasPermission("shop.grn.confirm");
   const canInvoice = useHasPermission("bil.invoice.issue");
+  const canCredit = useHasPermission("bil.creditnote.issue");
+  const canDispute = useHasPermission("bil.invoice.dispute");
 
   return (
     <main className="shell-page">
@@ -71,10 +73,22 @@ export function TradingPage() {
           <InvoiceRegister role="SELLER" />
         </section>
       )}
+      {(canInvoice || canCredit) && (
+        <section>
+          <h2>{t("trading.discrepancies.received.title").text}</h2>
+          <DiscrepancyRegister role="SELLER" />
+        </section>
+      )}
       <section>
         <h2>{t("trading.invoices.received.title").text}</h2>
         <InvoiceRegister role="BUYER" />
       </section>
+      {(canReceive || canDispute) && (
+        <section>
+          <h2>{t("trading.discrepancies.raised.title").text}</h2>
+          <DiscrepancyRegister role="BUYER" />
+        </section>
+      )}
     </main>
   );
 }
@@ -214,6 +228,56 @@ function GrnRegister({ role }: { role: Side }) {
                 </td>
                 <td>
                   <StateChip state={grnChip(grn.status)} label={t(`trading.grn.status.${grn.status}`).text} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** The discrepancies raised with the seller (SELLER) or raised by the buyer (BUYER), open first. */
+function DiscrepancyRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const rows = useQuery({ queryKey: ["trading", "discrepancies", role], queryFn: () => api.discrepancies(role) });
+
+  if (rows.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (rows.isError) {
+    return <p role="alert">{errorText(rows.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!rows.data?.length) {
+    return <p>{t("trading.discrepancies.empty").text}</p>;
+  }
+  const sorted = [...rows.data].sort((a, b) => (a.status === b.status ? 0 : a.status === "RAISED" ? -1 : 1));
+  return (
+    <div className="modern-table-card">
+      <div className="modern-table-scroll">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>{t("trading.column.number").text}</th>
+              <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+              <th>{t("trading.discrepancy.kind").text}</th>
+              <th>{t("trading.column.status").text}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.discrepancyId}>
+                <td>
+                  <Link to={`/trading/discrepancies/${row.discrepancyId}`}>{row.docNumber}</Link>
+                </td>
+                <td>
+                  <EntityName entityId={role === "BUYER" ? row.sellerEntityId : row.buyerEntityId} />
+                </td>
+                <td>{t(`trading.discrepancy.kind.${row.kind}`).text}</td>
+                <td>
+                  <StateChip state={discrepancyChip(row.status)} label={t(`trading.discrepancy.status.${row.status}`).text} />
                 </td>
               </tr>
             ))}

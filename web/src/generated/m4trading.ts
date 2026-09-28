@@ -360,6 +360,169 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/invoices/{invoiceId}/dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer disputes an invoice it received, with a reason
+         * @description Problems: m4.invoice.not_found, m4.invoice.not_buyer, m4.invoice.disputed_already.
+         */
+        post: operations["disputeInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices/{invoiceId}/resolve-dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller or the buyer closes the open dispute of an invoice
+         * @description Problems: m4.invoice.not_found, m4.invoice.not_disputed.
+         */
+        post: operations["resolveInvoiceDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller credits chosen quantities of lines of its invoice
+         * @description At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.qty_invalid, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+         */
+        post: operations["issueCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes/{creditNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        /** One credit note the caller's entity issued or received */
+        get: operations["getCreditNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes/{creditNoteId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's credit note
+         * @description As for the invoice: printed by the worker after the issue (m4.creditnote.print_not_ready until then), stored under the seller, printed by either party through the credit note.
+         */
+        get: operations["getCreditNotePrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The discrepancies the caller's entity raised (BUYER) or that were raised with it (SELLER) */
+        get: operations["listDiscrepancies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies/{discrepancyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        /** One discrepancy the caller's entity raised or that was raised with it */
+        get: operations["getDiscrepancy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies/{discrepancyId}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller accepts the buyer's count and settles the discrepancy
+         * @description The invoice bills the received quantity, so a short quantity is settled with no money; damaged quantity the invoice charged is credited by a credit note issued in the same act. Asks for a fresh second factor. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+         */
+        post: operations["settleDiscrepancy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -626,7 +789,143 @@ export interface components {
             netAmount: number;
             taxAmount: number;
             grossAmount: number;
+            /** @description What the invoice's credit notes took off it */
+            creditedAmount?: number;
+            /** @description The gross amount less what was credited and settled */
+            amountDue?: number;
+            /** @description The buyer disputes the invoice now */
+            disputed?: boolean;
+            disputeReason?: string;
+            creditNotes?: components["schemas"]["CreditNoteSummary"][];
             lines: components["schemas"]["InvoiceLineResponse"][];
+        };
+        CreditNoteSummary: {
+            /** Format: uuid */
+            creditNoteId: string;
+            docNumber?: string;
+            grossAmount: number;
+        };
+        DisputeInvoiceRequest: {
+            reason: string;
+        };
+        ResolveInvoiceDisputeRequest: {
+            note?: string;
+        };
+        SettleDiscrepancyRequest: {
+            reason: string;
+        };
+        IssueCreditNoteRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description Invoice lines and quantities to credit */
+            lines: components["schemas"]["CreditNoteLineRequest"][];
+            reason: string;
+        };
+        CreditNoteLineRequest: {
+            /** Format: uuid */
+            invoiceLineId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        CreditNoteResponse: {
+            /** Format: uuid */
+            creditNoteId: string;
+            docNumber?: string;
+            status: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceDocNumber?: string;
+            /** Format: uuid */
+            discrepancyId?: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            reason: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            netAmount: number;
+            taxAmount: number;
+            grossAmount: number;
+            lines: components["schemas"]["CreditNoteLineResponse"][];
+        };
+        CreditNoteLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            qty: number;
+            unitPrice: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            /** Format: uuid */
+            invoiceLineId?: string;
+        };
+        CreditNotePrintResponse: {
+            /** Format: uuid */
+            creditNoteId: string;
+            /** Format: uri */
+            url: string;
+        };
+        DiscrepancyResponse: {
+            /** Format: uuid */
+            discrepancyId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RAISED" | "SETTLED";
+            /** @enum {string} */
+            kind: "SHORT" | "OVER" | "DAMAGED" | "MIXED";
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            grnId: string;
+            grnDocNumber?: string;
+            /** Format: uuid */
+            deliveryNoteId?: string;
+            /** Format: date-time */
+            raisedAt?: string;
+            /** Format: date-time */
+            windowEndsAt: string;
+            /**
+             * Format: uuid
+             * @description The seller's invoice of the GRN, once issued
+             */
+            invoiceId?: string;
+            /**
+             * Format: uuid
+             * @description The credit note for damaged quantity the invoice charged, issued at settlement; none when nothing billed needed crediting (a short quantity is never billed)
+             */
+            creditNoteId?: string;
+            creditNoteDocNumber?: string;
+            /** Format: date-time */
+            settledAt?: string;
+            /** Format: uuid */
+            settledByUserId?: string;
+            settlementReason?: string;
+            lines: components["schemas"]["DiscrepancyLineResponse"][];
+        };
+        DiscrepancyLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            grnLineId: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode?: string;
+            expectedQty?: number;
+            receivedQty: number;
+            damagedQty: number;
+            /** @description Received less expected; negative when short */
+            varianceQty: number;
+            unitPrice?: number;
         };
         InvoiceLineResponse: {
             /** Format: uuid */
@@ -700,6 +999,8 @@ export interface components {
         OrderId: string;
         DeliveryNoteId: string;
         GrnId: string;
+        InvoiceId: string;
+        CreditNoteId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -1300,6 +1601,245 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    disputeInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisputeInvoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description The invoice, disputed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    resolveInvoiceDispute: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveInvoiceDisputeRequest"];
+            };
+        };
+        responses: {
+            /** @description The invoice, no longer disputed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    issueCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueCreditNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued credit note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getCreditNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The credit note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteResponse"];
+                };
+            };
+            /** @description m4.creditnote.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getCreditNotePrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNotePrintResponse"];
+                };
+            };
+            /** @description m4.creditnote.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDiscrepancies: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discrepancies, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getDiscrepancy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discrepancy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"];
+                };
+            };
+            /** @description m4.discrepancy.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    settleDiscrepancy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleDiscrepancyRequest"];
+            };
+        };
+        responses: {
+            /** @description The discrepancy, settled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };

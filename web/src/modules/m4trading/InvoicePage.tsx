@@ -1,6 +1,11 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { ApiProblem } from "../../shell/api/client";
+import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { useHasPermission } from "../../shell/auth/permissions";
+import { useScope } from "../../shell/scope/useScope";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
@@ -30,6 +35,38 @@ export function InvoicePage() {
     retry: false
   });
   const print = useMutation({ mutationFn: () => api.invoicePrint(invoiceId) });
+  // The buyer disputes the invoice with a reason; either party holding the permission closes it.
+  const scope = useScope();
+  const queryClient = useQueryClient();
+  const canDispute = useHasPermission("bil.invoice.dispute");
+  const [disputeReason, setDisputeReason] = useState("");
+  const disputeKey = useIdempotencyKey();
+  const resolveKey = useIdempotencyKey();
+  const dispute = useMutation({
+    mutationFn: () => api.disputeInvoice(invoiceId, disputeReason.trim(), disputeKey.current()),
+    onSuccess: () => {
+      disputeKey.next();
+      setDisputeReason("");
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        disputeKey.next();
+      }
+    }
+  });
+  const resolve = useMutation({
+    mutationFn: () => api.resolveInvoiceDispute(invoiceId, resolveKey.current()),
+    onSuccess: () => {
+      resolveKey.next();
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        resolveKey.next();
+      }
+    }
+  });
   // The tab is opened in the click itself, so a popup blocker lets it through, and is sent to
   // the PDF once the link arrives.
   const openPrint = () => {
@@ -62,6 +99,8 @@ export function InvoicePage() {
   }
 
   const inv = invoice.data;
+  const isBuyer = inv.buyerEntityId === scope.entityId;
+  const credited = (inv.creditedAmount ?? 0) > 0;
 
   return (
     <main className="shell-page">
@@ -72,7 +111,11 @@ export function InvoicePage() {
       <DocumentHeader
         code={inv.docNumber ?? t("trading.order.draft_number").text}
         title={t("trading.invoice.title").text}
-        state={{ look: "issued", label: t("trading.invoice.status.ISSUED").text }}
+        state={
+          inv.disputed
+            ? { look: "disputed", label: t("trading.invoice.status.DISPUTED").text }
+            : { look: "issued", label: t("trading.invoice.status.ISSUED").text }
+        }
         facts={[
           { label: t("trading.column.seller").text, value: <EntityName entityId={inv.sellerEntityId} /> },
           { label: t("trading.invoice.seller_vat").text, value: inv.sellerVatNo },
@@ -157,10 +200,62 @@ export function InvoicePage() {
         <div className="document-header__fact">
           <dt>{t("trading.invoice.gross").text}</dt>
           <dd>
-            <MoneyDisplay amount={inv.grossAmount} size="total" />
+            <MoneyDisplay amount={inv.grossAmount} size={credited ? undefined : "total"} />
           </dd>
         </div>
+        {credited && (
+          <>
+            <div className="document-header__fact">
+              <dt>{t("trading.invoice.credited").text}</dt>
+              <dd>
+                <MoneyDisplay amount={inv.creditedAmount ?? 0} />
+              </dd>
+            </div>
+            <div className="document-header__fact">
+              <dt>{t("trading.invoice.amount_due").text}</dt>
+              <dd>
+                <MoneyDisplay amount={inv.amountDue ?? inv.grossAmount} size="total" />
+              </dd>
+            </div>
+          </>
+        )}
       </dl>
+
+      {(inv.creditNotes ?? []).length > 0 && (
+        <section className="trading-section">
+          <h2>{t("trading.invoice.credit_notes").text}</h2>
+          <ul>
+            {(inv.creditNotes ?? []).map((note) => (
+              <li key={note.creditNoteId}>
+                <Link to={`/trading/credit-notes/${note.creditNoteId}`}>{note.docNumber ?? t("trading.creditnote.title").text}</Link>{" "}
+                <MoneyDisplay amount={note.grossAmount} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {canDispute && isBuyer && !inv.disputed && (
+        <section className="trading-section">
+          <label>
+            {t("trading.invoice.dispute_reason").text}
+            <input type="text" maxLength={500} value={disputeReason} onChange={(event) => setDisputeReason(event.target.value)} />
+          </label>
+          <button type="button" disabled={dispute.isPending || disputeReason.trim() === ""} onClick={() => dispute.mutate()}>
+            {t("trading.invoice.dispute").text}
+          </button>
+        </section>
+      )}
+      {canDispute && inv.disputed && (
+        <section className="trading-section">
+          <button type="button" disabled={resolve.isPending} onClick={() => resolve.mutate()}>
+            {t("trading.invoice.resolve").text}
+          </button>
+        </section>
+      )}
+      {(dispute.isError || resolve.isError) && (
+        <p role="alert">{errorText(dispute.error ?? resolve.error, t("trading.error.generic").text)}</p>
+      )}
     </main>
   );
 }

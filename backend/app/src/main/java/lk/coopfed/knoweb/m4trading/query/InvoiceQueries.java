@@ -18,4 +18,7 @@ public interface InvoiceQueries {
      * empty until the worker has printed it.
      */
     Optional<String> printObjectKey(UUID invoiceId, ScopeContext scope);
+
+    /** The credited, settled and due amounts of an invoice the caller can see, and its dispute. */
+    Optional<InvoiceBalance> balance(UUID invoiceId, ScopeContext scope);
 }

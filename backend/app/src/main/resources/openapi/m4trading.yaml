@@ -652,6 +652,254 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/invoices/{invoiceId}/dispute:
+
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+
+    post:
+      tags: [Billing]
+      operationId: disputeInvoice
+      summary: The buyer disputes an invoice it received, with a reason
+      description: >
+        Problems: m4.invoice.not_found, m4.invoice.not_buyer, m4.invoice.disputed_already.
+      x-permission: bil.invoice.dispute
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisputeInvoiceRequest'
+      responses:
+        '200':
+          description: The invoice, disputed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/invoices/{invoiceId}/resolve-dispute:
+
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+
+    post:
+      tags: [Billing]
+      operationId: resolveInvoiceDispute
+      summary: The seller or the buyer closes the open dispute of an invoice
+      description: >
+        Problems: m4.invoice.not_found, m4.invoice.not_disputed.
+      x-permission: bil.invoice.dispute
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveInvoiceDisputeRequest'
+      responses:
+        '200':
+          description: The invoice, no longer disputed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/credit-notes:
+
+    post:
+      tags: [Billing]
+      operationId: issueCreditNote
+      summary: The seller credits chosen quantities of lines of its invoice
+      description: >
+        At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead.
+        Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller,
+        m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.qty_invalid,
+        m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueCreditNoteRequest'
+      responses:
+        '201':
+          description: The issued credit note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/credit-notes/{creditNoteId}:
+
+    parameters:
+      - $ref: '#/components/parameters/CreditNoteId'
+
+    get:
+      tags: [Billing]
+      operationId: getCreditNote
+      summary: One credit note the caller's entity issued or received
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The credit note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '404':
+          description: m4.creditnote.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/credit-notes/{creditNoteId}/print:
+
+    parameters:
+      - $ref: '#/components/parameters/CreditNoteId'
+
+    get:
+      tags: [Billing]
+      operationId: getCreditNotePrint
+      summary: A fresh link to the printed A4 copy of the seller's credit note
+      description: >
+        As for the invoice: printed by the worker after the issue (m4.creditnote.print_not_ready
+        until then), stored under the seller, printed by either party through the credit note.
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNotePrintResponse'
+        '404':
+          description: m4.creditnote.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/discrepancies:
+
+    get:
+      tags: [Dispute]
+      operationId: listDiscrepancies
+      summary: The discrepancies the caller's entity raised (BUYER) or that were raised with it (SELLER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The discrepancies, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscrepancyResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+  /v1/trading/discrepancies/{discrepancyId}:
+
+    parameters:
+      - in: path
+        name: discrepancyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Dispute]
+      operationId: getDiscrepancy
+      summary: One discrepancy the caller's entity raised or that was raised with it
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The discrepancy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyResponse'
+        '404':
+          description: m4.discrepancy.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/discrepancies/{discrepancyId}/settle:
+
+    parameters:
+      - in: path
+        name: discrepancyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      tags: [Dispute]
+      operationId: settleDiscrepancy
+      summary: The seller accepts the buyer's count and settles the discrepancy
+      description: >
+        The invoice bills the received quantity, so a short quantity is settled with no money;
+        damaged quantity the invoice charged is credited by a credit note issued in the same act.
+        Asks for a fresh second factor. Problems: m4.discrepancy.not_found,
+        m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettleDiscrepancyRequest'
+      responses:
+        '200':
+          description: The discrepancy, settled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   # @@PATHS@@ (later tickets add their operations above this line)
 
 components:
@@ -677,6 +925,22 @@ components:
     GrnId:
       in: path
       name: grnId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    InvoiceId:
+      in: path
+      name: invoiceId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CreditNoteId:
+      in: path
+      name: creditNoteId
       required: true
       schema:
         type: string
@@ -1220,10 +1484,265 @@ components:
           type: number
         grossAmount:
           type: number
+        creditedAmount:
+          type: number
+          description: What the invoice's credit notes took off it
+        amountDue:
+          type: number
+          description: The gross amount less what was credited and settled
+        disputed:
+          type: boolean
+          description: The buyer disputes the invoice now
+        disputeReason:
+          type: string
+        creditNotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditNoteSummary'
         lines:
           type: array
           items:
             $ref: '#/components/schemas/InvoiceLineResponse'
+
+    CreditNoteSummary:
+      type: object
+      required: [creditNoteId, grossAmount]
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        grossAmount:
+          type: number
+
+    DisputeInvoiceRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    ResolveInvoiceDisputeRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 500
+
+    SettleDiscrepancyRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    IssueCreditNoteRequest:
+      type: object
+      required: [invoiceId, lines, reason]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: Invoice lines and quantities to credit
+          items:
+            $ref: '#/components/schemas/CreditNoteLineRequest'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    CreditNoteLineRequest:
+      type: object
+      required: [invoiceLineId, qty]
+      properties:
+        invoiceLineId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+
+    CreditNoteResponse:
+      type: object
+      required: [creditNoteId, status, invoiceId, sellerEntityId, buyerEntityId, reason, netAmount, taxAmount,
+        grossAmount, lines]
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceDocNumber:
+          type: string
+        discrepancyId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        netAmount:
+          type: number
+        taxAmount:
+          type: number
+        grossAmount:
+          type: number
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditNoteLineResponse'
+
+    CreditNoteLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, qty, unitPrice, taxRatePercent, taxAmount, lineTotal]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        qty:
+          type: number
+        unitPrice:
+          type: number
+        taxRatePercent:
+          type: number
+        taxAmount:
+          type: number
+        lineTotal:
+          type: number
+        invoiceLineId:
+          type: string
+          format: uuid
+
+    CreditNotePrintResponse:
+      type: object
+      required: [creditNoteId, url]
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+
+    DiscrepancyResponse:
+      type: object
+      required: [discrepancyId, status, kind, buyerEntityId, sellerEntityId, grnId, windowEndsAt, lines]
+      properties:
+        discrepancyId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RAISED, SETTLED]
+        kind:
+          type: string
+          enum: [SHORT, OVER, DAMAGED, MIXED]
+        buyerEntityId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        grnId:
+          type: string
+          format: uuid
+        grnDocNumber:
+          type: string
+        deliveryNoteId:
+          type: string
+          format: uuid
+        raisedAt:
+          type: string
+          format: date-time
+        windowEndsAt:
+          type: string
+          format: date-time
+        invoiceId:
+          type: string
+          format: uuid
+          description: The seller's invoice of the GRN, once issued
+        creditNoteId:
+          type: string
+          format: uuid
+          description: >
+            The credit note for damaged quantity the invoice charged, issued at settlement; none
+            when nothing billed needed crediting (a short quantity is never billed)
+        creditNoteDocNumber:
+          type: string
+        settledAt:
+          type: string
+          format: date-time
+        settledByUserId:
+          type: string
+          format: uuid
+        settlementReason:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscrepancyLineResponse'
+
+    DiscrepancyLineResponse:
+      type: object
+      required: [lineId, grnLineId, receivedQty, damagedQty, varianceQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        grnLineId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        expectedQty:
+          type: number
+        receivedQty:
+          type: number
+        damagedQty:
+          type: number
+        varianceQty:
+          type: number
+          description: Received less expected; negative when short
+        unitPrice:
+          type: number
 
     InvoiceLineResponse:
       type: object

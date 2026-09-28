@@ -71,5 +71,21 @@
   "m4.invoice.print.buyer_vat": "வாங்குபவர் VAT எண்",
   "m4.invoice.print.net": "நிகர தொகை",
   "m4.invoice.print.vat": "VAT",
-  "m4.invoice.print.gross": "மொத்தம்"
+  "m4.invoice.print.gross": "மொத்தம்",
+  "m4.invoice.not_buyer": "விலைப்பட்டியலை அதன் வாங்குநர் மட்டுமே மறுக்க முடியும்",
+  "m4.invoice.disputed_already": "விலைப்பட்டியல் ஏற்கனவே மறுக்கப்பட்டுள்ளது",
+  "m4.invoice.not_disputed": "விலைப்பட்டியல் மறுக்கப்படவில்லை",
+  "m4.discrepancy.not_found": "முரண்பாடு கண்டுபிடிக்கப்படவில்லை",
+  "m4.creditnote.not_found": "வரவுக் குறிப்பு கண்டுபிடிக்கப்படவில்லை",
+  "m4.creditnote.not_seller": "விலைப்பட்டியலின் விற்பனையாளர் மட்டுமே அதை வரவு வைக்க முடியும்",
+  "m4.discrepancy.invoice_first": "முதலில் பொருள் பெறுகைக் குறிப்பின் விலைப்பட்டியலை வழங்கவும்: சேதமடைந்த அளவு அதற்கு எதிராக வரவு வைக்கப்படும்",
+  "m4.discrepancy.settled_already": "முரண்பாடு ஏற்கனவே தீர்க்கப்பட்டுள்ளது",
+  "m4.creditnote.line_unknown": "இந்த வரி இந்த விலைப்பட்டியலின் வரி அல்ல",
+  "m4.creditnote.qty_invalid": "பூஜ்ஜியத்தை விட அதிகமாகவும் விலைப்பட்டியல் வரியை விட அதிகமில்லாமலும் வரவு வையுங்கள்",
+  "m4.creditnote.nothing_to_credit": "வரவு வைக்க எதுவும் இல்லை",
+  "m4.creditnote.print_not_ready": "அச்சிடப்பட்ட பிரதி இன்னும் தயாராகவில்லை; சிறிது நேரத்தில் மீண்டும் முயற்சிக்கவும்",
+  "m4.creditnote.print.title": "வரவுக் குறிப்பு",
+  "m4.creditnote.print.invoice": "வரி விலைப்பட்டியல்",
+  "m4.creditnote.print.reason": "காரணம்",
+  "m4.creditnote.print.gross": "வரவு வைக்கப்பட்ட மொத்தம்"
 }

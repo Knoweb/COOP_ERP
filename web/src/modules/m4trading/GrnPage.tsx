@@ -125,7 +125,12 @@ export function GrnPage() {
           },
           { label: t("trading.field.received_on").text, value: g.receivedOn && formatDate(g.receivedOn) },
           { label: t("trading.field.confirmed_at").text, value: g.confirmedAt && formatInstant(g.confirmedAt) },
-          { label: t("trading.field.discrepancy").text, value: g.discrepancyId && t("trading.grn.discrepancy_raised").text }
+          {
+            label: t("trading.field.discrepancy").text,
+            value: g.discrepancyId && (
+              <Link to={`/trading/discrepancies/${g.discrepancyId}`}>{t("trading.grn.discrepancy_raised").text}</Link>
+            )
+          }
         ]}
       />
 

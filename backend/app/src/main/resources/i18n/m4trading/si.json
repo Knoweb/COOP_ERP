@@ -71,5 +71,21 @@
   "m4.invoice.print.buyer_vat": "ගැනුම්කරුගේ වැට් අංකය",
   "m4.invoice.print.net": "ශුද්ධ මුදල",
   "m4.invoice.print.vat": "වැට්",
-  "m4.invoice.print.gross": "මුළු මුදල"
+  "m4.invoice.print.gross": "මුළු මුදල",
+  "m4.invoice.not_buyer": "ඉන්වොයිසියට විරෝධය දැක්විය හැක්කේ එහි ගැනුම්කරුට පමණි",
+  "m4.invoice.disputed_already": "ඉන්වොයිසියට දැනටමත් විරෝධය දක්වා ඇත",
+  "m4.invoice.not_disputed": "ඉන්වොයිසියට විරෝධයක් නැත",
+  "m4.discrepancy.not_found": "විෂමතාව හමු නොවීය",
+  "m4.creditnote.not_found": "බැර සටහන හමු නොවීය",
+  "m4.creditnote.not_seller": "ඉන්වොයිසිය බැර කළ හැක්කේ එහි විකුණුම්කරුට පමණි",
+  "m4.discrepancy.invoice_first": "පළමුව භාණ්ඩ ලැබීම් සටහනේ ඉන්වොයිසිය නිකුත් කරන්න: හානි වූ ප්‍රමාණය බැර කරන්නේ එයට එරෙහිවයි",
+  "m4.discrepancy.settled_already": "විෂමතාව දැනටමත් සමථයට පත් කර ඇත",
+  "m4.creditnote.line_unknown": "පේළිය මෙම ඉන්වොයිසියේ පේළියක් නොවේ",
+  "m4.creditnote.qty_invalid": "බින්දුවට වඩා වැඩි, ඉන්වොයිසි පේළියට නොවැඩි ප්‍රමාණයක් බැර කරන්න",
+  "m4.creditnote.nothing_to_credit": "බැර කිරීමට කිසිවක් නැත",
+  "m4.creditnote.print_not_ready": "මුද්‍රිත පිටපත තවම සූදානම් නැත; මොහොතකින් නැවත උත්සාහ කරන්න",
+  "m4.creditnote.print.title": "බැර සටහන",
+  "m4.creditnote.print.invoice": "බදු ඉන්වොයිසිය",
+  "m4.creditnote.print.reason": "හේතුව",
+  "m4.creditnote.print.gross": "බැර කළ මුළු මුදල"
 }
