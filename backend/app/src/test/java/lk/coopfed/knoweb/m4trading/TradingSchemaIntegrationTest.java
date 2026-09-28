@@ -49,7 +49,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_credit_note", FOLLOWS_HEADER_UPDATED),
             Map.entry("invoice_dispute", TEMPLATE_WITH_PARTY),
             Map.entry("discrepancy_settlement", TEMPLATE_WITH_PARTY),
-            Map.entry("doc_payment_receipt", FOLLOWS_HEADER),
+            Map.entry("doc_payment_receipt", FOLLOWS_HEADER_UPDATED),
             Map.entry("payment_allocation", FOLLOWS_HEADER),
             Map.entry("cheque", FOLLOWS_HEADER),
             Map.entry("cheque_outcome", TEMPLATE_WITH_PARTY),
@@ -72,7 +72,8 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             "doc_grn_line", Set.of("batch_id", "unit_cost"),
             "order_allocation_line", Set.of("fulfilled_qty"),
             "doc_invoice", Set.of("print_object_key", "credited_amount", "settled_amount"),
-            "doc_credit_note", Set.of("print_object_key"));
+            "doc_credit_note", Set.of("print_object_key"),
+            "doc_payment_receipt", Set.of("print_object_key"));
 
     @Test
     void theTradingSchemaHoldsTheTablesOfM401() {

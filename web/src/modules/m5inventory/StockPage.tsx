@@ -70,20 +70,23 @@ export function StockPage() {
               <span>{t("inventory.transfer.link").text}</span>
             </Link>
 
-            <Link className="action-link" to="/inventory/counts">
-              <span>{t("inventory.counts.link").text}</span>
-            </Link>
-
-            <Link className="action-link" to="/inventory/write-offs">
-              <span>{t("inventory.writeoffs.link").text}</span>
-            </Link>
-
-            <Link className="action-link" to="/inventory/repacks">
-              <span>{t("inventory.repacks.link").text}</span>
-            </Link>
           </>
         }
       />
+
+      {/* Stock control, below the header: five links in the header's action column squeezed the
+          title to nothing in Sinhala and Tamil. */}
+      <div className="inventory-control-links">
+        <Link className="action-link" to="/inventory/counts">
+          <span>{t("inventory.counts.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/write-offs">
+          <span>{t("inventory.writeoffs.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/repacks">
+          <span>{t("inventory.repacks.link").text}</span>
+        </Link>
+      </div>
 
       <section className="modern-filter-panel modern-filter-panel--stock">
         <div className="modern-location-picker">

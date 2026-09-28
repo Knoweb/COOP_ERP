@@ -66,11 +66,11 @@ test("an administrator creates a user, gives a role at a location, and the user 
 
   // 5. What the role allows is in the navigation; what it does not is not there at all.
   const nav = own.getByRole("navigation", { name: textOf(clerk, "shell.nav.label") });
-  await expect(nav.getByRole("link", { name: textOf(clerk, "trading.nav") })).toBeVisible();
-  await expect(nav.getByRole("link", { name: textOf(clerk, "reporting.nav") })).toBeVisible();
-  await expect(nav.getByRole("link", { name: textOf(clerk, "pricing.nav") })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: textOf(clerk, "party.nav.users") })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: textOf(clerk, "party.nav.roles") })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: textOf(clerk, "trading.nav"), exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: textOf(clerk, "reporting.nav"), exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: textOf(clerk, "pricing.nav"), exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: textOf(clerk, "party.nav.users"), exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: textOf(clerk, "party.nav.roles"), exact: true })).toHaveCount(0);
 
   // And an address typed by hand is refused by the route guard, not opened.
   await own.goto("/party/users");
@@ -83,8 +83,8 @@ test("the Federation view is shown no administration entry", async ({ page }) =>
   // catalogue and the grants are not, so only "Users" of the administration entries shows.
   await openSignedIn(page, FED_ADMIN, "/party/societies");
   const nav = page.getByRole("navigation", { name: textOf(FED_ADMIN, "shell.nav.label") });
-  await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav") })).toBeVisible();
-  await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav.roles") })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav.grants") })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav"), exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav.roles"), exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav.grants"), exact: true })).toHaveCount(0);
 });
 

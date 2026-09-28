@@ -67,6 +67,8 @@ public class TradeProjection extends Projection {
             Map.entry("credit_note.issued.v1", new String[] {"CREDIT_NOTE", "ISSUED"}),
             Map.entry("payment_receipt.recorded.v1", new String[] {"PAYMENT", "RECORDED"}),
             Map.entry("payment_receipt.reversed.v1", new String[] {"PAYMENT", "REVERSED"}),
+            // Money on account applied later: a row of its own (the application's id), not the receipt's.
+            Map.entry("payment_receipt.applied.v1", new String[] {"PAYMENT", "SETTLED"}),
             Map.entry("cheque.bounced.v1", new String[] {"PAYMENT", "BOUNCED"}),
             Map.entry("cheque.cleared.v1", new String[] {"PAYMENT", "CLEARED"}),
             Map.entry("discrepancy.raised.v1", new String[] {"DISCREPANCY", "RAISED"}),
@@ -207,6 +209,29 @@ public class TradeProjection extends Projection {
                 }
                 row.gross = event.decimal("amount");
                 row.unapplied = event.decimal("unappliedAmount");
+                for (JsonNode settlement : payload.path("settlements")) {
+                    insertSettlement(
+                            row.documentId,
+                            ProjectionEvent.uuid(settlement, "invoiceId"),
+                            "PAYMENT",
+                            owner,
+                            counterparty,
+                            seller,
+                            buyer,
+                            row.businessDate,
+                            ProjectionEvent.decimal(settlement, "amount"),
+                            event);
+                }
+            }
+            case "payment_receipt.applied.v1" -> {
+                row.documentId = event.uuid("applicationId");
+                row.reference = event.uuid("receiptId");
+                if (event.date("appliedOn") != null) {
+                    row.businessDate = event.date("appliedOn");
+                }
+                row.gross = event.decimal("appliedAmount");
+                // What the application took off the receipt's money on account.
+                row.unapplied = row.gross == null ? null : row.gross.negate();
                 for (JsonNode settlement : payload.path("settlements")) {
                     insertSettlement(
                             row.documentId,

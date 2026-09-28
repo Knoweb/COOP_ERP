@@ -176,8 +176,13 @@ public class RecordChequeOutcomeHandler implements Handles<RecordChequeOutcome, 
                 reason);
         List<RecordPaymentReceipt.Settlement> reopened = new ArrayList<>();
         for (Map<String, Object> allocation : jdbc.queryForList(
-                "select invoice_document_id, amount from trading.payment_allocation where receipt_document_id = ?"
-                        + " order by allocation_id",
+                // One row per invoice: money applied later from the account (ApplyPaymentReceipt)
+                // may have settled an invoice the receipt had already part-paid.
+                """
+                select invoice_document_id, sum(amount) as amount from trading.payment_allocation
+                 where receipt_document_id = ?
+                 group by invoice_document_id order by min(allocation_id::text)
+                """,
                 receiptId)) {
             UUID invoiceId = (UUID) allocation.get("invoice_document_id");
             BigDecimal settled = (BigDecimal) allocation.get("amount");

@@ -66,12 +66,15 @@ final class TradeSql {
                                                      on bill.link_kind = 'GRN' and bill.linked_document_id = g.document_id
                                                   where dn.link_kind = 'ORDER' and dn.linked_document_id = a.document_id)), 0)
                   - coalesce((select sum(r.unapplied) from reporting.trade_document_event r
-                               where r.doc_type = 'PAYMENT' and r.event_kind = 'RECORDED'
+                               where r.doc_type = 'PAYMENT' and r.event_kind in ('RECORDED', 'SETTLED')
                                  and r.seller_entity_id = w.seller_entity_id
                                  and r.buyer_entity_id = w.buyer_entity_id
                                  and not exists (select 1 from reporting.trade_document_event x
                                                   where x.doc_type = 'PAYMENT' and x.event_kind = 'REVERSED'
-                                                    and x.reference_document_id = r.document_id)), 0) as exposure
+                                                    and x.reference_document_id
+                                                        = case when r.event_kind = 'SETTLED'
+                                                               then r.reference_document_id
+                                                               else r.document_id end)), 0) as exposure
                from (select distinct on (relationship_id) relationship_id, seller_entity_id, buyer_entity_id,
                             credit_limit, occurred_at as warned_at,
                             min(threshold_percent) over (partition by relationship_id) as threshold_percent

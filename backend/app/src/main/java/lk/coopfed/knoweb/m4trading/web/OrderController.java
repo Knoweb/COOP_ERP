@@ -9,12 +9,14 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.api.AcceptOrder;
+import lk.coopfed.knoweb.m4trading.api.AmendOrder;
 import lk.coopfed.knoweb.m4trading.api.CancelOrder;
 import lk.coopfed.knoweb.m4trading.api.CreateOrder;
 import lk.coopfed.knoweb.m4trading.api.InventoryAvailability;
 import lk.coopfed.knoweb.m4trading.api.RejectOrder;
 import lk.coopfed.knoweb.m4trading.api.SubmitOrder;
 import lk.coopfed.knoweb.m4trading.internal.order.AcceptOrderHandler;
+import lk.coopfed.knoweb.m4trading.internal.order.AmendOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.CancelOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.CreateOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.RejectOrderHandler;
@@ -22,6 +24,7 @@ import lk.coopfed.knoweb.m4trading.internal.order.SubmitOrderHandler;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.OrderView;
 import lk.coopfed.knoweb.m4trading.web.generated.AcceptOrderRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.AmendOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreateOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.DeliveryPointResponse;
@@ -40,6 +43,7 @@ class OrderController implements OrderApi {
     private final CreateOrderHandler create;
     private final SubmitOrderHandler submit;
     private final CancelOrderHandler cancel;
+    private final AmendOrderHandler amend;
     private final AcceptOrderHandler accept;
     private final RejectOrderHandler reject;
     private final OrderQueries queries;
@@ -50,6 +54,7 @@ class OrderController implements OrderApi {
             CreateOrderHandler create,
             SubmitOrderHandler submit,
             CancelOrderHandler cancel,
+            AmendOrderHandler amend,
             AcceptOrderHandler accept,
             RejectOrderHandler reject,
             OrderQueries queries,
@@ -58,6 +63,7 @@ class OrderController implements OrderApi {
         this.create = create;
         this.submit = submit;
         this.cancel = cancel;
+        this.amend = amend;
         this.accept = accept;
         this.reject = reject;
         this.queries = queries;
@@ -95,6 +101,18 @@ class OrderController implements OrderApi {
         ScopeContext scope = currentScope.get();
         cancel.handle(new CancelOrder(orderId, request.getReasonCode(), request.getReasonText()), scope);
         return ResponseEntity.ok(read(orderId, scope));
+    }
+
+    @Override
+    public ResponseEntity<OrderResponse> amendOrder(String idempotencyKey, UUID orderId, AmendOrderRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<CreateOrder.Line> lines = request.getLines().stream()
+                .map(line -> new CreateOrder.Line(line.getSkuId(), line.getUomCode(), line.getQty()))
+                .toList();
+        UUID nextId =
+                amend.handle(new AmendOrder(orderId, request.getRequestedEta(), request.getNotes(), lines), scope);
+        return ResponseEntity.created(URI.create("/v1/trading/orders/" + nextId))
+                .body(read(nextId, scope));
     }
 
     @Override
@@ -162,6 +180,9 @@ class OrderController implements OrderApi {
         response.setNetAmount(order.netAmount());
         response.setNotes(order.notes());
         response.setDeliverToLocationId(order.deliverToLocationId());
+        response.setVersion(order.version());
+        response.setAmendsOrderId(order.amendsOrderId());
+        response.setAmendedByOrderId(order.amendedByOrderId());
         if (order.deliverTo() != null) {
             OrderView.DeliveryPoint point = order.deliverTo();
             DeliveryPointResponse deliverTo = new DeliveryPointResponse(point.code(), point.nameEn());

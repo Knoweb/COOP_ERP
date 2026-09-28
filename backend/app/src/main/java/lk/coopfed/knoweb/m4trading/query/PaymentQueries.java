@@ -15,4 +15,7 @@ public interface PaymentQueries {
 
     /** The receipts (and reversals) that settled part of an invoice, oldest first. */
     List<PaymentReceiptView> receiptsOf(UUID invoiceId, ScopeContext scope);
+
+    /** Where the printed A4 copy of a receipt is; empty until the worker has printed it. */
+    Optional<String> printObjectKey(UUID receiptId, ScopeContext scope);
 }

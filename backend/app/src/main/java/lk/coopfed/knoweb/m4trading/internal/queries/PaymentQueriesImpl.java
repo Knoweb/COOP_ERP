@@ -83,6 +83,22 @@ class PaymentQueriesImpl implements PaymentQueries {
                 invoiceId));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> printObjectKey(UUID receiptId, ScopeContext scope) {
+        if (receiptId == null) {
+            return Optional.empty();
+        }
+        return jdbc
+                .queryForList(
+                        "select print_object_key from trading.doc_payment_receipt where document_id = ?",
+                        String.class,
+                        receiptId)
+                .stream()
+                .filter(key -> key != null)
+                .findFirst();
+    }
+
     private List<PaymentReceiptView> views(List<UUID> ids) {
         List<PaymentReceiptView> views = new ArrayList<>();
         for (UUID id : ids) {

@@ -4,6 +4,7 @@
 
 import { useMemo } from "react";
 import { useApiClient } from "../../shell/api/client";
+import { businessToday, inForce } from "./tradingView";
 import type { components, paths } from "../../generated/m4trading";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
@@ -15,6 +16,8 @@ export type DeliveryPoint = components["schemas"]["DeliveryPointResponse"];
 export type OrderLine = components["schemas"]["OrderLineResponse"];
 export type OrderStatus = components["schemas"]["OrderStatus"];
 export type CreateOrderRequest = components["schemas"]["CreateOrderRequest"];
+export type AmendOrderRequest = components["schemas"]["AmendOrderRequest"];
+export type ApplyPaymentReceiptRequest = components["schemas"]["ApplyPaymentReceiptRequest"];
 export type AllocationOverride = components["schemas"]["AllocationOverride"];
 export type DeliveryNote = components["schemas"]["DeliveryNoteResponse"];
 export type CreateDeliveryNoteRequest = components["schemas"]["CreateDeliveryNoteRequest"];
@@ -151,10 +154,14 @@ export function useTradingApi() {
         return data ?? [];
       },
 
-      /** The ACTIVE relationships in which the caller's entity buys: the sellers it can order from. */
+      /**
+       * The relationships in force today in which the caller's entity buys: the sellers it can
+       * order from. An amendment of the terms (a new credit limit) closes the ACTIVE row and
+       * opens the next, so a pair has one row in force, not one per ACTIVE row.
+       */
       async sellers(): Promise<Relationship[]> {
         const { data } = await party.GET("/v1/party/relationships", { params: { query: { side: "BUYER" } } });
-        return (data ?? []).filter((row) => row.status === "ACTIVE");
+        return (data ?? []).filter((row) => inForce(row, businessToday()));
       },
 
       async relationship(relationshipId: string): Promise<Relationship | null> {
@@ -341,6 +348,32 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/payment-receipts/{receiptId}/cheque-outcome", {
           params: { path: { receiptId }, header: { "Idempotency-Key": key } },
           body: { outcome, reason: reason.trim() === "" ? undefined : reason.trim() }
+        });
+        return data!;
+      },
+
+      /** Money the receipt holds on account settles the buyer's open invoices (oldest first, or those chosen). */
+      async applyPayment(receiptId: string, body: ApplyPaymentReceiptRequest, key: string): Promise<PaymentReceipt> {
+        const { data } = await api.POST("/v1/trading/payment-receipts/{receiptId}/apply", {
+          params: { path: { receiptId }, header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      /** A fresh link to the A4 PDF of the receipt, for its seller or its buyer; refused until the worker printed it. */
+      async paymentPrint(receiptId: string): Promise<string> {
+        const { data } = await api.GET("/v1/trading/payment-receipts/{receiptId}/print", {
+          params: { path: { receiptId } }
+        });
+        return data!.url;
+      },
+
+      /** The buyer amends its undecided order; the answer is the next version (a new order). */
+      async amendOrder(orderId: string, body: AmendOrderRequest, key: string): Promise<Order> {
+        const { data } = await api.POST("/v1/trading/orders/{orderId}/amend", {
+          params: { path: { orderId }, header: { "Idempotency-Key": key } },
+          body
         });
         return data!;
       },

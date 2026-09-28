@@ -17,6 +17,8 @@ export type SocietyStatus = NonNullable<Society["status"]>;
 export type RegisterSocietyRequest = components["schemas"]["RegisterEntityRequest"];
 export type ReasonRequest = components["schemas"]["EntityReasonRequest"];
 export type BulkValidationReport = components["schemas"]["BulkValidationReport"];
+export type Relationship = components["schemas"]["RelationshipResponse"];
+export type AmendTermsRequest = components["schemas"]["AmendTermsRequest"];
 
 export type SocietyFilter = {
   status?: SocietyStatus;
@@ -96,6 +98,32 @@ export function usePartyApi() {
             form.append("file", file, file.name);
             return form;
           }
+        });
+        return data!;
+      },
+
+      /** Every row of the caller's relationships as seller (or buyer): a pair's history is its rows. */
+      async listRelationships(side: "SELLER" | "BUYER"): Promise<Relationship[]> {
+        const { data } = await api.GET("/v1/party/relationships", { params: { query: { side } } });
+        return data ?? [];
+      },
+
+      async getRelationship(relationshipId: string): Promise<Relationship> {
+        const { data } = await api.GET("/v1/party/relationships/{relationshipId}", {
+          params: { path: { relationshipId } }
+        });
+        return data!;
+      },
+
+      /**
+       * AmendRelationshipTerms (21A section 6.1): the answer is the new row. A credit-limit change
+       * also needs bil.creditlimit.change and a fresh second factor; the shell's client takes the
+       * user through the step-up on mfa.required and replays the command.
+       */
+      async amendRelationship(relationshipId: string, body: AmendTermsRequest, idempotencyKey: string): Promise<Relationship> {
+        const { data } = await api.POST("/v1/party/relationships/{relationshipId}/amend", {
+          params: { header: { "Idempotency-Key": idempotencyKey }, path: { relationshipId } },
+          body
         });
         return data!;
       }

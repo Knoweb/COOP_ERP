@@ -52,7 +52,9 @@ class OrderQueriesImpl implements OrderQueries {
                 """
                 select o.document_id, o.relationship_id, o.buyer_entity_id, o.seller_entity_id, o.requested_eta,
                        o.deliver_to_location_id, o.deliver_to_code, o.deliver_to_name_en, o.deliver_to_name_si,
-                       o.deliver_to_name_ta, o.deliver_to_address,
+                       o.deliver_to_name_ta, o.deliver_to_address, o.version, o.amends_order_id,
+                       (select n.document_id from trading.doc_order n where n.amends_order_id = o.document_id)
+                           as amended_by,
                        a.status as allocation_status, a.committed_eta, a.lock_at, a.reason_code
                   from trading.doc_order o
                   left join trading.order_allocation a on a.order_id = o.document_id
@@ -144,7 +146,10 @@ class OrderQueriesImpl implements OrderQueries {
                 header.notes(),
                 lines,
                 (UUID) row.get("deliver_to_location_id"),
-                deliveryPoint(row));
+                deliveryPoint(row),
+                ((Number) row.get("version")).intValue(),
+                (UUID) row.get("amends_order_id"),
+                (UUID) row.get("amended_by"));
     }
 
     /** The delivery point the order was drafted for (V0004); null for an order that names none. */

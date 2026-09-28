@@ -51,13 +51,20 @@ public class OrderGuards {
         return order;
     }
 
-    /** The relationship the order was drafted under, still ACTIVE today (M1). */
+    /**
+     * The relationship of the order's seller and buyer in force today (M1 LookupRelationship),
+     * ACTIVE. The order names the row it was drafted under; an amendment of the terms (a new
+     * credit limit, say) closes that row and opens the next one (21A section 6.1), and the pair
+     * still trades, so the order is judged by the row in force today, not by the row it names.
+     * Accepted on the architect's delegation, 29 September 2026: a limit change must not strand
+     * the open orders of the pair.
+     */
     public RelationshipView activeRelationship(UUID relationshipId, ScopeContext scope) {
         return relationships
                 .getRelationship(relationshipId, scope)
+                .flatMap(drafted -> relationships.lookupRelationship(
+                        drafted.sellerEntityId(), drafted.buyerEntityId(), clock.today(), scope))
                 .filter(row -> "ACTIVE".equals(row.status()))
-                .filter(row -> !clock.today().isBefore(row.effectiveFrom())
-                        && (row.effectiveTo() == null || !clock.today().isAfter(row.effectiveTo())))
                 .orElseThrow(() -> new ProblemException("m4.order.relationship_inactive"));
     }
 }

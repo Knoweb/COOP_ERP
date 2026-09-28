@@ -181,7 +181,7 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
             }
             remaining.put(line.skuId(), stock.subtract(allocated));
             BigDecimal tierPrice = pricing.resolve(
-                            relationshipId,
+                            relationship.relationshipId(), // the terms in force today (OrderGuards)
                             scope.entityId(),
                             buyer,
                             line.skuId(),
@@ -265,7 +265,13 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
         events.publish(new OrderAllocated(orderId, runId, scope.entityId(), buyer, List.copyOf(summary)));
         if (crossed != null) {
             events.publish(new ExposureWarning(
-                    relationshipId, scope.entityId(), buyer, now.amount(), now.creditLimit(), crossed, orderId));
+                    relationship.relationshipId(),
+                    scope.entityId(),
+                    buyer,
+                    now.amount(),
+                    now.creditLimit(),
+                    crossed,
+                    orderId));
         }
         return runId;
     }
