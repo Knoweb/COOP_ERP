@@ -17,7 +17,8 @@ import { errorText } from "./tradingView";
  * One payment receipt (24A section 8, "Receipt book and matching"; M4-07): what the seller
  * received, how, what it settled of each invoice and what stays on account. Both parties read it;
  * the seller's accounts record a cheque's outcome, and a bounced cheque shows the reversal that
- * reopened the invoices. On screen only: the A4 print of a receipt follows later.
+ * reopened the invoices. Print opens the A4 PDF the worker printed (as for the invoice); the seller's
+ * accounts apply what the receipt holds on account to the buyer's open invoices, oldest first.
  */
 export function PaymentPage() {
   const { receiptId = "" } = useParams();
@@ -30,7 +31,36 @@ export function PaymentPage() {
   const [reason, setReason] = useState("");
   const key = useIdempotencyKey();
 
+  const applyKey = useIdempotencyKey();
   const receipt = useQuery({ queryKey: ["trading", "payment", receiptId], queryFn: () => api.payment(receiptId) });
+  // ApplyReceipt (24A section 6.3): what the receipt holds on account settles the open invoices, oldest first.
+  const apply = useMutation({
+    mutationFn: () => api.applyPayment(receiptId, {}, applyKey.current()),
+    onSuccess: () => {
+      applyKey.next();
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        applyKey.next();
+      }
+    }
+  });
+  const print = useMutation({ mutationFn: () => api.paymentPrint(receiptId) });
+  // The tab is opened in the click itself, so a popup blocker lets it through (as InvoicePage).
+  const openPrint = () => {
+    const tab = window.open("about:blank", "_blank");
+    print.mutate(undefined, {
+      onSuccess: (url) => {
+        if (tab) {
+          tab.location.href = url;
+        } else {
+          window.location.assign(url);
+        }
+      },
+      onError: () => tab?.close()
+    });
+  };
   const outcome = useMutation({
     mutationFn: (value: "CLEARED" | "BOUNCED") => api.chequeOutcome(receiptId, value, reason, key.current()),
     onSuccess: () => {
@@ -96,6 +126,22 @@ export function PaymentPage() {
         ]}
       />
 
+      <section className="trading-filter-bar">
+        {prc.status !== "REVERSAL" && (
+          <button type="button" disabled={print.isPending} onClick={openPrint}>
+            {t("trading.payment.print").text}
+          </button>
+        )}
+        {canRecord && isSeller && prc.status === "RECORDED" && prc.unappliedAmount > 0 && (
+          <button type="button" disabled={apply.isPending} onClick={() => apply.mutate()}>
+            {t("trading.payment.apply").text}
+          </button>
+        )}
+      </section>
+      {print.isError && <p role="alert">{errorText(print.error, t("trading.error.generic").text)}</p>}
+      {apply.isError && <p role="alert">{errorText(apply.error, t("trading.error.generic").text)}</p>}
+      {apply.isSuccess && <p role="status">{t("trading.payment.applied").text}</p>}
+
       {cheque && (
         <section className="trading-section">
           <h2>{t("trading.payment.cheque").text}</h2>
@@ -148,8 +194,8 @@ export function PaymentPage() {
               </tr>
             </thead>
             <tbody>
-              {prc.allocations.map((allocation) => (
-                <tr key={allocation.invoiceId}>
+              {prc.allocations.map((allocation, index) => (
+                <tr key={`${allocation.invoiceId}-${index}`}>
                   <td>
                     <Link to={`/trading/invoices/${allocation.invoiceId}`}>{allocation.invoiceNumber ?? t("trading.invoice.title").text}</Link>
                   </td>

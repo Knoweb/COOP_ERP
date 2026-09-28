@@ -159,3 +159,18 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: The cheque of a payment receipt bounced; the receipt is reversed and its invoices reopen
+
+  - code: ORDER_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: The buyer amended its order before the seller decided it; the next version replaces it
+
+  - code: PAYMENT_RECEIPT_APPLIED
+    severity: INFO
+    offline_capturable: false
+    description_en: Money a payment receipt held on the buyer's account applied to later invoices
+
+  - code: PAYMENT_RECEIPT_PRINTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The A4 copy of a recorded payment receipt stored for printing

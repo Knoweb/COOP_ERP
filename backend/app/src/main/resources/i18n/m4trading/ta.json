@@ -102,5 +102,22 @@
   "m4.creditnote.print.title": "வரவுக் குறிப்பு",
   "m4.creditnote.print.invoice": "வரி விலைப்பட்டியல்",
   "m4.creditnote.print.reason": "காரணம்",
-  "m4.creditnote.print.gross": "வரவு வைக்கப்பட்ட மொத்தம்"
+  "m4.creditnote.print.gross": "வரவு வைக்கப்பட்ட மொத்தம்",
+  "m4.order.not_amendable": "ஆர்டரை இனி திருத்த முடியாது: விற்பனையாளர் ஏற்கனவே முடிவு செய்துவிட்டார்",
+  "m4.payment.not_recorded": "இந்த ரசீது திருப்பப்பட்டது; அதிலிருந்து எதையும் பயன்படுத்த முடியாது",
+  "m4.payment.nothing_on_account": "இந்த ரசீதிலிருந்து கணக்கில் எதுவும் மீதமில்லை",
+  "m4.payment.exceeds_on_account": "தேர்ந்தெடுத்த தொகைகள் ரசீது கணக்கில் வைத்திருப்பதை விட அதிகம்",
+  "m4.payment.nothing_to_apply": "பணத்தைப் பயன்படுத்த வாங்குநருக்குத் திறந்த விலைப்பட்டியல் இல்லை",
+  "m4.payment.print_not_ready": "அச்சிட்ட நகல் இன்னும் தயாராகவில்லை; சிறிது நேரத்தில் மீண்டும் முயற்சிக்கவும்",
+  "m4.payment.print.title": "கட்டண ரசீது",
+  "m4.payment.print.method": "செலுத்திய முறை",
+  "m4.payment.print.method.CASH": "பணம்",
+  "m4.payment.print.method.CHEQUE": "காசோலை",
+  "m4.payment.print.method.TRANSFER": "வங்கிப் பரிமாற்றம்",
+  "m4.payment.print.method.DEPOSIT": "வைப்பு",
+  "m4.payment.print.reference": "குறிப்பு",
+  "m4.payment.print.cheque": "காசோலை",
+  "m4.payment.print.settles": "வரி விலைப்பட்டியலைத் தீர்க்கிறது",
+  "m4.payment.print.on_account": "கணக்கில் வைக்கப்பட்டது",
+  "m4.payment.print.amount": "பெறப்பட்ட தொகை"
 }

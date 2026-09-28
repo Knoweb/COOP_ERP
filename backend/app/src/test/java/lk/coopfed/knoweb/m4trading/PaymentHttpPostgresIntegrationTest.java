@@ -173,6 +173,42 @@ class PaymentHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void moneyOnAccountIsAppliedToALaterInvoiceAndTheReceiptPrintIsNotReadyWithoutTheWorker() {
+        invoiced();
+        ResponseEntity<JsonNode> recorded = post(
+                "/v1/trading/payment-receipts",
+                Map.of("buyerEntityId", BUYER.toString(), "method", "TRANSFER", "amount", 2000.00));
+        assertThat(recorded.getStatusCode())
+                .as(String.valueOf(recorded.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        String receiptId = recorded.getBody().get("receiptId").asText();
+        assertThat(recorded.getBody().get("unappliedAmount").decimalValue()).isEqualByComparingTo("264.00");
+        UUID later = invoiced();
+
+        ResponseEntity<JsonNode> applied = post("/v1/trading/payment-receipts/" + receiptId + "/apply", Map.of());
+        assertThat(applied.getStatusCode())
+                .as(String.valueOf(applied.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(applied.getBody().get("unappliedAmount").decimalValue()).isEqualByComparingTo("0");
+        assertThat(applied.getBody().get("allocations")).hasSize(2);
+        JsonNode invoice =
+                get("/v1/trading/invoices/" + later, BUYER_USER, BUYER).getBody();
+        assertThat(invoice.get("paymentState").asText()).isEqualTo("PART_PAID");
+
+        ResponseEntity<JsonNode> again = post("/v1/trading/payment-receipts/" + receiptId + "/apply", Map.of());
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(String.valueOf(again.getBody())).contains("m4.payment.nothing_on_account");
+
+        // No worker renders in this test: both parties are told the copy is not ready yet.
+        ResponseEntity<JsonNode> print = get("/v1/trading/payment-receipts/" + receiptId + "/print", BUYER_USER, BUYER);
+        assertThat(print.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(String.valueOf(print.getBody())).contains("m4.payment.print_not_ready");
+        ResponseEntity<JsonNode> stranger =
+                get("/v1/trading/payment-receipts/" + receiptId + "/print", UUID.randomUUID(), STRANGER);
+        assertThat(String.valueOf(stranger.getBody())).contains("m4.payment.not_found");
+    }
+
+    @Test
     void theShapeOfAPaymentIsTheSlicesToRefuse() {
         ResponseEntity<JsonNode> noAmount =
                 post("/v1/trading/payment-receipts", Map.of("buyerEntityId", BUYER.toString(), "method", "CASH"));

@@ -102,5 +102,22 @@
   "m4.creditnote.print.title": "Credit note",
   "m4.creditnote.print.invoice": "Tax invoice",
   "m4.creditnote.print.reason": "Reason",
-  "m4.creditnote.print.gross": "Total credited"
+  "m4.creditnote.print.gross": "Total credited",
+  "m4.order.not_amendable": "The order can no longer be amended: the seller has already decided it",
+  "m4.payment.not_recorded": "This receipt was reversed; nothing on it can be applied",
+  "m4.payment.nothing_on_account": "Nothing of this receipt is left on account",
+  "m4.payment.exceeds_on_account": "The amounts chosen are more than the receipt holds on account",
+  "m4.payment.nothing_to_apply": "The buyer has no open invoice to apply the money to",
+  "m4.payment.print_not_ready": "The printed copy is not ready yet; try again in a moment",
+  "m4.payment.print.title": "Payment receipt",
+  "m4.payment.print.method": "Paid by",
+  "m4.payment.print.method.CASH": "Cash",
+  "m4.payment.print.method.CHEQUE": "Cheque",
+  "m4.payment.print.method.TRANSFER": "Bank transfer",
+  "m4.payment.print.method.DEPOSIT": "Deposit",
+  "m4.payment.print.reference": "Reference",
+  "m4.payment.print.cheque": "Cheque",
+  "m4.payment.print.settles": "Settles tax invoice",
+  "m4.payment.print.on_account": "Held on account",
+  "m4.payment.print.amount": "Amount received"
 }

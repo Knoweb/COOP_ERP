@@ -18,6 +18,9 @@ import java.util.UUID;
  * @param deliverTo what the buyer's delivery location was called when the order was drafted,
  *     copied in the buyer's session (V0004), so the seller, who may not read the buyer's
  *     locations, reads its name too; null when the order names no location
+ * @param version 1, or the version of an amendment (AmendOrder: each amendment is a new order)
+ * @param amendsOrderId the order this version amends; null for a first version
+ * @param amendedByOrderId the next version, when the buyer amended this order; null otherwise
  */
 public record OrderView(
         UUID orderId,
@@ -35,7 +38,10 @@ public record OrderView(
         String notes,
         List<OrderLineView> lines,
         UUID deliverToLocationId,
-        DeliveryPoint deliverTo) {
+        DeliveryPoint deliverTo,
+        int version,
+        UUID amendsOrderId,
+        UUID amendedByOrderId) {
 
     /** A location as the order names it: a snapshot taken at drafting, never changed after. */
     public record DeliveryPoint(String code, String nameEn, String nameSi, String nameTa, String address) {}

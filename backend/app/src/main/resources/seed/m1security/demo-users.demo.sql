@@ -81,10 +81,12 @@ WITH job (role_id, codes) AS (
             'trd.document.view', 'ord.order.accept', 'del.note.draft', 'del.note.issue', 'cat.sku.view', 'gov.entity.view', 'prt.location.view',
             'prt.relationship.view', 'prc.pricelist.view', 'inv.stock.view',
             'rpt.report.run', 'rpt.export.run']),
-        -- Federation accounts: invoices, and the second signature on the opening balance
+        -- Federation accounts: invoices, payments, the credit limit of each buyer (21A: an amendment
+        -- of the terms with bil.creditlimit.change), and the second signature on the opening balance
         ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.creditnote.issue', 'bil.debitnote.issue',
             'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
+            'prt.relationship.amend', 'bil.creditlimit.change',
             'prt.relationship.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         -- Federation administration (phase 4, docs/demo/07): the society register (register,
@@ -118,11 +120,13 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
             'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY[
             'trd.document.view', 'bil.invoice.issue', 'bil.invoice.dispute', 'bil.payment.record',
             'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view', 'prt.relationship.view',
+            'prt.relationship.amend', 'bil.creditlimit.change',
             'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
         -- society buyer

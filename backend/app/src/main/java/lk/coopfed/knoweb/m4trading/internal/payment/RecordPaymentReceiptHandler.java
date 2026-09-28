@@ -2,8 +2,6 @@ package lk.coopfed.knoweb.m4trading.internal.payment;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +29,6 @@ import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingDocuments;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingGuards;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingSeries;
-import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceDisputes;
 import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceSettlements;
 import lk.coopfed.knoweb.m4trading.internal.posting.PostingMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -71,7 +68,7 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
     private final TradingSeries series;
     private final RelationshipQueries relationships;
     private final InvoiceSettlements settlements;
-    private final InvoiceDisputes disputes;
+    private final SettlementPlanner planner;
     private final PostingMapper postings;
     private final TradingClock clock;
     private final AuditFacade audit;
@@ -85,7 +82,7 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
             TradingSeries series,
             RelationshipQueries relationships,
             InvoiceSettlements settlements,
-            InvoiceDisputes disputes,
+            SettlementPlanner planner,
             PostingMapper postings,
             TradingClock clock,
             AuditFacade audit,
@@ -96,7 +93,7 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
         this.series = series;
         this.relationships = relationships;
         this.settlements = settlements;
-        this.disputes = disputes;
+        this.planner = planner;
         this.postings = postings;
         this.clock = clock;
         this.audit = audit;
@@ -141,8 +138,8 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
                 .orElseThrow(() -> new ProblemException("m4.payment.no_relationship"));
 
         List<RecordPaymentReceipt.Settlement> applied = command.settlements().isEmpty()
-                ? oldestFirst(seller, buyer, amount)
-                : chosen(command.settlements(), seller, buyer, amount);
+                ? planner.oldestFirst(seller, buyer, amount)
+                : planner.chosen(command.settlements(), seller, buyer, amount, "m4.payment.exceeds_receipt");
         BigDecimal sum =
                 applied.stream().map(RecordPaymentReceipt.Settlement::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal unapplied = amount.subtract(sum);
@@ -220,77 +217,6 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
                 unapplied));
         events.publish(new JournalPostingsReady(receiptId, PRC, issued.docNumberDisplay(), seller, journal));
         return receiptId;
-    }
-
-    /** The buyer's open, undisputed invoices of this seller, oldest first, each settled as far as the amount goes. */
-    private List<RecordPaymentReceipt.Settlement> oldestFirst(UUID seller, UUID buyer, BigDecimal amount) {
-        List<RecordPaymentReceipt.Settlement> applied = new ArrayList<>();
-        BigDecimal left = amount;
-        for (UUID invoiceId : jdbc.queryForList(
-                """
-                select document_id from trading.doc_invoice
-                 where seller_entity_id = ? and buyer_entity_id = ?
-                 order by tax_point_date, document_id
-                """,
-                UUID.class,
-                seller,
-                buyer)) {
-            if (left.signum() <= 0) {
-                break;
-            }
-            DocumentRecord invoice = documents.findById(invoiceId).orElse(null);
-            if (invoice == null || !invoice.isIssued() || disputes.isDisputed(invoiceId)) {
-                continue;
-            }
-            documents.lockForLinking(invoiceId);
-            BigDecimal due = settlements.amountDue(invoiceId);
-            if (due.signum() <= 0) {
-                continue;
-            }
-            BigDecimal take = due.min(left);
-            applied.add(new RecordPaymentReceipt.Settlement(invoiceId, take));
-            left = left.subtract(take);
-        }
-        return applied;
-    }
-
-    /** The settlements the accounts chose, each checked against its invoice. */
-    private List<RecordPaymentReceipt.Settlement> chosen(
-            List<RecordPaymentReceipt.Settlement> wanted, UUID seller, UUID buyer, BigDecimal amount) {
-        Set<UUID> seen = new HashSet<>();
-        BigDecimal sum = BigDecimal.ZERO;
-        for (RecordPaymentReceipt.Settlement settlement : wanted) {
-            if (settlement == null || settlement.invoiceId() == null || !seen.add(settlement.invoiceId())) {
-                throw new ProblemException("m4.payment.invoice_invalid");
-            }
-            UUID invoiceId = settlement.invoiceId();
-            DocumentRecord invoice = documents
-                    .findById(invoiceId)
-                    .filter(document -> "INV".equals(document.docTypeCode()))
-                    .orElseThrow(() -> new ProblemException("m4.invoice.not_found"));
-            if (!seller.equals(invoice.ownerEntityId()) || !buyer.equals(invoice.counterpartyEntityId())) {
-                throw new ProblemException("m4.payment.invoice_not_ours", Map.of("invoiceId", invoiceId));
-            }
-            if (!invoice.isIssued()) {
-                throw new ProblemException("m4.invoice.not_issued");
-            }
-            if (settlement.amount() == null
-                    || settlement.amount().signum() <= 0
-                    || settlement.amount().scale() > 2) {
-                throw new ProblemException("m4.payment.amount_invalid");
-            }
-            documents.lockForLinking(invoiceId);
-            BigDecimal due = settlements.amountDue(invoiceId);
-            if (settlement.amount().compareTo(due) > 0) {
-                throw new ProblemException(
-                        "m4.payment.exceeds_due", Map.of("invoiceId", invoiceId, "due", due.toPlainString()));
-            }
-            sum = sum.add(settlement.amount());
-        }
-        if (sum.compareTo(amount) > 0) {
-            throw new ProblemException("m4.payment.exceeds_receipt");
-        }
-        return List.copyOf(wanted);
     }
 
     /** The one line of a receipt: no item, quantity one, the amount as its total (a reversal's negated). */

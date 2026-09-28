@@ -210,6 +210,45 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/orders/{orderId}/amend:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    post:
+      tags: [Order]
+      operationId: amendOrder
+      summary: The buyer amends its order before the seller decides it; the answer is the next version
+      description: >
+        The lines (the whole set), their quantities and the requested delivery date. The next
+        version is a new order that names the one it amends; the amended order is CANCELLED
+        (reason ORDER_AMENDED). A submitted order's next version is submitted at once and the
+        seller accepts it afresh. Problems: m4.order.not_found, m4.order.not_buyer,
+        m4.order.not_amendable, m4.order.relationship_inactive, m4.order.eta_past,
+        m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
+        m4.order.uom_invalid, m4.order.qty_not_positive.
+      x-permission: ord.order.submit
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendOrderRequest'
+      responses:
+        '201':
+          description: The next version of the order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/trading/orders/{orderId}/accept:
 
     parameters:
@@ -1014,6 +1053,69 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/payment-receipts/{receiptId}/apply:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    post:
+      tags: [Payment]
+      operationId: applyPaymentReceipt
+      summary: The seller applies money a receipt left on account to the buyer's later open invoices
+      description: >
+        With no settlements the money on account settles the buyer's open, undisputed invoices
+        oldest first; with settlements, each chosen invoice as the payment form does. The
+        allocation rows belong to the receipt, so a bounced cheque reverses them too. Problems:
+        m4.payment.not_found, m4.payment.not_seller, m4.payment.not_recorded,
+        m4.payment.nothing_on_account, m4.payment.invoice_invalid, m4.invoice.not_found,
+        m4.payment.invoice_not_ours, m4.invoice.not_issued, m4.payment.amount_invalid,
+        m4.payment.exceeds_due, m4.payment.exceeds_on_account, m4.payment.nothing_to_apply.
+      x-permission: bil.payment.record
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPaymentReceiptRequest'
+      responses:
+        '200':
+          description: The receipt, with what it now settles and what is left on account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}/print:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    get:
+      tags: [Payment]
+      operationId: getPaymentReceiptPrint
+      summary: A fresh link to the printed A4 copy of the seller's payment receipt
+      description: >
+        As for the invoice: printed by the worker after the receipt is recorded
+        (m4.payment.print_not_ready until then), stored under the seller, printed by either
+        party through the receipt.
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptPrintResponse'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/trading/exposures:
 
     get:
@@ -1143,6 +1245,23 @@ components:
           items:
             $ref: '#/components/schemas/OrderLineRequest'
 
+    AmendOrderRequest:
+      type: object
+      required: [lines]
+      properties:
+        requestedEta:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 500
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/OrderLineRequest'
+
     OrderLineRequest:
       type: object
       required: [skuId, qty]
@@ -1203,6 +1322,17 @@ components:
           format: uuid
         deliverTo:
           $ref: '#/components/schemas/DeliveryPointResponse'
+        version:
+          description: 1, or the version of an amendment (each amendment is a new order)
+          type: integer
+        amendsOrderId:
+          description: The order this version amends
+          type: string
+          format: uuid
+        amendedByOrderId:
+          description: The next version, when the buyer amended this order
+          type: string
+          format: uuid
         lines:
           type: array
           items:
@@ -2000,6 +2130,27 @@ components:
           description: Chosen invoices and amounts; left out, the open invoices are settled oldest first
           items:
             $ref: '#/components/schemas/SettlementRequest'
+
+    ApplyPaymentReceiptRequest:
+      type: object
+      properties:
+        settlements:
+          type: array
+          maxItems: 200
+          description: Chosen invoices and amounts; left out, the open invoices are settled oldest first
+          items:
+            $ref: '#/components/schemas/SettlementRequest'
+
+    PaymentReceiptPrintResponse:
+      type: object
+      required: [receiptId, url]
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
 
     ChequeRequest:
       type: object

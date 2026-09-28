@@ -102,5 +102,22 @@
   "m4.creditnote.print.title": "බැර සටහන",
   "m4.creditnote.print.invoice": "බදු ඉන්වොයිසිය",
   "m4.creditnote.print.reason": "හේතුව",
-  "m4.creditnote.print.gross": "බැර කළ මුළු මුදල"
+  "m4.creditnote.print.gross": "බැර කළ මුළු මුදල",
+  "m4.order.not_amendable": "ඇණවුම තවදුරටත් සංශෝධනය කළ නොහැක: විකුණුම්කරු දැනටමත් තීරණය කර ඇත",
+  "m4.payment.not_recorded": "මෙම රිසිට්පත ආපසු හරවා ඇත; එහි කිසිවක් යෙදිය නොහැක",
+  "m4.payment.nothing_on_account": "මෙම රිසිට්පතෙන් ගිණුමේ කිසිවක් ඉතිරි නැත",
+  "m4.payment.exceeds_on_account": "තෝරාගත් මුදල් රිසිට්පත ගිණුමේ තබා ඇති මුදලට වඩා වැඩිය",
+  "m4.payment.nothing_to_apply": "මුදල යෙදීමට ගැනුම්කරුට විවෘත ඉන්වොයිසියක් නැත",
+  "m4.payment.print_not_ready": "මුද්‍රිත පිටපත තවම සූදානම් නැත; මොහොතකින් නැවත උත්සාහ කරන්න",
+  "m4.payment.print.title": "ගෙවීම් රිසිට්පත",
+  "m4.payment.print.method": "ගෙවූ ක්‍රමය",
+  "m4.payment.print.method.CASH": "මුදල්",
+  "m4.payment.print.method.CHEQUE": "චෙක්පත",
+  "m4.payment.print.method.TRANSFER": "බැංකු හුවමාරුව",
+  "m4.payment.print.method.DEPOSIT": "තැන්පතුව",
+  "m4.payment.print.reference": "යොමුව",
+  "m4.payment.print.cheque": "චෙක්පත",
+  "m4.payment.print.settles": "බදු ඉන්වොයිසිය පියවයි",
+  "m4.payment.print.on_account": "ගිණුමේ තබා ඇත",
+  "m4.payment.print.amount": "ලැබුණු මුදල"
 }

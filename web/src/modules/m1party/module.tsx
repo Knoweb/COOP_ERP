@@ -10,6 +10,8 @@ import { BulkRegisterPage } from "./BulkRegisterPage";
 import { GrantsPage } from "./GrantsPage";
 import { NewUserPage } from "./NewUserPage";
 import { RegisterSocietyPage } from "./RegisterSocietyPage";
+import { RelationshipPage } from "./RelationshipPage";
+import { RelationshipsPage } from "./RelationshipsPage";
 import { RolesPage } from "./RolesPage";
 import { SocietyCardPage } from "./SocietyCardPage";
 import { SocietyRegisterPage } from "./SocietyRegisterPage";
@@ -25,6 +27,8 @@ export const SOCIETY_PERMISSIONS = ["gov.entity.view", "gov.entity.register", "g
 export const USER_PERMISSIONS = ["gov.user.view", "gov.user.manage"];
 export const ROLE_PERMISSIONS = ["gov.role.manage"];
 export const GRANT_PERMISSIONS = ["gov.external.grant"];
+// The seller's people who change terms (21A): pricing amends them, accounts change the credit limit.
+export const RELATIONSHIP_PERMISSIONS = ["prt.relationship.amend"];
 
 const guard = (anyOf: string[], page: ReactElement) => <RequirePermission anyOf={anyOf}>{page}</RequirePermission>;
 
@@ -43,7 +47,9 @@ export const partyModule: ModuleDefinition = {
     { path: "party/users/new", element: guard(["gov.user.manage"], <NewUserPage />) },
     { path: "party/users/:userId", element: guard(USER_PERMISSIONS, <UserCardPage />) },
     { path: "party/roles", element: guard(ROLE_PERMISSIONS, <RolesPage />) },
-    { path: "party/grants", element: guard(GRANT_PERMISSIONS, <GrantsPage />) }
+    { path: "party/grants", element: guard(GRANT_PERMISSIONS, <GrantsPage />) },
+    { path: "party/relationships", element: guard(RELATIONSHIP_PERMISSIONS, <RelationshipsPage />) },
+    { path: "party/relationships/:relationshipId", element: guard(RELATIONSHIP_PERMISSIONS, <RelationshipPage />) }
   ],
 
   // The labels are message ids of party.messages.json, never literal text.
@@ -51,10 +57,17 @@ export const partyModule: ModuleDefinition = {
     { labelId: "party.nav", to: "/party/societies", requiredPermissions: SOCIETY_PERMISSIONS },
     { labelId: "party.nav.users", to: "/party/users", requiredPermissions: USER_PERMISSIONS },
     { labelId: "party.nav.roles", to: "/party/roles", requiredPermissions: ROLE_PERMISSIONS },
-    { labelId: "party.nav.grants", to: "/party/grants", requiredPermissions: GRANT_PERMISSIONS }
+    { labelId: "party.nav.grants", to: "/party/grants", requiredPermissions: GRANT_PERMISSIONS },
+    { labelId: "party.nav.relationships", to: "/party/relationships", requiredPermissions: RELATIONSHIP_PERMISSIONS }
   ],
 
   // Every code any screen of the module uses: a user with at least one sees the module; each
   // entry and page then narrows to its own group.
-  requiredPermissions: [...SOCIETY_PERMISSIONS, ...USER_PERMISSIONS, ...ROLE_PERMISSIONS, ...GRANT_PERMISSIONS]
+  requiredPermissions: [
+    ...SOCIETY_PERMISSIONS,
+    ...USER_PERMISSIONS,
+    ...ROLE_PERMISSIONS,
+    ...GRANT_PERMISSIONS,
+    ...RELATIONSHIP_PERMISSIONS
+  ]
 };

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import messages from "./trading.messages.json" with { type: "json" };
 import type { Order, OrderLine } from "./tradingApi";
 import {
+  amendReady,
+  amendRequest,
+  inForce,
   businessToday,
   canDeliver,
   countReady,
@@ -244,5 +247,26 @@ describe("payments and exposure (M4-07, M4-09)", () => {
     expect(receiptChip("RECORDED")).toBe("issued");
     expect(receiptChip("REVERSED")).toBe("void");
     expect(receiptChip("REVERSAL")).toBe("void");
+  });
+});
+
+describe("amending an order and the relationship in force", () => {
+  it("keeps one relationship row per pair in force, not every ACTIVE row", () => {
+    const closed = { status: "ACTIVE", effectiveFrom: "2026-01-01", effectiveTo: "2026-09-28" };
+    const next = { status: "ACTIVE", effectiveFrom: "2026-09-29", effectiveTo: null };
+    expect(inForce(closed, "2026-09-29")).toBe(false);
+    expect(inForce(next, "2026-09-29")).toBe(true);
+    expect(inForce({ ...next, status: "SUSPENDED" }, "2026-09-29")).toBe(false);
+  });
+
+  it("sends the whole set of lines, a line at zero dropped, and refuses an order with none", () => {
+    const rows = [
+      { skuId: "a", uomCode: "EA", qty: "0" },
+      { skuId: "b", uomCode: "KG", qty: "2.5" }
+    ];
+    expect(amendReady(rows)).toBe(true);
+    expect(amendReady([{ skuId: "a", uomCode: "EA", qty: "0" }])).toBe(false);
+    expect(amendReady([{ skuId: "a", uomCode: "EA", qty: "" }])).toBe(false);
+    expect(amendRequest(rows, "")).toEqual({ requestedEta: undefined, notes: undefined, lines: [{ skuId: "b", uomCode: "KG", qty: 2.5 }] });
   });
 });

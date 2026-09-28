@@ -108,6 +108,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/orders/{orderId}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer amends its order before the seller decides it; the answer is the next version
+         * @description The lines (the whole set), their quantities and the requested delivery date. The next version is a new order that names the one it amends; the amended order is CANCELLED (reason ORDER_AMENDED). A submitted order's next version is submitted at once and the seller accepts it afresh. Problems: m4.order.not_found, m4.order.not_buyer, m4.order.not_amendable, m4.order.relationship_inactive, m4.order.eta_past, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
+         */
+        post: operations["amendOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/orders/{orderId}/accept": {
         parameters: {
             query?: never;
@@ -585,6 +607,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/payment-receipts/{receiptId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller applies money a receipt left on account to the buyer's later open invoices
+         * @description With no settlements the money on account settles the buyer's open, undisputed invoices oldest first; with settlements, each chosen invoice as the payment form does. The allocation rows belong to the receipt, so a bounced cheque reverses them too. Problems: m4.payment.not_found, m4.payment.not_seller, m4.payment.not_recorded, m4.payment.nothing_on_account, m4.payment.invoice_invalid, m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued, m4.payment.amount_invalid, m4.payment.exceeds_due, m4.payment.exceeds_on_account, m4.payment.nothing_to_apply.
+         */
+        post: operations["applyPaymentReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's payment receipt
+         * @description As for the invoice: printed by the worker after the receipt is recorded (m4.payment.print_not_ready until then), stored under the seller, printed by either party through the receipt.
+         */
+        get: operations["getPaymentReceiptPrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/exposures": {
         parameters: {
             query?: never;
@@ -627,6 +693,12 @@ export interface components {
             deliverToLocationId?: string;
             lines: components["schemas"]["OrderLineRequest"][];
         };
+        AmendOrderRequest: {
+            /** Format: date */
+            requestedEta?: string;
+            notes?: string;
+            lines: components["schemas"]["OrderLineRequest"][];
+        };
         OrderLineRequest: {
             /** Format: uuid */
             skuId: string;
@@ -660,6 +732,18 @@ export interface components {
             /** Format: uuid */
             deliverToLocationId?: string;
             deliverTo?: components["schemas"]["DeliveryPointResponse"];
+            /** @description 1, or the version of an amendment (each amendment is a new order) */
+            version?: number;
+            /**
+             * Format: uuid
+             * @description The order this version amends
+             */
+            amendsOrderId?: string;
+            /**
+             * Format: uuid
+             * @description The next version, when the buyer amended this order
+             */
+            amendedByOrderId?: string;
             lines: components["schemas"]["OrderLineResponse"][];
         };
         /** @description The buyer's delivery location as it was when the order was drafted: its code, names and address, copied in the buyer's session, so that the seller, who may not read the buyer's locations, can name it (CR-24A-2 as revised). Never changed after. */
@@ -1067,6 +1151,16 @@ export interface components {
             /** @description Chosen invoices and amounts; left out, the open invoices are settled oldest first */
             settlements?: components["schemas"]["SettlementRequest"][];
         };
+        ApplyPaymentReceiptRequest: {
+            /** @description Chosen invoices and amounts; left out, the open invoices are settled oldest first */
+            settlements?: components["schemas"]["SettlementRequest"][];
+        };
+        PaymentReceiptPrintResponse: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uri */
+            url: string;
+        };
         ChequeRequest: {
             bank: string;
             chequeNo: string;
@@ -1366,6 +1460,37 @@ export interface operations {
         responses: {
             /** @description The cancelled order */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    amendOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The next version of the order */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2147,6 +2272,60 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    applyPaymentReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyPaymentReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description The receipt, with what it now settles and what is left on account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getPaymentReceiptPrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptPrintResponse"];
+                };
+            };
             422: components["responses"]["RuleBroken"];
         };
     };

@@ -140,6 +140,47 @@ class OrderHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(rejected.getBody().get("status").asText()).isEqualTo("REJECTED");
     }
 
+    @Test
+    void theBuyerAmendsASubmittedOrderAndTheAnswerIsTheNextVersion() {
+        String first = submittedOrder();
+
+        ResponseEntity<JsonNode> amended = post(
+                "/v1/trading/orders/" + first + "/amend",
+                Map.of(
+                        "requestedEta",
+                        TradingFixture.today().plusDays(4).toString(),
+                        "lines",
+                        List.of(Map.of("skuId", RICE.toString(), "qty", 7))),
+                headers(BUYER_USER, BUYER));
+        assertThat(amended.getStatusCode())
+                .as(String.valueOf(amended.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(amended.getBody().get("status").asText()).isEqualTo("SUBMITTED");
+        assertThat(amended.getBody().get("version").asInt()).isEqualTo(2);
+        assertThat(amended.getBody().get("amendsOrderId").asText()).isEqualTo(first);
+        assertThat(amended.getBody().get("lines").get(0).get("requestedQty").decimalValue())
+                .isEqualByComparingTo("7");
+
+        ResponseEntity<JsonNode> old = http.exchange(
+                "/v1/trading/orders/" + first,
+                HttpMethod.GET,
+                new HttpEntity<>(headers(BUYER_USER, BUYER)),
+                JsonNode.class);
+        assertThat(old.getBody().get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(old.getBody().get("amendedByOrderId").asText())
+                .isEqualTo(amended.getBody().get("orderId").asText());
+
+        ResponseEntity<JsonNode> again = post(
+                "/v1/trading/orders/" + first + "/amend",
+                Map.of("lines", List.of(Map.of("skuId", RICE.toString(), "qty", 7))),
+                headers(BUYER_USER, BUYER));
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(again.getBody().get("code").asText()).isEqualTo("m4.order.not_amendable");
+        ResponseEntity<JsonNode> noLines =
+                post("/v1/trading/orders/" + first + "/amend", Map.of("lines", List.of()), headers(BUYER_USER, BUYER));
+        assertThat(noLines.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     private String submittedOrder() {
         ResponseEntity<JsonNode> created = post(
                 "/v1/trading/orders",

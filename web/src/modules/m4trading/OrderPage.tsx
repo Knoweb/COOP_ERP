@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
@@ -13,7 +13,8 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { ExposurePanel } from "./ExposurePanel";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
-import { businessToday, canDeliver, errorText, firstOpenEta, orderChip } from "./tradingView";
+import { amendReady, amendRequest, businessToday, canDeliver, errorText, firstOpenEta, orderChip } from "./tradingView";
+import type { AmendRow } from "./tradingView";
 
 const CANCEL_REASONS = ["NOT_NEEDED", "WRONG_ITEMS", "OTHER"];
 const REJECT_REASONS = ["NO_STOCK", "NOT_SUPPLIED", "OTHER"];
@@ -38,6 +39,11 @@ export function OrderPage() {
   const cancelKey = useIdempotencyKey();
   const acceptKey = useIdempotencyKey();
   const rejectKey = useIdempotencyKey();
+  const amendKey = useIdempotencyKey();
+  const navigate = useNavigate();
+  // AmendOrder (24A section 6): the buyer edits the quantities and the delivery date it asks for.
+  const [amendRows, setAmendRows] = useState<AmendRow[] | null>(null);
+  const [amendEta, setAmendEta] = useState("");
   const [asking, setAsking] = useState<"cancel" | "reject" | null>(null);
   const [eta, setEta] = useState("");
 
@@ -94,6 +100,20 @@ export function OrderPage() {
   const accept = useMutation(run(acceptKey, (k) => api.acceptOrder(orderId, eta, [], k)));
   const cancel = useMutation(run(cancelKey, (k, reason) => api.cancelOrder(orderId, reason.code, reason.text, k)));
   const reject = useMutation(run(rejectKey, (k, reason) => api.rejectOrder(orderId, reason.code, reason.text, k)));
+  const amend = useMutation({
+    mutationFn: () => api.amendOrder(orderId, amendRequest(amendRows ?? [], amendEta), amendKey.current()),
+    onSuccess: (next: { orderId: string }) => {
+      amendKey.next();
+      setAmendRows(null);
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+      navigate(`/trading/orders/${next.orderId}`);
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiProblem) {
+        amendKey.next();
+      }
+    }
+  });
 
   if (order.isLoading) {
     return <main className="shell-page">{t("trading.loading").text}</main>;
@@ -113,7 +133,14 @@ export function OrderPage() {
   const o = order.data;
   const isBuyer = o.buyerEntityId === scope.entityId;
   const accepted = o.lines.some((line) => line.allocatedQty !== undefined && line.allocatedQty !== null);
-  const failed = [submit, accept, cancel, reject].find((m) => m.isError);
+  const failed = [submit, accept, cancel, reject, amend].find((m) => m.isError);
+  const amendable = isBuyer && canSubmit && (o.status === "DRAFT" || o.status === "SUBMITTED");
+  const startAmend = () => {
+    setAmendRows(o.lines.map((line) => ({ skuId: line.skuId, uomCode: line.uomCode, qty: String(line.requestedQty) })));
+    setAmendEta(o.requestedEta ?? "");
+  };
+  const setAmendQty = (index: number, qty: string) =>
+    setAmendRows((rows) => (rows ?? []).map((row, i) => (i === index ? { ...row, qty } : row)));
 
   return (
     <main className="shell-page">
@@ -131,7 +158,16 @@ export function OrderPage() {
           { label: t("trading.field.deliver_to").text, value: o.deliverToLocationId && <LocationName locationId={o.deliverToLocationId} own={isBuyer} known={o.deliverTo} /> },
           { label: t("trading.field.committed_eta").text, value: o.committedEta && formatDate(o.committedEta) },
           { label: t("trading.column.amount").text, value: <MoneyDisplay amount={o.netAmount} /> },
-          { label: t("trading.field.reject_reason").text, value: o.rejectReasonCode }
+          { label: t("trading.field.reject_reason").text, value: o.rejectReasonCode },
+          { label: t("trading.order.version").text, value: o.version && o.version > 1 ? String(o.version) : undefined },
+          {
+            label: t("trading.order.amends").text,
+            value: o.amendsOrderId && <Link to={`/trading/orders/${o.amendsOrderId}`}>{t("trading.order.previous_version").text}</Link>
+          },
+          {
+            label: t("trading.order.amended_by").text,
+            value: o.amendedByOrderId && <Link to={`/trading/orders/${o.amendedByOrderId}`}>{t("trading.order.next_version").text}</Link>
+          }
         ]}
       />
 
@@ -149,13 +185,26 @@ export function OrderPage() {
           </tr>
         </thead>
         <tbody>
-          {o.lines.map((line) => (
+          {o.lines.map((line, index) => (
             <tr key={line.lineId}>
               <td>
                 <SkuLabel skuId={line.skuId} />
               </td>
               <td>{line.uomCode}</td>
-              <td>{line.requestedQty}</td>
+              <td>
+                {amendRows ? (
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    aria-label={t("trading.order.amend.qty", undefined, { line: line.lineNo }).text}
+                    value={amendRows[index]?.qty ?? ""}
+                    onChange={(event) => setAmendQty(index, event.target.value)}
+                  />
+                ) : (
+                  line.requestedQty
+                )}
+              </td>
               <td>
                 <MoneyDisplay amount={line.indicativePrice} />
               </td>
@@ -173,7 +222,26 @@ export function OrderPage() {
       </table>
 
       <section className="trading-filter-bar">
-        {isBuyer && canSubmit && o.status === "DRAFT" && (
+        {amendable && !amendRows && (
+          <button type="button" onClick={startAmend}>
+            {t("trading.order.amend").text}
+          </button>
+        )}
+        {amendRows && (
+          <>
+            <label className="trading-form-field">
+              {t("trading.order.amend.eta").text}
+              <input type="date" min={businessToday()} value={amendEta} onChange={(event) => setAmendEta(event.target.value)} />
+            </label>
+            <button type="button" disabled={amend.isPending || !amendReady(amendRows)} onClick={() => amend.mutate()}>
+              {t("trading.order.amend.save").text}
+            </button>
+            <button type="button" onClick={() => setAmendRows(null)}>
+              {t("trading.order.amend.discard").text}
+            </button>
+          </>
+        )}
+        {isBuyer && canSubmit && o.status === "DRAFT" && !amendRows && (
           <button type="button" disabled={submit.isPending} onClick={() => submit.mutate()}>
             {t("trading.order.submit").text}
           </button>

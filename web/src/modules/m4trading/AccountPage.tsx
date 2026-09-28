@@ -25,6 +25,8 @@ export function AccountPage() {
   const api = useTradingApi();
   const navigate = useNavigate();
   const canRecord = useHasPermission("bil.payment.record");
+  // The limit also needs bil.creditlimit.change, which no operation carries: the server checks it (21A 6.1).
+  const canChangeLimit = useHasPermission("prt.relationship.amend");
   const theirs = (seller: string, buyer: string) => (role === "SELLER" ? buyer : seller) === counterpartyId;
 
   const exposures = useQuery({ queryKey: ["trading", "exposures", role], queryFn: () => api.exposures(role) });
@@ -47,6 +49,11 @@ export function AccountPage() {
       </h1>
       {error && <p role="alert">{errorText(error, t("trading.error.generic").text)}</p>}
       {exposures.isLoading ? <p>{t("trading.loading").text}</p> : exposure && <ExposurePanel exposure={exposure} />}
+      {role === "SELLER" && canChangeLimit && exposure && (
+        <p>
+          <Link to={`/party/relationships/${exposure.relationshipId}`}>{t("trading.account.credit_limit").text}</Link>
+        </p>
+      )}
 
       <section className="trading-section">
         <h2>{t(role === "SELLER" ? "trading.invoices.issued.title" : "trading.invoices.received.title").text}</h2>

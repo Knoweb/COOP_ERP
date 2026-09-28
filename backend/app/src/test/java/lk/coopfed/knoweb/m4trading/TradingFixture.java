@@ -200,7 +200,11 @@ public final class TradingFixture {
         admin.update("update pricing.price_list set status = 'DRAFT' where price_list_id = ?", PRICE_LIST);
         admin.update("delete from pricing.price_list_line where price_list_id = ?", PRICE_LIST);
         admin.update("delete from pricing.price_list where price_list_id = ?", PRICE_LIST);
-        admin.update("delete from party.entity_relationship where relationship_id = ?", RELATIONSHIP);
+        // Every row of the pair: an amendment of the terms (AmendOrderPostgresIntegrationTest) adds one.
+        admin.update(
+                "delete from party.entity_relationship where seller_entity_id = ? and buyer_entity_id = ?",
+                SELLER,
+                BUYER);
         admin.update("delete from party.location where location_id in (?, ?, ?)", WAREHOUSE, SHOP, SELLER_WAREHOUSE);
         admin.update("delete from party.entity_party_directory where entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from party.entity where entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);

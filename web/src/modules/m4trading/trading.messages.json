@@ -220,7 +220,21 @@
     "trading.accounts.sellers.title": "Our accounts with suppliers",
     "trading.accounts.empty": "No trading relationships.",
     "trading.accounts.open": "Open the account",
-    "trading.account.title": "Account"
+    "trading.account.title": "Account",
+    "trading.order.version": "Version",
+    "trading.order.amends": "Amends",
+    "trading.order.amended_by": "Amended by",
+    "trading.order.previous_version": "Open the previous version",
+    "trading.order.next_version": "Open the next version",
+    "trading.order.amend": "Amend the order",
+    "trading.order.amend.qty": "Quantity of line {line}",
+    "trading.order.amend.eta": "Delivery date asked for",
+    "trading.order.amend.save": "Save the amendment",
+    "trading.order.amend.discard": "Discard the changes",
+    "trading.payment.print": "Print the receipt",
+    "trading.payment.apply": "Apply the money on account to open invoices",
+    "trading.payment.applied": "The money on account was applied to the open invoices.",
+    "trading.account.credit_limit": "Change the credit limit"
   },
   "si": {
     "trading.nav": "වෙළඳාම",
@@ -443,7 +457,21 @@
     "trading.accounts.sellers.title": "සැපයුම්කරුවන් සමඟ අපගේ ගිණුම්",
     "trading.accounts.empty": "වෙළඳ සබඳතා නැත.",
     "trading.accounts.open": "ගිණුම විවෘත කරන්න",
-    "trading.account.title": "ගිණුම"
+    "trading.account.title": "ගිණුම",
+    "trading.order.version": "අනුවාදය",
+    "trading.order.amends": "සංශෝධනය කරයි",
+    "trading.order.amended_by": "සංශෝධනය කළේ",
+    "trading.order.previous_version": "පෙර අනුවාදය විවෘත කරන්න",
+    "trading.order.next_version": "ඊළඟ අනුවාදය විවෘත කරන්න",
+    "trading.order.amend": "ඇණවුම සංශෝධනය කරන්න",
+    "trading.order.amend.qty": "{line} පේළියේ ප්‍රමාණය",
+    "trading.order.amend.eta": "ඉල්ලූ බෙදාහැරීමේ දිනය",
+    "trading.order.amend.save": "සංශෝධනය සුරකින්න",
+    "trading.order.amend.discard": "වෙනස්කම් ඉවත දමන්න",
+    "trading.payment.print": "රිසිට්පත මුද්‍රණය කරන්න",
+    "trading.payment.apply": "ගිණුමේ මුදල විවෘත ඉන්වොයිසිවලට යොදන්න",
+    "trading.payment.applied": "ගිණුමේ මුදල විවෘත ඉන්වොයිසිවලට යොදන ලදී.",
+    "trading.account.credit_limit": "ණය සීමාව වෙනස් කරන්න"
   },
   "ta": {
     "trading.nav": "வர்த்தகம்",
@@ -666,6 +694,20 @@
     "trading.accounts.sellers.title": "விநியோகஸ்தர்களுடன் எங்கள் கணக்குகள்",
     "trading.accounts.empty": "வர்த்தக உறவுகள் இல்லை.",
     "trading.accounts.open": "கணக்கைத் திற",
-    "trading.account.title": "கணக்கு"
+    "trading.account.title": "கணக்கு",
+    "trading.order.version": "பதிப்பு",
+    "trading.order.amends": "திருத்துகிறது",
+    "trading.order.amended_by": "திருத்தியது",
+    "trading.order.previous_version": "முந்தைய பதிப்பைத் திற",
+    "trading.order.next_version": "அடுத்த பதிப்பைத் திற",
+    "trading.order.amend": "ஆர்டரைத் திருத்து",
+    "trading.order.amend.qty": "வரி {line} இன் அளவு",
+    "trading.order.amend.eta": "கோரிய விநியோகத் தேதி",
+    "trading.order.amend.save": "திருத்தத்தைச் சேமி",
+    "trading.order.amend.discard": "மாற்றங்களைக் கைவிடு",
+    "trading.payment.print": "ரசீதை அச்சிடு",
+    "trading.payment.apply": "கணக்கில் உள்ள பணத்தைத் திறந்த விலைப்பட்டியல்களுக்குப் பயன்படுத்து",
+    "trading.payment.applied": "கணக்கில் உள்ள பணம் திறந்த விலைப்பட்டியல்களுக்குப் பயன்படுத்தப்பட்டது.",
+    "trading.account.credit_limit": "கடன் வரம்பை மாற்று"
   }
 }

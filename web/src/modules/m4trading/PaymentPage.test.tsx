@@ -15,7 +15,7 @@ const RECEIPT_ID = "0190f4aa-0000-7000-8000-000000000001";
 const REVERSAL_ID = "0190f4aa-0000-7000-8000-000000000002";
 const INVOICE_ID = "0190f4ee-0000-7000-8000-000000000001";
 
-const state = { entityId: SELLER, permissions: new Set<string>(["bil.payment.record"]), bounced: false };
+const state = { entityId: SELLER, permissions: new Set<string>(["bil.payment.record"]), bounced: false, onAccount: 0 };
 
 function receipt(): PaymentReceipt {
   return {
@@ -27,7 +27,7 @@ function receipt(): PaymentReceipt {
     method: "CHEQUE",
     receivedOn: "2026-09-28",
     amount: 1736,
-    unappliedAmount: 0,
+    unappliedAmount: state.onAccount,
     reversedBy: state.bounced ? REVERSAL_ID : undefined,
     cheque: { bank: "Bank of Ceylon", chequeNo: "400123", dated: "2026-09-28", outcome: state.bounced ? "BOUNCED" : undefined },
     allocations: [{ invoiceId: INVOICE_ID, invoiceNumber: "FED-INV-0000009", amount: 1736 }]
@@ -41,6 +41,8 @@ const api = {
     return receipt();
   }),
   recordPayment: vi.fn(async () => receipt()),
+  applyPayment: vi.fn(async () => receipt()),
+  paymentPrint: vi.fn(async () => "https://objects.example/receipt.pdf"),
   entity: vi.fn(async () => null)
 };
 
@@ -70,9 +72,31 @@ describe("the payment receipt", () => {
     vi.clearAllMocks();
     state.entityId = SELLER;
     state.bounced = false;
+    state.onAccount = 0;
     state.permissions = new Set(["bil.payment.record"]);
   });
   afterEach(cleanup);
+
+  it("lets the seller's accounts apply what the receipt holds on account, oldest first", async () => {
+    state.onAccount = 264;
+    renderWith(<PaymentPage />);
+    fireEvent.click(await screen.findByRole("button", { name: text("trading.payment.apply") }));
+    await waitFor(() => expect(api.applyPayment).toHaveBeenCalledOnce());
+    expect(api.applyPayment.mock.calls[0]).toEqual([RECEIPT_ID, {}, expect.any(String)]);
+  });
+
+  it("offers no application when nothing is on account, nor to the buyer; both may print", async () => {
+    renderWith(<PaymentPage />);
+    expect(await screen.findByRole("button", { name: text("trading.payment.print") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: text("trading.payment.apply") })).toBeNull();
+    cleanup();
+
+    state.onAccount = 264;
+    state.entityId = BUYER;
+    renderWith(<PaymentPage />);
+    expect(await screen.findByRole("button", { name: text("trading.payment.print") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: text("trading.payment.apply") })).toBeNull();
+  });
 
   it("lets the seller's accounts record that the cheque bounced, and then shows the reversal", async () => {
     renderWith(<PaymentPage />);

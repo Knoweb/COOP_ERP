@@ -6,6 +6,7 @@ import { ApiProblem } from "../../shell/api/client";
 import type { ChipState } from "../../shell/components/StateChip";
 import { BUSINESS_TIME_ZONE } from "../../shell/i18n/formats";
 import type {
+  AmendOrderRequest,
   CaptureGrnRequest,
   CreateDeliveryNoteRequest,
   CreateOrderRequest,
@@ -179,6 +180,31 @@ export function orderRequest(sellerEntityId: string, deliverToLocationId: string
     sellerEntityId,
     deliverToLocationId: deliverToLocationId || undefined,
     lines: rows.map((row) => ({ skuId: row.skuId, uomCode: row.uomCode, qty: Number(row.qty) }))
+  };
+}
+
+/** A relationship row ACTIVE and in force on `today` (yyyy-mm-dd): M1 keeps one row per term of a pair. */
+export function inForce(row: { status: string; effectiveFrom: string; effectiveTo?: string | null }, today: string): boolean {
+  return row.status === "ACTIVE" && row.effectiveFrom <= today && (!row.effectiveTo || row.effectiveTo >= today);
+}
+
+/** A line of an order being amended: its item and unit stay, the quantity is typed (0 drops the line). */
+export type AmendRow = { skuId: string; uomCode: string; qty: string };
+
+/** The amended order has at least one line, and every quantity is a number, none negative. */
+export function amendReady(rows: AmendRow[]): boolean {
+  const numbers = rows.map((row) => (row.qty.trim() === "" ? Number.NaN : Number(row.qty)));
+  return numbers.every((n) => Number.isFinite(n) && n >= 0) && numbers.some((n) => n > 0);
+}
+
+/** AmendOrder's body: the whole set of lines, those at zero left out, and the requested delivery date. */
+export function amendRequest(rows: AmendRow[], requestedEta: string, notes?: string): AmendOrderRequest {
+  return {
+    requestedEta: requestedEta || undefined,
+    notes: notes || undefined,
+    lines: rows
+      .filter((row) => Number(row.qty) > 0)
+      .map((row) => ({ skuId: row.skuId, uomCode: row.uomCode, qty: Number(row.qty) }))
   };
 }
 
