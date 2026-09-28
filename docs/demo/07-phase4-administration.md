@@ -24,6 +24,16 @@
    - **External access**: the Federation's register of time-boxed read-only grants for auditors. Grant (an external user, the organisations, an end date, a reason) and **End now**.
    - **Deactivate** (on a user's card): asks for a reason, signs the user out everywhere, and cannot be undone.
 
+## Dashboard and exception queue
+
+Sign in as **fed-accounts** and open **Reports**. You see:
+- "Sales this week (invoiced)", with eight small bars for the last eight weeks
+- "Owed to us", and "Owed to us and overdue"
+- fill rate and on-time delivery of the Federation's deliveries
+- the number of exceptions
+
+Each tile opens its report. The exception queue below the tiles lists the cheque D101 paid with that bounced (**Bounced cheque**, marked Alert); **View** opens the payment. Sign in as **d102-accounts** (Tamil) and open the exception queue: Point Pedro MPCS (M103) is listed as past its exposure warning, with its exposure as a percentage of the credit limit. **d101-accounts** also sees what D101 owes the Federation ("We owe") and the fill rate of deliveries to D101. **m101-manager** sees the society's purchases and its shops' till sales for this week. Open **Ageing of open invoices** or **Statement of account** to see what was paid, credited and is still due, invoice by invoice.
+
 ## What to point out
 
 - **Everything reported, not just recorded**: every document from phases 1–3 (the orders, deliveries, GRNs, invoices, transfers, the till sale) is what these reports are built from — nothing here is separately entered.
