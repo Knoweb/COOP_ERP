@@ -7,19 +7,27 @@ import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
+import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.CreatePriceList;
 import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
 import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
+import lk.coopfed.knoweb.m3pricing.api.WithdrawRule;
 import lk.coopfed.knoweb.m3pricing.internal.list.CreatePriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
+import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
+import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
+import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
+import lk.coopfed.knoweb.m3pricing.web.generated.AuthorRuleRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListDetailResponse;
@@ -27,9 +35,13 @@ import lk.coopfed.knoweb.m3pricing.web.generated.PriceListLineResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PricingApi;
 import lk.coopfed.knoweb.m3pricing.web.generated.PublishPriceListRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.RuleBenefit;
+import lk.coopfed.knoweb.m3pricing.web.generated.RulePredicate;
+import lk.coopfed.knoweb.m3pricing.web.generated.RuleResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.TradePriceResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.WithdrawRuleRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,6 +57,9 @@ class PricingController implements PricingApi {
     private final DraftNewVersionHandler draftNewVersion;
     private final SetLinesHandler setLines;
     private final PublishPriceListHandler publish;
+    private final AuthorRuleHandler authorRule;
+    private final ActivateRuleHandler activateRule;
+    private final WithdrawRuleHandler withdrawRule;
     private final PricingQueries queries;
     private final CurrentScope currentScope;
 
@@ -53,15 +68,104 @@ class PricingController implements PricingApi {
             DraftNewVersionHandler draftNewVersion,
             SetLinesHandler setLines,
             PublishPriceListHandler publish,
+            AuthorRuleHandler authorRule,
+            ActivateRuleHandler activateRule,
+            WithdrawRuleHandler withdrawRule,
             PricingQueries queries,
             CurrentScope currentScope) {
         this.create = create;
         this.draftNewVersion = draftNewVersion;
         this.setLines = setLines;
         this.publish = publish;
+        this.authorRule = authorRule;
+        this.activateRule = activateRule;
+        this.withdrawRule = withdrawRule;
         this.queries = queries;
         this.currentScope = currentScope;
     }
+
+    // ---- discount rules (M3-05) ----------------------------------------------------------------
+
+    @Override
+    public ResponseEntity<List<RuleResponse>> listRules(String status, String kind) {
+        return ResponseEntity.ok(queries.listRules(status, kind, currentScope.get()).stream()
+                .map(PricingController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<RuleResponse> getRule(UUID ruleId) {
+        return queries.getRule(ruleId, currentScope.get())
+                .map(PricingController::toResponse)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<RuleResponse> authorRule(String idempotencyKey, AuthorRuleRequest request) {
+        ScopeContext scope = currentScope.get();
+        RulePredicate p = request.getPredicate();
+        UUID id = authorRule.handle(
+                new AuthorRule(
+                        request.getName(),
+                        request.getKind().getValue(),
+                        p == null
+                                ? null
+                                : new lk.coopfed.knoweb.m3pricing.api.RulePredicate(
+                                        p.getSkuId(),
+                                        p.getUomCode(),
+                                        p.getMinQty(),
+                                        p.getDaysToExpiry(),
+                                        p.getBillTotalFrom()),
+                        new lk.coopfed.knoweb.m3pricing.api.RuleBenefit(
+                                request.getBenefit().getKind().getValue(),
+                                request.getBenefit().getValue()),
+                        request.getPriority(),
+                        request.getValidFrom(),
+                        request.getValidTo()),
+                scope);
+        return ResponseEntity.created(URI.create("/v1/pricing/rules/" + id))
+                .body(toResponse(queries.getRule(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<RuleResponse> activateRule(String idempotencyKey, UUID ruleId) {
+        ScopeContext scope = currentScope.get();
+        UUID id = activateRule.handle(new ActivateRule(ruleId), scope);
+        return ResponseEntity.ok(toResponse(queries.getRule(id, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<RuleResponse> withdrawRule(String idempotencyKey, UUID ruleId, WithdrawRuleRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID id = withdrawRule.handle(new WithdrawRule(ruleId, request.getReason()), scope);
+        return ResponseEntity.ok(toResponse(queries.getRule(id, scope).orElseThrow()));
+    }
+
+    private static RuleResponse toResponse(RuleView rule) {
+        lk.coopfed.knoweb.m3pricing.api.RulePredicate p = rule.predicate();
+        return new RuleResponse(
+                        rule.ruleId(),
+                        rule.ownerEntityId(),
+                        rule.name(),
+                        RuleResponse.KindEnum.fromValue(rule.kind()),
+                        new RulePredicate()
+                                .skuId(p.skuId())
+                                .uomCode(p.uomCode())
+                                .minQty(p.minQty())
+                                .daysToExpiry(p.daysToExpiry())
+                                .billTotalFrom(p.billTotalFrom()),
+                        new RuleBenefit(
+                                RuleBenefit.KindEnum.fromValue(rule.benefit().kind()),
+                                rule.benefit().value()),
+                        rule.priority(),
+                        rule.validFrom(),
+                        RuleResponse.StatusEnum.fromValue(rule.status()),
+                        rule.createdAt())
+                .validTo(rule.validTo());
+    }
+
+    // ---- price lists (M3-04) -------------------------------------------------------------------
 
     @Override
     public ResponseEntity<List<PriceListResponse>> listPriceLists(String kind, String status) {

@@ -51,6 +51,8 @@ templates:
       - "prc.pricelist.view"
       - "prc.pricelist.author"
       - "prc.pricelist.publish"
+      - "prc.rule.author"
+      - "prc.rule.activate"
   # The Federation's catalogue team (22A section 3.1): the shared path (cat.sku.create with the
   # guard FederationCaller of M2), promotion, its own drafts and deactivations, and the governed tags
   # (cat.tag.govern, CR-22A-3). Assigned at the Federation entity; cat.sku.create,
