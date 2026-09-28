@@ -44,6 +44,36 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/LotBalanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/locations/{locationId}/movements:
+    get:
+      tags: [Inventory]
+      operationId: listMovements
+      summary: The stock card of one SKU at a location, oldest first, with the running quantity
+      description: >
+        Every ledger movement of the SKU at the location (opening balance, receipt, transfer in
+        and out, sale, dispatch, reversal), in ledger order, each with the quantity of the SKU at
+        the location after it, summed by the server (25A section 8, "Stock card"). The unit cost
+        at the movement is shown to the owner's user only, like the balances. A location the
+        caller's scope does not read answers an empty list.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The movements with the running quantity
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockCardLineResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
   /v1/inventory/availability:
     get:
       tags: [Inventory]
@@ -364,6 +394,12 @@ components:
         documentLineId: { type: string, format: uuid }
         movementSeq: { type: integer, format: int64 }
         occurredAt: { type: string, format: date-time }
+    StockCardLineResponse:
+      type: object
+      required: [movement, balanceAfter]
+      properties:
+        movement: { $ref: '#/components/schemas/MovementResponse' }
+        balanceAfter: { type: number }
     PickListResponse:
       type: object
       required: [pickListId, deliveryNoteId, status, lines]

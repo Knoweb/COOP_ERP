@@ -63,7 +63,9 @@ export function StockPage() {
             {balances.data.map((lot) => (
               <tr key={lot.stockLotId}>
                 <td>
-                  <SkuLabel skuId={lot.skuId} />
+                  <Link to={`/inventory/locations/${locationId}/skus/${lot.skuId}`}>
+                    <SkuLabel skuId={lot.skuId} />
+                  </Link>
                 </td>
                 <td>{isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")}</td>
                 <td>{lot.expiryDate ?? ""}</td>

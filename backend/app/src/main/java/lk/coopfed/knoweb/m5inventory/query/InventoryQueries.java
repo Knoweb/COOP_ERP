@@ -51,6 +51,13 @@ public interface InventoryQueries {
     /** The movements a document caused (a GRN's receipts, a delivery note's dispatch, an OPB), in ledger order. */
     List<MovementView> movementsOf(UUID documentId, ScopeContext scope);
 
+    /**
+     * The stock card of a SKU at a location (25A section 8): every movement of the SKU there, in
+     * ledger order (received, source, sequence), each with the running quantity after it. The
+     * running quantity is summed by the database, never by the screen.
+     */
+    List<StockCardLine> stockCard(UUID locationId, UUID skuId, ScopeContext scope);
+
     /** GetPickList(dn): the pick list of a delivery note of the caller's. */
     Optional<PickListView> pickList(UUID deliveryDocumentId, ScopeContext scope);
 

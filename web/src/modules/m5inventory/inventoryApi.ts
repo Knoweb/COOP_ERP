@@ -12,7 +12,8 @@ export type LotBalance = components["schemas"]["LotBalanceResponse"];
 export type Availability = components["schemas"]["AvailabilityResponse"];
 export type OpeningBalance = components["schemas"]["OpeningBalanceResponse"];
 export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLineRequest"];
-export type Transfer = components["schemas"]["TransferResponse"];
+export type StockCardLine = components["schemas"]["StockCardLineResponse"];
+export type Transfer =components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
@@ -77,6 +78,13 @@ export function useInventoryApi() {
           params: { path: { openingBalanceId: id }, header: { "Idempotency-Key": idempotencyKey } }
         });
         return data!;
+      },
+
+      async stockCard(locationId: string, skuId: string): Promise<StockCardLine[]> {
+        const { data } = await api.GET("/v1/inventory/locations/{locationId}/movements", {
+          params: { path: { locationId }, query: { skuId } }
+        });
+        return data ?? [];
       },
 
       async transfers(locationId: string): Promise<Transfer[]> {

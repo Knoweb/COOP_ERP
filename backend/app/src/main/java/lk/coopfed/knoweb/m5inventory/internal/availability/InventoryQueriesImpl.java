@@ -19,6 +19,7 @@ import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
+import lk.coopfed.knoweb.m5inventory.query.StockCardLine;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -200,6 +201,39 @@ class InventoryQueriesImpl implements InventoryQueries {
                         rs.getLong("movement_seq"),
                         rs.getObject("occurred_at", OffsetDateTime.class).toInstant()),
                 documentId);
+    }
+
+    @Override
+    public List<StockCardLine> stockCard(UUID locationId, UUID skuId, ScopeContext scope) {
+        return jdbc.query(
+                """
+                select movement_id, location_id, sku_id, batch_id, condition, movement_type, qty_delta,
+                       unit_cost_at_movement, document_id, document_line_id, source, movement_seq, occurred_at,
+                       sum(qty_delta) over (order by received_at, source, movement_seq, movement_id
+                                            rows between unbounded preceding and current row) as balance_after
+                  from inventory.stock_movement
+                 where location_id = ? and sku_id = ?
+                 order by received_at, source, movement_seq, movement_id
+                """,
+                (rs, n) -> new StockCardLine(
+                        new MovementView(
+                                rs.getObject("movement_id", UUID.class),
+                                rs.getObject("location_id", UUID.class),
+                                rs.getObject("sku_id", UUID.class),
+                                rs.getObject("batch_id", UUID.class),
+                                rs.getString("condition"),
+                                rs.getString("movement_type"),
+                                rs.getBigDecimal("qty_delta"),
+                                rs.getBigDecimal("unit_cost_at_movement"),
+                                rs.getObject("document_id", UUID.class),
+                                rs.getObject("document_line_id", UUID.class),
+                                rs.getString("source"),
+                                rs.getLong("movement_seq"),
+                                rs.getObject("occurred_at", OffsetDateTime.class)
+                                        .toInstant()),
+                        rs.getBigDecimal("balance_after")),
+                locationId,
+                skuId);
     }
 
     @Override

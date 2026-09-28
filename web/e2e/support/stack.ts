@@ -46,7 +46,15 @@ export const DEMO = {
   fedAccounts: demoUser("fed-accounts", "Fathima Rizwan", "en"),
   d101Buyer: demoUser("d101-buyer", "Chaminda Rathnayake", "si"),
   d101Stores: demoUser("d101-stores", "Lasantha Herath", "si"),
-  d101Accounts: demoUser("d101-accounts", "Dilani Wijesekara", "si")
+  d101Accounts: demoUser("d101-accounts", "Dilani Wijesekara", "si"),
+  m101Manager: demoUser("m101-manager", "Ruwan Dissanayake", "si"),
+  m101Shop: demoUser("m101-shop", "Malani Gunawardena", "si")
+};
+
+/** The demo locations of phase 3 (seed/m1party/demo-parties.demo.sql). */
+export const DEMO_LOCATIONS = {
+  m101Stores: "0190f0de-0000-7000-8000-000000000131",
+  m101TownShop: "0190f0de-0000-7000-8000-000000000132"
 };
 
 export const FED_ADMIN: DevUser = {

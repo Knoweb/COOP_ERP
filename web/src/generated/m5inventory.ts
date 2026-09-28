@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/locations/{locationId}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The stock card of one SKU at a location, oldest first, with the running quantity
+         * @description Every ledger movement of the SKU at the location (opening balance, receipt, transfer in and out, sale, dispatch, reversal), in ledger order, each with the quantity of the SKU at the location after it, summed by the server (25A section 8, "Stock card"). The unit cost at the movement is shown to the owner's user only, like the balances. A location the caller's scope does not read answers an empty list.
+         */
+        get: operations["listMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/availability": {
         parameters: {
             query?: never;
@@ -285,6 +305,10 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
+        StockCardLineResponse: {
+            movement: components["schemas"]["MovementResponse"];
+            balanceAfter: number;
+        };
         PickListResponse: {
             /** Format: uuid */
             pickListId: string;
@@ -464,6 +488,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LotBalanceResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    listMovements: {
+        parameters: {
+            query: {
+                skuId: string;
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The movements with the running quantity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockCardLineResponse"][];
                 };
             };
             400: components["responses"]["RequestProblem"];
