@@ -672,3 +672,106 @@ config_items:
     change_permission: prc.mrp_policy.set
     till_visible: true
     module: m3pricing
+  # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
+  # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
+  - key: customers.phone_reuse_window_months
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 60 }
+    description_en: How many months after a customer gave up a phone number a new holder must be confirmed as another person
+    description_si: පාරිභෝගිකයෙකු දුරකථන අංකයක් අත්හැරීමෙන් පසු නව හිමිකරු වෙනත් අයෙකු බව තහවුරු කළ යුතු මාස ගණන
+    description_ta: ஒரு வாடிக்கையாளர் தொலைபேசி எண்ணைக் கைவிட்ட பிறகு புதிய உரிமையாளர் வேறு நபர் என உறுதிப்படுத்த வேண்டிய மாதங்கள்
+    default: 12
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m7customers
+  - key: customers.default_terms_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: The credit terms in days of a new customer account when none is given
+    description_si: කිසිවක් නොදුන් විට නව පාරිභෝගික ගිණුමක ණය කාලය දින වලින්
+    description_ta: எதுவும் கொடுக்கப்படாதபோது புதிய வாடிக்கையாளர் கணக்கின் கடன் காலம் நாட்களில்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: cus.account.manage
+    module: m7customers
+  - key: customers.offline_account_cap
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 1000000 }
+    description_en: The most a till may charge to a customer account in one sale while offline, when the account names no cap
+    description_si: ගිණුමේ සීමාවක් නොමැති විට, නොබැඳි අවස්ථාවේ එක් විකිණීමකදී පාරිභෝගික ගිණුමකට අය කළ හැකි උපරිමය
+    description_ta: கணக்கில் வரம்பு இல்லாதபோது, இணைப்பு இல்லாதபோது ஒரு விற்பனையில் வாடிக்கையாளர் கணக்கில் வசூலிக்கக்கூடிய அதிகபட்சம்
+    default: 5000
+    scope_kind: ENTITY
+    change_permission: cus.account.manage
+    module: m7customers
+  # M5 stock control (25A section 3.1; doc 25 section 7): the count tolerance below which a variance
+  # posts without approval (F-10), the value bands of an adjustment or a write-off (E-07), remote
+  # witnessing (DR-4) and when a write-off needs photographs. The per-SKU and per-tag tables of 25A
+  # (variance_threshold, loss_tolerance) are not built yet; these are the entity's one figure each.
+  - key: inventory.count_tolerance_pct
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 100 }
+    description_en: The count variance, as a percentage of what the book expected, that posts without approval
+    description_si: අනුමැතියකින් තොරව සටහන් වන, පොතේ අපේක්ෂිත ප්‍රමාණයේ ප්‍රතිශතයක් ලෙස ගණන් කිරීමේ වෙනස
+    description_ta: ஒப்புதல் இன்றிப் பதிவாகும், புத்தகம் எதிர்பார்த்ததின் சதவீதமாக எண்ணிக்கை வேறுபாடு
+    default: "1"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.count_tolerance_qty
+    value_type: DECIMAL
+    schema: { minimum: 0 }
+    description_en: The count variance in units that posts without approval
+    description_si: අනුමැතියකින් තොරව සටහන් වන ඒකක ගණනින් ගණන් කිරීමේ වෙනස
+    description_ta: ஒப்புதல் இன்றிப் பதிவாகும் அலகுகளில் எண்ணிக்கை வேறுபாடு
+    default: "2"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.approval_band1_limit
+    value_type: DECIMAL
+    schema: { minimum: 0 }
+    description_en: The highest value of a stock adjustment or write-off in the first approval band (Rs)
+    description_si: පළමු අනුමත කිරීමේ කලාපයේ තොග ගැලපීමක හෝ කපා හැරීමක උපරිම වටිනාකම (රු)
+    description_ta: முதல் ஒப்புதல் பட்டையில் இருப்புச் சரிசெய்தல் அல்லது தள்ளுபடியின் உயர் மதிப்பு (ரூ)
+    default: "25000"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.approval_band2_limit
+    value_type: DECIMAL
+    schema: { minimum: 0 }
+    description_en: The highest value of a stock adjustment or write-off in the second approval band (Rs); above it, the chairman
+    description_si: දෙවන අනුමත කිරීමේ කලාපයේ උපරිම වටිනාකම (රු); ඊට ඉහළින් සභාපති
+    description_ta: இரண்டாம் ஒப்புதல் பட்டையின் உயர் மதிப்பு (ரூ); அதற்கு மேல் தலைவர்
+    default: "250000"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.single_staff
+    value_type: BOOLEAN
+    description_en: Whether one person runs the location alone, so a write-off there is witnessed remotely from photographs
+    description_si: එක් අයෙකු පමණක් ස්ථානය පවත්වාගෙන යන්නේද; එවිට කපා හැරීම ඡායාරූප මගින් දුරස්ථව සාක්ෂි කෙරේ
+    description_ta: ஒருவரே இடத்தை நடத்துகிறாரா; அப்போது தள்ளுபடி புகைப்படங்கள் மூலம் தொலைவிலிருந்து சாட்சியமளிக்கப்படும்
+    default: false
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.remote_witness_allowed
+    value_type: BOOLEAN
+    description_en: Whether an approver may witness a write-off remotely at a single-staff location
+    description_si: තනි කාර්ය මණ්ඩල ස්ථානයක කපා හැරීමකට අනුමත කරන්නෙකුට දුරස්ථව සාක්ෂි දිය හැකිද
+    description_ta: ஒருவர் மட்டும் பணிபுரியும் இடத்தில் ஒப்புதலளிப்பவர் தொலைவிலிருந்து தள்ளுபடிக்குச் சாட்சியமளிக்கலாமா
+    default: true
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.writeoff_photo_categories
+    value_type: JSON
+    description_en: The loss categories whose write-offs need photographs everywhere
+    description_si: සෑම තැනකම කපා හැරීම් සඳහා ඡායාරූප අවශ්‍ය අලාභ වර්ග
+    description_ta: எல்லா இடங்களிலும் தள்ளுபடிக்குப் புகைப்படங்கள் தேவைப்படும் இழப்பு வகைகள்
+    default: "[\"THEFT\", \"SHRINKAGE_UNEXPLAINED\"]"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory

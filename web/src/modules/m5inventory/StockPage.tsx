@@ -69,6 +69,18 @@ export function StockPage() {
 
               <span>{t("inventory.transfer.link").text}</span>
             </Link>
+
+            <Link className="action-link" to="/inventory/counts">
+              <span>{t("inventory.counts.link").text}</span>
+            </Link>
+
+            <Link className="action-link" to="/inventory/write-offs">
+              <span>{t("inventory.writeoffs.link").text}</span>
+            </Link>
+
+            <Link className="action-link" to="/inventory/repacks">
+              <span>{t("inventory.repacks.link").text}</span>
+            </Link>
           </>
         }
       />

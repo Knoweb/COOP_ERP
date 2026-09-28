@@ -122,6 +122,8 @@ public class DemoDataLoader {
     private final DemoTradingHistory history;
     private final DemoRetailPricing retailPricing;
     private final DemoPayments payments;
+    private final DemoStockOperations stockOperations;
+    private final DemoCustomers customers;
     private final DemoCalendar calendar;
     private final Clock clock;
     private final ZoneId businessZone;
@@ -161,6 +163,8 @@ public class DemoDataLoader {
             DemoTradingHistory history,
             DemoRetailPricing retailPricing,
             DemoPayments payments,
+            DemoStockOperations stockOperations,
+            DemoCustomers customers,
             DemoCalendar calendar,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
@@ -189,6 +193,8 @@ public class DemoDataLoader {
         this.history = history;
         this.retailPricing = retailPricing;
         this.payments = payments;
+        this.stockOperations = stockOperations;
+        this.customers = customers;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
     }
@@ -216,6 +222,10 @@ public class DemoDataLoader {
         history.load(items, skus, this::count);
         // M4-07: the buyers paid some of it (DemoPayments).
         payments.load(this::count);
+        // M5-11, M5-13: a count, a write-off and a repack at the society's stores (DemoStockOperations).
+        stockOperations.load(this::count);
+        // M7: the members of M101 and its credit book (DemoCustomers).
+        customers.load(this::count);
 
         Report report = new Report(Map.copyOf(counts));
         log.info("Demo data: {} commands issued {}", report.total(), report.commands());

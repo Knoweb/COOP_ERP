@@ -72,3 +72,83 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A till receipt line named no batch the shop could deduct from and was not posted
+
+  - code: COUNT_SCHEDULED
+    severity: INFO
+    offline_capturable: false
+    description_en: A stock count of a location was scheduled
+
+  - code: COUNT_STARTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A stock count began and noted what the book held
+
+  - code: COUNT_SUBMITTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A stock count was submitted; variances within tolerance were posted
+
+  - code: ADJUSTMENT_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The variances of a count beyond tolerance were approved and posted
+
+  - code: ADJUSTMENT_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The variances of a count beyond tolerance were rejected
+
+  - code: STOCK_LOT_ACKNOWLEDGED
+    severity: INFO
+    offline_capturable: false
+    description_en: A stock lot below zero was acknowledged for review
+
+  - code: WRITEOFF_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A write-off was drafted
+
+  - code: WRITEOFF_PHOTO_ADDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A photograph was authorised for a draft write-off
+
+  - code: WRITEOFF_SUBMITTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A write-off was issued and waits for its witness
+
+  - code: WRITEOFF_WITNESSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A write-off was witnessed
+
+  - code: WRITEOFF_POSTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A write-off was approved and its stock written off
+
+  - code: WRITEOFF_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A write-off was rejected
+
+  - code: RECIPE_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: A repack recipe was defined
+
+  - code: RECIPE_RETIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: A repack recipe was retired
+
+  - code: REPACK_EXECUTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A repack consumed an input lot and produced packs
+
+  - code: REPACK_REVERSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A repack was reversed and its input restored

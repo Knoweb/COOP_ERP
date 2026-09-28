@@ -24,6 +24,7 @@ A run through everything that works today, in the order that builds the story:
 | 6 | [06-phase3-shop.md](06-phase3-shop.md) | 8 | Stock moving from the society's stores to a shop, and a till sale |
 | 7 | [07-phase4-administration.md](07-phase4-administration.md) | 8 | The dashboard, the three reports, CSV and PDF, the society register |
 | 8 | [08-languages-and-permissions.md](08-languages-and-permissions.md) | 5 | Switching languages, a user who cannot see a screen |
+| 9 | [09-society-credit-book.md](09-society-credit-book.md) | 6 | The society's members and credit book: accounts, statements, repayments at the office |
 
 Run them in this order for a full demo; each file also stands alone if you only need to show one part. Files 4 and 5 are the heart of the story — do not cut them short if time is tight; cut file 7 or 8 instead.
 
@@ -33,4 +34,4 @@ The full table (name, entity, scope, language, job in the story) lives in `docs/
 
 ## What is marked "not in this demo yet"
 
-A few things the design describes are not built, or not loaded by `make demo-data`, as of this writing (28 September 2026). Each demo file says so at the point it would otherwise come up, with a one-line reason, instead of describing a screen that does not exist. The current list: retail and control prices (only the trade price list is built), the A4 print of a payment receipt, and a screen to set a credit limit.
+A few things the design describes are not built, or not loaded by `make demo-data`, as of this writing (28 September 2026). Each demo file says so at the point it would otherwise come up, with a one-line reason, instead of describing a screen that does not exist. The current list: the A4 print of a payment receipt, and a screen to set a credit limit.

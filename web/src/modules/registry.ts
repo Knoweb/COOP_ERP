@@ -14,6 +14,7 @@ import { inventoryModule } from "./m5inventory/module";
 import { tradingModule } from "./m4trading/module";
 import { posModule } from "./m6pos/module";
 import { reportingModule } from "./m8reporting/module";
+import { customersModule } from "./m7customers/module";
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export const MODULES: ModuleDefinition[] = [
@@ -25,5 +26,6 @@ export const MODULES: ModuleDefinition[] = [
   tradingModule,
   posModule,
   reportingModule,
+  customersModule,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];

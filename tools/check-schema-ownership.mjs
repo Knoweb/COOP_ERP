@@ -228,8 +228,10 @@ export function problemsOfMigration(
   // own, and a dynamic statement whose literals name no schema at all is refused: written
   // as catalogue.%I the check can read it, written as %s it cannot. A qualified function
   // call (kernel.scope_entity()) touches nothing, as above. GRANT EXECUTE, and the EXECUTE
-  // FUNCTION or PROCEDURE of a trigger, are not dynamic SQL.
-  const dynamic = /\bEXECUTE\b(?!\s+(?:ON|FUNCTION|PROCEDURE)\b)/gi;
+  // FUNCTION or PROCEDURE of a trigger, are not dynamic SQL. Nor is a word after a dot: a
+  // permission code such as 'inv.repack.execute' in a seed is data, and the keyword never
+  // follows a dot.
+  const dynamic = /(?<!\.)\bEXECUTE\b(?!\s+(?:ON|FUNCTION|PROCEDURE)\b)/gi;
 
   while ((match = dynamic.exec(sql)) !== null) {
     const schemas = schemasInLiterals(

@@ -56,6 +56,31 @@ public final class InventoryFixture {
         return sku;
     }
 
+    /**
+     * An active local item of the owner that is neither batch- nor expiry-tracked and carries no
+     * printed MRP (goods sold loose, or the packs an entity makes), of the given M2 origin.
+     */
+    public UUID plainSku(UUID owner, String code, String originKind) {
+        UUID sku = Ids.next();
+        admin.update(
+                """
+                insert into catalogue.sku
+                    (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si, short_name_ta,
+                     base_uom_code, tax_category_id, batch_tracked, expiry_tracked, has_printed_mrp, origin_kind)
+                values (?, ?, ?, 'LOCAL', ?, ?, ?, 'EA', ?, false, false, false, ?)
+                """,
+                sku,
+                "M5" + sku.toString().replace("-", "").substring(22),
+                owner,
+                code,
+                code,
+                code,
+                TAX_CATEGORY,
+                originKind);
+        skus.add(sku);
+        return sku;
+    }
+
     public UUID batch(UUID sku, UUID owner, String batchNo, LocalDate expiry) {
         UUID batch = Ids.next();
         admin.update(
@@ -100,7 +125,9 @@ public final class InventoryFixture {
         admin.execute("truncate table inventory.stock_lot, inventory.stock_movement, inventory.movement_sequence,"
                 + " inventory.entity_sku_cost, inventory.pick_list_line, inventory.pick_list,"
                 + " inventory.opening_balance_line, inventory.opening_balance, inventory.transfer_receipt,"
-                + " inventory.transfer_line, inventory.transfer");
+                + " inventory.transfer_line, inventory.transfer, inventory.count_line, inventory.count_expectation,"
+                + " inventory.count_task, inventory.write_off_photo, inventory.write_off_line, inventory.write_off,"
+                + " inventory.repack_reversal, inventory.repack, inventory.repack_recipe");
         for (UUID batch : batches) {
             admin.update("delete from catalogue.batch_key where batch_id = ?", batch);
             admin.update("delete from catalogue.batch where batch_id = ?", batch);
