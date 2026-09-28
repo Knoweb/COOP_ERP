@@ -22,7 +22,7 @@ M5 deducts from the till's own bundle, as 25A section 7.4 says ("m5.sales consum
 | Path | What it holds |
 |---|---|
 | `api/` | `ReceiptRecorded` (`receipt.recorded.v1`), `TillSessionRecorded` (`till_session.recorded.v1`). |
-| `query/` | `PosQueries`: a location's receipts (with lines and flags) and its sessions. |
+| `query/` | `PosQueries`: a location's receipts (with lines, tenders, till position, net, tax and flags) and its sessions. The web screens are `web/src/modules/m6pos` (receipts, one receipt, till sessions). |
 | `internal/ingest/` | `PosIngestConsumer` (reads the bundles), `RecordReceiptHandler`, `RecordSessionHandler`, `IngestGuards`. |
 | `web/` | `PosController`: `GET /v1/pos/receipts?locationId=`, `GET /v1/pos/sessions?locationId=` (`pos.receipt.view`). |
 | `resources/db/migration/m6pos/V0001__pos.sql` | `till_session`, `till_session_close`, `receipt`, `receipt_line`, `receipt_tender`: insert-only, template RLS. |

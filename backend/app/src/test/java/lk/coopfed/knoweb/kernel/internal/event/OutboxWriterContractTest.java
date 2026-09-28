@@ -15,7 +15,8 @@ class OutboxWriterContractTest {
             mock(JdbcTemplate.class),
             new ObjectMapper(),
             new org.springframework.beans.factory.support.StaticListableBeanFactory()
-                    .getBeanProvider(PublishedEventListener.class));
+                    .getBeanProvider(PublishedEventListener.class),
+            java.time.Clock.systemUTC());
 
     @Test
     void nullEventIsRefused() {

@@ -120,13 +120,15 @@ WITH job (role_id, codes) AS (
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'whs.grn.confirm', 'shop.grn.confirm',
             'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prt.relationship.view', 'inv.stock.view',
             'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign', 'gov.entity.view']),
-        -- society manager: the second signature (countersign), the shops and their tills
+        -- society manager: the second signature (countersign), the shops and their tills; receives
+        -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02)
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
+            'pos.receipt.view']),
         -- the society managers of M102 and M103 also order from their distributor and receive
         -- at the shop (DEMO-02: the second tier of the demo history)
         ('0190f0de-0000-7000-8000-000000000342'::uuid, ARRAY[

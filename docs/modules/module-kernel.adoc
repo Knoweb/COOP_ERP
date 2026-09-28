@@ -9,6 +9,7 @@
 
 _Others_
 
+* `l.c.k.k.api.HistoricalTime` (via `l.c.k.k.internal.HistoricalClock`)
 * `l.c.k.k.api.Attachments` (via `l.c.k.k.internal.attachment.AttachmentService`)
 * `l.c.k.k.api.ObjectStorage` (via `l.c.k.k.internal.attachment.ObjectStorageService`)
 * `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)

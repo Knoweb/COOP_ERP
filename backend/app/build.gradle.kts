@@ -314,6 +314,15 @@ tasks.register<JavaExec>("demoTillSale") {
     mainClass.set("lk.coopfed.knoweb.demo.DemoTillSale")
 }
 
+// The last step of make demo-data (DEMO-02b, docs/DEMO.md): eight weeks of till sales at the four
+// demo shops through the sync contract, with the same till simulator. Idempotent.
+tasks.register<JavaExec>("demoTillHistory") {
+    description = "Loads the demo's history of till sales through the sync contract (local stack)."
+    group = "demo"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("lk.coopfed.knoweb.demo.DemoTillHistory")
+}
+
 val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"

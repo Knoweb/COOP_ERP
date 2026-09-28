@@ -7,7 +7,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -39,9 +39,11 @@ public class OutboxWriter implements EventPublisher {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final ObjectProvider<PublishedEventListener> listeners;
+    private final Clock clock;
 
-    public OutboxWriter(JdbcTemplate jdbc, ObjectMapper mapper, ObjectProvider<PublishedEventListener> listeners) {
-
+    public OutboxWriter(
+            JdbcTemplate jdbc, ObjectMapper mapper, ObjectProvider<PublishedEventListener> listeners, Clock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.listeners = listeners;
@@ -104,7 +106,7 @@ public class OutboxWriter implements EventPublisher {
         UUID aggregateId = aggregateId(event);
         String aggregateType = aggregateType(type);
 
-        Envelope<DomainEvent> envelope = new Envelope<>(Ids.next(), Instant.now(), event);
+        Envelope<DomainEvent> envelope = new Envelope<>(Ids.next(), clock.instant(), event);
 
         JsonNode payload = mapper.valueToTree(envelope.getPayload());
 
