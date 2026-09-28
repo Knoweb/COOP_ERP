@@ -35,4 +35,4 @@ The full table (name, entity, scope, language, job in the story) lives in `docs/
 
 ## What is marked "not in this demo yet"
 
-A few things the design describes are not built, or not loaded by `make demo-data`, as of this writing (28 September 2026). Each demo file says so at the point it would otherwise come up, with a one-line reason, instead of describing a screen that does not exist. The current list: the A4 print of a payment receipt, and a screen to set a credit limit.
+A few things the design describes are not built, or not loaded by `make demo-data`, as of this writing (28 September 2026). Each demo file says so at the point it would otherwise come up, with a one-line reason, instead of describing a screen that does not exist. The current list is short: the till itself (the demo uses the till simulator), and the parts each file names under "Not here yet".
