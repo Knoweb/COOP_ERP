@@ -15,6 +15,7 @@ What `make demo-data` does:
 
 1. `make seed`, then the demo's parties and users as rows (`seed/m1party/demo-parties.demo.sql`, `seed/m1security/demo-users.demo.sql`). These are rows and not commands because the identity server's token names the user's home entity (the `ent` attribute of the realm), so the entities need ids fixed in advance, as the development seed already does.
 2. A one-off backend container (`COOP_ERP_DEMO_LOAD=true`) runs `lk.coopfed.knoweb.demo.DemoDataLoader` and exits. The loader issues every other part of the demo through the modules' own command handlers, each as the demo user whose job it is, with the permission check on. So every row has its audit record, its event, its document number and its stock movements, exactly as if a person had done it on the screens. It asks each module first and skips what is already there.
+3. Last, the till history (DEMO-02b, below): `./gradlew :app:demoTillHistory` on the host, the till simulator selling at the four shops through the sync contract. It needs Java 21 on the host, as `make demo-till-sale` does.
 
 What is loaded:
 
@@ -47,6 +48,21 @@ Last, the loader leaves a history of trading so that the Trading, Reports and da
 **Dates.** The demo opens for business 60 days before `make demo-data` runs (catalogue, price lists, relationships, opening stock and the town shop's transfer carry that date; the Hettipola transfer is 30 days ago), and the history spreads over the eight weeks since: the first order of each relationship was placed 55 days ago, the last (the submitted one) today, the others evenly between, all five relationships interleaved in date order. Each step of an order has its own later day: ordered and submitted at 09:00, accepted the next day, on a delivery note and dispatched the day after, received (GRN) two days later, invoiced the day after that. So Reports by period and the dashboard show a trend, and every numbering series numbers its documents in date order. A step that would fall later today than the load runs at the time of the load.
 
 How: the loader runs each step through the ordinary handlers inside `kernel.api.HistoricalTime`, which moves the application's clock, and each location's business date, back on the loader's own thread only. It is refused unless `coop-erp.demo.historical-time` is true, which only the one-off `make demo-data` container sets (`COOP_ERP_DEMO_LOAD`); no controller or job can reach it, and an architecture rule allows only the demo package to use it. Nothing is written to the database behind the handlers: numbering, audit, events and projections are what they would have been on those days. Event listeners on other threads (M5's stock ledger from `grn.confirmed.v1`) record their own rows at the real time.
+
+### The till history (DEMO-02b)
+
+After the loader, `make demo-data` sells at the four shops over the same eight weeks (`lk.coopfed.knoweb.demo.DemoTillHistory`, test sources, run on the host), so that the receipts screen, the till sessions and the shops' stock have sales in them. Receipts are the till's to write, never central's (AGENTS.md, idea 3), so the loader cannot write them and `HistoricalTime` is not the tool: the history goes the way a real till's sales do, through the sync contract, with the till simulator of `make demo-till-sale`.
+
+| Shop | Demo till | Enrolled by | Sale days |
+|---|---|---|---|
+| Kuliyapitiya town shop (M101 S01) | `DEMO-TILL-S01` (the one `make demo-till-sale` uses) | `m101-manager` | 24, from 55 days ago |
+| Hettipola shop (M101 S02) | `DEMO-TILL-M101-S02` | `m101-manager` | from its transfer, a month ago |
+| Pannala shop (M102) | `DEMO-TILL-M102-S01` | `m102-manager` | from its first GRN, 50 days ago |
+| Point Pedro shop (M103) | `DEMO-TILL-M103-S01` | `m103-manager` | from its first GRN, 50 days ago |
+
+Each shop's manager registers the shop's demo till on till position 1 when it is not there and issues it a one-time code; the till enrols and takes its snapshot. Then, three days a week (never today, which is `make demo-till-sale`'s), the till opens a session at 08:30 with a float of 2,000, makes one or two cash sales of two items each (one or two of each, only items the shop holds ten or more of, so no lot goes negative), closes at 18:00 with the count equal to what it expects, and uploads. The till's own clock is set to that day, so sessions and receipts carry the day's business date and times and number from the till position's receipt series in date order. M5's stock movements for these sales are recorded at the real time by M5's own listener, as for the trading history.
+
+Safe to repeat: a sale day on which the shop's demo till already has a receipt is not sold again, so a second run finds every day done and enrols nothing. It waits for central to apply the sales before it ends, and fails if the relay has not applied them within a minute.
 
 A database loaded before this (with a history dated all on one day) keeps it: the loader finds every order by its notes and issues nothing. To see the eight weeks, `make reset && make up && make demo-data`.
 
@@ -105,13 +121,13 @@ A society moves stock from its stores to one of its shops; the shop sells at the
 2. **The transfer.** `m101-manager`: Inventory, Transfers (`/inventory/transfers`), location W01: the transfer to S01 is RECEIVED. Live: to "S01 Kuliyapitiya town shop", enter a quantity against a few lots, Send: the stores' stock drops at once and the transfer is IN_TRANSIT (TRANSFER_OUT at the stores).
 3. **The shop receives.** `m101-shop` (held to the town shop only): Inventory, Transfers: the transfer in transit to the shop, Receive: the shop's stock rises (TRANSFER_IN at the shop). The shop's session writes only the shop's rows; it cannot see or change the stores' (PR #148).
 4. **The sale.** Without an Android device: `make demo-till-sale` in a terminal. The till simulator registers the demo till `DEMO-TILL-S01` on till position 1 of the town shop (as `m101-manager`), enrols it with a one-time code, takes its snapshot, opens a session with a float of 2,000, sells three items by barcode (1, 2 and 3 of the first three packed items), closes the session and uploads through the sync contract. It prints each item's stock at the shop before and after, and the receipt with its number from the till position's own receipt series.
-5. **Central sees it.** `m101-shop` or `m101-manager`: Inventory, location S01: the three items are down by what was sold. The receipt and the session are at `GET /v1/pos/receipts?locationId=...` and `/v1/pos/sessions` (no screen yet). Selling more than the shop holds is not refused: the lot goes negative and is flagged for review, because a sale that happened at a till is a fact (AGENTS.md).
+5. **Central sees it.** `m101-shop` or `m101-manager`: Inventory, location S01: the three items are down by what was sold. Shop receipts (`/pos`), shop "S01 Kuliyapitiya town shop": today's receipt at the top, above eight weeks of the till history; each row shows the number from the till position's series, the time, the till, how it was paid and the total. Open it: its lines, net, tax and total, the tender and the session it was sold in. Till sessions (`/pos/sessions`): each session's float, and at the close the counted and expected cash and the variance. Selling more than the shop holds is not refused: the lot goes negative and is flagged for review, because a sale that happened at a till is a fact (AGENTS.md).
 
 `make demo-till-sale` needs the stack (`make up`) and the demo (`make demo-data`); each run is one more sale. It uses the demo users' passwords, so it runs against the local stack only (`COOP_ERP_API`, `COOP_ERP_TOKEN_URL` to point it elsewhere).
 
 ## Still to come (TODO)
 
-- **More history (DEMO-02, deferred).** A history of till sales at the shops is not loaded yet (`make demo-till-sale` makes one sale per run, dated today). The trading history's eight weeks and M101's transfer to the Hettipola shop are loaded.
+- The till history is cash only, with no voids, refunds, khata (customer account) sales or variances at the close; those wait for M6's and M7's deferred work.
 - The demo users sign in with a password only; a step that asks for a second factor (publishing a price list, signing a balance) is accepted in the development realm because a fresh password sign-in counts (`COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS`).
-- The till is not part of phase 1: the shops have positions and a primary till. Phase 3's demo till is enrolled by `make demo-till-sale`, not by `make demo-data`; the Android till itself is the till track's.
-- Phase 3 has no receipts screen yet (the reads are in the API); counts, write-offs, repack, weigh-and-price, park and resume, and returns are deferred.
+- The till is not part of phase 1: the shops have positions and a primary till. The shops' demo tills are enrolled by the till history of `make demo-data` (and `make demo-till-sale`); the Android till itself is the till track's.
+- Phase 3's receipts screen reads a shop's whole list (M6 has no paging or single-receipt read yet); counts, write-offs, repack, weigh-and-price, park and resume, and returns are deferred.

@@ -14,7 +14,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
  */
 public interface PosQueries {
 
-    /** The receipts of a location, newest first, with their lines. */
+    /** The receipts of a location, newest first, with their lines and tenders. */
     List<ReceiptView> receipts(UUID locationId, ScopeContext scope);
 
     /** The till sessions of a location, newest first, with their close when it arrived. */
@@ -30,10 +30,17 @@ public interface PosQueries {
             LocalDate businessDate,
             BigDecimal grossAmount,
             List<String> flags,
-            List<Line> lines) {
+            List<Line> lines,
+            UUID tillPositionId,
+            BigDecimal netAmount,
+            BigDecimal taxAmount,
+            List<Tender> tenders) {
 
         public record Line(
                 int lineNo, UUID skuId, UUID batchId, BigDecimal qty, BigDecimal unitPrice, BigDecimal lineTotal) {}
+
+        /** How the customer paid: CASH, CARD ... as the till reported it, in the till's order. */
+        public record Tender(int seq, String kind, BigDecimal amount) {}
     }
 
     record SessionView(

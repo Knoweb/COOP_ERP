@@ -14,8 +14,8 @@ paths:
       operationId: listReceipts
       summary: The receipts the tills of a location issued, newest first
       description: >
-        Each receipt as the till issued it (its number from the till's series), its lines and
-        what central flagged about it. A location the caller's scope does not read answers an
+        Each receipt as the till issued it (its number from the till's series, its till
+        position), its lines, its tenders and what central flagged about it. A location the caller's scope does not read answers an
         empty list.
       x-permission: pos.receipt.view
       parameters:
@@ -56,15 +56,18 @@ components:
   schemas:
     ReceiptResponse:
       type: object
-      required: [documentId, locationId, issuedAt, flags, lines]
+      required: [documentId, locationId, issuedAt, flags, lines, tenders]
       properties:
         documentId: { type: string, format: uuid }
         locationId: { type: string, format: uuid }
         deviceId: { type: string, format: uuid }
         sessionId: { type: string, format: uuid }
+        tillPositionId: { type: string, format: uuid }
         docNumberDisplay: { type: string }
         issuedAt: { type: string, format: date-time }
         businessDate: { type: string, format: date }
+        netAmount: { type: number }
+        taxAmount: { type: number }
         grossAmount: { type: number }
         flags:
           type: array
@@ -72,6 +75,16 @@ components:
         lines:
           type: array
           items: { $ref: '#/components/schemas/ReceiptLineResponse' }
+        tenders:
+          type: array
+          items: { $ref: '#/components/schemas/ReceiptTenderResponse' }
+    ReceiptTenderResponse:
+      type: object
+      required: [seq, kind, amount]
+      properties:
+        seq: { type: integer }
+        kind: { type: string, description: 'CASH, CARD ... as the till reported it' }
+        amount: { type: number }
     ReceiptLineResponse:
       type: object
       required: [lineNo, qty]

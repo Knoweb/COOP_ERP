@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * The receipts the tills of a location issued, newest first
-         * @description Each receipt as the till issued it (its number from the till's series), its lines and what central flagged about it. A location the caller's scope does not read answers an empty list.
+         * @description Each receipt as the till issued it (its number from the till's series, its till position), its lines, its tenders and what central flagged about it. A location the caller's scope does not read answers an empty list.
          */
         get: operations["listReceipts"];
         put?: never;
@@ -54,14 +54,25 @@ export interface components {
             deviceId?: string;
             /** Format: uuid */
             sessionId?: string;
+            /** Format: uuid */
+            tillPositionId?: string;
             docNumberDisplay?: string;
             /** Format: date-time */
             issuedAt: string;
             /** Format: date */
             businessDate?: string;
+            netAmount?: number;
+            taxAmount?: number;
             grossAmount?: number;
             flags: string[];
             lines: components["schemas"]["ReceiptLineResponse"][];
+            tenders: components["schemas"]["ReceiptTenderResponse"][];
+        };
+        ReceiptTenderResponse: {
+            seq: number;
+            /** @description CASH, CARD ... as the till reported it */
+            kind: string;
+            amount: number;
         };
         ReceiptLineResponse: {
             lineNo: number;

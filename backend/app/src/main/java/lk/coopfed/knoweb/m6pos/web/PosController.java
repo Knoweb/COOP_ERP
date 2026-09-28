@@ -7,6 +7,7 @@ import lk.coopfed.knoweb.m6pos.query.PosQueries;
 import lk.coopfed.knoweb.m6pos.web.generated.PosApi;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptLineResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptResponse;
+import lk.coopfed.knoweb.m6pos.web.generated.ReceiptTenderResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.SessionResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,7 +38,13 @@ class PosController implements PosApi {
                                                 .batchId(l.batchId())
                                                 .unitPrice(l.unitPrice())
                                                 .lineTotal(l.lineTotal()))
+                                        .toList(),
+                                r.tenders().stream()
+                                        .map(x -> new ReceiptTenderResponse(x.seq(), x.kind(), x.amount()))
                                         .toList())
+                        .tillPositionId(r.tillPositionId())
+                        .netAmount(r.netAmount())
+                        .taxAmount(r.taxAmount())
                         .deviceId(r.deviceId())
                         .sessionId(r.sessionId())
                         .docNumberDisplay(r.docNumberDisplay())

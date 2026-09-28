@@ -30,7 +30,7 @@ class PosQueriesImpl implements PosQueries {
         return jdbc.query(
                 """
                 select document_id, location_id, device_id, session_id, doc_number_display, issued_at, business_date,
-                       gross_amount, flags
+                       gross_amount, flags, till_position_id, net_amount, tax_amount
                   from pos.receipt
                  where location_id = ?
                  order by issued_at desc, document_id
@@ -47,7 +47,11 @@ class PosQueriesImpl implements PosQueries {
                             rs.getObject("business_date", LocalDate.class),
                             rs.getBigDecimal("gross_amount"),
                             texts(rs.getArray("flags")),
-                            lines(id));
+                            lines(id),
+                            rs.getObject("till_position_id", UUID.class),
+                            rs.getBigDecimal("net_amount"),
+                            rs.getBigDecimal("tax_amount"),
+                            tenders(id));
                 },
                 locationId);
     }
@@ -67,6 +71,18 @@ class PosQueriesImpl implements PosQueries {
                         rs.getBigDecimal("qty"),
                         rs.getBigDecimal("unit_price"),
                         rs.getBigDecimal("line_total")),
+                documentId);
+    }
+
+    private List<ReceiptView.Tender> tenders(UUID documentId) {
+        return jdbc.query(
+                """
+                select seq, kind, amount
+                  from pos.receipt_tender
+                 where document_id = ?
+                 order by seq
+                """,
+                (rs, n) -> new ReceiptView.Tender(rs.getInt("seq"), rs.getString("kind"), rs.getBigDecimal("amount")),
                 documentId);
     }
 
