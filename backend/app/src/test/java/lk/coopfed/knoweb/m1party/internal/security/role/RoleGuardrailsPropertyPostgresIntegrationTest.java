@@ -23,6 +23,7 @@ import lk.coopfed.knoweb.m1party.api.AmendRole;
 import lk.coopfed.knoweb.m1party.api.AssignRole;
 import lk.coopfed.knoweb.m1party.api.RolePermission;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.PropertyTestTuning;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,7 +111,7 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         ScopeContext asAdmin = ScopeContext.dev(admin, mpcs, null);
         int accepted = 0;
         int refused = 0;
-        for (int step = 0; step < 200; step++) {
+        for (int step = 0, tries = PropertyTestTuning.tries(200); step < tries; step++) {
             UUID role = roles.get(random.nextInt(roles.size()));
             List<RolePermission> wanted = new ArrayList<>();
             for (String code : CODES) {
@@ -236,7 +237,7 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         Random random = new Random(SEED);
         int accepted = 0;
         int refused = 0;
-        for (int attempt = 0; attempt < 250; attempt++) {
+        for (int attempt = 0, tries = PropertyTestTuning.tries(250); attempt < tries; attempt++) {
             Grantor grantor = grantors.get(random.nextInt(grantors.size()));
             UUID user = users.get(random.nextInt(users.size()));
             UUID role = roles.get(random.nextInt(roles.size()));

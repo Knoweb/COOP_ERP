@@ -26,6 +26,7 @@ import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -39,7 +40,13 @@ import org.springframework.test.context.DynamicPropertySource;
  * command handlers, as the demo users, with the permission check on (the users' roles decide, as in
  * compose) and the application connected as coop_app under row-level security; the second run
  * issues no command and changes no row.
+ *
+ * <p>Tagged {@code slow} (about 67s locally) so a pull request's integration run excludes it;
+ * the stack-smoke job already loads the demo, through the real HTTP API, on every pull request.
+ * Pushes to main and the nightly run include it here too, for the assertions this test makes
+ * that stack-smoke does not (the second, no-op run; the query-side views).
  */
+@Tag("slow")
 class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     /** The Federation the demo users belong to: the one of the development seed and of compose. */
