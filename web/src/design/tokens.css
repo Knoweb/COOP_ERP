@@ -67,7 +67,7 @@
   --target-gap: 0.75rem; /* 12 px: the one distance that is not on the 8 px grid; doc 30 names it */
 
   /* A page is shaped like a document: one column that stays readable on a wide monitor. */
-  --page-max-width: 40rem; /* 640 px */
+  --page-max-width: 72rem; /* 1152 px: desktop back-office workspace */
 
   /* ---- Edges ----------------------------------------------------------------------------- */
 
