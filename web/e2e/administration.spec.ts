@@ -28,8 +28,8 @@ test("an administrator creates a user, gives a role at a location, and the user 
 
   // 1. The user, in English, of the officer's own entity (the Federation).
   await openSignedIn(page, admin, "/party/users/new");
-  await page.getByLabel(textOf(admin, "party.user.username")).fill(username);
-  await page.getByLabel(textOf(admin, "party.user.display_name")).fill(`E2E clerk ${username}`);
+  await page.getByRole("textbox", { name: textOf(admin, "party.user.username"), exact: true }).fill(username);
+  await page.getByRole("textbox", { name: textOf(admin, "party.user.display_name"), exact: true }).fill(`E2E clerk ${username}`);
   await page.getByRole("button", { name: textOf(admin, "party.users.new.submit") }).click();
   await expect(page).toHaveURL(/\/party\/users\/[0-9a-f-]{36}$/);
   await expect(page.getByText(textOf(admin, "party.user.status.PENDING"), { exact: true })).toBeVisible();
@@ -43,8 +43,8 @@ test("an administrator creates a user, gives a role at a location, and the user 
   await expect(page.getByText(textOf(admin, "party.user.status.ACTIVE"), { exact: true })).toBeVisible();
 
   // 3. The accounts role, at the Federation warehouse only.
-  await page.getByLabel(textOf(admin, "party.roles.role")).selectOption({ label: "Demo: accounts" });
-  await page.getByLabel(textOf(admin, "party.roles.where")).selectOption(FEDERATION_WAREHOUSE);
+  await page.getByRole("combobox", { name: textOf(admin, "party.roles.role"), exact: true }).selectOption({ label: "Demo: accounts" });
+  await page.getByRole("combobox", { name: textOf(admin, "party.roles.where"), exact: true }).selectOption(FEDERATION_WAREHOUSE);
   await page.getByRole("button", { name: textOf(admin, "party.roles.assign") }).click();
   await expect(page.getByText(textOf(admin, "party.roles.assigned"))).toBeVisible();
   await expect(page.getByRole("cell", { name: "Demo: accounts" })).toBeVisible();
@@ -87,3 +87,4 @@ test("the Federation view is shown no administration entry", async ({ page }) =>
   await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav.roles") })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: textOf(FED_ADMIN, "party.nav.grants") })).toHaveCount(0);
 });
+

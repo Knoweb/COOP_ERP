@@ -301,7 +301,7 @@ function UserRoles({ userId, deactivated }: { userId: string; deactivated: boole
           <h3 id="party-assign-title">{t("party.roles.assign.title").text}</h3>
           <label className="party-form-field">
             {t("party.roles.role").text}
-            <select value={roleId} onChange={(event) => setRoleId(event.target.value)} required>
+            <select aria-label={t("party.roles.role").text} value={roleId} onChange={(event) => setRoleId(event.target.value)} required>
               <option value="">{t("party.roles.choose").text}</option>
               {assignableRoles(roles.data ?? []).map((role) => (
                 <option key={role.roleId} value={role.roleId}>
@@ -312,7 +312,7 @@ function UserRoles({ userId, deactivated }: { userId: string; deactivated: boole
           </label>
           <label className="party-form-field">
             {t("party.roles.where").text}
-            <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+            <select aria-label={t("party.roles.where").text} value={locationId} onChange={(event) => setLocationId(event.target.value)}>
               <option value="">{t("party.roles.entity_wide").text}</option>
               {(locations.data ?? []).map((location) => (
                 <option key={location.locationId} value={location.locationId}>
