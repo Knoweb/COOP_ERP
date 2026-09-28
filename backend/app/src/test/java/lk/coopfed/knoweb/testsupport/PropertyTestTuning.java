@@ -26,4 +26,16 @@ public final class PropertyTestTuning {
         int requested = Integer.parseInt(configured.trim());
         return Math.min(requested, full);
     }
+
+    /**
+     * A floor a property test asserts over its full count, scaled to the count run this time,
+     * so a shorter pull request run still asks for the same share of outcomes (rounded down).
+     *
+     * @param floor the floor at the full count
+     * @param full the full count
+     * @param tries the count run this time
+     */
+    public static int scaled(int floor, int full, int tries) {
+        return floor * tries / full;
+    }
 }

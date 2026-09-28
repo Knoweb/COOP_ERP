@@ -251,7 +251,7 @@ jobs:
       COOP_ERP_INTEGRATION_FORKS: "1"
       COOP_ERP_TEST_SHARD_PACKAGES: ${{ matrix.shard.packages }}
       COOP_ERP_EXCLUDE_SLOW: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
-      COOP_ERP_PROPERTY_TRIES: ${{ github.event_name == 'pull_request' && '40' || '' }}
+      COOP_ERP_PROPERTY_TRIES: ${{ github.event_name == 'pull_request' && '100' || '' }}
 
     steps:
       - name: Checkout
