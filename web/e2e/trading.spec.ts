@@ -107,10 +107,10 @@ test("the Federation sells to D101: order, acceptance, delivery note, dispatch, 
   const invoicePath = new URL(page.url()).pathname;
   await page.context().close();
 
-  // d101-accounts reads the same invoice; the printed copy is the seller's.
+  // d101-accounts reads the same invoice and prints the same PDF, stored under the seller.
   const buyerAccounts = DEMO.d101Accounts;
   page = await as(buyerAccounts, invoicePath);
   await expect(page.getByRole("heading", { name: textOf(buyerAccounts, "trading.invoice.title") })).toBeVisible();
-  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.invoice.print") })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.invoice.print") })).toBeVisible();
   await page.context().close();
 });
