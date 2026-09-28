@@ -46,8 +46,8 @@ test("an administrator creates a user, gives a role at a location, and the user 
   await page.getByRole("combobox", { name: textOf(admin, "party.roles.role"), exact: true }).selectOption({ label: "Demo: accounts" });
   await page.getByRole("combobox", { name: textOf(admin, "party.roles.where"), exact: true }).selectOption(FEDERATION_WAREHOUSE);
   await page.getByRole("button", { name: textOf(admin, "party.roles.assign") }).click();
-  await expect(page.getByText(textOf(admin, "party.roles.assigned"))).toBeVisible();
-  await expect(page.getByRole("cell", { name: "Demo: accounts" })).toBeVisible();
+  await expect(page.getByText(textOf(admin, "party.roles.assigned")).first()).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Demo: accounts", exact: true }).first()).toBeVisible();
   await page.context().close();
 
   // 4. The new user signs in with the temporary password and chooses a new one.
