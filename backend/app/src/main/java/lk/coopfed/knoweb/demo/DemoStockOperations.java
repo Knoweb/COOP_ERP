@@ -50,7 +50,7 @@ import org.springframework.stereotype.Service;
 /**
  * Stock control at Kuliyapitiya MPCS's stores (M5-11, M5-13 and the repack), dated in the demo
  * history (DEMO-02, {@link DemoCalendar}): three weeks ago the stores counted dhal and sugar and
- * found a small shortfall, which the manager approved; twelve days ago the buyer wrote off expired
+ * found a small shortfall, which the manager approved; twelve days ago the buyer wrote off damaged
  * wheat flour, which the manager witnessed and approved; six days ago the stores repacked loose
  * samba rice into the society's own 5 kg packs. Every step goes through the ordinary handlers as
  * the demo user whose job it is: the buyer (m101-buyer) counts, requests and repacks; the manager
@@ -65,7 +65,7 @@ class DemoStockOperations {
 
     static final String COUNTED_ITEM_SHORT_ONE = "Red dhal 1 kg";
     static final String COUNTED_ITEM_SHORT_THREE = "White sugar 1 kg";
-    static final String EXPIRED_ITEM = "Wheat flour 1 kg";
+    static final String DAMAGED_ITEM = "Wheat flour 1 kg";
     static final String LOOSE_RICE = "Samba rice, loose";
     static final String SOCIETY_PACK = "Samba rice 5 kg, society pack";
     static final String RECIPE = "Loose samba rice into 5 kg packs";
@@ -132,7 +132,7 @@ class DemoStockOperations {
         LocalDate today = calendar.today();
         calendar.run(today.minusDays(20), LocalTime.of(10, 0), () -> countAtTheStores(count));
         calendar.run(today.minusDays(20), LocalTime.of(15, 0), () -> approveTheCount(count));
-        calendar.run(today.minusDays(12), LocalTime.of(9, 30), () -> writeOffExpiredFlour(count));
+        calendar.run(today.minusDays(12), LocalTime.of(9, 30), () -> writeOffDamagedFlour(count));
         calendar.run(today.minusDays(12), LocalTime.of(11, 0), () -> witnessAndApprove(count));
         calendar.run(today.minusDays(6), LocalTime.of(8, 30), () -> theSocietyPack(count));
         calendar.run(today.minusDays(6), LocalTime.of(10, 0), () -> repackLooseRice(count));
@@ -197,14 +197,14 @@ class DemoStockOperations {
                 .min(Comparator.comparing(CountView::scheduledAt).thenComparing(CountView::taskId));
     }
 
-    // ---- the write-off: expired flour, witnessed and approved by the manager ------------------
+    // ---- the write-off: damaged flour, witnessed and approved by the manager ------------------
 
-    private void writeOffExpiredFlour(Consumer<String> count) {
+    private void writeOffDamagedFlour(Consumer<String> count) {
         ScopeContext buyer = scopeOf(DemoCast.M101_BUYER);
         Optional<WriteOffView> existing = firstWriteOff(buyer);
         UUID id;
         if (existing.isEmpty()) {
-            UUID flour = sku(EXPIRED_ITEM, buyer);
+            UUID flour = sku(DAMAGED_ITEM, buyer);
             BigDecimal qty = new BigDecimal("2");
             Optional<LotBalance> lot = inventory.balances(DemoCast.M101_WAREHOUSE, flour, false, buyer).stream()
                     .filter(l -> "GOOD".equals(l.condition()) && l.qtyOnHand().compareTo(qty) >= 0)
@@ -215,8 +215,8 @@ class DemoStockOperations {
             id = requestWriteOff.handle(
                     new RequestWriteOff(
                             DemoCast.M101_WAREHOUSE,
-                            LossCategory.EXPIRED,
-                            "Two packs past their date, found behind the shelf at the stock check",
+                            LossCategory.DAMAGED_IN_STORE,
+                            "Two packs torn and spoilt by a roof leak, found behind the shelf at the stock check",
                             List.of(new RequestWriteOff.Line(lot.get().batchId(), LotCondition.GOOD, qty))),
                     buyer);
             count.accept("RequestWriteOff");

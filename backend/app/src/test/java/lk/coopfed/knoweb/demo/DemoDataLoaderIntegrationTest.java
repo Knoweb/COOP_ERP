@@ -287,7 +287,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     /**
      * M5-11, M5-13 (DemoStockOperations): at Kuliyapitiya stores, a count closed with a small
-     * shortfall approved by the manager three weeks ago, a write-off of expired flour witnessed and
+     * shortfall approved by the manager three weeks ago, a write-off of damaged flour witnessed and
      * posted twelve days ago, and loose samba rice repacked into the society's own 5 kg packs six
      * days ago; each dated in the history.
      */
@@ -312,7 +312,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         List<WriteOffView> writeOffs = control.writeOffs(DemoCast.M101_WAREHOUSE, manager);
         assertThat(writeOffs).singleElement().satisfies(w -> {
             assertThat(w.status()).isEqualTo("POSTED");
-            assertThat(w.category()).isEqualTo("EXPIRED");
+            assertThat(w.category()).isEqualTo("DAMAGED_IN_STORE");
             assertThat(w.witnessUserId()).isEqualTo(DemoCast.M101_MANAGER.userId());
             assertThat(w.documentNo()).isNotBlank();
             assertThat(LocalDate.ofInstant(w.decidedAt(), colombo))
