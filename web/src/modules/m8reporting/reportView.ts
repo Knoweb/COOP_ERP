@@ -44,5 +44,43 @@ export function csvFileName(reportId: string, query: ReportQuery): string {
 
 /** Whether a column is a number, right-aligned. */
 export function isNumeric(kind: string): boolean {
-  return kind === "QTY" || kind === "MONEY";
+  return kind === "QTY" || kind === "MONEY" || kind === "COUNT" || kind === "PERCENT";
+}
+
+/** Where the user acts on an exception: the trading page of its subject, if it has one. */
+export function exceptionLink(item: {
+  kind: string;
+  subjectId: string;
+  role?: string;
+  counterpartyEntityId?: string;
+}): string | undefined {
+  switch (item.kind) {
+    case "DISCREPANCY_OPEN":
+      return `/trading/discrepancies/${item.subjectId}`;
+    case "INVOICE_DISPUTED":
+      return `/trading/invoices/${item.subjectId}`;
+    case "CHEQUE_BOUNCED":
+      return `/trading/payments/${item.subjectId}`;
+    case "EXPOSURE_WARNING":
+      return item.role && item.counterpartyEntityId
+        ? `/trading/accounts/${item.role}/${item.counterpartyEntityId}`
+        : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** Where a tile opens: its report, or the exception queue. */
+export function tileLink(drillReportId: string | undefined): string | undefined {
+  if (!drillReportId) {
+    return undefined;
+  }
+  return drillReportId === "exceptions" ? "/reporting/exceptions" : `/reporting/reports/${drillReportId}`;
+}
+
+/** The heights of a trend's bars, 0 to 100, against its largest week; all 0 when every week is 0. */
+export function trendHeights(values: string[]): number[] {
+  const numbers = values.map((value) => Math.max(0, Number(value) || 0));
+  const max = Math.max(0, ...numbers);
+  return numbers.map((value) => (max === 0 ? 0 : Math.round((value / max) * 100)));
 }

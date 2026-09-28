@@ -36,8 +36,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class TradeProjectionPostgresIntegrationTest extends PostgresIntegrationTest {
 
-    static final List<String> TABLES =
-            List.of("reporting.projection_state", "reporting.trade_document_event", "reporting.trade_line_fact");
+    static final List<String> TABLES = List.of(
+            "reporting.projection_state",
+            "reporting.trade_document_event",
+            "reporting.trade_line_fact",
+            "reporting.trade_document_link",
+            "reporting.trade_settlement_fact",
+            "reporting.exposure_warning_event");
 
     @Autowired
     TradeProjection projection;
@@ -73,7 +78,7 @@ class TradeProjectionPostgresIntegrationTest extends PostgresIntegrationTest {
             for (int i = 0; i < 12; i++) {
                 t = t.plusSeconds(3_600 + random.nextInt(40_000));
                 events.addAll(TradeFlows.flow(
-                        harness, seller, buyers[random.nextInt(3)], skus, random, t, random.nextInt(4)));
+                        harness, seller, buyers[random.nextInt(3)], skus, random, t, random.nextInt(5)));
             }
 
             ProjectionHarness.Result result = harness.liveThenRebuild(events, projection::on, TABLES, seed);

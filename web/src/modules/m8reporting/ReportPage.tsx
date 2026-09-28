@@ -56,6 +56,13 @@ export function ReportPage() {
     }
   }, [definition, form, query]);
 
+  // The run history: the entity's earlier prints of this report, asked again after each print.
+  const runs = useQuery({
+    queryKey: ["reporting", "runs", reportId, run?.runId, run?.status],
+    queryFn: () => api.runs(reportId),
+    enabled: canExport && definition !== undefined
+  });
+
   const data = useQuery({
     queryKey: ["reporting", "data", reportId, query],
     queryFn: () => api.data(reportId, query!),
@@ -252,6 +259,55 @@ export function ReportPage() {
           )}
         </>
       )}
+
+      {canExport && runs.data && (
+        <section>
+          <h2>{t("reporting.runs.title").text}</h2>
+          {runs.data.length === 0 ? (
+            <p>{t("reporting.runs.empty").text}</p>
+          ) : (
+            <div className="modern-table-card">
+              <div className="modern-table-scroll">
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("reporting.runs.col.requested").text}</th>
+                      <th scope="col">{t("reporting.runs.col.language").text}</th>
+                      <th scope="col">{t("reporting.runs.col.status").text}</th>
+                      <th scope="col" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runs.data.map((earlier) => (
+                      <tr key={earlier.runId}>
+                        <td>{formatInstant(earlier.requestedAt)}</td>
+                        <td>{earlier.language}</td>
+                        <td>{t(`reporting.runs.status.${earlier.status}`).text}</td>
+                        <td>
+                          {earlier.status === "READY" && (
+                            <button
+                              type="button"
+                              className="modern-btn"
+                              onClick={() =>
+                                api.run(earlier.runId).then(
+                                  (fresh) => fresh.downloadUrl && window.open(fresh.downloadUrl, "_blank", "noreferrer"),
+                                  (error) => setExportError(errorText(error, t("reporting.error.generic").text))
+                                )
+                              }
+                            >
+                              {t("reporting.runs.open").text}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
     </main>
   );
 
@@ -264,6 +320,9 @@ export function ReportPage() {
     }
     if (kind === "DATE") {
       return formatDate(value);
+    }
+    if (kind === "PERCENT") {
+      return t("reporting.percent", undefined, { value }).text;
     }
     return value;
   }

@@ -9,15 +9,26 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.m4trading.api.ChequeBounced;
+import lk.coopfed.knoweb.m4trading.api.CreditNoteIssued;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteDispatched;
+import lk.coopfed.knoweb.m4trading.api.DeliveryNoteIssued;
+import lk.coopfed.knoweb.m4trading.api.DiscrepancyRaised;
+import lk.coopfed.knoweb.m4trading.api.DiscrepancySettled;
+import lk.coopfed.knoweb.m4trading.api.ExposureWarning;
 import lk.coopfed.knoweb.m4trading.api.GrnConfirmed;
 import lk.coopfed.knoweb.m4trading.api.GrnLineConfirmed;
+import lk.coopfed.knoweb.m4trading.api.InvoiceDisputeResolved;
+import lk.coopfed.knoweb.m4trading.api.InvoiceDisputed;
 import lk.coopfed.knoweb.m4trading.api.InvoiceIssued;
 import lk.coopfed.knoweb.m4trading.api.OrderAccepted;
 import lk.coopfed.knoweb.m4trading.api.OrderCancelled;
 import lk.coopfed.knoweb.m4trading.api.OrderLineSummary;
 import lk.coopfed.knoweb.m4trading.api.OrderRejected;
 import lk.coopfed.knoweb.m4trading.api.OrderSubmitted;
+import lk.coopfed.knoweb.m4trading.api.PaymentReceiptRecorded;
+import lk.coopfed.knoweb.m4trading.api.PaymentReceiptReversed;
+import lk.coopfed.knoweb.m4trading.api.RecordPaymentReceipt.Settlement;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness.Delivery;
 
@@ -28,7 +39,9 @@ public final class TradeFlows {
 
     /**
      * One order from submission to where {@code depth} stops it: 0 submitted only, 1 rejected
-     * or cancelled, 2 accepted and dispatched (in transit), 3 received and invoiced.
+     * or cancelled, 2 accepted and dispatched (in transit), 3 received and invoiced, 4 then part
+     * paid, a cheque bounced, a discrepancy raised, credited and settled, disputed and resolved,
+     * and an exposure warning.
      */
     public static List<Delivery> flow(
             ProjectionHarness harness, UUID seller, UUID buyer, UUID[] skus, Random random, Instant t, int depth) {
@@ -90,6 +103,11 @@ public final class TradeFlows {
                 new OrderAccepted(order, relationship, buyer, seller, Ids.next(), null, null, accepted)));
         UUID note = Ids.next();
         events.add(harness.event(
+                DeliveryNoteIssued.TYPE,
+                seller,
+                t.plusSeconds(90),
+                new DeliveryNoteIssued(note, "DN-" + note, seller, buyer, List.of(order), List.of(), null)));
+        events.add(harness.event(
                 DeliveryNoteDispatched.TYPE,
                 seller,
                 t.plusSeconds(120),
@@ -122,12 +140,13 @@ public final class TradeFlows {
         net = net.setScale(2, java.math.RoundingMode.HALF_UP);
         BigDecimal tax = net.multiply(new BigDecimal("0.18")).setScale(2, java.math.RoundingMode.HALF_UP);
         LocalDate taxPoint = t.plusSeconds(240).atZone(ZoneOffset.UTC).toLocalDate();
+        UUID invoice = Ids.next();
         events.add(harness.event(
                 InvoiceIssued.TYPE,
                 seller,
                 t.plusSeconds(240),
                 new InvoiceIssued(
-                        Ids.next(),
+                        invoice,
                         "INV-" + grn,
                         relationship,
                         seller,
@@ -141,6 +160,111 @@ public final class TradeFlows {
                         tax,
                         net.add(tax),
                         "hash")));
+        if (depth == 3) {
+            return events;
+        }
+        // 4: after the invoice, what the buyer and the seller do with it: part paid, credited, a
+        // cheque that bounced, a discrepancy raised and settled, a dispute, a warning.
+        BigDecimal part = net.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.DOWN);
+        events.add(harness.event(
+                PaymentReceiptRecorded.TYPE,
+                seller,
+                t.plusSeconds(300),
+                new PaymentReceiptRecorded(
+                        Ids.next(),
+                        "PRC-" + grn,
+                        relationship,
+                        seller,
+                        buyer,
+                        "CASH",
+                        part.add(BigDecimal.TEN),
+                        taxPoint,
+                        List.of(new Settlement(invoice, part)),
+                        BigDecimal.TEN)));
+        UUID cheque = Ids.next();
+        UUID reversal = Ids.next();
+        events.add(harness.event(
+                PaymentReceiptRecorded.TYPE,
+                seller,
+                t.plusSeconds(310),
+                new PaymentReceiptRecorded(
+                        cheque,
+                        "PRC-C-" + grn,
+                        relationship,
+                        seller,
+                        buyer,
+                        "CHEQUE",
+                        BigDecimal.ONE,
+                        taxPoint,
+                        List.of(new Settlement(invoice, BigDecimal.ONE)),
+                        BigDecimal.ZERO)));
+        events.add(harness.event(
+                PaymentReceiptReversed.TYPE,
+                seller,
+                t.plusSeconds(320),
+                new PaymentReceiptReversed(
+                        reversal,
+                        "PRC-R-" + grn,
+                        cheque,
+                        seller,
+                        buyer,
+                        BigDecimal.ONE,
+                        List.of(new Settlement(invoice, BigDecimal.ONE)),
+                        "BOUNCED")));
+        events.add(harness.event(
+                ChequeBounced.TYPE,
+                seller,
+                t.plusSeconds(320),
+                new ChequeBounced(cheque, reversal, seller, buyer, BigDecimal.ONE, "FUNDS")));
+        UUID discrepancy = Ids.next();
+        events.add(harness.event(
+                DiscrepancyRaised.TYPE,
+                buyer,
+                t.plusSeconds(200),
+                new DiscrepancyRaised(
+                        discrepancy,
+                        "DSC-" + grn,
+                        grn,
+                        note,
+                        buyer,
+                        Ids.next(),
+                        seller,
+                        "SHORT",
+                        t.plusSeconds(86_400),
+                        List.of())));
+        UUID credit = Ids.next();
+        events.add(harness.event(
+                CreditNoteIssued.TYPE,
+                seller,
+                t.plusSeconds(400),
+                new CreditNoteIssued(
+                        credit,
+                        "CN-" + grn,
+                        invoice,
+                        discrepancy,
+                        seller,
+                        buyer,
+                        BigDecimal.ONE,
+                        new BigDecimal("0.18"),
+                        new BigDecimal("1.18"),
+                        "hash")));
+        events.add(harness.event(
+                DiscrepancySettled.TYPE,
+                seller,
+                t.plusSeconds(400),
+                new DiscrepancySettled(discrepancy, grn, seller, buyer, credit, null, t.plusSeconds(400))));
+        events.add(harness.event(
+                InvoiceDisputed.TYPE, buyer, t.plusSeconds(500), new InvoiceDisputed(invoice, seller, buyer, "PRICE")));
+        events.add(harness.event(
+                InvoiceDisputeResolved.TYPE,
+                seller,
+                t.plusSeconds(600),
+                new InvoiceDisputeResolved(invoice, seller, buyer, seller)));
+        events.add(harness.event(
+                ExposureWarning.TYPE,
+                seller,
+                t.plusSeconds(60),
+                new ExposureWarning(relationship, seller, buyer, net, net, 100, order)));
         return events;
     }
 }

@@ -10,3 +10,11 @@
   display: block;
   margin-bottom: var(--space-half);
 }
+
+/* The eight-week trend on a tile: one series, the accent colour, a text for every bar. */
+.reporting-trend {
+  display: block;
+  width: 100%;
+  height: var(--space-6);
+  fill: var(--color-accent);
+}

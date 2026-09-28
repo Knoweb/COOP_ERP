@@ -7,6 +7,8 @@ import { messages } from "../i18n/messages";
 import type { Locale } from "../i18n/messages";
 import { ApprovalBar } from "./ApprovalBar";
 import { DocumentHeader } from "./DocumentHeader";
+import { ExceptionQueue } from "./ExceptionQueue";
+import { MemoryRouter } from "react-router-dom";
 import { MoneyDisplay } from "./MoneyDisplay";
 import { ReasonCapture } from "./ReasonCapture";
 import { CHIP_STATES, StateChip } from "./StateChip";
@@ -292,5 +294,36 @@ describe("ReasonCapture", () => {
     cleanup();
     renderIn("ta", <ReasonCapture title="ஏன்?" codes={codes} onConfirm={() => {}} onCancel={() => {}} />);
     expect(screen.getByRole("button", { name: "உறுதிப்படுத்து" })).toBeTruthy();
+  });
+});
+
+describe("ExceptionQueue", () => {
+  const headers = { state: "State", what: "What", subject: "With", amount: "Amount", since: "Since", action: "Action" };
+
+  it("lists each item with its state as a word, and links to where it is dealt with", () => {
+    renderIn(
+      "en",
+      <MemoryRouter>
+        <ExceptionQueue
+          caption="Needs a person"
+          headers={headers}
+          emptyText="Nothing"
+          items={[
+            { key: "a", severity: "alert", stateLabel: "Alert", what: "Bounced cheque", subject: "D101", since: "today", href: "/x", linkLabel: "View" },
+            { key: "b", severity: "review", stateLabel: "Escalated", escalated: true, what: "Open discrepancy", since: "Monday" }
+          ]}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("table", { name: "Needs a person" })).toBeTruthy();
+    expect(screen.getByText("Bounced cheque")).toBeTruthy();
+    expect(screen.getByText("Escalated").closest(".state-chip--alert")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View" }).getAttribute("href")).toBe("/x");
+  });
+
+  it("says so when there is nothing", () => {
+    renderIn("en", <ExceptionQueue caption="c" headers={headers} emptyText="Nothing needs attention." items={[]} />);
+    expect(screen.getByText("Nothing needs attention.")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });
