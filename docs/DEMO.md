@@ -97,7 +97,7 @@ Places: Federation central warehouse, Peliyagoda (FW01); Kurunegala warehouse (D
 
 ## The storyline of phase 1: the Federation sells to a distributor
 
-Each step names who signs in and where they click. Steps 1 to 3 are already done by `make demo-data`; the demo shows them, then does steps 4 to 9 live.
+Each step names who signs in and where they click. Steps 1 to 3 are already done by `make demo-data`; the demo shows them, then does steps 4 to 10 live.
 
 1. **Catalogue.** `fed-steward`: Catalogue, browse the SKUs; open "Samba rice 5 kg": names in three scripts, unit EA, pack BAG of 5, barcode, tax EXEMPT, status SHARED. (Optional: create a new SKU and share it.)
 2. **Price list.** `fed-pricing`: Pricing, "Federation trade list for distributors", PUBLISHED; the tiers (a lower price from 100). Relationships: D101 and D102 ACTIVE on this list. (Optional: draft a new version, change a price, publish.)
@@ -108,6 +108,7 @@ Each step names who signs in and where they click. Steps 1 to 3 are already done
 7. **Dispatch.** `fed-stores` (Sinhala, FW01 only): **Trading**, *Delivery notes sent*, open the note; type the vehicle and the driver, **Dispatch**: *In transit*.
 8. **GRN.** `d101-stores` (Sinhala, W01 only): **Trading**, *Deliveries on their way to us*, open the note, **Receive the goods**. The count starts at what was sent, the batch, expiry and MRP from the Federation's batch; type 38 for the dhal to show a short line (marked *Short*). **Save the count**, then **Confirm receipt**: the GRN takes its number, ownership passes here (AGENTS.md, idea 2), the short line raises a discrepancy with the Federation, and the card lists the stock received. **See the stock position** (Inventory, Kurunegala warehouse) shows the new lots.
 9. **Invoice.** `fed-accounts`: **Trading**, *Goods received by our buyers*, open the GRN, **Issue the invoice**: the tax invoice at the received quantities and the tier prices, with its links to the GRN and the delivery note. **Print** opens the A4 PDF once the worker has printed it (a moment after the issue). `d101-accounts` (Sinhala): **Trading**, *Invoices received*, reads the same invoice, and its **Print** opens the same A4 PDF (stored under the Federation, reached through the invoice the buyer reads).
+10. **Settle the short delivery.** `fed-accounts`: open the GRN of step 8 (**Trading**, *Goods received by our buyers*). Its *Discrepancy* fact **Raised with the seller** opens the discrepancy: the dhal line sent 40, received 38, difference -2, status *Open* (also listed under *Discrepancies raised with us* on the desk). **Accept the count and settle** (reason prefilled "Count accepted"): the discrepancy reads *Settled*, with when and the reason, and **no credit note is issued**. The invoice of step 9 billed the 38 received (ownership passes at the GRN), so the 2 short bags were never charged. Only damaged quantity the invoice charged is credited, by a credit note at the invoice price (the demo GRN has none). `d101-accounts` (Sinhala): **Trading**, *Discrepancies we raised*, reads the same discrepancy *Settled* (read only), and the invoice with nothing credited. (Optional: `d101-accounts` disputes the invoice with a reason, and closes the dispute.)
 
 The whole path, as these users, is `web/e2e/trading.spec.ts` (run by the pipeline's stack smoke after `make demo-data`).
 
