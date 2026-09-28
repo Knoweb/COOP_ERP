@@ -12,6 +12,7 @@ export type Tile = components["schemas"]["DashboardTile"];
 export type ReportDefinition = components["schemas"]["ReportDefinitionResponse"];
 export type ReportData = components["schemas"]["ReportDataResponse"];
 export type ReportRun = components["schemas"]["ReportRunResponse"];
+export type ExceptionItem = components["schemas"]["ExceptionItemResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
@@ -61,6 +62,18 @@ export function useReportingApi() {
           body: { ...query, language }
         });
         return data!;
+      },
+
+      async exceptions(): Promise<ExceptionItem[]> {
+        const { data } = await api.GET("/v1/reporting/exceptions");
+        return data ?? [];
+      },
+
+      async runs(reportId: string): Promise<ReportRun[]> {
+        const { data } = await api.GET("/v1/reporting/reports/{reportId}/runs", {
+          params: { path: { reportId } }
+        });
+        return data ?? [];
       },
 
       async run(runId: string): Promise<ReportRun> {

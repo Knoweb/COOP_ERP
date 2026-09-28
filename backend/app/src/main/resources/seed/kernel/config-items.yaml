@@ -314,6 +314,27 @@ config_items:
     default: 5242880
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # M8-05 (28A section 7): the dashboard's cache and the exception queue's escalation.
+  - key: reporting.dashboard_cache_seconds
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 600 }
+    description_en: How long the dashboard's figures are kept before they are read again, in seconds
+    description_si: උපකරණ පුවරුවේ සංඛ්‍යා නැවත කියවීමට පෙර තබා ගන්නා කාලය, තත්පර වලින්
+    description_ta: டாஷ்போர்டின் எண்ணிக்கைகள் மீண்டும் படிக்கப்படுவதற்கு முன் வைத்திருக்கப்படும் நேரம், வினாடிகளில்
+    default: 60
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m8reporting
+  - key: reporting.exception_escalate_after
+    value_type: DURATION
+    schema: { minimum: PT1H, maximum: P90D }
+    description_en: How long an exception may wait before the queue marks it escalated
+    description_si: ව්‍යතිරේකයක් උත්සන්න කළ බව සලකුණු කිරීමට පෙර එයට රැඳී සිටිය හැකි කාලය
+    description_ta: ஒரு விதிவிலக்கு மேலுயர்த்தப்பட்டதாகக் குறிக்கப்படுவதற்கு முன் காத்திருக்கக்கூடிய நேரம்
+    default: "P3D"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m8reporting
   # K-08: the sync gateway (doc 32; 19A section 8). The batch limits and the chunk size are doc 32
   # DR-1 and DR-5, the change-log retention DR-4: proposed values, to be settled after the load
   # test (spike 5), so they are configuration and not constants.
