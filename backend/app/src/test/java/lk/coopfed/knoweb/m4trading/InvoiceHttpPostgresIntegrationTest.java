@@ -146,7 +146,7 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aShortDeliveryIsSettledWithACreditNoteThatBothPartiesRead() {
+    void aShortDeliveryIsSettledWithNoMoneyAndACreditNoteIsForBilledLinesOnly() {
         UUID noteId = flow.dispatchedNote(SHOP);
         UUID dropId = deliveries
                 .getDeliveryNote(noteId, buyer())
@@ -179,27 +179,53 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(open.get(0).get("invoiceId").asText()).isEqualTo(invoiceId);
         String discrepancyId = open.get(0).get("discrepancyId").asText();
 
+        // The seller accepts the count: the 2 short bags were never billed, so no money moves.
+        JsonNode settledBySeller = post(
+                "/v1/trading/discrepancies/" + discrepancyId + "/settle",
+                Map.of("reason", "Count accepted"),
+                SELLER_USER,
+                SELLER);
+        assertThat(settledBySeller.get("status").asText()).isEqualTo("SETTLED");
+        assertThat(settledBySeller.path("creditNoteId").isMissingNode()
+                        || settledBySeller.get("creditNoteId").isNull())
+                .isTrue();
+        assertThat(settledBySeller.get("settledByUserId").asText()).isEqualTo(SELLER_USER.toString());
+
+        // The buyer reads it settled, and the invoice unchanged: no double credit.
+        JsonNode settled = get("/v1/trading/discrepancies/" + discrepancyId, BUYER_USER, BUYER);
+        assertThat(settled.get("status").asText()).isEqualTo("SETTLED");
+        JsonNode invoice = get("/v1/trading/invoices/" + invoiceId, BUYER_USER, BUYER);
+        assertThat(invoice.get("creditedAmount").decimalValue()).isEqualByComparingTo("0");
+        assertThat(invoice.get("amountDue").decimalValue()).isEqualByComparingTo("1452.80");
+
+        // A credit note of a chosen line (one dhal, EXEMPT, 80.00), read by the buyer.
+        String dhalLine = null;
+        for (JsonNode line : invoice.get("lines")) {
+            if (line.get("skuId").asText().equals(DHAL.toString())) {
+                dhalLine = line.get("lineId").asText();
+            }
+        }
         JsonNode note = post(
                 "/v1/trading/credit-notes",
-                Map.of("invoiceId", invoiceId, "discrepancyId", discrepancyId, "reason", "Two bags short"),
+                Map.of(
+                        "invoiceId",
+                        invoiceId,
+                        "lines",
+                        List.of(Map.of("invoiceLineId", dhalLine, "qty", 1)),
+                        "reason",
+                        "Torn bag"),
                 SELLER_USER,
                 SELLER);
         assertThat(note.get("docNumber").asText()).isEqualTo("D4S-CN-0000001");
-        assertThat(note.get("grossAmount").decimalValue()).isEqualByComparingTo("283.20");
         String creditNoteId = note.get("creditNoteId").asText();
-
-        // The buyer reads the discrepancy settled, the credit note, and the invoice net of it.
-        JsonNode settled = get("/v1/trading/discrepancies/" + discrepancyId, BUYER_USER, BUYER);
-        assertThat(settled.get("status").asText()).isEqualTo("SETTLED");
-        assertThat(settled.get("creditNoteId").asText()).isEqualTo(creditNoteId);
         assertThat(get("/v1/trading/credit-notes/" + creditNoteId, BUYER_USER, BUYER)
-                        .get("lines"))
-                .hasSize(1);
-        JsonNode invoice = get("/v1/trading/invoices/" + invoiceId, BUYER_USER, BUYER);
-        assertThat(invoice.get("creditedAmount").decimalValue()).isEqualByComparingTo("283.20");
-        assertThat(invoice.get("amountDue").decimalValue()).isEqualByComparingTo("1169.60");
-        assertThat(invoice.get("creditNotes").get(0).get("creditNoteId").asText())
-                .isEqualTo(creditNoteId);
+                        .get("grossAmount")
+                        .decimalValue())
+                .isEqualByComparingTo("80.00");
+        assertThat(get("/v1/trading/invoices/" + invoiceId, BUYER_USER, BUYER)
+                        .get("amountDue")
+                        .decimalValue())
+                .isEqualByComparingTo("1372.80");
 
         // The buyer disputes, the seller resolves.
         assertThat(post("/v1/trading/invoices/" + invoiceId + "/dispute", Map.of("reason", "Short"), BUYER_USER, BUYER)

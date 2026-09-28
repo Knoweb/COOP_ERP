@@ -23,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The discrepancies, from the document base and {@code trading.doc_discrepancy}; unpaged for the
  * demo. The buyer owns the discrepancy and the seller is its counterparty, so both read it through
- * document_read. It is SETTLED once a credit note names it ({@code trading.doc_credit_note}, V0005):
- * the seller never writes the buyer's discrepancy (AGENTS.md idea 3).
+ * document_read. It is SETTLED once the seller's row in {@code trading.discrepancy_settlement}
+ * (V0005) names it: the seller never writes the buyer's discrepancy (AGENTS.md idea 3).
  */
 @Service
 class DiscrepancyQueriesImpl implements DiscrepancyQueries {
@@ -64,14 +64,14 @@ class DiscrepancyQueriesImpl implements DiscrepancyQueries {
                 .stream()
                 .findFirst()
                 .orElse(null);
-        UUID creditNoteId = jdbc
-                .queryForList(
-                        "select document_id from trading.doc_credit_note where discrepancy_document_id = ?",
-                        UUID.class,
-                        discrepancyId)
-                .stream()
-                .findFirst()
-                .orElse(null);
+        List<Map<String, Object>> settlement = jdbc.queryForList(
+                """
+                select credit_note_document_id, reason, settled_by, settled_at
+                  from trading.discrepancy_settlement where discrepancy_document_id = ?
+                """,
+                discrepancyId);
+        Map<String, Object> settled = settlement.isEmpty() ? null : settlement.get(0);
+        UUID creditNoteId = settled == null ? null : (UUID) settled.get("credit_note_document_id");
 
         Map<UUID, DocumentLineRecord> reported = new LinkedHashMap<>();
         for (DocumentLineRecord line : documents.findLines(discrepancyId)) {
@@ -105,7 +105,7 @@ class DiscrepancyQueriesImpl implements DiscrepancyQueries {
         return Optional.of(new DiscrepancyView(
                 disc.id(),
                 disc.docNumberDisplay(),
-                creditNoteId == null ? DiscrepancyView.RAISED : DiscrepancyView.SETTLED,
+                settled == null ? DiscrepancyView.RAISED : DiscrepancyView.SETTLED,
                 (String) row.get("kind"),
                 disc.ownerEntityId(),
                 disc.counterpartyEntityId(),
@@ -122,6 +122,9 @@ class DiscrepancyQueriesImpl implements DiscrepancyQueries {
                                 .findById(creditNoteId)
                                 .map(DocumentRecord::docNumberDisplay)
                                 .orElse(null),
+                settled == null ? null : ((Timestamp) settled.get("settled_at")).toInstant(),
+                settled == null ? null : (UUID) settled.get("settled_by"),
+                settled == null ? null : (String) settled.get("reason"),
                 List.copyOf(lines)));
     }
 

@@ -414,8 +414,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * The seller credits its invoice, settling the buyer's discrepancy or chosen lines
-         * @description With discrepancyId the lines are the short and damaged quantities of the discrepancy at the invoice's prices; with lines, the chosen quantities of invoice lines. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued, m4.creditnote.discrepancy_or_lines, m4.discrepancy.not_found, m4.creditnote.discrepancy_not_invoiced, m4.creditnote.discrepancy_settled, m4.creditnote.line_unknown, m4.creditnote.qty_invalid, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+         * The seller credits chosen quantities of lines of its invoice
+         * @description At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.qty_invalid, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
          */
         post: operations["issueCreditNote"];
         delete?: never;
@@ -495,6 +495,28 @@ export interface paths {
         get: operations["getDiscrepancy"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies/{discrepancyId}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller accepts the buyer's count and settles the discrepancy
+         * @description The invoice bills the received quantity, so a short quantity is settled with no money; damaged quantity the invoice charged is credited by a credit note issued in the same act. Asks for a fresh second factor. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+         */
+        post: operations["settleDiscrepancy"];
         delete?: never;
         options?: never;
         head?: never;
@@ -789,16 +811,14 @@ export interface components {
         ResolveInvoiceDisputeRequest: {
             note?: string;
         };
+        SettleDiscrepancyRequest: {
+            reason: string;
+        };
         IssueCreditNoteRequest: {
             /** Format: uuid */
             invoiceId: string;
-            /**
-             * Format: uuid
-             * @description The buyer's discrepancy this credit note settles; not with lines
-             */
-            discrepancyId?: string;
-            /** @description Invoice lines and quantities to credit; not with discrepancyId */
-            lines?: components["schemas"]["CreditNoteLineRequest"][];
+            /** @description Invoice lines and quantities to credit */
+            lines: components["schemas"]["CreditNoteLineRequest"][];
             reason: string;
         };
         CreditNoteLineRequest: {
@@ -879,10 +899,15 @@ export interface components {
             invoiceId?: string;
             /**
              * Format: uuid
-             * @description The seller's credit note that settled the discrepancy
+             * @description The credit note for damaged quantity the invoice charged, issued at settlement; none when nothing billed needed crediting (a short quantity is never billed)
              */
             creditNoteId?: string;
             creditNoteDocNumber?: string;
+            /** Format: date-time */
+            settledAt?: string;
+            /** Format: uuid */
+            settledByUserId?: string;
+            settlementReason?: string;
             lines: components["schemas"]["DiscrepancyLineResponse"][];
         };
         DiscrepancyLineResponse: {
@@ -1785,6 +1810,37 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    settleDiscrepancy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleDiscrepancyRequest"];
+            };
+        };
+        responses: {
+            /** @description The discrepancy, settled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
 }

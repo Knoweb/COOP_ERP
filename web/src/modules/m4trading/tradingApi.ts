@@ -274,11 +274,14 @@ export function useTradingApi() {
         return data!;
       },
 
-      /** The seller settles the buyer's discrepancy with a credit note against the invoice of its GRN. */
-      async settleDiscrepancy(invoiceId: string, discrepancyId: string, reason: string, key: string): Promise<CreditNote> {
-        const { data } = await api.POST("/v1/trading/credit-notes", {
-          params: { header: { "Idempotency-Key": key } },
-          body: { invoiceId, discrepancyId, reason }
+      /**
+       * The seller accepts the buyer's count. A short quantity was never billed and is settled with no
+       * money; damaged quantity the invoice charged is credited by a credit note issued with it.
+       */
+      async settleDiscrepancy(discrepancyId: string, reason: string, key: string): Promise<Discrepancy> {
+        const { data } = await api.POST("/v1/trading/discrepancies/{discrepancyId}/settle", {
+          params: { path: { discrepancyId }, header: { "Idempotency-Key": key } },
+          body: { reason }
         });
         return data!;
       },

@@ -112,6 +112,7 @@ public final class TradingFixture {
                 UUID.class);
         for (String table : new String[] {
             "invoice_dispute",
+            "discrepancy_settlement",
             "doc_credit_note",
             "doc_invoice",
             "doc_discrepancy_line",
@@ -147,6 +148,7 @@ public final class TradingFixture {
     public static void clean(JdbcTemplate admin) {
         for (String table : new String[] {
             "invoice_dispute",
+            "discrepancy_settlement",
             "doc_credit_note",
             "doc_invoice",
             "doc_discrepancy_line",

@@ -1,14 +1,14 @@
--- M4-08, the rest the demo needs (28 September 2026): a short delivery is settled with a credit
--- note, and a buyer may dispute an invoice. 24A sections 3 and 6; what differs and why is in the
+-- M4-08, the rest the demo needs (28 September 2026): the seller settles a discrepancy (a credit
+-- note only for billed damaged quantity), and a buyer may dispute an invoice. 24A sections 3 and 6; what differs and why is in the
 -- module README ("Credit notes and invoice disputes").
 --
 -- 1. trading.doc_credit_note: the seller's credit note (CN, doc 24 section 3.6), an extension of
 --    its kernel document like doc_invoice, so it follows the header (document_read /
 --    document_write; the buyer reads it as the counterparty). It names the invoice it credits
 --    (the CREDITS link in kernel.document_link carries the amount) and, when it settles one, the
---    buyer's discrepancy. The discrepancy is the buyer's document and the seller never writes it
---    (AGENTS.md idea 3), so "settled" is read from here, not stored on the discrepancy: at most
---    one credit note settles a discrepancy (the unique index).
+--    buyer's discrepancy (the damaged quantity it credits). The discrepancy is the buyer's document
+--    (AGENTS.md idea 3); its settlement is the seller's row in discrepancy_settlement (2b). At
+--    most one credit note per discrepancy (the unique index).
 CREATE TABLE trading.doc_credit_note (
     document_id             uuid PRIMARY KEY,
     invoice_document_id     uuid NOT NULL,
@@ -35,6 +35,36 @@ GRANT UPDATE (print_object_key) ON trading.doc_credit_note TO app_rw;
 -- 2. The invoice's credited_amount cache (V0001: "recomputed from document_link by the handlers
 --    that write the links"): IssueCreditNote writes it on the seller's own invoice.
 GRANT UPDATE (credited_amount) ON trading.doc_invoice TO app_rw;
+
+-- 2b. trading.discrepancy_settlement: the seller's acceptance of the buyer's count (architect's
+--    decision of 28 Sep). The invoice bills the received quantity (DR-2), so a short quantity is
+--    settled with no money and only damaged quantity the invoice charged is credited; the row
+--    records who settled, when, and the credit note when there was one. The seller's own row
+--    (the discrepancy is the buyer's document), read by the buyer through party_read.
+CREATE TABLE trading.discrepancy_settlement (
+    discrepancy_document_id uuid        PRIMARY KEY,
+    credit_note_document_id uuid,
+    reason                  text        NOT NULL,
+    settled_by              uuid        NOT NULL,
+    settled_at              timestamptz NOT NULL,
+    owner_entity_id         uuid        NOT NULL,
+    counterparty_entity_id  uuid        NOT NULL
+);
+
+ALTER TABLE trading.discrepancy_settlement ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trading.discrepancy_settlement FORCE ROW LEVEL SECURITY;
+CREATE POLICY own_read ON trading.discrepancy_settlement FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+CREATE POLICY own_write ON trading.discrepancy_settlement FOR INSERT TO app_rw
+    WITH CHECK (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+CREATE POLICY party_read ON trading.discrepancy_settlement FOR SELECT TO app_rw
+    USING (kernel.scope_class() IN ('OWN', 'PARTY')
+           AND (owner_entity_id = kernel.scope_entity() OR counterparty_entity_id = kernel.scope_entity()));
+CREATE POLICY fed_view ON trading.discrepancy_settlement FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'FEDERATION_VIEW');
+CREATE POLICY ext_view ON trading.discrepancy_settlement FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED' AND owner_entity_id = ANY (kernel.granted_entities()));
+GRANT SELECT, INSERT ON trading.discrepancy_settlement TO app_rw;
 
 -- 3. trading.invoice_dispute: the dispute of an invoice, one insert-only row per act. The invoice
 --    is the seller's document and the buyer who disputes it may not write it (AGENTS.md idea 3),

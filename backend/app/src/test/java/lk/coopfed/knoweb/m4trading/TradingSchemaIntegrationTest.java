@@ -48,6 +48,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_invoice", FOLLOWS_HEADER_UPDATED),
             Map.entry("doc_credit_note", FOLLOWS_HEADER_UPDATED),
             Map.entry("invoice_dispute", TEMPLATE_WITH_PARTY),
+            Map.entry("discrepancy_settlement", TEMPLATE_WITH_PARTY),
             Map.entry("posting_map", Set.of("reference_read", "seed_reference")));
 
     /** The columns app_rw may update, per table; a table not named here grants no UPDATE. */

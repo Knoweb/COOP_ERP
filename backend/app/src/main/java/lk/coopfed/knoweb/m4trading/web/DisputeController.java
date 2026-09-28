@@ -4,12 +4,16 @@ import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.SettleDiscrepancy;
+import lk.coopfed.knoweb.m4trading.internal.invoice.SettleDiscrepancyHandler;
 import lk.coopfed.knoweb.m4trading.query.DiscrepancyQueries;
 import lk.coopfed.knoweb.m4trading.query.DiscrepancyView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.DiscrepancyResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.DisputeApi;
+import lk.coopfed.knoweb.m4trading.web.generated.SettleDiscrepancyRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,11 +26,23 @@ import org.springframework.web.bind.annotation.RestController;
 class DisputeController implements DisputeApi {
 
     private final DiscrepancyQueries queries;
+    private final SettleDiscrepancyHandler settle;
     private final CurrentScope currentScope;
 
-    DisputeController(DiscrepancyQueries queries, CurrentScope currentScope) {
+    DisputeController(DiscrepancyQueries queries, SettleDiscrepancyHandler settle, CurrentScope currentScope) {
         this.queries = queries;
+        this.settle = settle;
         this.currentScope = currentScope;
+    }
+
+    @Override
+    public ResponseEntity<DiscrepancyResponse> settleDiscrepancy(
+            String idempotencyKey, UUID discrepancyId, SettleDiscrepancyRequest request) {
+        ScopeContext scope = currentScope.get();
+        settle.handle(new SettleDiscrepancy(discrepancyId, request.getReason()), scope);
+        return ResponseEntity.ok(queries.getDiscrepancy(discrepancyId, scope)
+                .map(DisputeController::toResponse)
+                .orElseThrow(() -> new ProblemException("m4.discrepancy.not_found")));
     }
 
     @Override
@@ -75,6 +91,9 @@ class DisputeController implements DisputeApi {
         response.setInvoiceId(view.invoiceId());
         response.setCreditNoteId(view.creditNoteId());
         response.setCreditNoteDocNumber(view.creditNoteDocNumberDisplay());
+        response.setSettledAt(view.settledAt());
+        response.setSettledByUserId(view.settledByUserId());
+        response.setSettlementReason(view.settlementReason());
         return response;
     }
 }

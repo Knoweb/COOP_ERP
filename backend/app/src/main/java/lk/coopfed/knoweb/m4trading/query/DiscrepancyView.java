@@ -7,8 +7,9 @@ import java.util.UUID;
 
 /**
  * A discrepancy as the buyer who raised it and the seller it was raised with see it (doc 24
- * section 3.4). {@code status} is RAISED, or SETTLED once a credit note of the seller settles it
- * ({@code creditNoteId}); {@code invoiceId} is the seller's invoice of the GRN, when there is one.
+ * section 3.4). {@code status} is RAISED, or SETTLED once the seller accepted the count (who and
+ * when); {@code creditNoteId} is the credit note for billed damaged quantity, if there was any (a
+ * short quantity is never billed, DR-2); {@code invoiceId} is the seller's invoice of the GRN.
  */
 public record DiscrepancyView(
         UUID discrepancyId,
@@ -25,6 +26,9 @@ public record DiscrepancyView(
         UUID invoiceId,
         UUID creditNoteId,
         String creditNoteDocNumberDisplay,
+        Instant settledAt,
+        UUID settledByUserId,
+        String settlementReason,
         List<DiscrepancyLineView> lines) {
 
     public static final String RAISED = "RAISED";

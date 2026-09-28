@@ -5,12 +5,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * IssueCreditNote (24A section 6): the seller credits its own issued invoice. Either it settles the
- * buyer's discrepancy on a GRN of that invoice ({@code discrepancyId}: the lines are the short and
- * damaged quantities of the discrepancy at the invoice's price and VAT rate), or it names the
- * invoice lines and quantities to credit ({@code lines}). One of the two, never both.
+ * IssueCreditNote (24A section 6): the seller credits chosen quantities of lines of its own issued
+ * invoice, at their prices and VAT rates. A discrepancy is settled by {@link SettleDiscrepancy},
+ * which issues a credit note only for billed quantity that should not have been billed.
  */
-public record IssueCreditNote(UUID invoiceId, UUID discrepancyId, List<Line> lines, String reason) {
+public record IssueCreditNote(UUID invoiceId, List<Line> lines, String reason) {
 
     public IssueCreditNote {
         lines = lines == null ? List.of() : List.copyOf(lines);

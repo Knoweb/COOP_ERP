@@ -133,9 +133,8 @@ class BillingController implements BillingApi {
                 : request.getLines().stream()
                         .map(line -> new IssueCreditNote.Line(line.getInvoiceLineId(), line.getQty()))
                         .toList();
-        UUID creditNoteId = issueCreditNote.handle(
-                new IssueCreditNote(request.getInvoiceId(), request.getDiscrepancyId(), lines, request.getReason()),
-                scope);
+        UUID creditNoteId =
+                issueCreditNote.handle(new IssueCreditNote(request.getInvoiceId(), lines, request.getReason()), scope);
         return ResponseEntity.created(URI.create("/v1/trading/credit-notes/" + creditNoteId))
                 .body(readCreditNote(creditNoteId, scope));
     }

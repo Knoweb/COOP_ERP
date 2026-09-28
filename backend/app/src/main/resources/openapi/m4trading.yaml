@@ -723,15 +723,12 @@ paths:
     post:
       tags: [Billing]
       operationId: issueCreditNote
-      summary: The seller credits its invoice, settling the buyer's discrepancy or chosen lines
+      summary: The seller credits chosen quantities of lines of its invoice
       description: >
-        With discrepancyId the lines are the short and damaged quantities of the discrepancy at the
-        invoice's prices; with lines, the chosen quantities of invoice lines. Asks for a fresh
-        second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller,
-        m4.invoice.not_issued, m4.creditnote.discrepancy_or_lines, m4.discrepancy.not_found,
-        m4.creditnote.discrepancy_not_invoiced, m4.creditnote.discrepancy_settled,
-        m4.creditnote.line_unknown, m4.creditnote.qty_invalid, m4.creditnote.nothing_to_credit,
-        document.link.exceeds_balance.
+        At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead.
+        Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller,
+        m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.qty_invalid,
+        m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
       x-permission: bil.creditnote.issue
       x-scope: ENTITY
       parameters:
@@ -861,6 +858,47 @@ paths:
             application/problem+json:
               schema:
                 $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/discrepancies/{discrepancyId}/settle:
+
+    parameters:
+      - in: path
+        name: discrepancyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      tags: [Dispute]
+      operationId: settleDiscrepancy
+      summary: The seller accepts the buyer's count and settles the discrepancy
+      description: >
+        The invoice bills the received quantity, so a short quantity is settled with no money;
+        damaged quantity the invoice charged is credited by a credit note issued in the same act.
+        Asks for a fresh second factor. Problems: m4.discrepancy.not_found,
+        m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettleDiscrepancyRequest'
+      responses:
+        '200':
+          description: The discrepancy, settled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
 
   # @@PATHS@@ (later tickets add their operations above this line)
 
@@ -1494,21 +1532,27 @@ components:
           type: string
           maxLength: 500
 
+    SettleDiscrepancyRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
     IssueCreditNoteRequest:
       type: object
-      required: [invoiceId, reason]
+      required: [invoiceId, lines, reason]
       properties:
         invoiceId:
           type: string
           format: uuid
-        discrepancyId:
-          type: string
-          format: uuid
-          description: The buyer's discrepancy this credit note settles; not with lines
         lines:
           type: array
+          minItems: 1
           maxItems: 500
-          description: Invoice lines and quantities to credit; not with discrepancyId
+          description: Invoice lines and quantities to credit
           items:
             $ref: '#/components/schemas/CreditNoteLineRequest'
         reason:
@@ -1652,8 +1696,18 @@ components:
         creditNoteId:
           type: string
           format: uuid
-          description: The seller's credit note that settled the discrepancy
+          description: >
+            The credit note for damaged quantity the invoice charged, issued at settlement; none
+            when nothing billed needed crediting (a short quantity is never billed)
         creditNoteDocNumber:
+          type: string
+        settledAt:
+          type: string
+          format: date-time
+        settledByUserId:
+          type: string
+          format: uuid
+        settlementReason:
           type: string
         lines:
           type: array

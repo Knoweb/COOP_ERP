@@ -17,9 +17,9 @@ import { discrepancyChip, errorText } from "./tradingView";
 /**
  * One discrepancy (24A section 8, "Discrepancy / Claim", demo scope; M4-08): raised by the buyer's
  * GRN when the count differs from what was sent. Both parties read it. The seller's accounts
- * settle it with a credit note against the invoice of the GRN, for the short and damaged
- * quantities at the invoice price; from then on both see it settled and reach the credit note.
- * The two-step propose/accept, escalation and claims come later (docs/progress, M4-08 deferred).
+ * settle it by accepting the buyer's count: the invoice bills the received quantity, so a short
+ * quantity is settled with no money, and only damaged quantity the invoice charged is credited by a
+ * credit note issued with the settlement. Both then see it settled, by whom and when. The two-step propose/accept, escalation and claims come later (docs/progress, M4-08 deferred).
  */
 export function DiscrepancyPage() {
   const { discrepancyId = "" } = useParams();
@@ -39,16 +39,14 @@ export function DiscrepancyPage() {
   });
   const settle = useMutation({
     mutationFn: () =>
-      api.settleDiscrepancy(
-        discrepancy.data!.invoiceId!,
-        discrepancyId,
-        reason ?? t("trading.discrepancy.reason_default").text,
-        key.current()
-      ),
-    onSuccess: (note) => {
+      api.settleDiscrepancy(discrepancyId, reason ?? t("trading.discrepancy.reason_default").text, key.current()),
+    onSuccess: (settled) => {
       key.next();
       queryClient.invalidateQueries({ queryKey: ["trading"] });
-      navigate(`/trading/credit-notes/${note.creditNoteId}`);
+      // A credit note was issued only for damaged quantity the invoice charged: show it then.
+      if (settled.creditNoteId) {
+        navigate(`/trading/credit-notes/${settled.creditNoteId}`);
+      }
     },
     onError: (error) => {
       if (error instanceof ApiProblem) {
@@ -75,6 +73,9 @@ export function DiscrepancyPage() {
   const d = discrepancy.data;
   const isSeller = d.sellerEntityId === scope.entityId;
   const open = d.status === "RAISED";
+  // Damaged quantity was billed and is credited against the invoice, so it waits for the invoice;
+  // a short quantity was never billed and is settled with no money at any time.
+  const hasDamaged = d.lines.some((line) => line.damagedQty > 0);
 
   return (
     <main className="shell-page">
@@ -99,8 +100,10 @@ export function DiscrepancyPage() {
             value: d.invoiceId && <Link to={`/trading/invoices/${d.invoiceId}`}>{t("trading.invoice.title").text}</Link>
           },
           { label: t("trading.discrepancy.window").text, value: formatInstant(d.windowEndsAt) },
+          { label: t("trading.discrepancy.settled_at").text, value: d.settledAt && formatInstant(d.settledAt) },
+          { label: t("trading.creditnote.reason").text, value: d.settlementReason },
           {
-            label: t("trading.discrepancy.settled_by").text,
+            label: t("trading.discrepancy.credit_note").text,
             value: d.creditNoteId && (
               <Link to={`/trading/credit-notes/${d.creditNoteId}`}>
                 {d.creditNoteDocNumber ?? t("trading.creditnote.title").text}
@@ -139,7 +142,7 @@ export function DiscrepancyPage() {
 
       {isSeller && open && canCredit && (
         <section className="trading-section">
-          {d.invoiceId ? (
+          {d.invoiceId || !hasDamaged ? (
             <>
               <p>{t("trading.discrepancy.settle.explain").text}</p>
               <label>

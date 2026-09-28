@@ -115,29 +115,26 @@ test("the Federation sells to D101: order, acceptance, delivery note, dispatch, 
   await page.context().close();
 
   // 10. Settle the short delivery: fed-accounts opens the discrepancy the GRN raised (from the
-  // GRN it invoiced) and settles it with a credit note for the two short bags at the invoice price.
+  // GRN it invoiced) and accepts the count. The invoice billed the 38 received, so the 2 short bags
+  // were never billed: the discrepancy is settled with no money and no credit note (no double credit).
   page = await as(accounts, grnPath);
   await page.getByRole("link", { name: textOf(accounts, "trading.grn.discrepancy_raised") }).click();
   await expect(page).toHaveURL(/\/trading\/discrepancies\/[0-9a-f-]{36}$/);
   await expect(page.getByText(textOf(accounts, "trading.discrepancy.status.RAISED"), { exact: true })).toBeVisible();
   const discrepancyPath = new URL(page.url()).pathname;
   await page.getByRole("button", { name: textOf(accounts, "trading.discrepancy.settle") }).click();
-  await expect(page).toHaveURL(/\/trading\/credit-notes\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { name: textOf(accounts, "trading.creditnote.title") })).toBeVisible();
-  await expect(page.getByRole("row")).toHaveCount(2); // the header and the short dhal line
-  const creditNotePath = new URL(page.url()).pathname;
-  await page.goto(invoicePath);
-  await expect(page.getByText(textOf(accounts, "trading.invoice.amount_due"))).toBeVisible();
+  await expect(page.getByText(textOf(accounts, "trading.discrepancy.status.SETTLED"), { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(discrepancyPath + "$"));
+  await expect(page.getByRole("link", { name: /CN-/ })).toHaveCount(0);
   await page.context().close();
 
-  // d101-accounts sees the discrepancy settled, the credit note, and the invoice net of it.
+  // d101-accounts sees the discrepancy settled (read only), and the invoice with nothing credited.
   page = await as(buyerAccounts, discrepancyPath);
   await expect(page.getByText(textOf(buyerAccounts, "trading.discrepancy.status.SETTLED"), { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.discrepancy.settle") })).toHaveCount(0);
-  await page.goto(creditNotePath);
-  await expect(page.getByRole("heading", { name: textOf(buyerAccounts, "trading.creditnote.title") })).toBeVisible();
   await page.goto(invoicePath);
-  await expect(page.getByRole("link", { name: /CN-/ })).toBeVisible();
-  await expect(page.getByText(textOf(buyerAccounts, "trading.invoice.amount_due"))).toBeVisible();
+  await expect(page.getByRole("heading", { name: textOf(buyerAccounts, "trading.invoice.title") })).toBeVisible();
+  await expect(page.getByRole("link", { name: /CN-/ })).toHaveCount(0);
+  await expect(page.getByText(textOf(buyerAccounts, "trading.invoice.credited"), { exact: true })).toHaveCount(0);
   await page.context().close();
 });

@@ -130,6 +130,11 @@ audit_event_types:
     offline_capturable: false
     description_en: The open dispute of a tax invoice closed by the seller or the buyer
 
+  - code: DISCREPANCY_SETTLED
+    severity: INFO
+    offline_capturable: false
+    description_en: The seller accepted the buyer's count; a credit note only for billed damaged quantity
+
   - code: CREDIT_NOTE_ISSUED
     severity: INFO
     offline_capturable: false
