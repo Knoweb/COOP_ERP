@@ -14,6 +14,13 @@ export type NavItem = {
   labelId: string;
   /** Where the entry leads: an absolute path of one of the module's routes, for example "/hello". */
   to: string;
+  /**
+   * The permission codes that show THIS entry, when they are stricter than the module's: a user
+   * who holds at least one of them sees it, anybody else does not see it at all (never a link
+   * that leads to the "not allowed" page). Left out, the module's own list decides. Guard the
+   * route with the same codes (<RequirePermission>), so that the entry and the page agree.
+   */
+  requiredPermissions?: string[];
 };
 
 export type ModuleDefinition = {
