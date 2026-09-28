@@ -15,6 +15,16 @@ export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLin
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type Transfer =components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
+export type Count = components["schemas"]["CountResponse"];
+export type ScheduleCountRequest = components["schemas"]["ScheduleCountRequest"];
+export type CountLineRequest = components["schemas"]["CountLineRequest"];
+export type NegativeLot = components["schemas"]["NegativeLotResponse"];
+export type WriteOff = components["schemas"]["WriteOffResponse"];
+export type RequestWriteOffRequest = components["schemas"]["RequestWriteOffRequest"];
+export type Recipe = components["schemas"]["RecipeResponse"];
+export type DefineRecipeRequest = components["schemas"]["DefineRecipeRequest"];
+export type Repack = components["schemas"]["RepackResponse"];
+export type ExecuteRepackRequest = components["schemas"]["ExecuteRepackRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 
@@ -103,6 +113,167 @@ export function useInventoryApi() {
       async receiveTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
           params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      // ---- stock control (M5-11, M5-13, repack) ---------------------------------------------
+
+      async counts(locationId: string): Promise<Count[]> {
+        const { data } = await api.GET("/v1/inventory/counts", { params: { query: { locationId } } });
+        return data ?? [];
+      },
+
+      async count(taskId: string): Promise<Count> {
+        const { data } = await api.GET("/v1/inventory/counts/{taskId}", { params: { path: { taskId } } });
+        return data!;
+      },
+
+      async scheduleCount(request: ScheduleCountRequest, idempotencyKey: string): Promise<Count> {
+        const { data } = await api.POST("/v1/inventory/counts", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async startCount(taskId: string, idempotencyKey: string): Promise<Count> {
+        const { data } = await api.POST("/v1/inventory/counts/{taskId}/start", {
+          params: { path: { taskId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async submitCount(taskId: string, lines: CountLineRequest[], idempotencyKey: string): Promise<Count> {
+        const { data } = await api.POST("/v1/inventory/counts/{taskId}/submit", {
+          params: { path: { taskId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { lines }
+        });
+        return data!;
+      },
+
+      async approveAdjustment(taskId: string, idempotencyKey: string): Promise<Count> {
+        const { data } = await api.POST("/v1/inventory/counts/{taskId}/approve", {
+          params: { path: { taskId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async rejectAdjustment(taskId: string, reason: string, idempotencyKey: string): Promise<Count> {
+        const { data } = await api.POST("/v1/inventory/counts/{taskId}/reject", {
+          params: { path: { taskId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      async negativeLots(locationId: string): Promise<NegativeLot[]> {
+        const { data } = await api.GET("/v1/inventory/locations/{locationId}/negative-lots", {
+          params: { path: { locationId } }
+        });
+        return data ?? [];
+      },
+
+      async acknowledgeNegativeLot(stockLotId: string, reason: string, idempotencyKey: string): Promise<NegativeLot> {
+        const { data } = await api.POST("/v1/inventory/lots/{stockLotId}/acknowledge-negative", {
+          params: { path: { stockLotId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      async writeOffs(locationId: string): Promise<WriteOff[]> {
+        const { data } = await api.GET("/v1/inventory/write-offs", { params: { query: { locationId } } });
+        return data ?? [];
+      },
+
+      async writeOff(writeOffId: string): Promise<WriteOff> {
+        const { data } = await api.GET("/v1/inventory/write-offs/{writeOffId}", {
+          params: { path: { writeOffId } }
+        });
+        return data!;
+      },
+
+      async requestWriteOff(request: RequestWriteOffRequest, idempotencyKey: string): Promise<WriteOff> {
+        const { data } = await api.POST("/v1/inventory/write-offs", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      /** Authorises one photograph, then PUTs its bytes to the store at the URL the server signed. */
+      async addWriteOffPhoto(writeOffId: string, file: File, idempotencyKey: string): Promise<void> {
+        const { data } = await api.POST("/v1/inventory/write-offs/{writeOffId}/photos", {
+          params: { path: { writeOffId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { contentType: file.type, contentLength: file.size }
+        });
+        const upload = await fetch(data!.url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+        if (!upload.ok) {
+          throw new Error(`upload ${upload.status}`);
+        }
+      },
+
+      async writeOffStep(
+        writeOffId: string,
+        step: "submit" | "witness" | "approve",
+        idempotencyKey: string
+      ): Promise<WriteOff> {
+        const params = { path: { writeOffId }, header: { "Idempotency-Key": idempotencyKey } };
+        const { data } =
+          step === "submit"
+            ? await api.POST("/v1/inventory/write-offs/{writeOffId}/submit", { params })
+            : step === "witness"
+              ? await api.POST("/v1/inventory/write-offs/{writeOffId}/witness", { params })
+              : await api.POST("/v1/inventory/write-offs/{writeOffId}/approve", { params });
+        return data!;
+      },
+
+      async rejectWriteOff(writeOffId: string, reason: string, idempotencyKey: string): Promise<WriteOff> {
+        const { data } = await api.POST("/v1/inventory/write-offs/{writeOffId}/reject", {
+          params: { path: { writeOffId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      async recipes(): Promise<Recipe[]> {
+        const { data } = await api.GET("/v1/inventory/recipes");
+        return data ?? [];
+      },
+
+      async defineRecipe(request: DefineRecipeRequest, idempotencyKey: string): Promise<Recipe> {
+        const { data } = await api.POST("/v1/inventory/recipes", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async retireRecipe(recipeId: string, idempotencyKey: string): Promise<Recipe> {
+        const { data } = await api.POST("/v1/inventory/recipes/{recipeId}/retire", {
+          params: { path: { recipeId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async repacks(locationId: string): Promise<Repack[]> {
+        const { data } = await api.GET("/v1/inventory/repacks", { params: { query: { locationId } } });
+        return data ?? [];
+      },
+
+      async executeRepack(request: ExecuteRepackRequest, idempotencyKey: string): Promise<Repack> {
+        const { data } = await api.POST("/v1/inventory/repacks", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async reverseRepack(repackId: string, reason: string, idempotencyKey: string): Promise<Repack> {
+        const { data } = await api.POST("/v1/inventory/repacks/{repackId}/reverse", {
+          params: { path: { repackId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
         });
         return data!;
       },

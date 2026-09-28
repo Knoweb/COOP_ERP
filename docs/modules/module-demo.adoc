@@ -18,6 +18,7 @@
 * `l.c.k.m.query.InventoryQueries` (in M5 Inventory, Costing, Repack & Loss)
 * `l.c.k.m.query.InvoiceQueries` (in M4 Trading Documents)
 * `l.c.k.m.query.PaymentQueries` (in M4 Trading Documents)
+* `l.c.k.m.query.StockControlQueries` (in M5 Inventory, Costing, Repack & Loss)
 * `l.c.k.m.query.OrderQueries` (in M4 Trading Documents)
 * `l.c.k.m.query.DeliveryQueries` (in M4 Trading Documents)
 * `l.c.k.m.query.GrnQueries` (in M4 Trading Documents)

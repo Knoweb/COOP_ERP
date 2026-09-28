@@ -25,6 +25,10 @@ import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
+import lk.coopfed.knoweb.m5inventory.query.CountView;
+import lk.coopfed.knoweb.m5inventory.query.RepackView;
+import lk.coopfed.knoweb.m5inventory.query.StockControlQueries;
+import lk.coopfed.knoweb.m5inventory.query.WriteOffView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,6 +81,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     ExposureQueries exposures;
+
+    @Autowired
+    StockControlQueries control;
 
     @Autowired
     lk.coopfed.knoweb.m7customers.query.CustomerQueries customers;
@@ -134,7 +141,8 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("MRP policies of M101", 1L)
                 .containsEntry("active relationships", 5L)
                 .containsEntry("posted opening balances", 4L)
-                .containsEntry("lots", 229L) // 200, and 29 at the Hettipola shop (DEMO-02)
+                // 200, 29 at the Hettipola shop (DEMO-02) and the society's own 5 kg packs (the repack)
+                .containsEntry("lots", 230L)
                 .containsEntry("received transfers to the town shop", 1L)
                 .containsEntry("received transfers to the Hettipola shop", 1L)
                 .containsEntry("lots with stock at the town shop", 40L)
@@ -161,11 +169,19 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("IssueInvoice", 24)
                     // M4-07: eight payments, three cheque outcomes (two cleared, one bounced).
                     .containsEntry("RecordPaymentReceipt", 8)
-                    .containsEntry("RecordChequeOutcome", 3);
+                    .containsEntry("RecordChequeOutcome", 3)
+                    // M5-11, M5-13: a count approved, a write-off witnessed and approved, a repack.
+                    .containsEntry("SubmitCount", 1)
+                    .containsEntry("ApproveAdjustment", 1)
+                    .containsEntry("WitnessWriteOff", 1)
+                    .containsEntry("ApproveWriteOff", 1)
+                    .containsEntry("DefineRecipe", 1)
+                    .containsEntry("ExecuteRepack", 1);
             theHistorySpreadsOverEightWeeks();
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();
         thePaymentsAndTheCreditLimit();
+        theStockOperationsAtTheSocietysStores();
         theSocietysCreditBook();
 
         kernel.reset();
@@ -335,6 +351,50 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .isGreaterThanOrEqualTo(m103.creditLimit().multiply(new BigDecimal("0.80")))
                 .isLessThan(m103.creditLimit());
         assertThat(m103.warnThresholdPercent()).isEqualTo(80);
+    }
+
+    /**
+     * M5-11, M5-13 (DemoStockOperations): at Kuliyapitiya stores, a count closed with a small
+     * shortfall approved by the manager three weeks ago, a write-off of damaged flour witnessed and
+     * posted twelve days ago, and loose samba rice repacked into the society's own 5 kg packs six
+     * days ago; each dated in the history.
+     */
+    private void theStockOperationsAtTheSocietysStores() {
+        ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
+        // Dated in the history, and never against today: the load and the test may straddle midnight.
+        ZoneId colombo = ZoneId.of("Asia/Colombo");
+
+        List<CountView> counts = control.counts(DemoCast.M101_WAREHOUSE, manager);
+        assertThat(counts).isNotEmpty();
+        CountView count = counts.get(counts.size() - 1);
+        assertThat(count.status()).isEqualTo("CLOSED");
+        assertThat(count.outcome()).isEqualTo("APPROVED");
+        assertThat(count.reviewedBy()).isEqualTo(DemoCast.M101_MANAGER.userId());
+        assertThat(count.submittedBy()).isEqualTo(DemoCast.M101_BUYER.userId());
+        assertThat(count.lines())
+                .extracting(line -> line.varianceQty().stripTrailingZeros().toPlainString())
+                .contains("-1", "-3");
+        assertThat(LocalDate.ofInstant(count.submittedAt(), colombo)).isEqualTo(count.scheduledFor());
+        assertThat(count.submittedAt()).isBefore(clock.instant().minus(java.time.Duration.ofDays(19)));
+
+        List<WriteOffView> writeOffs = control.writeOffs(DemoCast.M101_WAREHOUSE, manager);
+        assertThat(writeOffs).singleElement().satisfies(w -> {
+            assertThat(w.status()).isEqualTo("POSTED");
+            assertThat(w.category()).isEqualTo("DAMAGED_IN_STORE");
+            assertThat(w.witnessUserId()).isEqualTo(DemoCast.M101_MANAGER.userId());
+            assertThat(w.documentNo()).isNotBlank();
+            assertThat(LocalDate.ofInstant(w.decidedAt(), colombo))
+                    .isEqualTo(LocalDate.ofInstant(w.requestedAt(), colombo));
+            assertThat(w.decidedAt()).isBefore(clock.instant().minus(java.time.Duration.ofDays(11)));
+        });
+
+        List<RepackView> repacks = control.repacks(DemoCast.M101_WAREHOUSE, manager);
+        assertThat(repacks).singleElement().satisfies(r -> {
+            assertThat(r.status()).isEqualTo("EXECUTED");
+            assertThat(r.actualOutputQty()).isEqualByComparingTo("2");
+            assertThat(r.inputQty()).isEqualByComparingTo("10");
+            assertThat(r.varianceQty()).isEqualByComparingTo("0");
+        });
     }
 
     /**
