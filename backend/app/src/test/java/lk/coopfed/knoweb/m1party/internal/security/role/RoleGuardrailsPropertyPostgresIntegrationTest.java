@@ -23,6 +23,7 @@ import lk.coopfed.knoweb.m1party.api.AmendRole;
 import lk.coopfed.knoweb.m1party.api.AssignRole;
 import lk.coopfed.knoweb.m1party.api.RolePermission;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.PropertyTestTuning;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,7 +111,8 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         ScopeContext asAdmin = ScopeContext.dev(admin, mpcs, null);
         int accepted = 0;
         int refused = 0;
-        for (int step = 0; step < 200; step++) {
+        int tries = PropertyTestTuning.tries(200);
+        for (int step = 0; step < tries; step++) {
             UUID role = roles.get(random.nextInt(roles.size()));
             List<RolePermission> wanted = new ArrayList<>();
             for (String code : CODES) {
@@ -160,8 +162,8 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
                     .as("step %d: the clerk holds a ROLE pair through two roles", step)
                     .isEmpty();
         }
-        assertThat(accepted).as("edits accepted").isGreaterThan(20);
-        assertThat(refused).as("edits refused").isGreaterThan(20);
+        assertThat(accepted).as("edits accepted").isGreaterThan(PropertyTestTuning.scaled(20, 200, tries));
+        assertThat(refused).as("edits refused").isGreaterThan(PropertyTestTuning.scaled(20, 200, tries));
     }
 
     /** One caller of the assignment property: who, where, and what they hold there. */
@@ -236,7 +238,8 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         Random random = new Random(SEED);
         int accepted = 0;
         int refused = 0;
-        for (int attempt = 0; attempt < 250; attempt++) {
+        int tries = PropertyTestTuning.tries(250);
+        for (int attempt = 0; attempt < tries; attempt++) {
             Grantor grantor = grantors.get(random.nextInt(grantors.size()));
             UUID user = users.get(random.nextInt(users.size()));
             UUID role = roles.get(random.nextInt(roles.size()));
@@ -301,8 +304,8 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
                     .as(at + ": nothing the grantor does not hold")
                     .containsAll(permissionsOf.get(role));
         }
-        assertThat(accepted).as("assignments made").isGreaterThan(5);
-        assertThat(refused).as("assignments refused").isGreaterThan(20);
+        assertThat(accepted).as("assignments made").isGreaterThan(PropertyTestTuning.scaled(5, 250, tries));
+        assertThat(refused).as("assignments refused").isGreaterThan(PropertyTestTuning.scaled(20, 250, tries));
     }
 
     /**
