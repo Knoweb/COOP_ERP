@@ -11,23 +11,57 @@ const inEnglish = ({ children }: { children: ReactNode }) => (
   </IntlProvider>
 );
 
+const inSinhala = ({ children }: { children: ReactNode }) => (
+  <IntlProvider locale="si" messages={messages.si}>
+    {children}
+  </IntlProvider>
+);
+
+const inTamil = ({ children }: { children: ReactNode }) => (
+  <IntlProvider locale="ta" messages={messages.ta}>
+    {children}
+  </IntlProvider>
+);
+
 describe("formatting a calendar date", () => {
-  it("prints the day the API sent and no time, whatever the zone: a date is not an instant", () => {
+  it("prints dd/MM/yyyy, doc 19 section 5.1, whatever the zone: a date is not an instant", () => {
     const { result } = renderHook(() => useFormatDate(), { wrapper: inEnglish });
     // 2026-09-25 read as UTC midnight is 5:30 AM in Colombo; a signature has no such time.
-    expect(result.current("2026-09-25")).toBe("Sep 25, 2026");
-    expect(result.current("2026-01-01")).toBe("Jan 1, 2026");
+    expect(result.current("2026-09-25")).toBe("25/09/2026");
+    expect(result.current("2026-01-01")).toBe("01/01/2026");
   });
 
   it("differs from an instant, which is a date AND a time in the business zone", () => {
     const { result } = renderHook(() => useFormatInstant(), { wrapper: inEnglish });
-    expect(result.current("2026-09-25T00:00:00Z")).toContain("5:30");
+    expect(result.current("2026-09-25T00:00:00Z")).toContain("05:30");
   });
 
   it("shows a text that is not a calendar date as it came, never 'Invalid Date'", () => {
     const { result } = renderHook(() => useFormatDate(), { wrapper: inEnglish });
     expect(result.current("25/09/2026")).toBe("25/09/2026");
     expect(result.current("")).toBe("");
+  });
+
+  // The demo review of 28 September 2026: si showed "2026 බිනර 28" (the traditional Sinhala
+  // calendar's month name for September) instead of a Gregorian, numeric date. dd/MM/yyyy has
+  // no month name and no native digit to get wrong, in any of the three languages.
+  it("uses Gregorian, Western-digit dd/MM/yyyy in Sinhala, not the traditional calendar's month names", () => {
+    const { result } = renderHook(() => useFormatDate(), { wrapper: inSinhala });
+    expect(result.current("2026-09-28")).toBe("28/09/2026");
+    expect(result.current("2028-03-21")).toBe("21/03/2028");
+  });
+
+  it("uses Gregorian, Western-digit dd/MM/yyyy in Tamil", () => {
+    const { result } = renderHook(() => useFormatDate(), { wrapper: inTamil });
+    expect(result.current("2026-09-28")).toBe("28/09/2026");
+    expect(result.current("2028-03-21")).toBe("21/03/2028");
+  });
+
+  it("formats an instant the same way in Sinhala and Tamil as in English: dd/MM/yyyy HH:mm", () => {
+    const sinhala = renderHook(() => useFormatInstant(), { wrapper: inSinhala });
+    const tamil = renderHook(() => useFormatInstant(), { wrapper: inTamil });
+    expect(sinhala.result.current("2026-09-25T00:00:00Z")).toBe("25/09/2026 05:30");
+    expect(tamil.result.current("2026-09-25T00:00:00Z")).toBe("25/09/2026 05:30");
   });
 });
 

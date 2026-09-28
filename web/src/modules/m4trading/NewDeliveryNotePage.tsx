@@ -8,7 +8,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
 import { useTradingApi, type LotBalance } from "./tradingApi";
-import { deliveryRequest, errorText, openQty, type DispatchRow } from "./tradingView";
+import { deliveryRequest, errorText, isSyntheticBatchNo, openQty, type DispatchRow } from "./tradingView";
 
 /** The lot a line is sent from by default: the first GOOD lot of the item in FEFO order (M5). */
 function firstLot(lots: LotBalance[], skuId: string): LotBalance | undefined {
@@ -158,7 +158,7 @@ export function NewDeliveryNotePage() {
                       .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
                       .map((lot) => (
                         <option key={lot.stockLotId} value={lot.batchId}>
-                          {`${lot.batchNo ?? ""} ${lot.expiryDate ?? ""} (${lot.qtyOnHand})`}
+                          {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ?? ""} (${lot.qtyOnHand})`}
                         </option>
                       ))}
                   </select>

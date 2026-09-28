@@ -10,7 +10,7 @@ import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
-import { errorText, grnChip } from "./tradingView";
+import { errorText, grnChip, isSyntheticBatchNo } from "./tradingView";
 
 /**
  * One goods received note (24A section 6 ConfirmGrn; section 8, "Receive", demo scope). The
@@ -145,7 +145,7 @@ export function GrnPage() {
               <td>{line.expectedQty}</td>
               <td>{line.receivedQty}</td>
               <td>{line.damagedQty}</td>
-              <td>{line.batchNo}</td>
+              <td>{isSyntheticBatchNo(line.batchNo) ? t("trading.field.batch_not_tracked").text : line.batchNo}</td>
               <td>{line.expiryDate && formatDate(line.expiryDate)}</td>
               <td>{line.printedMrp !== undefined && <MoneyDisplay amount={line.printedMrp} />}</td>
               <td>{line.unitCost !== undefined && <MoneyDisplay amount={line.unitCost} />}</td>

@@ -9,6 +9,7 @@ import {
   firstOpenEta,
   grnRequest,
   isShort,
+  isSyntheticBatchNo,
   lineAmount,
   openQty,
   orderChip,
@@ -147,6 +148,20 @@ describe("the goods received note", () => {
         }
       ]
     });
+  });
+});
+
+describe("recognising a synthetic batch number", () => {
+  it("recognises M2's own shape, S-<document>-<line>, whatever the document number looks like", () => {
+    expect(isSyntheticBatchNo("S-OPB-01a0e468-9")).toBe(true);
+    expect(isSyntheticBatchNo("S-GRN1-1")).toBe(true);
+    expect(isSyntheticBatchNo("S-A-B-C-12")).toBe(true);
+  });
+
+  it("leaves a real, printed batch number alone, even one a supplier chose to start with S-", () => {
+    expect(isSyntheticBatchNo("DEMO-2026-1")).toBe(false);
+    expect(isSyntheticBatchNo("SUGAR-01")).toBe(false);
+    expect(isSyntheticBatchNo(undefined)).toBe(false);
   });
 });
 
