@@ -39,4 +39,8 @@ regexes = [
   # snapshot. Public on purpose; a real environment sets SYNC_SIGNING_* to its own secret.
   '''MC4CAQAwBQYDK2VwBCIEIEXGbZPMAOjGn3GfnQFq4dleT1FllP7DFrU3iZfoYwn3''',
   '''MCowBQYDK2VwAyEAhHqEJHTMyMDprN89bJna8XrGfjtkJkpvX7Bw9CWW4Jk=''',
+  # A made-up temporary password in a mocked API answer of UserCardPage.test.tsx (M1 admin
+  # screens, 28 September 2026); no system ever issued it. The value was replaced by a plainly
+  # fake one; the commit stays in the history.
+  '''Kp7wQ2xZr9Ta''',
 ]
