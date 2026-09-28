@@ -2,7 +2,6 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatDate } from "../../shell/i18n/formats";
-import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { EntityName, SkuLabel } from "./labels";
@@ -13,15 +12,14 @@ import { errorText } from "./tradingView";
  * One tax invoice (24A section 8, "Invoice", demo scope; M4-08): the seller's invoice built from
  * the buyer's confirmed goods received notes, each line at the tier price with its VAT, and the
  * totals. Both parties read it; it leads to the GRNs and the delivery note it came from. The
- * seller's Print opens the A4 PDF the worker printed (a fresh pre-signed link each time); the
- * buyer's printed copy is deferred (the PDF is stored under the seller).
+ * Print opens the A4 PDF the worker printed (a fresh pre-signed link each time), for the seller and
+ * for the buyer alike: the PDF is stored under the seller and the buyer reaches it through this invoice.
  */
 export function InvoicePage() {
   const { invoiceId = "" } = useParams();
   const t = useT();
   const formatDate = useFormatDate();
   const api = useTradingApi();
-  const scope = useScope();
 
   const invoice = useQuery({ queryKey: ["trading", "invoice", invoiceId], queryFn: () => api.invoice(invoiceId) });
   const firstGrn = invoice.data?.grnIds[0];
@@ -64,7 +62,6 @@ export function InvoicePage() {
   }
 
   const inv = invoice.data;
-  const isSeller = inv.sellerEntityId === scope.entityId;
 
   return (
     <main className="shell-page">
@@ -103,11 +100,9 @@ export function InvoicePage() {
           }
         ]}
       >
-        {isSeller && (
-          <button type="button" disabled={print.isPending} onClick={openPrint}>
-            {t("trading.invoice.print").text}
-          </button>
-        )}
+        <button type="button" disabled={print.isPending} onClick={openPrint}>
+          {t("trading.invoice.print").text}
+        </button>
       </DocumentHeader>
       {print.isError && <p role="alert">{errorText(print.error, t("trading.error.generic").text)}</p>}
 
