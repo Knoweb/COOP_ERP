@@ -398,6 +398,21 @@
       "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
     },
     {
+      "id": "0190f0de-0000-7000-8000-000000000234",
+      "username": "m101-office",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m101-office@coop-erp.test",
+      "firstName": "Shanthi",
+      "lastName": "Wijeratne",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e3"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
       "id": "0190f0de-0000-7000-8000-000000000242",
       "username": "m102-manager",
       "enabled": true,

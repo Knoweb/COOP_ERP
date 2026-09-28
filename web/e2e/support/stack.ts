@@ -49,7 +49,8 @@ export const DEMO = {
   d101Accounts: demoUser("d101-accounts", "Dilani Wijesekara", "si"),
   d102Accounts: demoUser("d102-accounts", "Priya Nadarajah", "ta"),
   m101Manager: demoUser("m101-manager", "Ruwan Dissanayake", "si"),
-  m101Shop: demoUser("m101-shop", "Malani Gunawardena", "si")
+  m101Shop: demoUser("m101-shop", "Malani Gunawardena", "si"),
+  m101Office: demoUser("m101-office", "Shanthi Wijeratne", "si")
 };
 
 /** The demo locations of phase 3 (seed/m1party/demo-parties.demo.sql). */

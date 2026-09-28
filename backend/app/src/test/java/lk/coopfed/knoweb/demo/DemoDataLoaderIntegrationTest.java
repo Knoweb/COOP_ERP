@@ -78,6 +78,12 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     ExposureQueries exposures;
 
+    @Autowired
+    lk.coopfed.knoweb.m7customers.query.CustomerQueries customers;
+
+    @Autowired
+    lk.coopfed.knoweb.m7customers.query.AccountQueries accounts;
+
     @BeforeEach
     void theSeedTheDemoStartsFrom() throws Exception {
         JdbcTemplate admin = superuserJdbc();
@@ -107,6 +113,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     void removeTheTradingHistory() {
         JdbcTemplate admin = superuserJdbc();
         lk.coopfed.knoweb.m4trading.TradingFixture.cleanAllTrading(admin);
+        lk.coopfed.knoweb.m7customers.CustomersFixture.cleanAllCustomers(admin);
     }
 
     @Test
@@ -131,7 +138,11 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("received transfers to the town shop", 1L)
                 .containsEntry("received transfers to the Hettipola shop", 1L)
                 .containsEntry("lots with stock at the town shop", 40L)
-                .containsEntry("orders of the history", 44L);
+                .containsEntry("orders of the history", 44L)
+                // M7: 36 members, every other one with an account (DemoCustomers).
+                .containsEntry("members of M101", 36L)
+                .containsEntry("credit accounts", 18L);
+        assertThat(afterFirst.get("account postings")).isGreaterThan(100L);
         if (first.total() > 0) {
             // A fresh database: the loader went through the handlers, which audited and published.
             assertThat(kernel.committedAudit()).isNotEmpty();
@@ -155,6 +166,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();
         thePaymentsAndTheCreditLimit();
+        theSocietysCreditBook();
 
         kernel.reset();
         DemoDataLoader.Report second = loader.load();
@@ -325,6 +337,38 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         assertThat(m103.warnThresholdPercent()).isEqualTo(80);
     }
 
+    /**
+     * M7: the office reads its members; the first account stands near its limit (95 %), the others
+     * have charges spread over the eight weeks and repayments recorded at the office, each a CPR.
+     */
+    private void theSocietysCreditBook() {
+        ScopeContext office = scopeOf(DemoCustomers.M101_OFFICE);
+        List<lk.coopfed.knoweb.m7customers.query.CustomerSummary> members = customers.search(null, null, 200, office);
+        assertThat(members).hasSize(36);
+        assertThat(members).anySatisfy(m -> assertThat(m.language()).isEqualTo("ta"));
+        lk.coopfed.knoweb.m7customers.query.CustomerSummary first =
+                customers.search(null, DemoCustomers.phone(0), 1, office).get(0);
+        var account = accounts.account(first.accountId(), office).orElseThrow();
+        assertThat(account.balance()).isEqualByComparingTo("14200.00");
+        assertThat(account.creditLimit()).isEqualByComparingTo("15000.00");
+        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"));
+        var statement = accounts.statement(
+                        first.accountId(), today.minusDays(DemoCustomers.REGISTERED_DAYS_AGO), today, office)
+                .orElseThrow();
+        assertThat(statement.lines())
+                .filteredOn(line -> "CHARGE".equals(line.kind()))
+                .hasSize(8);
+        assertThat(statement.lines())
+                .filteredOn(line -> "PAYMENT".equals(line.kind()))
+                .singleElement()
+                .satisfies(line -> assertThat(line.documentNumber()).contains("-CPR-"));
+        assertThat(statement.lines().stream()
+                        .map(line -> line.businessDate())
+                        .distinct()
+                        .count())
+                .isGreaterThan(5);
+    }
+
     private ScopeContext scopeOf(DemoCast.Actor actor) {
         Scope scope = new Scope(actor.entityId(), actor.locationId());
         return new ScopeContext(
@@ -446,6 +490,14 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         counts.put(
                 "orders of the history",
                 count(admin, "select count(*) from kernel.document where notes like 'Demo history %'"));
+        counts.put(
+                "members of M101",
+                count(
+                        admin,
+                        "select count(*) from customers.customer where owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put("credit accounts", count(admin, "select count(*) from customers.customer_account"));
+        counts.put("account postings", count(admin, "select count(*) from customers.account_posting"));
         counts.put(
                 "audit of the demo users",
                 count(admin, "select count(*) from kernel.audit_event where actor_user_id::text like '0190f0de-%'"));

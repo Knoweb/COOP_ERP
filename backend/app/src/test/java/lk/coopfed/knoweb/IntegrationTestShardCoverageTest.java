@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ class IntegrationTestShardCoverageTest {
                     List.of(
                             "lk.coopfed.knoweb.m5inventory.",
                             "lk.coopfed.knoweb.m6pos.",
+                            "lk.coopfed.knoweb.m7customers.",
                             "lk.coopfed.knoweb.m8reporting.",
                             "lk.coopfed.knoweb.demo.",
                             "lk.coopfed.knoweb.hello.",
@@ -51,7 +53,11 @@ class IntegrationTestShardCoverageTest {
 
     @Test
     void everyIntegrationTestClassIsInExactlyOneShard() {
-        JavaClasses classes = new ClassFileImporter().importPackages("lk.coopfed.knoweb");
+        // Test classes only: the shard rule is about integration test classes, and importing the
+        // whole application as well ran the test JVM out of heap beside ArchitectureTests.
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(new ImportOption.OnlyIncludeTests())
+                .importPackages("lk.coopfed.knoweb");
 
         List<String> uncovered = new ArrayList<>();
         List<String> doubleCovered = new ArrayList<>();
