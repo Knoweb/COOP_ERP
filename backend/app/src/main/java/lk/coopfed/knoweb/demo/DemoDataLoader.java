@@ -120,8 +120,10 @@ public class DemoDataLoader {
     private final PricingQueries pricing;
     private final InventoryQueries inventory;
     private final DemoTradingHistory history;
+    private final DemoRetailPricing retailPricing;
     private final DemoPayments payments;
     private final DemoStockOperations stockOperations;
+    private final DemoCustomers customers;
     private final DemoCalendar calendar;
     private final Clock clock;
     private final ZoneId businessZone;
@@ -159,8 +161,10 @@ public class DemoDataLoader {
             PricingQueries pricing,
             InventoryQueries inventory,
             DemoTradingHistory history,
+            DemoRetailPricing retailPricing,
             DemoPayments payments,
             DemoStockOperations stockOperations,
+            DemoCustomers customers,
             DemoCalendar calendar,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
@@ -187,8 +191,10 @@ public class DemoDataLoader {
         this.pricing = pricing;
         this.inventory = inventory;
         this.history = history;
+        this.retailPricing = retailPricing;
         this.payments = payments;
         this.stockOperations = stockOperations;
+        this.customers = customers;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
     }
@@ -203,6 +209,12 @@ public class DemoDataLoader {
         // history after it has prices, relationships and stock on the days it was traded.
         Map<String, UUID> skus = new HashMap<>();
         calendar.run(today.minusDays(DemoCalendar.SETUP_DAYS_AGO), LocalTime.of(8, 0), () -> skus.putAll(setUp(items)));
+        // M3-06, M3-07: the control prices, the milk powder policy and the society's shelf price
+        // list, the same morning, once the society's stock is on its shelves (DemoRetailPricing).
+        calendar.run(
+                today.minusDays(DemoCalendar.SETUP_DAYS_AGO),
+                LocalTime.of(9, 0),
+                () -> retailPricing.load(items, skus, this::count));
         // The Hettipola shop got its first stock a month later.
         calendar.run(
                 today.minusDays(DemoCalendar.SETUP_DAYS_AGO / 2), LocalTime.of(8, 0), this::hettipolaStockByTransfer);
@@ -212,6 +224,8 @@ public class DemoDataLoader {
         payments.load(this::count);
         // M5-11, M5-13: a count, a write-off and a repack at the society's stores (DemoStockOperations).
         stockOperations.load(this::count);
+        // M7: the members of M101 and its credit book (DemoCustomers).
+        customers.load(this::count);
 
         Report report = new Report(Map.copyOf(counts));
         log.info("Demo data: {} commands issued {}", report.total(), report.commands());

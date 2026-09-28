@@ -31,6 +31,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-0000000000e3', 'm101-buyer',    'Sandya Kumari',       'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-0000000000e3', 'm101-manager',  'Ruwan Dissanayake',   'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE')
 ON CONFLICT (user_id) DO NOTHING;
@@ -52,6 +53,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000331', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society buyer',              false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000332', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society manager',            false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: shop staff',                 false, 'OWN', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society office',             false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', 'Demo: society manager',            false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', 'Demo: society manager',            false, 'OWN', 'ACTIVE')
 ON CONFLICT (role_id) DO NOTHING;
@@ -64,9 +66,11 @@ WITH job (role_id, codes) AS (
             'cat.sku.view', 'cat.sku.create', 'cat.sku.create_local', 'cat.sku.promote', 'cat.sku.deactivate',
             'cat.barcode.manage', 'cat.image.manage', 'cat.tag.manage', 'cat.batch.correct', 'cat.supplier.manage',
             'prc.pricelist.view', 'inv.stock.view', 'prt.location.view', 'gov.entity.view']),
-        -- Federation pricing: the trade price list and the relationships that trade on it
+        -- Federation pricing: the trade price list and the relationships that trade on it; the
+        -- gazetted control prices and the Federation's MRP policy (M3-06, M3-07)
         ('0190f0de-0000-7000-8000-000000000302'::uuid, ARRAY[
             'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish',
+            'prc.controlprice.enter', 'prc.mrp_policy.set',
             'prt.relationship.view', 'prt.relationship.open', 'prt.relationship.activate', 'prt.relationship.amend',
             'cat.sku.view', 'gov.entity.view']),
         -- stores and dispatch, at the Federation warehouse only (assignment below)
@@ -131,8 +135,11 @@ WITH job (role_id, codes) AS (
             'inv.count.schedule', 'shop.count.record', 'inv.adjust.request', 'inv.writeoff.request',
             'inv.recipe.manage', 'inv.repack.execute']),
         -- society manager: the second signature (countersign), the shops and their tills; receives
-        -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02)
+        -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02); and the
+        -- society's shelf prices: its RETAIL list, its MRP policy and its discount rules (M3-06)
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
+            'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish', 'prc.mrp_policy.set',
+            'prc.rule.author', 'prc.rule.activate',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
@@ -160,7 +167,12 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
             'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view', 'gov.entity.view',
-            'inv.writeoff.request'])
+            'prc.pricelist.view', 'inv.writeoff.request']),
+        -- the society office (M7, back office): the member register, the credit accounts, the
+        -- statements and the repayments at the office, entity-wide
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, ARRAY[
+            'cus.customer.view', 'cus.customer.register', 'cus.customer.manage', 'cus.account.manage',
+            'cus.payment.record', 'gov.entity.view', 'prt.location.view', 'rpt.report.run'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code
@@ -187,6 +199,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-000000000331', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-000000000332', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
+    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL)
 ON CONFLICT DO NOTHING;

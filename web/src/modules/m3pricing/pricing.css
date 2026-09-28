@@ -46,3 +46,33 @@
   display: block;
   margin-bottom: var(--space-half);
 }
+
+.pricing-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.pricing-tab {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.pricing-tab--active {
+  background: var(--color-surface-subtle);
+  font-weight: var(--font-weight-strong);
+}
+
+.pricing-form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.pricing-muted {
+  color: var(--color-text-muted);
+}

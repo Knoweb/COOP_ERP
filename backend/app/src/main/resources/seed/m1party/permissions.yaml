@@ -140,6 +140,19 @@ permissions:
     module: "m3pricing"
     description_en: "Activate and withdraw discount rules"
     scope: "ENTITY"
+  # M3-06 and M3-07 (23A section 3.1): "prc.controlprice.enter (F, mfa)" enters and rescinds the
+  # gazetted control prices; "prc.mrp_policy.set (ENTITY; tags F)" sets a SKU's multi-MRP policy
+  # (tag scope is deferred). The second factor of prc.pricelist.publish now covers RETAIL and
+  # ADVISORY lists too (M3-06, decided on the architect's delegation).
+  - code: "prc.controlprice.enter"
+    module: "m3pricing"
+    description_en: "Enter and rescind gazetted control prices"
+    scope: "FEDERATION"
+    requires_mfa: true
+  - code: "prc.mrp_policy.set"
+    module: "m3pricing"
+    description_en: "Set the multi-MRP policy of an item"
+    scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes
@@ -428,4 +441,29 @@ permissions:
   - code: "pos.receipt.view"
     module: "m6pos"
     description_en: "See the receipts and till sessions of the shops"
+    scope: "LOCATION"
+  # M7 Customers & Payment Recording (27A section 3.1, seed/m7/permissions.yaml, appended here as
+  # M4 and M6 do: M1SeedLoader reads this one file). cus.customer.view is the read code of the
+  # slice's queries (27A lists no read code; one per aggregate, as M1 does, decided 29 September
+  # 2026 on the architect's delegation). The adjustment, reversal, statement, privacy and banking
+  # codes come with their tickets.
+  - code: "cus.customer.view"
+    module: "m7customers"
+    description_en: "See the society's customers, their accounts and statements"
+    scope: "ENTITY"
+  - code: "cus.customer.register"
+    module: "m7customers"
+    description_en: "Register a customer"
+    scope: "LOCATION"
+  - code: "cus.customer.manage"
+    module: "m7customers"
+    description_en: "Amend, re-phone and deactivate a customer"
+    scope: "ENTITY"
+  - code: "cus.account.manage"
+    module: "m7customers"
+    description_en: "Open a customer's credit account"
+    scope: "ENTITY"
+  - code: "cus.payment.record"
+    module: "m7customers"
+    description_en: "Record a customer's repayment"
     scope: "LOCATION"

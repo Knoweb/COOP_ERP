@@ -54,4 +54,39 @@ public interface PricingQueries {
 
     /** ListRules: the rules visible to the caller, newest validity first; filters when not null. */
     List<RuleView> listRules(String status, String kind, ScopeContext scope);
+
+    // ---- M3-06: control prices (every authenticated scope reads them) --------------------------
+
+    /** Every control price, of one SKU when {@code skuId} is not null: the history, newest first. */
+    List<ControlPriceView> controlPrices(UUID skuId, ScopeContext scope);
+
+    /** ControlPricesInForce(date) of doc 23 section 5.2. */
+    List<ControlPriceView> controlPricesInForce(LocalDate date, ScopeContext scope);
+
+    /** ControlPriceFor(sku, date) in the unit: the ceiling in force; empty when there is none. */
+    Optional<ControlPriceView> controlPriceFor(UUID skuId, String uomCode, LocalDate date, ScopeContext scope);
+
+    // ---- M3-07: the multi-MRP policy -----------------------------------------------------------
+
+    /** The effective MRP policy of a SKU at the caller's entity: its own row, the Federation's, or the default. */
+    MrpPolicyView effectiveMrpPolicy(UUID skuId, ScopeContext scope);
+
+    /** The stored policies that apply at the caller's entity: its own and, where it has none, the Federation's. */
+    List<MrpPolicyView> listMrpPolicies(ScopeContext scope);
+
+    // ---- M3-06: retail prices ------------------------------------------------------------------
+
+    /**
+     * ResolveRetailPrice(location, sku, uom, qty, date) of doc 23 section 5.2: the shelf price of the
+     * SKU at a shop on the date, through the shared engine (steps 1 to 4 of doc 23 section 3.5): the
+     * society's published RETAIL line in force, bounded by the printed MRP of the batches in stock at
+     * the location under the effective MRP policy, and by the control price. Rules are not applied.
+     * Empty when the caller's scope does not see the location. The till will get the same inputs in
+     * its snapshot (M3-09) and call the same function.
+     */
+    Optional<RetailPrice> resolveRetailPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope);
+
+    /** The published ADVISORY lines in force on the date, of every Federation list (the shelf list's advisory column). */
+    List<PriceListLineView> advisoryLines(LocalDate date, ScopeContext scope);
 }

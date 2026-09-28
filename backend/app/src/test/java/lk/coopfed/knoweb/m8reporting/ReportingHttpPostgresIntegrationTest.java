@@ -56,6 +56,11 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
             "reporting.stock_position",
             "reporting.trade_document_event",
             "reporting.trade_line_fact",
+            "reporting.trade_document_link",
+            "reporting.trade_settlement_fact",
+            "reporting.exposure_warning_event",
+            "reporting.shop_sale_fact",
+            "reporting.shop_sale_line_fact",
             "reporting.report_run");
 
     @Autowired
@@ -199,11 +204,19 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void theDefinitionsAreTheThreeOfTheDemo() {
+    void theDefinitionsAreThoseOfTheCatalogueInItsOrder() {
         JsonNode definitions = get("/v1/reporting/reports", as(SELLER)).getBody();
         assertThat(definitions)
                 .extracting(d -> d.get("reportId").asText())
-                .containsExactly("stock-position", "trade-by-distributor", "invoices-issued");
+                .containsExactly(
+                        "stock-position",
+                        "trade-by-distributor",
+                        "invoices-issued",
+                        "statement-of-account",
+                        "receivables-ageing",
+                        "fill-rate-delivery",
+                        "shop-sales-by-shop",
+                        "shop-sales-by-item");
         assertThat(definitions.get(1).get("period").asBoolean()).isTrue();
         assertThat(definitions.get(0).get("location").asBoolean()).isTrue();
     }

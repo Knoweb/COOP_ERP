@@ -314,6 +314,27 @@ config_items:
     default: 5242880
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # M8-05 (28A section 7): the dashboard's cache and the exception queue's escalation.
+  - key: reporting.dashboard_cache_seconds
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 600 }
+    description_en: How long the dashboard's figures are kept before they are read again, in seconds
+    description_si: උපකරණ පුවරුවේ සංඛ්‍යා නැවත කියවීමට පෙර තබා ගන්නා කාලය, තත්පර වලින්
+    description_ta: டாஷ்போர்டின் எண்ணிக்கைகள் மீண்டும் படிக்கப்படுவதற்கு முன் வைத்திருக்கப்படும் நேரம், வினாடிகளில்
+    default: 60
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m8reporting
+  - key: reporting.exception_escalate_after
+    value_type: DURATION
+    schema: { minimum: PT1H, maximum: P90D }
+    description_en: How long an exception may wait before the queue marks it escalated
+    description_si: ව්‍යතිරේකයක් උත්සන්න කළ බව සලකුණු කිරීමට පෙර එයට රැඳී සිටිය හැකි කාලය
+    description_ta: ஒரு விதிவிலக்கு மேலுயர்த்தப்பட்டதாகக் குறிக்கப்படுவதற்கு முன் காத்திருக்கக்கூடிய நேரம்
+    default: "P3D"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m8reporting
   # K-08: the sync gateway (doc 32; 19A section 8). The batch limits and the chunk size are doc 32
   # DR-1 and DR-5, the change-log retention DR-4: proposed values, to be settled after the load
   # test (spike 5), so they are configuration and not constants.
@@ -615,6 +636,74 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m4trading
+  # M3-07 (23A section 3.1; doc 23 section 3.4 and DR-4): the multi-MRP policy of a SKU with no
+  # policy row of its own or the Federation's, and the PICKER gap a policy row without its own gap
+  # takes. Read by EffectivePolicy; the till gets them with its snapshot (M3-09).
+  - key: pricing.default_mrp_policy
+    value_type: STRING
+    schema: { enum: [AUTO_LOWEST, BARCODE_RESOLVED, PICKER] }
+    description_en: The multi-MRP policy of an item that has none of its own
+    description_si: තමන්ගේම ප්‍රතිපත්තියක් නැති අයිතමයක බහු-MRP ප්‍රතිපත්තිය
+    description_ta: சொந்தக் கொள்கை இல்லாத பொருளின் பல-MRP கொள்கை
+    default: "AUTO_LOWEST"
+    scope_kind: FEDERATION
+    change_permission: prc.mrp_policy.set
+    till_visible: true
+    module: m3pricing
+  - key: pricing.picker_gap_amount
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 100000 }
+    description_en: The difference in rupees between the lowest and highest MRP on the shelf above which the till asks the cashier to pick the batch
+    description_si: රාක්කයේ අඩුම හා වැඩිම MRP අතර, මුදල් අයකැමිගෙන් කාණ්ඩය තෝරන ලෙස පොත ඉල්ලන රුපියල් වෙනස
+    description_ta: அலமாரியில் உள்ள குறைந்த மற்றும் அதிக MRP இடையே, காசாளரிடம் தொகுதியைத் தேர்ந்தெடுக்கக் கேட்கும் ரூபாய் வேறுபாடு
+    default: 20
+    scope_kind: ENTITY
+    change_permission: prc.mrp_policy.set
+    till_visible: true
+    module: m3pricing
+  - key: pricing.picker_gap_percent
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 100 }
+    description_en: The same difference as a percentage of the lowest MRP
+    description_si: එම වෙනස අඩුම MRP හි ප්‍රතිශතයක් ලෙස
+    description_ta: அதே வேறுபாடு குறைந்த MRP இன் சதவீதமாக
+    default: 5
+    scope_kind: ENTITY
+    change_permission: prc.mrp_policy.set
+    till_visible: true
+    module: m3pricing
+  # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
+  # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
+  - key: customers.phone_reuse_window_months
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 60 }
+    description_en: How many months after a customer gave up a phone number a new holder must be confirmed as another person
+    description_si: පාරිභෝගිකයෙකු දුරකථන අංකයක් අත්හැරීමෙන් පසු නව හිමිකරු වෙනත් අයෙකු බව තහවුරු කළ යුතු මාස ගණන
+    description_ta: ஒரு வாடிக்கையாளர் தொலைபேசி எண்ணைக் கைவிட்ட பிறகு புதிய உரிமையாளர் வேறு நபர் என உறுதிப்படுத்த வேண்டிய மாதங்கள்
+    default: 12
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m7customers
+  - key: customers.default_terms_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: The credit terms in days of a new customer account when none is given
+    description_si: කිසිවක් නොදුන් විට නව පාරිභෝගික ගිණුමක ණය කාලය දින වලින්
+    description_ta: எதுவும் கொடுக்கப்படாதபோது புதிய வாடிக்கையாளர் கணக்கின் கடன் காலம் நாட்களில்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: cus.account.manage
+    module: m7customers
+  - key: customers.offline_account_cap
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 1000000 }
+    description_en: The most a till may charge to a customer account in one sale while offline, when the account names no cap
+    description_si: ගිණුමේ සීමාවක් නොමැති විට, නොබැඳි අවස්ථාවේ එක් විකිණීමකදී පාරිභෝගික ගිණුමකට අය කළ හැකි උපරිමය
+    description_ta: கணக்கில் வரம்பு இல்லாதபோது, இணைப்பு இல்லாதபோது ஒரு விற்பனையில் வாடிக்கையாளர் கணக்கில் வசூலிக்கக்கூடிய அதிகபட்சம்
+    default: 5000
+    scope_kind: ENTITY
+    change_permission: cus.account.manage
+    module: m7customers
   # M5 stock control (25A section 3.1; doc 25 section 7): the count tolerance below which a variance
   # posts without approval (F-10), the value bands of an adjustment or a write-off (E-07), remote
   # witnessing (DR-4) and when a write-off needs photographs. The per-SKU and per-tag tables of 25A

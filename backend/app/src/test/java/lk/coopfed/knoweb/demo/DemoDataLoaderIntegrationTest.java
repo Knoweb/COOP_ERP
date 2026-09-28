@@ -12,9 +12,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
 import lk.coopfed.knoweb.m4trading.query.ExposureView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
@@ -30,6 +32,7 @@ import lk.coopfed.knoweb.m5inventory.query.WriteOffView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -43,7 +46,13 @@ import org.springframework.test.context.DynamicPropertySource;
  * command handlers, as the demo users, with the permission check on (the users' roles decide, as in
  * compose) and the application connected as coop_app under row-level security; the second run
  * issues no command and changes no row.
+ *
+ * <p>Tagged {@code slow} (about 67s locally) so a pull request's integration run excludes it;
+ * the stack-smoke job already loads the demo, through the real HTTP API, on every pull request.
+ * Pushes to main and the nightly run include it here too, for the assertions this test makes
+ * that stack-smoke does not (the second, no-op run; the query-side views).
  */
+@Tag("slow")
 class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     /** The Federation the demo users belong to: the one of the development seed and of compose. */
@@ -62,6 +71,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     Clock clock;
 
     @Autowired
+    PricingQueries pricing;
+
+    @Autowired
     InvoiceQueries invoices;
 
     @Autowired
@@ -72,6 +84,12 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     StockControlQueries control;
+
+    @Autowired
+    lk.coopfed.knoweb.m7customers.query.CustomerQueries customers;
+
+    @Autowired
+    lk.coopfed.knoweb.m7customers.query.AccountQueries accounts;
 
     @BeforeEach
     void theSeedTheDemoStartsFrom() throws Exception {
@@ -102,6 +120,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     void removeTheTradingHistory() {
         JdbcTemplate admin = superuserJdbc();
         lk.coopfed.knoweb.m4trading.TradingFixture.cleanAllTrading(admin);
+        lk.coopfed.knoweb.m7customers.CustomersFixture.cleanAllCustomers(admin);
     }
 
     @Test
@@ -116,6 +135,10 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("till positions", 5L)
                 .containsEntry("primary tills", 4L)
                 .containsEntry("published trade lists", 3L)
+                .containsEntry("control prices", 3L)
+                .containsEntry("published shelf lists of M101", 1L)
+                .containsEntry("shelf prices of M101", 40L)
+                .containsEntry("MRP policies of M101", 1L)
                 .containsEntry("active relationships", 5L)
                 .containsEntry("posted opening balances", 4L)
                 // 200, 29 at the Hettipola shop (DEMO-02) and the society's own 5 kg packs (the repack)
@@ -123,7 +146,11 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("received transfers to the town shop", 1L)
                 .containsEntry("received transfers to the Hettipola shop", 1L)
                 .containsEntry("lots with stock at the town shop", 40L)
-                .containsEntry("orders of the history", 44L);
+                .containsEntry("orders of the history", 44L)
+                // M7: 36 members, every other one with an account (DemoCustomers).
+                .containsEntry("members of M101", 36L)
+                .containsEntry("credit accounts", 18L);
+        assertThat(afterFirst.get("account postings")).isGreaterThan(100L);
         if (first.total() > 0) {
             // A fresh database: the loader went through the handlers, which audited and published.
             assertThat(kernel.committedAudit()).isNotEmpty();
@@ -152,8 +179,10 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("ExecuteRepack", 1);
             theHistorySpreadsOverEightWeeks();
         }
+        theTownShopSellsTheGazettedRiceAtItsControlPrice();
         thePaymentsAndTheCreditLimit();
         theStockOperationsAtTheSocietysStores();
+        theSocietysCreditBook();
 
         kernel.reset();
         DemoDataLoader.Report second = loader.load();
@@ -246,6 +275,45 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
+     * M3-06: the shelf price of Nadu rice 5 kg at the town shop, as the shop's staff reads it. The
+     * pack's MRP is Rs 1,150 and the gazette caps it at Rs 1,100, so the society's list carries the
+     * control price; the engine resolves it, with the MRP of the batch on the shelf as its batch term.
+     * The date is the set-up day plus one, well inside the list's validity, never "today" (a run
+     * that crosses midnight in Colombo reads the same answer).
+     */
+    private void theTownShopSellsTheGazettedRiceAtItsControlPrice() {
+        UUID rice = superuserJdbc()
+                .queryForObject(
+                        "select sku_id from catalogue.sku where short_name_en = 'Nadu rice 5 kg'"
+                                + " and attributes ->> 'demo' = 'true'",
+                        UUID.class);
+        LocalDate shelfDay = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"))
+                .minusDays(DemoCalendar.SETUP_DAYS_AGO - 1);
+        Scope shop = new Scope(DemoCast.M101, DemoCast.M101_TOWN_SHOP);
+        ScopeContext staff = new ScopeContext(
+                DemoCast.M101_SHOP_STAFF.userId(),
+                null,
+                DemoCast.M101,
+                List.of(shop),
+                shop,
+                PolicyClass.OWN,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                null);
+
+        assertThat(pricing.resolveRetailPrice(DemoCast.M101_TOWN_SHOP, rice, "EA", BigDecimal.ONE, shelfDay, staff))
+                .get()
+                .satisfies(price -> {
+                    assertThat(price.sellable()).isTrue();
+                    assertThat(price.listPrice()).isEqualByComparingTo("1100.00");
+                    assertThat(price.controlPrice()).isEqualByComparingTo("1100.00");
+                    assertThat(price.mrpApplied()).isEqualByComparingTo("1150.00");
+                    assertThat(price.unitPrice()).isEqualByComparingTo("1100.00");
+                });
+    }
+
+    /**
      * M4-07 and M4-09: of D101's invoices from the Federation (oldest first) the first two are
      * settled, the third part-paid, and the fourth open again after its cheque bounced; and
      * Point Pedro MPCS (M103) owes D102 past the first warning threshold of its credit limit, but
@@ -329,6 +397,38 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         });
     }
 
+    /**
+     * M7: the office reads its members; the first account stands near its limit (95 %), the others
+     * have charges spread over the eight weeks and repayments recorded at the office, each a CPR.
+     */
+    private void theSocietysCreditBook() {
+        ScopeContext office = scopeOf(DemoCustomers.M101_OFFICE);
+        List<lk.coopfed.knoweb.m7customers.query.CustomerSummary> members = customers.search(null, null, 200, office);
+        assertThat(members).hasSize(36);
+        assertThat(members).anySatisfy(m -> assertThat(m.language()).isEqualTo("ta"));
+        lk.coopfed.knoweb.m7customers.query.CustomerSummary first =
+                customers.search(null, DemoCustomers.phone(0), 1, office).get(0);
+        var account = accounts.account(first.accountId(), office).orElseThrow();
+        assertThat(account.balance()).isEqualByComparingTo("14200.00");
+        assertThat(account.creditLimit()).isEqualByComparingTo("15000.00");
+        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"));
+        var statement = accounts.statement(
+                        first.accountId(), today.minusDays(DemoCustomers.REGISTERED_DAYS_AGO), today, office)
+                .orElseThrow();
+        assertThat(statement.lines())
+                .filteredOn(line -> "CHARGE".equals(line.kind()))
+                .hasSize(8);
+        assertThat(statement.lines())
+                .filteredOn(line -> "PAYMENT".equals(line.kind()))
+                .singleElement()
+                .satisfies(line -> assertThat(line.documentNumber()).contains("-CPR-"));
+        assertThat(statement.lines().stream()
+                        .map(line -> line.businessDate())
+                        .distinct()
+                        .count())
+                .isGreaterThan(5);
+    }
+
     private ScopeContext scopeOf(DemoCast.Actor actor) {
         Scope scope = new Scope(actor.entityId(), actor.locationId());
         return new ScopeContext(
@@ -389,6 +489,32 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                                 + " and name like '%trade list for%'",
                         fed));
         counts.put(
+                "control prices",
+                count(
+                        admin,
+                        "select count(*) from pricing.control_price c join catalogue.sku s using (sku_id)"
+                                + " where s.attributes ->> 'demo' = 'true'"));
+        counts.put(
+                "published shelf lists of M101",
+                count(
+                        admin,
+                        "select count(*) from pricing.price_list where status = 'PUBLISHED' and kind = 'RETAIL'"
+                                + " and owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put(
+                "shelf prices of M101",
+                count(
+                        admin,
+                        "select count(*) from pricing.price_list_line l join pricing.price_list p using (price_list_id)"
+                                + " where p.kind = 'RETAIL' and p.status = 'PUBLISHED' and p.owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put(
+                "MRP policies of M101",
+                count(
+                        admin,
+                        "select count(*) from pricing.mrp_policy where owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put(
                 "active relationships",
                 count(
                         admin,
@@ -424,6 +550,14 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         counts.put(
                 "orders of the history",
                 count(admin, "select count(*) from kernel.document where notes like 'Demo history %'"));
+        counts.put(
+                "members of M101",
+                count(
+                        admin,
+                        "select count(*) from customers.customer where owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put("credit accounts", count(admin, "select count(*) from customers.customer_account"));
+        counts.put("account postings", count(admin, "select count(*) from customers.account_posting"));
         counts.put(
                 "audit of the demo users",
                 count(admin, "select count(*) from kernel.audit_event where actor_user_id::text like '0190f0de-%'"));

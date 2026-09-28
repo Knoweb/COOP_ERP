@@ -9,6 +9,7 @@
 |Bean references
 |* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.Messages` (in Platform Kernel)
 * `l.c.k.k.api.Formats` (in Platform Kernel)
 * `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)

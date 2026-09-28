@@ -1,0 +1,57 @@
+# M7's audit codes (27A section 6), loaded by the kernel's AuditEventTypeSeedLoader. No record of
+# these holds a name, a phone number or a NIC (27A, "Read this first").
+audit_event_types:
+  - code: CUSTOMER_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer was registered at a society
+
+  - code: CUSTOMER_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's names, language, attributes or tags were amended
+
+  - code: CUSTOMER_PHONE_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's primary phone was changed
+
+  - code: CUSTOMER_DEACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer was deactivated
+
+  - code: ACCOUNT_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: A society opened a credit account for a customer
+
+  - code: ACCOUNT_CHARGED
+    severity: INFO
+    offline_capturable: true
+    description_en: A till's account tender was charged to a customer's account
+
+  - code: ACCOUNT_CREDITED
+    severity: INFO
+    offline_capturable: true
+    description_en: A till's refund was credited to a customer's account
+
+  - code: ACCOUNT_LIMIT_BREACH
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A charge took a customer's account beyond its credit limit
+
+  - code: HARD_BLOCK_BYPASSED_OFFLINE
+    severity: ALERT
+    offline_capturable: true
+    description_en: An offline till charged a hard-blocked account beyond its limit
+
+  - code: ACCOUNT_TENDER_UNKNOWN
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till receipt charged an account the society does not have; nothing was posted
+
+  - code: CUSTOMER_PAYMENT_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's repayment was recorded

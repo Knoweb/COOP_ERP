@@ -16,10 +16,13 @@ paths:
       operationId: getDashboard
       summary: The dashboard tiles of the caller's scope
       description: >
-        Open orders (submitted, not yet accepted, rejected or cancelled), deliveries in transit
-        (dispatched, no GRN confirmed against them), GRNs confirmed today (the business date),
-        and, for the owner's users and the Federation view, the stock value at the entity
-        average. Each count covers the documents the caller is a party to.
+        The tiles of seed/m8reporting/dashboard-tiles.yaml that have something for the caller's
+        scope: sales and purchases (invoiced, net) and the shop's sales with their eight-week
+        trend, receivables and payables with what is overdue, the highest exposure against a
+        known credit limit, fill rate and on-time delivery (eight weeks), the open exceptions,
+        open orders, deliveries in transit, GRNs confirmed today and, for the owner's users and
+        the Federation view, the stock value at the entity average. Kept for
+        reporting.dashboard_cache_seconds.
       x-permission: rpt.report.run
       responses:
         '200':
@@ -27,6 +30,25 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
+  /v1/reporting/exceptions:
+    get:
+      tags: [Reporting]
+      operationId: listExceptions
+      summary: The exception queue of the caller's scope
+      description: >
+        Open discrepancies, disputed invoices, bounced cheques, buyers at or past their exposure
+        warning and stock lots below zero that the caller is a party to or owns; escalated
+        first, then alerts, oldest first. An item is escalated once older than
+        reporting.exception_escalate_after, or a discrepancy past its window.
+      x-permission: rpt.report.run
+      responses:
+        '200':
+          description: The items
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExceptionItemResponse' }
   /v1/reporting/reports:
     get:
       tags: [Reporting]
@@ -87,6 +109,27 @@ paths:
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/reporting/reports/{reportId}/runs:
+    get:
+      tags: [Reporting]
+      operationId: listReportRuns
+      summary: The latest print runs of a report, newest first
+      description: >
+        The last twenty runs of the report the caller's entity requested (at the caller's
+        location, for a user bound to one). Code this operation can answer with 422:
+        m8.report.unknown.
+      x-permission: rpt.export.run
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: The runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReportRunResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
     post:
       tags: [Reporting]
       operationId: requestReportRun
@@ -175,9 +218,49 @@ components:
       properties:
         tileId: { type: string }
         labelId: { type: string, description: The message id of the tile's name }
-        value: { type: string, description: 'A count, or an amount (plain decimal) for kind MONEY' }
-        kind: { type: string, enum: [COUNT, MONEY] }
-        drillReportId: { type: string }
+        value:
+          type: string
+          description: 'A count, an amount (plain decimal) for kind MONEY, a percentage (one decimal) for kind PERCENT'
+        kind: { type: string, enum: [COUNT, MONEY, PERCENT] }
+        drillReportId:
+          type: string
+          description: The report the tile opens; "exceptions" for the exception queue
+        trend:
+          type: array
+          description: For a trend tile, the eight weeks ending today, oldest first; the value is the last
+          items: { $ref: '#/components/schemas/TrendPoint' }
+    TrendPoint:
+      type: object
+      required: [from, value]
+      properties:
+        from: { type: string, format: date, description: The first day of the week }
+        value: { type: string, description: 'The week''s figure, a plain decimal' }
+    ExceptionItemResponse:
+      type: object
+      required: [kind, severity, subjectId, since, escalated]
+      properties:
+        kind:
+          type: string
+          enum: [DISCREPANCY_OPEN, INVOICE_DISPUTED, CHEQUE_BOUNCED, EXPOSURE_WARNING, NEGATIVE_STOCK]
+        severity: { type: string, enum: [ALERT, REVIEW] }
+        subjectId:
+          type: string
+          format: uuid
+          description: The discrepancy, invoice, payment receipt, relationship, or the lot's batch
+        documentNumber: { type: string }
+        role:
+          type: string
+          enum: [SELLER, BUYER]
+          description: The caller's side of a trading item
+        counterpartyEntityId: { type: string, format: uuid }
+        counterparty: { type: string, description: The other party's name in the caller's language }
+        subject: { type: string, description: 'For stock: the item and the location' }
+        amount:
+          type: string
+          description: 'The money at stake (plain decimal), or the quantity below zero for stock'
+        percent: { type: string, description: 'For an exposure warning: exposure as a percentage of the limit' }
+        since: { type: string, format: date-time }
+        escalated: { type: boolean }
     ReportDefinitionResponse:
       type: object
       required: [reportId, titleId, decisionId, period, location]
@@ -193,7 +276,7 @@ components:
       properties:
         key: { type: string }
         labelId: { type: string }
-        kind: { type: string, enum: [TEXT, DATE, QTY, MONEY] }
+        kind: { type: string, enum: [TEXT, DATE, QTY, COUNT, MONEY, PERCENT] }
     ReportDataResponse:
       type: object
       required: [reportId, titleId, columns, rows, totals, generatedAt]

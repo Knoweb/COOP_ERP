@@ -9,6 +9,8 @@
 |Bean references
 |* `l.c.k.k.api.HistoricalTime` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.m.query.CustomerQueries` (in M7 Customers & Payment Recording)
+* `l.c.k.m.query.AccountQueries` (in M7 Customers & Payment Recording)
 * `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.m.query.RelationshipQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.m.query.CatalogueQueries` (in M2 Catalogue & Batch)
