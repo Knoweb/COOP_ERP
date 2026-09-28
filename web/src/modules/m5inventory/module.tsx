@@ -11,6 +11,11 @@ import { OpeningBalancePage } from "./OpeningBalancePage";
 import { StockCardPage } from "./StockCardPage";
 import { StockPage } from "./StockPage";
 import { TransfersPage } from "./TransfersPage";
+import { CountsPage } from "./CountsPage";
+import { CountPage } from "./CountPage";
+import { WriteOffsPage } from "./WriteOffsPage";
+import { WriteOffPage } from "./WriteOffPage";
+import { RepacksPage } from "./RepacksPage";
 
 export const inventoryModule: ModuleDefinition = {
   id: "inventory",
@@ -29,7 +34,14 @@ export const inventoryModule: ModuleDefinition = {
     // The stock card of an item at a location, linked from the stock position (25A section 8).
     { path: "inventory/locations/:locationId/skus/:skuId", element: <StockCardPage /> },
     // M5-09 (demo scope): send stock to another location of the entity, receive it there.
-    { path: "inventory/transfers", element: <TransfersPage /> }
+    { path: "inventory/transfers", element: <TransfersPage /> },
+    // M5-11, M5-13 and the repack (25A section 8, back office): counts with their adjustment,
+    // the damage and expiry register, repacks.
+    { path: "inventory/counts", element: <CountsPage /> },
+    { path: "inventory/counts/:taskId", element: <CountPage /> },
+    { path: "inventory/write-offs", element: <WriteOffsPage /> },
+    { path: "inventory/write-offs/:writeOffId", element: <WriteOffPage /> },
+    { path: "inventory/repacks", element: <RepacksPage /> }
   ],
 
   // The label is a message id of inventory.messages.json, never literal text.

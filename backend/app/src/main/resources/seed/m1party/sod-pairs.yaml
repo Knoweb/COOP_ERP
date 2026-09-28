@@ -11,3 +11,13 @@ pairs:
     permission_a: "gov.audit.review"
     permission_b: "gov.user.manage"
     mode: "INSTANCE"
+  # M5 (25A section 6.3, "Sod.assertDistinct(request, approve, requester)"): whoever asks for a stock
+  # adjustment or a write-off does not approve the same one.
+  - id: "0199a5e0-0000-7000-8000-000000000501"
+    permission_a: "inv.adjust.approve"
+    permission_b: "inv.adjust.request"
+    mode: "INSTANCE"
+  - id: "0199a5e0-0000-7000-8000-000000000502"
+    permission_a: "inv.writeoff.approve"
+    permission_b: "inv.writeoff.request"
+    mode: "INSTANCE"

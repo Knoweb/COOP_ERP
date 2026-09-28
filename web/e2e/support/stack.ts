@@ -47,6 +47,7 @@ export const DEMO = {
   d101Buyer: demoUser("d101-buyer", "Chaminda Rathnayake", "si"),
   d101Stores: demoUser("d101-stores", "Lasantha Herath", "si"),
   d101Accounts: demoUser("d101-accounts", "Dilani Wijesekara", "si"),
+  m101Buyer: demoUser("m101-buyer", "Sandya Kumari", "si"),
   m101Manager: demoUser("m101-manager", "Ruwan Dissanayake", "si"),
   m101Shop: demoUser("m101-shop", "Malani Gunawardena", "si")
 };

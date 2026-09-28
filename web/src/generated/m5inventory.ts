@@ -239,6 +239,398 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The counts of a location, newest first */
+        get: operations["listCounts"];
+        put?: never;
+        /**
+         * Schedule a count of a location, of everything or of some items
+         * @description Nothing is frozen: the location keeps selling and receiving while it is counted. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.count.scope_invalid, m5.count.already_open.
+         */
+        post: operations["scheduleCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One count with its expectation, its lines and its adjustment */
+        get: operations["getCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts/{taskId}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the count; what the book holds of every lot in scope is noted
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found, m5.count.not_scheduled.
+         */
+        post: operations["startCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts/{taskId}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit what was counted; variances within tolerance post at once
+         * @description Each lot is measured against the book as it stands at submit (what was noted at the start, moved by the sales and receipts since). Variances within tolerance post as COUNT_ADJUST; the others wait for approval (VARIANCE_REVIEW). Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found, m5.count.not_counting, m5.count.line_invalid, m5.batch.not_found, m5.count.line_out_of_scope, m5.count.line_missing.
+         */
+        post: operations["submitCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts/{taskId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the count's variances beyond tolerance and post them
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found, m5.adjustment.not_in_review, m5.adjustment.approver_is_requester, sod.same_person, m5.approval.limit_exceeded; mfa.required when the second factor is not fresh.
+         */
+        post: operations["approveAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts/{taskId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject the count's variances beyond tolerance; nothing more is posted
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found, m5.adjustment.not_in_review, m5.reason_required; mfa.required when the second factor is not fresh.
+         */
+        post: operations["rejectAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/locations/{locationId}/negative-lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The lots of a location below zero, oversold at the till, oldest first */
+        get: operations["listNegativeLots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/lots/{stockLotId}/acknowledge-negative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge a lot below zero with a note; the next count corrects it
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.lot.not_found, m5.lot.not_negative, m5.lot.already_acknowledged, m5.reason_required.
+         */
+        post: operations["acknowledgeNegativeLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The write-offs of a location, newest first */
+        get: operations["listWriteOffs"];
+        put?: never;
+        /**
+         * Draft a write-off of lost stock at a location
+         * @description No stock moves until approval. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.writeoff.category_required, m5.writeoff.lines_required, m5.writeoff.line_invalid, m5.batch.not_found, m5.writeoff.insufficient_stock.
+         */
+        post: operations["requestWriteOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One write-off with its lines, photographs and approval state */
+        get: operations["getWriteOff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise the upload of one photograph for a draft write-off
+         * @description Answers a URL the client PUTs the bytes to, with the content type given here. Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found, m5.writeoff.not_draft, attachment.content_type_not_allowed, attachment.too_large.
+         */
+        post: operations["addWriteOffPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue the write-off as a WOF document; it waits for its witness
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found, m5.writeoff.not_draft, m5.location.not_in_scope, m5.writeoff.photos_required, m5.writeoff.insufficient_stock, m5.writeoff.entity_unknown.
+         */
+        post: operations["submitWriteOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}/witness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Witness the loss; remotely from the photographs at a single-staff location
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found, m5.writeoff.not_requested, m5.writeoff.witness_is_requester, m5.writeoff.photos_incomplete, m5.location.not_in_scope, m5.writeoff.remote_witness_not_allowed.
+         */
+        post: operations["witnessWriteOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the write-off within your band; the stock is written off
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found, m5.writeoff.not_witnessed, m5.writeoff.approver_is_requester, sod.same_person, m5.writeoff.insufficient_stock, m5.approval.limit_exceeded; mfa.required when the second factor is not fresh.
+         */
+        post: operations["approveWriteOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/write-offs/{writeOffId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject the write-off with a reason; no stock moves
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found, m5.writeoff.not_open, m5.reason_required; mfa.required when the second factor is not fresh.
+         */
+        post: operations["rejectWriteOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entity's repack recipes, active first */
+        get: operations["listRecipes"];
+        put?: never;
+        /**
+         * Define a repack recipe
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.recipe.name_required, m5.recipe.invalid, m5.recipe.same_sku, m5.recipe.sku_inactive, m5.recipe.output_not_repack, m5.recipe.name_taken.
+         */
+        post: operations["defineRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/recipes/{recipeId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire a recipe; repacks done with it stay
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.recipe.not_found, m5.recipe.retired.
+         */
+        post: operations["retireRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/repacks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The repacks done at a location, newest first */
+        get: operations["listRepacks"];
+        put?: never;
+        /**
+         * Repack part of a bulk lot into packs by a recipe
+         * @description The input leaves as REPACK_CONSUME at the entity average; the packs made come in as a new batch at the consumed value divided by their number. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.recipe.not_found, m5.recipe.retired, m5.repack.qty_invalid, m5.batch.not_found, m5.repack.input_mismatch, m5.repack.insufficient_stock, and M2's batch guards for the output.
+         */
+        post: operations["executeRepack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/repacks/{repackId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One repack */
+        get: operations["getRepack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/repacks/{repackId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a repack while its packs are untouched; the input lot is restored
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.repack.not_found, m5.repack.already_reversed, m5.reason_required, m5.repack.output_touched.
+         */
+        post: operations["reverseRepack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -412,6 +804,260 @@ export interface components {
             skuId: string;
             available: number;
         };
+        ScheduleCountRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            scopeKind: "FULL" | "SKUS";
+            skuIds?: string[];
+            /** Format: date */
+            scheduledFor?: string;
+        };
+        SubmitCountRequest: {
+            lines: components["schemas"]["CountLineRequest"][];
+        };
+        /** @description A counted quantity, or a reason to skip the lot; never both. */
+        CountLineRequest: {
+            /** Format: uuid */
+            batchId: string;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            countedQty?: number;
+            skipReason?: string;
+        };
+        ReasonRequest: {
+            reason: string;
+        };
+        CountResponse: {
+            /** Format: uuid */
+            taskId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            scopeKind: "FULL" | "SKUS";
+            skuIds: string[];
+            /** Format: date */
+            scheduledFor: string;
+            /** @enum {string} */
+            status: "SCHEDULED" | "COUNTING" | "VARIANCE_REVIEW" | "CLOSED";
+            /** @enum {string} */
+            outcome?: "POSTED" | "APPROVED" | "REJECTED";
+            /** Format: uuid */
+            scheduledBy?: string;
+            /** Format: uuid */
+            startedBy?: string;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: uuid */
+            submittedBy?: string;
+            /** Format: date-time */
+            submittedAt?: string;
+            /** @description the value of the variances beyond tolerance, at the entity average */
+            reviewValue?: number;
+            reviewBand?: number;
+            /** Format: uuid */
+            reviewedBy?: string;
+            /** Format: date-time */
+            reviewedAt?: string;
+            reviewReason?: string;
+            expectation: components["schemas"]["CountExpectedResponse"][];
+            lines: components["schemas"]["CountLineResponse"][];
+        };
+        CountExpectedResponse: {
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            skuId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            expectedQty: number;
+        };
+        CountLineResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            skuId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            expectedQty: number;
+            countedQty?: number;
+            skipReason?: string;
+            varianceQty: number;
+            varianceValue: number;
+            withinTolerance: boolean;
+        };
+        NegativeLotResponse: {
+            /** Format: uuid */
+            stockLotId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            qtyOnHand: number;
+            /** Format: date-time */
+            negativeSince?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string;
+        };
+        RequestWriteOffRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            category: "DAMAGED_IN_TRANSIT" | "DAMAGED_IN_STORE" | "EXPIRED" | "THEFT" | "SHRINKAGE_UNEXPLAINED" | "STAFF_CONSUMPTION" | "SAMPLES" | "DONATION" | "OTHER";
+            note?: string;
+            lines: components["schemas"]["WriteOffLineRequest"][];
+        };
+        WriteOffLineRequest: {
+            /** Format: uuid */
+            batchId: string;
+            /**
+             * @default GOOD
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+            qty: number;
+        };
+        PhotoUploadRequest: {
+            contentType: string;
+            /** Format: int64 */
+            contentLength?: number;
+        };
+        PhotoUploadResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        WriteOffResponse: {
+            /** Format: uuid */
+            writeOffId: string;
+            /** Format: uuid */
+            locationId: string;
+            category: string;
+            note?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "REQUESTED" | "WITNESSED" | "POSTED" | "REJECTED";
+            /** Format: uuid */
+            requestedBy?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            /** Format: date-time */
+            submittedAt?: string;
+            documentNo?: string;
+            /** @description the loss at the entity average, from the submit on */
+            value?: number;
+            band?: number;
+            /** Format: uuid */
+            witnessUserId?: string;
+            /** Format: date-time */
+            witnessedAt?: string;
+            remoteWitness: boolean;
+            /** Format: uuid */
+            approverUserId?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            rejectReason?: string;
+            photosRequired: boolean;
+            lines: components["schemas"]["WriteOffLineResponse"][];
+            photos: components["schemas"]["WriteOffPhotoResponse"][];
+        };
+        WriteOffLineResponse: {
+            lineNo: number;
+            /** Format: uuid */
+            batchId: string;
+            /** Format: uuid */
+            skuId: string;
+            batchNo?: string;
+            /** @enum {string} */
+            condition: "GOOD" | "DAMAGED";
+            qty: number;
+        };
+        WriteOffPhotoResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETE" | "FAILED";
+        };
+        DefineRecipeRequest: {
+            name: string;
+            /** Format: uuid */
+            inputSkuId: string;
+            inputQty: number;
+            /** Format: uuid */
+            outputSkuId: string;
+            outputQty: number;
+            expectedLossPct?: number;
+        };
+        RecipeResponse: {
+            /** Format: uuid */
+            recipeId: string;
+            name: string;
+            /** Format: uuid */
+            inputSkuId: string;
+            inputQty: number;
+            /** Format: uuid */
+            outputSkuId: string;
+            outputQty: number;
+            expectedLossPct: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "RETIRED";
+        };
+        ExecuteRepackRequest: {
+            /** Format: uuid */
+            recipeId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            inputBatchId: string;
+            inputQty: number;
+            actualOutputQty: number;
+            printedMrp?: number;
+        };
+        RepackResponse: {
+            /** Format: uuid */
+            repackId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            recipeId: string;
+            /** Format: uuid */
+            inputBatchId: string;
+            /** Format: uuid */
+            inputSkuId: string;
+            inputQty: number;
+            inputUnitCost?: number;
+            /** Format: uuid */
+            outputSkuId: string;
+            /** Format: uuid */
+            outputBatchId: string;
+            outputBatchNo?: string;
+            expectedOutputQty: number;
+            actualOutputQty: number;
+            /** @description expected minus actual output: the yield loss beyond the recipe */
+            varianceQty: number;
+            outputUnitCost?: number;
+            /** @enum {string} */
+            status: "EXECUTED" | "REVERSED";
+            /** Format: uuid */
+            executedBy?: string;
+            /** Format: date-time */
+            executedAt?: string;
+            reversalReason?: string;
+            /** Format: date-time */
+            reversedAt?: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -458,6 +1104,9 @@ export interface components {
         };
     };
     parameters: {
+        TaskId: string;
+        WriteOffId: string;
+        RepackId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -807,6 +1456,662 @@ export interface operations {
                     "application/json": components["schemas"]["TransferResponse"];
                 };
             };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listCounts: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    scheduleCount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleCountRequest"];
+            };
+        };
+        responses: {
+            /** @description Scheduled */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"];
+                };
+            };
+            /** @description No such count, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    startCount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    submitCount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitCountRequest"];
+            };
+        };
+        responses: {
+            /** @description Submitted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    approveAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved and posted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listNegativeLots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The negative lots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NegativeLotResponse"][];
+                };
+            };
+        };
+    };
+    acknowledgeNegativeLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                stockLotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Acknowledged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NegativeLotResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listWriteOffs: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The write-offs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    requestWriteOff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestWriteOffRequest"];
+            };
+        };
+        responses: {
+            /** @description Drafted */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getWriteOff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The write-off */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"];
+                };
+            };
+            /** @description No such write-off, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    addWriteOffPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorised */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoUploadResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    submitWriteOff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Submitted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    witnessWriteOff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Witnessed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    approveWriteOff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved and posted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectWriteOff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                writeOffId: components["parameters"]["WriteOffId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteOffResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRecipes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recipes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeResponse"][];
+                };
+            };
+        };
+    };
+    defineRecipe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineRecipeRequest"];
+            };
+        };
+        responses: {
+            /** @description Defined */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    retireRecipe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retired */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listRepacks: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The repacks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepackResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    executeRepack: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteRepackRequest"];
+            };
+        };
+        responses: {
+            /** @description Executed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepackResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getRepack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repackId: components["parameters"]["RepackId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The repack */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepackResponse"];
+                };
+            };
+            /** @description No such repack, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reverseRepack: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                repackId: components["parameters"]["RepackId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Reversed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepackResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };
