@@ -14,6 +14,15 @@
 4. Optional live addition: click **Draft the next version**. **Find an item by code or name**, find one, **Add**, fill in a **Unit price (without VAT)** and a **From quantity**, **Save lines**. Point out the checks: a negative price, a duplicate quantity for the same item, or a missing line from quantity 0 are all refused with a plain reason before you can publish.
 5. Click **Publish** — the new version becomes "Published" and the old one moves to "Superseded" automatically; nothing is overwritten.
 
+## Shelf prices under the gazette
+
+(demo data loaded; the list was published on the set-up day)
+1. Sign in as **fed-pricing** → Price lists → **Gazette**. Three control prices are in force: Nadu rice 5 kg Rs 1,100 (2492/29), white sugar 1 kg Rs 275 (2492/30), samba rice loose Rs 250/kg (2492/31). Rows are never deleted: a later gazette closes the earlier one the day before, and *Rescind…* ends one with a reason.
+2. Sign in as **m101-manager** → Price lists → **Shelf prices** → *Kuliyapitiya shelf prices*. Each line shows its shelf price (with VAT), the Federation's advisory price if any, and the binding ceiling.
+3. *Draft the next version* (the lines are carried forward). Set Nadu rice to 1,200 and *Save lines*. The line is refused with "above the control price", gazette 2492/29 is shown, and *Publish* stays disabled. Set it back to 1,100 and save. It is accepted.
+4. Publish from tomorrow; the second factor is asked. Under **Price at a shop**, choose the town shop, Nadu rice and tomorrow. The price is Rs 1,100 = list = control price; the MRP on the shelf is Rs 1,150. The till never charges more than the control price.
+5. **MRP policy**: milk powder 400 g is set to "Cashier picks the batch" (gap Rs 20) by the society. Items not listed use the lowest MRP on the shelf.
+
 ## What to point out
 
 - **Tiers reward volume without a special case in the order screen**: the buyer's order screen (phase 1, next file) just reads whichever tier line matches the quantity ordered.
