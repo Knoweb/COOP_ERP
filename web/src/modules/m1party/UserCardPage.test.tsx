@@ -38,7 +38,7 @@ const warehouse = { locationId: WAREHOUSE, locationCode: "W01", nameEn: "Federat
 
 const api = {
   getUser: vi.fn(async () => pending),
-  resetCredential: vi.fn(async () => ({ userId: USER, credential: "PASSWORD", status: "ACTIVE", delivery: "RETURNED", temporaryPassword: "Kp7wQ2xZr9Ta" })),
+  resetCredential: vi.fn(async () => ({ userId: USER, credential: "PASSWORD", status: "ACTIVE", delivery: "RETURNED", temporaryPassword: "shown-once-in-test" })),
   deactivateUser: vi.fn(async () => undefined),
   listAssignments: vi.fn(async () => [] as unknown[]),
   listRoles: vi.fn(async () => [role, template]),
@@ -74,7 +74,7 @@ describe("the user card", () => {
   it("issues the first password and shows it once", async () => {
     renderCard();
     fireEvent.click(await screen.findByRole("button", { name: text("party.user.password") }));
-    expect(await screen.findByText("Kp7wQ2xZr9Ta")).toBeTruthy();
+    expect(await screen.findByText("shown-once-in-test")).toBeTruthy();
     expect(api.resetCredential).toHaveBeenCalledWith(USER, "PASSWORD", expect.any(String));
   });
 
