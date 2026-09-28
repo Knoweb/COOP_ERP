@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -54,10 +56,12 @@ import org.springframework.stereotype.Service;
  * part-way, so every screen has something to act on live: one received but not invoiced, one in
  * transit, one accepted, one submitted.
  *
- * <p>Dated today: the handlers take the date from the one clock of the application (the order,
- * the delivery note and the invoice from M4's TradingClock) and there is no supported way to
- * back-date a document, so the history is generated as of the day of the load; faking dates in
- * the database is not done (docs/DEMO.md).
+ * <p>Spread over eight weeks: the first order of each relationship was placed
+ * {@link DemoCalendar#HISTORY_DAYS} days before the load, the last today, and each step of an order
+ * runs on its own later day. The handlers take the date from the application's clock and the
+ * location's business date as always; the loader runs each step inside kernel.api.HistoricalTime,
+ * which only the demo container enables, so nothing is faked in the database and no back-dating
+ * path exists in the API (docs/DEMO.md).
  *
  * <p>Idempotent and resumable: every order carries its key in its notes ("Demo history ..."), and
  * each run moves each order on from where it stands to its target stage, so a second run issues
@@ -151,6 +155,15 @@ class DemoTradingHistory {
 
     static final String NOTE_PREFIX = "Demo history ";
 
+    /** The time of day of each step, in the business time zone. */
+    private static final LocalTime ORDERED = LocalTime.of(9, 0);
+
+    private static final LocalTime ACCEPTED = LocalTime.of(10, 30);
+    private static final LocalTime NOTE_DRAFTED = LocalTime.of(9, 15);
+    private static final LocalTime DISPATCHED = LocalTime.of(14, 0);
+    private static final LocalTime RECEIVED = LocalTime.of(11, 0);
+    private static final LocalTime INVOICED = LocalTime.of(15, 30);
+
     private final Handles<CreateOrder, UUID> createOrder;
     private final Handles<SubmitOrder, String> submitOrder;
     private final Handles<AcceptOrder, UUID> acceptOrder;
@@ -166,6 +179,7 @@ class DemoTradingHistory {
     private final InvoiceQueries invoices;
     private final InventoryQueries inventory;
     private final BatchQueries batches;
+    private final DemoCalendar calendar;
     private final Clock clock;
     private final ZoneId businessZone;
 
@@ -186,6 +200,7 @@ class DemoTradingHistory {
             InvoiceQueries invoices,
             InventoryQueries inventory,
             BatchQueries batches,
+            DemoCalendar calendar,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
         this.createOrder = createOrder;
@@ -203,6 +218,7 @@ class DemoTradingHistory {
         this.invoices = invoices;
         this.inventory = inventory;
         this.batches = batches;
+        this.calendar = calendar;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
     }
@@ -211,8 +227,10 @@ class DemoTradingHistory {
     void load(List<Item> items, Map<String, UUID> skus, Consumer<String> count) {
         Map<UUID, Item> bySku = new HashMap<>();
         items.forEach(item -> bySku.put(skus.get(item.nameEn()), item));
+        LocalDate today = calendar.today();
+        Map<String, OrderView> existing = new HashMap<>();
+        List<Planned> plan = new ArrayList<>();
         for (Lane lane : LANES) {
-            Map<String, OrderView> existing = new HashMap<>();
             for (OrderView order : orders.listOrders(OrderQueries.Role.BUYER, null, scopeOf(lane.buyer()))) {
                 if (order.notes() != null && order.notes().startsWith(NOTE_PREFIX)) {
                     existing.putIfAbsent(order.notes(), order);
@@ -221,37 +239,63 @@ class DemoTradingHistory {
             for (int no = 1; no <= lane.orders(); no++) {
                 int fromEnd = lane.orders() - no;
                 Stage target = fromEnd < OPEN_TAIL.size() ? OPEN_TAIL.get(fromEnd) : Stage.INVOICED;
+                // The key keeps its "week" of the first version (1 to 4): it is how a second run
+                // finds the order, so it does not change with the dates.
                 String key = NOTE_PREFIX + lane.code() + " week " + ((no - 1) * 4 / lane.orders() + 1) + " no. " + no;
-                carry(lane, no, key, target, existing.get(key), items, skus, bySku, count);
+                plan.add(new Planned(lane, no, key, target, today.minusDays(daysAgo(lane, no))));
             }
+        }
+        // All relationships together, oldest order first: each series then numbers its documents
+        // in the order of their dates (the Federation's delivery notes and invoices serve two lanes).
+        plan.sort(Comparator.comparing(Planned::placed));
+        for (Planned order : plan) {
+            carry(order, existing.get(order.key()), items, skus, bySku, count);
         }
     }
 
-    @SuppressWarnings("java:S107")
+    /**
+     * How many days before the load order {@code no} of the lane was placed: the first
+     * {@link DemoCalendar#HISTORY_DAYS} days ago, the last today, the others evenly between.
+     */
+    static int daysAgo(Lane lane, int no) {
+        return (lane.orders() - no) * DemoCalendar.HISTORY_DAYS / (lane.orders() - 1);
+    }
+
+    /** One order of the history: its lane, number, key, how far it goes and the day it was placed. */
+    record Planned(Lane lane, int no, String key, Stage target, LocalDate placed) {}
+
+    /**
+     * Moves one order on to its target stage, each step on its own day after the order was placed
+     * (DEMO-02): ordered and submitted that morning, accepted the next day, on a delivery note and
+     * dispatched the day after, received two days later, invoiced the day after that. A step of
+     * today that is still to come on the clock runs now (DemoCalendar).
+     */
     private void carry(
-            Lane lane,
-            int no,
-            String key,
-            Stage target,
+            Planned plan,
             OrderView found,
             List<Item> items,
             Map<String, UUID> skus,
             Map<UUID, Item> bySku,
             Consumer<String> count) {
-        ScopeContext buyer = scopeOf(lane.buyer());
+        Lane lane = plan.lane();
+        int no = plan.no();
+        Stage target = plan.target();
+        LocalDate placed = plan.placed();
         ScopeContext sales = scopeOf(lane.sales());
-        LocalDate today = today();
         UUID orderId;
         String status;
         if (found == null) {
-            orderId = createOrder.handle(
-                    new CreateOrder(
-                            lane.sales().entityId(),
-                            today.plusDays(3),
-                            key,
-                            orderLines(lane, no, items, skus),
-                            lane.deliverTo()),
-                    buyer);
+            orderId = calendar.at(
+                    placed,
+                    ORDERED,
+                    () -> createOrder.handle(
+                            new CreateOrder(
+                                    lane.sales().entityId(),
+                                    placed.plusDays(3),
+                                    plan.key(),
+                                    orderLines(lane, no, items, skus),
+                                    lane.deliverTo()),
+                            scopeOf(lane.buyer())));
             count.accept("CreateOrder");
             status = "DRAFT";
         } else {
@@ -259,7 +303,10 @@ class DemoTradingHistory {
             status = found.status();
         }
         if ("DRAFT".equals(status)) {
-            submitOrder.handle(new SubmitOrder(orderId), buyer);
+            calendar.at(
+                    placed,
+                    ORDERED.plusMinutes(10),
+                    () -> submitOrder.handle(new SubmitOrder(orderId), scopeOf(lane.buyer())));
             count.accept("SubmitOrder");
             status = "SUBMITTED";
         }
@@ -267,30 +314,42 @@ class DemoTradingHistory {
             return;
         }
         if ("SUBMITTED".equals(status)) {
-            acceptOrder.handle(new AcceptOrder(orderId, today.plusDays(3), List.of()), sales);
+            calendar.at(
+                    placed.plusDays(1),
+                    ACCEPTED,
+                    () -> acceptOrder.handle(
+                            new AcceptOrder(orderId, placed.plusDays(3), List.of()), scopeOf(lane.sales())));
             count.accept("AcceptOrder");
         }
         if (target == Stage.ACCEPTED) {
             return;
         }
 
+        LocalDate shipped = placed.plusDays(2);
         DeliveryView note = noteOf(orderId, sales).orElse(null);
         if (note == null) {
-            UUID noteId = draftNote(lane, orderId, sales);
+            UUID noteId = calendar.at(shipped, NOTE_DRAFTED, () -> draftNote(lane, orderId, scopeOf(lane.sales())));
             if (noteId == null) {
                 return; // nothing allocated: the seller had none of it
             }
             count.accept("CreateDeliveryNote");
             note = deliveries.getDeliveryNote(noteId, sales).orElseThrow();
         }
+        UUID noteId = note.deliveryNoteId();
         if (note.issuedAt() == null) {
-            issueNote.handle(new IssueDeliveryNote(note.deliveryNoteId()), sales);
+            calendar.at(
+                    shipped,
+                    NOTE_DRAFTED.plusMinutes(30),
+                    () -> issueNote.handle(new IssueDeliveryNote(noteId), scopeOf(lane.sales())));
             count.accept("IssueDeliveryNote");
         }
         if (note.dispatchedAt() == null) {
-            dispatchNote.handle(
-                    new DispatchDeliveryNote(note.deliveryNoteId(), "NB-" + (4500 + no), null, "Sunil Perera"),
-                    scopeOf(lane.stores()));
+            calendar.run(
+                    shipped,
+                    DISPATCHED,
+                    () -> dispatchNote.handle(
+                            new DispatchDeliveryNote(noteId, "NB-" + (4500 + no), null, "Sunil Perera"),
+                            scopeOf(lane.stores())));
             count.accept("DispatchDeliveryNote");
         }
         if (target == Stage.DISPATCHED) {
@@ -307,14 +366,23 @@ class DemoTradingHistory {
                     .findFirst()
                     .orElse(null);
         }
+        LocalDate arrived = placed.plusDays(4);
         if (grnId == null) {
-            grnId = captureGrn.handle(
-                    new CaptureGrn(drop.dropId(), lane.deliverTo(), null, grnLines(lane, no, drop, bySku)), receiver);
+            grnId = calendar.at(
+                    arrived,
+                    RECEIVED,
+                    () -> captureGrn.handle(
+                            new CaptureGrn(drop.dropId(), lane.deliverTo(), null, grnLines(lane, no, drop, bySku)),
+                            scopeOf(lane.receiver())));
             count.accept("CaptureGrn");
         }
-        GrnView grn = grns.getGrn(grnId, receiver).orElseThrow();
+        UUID received = grnId;
+        GrnView grn = grns.getGrn(received, receiver).orElseThrow();
         if (grn.confirmedAt() == null) {
-            confirmGrn.handle(new ConfirmGrn(grnId), receiver);
+            calendar.at(
+                    arrived,
+                    RECEIVED.plusMinutes(45),
+                    () -> confirmGrn.handle(new ConfirmGrn(received), scopeOf(lane.receiver())));
             count.accept("ConfirmGrn");
         }
         if (target == Stage.RECEIVED) {
@@ -322,11 +390,13 @@ class DemoTradingHistory {
         }
 
         ScopeContext accounts = scopeOf(lane.accounts());
-        UUID received = grnId;
         boolean invoiced = invoices.listInvoices(OrderQueries.Role.SELLER, accounts).stream()
                 .anyMatch(invoice -> invoice.grnIds().contains(received));
         if (!invoiced) {
-            issueInvoice.handle(new IssueInvoice(List.of(grnId)), accounts);
+            calendar.at(
+                    placed.plusDays(5),
+                    INVOICED,
+                    () -> issueInvoice.handle(new IssueInvoice(List.of(received)), scopeOf(lane.accounts())));
             count.accept("IssueInvoice");
         }
     }

@@ -80,6 +80,9 @@ coop-erp:
   # the demo through the command handlers and exits (lk.coopfed.knoweb.demo.DemoDataRunner).
   demo:
     load: ${COOP_ERP_DEMO_LOAD:false}
+    # DEMO-02: lets the loader issue its history at past dates (kernel.api.HistoricalTime); the
+    # same container only, never the running application.
+    historical-time: ${COOP_ERP_DEMO_LOAD:false}
 
   # K-03b resolves every command's permission from M1's roles; it refuses only when this is
   # true. Off by default: on in compose, where the dev realm's users hold the roles of the dev

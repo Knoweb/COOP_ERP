@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.demo;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -119,6 +120,7 @@ public class DemoDataLoader {
     private final PricingQueries pricing;
     private final InventoryQueries inventory;
     private final DemoTradingHistory history;
+    private final DemoCalendar calendar;
     private final Clock clock;
     private final ZoneId businessZone;
 
@@ -148,8 +150,10 @@ public class DemoDataLoader {
             PricingQueries pricing,
             InventoryQueries inventory,
             DemoTradingHistory history,
+            DemoCalendar calendar,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
+        this.calendar = calendar;
         this.registerTillPosition = registerTillPosition;
         this.setPrimaryTill = setPrimaryTill;
         this.createSku = createSku;
@@ -180,7 +184,25 @@ public class DemoDataLoader {
     public synchronized Report load() {
         counts = new LinkedHashMap<>();
         List<Item> items = DemoCatalogue.load();
+        LocalDate today = calendar.today();
 
+        // DEMO-02: the demo opened for business eight weeks and a few days ago, so that the
+        // history after it has prices, relationships and stock on the days it was traded.
+        Map<String, UUID> skus = new HashMap<>();
+        calendar.run(today.minusDays(DemoCalendar.SETUP_DAYS_AGO), LocalTime.of(8, 0), () -> skus.putAll(setUp(items)));
+        // The Hettipola shop got its first stock a month later.
+        calendar.run(
+                today.minusDays(DemoCalendar.SETUP_DAYS_AGO / 2), LocalTime.of(8, 0), this::hettipolaStockByTransfer);
+        // DEMO-02: the trading history, orders to invoices at both tiers (DemoTradingHistory).
+        history.load(items, skus, this::count);
+
+        Report report = new Report(Map.copyOf(counts));
+        log.info("Demo data: {} commands issued {}", report.total(), report.commands());
+        return report;
+    }
+
+    /** Master data and opening stock, in the order of the storyline; answers the SKU ids by English name. */
+    private Map<String, UUID> setUp(List<Item> items) {
         tills();
         Map<String, UUID> skus = catalogue(items);
         UUID federationList = federationPriceList(items, skus);
@@ -202,12 +224,7 @@ public class DemoDataLoader {
         // town shop, whose till sells it (make demo-till-sale).
         societyStock(items, skus);
         shopStockByTransfer();
-        // DEMO-02: the trading history, orders to invoices at both tiers (DemoTradingHistory).
-        history.load(items, skus, this::count);
-
-        Report report = new Report(Map.copyOf(counts));
-        log.info("Demo data: {} commands issued {}", report.total(), report.commands());
-        return report;
+        return skus;
     }
 
     // ---- M1: till positions and the primary till of every shop -----------------------------
@@ -518,6 +535,40 @@ public class DemoDataLoader {
         for (TransferView transfer : existing) {
             if ("IN_TRANSIT".equals(transfer.status()) && DemoCast.M101_TOWN_SHOP.equals(transfer.toLocationId())) {
                 receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), shop);
+                count("ReceiveTransfer");
+            }
+        }
+    }
+
+    /**
+     * The society manager sends a quarter of every GOOD lot left at the stores to the Hettipola shop
+     * and receives it there himself: the shop has no staff user of its own in the demo, and the
+     * manager works entity-wide. Skipped when a transfer to the shop exists; one left in transit is
+     * received.
+     */
+    private void hettipolaStockByTransfer() {
+        ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
+        List<TransferView> existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
+        if (existing.isEmpty()) {
+            List<IssueTransfer.Line> lines = new ArrayList<>();
+            for (LotBalance lot : inventory.balances(DemoCast.M101_WAREHOUSE, null, false, manager)) {
+                BigDecimal quarter = lot.qtyOnHand().divide(BigDecimal.valueOf(4), 0, java.math.RoundingMode.DOWN);
+                if ("GOOD".equals(lot.condition()) && quarter.signum() > 0) {
+                    lines.add(new IssueTransfer.Line(lot.batchId(), quarter));
+                }
+            }
+            if (lines.isEmpty()) {
+                return;
+            }
+            issueTransfer.handle(
+                    new IssueTransfer(DemoCast.M101_WAREHOUSE, DemoCast.M101_HETTIPOLA_SHOP, lines), manager);
+            count("IssueTransfer");
+            existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
+        }
+        for (TransferView transfer : existing) {
+            if ("IN_TRANSIT".equals(transfer.status())
+                    && DemoCast.M101_HETTIPOLA_SHOP.equals(transfer.toLocationId())) {
+                receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), manager);
                 count("ReceiveTransfer");
             }
         }

@@ -2,7 +2,11 @@ package lk.coopfed.knoweb.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
@@ -28,10 +32,15 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     static void theDemoFederation(DynamicPropertyRegistry registry) {
         registry.add("coop-erp.system.entity-id", DemoCast.FEDERATION::toString);
         registry.add("coop-erp.security.enforce-permissions", () -> "true");
+        // DEMO-02: what the demo container sets, so the history is dated over eight weeks.
+        registry.add("coop-erp.demo.historical-time", () -> "true");
     }
 
     @Autowired
     DemoDataLoader loader;
+
+    @Autowired
+    Clock clock;
 
     @BeforeEach
     void theSeedTheDemoStartsFrom() throws Exception {
@@ -78,8 +87,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("published trade lists", 3L)
                 .containsEntry("active relationships", 5L)
                 .containsEntry("posted opening balances", 4L)
-                .containsEntry("lots", 200L)
+                .containsEntry("lots", 229L) // 200, and 29 at the Hettipola shop (DEMO-02)
                 .containsEntry("received transfers to the town shop", 1L)
+                .containsEntry("received transfers to the Hettipola shop", 1L)
                 .containsEntry("lots with stock at the town shop", 40L)
                 .containsEntry("orders of the history", 44L);
         if (first.total() > 0) {
@@ -98,6 +108,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("CaptureGrn", 29)
                     .containsEntry("ConfirmGrn", 29)
                     .containsEntry("IssueInvoice", 24);
+            theHistorySpreadsOverEightWeeks();
         }
 
         kernel.reset();
@@ -131,6 +142,63 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                         """,
                 Long.class);
         assertThat(offenders).isZero();
+    }
+
+    /**
+     * DEMO-02: the history's orders, delivery notes, GRNs and invoices carry business dates over the
+     * eight weeks before today, each kind later than the one before it, and every numbering series
+     * the demo used numbers its documents in the order of their dates.
+     */
+    private void theHistorySpreadsOverEightWeeks() {
+        JdbcTemplate admin = superuserJdbc();
+        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"));
+        String demo = "(owner_entity_id = '" + DemoCast.FEDERATION + "' or owner_entity_id::text like '0190f0de-%')";
+
+        LocalDate firstOrder = admin.queryForObject(
+                "select min(business_date) from kernel.document where notes like 'Demo history %'", LocalDate.class);
+        LocalDate lastOrder = admin.queryForObject(
+                "select max(business_date) from kernel.document where notes like 'Demo history %'", LocalDate.class);
+        assertThat(firstOrder).isEqualTo(today.minusDays(DemoCalendar.HISTORY_DAYS));
+        assertThat(lastOrder).isEqualTo(today);
+
+        // Every document of the history is dated within the eight weeks, on at least 20 different days.
+        List<String> types = List.of("ORD", "DN", "GRN", "INV");
+        LocalDate previousFirst = null;
+        for (String type : types) {
+            Map<String, Object> range = admin.queryForMap(
+                    "select min(business_date) as first, max(business_date) as last,"
+                            + " count(distinct business_date) as days from kernel.document"
+                            + " where doc_type_code = ? and issued_at is not null and " + demo,
+                    type);
+            LocalDate first = ((java.sql.Date) range.get("first")).toLocalDate();
+            LocalDate last = ((java.sql.Date) range.get("last")).toLocalDate();
+            assertThat(first).as(type).isAfterOrEqualTo(today.minusDays(DemoCalendar.HISTORY_DAYS));
+            assertThat(last).as(type).isBeforeOrEqualTo(today);
+            assertThat((Long) range.get("days")).as(type).isGreaterThanOrEqualTo(10L);
+            if (previousFirst != null) {
+                assertThat(first).as(type + " after the step before it").isAfter(previousFirst);
+            }
+            previousFirst = first;
+        }
+
+        // Per series, a later number never carries an earlier date.
+        Long outOfOrder = admin.queryForObject(
+                "select count(*) from (select business_date, lag(business_date) over"
+                        + " (partition by series_id order by doc_number) as before"
+                        + " from kernel.document where series_id is not null and doc_number is not null and "
+                        + demo + ") numbered where business_date < before",
+                Long.class);
+        assertThat(outOfOrder).isZero();
+
+        // And each document of an invoiced order is dated after the one it follows.
+        Long backwards = admin.queryForObject(
+                """
+                select count(*) from kernel.document inv
+                  join kernel.document grn on grn.document_id = inv.reference_document_id
+                 where inv.doc_type_code = 'INV' and grn.doc_type_code = 'GRN' and inv.business_date <= grn.business_date
+                """,
+                Long.class);
+        assertThat(backwards).isZero();
     }
 
     /** What the demo consists of, counted as the superuser over the demo's own rows. */
@@ -198,6 +266,12 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                         admin,
                         "select count(*) from inventory.transfer_receipt where location_id = ?::uuid",
                         DemoCast.M101_TOWN_SHOP.toString()));
+        counts.put(
+                "received transfers to the Hettipola shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.transfer_receipt where location_id = ?::uuid",
+                        DemoCast.M101_HETTIPOLA_SHOP.toString()));
         counts.put(
                 "lots with stock at the town shop",
                 count(

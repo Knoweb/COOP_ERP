@@ -28,6 +28,7 @@ What is loaded:
 | Opening stock of every SKU at the Federation warehouse and at both distributors' warehouses, batches with expiry and printed MRP | M5 `PrepareOpeningBalance`, `SignOpeningBalance` (stores), `CountersignOpeningBalance` (a second person, accounts) | `fed-stores` then `fed-accounts`; `d101-stores` then `d101-accounts`; `d102-stores` then `d102-accounts` |
 | Phase 3: Kuliyapitiya MPCS's opening stock at its stores (M101 W01), a tenth of a distributor's quantities at the Wayamba price | M5, the same three commands | `m101-buyer` then `m101-manager` |
 | Phase 3: half of every lot at the stores sent to Kuliyapitiya town shop (M101 S01) and received there | M5 `IssueTransfer` (at the stores), `ReceiveTransfer` (at the shop, by the shop's own session) | `m101-manager`, then `m101-shop` |
+| Phase 3: a quarter of every lot left at the stores sent to the Hettipola shop (M101 S02) a month later and received there | M5 `IssueTransfer`, `ReceiveTransfer` (the shop has no staff user of its own, so the manager, entity-wide, receives) | `m101-manager` |
 
 ### The trading history (DEMO-02)
 
@@ -43,7 +44,11 @@ Last, the loader leaves a history of trading so that the Trading, Reports and da
 
 **Left open for the live walk.** The last four orders of each relationship stop part-way: one **submitted** (to accept at the order desk), one **accepted** (to put on a delivery note), one **in transit** (to receive with a GRN), one **received** (to invoice). The others, 24 in all, are invoiced. Each history order's notes read `Demo history <relationship> week n no. k`; that is how a second run finds them and moves each on from where it stands.
 
-**Dates.** All of the history is dated the day `make demo-data` runs: the handlers take the date from the application's clock and there is no supported way to back-date a document, and dates are not faked in the database.
+**Dates.** The demo opens for business 60 days before `make demo-data` runs (catalogue, price lists, relationships, opening stock and the town shop's transfer carry that date; the Hettipola transfer is 30 days ago), and the history spreads over the eight weeks since: the first order of each relationship was placed 55 days ago, the last (the submitted one) today, the others evenly between, all five relationships interleaved in date order. Each step of an order has its own later day: ordered and submitted at 09:00, accepted the next day, on a delivery note and dispatched the day after, received (GRN) two days later, invoiced the day after that. So Reports by period and the dashboard show a trend, and every numbering series numbers its documents in date order. A step that would fall later today than the load runs at the time of the load.
+
+How: the loader runs each step through the ordinary handlers inside `kernel.api.HistoricalTime`, which moves the application's clock, and each location's business date, back on the loader's own thread only. It is refused unless `coop-erp.demo.historical-time` is true, which only the one-off `make demo-data` container sets (`COOP_ERP_DEMO_LOAD`); no controller or job can reach it, and an architecture rule allows only the demo package to use it. Nothing is written to the database behind the handlers: numbering, audit, events and projections are what they would have been on those days. Event listeners on other threads (M5's stock ledger from `grn.confirmed.v1`) record their own rows at the real time.
+
+A database loaded before this (with a history dated all on one day) keeps it: the loader finds every order by its notes and issues nothing. To see the eight weeks, `make reset && make up && make demo-data`.
 
 The catalogue, its prices and the opening quantities are in `backend/app/src/main/resources/demo/catalogue.psv`, one line per SKU; change it there, not in code.
 
@@ -106,7 +111,7 @@ A society moves stock from its stores to one of its shops; the shop sells at the
 
 ## Still to come (TODO)
 
-- **More history (DEMO-02, deferred).** The history is dated today, not spread over weeks; M101's transfer to Hettipola shop and a history of till sales at the shops are not loaded yet (`make demo-till-sale` makes one sale per run).
+- **More history (DEMO-02, deferred).** A history of till sales at the shops is not loaded yet (`make demo-till-sale` makes one sale per run, dated today). The trading history's eight weeks and M101's transfer to the Hettipola shop are loaded.
 - **The buyer's printed invoice.** The A4 PDF is stored under the seller, so only the seller's accounts can print it; the buyer reads the invoice on the screen.
 - The demo users sign in with a password only; a step that asks for a second factor (publishing a price list, signing a balance) is accepted in the development realm because a fresh password sign-in counts (`COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS`).
 - The till is not part of phase 1: the shops have positions and a primary till. Phase 3's demo till is enrolled by `make demo-till-sale`, not by `make demo-data`; the Android till itself is the till track's.
