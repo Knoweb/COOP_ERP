@@ -41,7 +41,9 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     TestRestTemplate http;
 
     private final UUID rice = Ids.next();
-    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Colombo"));
+    // Tomorrow, not today: the test takes a while, and a list published "from today" is refused
+    // as backdated once midnight in Colombo passes during the run (CI runs at any hour).
+    private final LocalDate applyFrom = LocalDate.now(ZoneId.of("Asia/Colombo")).plusDays(1);
 
     @BeforeEach
     void arrange() {
@@ -111,12 +113,12 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 HttpMethod.POST,
                 "/v1/pricing/lists/" + listId + "/publish",
                 FEDERATION,
-                Map.of("applyFrom", today.toString()));
+                Map.of("applyFrom", applyFrom.toString()));
         assertThat(published.getStatusCode())
                 .as(String.valueOf(published.getBody()))
                 .isEqualTo(HttpStatus.OK);
         assertThat(published.getBody().get("status").asText()).isEqualTo("PUBLISHED");
-        assertThat(published.getBody().get("applyFrom").asText()).isEqualTo(today.toString());
+        assertThat(published.getBody().get("applyFrom").asText()).isEqualTo(applyFrom.toString());
 
         ResponseEntity<JsonNode> detail = send(HttpMethod.GET, "/v1/pricing/lists/" + listId, FEDERATION, null);
         assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -135,7 +137,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 HttpMethod.POST,
                 "/v1/pricing/lists/" + listId + "/publish",
                 FEDERATION,
-                Map.of("applyFrom", today.toString()));
+                Map.of("applyFrom", applyFrom.toString()));
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(again.getBody().get("code").asText()).isEqualTo("m3.price_list.not_draft");
 
@@ -156,7 +158,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         ResponseEntity<JsonNode> price = send(
                 HttpMethod.GET,
                 "/v1/pricing/resolve/trade?relationshipId=" + RELATIONSHIP + "&skuId=" + rice + "&uom=EA&qty=12&date="
-                        + today,
+                        + applyFrom,
                 DISTRIBUTOR,
                 null);
         assertThat(price.getStatusCode()).as(String.valueOf(price.getBody())).isEqualTo(HttpStatus.OK);
@@ -166,7 +168,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(send(
                                 HttpMethod.GET,
                                 "/v1/pricing/resolve/trade?relationshipId=" + RELATIONSHIP + "&skuId=" + Ids.next()
-                                        + "&uom=EA&qty=1&date=" + today,
+                                        + "&uom=EA&qty=1&date=" + applyFrom,
                                 DISTRIBUTOR,
                                 null)
                         .getStatusCode())
@@ -184,7 +186,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         "kind", "TIME_LIMITED_PRICE",
                         "predicate", Map.of("skuId", rice),
                         "benefit", Map.of("kind", "PERCENT_OFF", "value", 10),
-                        "validFrom", today.toString()));
+                        "validFrom", applyFrom.toString()));
         assertThat(authored.getStatusCode())
                 .as(String.valueOf(authored.getBody()))
                 .isEqualTo(HttpStatus.CREATED);
@@ -232,7 +234,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         "kind", "FREE_ITEM",
                         "predicate", Map.of("skuId", rice),
                         "benefit", Map.of("kind", "FREE_QTY", "value", 1),
-                        "validFrom", today.toString()));
+                        "validFrom", applyFrom.toString()));
         assertThat(freeItem.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(freeItem.getBody().get("code").asText()).isEqualTo("m3.rule.kind_not_available");
     }

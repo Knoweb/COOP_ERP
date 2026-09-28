@@ -1,6 +1,11 @@
 package lk.coopfed.knoweb.m3pricing.internal.list;
 
+import java.sql.Date;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
@@ -13,7 +18,9 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.PriceListDrafted;
+import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,9 +28,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * DraftNewVersion (23A section 7). Guards: the owner in an entity-wide OWN scope; the source
  * exists in the caller's own lists (row-level security hides the others) and is PUBLISHED or
- * SUPERSEDED; the list has no other draft (the one_draft_per_list index is the backstop).
- * Mutation: the next version as a DRAFT, with no lines: carrying the source's lines forward is
- * deferred for the demo (M3-04).
+ * SUPERSEDED; the list has no other draft (the one_draft_per_list and one_draft_retail indexes are
+ * the backstop). Mutation: the next version as a DRAFT with the source's lines carried forward
+ * (M3-06: "new DRAFT with lines carried forward"), each dated today until publication dates it
+ * apply_from, as SetLines dates a draft line. Closing the previous version's lines at
+ * apply_from - 1 stays deferred: the lookups read the newest version in force on the date.
  */
 @Service
 @CommandHandler(permission = "prc.pricelist.author")
@@ -33,12 +42,22 @@ public class DraftNewVersionHandler implements Handles<DraftNewVersion, UUID> {
     private final PriceListStore store;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final Clock clock;
+    private final ZoneId businessZone;
 
-    DraftNewVersionHandler(JdbcTemplate jdbc, PriceListStore store, AuditFacade audit, EventPublisher events) {
+    DraftNewVersionHandler(
+            JdbcTemplate jdbc,
+            PriceListStore store,
+            AuditFacade audit,
+            EventPublisher events,
+            Clock clock,
+            @Value("${coop-erp.business-timezone}") String businessZone) {
         this.jdbc = jdbc;
         this.store = store;
         this.audit = audit;
         this.events = events;
+        this.clock = clock;
+        this.businessZone = ZoneId.of(businessZone);
     }
 
     @Override
@@ -71,12 +90,29 @@ public class DraftNewVersionHandler implements Handles<DraftNewVersion, UUID> {
                 source.rootPriceListId(),
                 source.priceListId());
 
+        LocalDate today = PriceListRules.today(clock, businessZone);
+        List<PriceListLineView> carried = store.lines(source.priceListId());
+        for (PriceListLineView line : carried) {
+            jdbc.update(
+                    "insert into pricing.price_list_line (line_id, price_list_id, sku_id, uom_code, tier_from_qty,"
+                            + " price, effective_from, owner_entity_id) values (?, ?, ?, ?, ?, ?, ?, ?)",
+                    Ids.next(),
+                    priceListId,
+                    line.skuId(),
+                    line.uomCode(),
+                    line.tierFromQty(),
+                    line.price(),
+                    Date.valueOf(today),
+                    scope.entityId());
+        }
+
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("priceListId", priceListId);
         after.put("rootPriceListId", source.rootPriceListId());
         after.put("sourceVersionId", source.priceListId());
         after.put("version", version);
         after.put("status", PriceListStore.DRAFT);
+        after.put("linesCarried", carried.size());
         audit.record(CreatePriceListHandler.AUDIT_DRAFTED, Subject.of("price_list", priceListId), null, after, scope);
 
         events.publish(

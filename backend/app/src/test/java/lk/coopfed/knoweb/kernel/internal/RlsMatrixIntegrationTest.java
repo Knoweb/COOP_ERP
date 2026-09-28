@@ -258,6 +258,16 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             // catalogue.supplier follows the template since m2catalogue V0007: beyond it, a supplier
             // is read by everyone once a batch cites it (cited_read), which no made-up row is.
             new Departure(
+                    "pricing.control_price",
+                    "everyone_reads (m3pricing V0005): a gazetted ceiling is law every society and till checks"
+                            + " its prices against (23A section 3); only the Federation writes it",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
+                    "pricing.mrp_policy",
+                    "everyone_reads (m3pricing V0005): a society's effective policy falls back to the"
+                            + " Federation's row for the item (EffectivePolicy)",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),

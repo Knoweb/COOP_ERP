@@ -207,7 +207,7 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     void createRefusesAKindNotBuiltYetAndAScopeThatIsNotTheOwnersEntityWide() {
         refused(
                 () -> create.handle(new CreatePriceList("RETAIL", "Shelf"), own(DISTRIBUTOR)),
-                "m3.price_list.kind_not_available");
+                "m3.price_list.retail_mpcs_only");
         refused(() -> create.handle(new CreatePriceList("TRADE", "At a shop"), atShop(DISTRIBUTOR)), "scope.invalid");
         refused(() -> create.handle(new CreatePriceList("TRADE", "Viewer"), viewer(DISTRIBUTOR)), "scope.invalid");
         refused(() -> create.handle(new CreatePriceList("TRADE", "  "), own(DISTRIBUTOR)), "request.field.required");
