@@ -133,10 +133,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The discount rules visible in the caller's scope, newest validity first */
+        get: operations["listRules"];
+        put?: never;
+        /**
+         * Author a discount rule of the caller's entity, as a draft
+         * @description The predicate and benefit follow the closed vocabulary of doc 23 section 3.3, per kind. Codes this operation can answer with 422: m3.rule.kind_not_available (FREE_ITEM, not yet), m3.rule.kind_invalid, m3.rule.sku_required, m3.rule.sku_not_active, m3.rule.uom_invalid, m3.rule.field_not_allowed, m3.rule.min_qty_required, m3.rule.days_to_expiry_required, m3.rule.not_expiry_tracked, m3.rule.bill_total_required, m3.rule.benefit_not_allowed, m3.rule.benefit_value_invalid, m3.rule.validity_invalid, m3.rule.priority_invalid, scope.invalid, request.field.required.
+         */
+        post: operations["authorRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        /** One discount rule */
+        get: operations["getRule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/rules/{ruleId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate a draft rule; it applies at the owner's shops from its first valid date
+         * @description Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_draft, m3.rule.valid_from_past, the vocabulary codes of authorRule (checked again), scope.invalid.
+         */
+        post: operations["activateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/rules/{ruleId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw an active rule, for a reason
+         * @description Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_active, scope.invalid.
+         */
+        post: operations["withdrawRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The closed vocabulary of doc 23 section 3.3. TIME_LIMITED_PRICE needs skuId (uomCode optional); QUANTITY_BREAK skuId and minQty; EXPIRY_MARKDOWN skuId and daysToExpiry; BILL_THRESHOLD billTotalFrom. A field a kind does not use is left out. */
+        RulePredicate: {
+            /** Format: uuid */
+            skuId?: string | null;
+            uomCode?: string | null;
+            minQty?: number | null;
+            daysToExpiry?: number | null;
+            billTotalFrom?: number | null;
+        };
+        RuleBenefit: {
+            /** @enum {string} */
+            kind: "FIXED_PRICE" | "PERCENT_OFF" | "AMOUNT_OFF" | "FREE_QTY";
+            /** @description The price or the percentage or the rupees off */
+            value: number;
+        };
+        AuthorRuleRequest: {
+            name: string;
+            /** @enum {string} */
+            kind: "TIME_LIMITED_PRICE" | "QUANTITY_BREAK" | "BILL_THRESHOLD" | "FREE_ITEM" | "EXPIRY_MARKDOWN";
+            predicate: components["schemas"]["RulePredicate"];
+            benefit: components["schemas"]["RuleBenefit"];
+            /** @description Lower applies first; 100 when left out */
+            priority?: number | null;
+            /** Format: date */
+            validFrom: string;
+            /** Format: date */
+            validTo?: string | null;
+        };
+        WithdrawRuleRequest: {
+            reason: string;
+        };
+        RuleResponse: {
+            /** Format: uuid */
+            ruleId: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            name: string;
+            /** @enum {string} */
+            kind: "TIME_LIMITED_PRICE" | "QUANTITY_BREAK" | "BILL_THRESHOLD" | "FREE_ITEM" | "EXPIRY_MARKDOWN";
+            predicate: components["schemas"]["RulePredicate"];
+            benefit: components["schemas"]["RuleBenefit"];
+            priority: number;
+            /** Format: date */
+            validFrom: string;
+            /** Format: date */
+            validTo?: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "ACTIVE" | "EXPIRED" | "WITHDRAWN";
+            /** Format: date-time */
+            createdAt: string;
+        };
         CreatePriceListRequest: {
             /** @enum {string} */
             kind: "TRADE" | "RETAIL" | "ADVISORY";
@@ -496,6 +631,147 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    listRules: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "ACTIVE" | "EXPIRED" | "WITHDRAWN";
+                kind?: "TIME_LIMITED_PRICE" | "QUANTITY_BREAK" | "BILL_THRESHOLD" | "FREE_ITEM" | "EXPIRY_MARKDOWN";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"][];
+                };
+            };
+        };
+    };
+    authorRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description Address of the new rule */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            /** @description No such rule, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    activateRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The active rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    withdrawRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description The withdrawn rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
 }

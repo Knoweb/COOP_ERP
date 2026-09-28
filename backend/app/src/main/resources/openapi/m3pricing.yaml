@@ -1,5 +1,5 @@
 # OpenAPI slice of the pricing module (23A section 5). Built so far: TRADE price lists (M3-04)
-# and the trade price of an order line. The other operations of 23A section 5 arrive with their
+# and the trade price of an order line; discount rules: author, activate, withdraw (M3-05). The other operations of 23A section 5 arrive with their
 # tickets. Rules every slice obeys (AGENTS.md): x-permission on every operation, the same string
 # as the @CommandHandler; Idempotency-Key on every mutating operation; errors are problem
 # documents whose `code` is a message id; the shape of a request lives here and the kernel
@@ -7,7 +7,7 @@
 openapi: 3.1.0
 info:
   title: COOP ERP Pricing API
-  version: 0.2.0
+  version: 0.3.0
 paths:
   /v1/pricing/lists:
     get:
@@ -213,8 +213,184 @@ paths:
               schema: { $ref: '#/components/schemas/TradePriceResponse' }
         '404':
           description: No visible relationship, no bound list in force, or no line for the SKU and unit
+  /v1/pricing/rules:
+    get:
+      tags: [Pricing]
+      operationId: listRules
+      summary: The discount rules visible in the caller's scope, newest validity first
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [DRAFT, ACTIVE, EXPIRED, WITHDRAWN] }
+        - in: query
+          name: kind
+          required: false
+          schema: { type: string, enum: [TIME_LIMITED_PRICE, QUANTITY_BREAK, BILL_THRESHOLD, FREE_ITEM, EXPIRY_MARKDOWN] }
+      responses:
+        '200':
+          description: The rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RuleResponse' }
+    post:
+      tags: [Pricing]
+      operationId: authorRule
+      summary: Author a discount rule of the caller's entity, as a draft
+      description: >
+        The predicate and benefit follow the closed vocabulary of doc 23 section 3.3, per kind.
+        Codes this operation can answer with 422: m3.rule.kind_not_available (FREE_ITEM, not yet),
+        m3.rule.kind_invalid, m3.rule.sku_required, m3.rule.sku_not_active, m3.rule.uom_invalid,
+        m3.rule.field_not_allowed, m3.rule.min_qty_required, m3.rule.days_to_expiry_required,
+        m3.rule.not_expiry_tracked, m3.rule.bill_total_required, m3.rule.benefit_not_allowed,
+        m3.rule.benefit_value_invalid, m3.rule.validity_invalid, m3.rule.priority_invalid,
+        scope.invalid, request.field.required.
+      x-permission: prc.rule.author
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthorRuleRequest' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: Address of the new rule
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/rules/{ruleId}:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Pricing]
+      operationId: getRule
+      summary: One discount rule
+      x-permission: prc.pricelist.view
+      responses:
+        '200':
+          description: The rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '404':
+          description: No such rule, or the caller's scope may not see it
+  /v1/pricing/rules/{ruleId}/activate:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: activateRule
+      summary: Activate a draft rule; it applies at the owner's shops from its first valid date
+      description: >
+        Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_draft,
+        m3.rule.valid_from_past, the vocabulary codes of authorRule (checked again), scope.invalid.
+      x-permission: prc.rule.activate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The active rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/rules/{ruleId}/withdraw:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: withdrawRule
+      summary: Withdraw an active rule, for a reason
+      description: >
+        Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_active,
+        scope.invalid.
+      x-permission: prc.rule.activate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithdrawRuleRequest' }
+      responses:
+        '200':
+          description: The withdrawn rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
+    RulePredicate:
+      type: object
+      description: >
+        The closed vocabulary of doc 23 section 3.3. TIME_LIMITED_PRICE needs skuId (uomCode
+        optional); QUANTITY_BREAK skuId and minQty; EXPIRY_MARKDOWN skuId and daysToExpiry;
+        BILL_THRESHOLD billTotalFrom. A field a kind does not use is left out.
+      properties:
+        skuId: { type: [string, 'null'], format: uuid }
+        uomCode: { type: [string, 'null'], minLength: 1, maxLength: 10 }
+        minQty: { type: [number, 'null'], exclusiveMinimum: 0 }
+        daysToExpiry: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
+        billTotalFrom: { type: [number, 'null'], exclusiveMinimum: 0 }
+    RuleBenefit:
+      type: object
+      required: [kind, value]
+      properties:
+        kind: { type: string, enum: [FIXED_PRICE, PERCENT_OFF, AMOUNT_OFF, FREE_QTY] }
+        value: { type: number, minimum: 0, description: The price or the percentage or the rupees off }
+    AuthorRuleRequest:
+      type: object
+      required: [name, kind, predicate, benefit, validFrom]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { type: string, enum: [TIME_LIMITED_PRICE, QUANTITY_BREAK, BILL_THRESHOLD, FREE_ITEM, EXPIRY_MARKDOWN] }
+        predicate: { $ref: '#/components/schemas/RulePredicate' }
+        benefit: { $ref: '#/components/schemas/RuleBenefit' }
+        priority: { type: [integer, 'null'], minimum: 0, maximum: 32767, description: Lower applies first; 100 when left out }
+        validFrom: { type: string, format: date }
+        validTo: { type: [string, 'null'], format: date }
+    WithdrawRuleRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    RuleResponse:
+      type: object
+      required: [ruleId, ownerEntityId, name, kind, predicate, benefit, priority, validFrom, status, createdAt]
+      properties:
+        ruleId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [TIME_LIMITED_PRICE, QUANTITY_BREAK, BILL_THRESHOLD, FREE_ITEM, EXPIRY_MARKDOWN] }
+        predicate: { $ref: '#/components/schemas/RulePredicate' }
+        benefit: { $ref: '#/components/schemas/RuleBenefit' }
+        priority: { type: integer }
+        validFrom: { type: string, format: date }
+        validTo: { type: [string, 'null'], format: date }
+        status: { type: string, enum: [DRAFT, ACTIVE, EXPIRED, WITHDRAWN] }
+        createdAt: { type: string, format: date-time }
     CreatePriceListRequest:
       type: object
       required: [kind, name]

@@ -12,9 +12,11 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
+import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +32,22 @@ class PricingQueriesImpl implements PricingQueries {
 
     private final PriceListStore store;
     private final RelationshipQueries relationships;
+    private final RuleStore rules;
 
-    PricingQueriesImpl(PriceListStore store, RelationshipQueries relationships) {
+    PricingQueriesImpl(PriceListStore store, RelationshipQueries relationships, RuleStore rules) {
         this.store = store;
         this.relationships = relationships;
+        this.rules = rules;
+    }
+
+    @Override
+    public Optional<RuleView> getRule(UUID ruleId, ScopeContext scope) {
+        return rules.find(ruleId);
+    }
+
+    @Override
+    public List<RuleView> listRules(String status, String kind, ScopeContext scope) {
+        return rules.list(status, kind);
     }
 
     @Override
