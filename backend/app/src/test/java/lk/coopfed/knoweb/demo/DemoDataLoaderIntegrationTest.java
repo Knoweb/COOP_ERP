@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,17 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("seed/m1party/demo-parties.demo.sql"));
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("seed/m1security/demo-users.demo.sql"));
         }
+    }
+
+    /**
+     * The trading history's documents go again after the test: the classes of one run share the
+     * database, and a class that clears {@code kernel.document} (AttachmentsPostgresIntegrationTest)
+     * must not find M4's rows pointing at it.
+     */
+    @AfterEach
+    void removeTheTradingHistory() {
+        JdbcTemplate admin = superuserJdbc();
+        lk.coopfed.knoweb.m4trading.TradingFixture.cleanAllTrading(admin);
     }
 
     @Test
