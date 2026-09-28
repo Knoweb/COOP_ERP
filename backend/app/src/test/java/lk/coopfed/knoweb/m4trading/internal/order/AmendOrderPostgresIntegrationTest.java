@@ -193,8 +193,7 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
         // limit change closes it the same way; the terms are amended here because the test user
         // holds no bil.creditlimit.change (the resolver checks it; M1's own tests cover that guard).
         UUID nextRow = amendTerms.handle(
-                new AmendRelationshipTerms(
-                        RELATIONSHIP, today(), null, null, 45, null, null, null, "REVIEW", null),
+                new AmendRelationshipTerms(RELATIONSHIP, today(), null, null, 45, null, null, null, "REVIEW", null),
                 sellerWithFreshSecondFactor());
         assertThat(nextRow).isNotEqualTo(RELATIONSHIP);
         kernel.reset();
