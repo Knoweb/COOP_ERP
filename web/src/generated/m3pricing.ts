@@ -19,7 +19,7 @@ export interface paths {
         put?: never;
         /**
          * Create a price list, version 1, as a draft of the caller's entity
-         * @description Codes this operation can answer with 422: m3.price_list.kind_not_available (only TRADE is available so far), scope.invalid (not an entity-wide OWN scope), request.field.required.
+         * @description Codes this operation can answer with 422: m3.price_list.kind_not_available, m3.price_list.retail_mpcs_only (a RETAIL list is a society's), m3.price_list.retail_exists (one per society; draft a new version instead), m3.price_list.advisory_federation_only, scope.invalid (not an entity-wide OWN scope), request.field.required.
          */
         post: operations["createPriceList"];
         delete?: never;
@@ -81,7 +81,7 @@ export interface paths {
         get?: never;
         /**
          * Replace the lines of a draft
-         * @description Answers one outcome per line, in the order given. The lines are stored only when every line is accepted (saved true); a refused line carries its reason (a message id: m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing, .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete). An accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+         * @description Answers one outcome per line, in the order given. The lines are stored only when every line is accepted (saved true); a refused line carries its reason (a message id: m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing, .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete; and for RETAIL and ADVISORY .above_control_price, .above_shelf_mrp (RETAIL: the lowest printed MRP in stock at the society's locations), .retail_precision, .tier_not_allowed), with the binding ceiling in ceilingKind, ceilingValue and ceilingRef. An accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
          */
         put: operations["setLines"];
         post?: never;
@@ -104,7 +104,7 @@ export interface paths {
         put?: never;
         /**
          * Publish a draft from a date; the previous published version is superseded
-         * @description A second factor is required (TRADE). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, m3.price_list.apply_from_past, m3.price_list.no_lines, m3.price_list.lines_invalid, scope.invalid.
+         * @description A second factor is required (every kind). The lines are checked again against the ceilings in force on applyFrom. Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, m3.price_list.apply_from_past, m3.price_list.no_lines, m3.price_list.lines_invalid, scope.invalid.
          */
         post: operations["publishPriceList"];
         delete?: never;
@@ -125,6 +125,130 @@ export interface paths {
          * @description 23A section 5 writes this as a POST; it changes nothing, so it is a GET here and needs no Idempotency-Key. The tier is the highest not above the quantity (the ordered quantity).
          */
         get: operations["resolveTradePrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/resolve/retail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The shelf price of a SKU at a shop on a date (tax-inclusive, per unit), under the MRP and control ceilings
+         * @description Steps 1 to 4 of doc 23 section 3.5 through the shared engine: the society's published RETAIL line in force, the printed MRP of the batches in stock at the location under the effective MRP policy, and the control price; the lowest of them, with the bound that set it (capReason). Rules are not applied. 23A section 5 has resolveBasket (POST, a whole basket); this is its one-line, read-only form, a GET like resolveTradePrice.
+         */
+        get: operations["resolveRetailPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/advisory-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Federation's published ADVISORY prices in force on a date (read by every scope) */
+        get: operations["listAdvisoryLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/control-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The gazetted control prices, newest first by SKU; those in force on a date when one is given
+         * @description Without inForceOn the answer is the whole history (a row is never removed: a later gazette closes it, a rescission ends it). Read by every authenticated scope.
+         */
+        get: operations["listControlPrices"];
+        put?: never;
+        /**
+         * Enter a gazetted control price for a SKU from a date (the Federation, with a second factor)
+         * @description The ceiling of the same SKU in force on effectiveFrom is closed at effectiveFrom - 1. Codes this operation can answer with 422: m3.control_price.federation_only, m3.control_price.sku_not_active, m3.control_price.uom_invalid, m3.control_price.ceiling_invalid, m3.control_price.dates_invalid, m3.control_price.overlap, request.field.required, scope.invalid.
+         */
+        post: operations["enterControlPrice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/control-prices/{controlPriceId}/rescind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                controlPriceId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a control price early, by the gazette that withdraws it
+         * @description Codes this operation can answer with 422: m3.control_price.federation_only, m3.control_price.not_found, m3.control_price.last_day_invalid, m3.control_price.last_day_past, request.field.required, scope.invalid.
+         */
+        post: operations["rescindControlPrice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/mrp-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The MRP policies that apply at the caller's entity (its own, and the Federation's where it has none)
+         * @description A SKU not listed has the default policy (pricing.default_mrp_policy).
+         */
+        get: operations["listMrpPolicies"];
+        /**
+         * Set the caller's MRP policy for a SKU (replaces its previous one)
+         * @description Codes this operation can answer with 422: m3.mrp_policy.sku_not_active, m3.mrp_policy.policy_invalid, m3.mrp_policy.gap_not_allowed, m3.mrp_policy.gap_invalid, scope.invalid.
+         */
+        put: operations["setMrpPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/mrp-policies/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The MRP policy that applies to a SKU at the caller's entity, and where it comes from */
+        get: operations["getEffectiveMrpPolicy"];
         put?: never;
         post?: never;
         delete?: never;
@@ -310,6 +434,108 @@ export interface components {
             reason?: string | null;
             /** @description The message id of a review raised on an accepted line */
             review?: string | null;
+            /** @description CONTROL_PRICE or MRP, the binding ceiling of a RETAIL or ADVISORY line (refused or not), or the MRP a TRADE line is reviewed against */
+            ceilingKind?: string | null;
+            ceilingValue?: number | null;
+            /** @description The gazette reference of a control price, the batch number of an MRP */
+            ceilingRef?: string | null;
+        };
+        RetailPriceResponse: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            skuId: string;
+            uomCode: string;
+            sellable: boolean;
+            /** @description Why not sellable: price.no_list_line or price.needs_pick */
+            reason?: string | null;
+            /**
+             * Format: uuid
+             * @description The RETAIL version the list price was read from
+             */
+            priceListId?: string | null;
+            /** @description The retail list line, tax-inclusive */
+            listPrice?: number | null;
+            /** @description min(list, batch term, control term), tax-inclusive */
+            unitPrice?: number | null;
+            /** @description The printed MRP the policy chose */
+            mrpApplied?: number | null;
+            /** @description The control price in force */
+            controlPrice?: number | null;
+            /** @enum {string} */
+            capReason: "NONE" | "MRP_LOWEST" | "MRP_BARCODE" | "MRP_PICKED" | "CONTROL_PRICE";
+            /** @enum {string} */
+            policy: "AUTO_LOWEST" | "BARCODE_RESOLVED" | "PICKER";
+            /** Format: uuid */
+            batchId?: string | null;
+            engineVersion: string;
+        };
+        EnterControlPriceRequest: {
+            /** Format: uuid */
+            skuId: string;
+            /** @description The maximum retail price, tax-inclusive, two decimals */
+            ceilingPrice: number;
+            ceilingUomCode: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+            gazetteReference: string;
+        };
+        RescindControlPriceRequest: {
+            /**
+             * Format: date
+             * @description The last day the ceiling holds
+             */
+            lastDay: string;
+            reason: string;
+            gazetteReference: string;
+        };
+        ControlPriceResponse: {
+            /** Format: uuid */
+            controlPriceId: string;
+            /** Format: uuid */
+            skuId: string;
+            ceilingPrice: number;
+            ceilingUomCode: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+            gazetteReference: string;
+            /** Format: uuid */
+            enteredBy?: string | null;
+            /** Format: date-time */
+            enteredAt: string;
+        };
+        SetMrpPolicyRequest: {
+            /** Format: uuid */
+            skuId: string;
+            /** @enum {string} */
+            policy: "AUTO_LOWEST" | "BARCODE_RESOLVED" | "PICKER";
+            /** @description PICKER only: rupees between the lowest and highest MRP above which the till asks */
+            gapAmount?: number | null;
+            /** @description PICKER only: the same as a percentage of the lowest MRP */
+            gapPercent?: number | null;
+        };
+        MrpPolicyResponse: {
+            /** Format: uuid */
+            policyId?: string | null;
+            /** Format: uuid */
+            skuId: string;
+            /** @enum {string} */
+            policy: "AUTO_LOWEST" | "BARCODE_RESOLVED" | "PICKER";
+            gapAmount?: number | null;
+            gapPercent?: number | null;
+            /** Format: uuid */
+            ownerEntityId?: string | null;
+            /**
+             * @description Whose row applies: the caller's, the Federation's, or none (the configured default)
+             * @enum {string}
+             */
+            source: "OWN" | "FEDERATION" | "DEFAULT";
+            /** Format: date-time */
+            setAt?: string | null;
         };
         PriceListResponse: {
             /** Format: uuid */
@@ -630,6 +856,217 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    resolveRetailPrice: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId: string;
+                uom: string;
+                qty: number;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The price, or why the item is not sellable there */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetailPriceResponse"];
+                };
+            };
+            /** @description The location or the SKU is not visible in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAdvisoryLines: {
+        parameters: {
+            query: {
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The advisory lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListLineResponse"][];
+                };
+            };
+        };
+    };
+    listControlPrices: {
+        parameters: {
+            query?: {
+                skuId?: string;
+                inForceOn?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The control prices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlPriceResponse"][];
+                };
+            };
+        };
+    };
+    enterControlPrice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnterControlPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description Entered */
+            201: {
+                headers: {
+                    /** @description Address of the control price */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlPriceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rescindControlPrice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                controlPriceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescindControlPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description The control price with its new last day */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlPriceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listMrpPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policies */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrpPolicyResponse"][];
+                };
+            };
+        };
+    };
+    setMrpPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMrpPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description The effective policy of the SKU after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrpPolicyResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getEffectiveMrpPolicy: {
+        parameters: {
+            query: {
+                skuId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The effective policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrpPolicyResponse"];
+                };
             };
         };
     };
