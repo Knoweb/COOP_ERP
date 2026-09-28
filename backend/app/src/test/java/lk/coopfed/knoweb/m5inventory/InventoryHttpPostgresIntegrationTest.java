@@ -269,6 +269,58 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void theStockCardListsTheMovementsInLedgerOrderWithTheRunningQuantity() {
+        UUID shop = fixture.location(MPCS, "SHOP");
+        ResponseEntity<JsonNode> issued = post(
+                "/v1/inventory/transfers",
+                java.util.Map.of(
+                        "fromLocationId", warehouse.toString(),
+                        "toLocationId", shop.toString(),
+                        "lines", List.of(java.util.Map.of("batchId", batch.toString(), "qty", 5))),
+                USER);
+        assertThat(issued.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String url = "/v1/inventory/locations/" + warehouse + "/movements?skuId=" + sku;
+
+        ResponseEntity<JsonNode> card = get(url, TestIdentityProvider.entityWideHeaders(USER, MPCS));
+
+        assertThat(card.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(card.getBody()).hasSize(2);
+        JsonNode first = card.getBody().get(0);
+        assertThat(first.get("movement").get("movementType").asText()).isEqualTo("RECEIPT");
+        assertThat(first.get("movement").get("unitCostAtMovement").decimalValue())
+                .isEqualByComparingTo("45.5");
+        assertThat(first.get("balanceAfter").decimalValue()).isEqualByComparingTo("12");
+        JsonNode second = card.getBody().get(1);
+        assertThat(second.get("movement").get("movementType").asText()).isEqualTo("TRANSFER_OUT");
+        assertThat(second.get("movement").get("qtyDelta").decimalValue()).isEqualByComparingTo("-5");
+        assertThat(second.get("balanceAfter").decimalValue()).isEqualByComparingTo("7");
+
+        HttpHeaders view = new HttpHeaders();
+        view.setBearerAuth(TestIdentityProvider.entityWideToken(USER, TEST_FEDERATION, "FEDERATION_VIEW"));
+        view.set("X-Scope-Entity", TEST_FEDERATION.toString());
+        JsonNode seen = get(url, view).getBody();
+        assertThat(seen).hasSize(2);
+        assertThat(seen.get(0).get("movement").path("unitCostAtMovement").isMissingNode()
+                        || seen.get(0)
+                                .get("movement")
+                                .path("unitCostAtMovement")
+                                .isNull())
+                .isTrue();
+
+        assertThat(get(url, TestIdentityProvider.entityWideHeaders(USER, OTHER)).getBody())
+                .isEmpty();
+    }
+
+    @Test
+    void theStockCardWithoutASkuIsARequestProblem() {
+        ResponseEntity<JsonNode> response = get(
+                "/v1/inventory/locations/" + warehouse + "/movements",
+                TestIdentityProvider.entityWideHeaders(USER, MPCS));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void theReceiptOfAGrnAndThePickListOfADeliveryNoteAreRead() {
         HttpHeaders headers = TestIdentityProvider.entityWideHeaders(USER, MPCS);
 

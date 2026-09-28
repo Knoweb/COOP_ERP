@@ -8,6 +8,7 @@ import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { NewOpeningBalancePage } from "./NewOpeningBalancePage";
 import { OpeningBalancePage } from "./OpeningBalancePage";
+import { StockCardPage } from "./StockCardPage";
 import { StockPage } from "./StockPage";
 import { TransfersPage } from "./TransfersPage";
 
@@ -25,6 +26,8 @@ export const inventoryModule: ModuleDefinition = {
       )
     },
     { path: "inventory/opening/:openingBalanceId", element: <OpeningBalancePage /> },
+    // The stock card of an item at a location, linked from the stock position (25A section 8).
+    { path: "inventory/locations/:locationId/skus/:skuId", element: <StockCardPage /> },
     // M5-09 (demo scope): send stock to another location of the entity, receive it there.
     { path: "inventory/transfers", element: <TransfersPage /> }
   ],

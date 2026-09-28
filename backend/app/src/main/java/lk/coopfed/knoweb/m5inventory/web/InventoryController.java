@@ -34,6 +34,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
 import org.springframework.http.ResponseEntity;
@@ -145,6 +146,19 @@ class InventoryController implements InventoryApi {
                         .map(lot -> toResponse(lot, showCost, batchNo(batchNumbers, lot.batchId(), scope)))
                         .toList();
         return ResponseEntity.ok(lots);
+    }
+
+    @Override
+    public ResponseEntity<List<StockCardLineResponse>> listMovements(UUID locationId, UUID skuId) {
+        ScopeContext scope = currentScope.get();
+        boolean showCost = scope.policyClass() == PolicyClass.OWN && scope.deviceId() == null;
+        return ResponseEntity.ok(queries.stockCard(locationId, skuId, scope).stream()
+                .map(line -> {
+                    MovementResponse movement = toResponse(line.movement());
+                    return new StockCardLineResponse(
+                            showCost ? movement : movement.unitCostAtMovement(null), line.balanceAfter());
+                })
+                .toList());
     }
 
     @Override
