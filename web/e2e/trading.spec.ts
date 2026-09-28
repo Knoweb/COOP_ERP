@@ -1,4 +1,4 @@
-// Phase 1 of the demo through the browser (docs/DEMO.md, steps 4 to 9; M4-11): the Federation
+// Phase 1 of the demo through the browser (docs/DEMO.md, steps 4 to 11; M4-11): the Federation
 // sells to the Wayamba distributor, each step signed in as the demo user whose job it is. Needs
 // the demo data (`make demo-data`; the stack smoke loads it before the e2e run).
 //
@@ -136,5 +136,23 @@ test("the Federation sells to D101: order, acceptance, delivery note, dispatch, 
   await expect(page.getByRole("heading", { name: textOf(buyerAccounts, "trading.invoice.title") })).toBeVisible();
   await expect(page.getByRole("link", { name: /CN-/ })).toHaveCount(0);
   await expect(page.getByText(textOf(buyerAccounts, "trading.invoice.credited"), { exact: true })).toHaveCount(0);
+  await page.context().close();
+
+  // 11. Payment: fed-accounts records D101's bank transfer against the invoice (the form starts at
+  // the amount due); the invoice reads Settled, and d101-accounts sees it settled with the receipt,
+  // read only.
+  page = await as(accounts, invoicePath);
+  await expect(page.getByRole("heading", { name: textOf(accounts, "trading.invoice.title") })).toBeVisible();
+  await page.getByLabel(textOf(accounts, "trading.payment.reference")).fill("TT-1001");
+  await page.getByRole("button", { name: textOf(accounts, "trading.payment.record") }).click();
+  await expect(page.getByText(textOf(accounts, "trading.invoice.payment_state.SETTLED"), { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /PRC-/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: textOf(accounts, "trading.payment.record") })).toHaveCount(0);
+  await page.context().close();
+
+  page = await as(buyerAccounts, invoicePath);
+  await expect(page.getByText(textOf(buyerAccounts, "trading.invoice.payment_state.SETTLED"), { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /PRC-/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.payment.record") })).toHaveCount(0);
   await page.context().close();
 });

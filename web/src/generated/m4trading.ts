@@ -523,6 +523,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/payment-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The payments the caller's entity received (SELLER) or made (BUYER), newest first */
+        get: operations["listPaymentReceipts"];
+        put?: never;
+        /**
+         * The seller records a payment received from a buyer and settles its invoices
+         * @description With no settlements the payment settles the buyer's open, undisputed invoices oldest first; what is left stays on the buyer's account (unapplied). Problems: m4.payment.method_invalid, m4.payment.amount_invalid, m4.payment.received_in_future, m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.invoice_invalid, m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued, m4.payment.exceeds_due, m4.payment.exceeds_receipt.
+         */
+        post: operations["recordPaymentReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        /** One payment receipt, for its seller or its buyer */
+        get: operations["getPaymentReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}/cheque-outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The cheque of a receipt cleared or bounced
+         * @description A bounced cheque reverses the receipt (a PRC reversal) and reopens the invoices it settled. Problems: m4.payment.outcome_invalid, m4.payment.not_found, m4.payment.not_seller, m4.payment.not_cheque, m4.payment.outcome_recorded.
+         */
+        post: operations["recordChequeOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The exposure of every relationship in which the caller's entity sells (SELLER) or buys (BUYER)
+         * @description Open invoice balances plus accepted orders not yet invoiced, less payments held on account, beside the relationship's credit limit. Computed when read; it warns, never blocks (ADR-12).
+         */
+        get: operations["listExposures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -793,6 +875,12 @@ export interface components {
             creditedAmount?: number;
             /** @description The gross amount less what was credited and settled */
             amountDue?: number;
+            /** @description What payments settled of it, net of bounced cheques */
+            settledAmount?: number;
+            /** @enum {string} */
+            paymentState?: "OPEN" | "PART_PAID" | "SETTLED";
+            /** @description The receipts (and reversals) that settled part of it, oldest first */
+            payments?: components["schemas"]["InvoicePaymentSummary"][];
             /** @description The buyer disputes the invoice now */
             disputed?: boolean;
             disputeReason?: string;
@@ -950,6 +1038,118 @@ export interface components {
             /** Format: uri */
             url: string;
         };
+        InvoicePaymentSummary: {
+            /** Format: uuid */
+            receiptId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RECORDED" | "REVERSED" | "REVERSAL";
+            method?: string;
+            /** Format: date */
+            receivedOn?: string;
+            /** @description What this receipt settled of the invoice; negative on a reversal */
+            amount: number;
+        };
+        RecordPaymentReceiptRequest: {
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** @enum {string} */
+            method: "CASH" | "CHEQUE" | "TRANSFER" | "DEPOSIT";
+            amount: number;
+            /** @description The bank reference, deposit slip or cash receipt book number */
+            reference?: string;
+            /**
+             * Format: date
+             * @description When the money was received; today when left out
+             */
+            receivedOn?: string;
+            cheque?: components["schemas"]["ChequeRequest"];
+            /** @description Chosen invoices and amounts; left out, the open invoices are settled oldest first */
+            settlements?: components["schemas"]["SettlementRequest"][];
+        };
+        ChequeRequest: {
+            bank: string;
+            chequeNo: string;
+            /** Format: date */
+            dated: string;
+        };
+        SettlementRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            amount: number;
+        };
+        ChequeOutcomeRequest: {
+            /** @enum {string} */
+            outcome: "CLEARED" | "BOUNCED";
+            reason?: string;
+        };
+        PaymentReceiptResponse: {
+            /** Format: uuid */
+            receiptId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RECORDED" | "REVERSED" | "REVERSAL";
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            method: string;
+            reference?: string;
+            /** Format: date */
+            receivedOn: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            amount: number;
+            /** @description What stays on the buyer's account; zero once reversed */
+            unappliedAmount: number;
+            /**
+             * Format: uuid
+             * @description On a reversal, the receipt it reverses
+             */
+            reversalOf?: string;
+            /**
+             * Format: uuid
+             * @description On a reversed receipt, its reversal
+             */
+            reversedBy?: string;
+            reason?: string;
+            cheque?: components["schemas"]["ChequeResponse"];
+            allocations: components["schemas"]["AllocationResponse"][];
+        };
+        ChequeResponse: {
+            bank: string;
+            chequeNo: string;
+            /** Format: date */
+            dated: string;
+            /** @enum {string} */
+            outcome?: "CLEARED" | "BOUNCED";
+            /** Format: date-time */
+            outcomeAt?: string;
+        };
+        AllocationResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNumber?: string;
+            amount: number;
+        };
+        ExposureResponse: {
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** @description The relationship's credit limit (M1); absent when it sets none */
+            creditLimit?: number;
+            openInvoices: number;
+            acceptedNotInvoiced: number;
+            unappliedReceipts: number;
+            amount: number;
+            /** @description The highest configured percentage of the limit the amount has reached */
+            warnThresholdPercent?: number;
+            /** Format: date-time */
+            asOf: string;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1001,6 +1201,7 @@ export interface components {
         GrnId: string;
         InvoiceId: string;
         CreditNoteId: string;
+        ReceiptId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -1841,6 +2042,135 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPaymentReceipts: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipts, with their reversals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    recordPaymentReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPaymentReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued receipt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getPaymentReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    recordChequeOutcome: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChequeOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description The receipt, with the cheque's outcome (and its reversal when bounced) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listExposures: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The exposures */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
 }
