@@ -120,6 +120,7 @@ public class DemoDataLoader {
     private final PricingQueries pricing;
     private final InventoryQueries inventory;
     private final DemoTradingHistory history;
+    private final DemoRetailPricing retailPricing;
     private final DemoPayments payments;
     private final DemoCustomers customers;
     private final DemoCalendar calendar;
@@ -159,6 +160,7 @@ public class DemoDataLoader {
             PricingQueries pricing,
             InventoryQueries inventory,
             DemoTradingHistory history,
+            DemoRetailPricing retailPricing,
             DemoPayments payments,
             DemoCustomers customers,
             DemoCalendar calendar,
@@ -187,6 +189,7 @@ public class DemoDataLoader {
         this.pricing = pricing;
         this.inventory = inventory;
         this.history = history;
+        this.retailPricing = retailPricing;
         this.payments = payments;
         this.customers = customers;
         this.clock = clock;
@@ -203,6 +206,12 @@ public class DemoDataLoader {
         // history after it has prices, relationships and stock on the days it was traded.
         Map<String, UUID> skus = new HashMap<>();
         calendar.run(today.minusDays(DemoCalendar.SETUP_DAYS_AGO), LocalTime.of(8, 0), () -> skus.putAll(setUp(items)));
+        // M3-06, M3-07: the control prices, the milk powder policy and the society's shelf price
+        // list, the same morning, once the society's stock is on its shelves (DemoRetailPricing).
+        calendar.run(
+                today.minusDays(DemoCalendar.SETUP_DAYS_AGO),
+                LocalTime.of(9, 0),
+                () -> retailPricing.load(items, skus, this::count));
         // The Hettipola shop got its first stock a month later.
         calendar.run(
                 today.minusDays(DemoCalendar.SETUP_DAYS_AGO / 2), LocalTime.of(8, 0), this::hettipolaStockByTransfer);

@@ -12,9 +12,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
 import lk.coopfed.knoweb.m4trading.query.ExposureView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
@@ -26,6 +28,7 @@ import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -39,7 +42,13 @@ import org.springframework.test.context.DynamicPropertySource;
  * command handlers, as the demo users, with the permission check on (the users' roles decide, as in
  * compose) and the application connected as coop_app under row-level security; the second run
  * issues no command and changes no row.
+ *
+ * <p>Tagged {@code slow} (about 67s locally) so a pull request's integration run excludes it;
+ * the stack-smoke job already loads the demo, through the real HTTP API, on every pull request.
+ * Pushes to main and the nightly run include it here too, for the assertions this test makes
+ * that stack-smoke does not (the second, no-op run; the query-side views).
  */
+@Tag("slow")
 class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     /** The Federation the demo users belong to: the one of the development seed and of compose. */
@@ -56,6 +65,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Clock clock;
+
+    @Autowired
+    PricingQueries pricing;
 
     @Autowired
     InvoiceQueries invoices;
@@ -116,6 +128,10 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("till positions", 5L)
                 .containsEntry("primary tills", 4L)
                 .containsEntry("published trade lists", 3L)
+                .containsEntry("control prices", 3L)
+                .containsEntry("published shelf lists of M101", 1L)
+                .containsEntry("shelf prices of M101", 40L)
+                .containsEntry("MRP policies of M101", 1L)
                 .containsEntry("active relationships", 5L)
                 .containsEntry("posted opening balances", 4L)
                 .containsEntry("lots", 229L) // 200, and 29 at the Hettipola shop (DEMO-02)
@@ -148,6 +164,7 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("RecordChequeOutcome", 3);
             theHistorySpreadsOverEightWeeks();
         }
+        theTownShopSellsTheGazettedRiceAtItsControlPrice();
         thePaymentsAndTheCreditLimit();
         theSocietysCreditBook();
 
@@ -239,6 +256,45 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 """,
                 Long.class);
         assertThat(backwards).isZero();
+    }
+
+    /**
+     * M3-06: the shelf price of Nadu rice 5 kg at the town shop, as the shop's staff reads it. The
+     * pack's MRP is Rs 1,150 and the gazette caps it at Rs 1,100, so the society's list carries the
+     * control price; the engine resolves it, with the MRP of the batch on the shelf as its batch term.
+     * The date is the set-up day plus one, well inside the list's validity, never "today" (a run
+     * that crosses midnight in Colombo reads the same answer).
+     */
+    private void theTownShopSellsTheGazettedRiceAtItsControlPrice() {
+        UUID rice = superuserJdbc()
+                .queryForObject(
+                        "select sku_id from catalogue.sku where short_name_en = 'Nadu rice 5 kg'"
+                                + " and attributes ->> 'demo' = 'true'",
+                        UUID.class);
+        LocalDate shelfDay = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"))
+                .minusDays(DemoCalendar.SETUP_DAYS_AGO - 1);
+        Scope shop = new Scope(DemoCast.M101, DemoCast.M101_TOWN_SHOP);
+        ScopeContext staff = new ScopeContext(
+                DemoCast.M101_SHOP_STAFF.userId(),
+                null,
+                DemoCast.M101,
+                List.of(shop),
+                shop,
+                PolicyClass.OWN,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                null);
+
+        assertThat(pricing.resolveRetailPrice(DemoCast.M101_TOWN_SHOP, rice, "EA", BigDecimal.ONE, shelfDay, staff))
+                .get()
+                .satisfies(price -> {
+                    assertThat(price.sellable()).isTrue();
+                    assertThat(price.listPrice()).isEqualByComparingTo("1100.00");
+                    assertThat(price.controlPrice()).isEqualByComparingTo("1100.00");
+                    assertThat(price.mrpApplied()).isEqualByComparingTo("1150.00");
+                    assertThat(price.unitPrice()).isEqualByComparingTo("1100.00");
+                });
     }
 
     /**
@@ -372,6 +428,32 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                                 + " and (owner_entity_id = ?::uuid or owner_entity_id::text like '0190f0de-%')"
                                 + " and name like '%trade list for%'",
                         fed));
+        counts.put(
+                "control prices",
+                count(
+                        admin,
+                        "select count(*) from pricing.control_price c join catalogue.sku s using (sku_id)"
+                                + " where s.attributes ->> 'demo' = 'true'"));
+        counts.put(
+                "published shelf lists of M101",
+                count(
+                        admin,
+                        "select count(*) from pricing.price_list where status = 'PUBLISHED' and kind = 'RETAIL'"
+                                + " and owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put(
+                "shelf prices of M101",
+                count(
+                        admin,
+                        "select count(*) from pricing.price_list_line l join pricing.price_list p using (price_list_id)"
+                                + " where p.kind = 'RETAIL' and p.status = 'PUBLISHED' and p.owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
+        counts.put(
+                "MRP policies of M101",
+                count(
+                        admin,
+                        "select count(*) from pricing.mrp_policy where owner_entity_id = ?::uuid",
+                        DemoCast.M101.toString()));
         counts.put(
                 "active relationships",
                 count(

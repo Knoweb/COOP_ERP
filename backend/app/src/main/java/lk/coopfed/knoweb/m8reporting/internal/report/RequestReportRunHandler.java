@@ -49,9 +49,16 @@ class RequestReportRunHandler implements Handles<RequestReportRun, UUID> {
     private final EventPublisher events;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final ReportCatalogue reports;
 
     RequestReportRunHandler(
-            JdbcTemplate jdbc, AuditFacade audit, EventPublisher events, ObjectMapper mapper, Clock clock) {
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events,
+            ObjectMapper mapper,
+            Clock clock,
+            ReportCatalogue reports) {
+        this.reports = reports;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -65,7 +72,7 @@ class RequestReportRunHandler implements Handles<RequestReportRun, UUID> {
         if (scope.userId() == null || scope.policyClass() != PolicyClass.OWN || scope.entityId() == null) {
             throw new ProblemException("m8.run.own_required");
         }
-        Definition definition = ReportQueriesImpl.definition(command.reportId());
+        Definition definition = ReportQueriesImpl.definition(reports, command.reportId());
         ReportQueriesImpl.checkPeriod(
                 definition, new ReportParameters(command.from(), command.to(), command.locationId()));
         String language = command.language() == null ? scope.lang() : command.language();

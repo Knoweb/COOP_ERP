@@ -1,0 +1,35 @@
+# M8's dashboard tiles as data (28A section 3, dashboard_tile; section 7, dashboard/TileService).
+# Read once at start by TileCatalogue and checked by DefinitionValidator with the report
+# definitions (a tile's source must be a named query of TileSources, its drill report a report
+# of report-definitions.yaml, its label a message id in three languages).
+#
+#   id      the tile's id in the answer
+#   label   the message id of its name
+#   kind    COUNT, MONEY or PERCENT: what the value is
+#   source  a named query of TileSources, over reporting.* only, in the caller's scope
+#   drill   the report the tile opens (optional); a tile with "exceptions" opens the exception queue
+#   trend   true: the tile also answers eight weekly figures ending today (the 8-week trend)
+#   cost    true: a cost figure, only for the owner's users and the Federation view
+#
+# Which tiles a user sees is decided by the data, not by a role list: a tile whose source has
+# nothing for the caller's scope (no sales for a society that sells nothing, no deliveries for a
+# seller that delivered none) is left out. 28A's tiles per role template and the user's pins
+# wait for the dashboard editor (module README).
+tiles:
+  - { id: sales, label: m8.tile.sales, kind: MONEY, source: sales, drill: invoices-issued, trend: true }
+  - { id: purchases, label: m8.tile.purchases, kind: MONEY, source: purchases, drill: trade-by-distributor, trend: true }
+  - { id: shop-sales, label: m8.tile.shop_sales, kind: MONEY, source: shop-sales, drill: shop-sales-by-shop, trend: true }
+  - { id: receivables, label: m8.tile.receivables, kind: MONEY, source: receivables, drill: receivables-ageing }
+  - { id: overdue-receivables, label: m8.tile.overdue_receivables, kind: MONEY, source: overdue-receivables, drill: receivables-ageing }
+  - { id: payables, label: m8.tile.payables, kind: MONEY, source: payables, drill: statement-of-account }
+  - { id: overdue-payables, label: m8.tile.overdue_payables, kind: MONEY, source: overdue-payables, drill: statement-of-account }
+  - { id: exposure, label: m8.tile.exposure, kind: PERCENT, source: exposure, drill: exceptions }
+  - { id: fill-rate, label: m8.tile.fill_rate, kind: PERCENT, source: fill-rate-out, drill: fill-rate-delivery }
+  - { id: on-time, label: m8.tile.on_time, kind: PERCENT, source: on-time-out, drill: fill-rate-delivery }
+  - { id: supplier-fill-rate, label: m8.tile.supplier_fill_rate, kind: PERCENT, source: fill-rate-in, drill: fill-rate-delivery }
+  - { id: supplier-on-time, label: m8.tile.supplier_on_time, kind: PERCENT, source: on-time-in, drill: fill-rate-delivery }
+  - { id: exceptions, label: m8.tile.exceptions, kind: COUNT, source: exceptions, drill: exceptions }
+  - { id: open-orders, label: m8.tile.open_orders, kind: COUNT, source: open-orders }
+  - { id: deliveries-in-transit, label: m8.tile.deliveries_in_transit, kind: COUNT, source: deliveries-in-transit }
+  - { id: grns-today, label: m8.tile.grns_today, kind: COUNT, source: grns-today, drill: trade-by-distributor }
+  - { id: stock-value, label: m8.tile.stock_value, kind: MONEY, source: stock-value, drill: stock-position, cost: true }

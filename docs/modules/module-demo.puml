@@ -10,8 +10,8 @@ top to bottom direction
 
 Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
   Component(CoopErpApplication.CoopErpApplication.M3PricingRules, "M3 Pricing & Rules", $techn="Module", $descr="", $tags="", $link="")
-  Component(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "M5 Inventory, Costing, Repack & Loss", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M7CustomersPaymentRecording, "M7 Customers & Payment Recording", $techn="Module", $descr="", $tags="", $link="")
+  Component(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "M5 Inventory, Costing, Repack & Loss", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M4TradingDocuments, "M4 Trading Documents", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.Demodata, "Demo data", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.PlatformKernel, "Platform Kernel", $techn="Module", $descr="", $tags="", $link="")
@@ -38,6 +38,7 @@ Rel(CoopErpApplication.CoopErpApplication.M4TradingDocuments, CoopErpApplication
 Rel(CoopErpApplication.CoopErpApplication.M4TradingDocuments, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M2CatalogueBatch, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M3PricingRules, "depends on", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M7CustomersPaymentRecording, CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M7CustomersPaymentRecording, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
