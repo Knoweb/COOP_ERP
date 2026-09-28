@@ -31,6 +31,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-0000000000e3', 'm101-buyer',    'Sandya Kumari',       'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-0000000000e3', 'm101-manager',  'Ruwan Dissanayake',   'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE')
 ON CONFLICT (user_id) DO NOTHING;
@@ -52,6 +53,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000331', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society buyer',              false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000332', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society manager',            false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: shop staff',                 false, 'OWN', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society office',             false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', 'Demo: society manager',            false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', 'Demo: society manager',            false, 'OWN', 'ACTIVE')
 ON CONFLICT (role_id) DO NOTHING;
@@ -156,7 +158,12 @@ WITH job (role_id, codes) AS (
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
-            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view', 'gov.entity.view'])
+            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view', 'gov.entity.view']),
+        -- the society office (M7, back office): the member register, the credit accounts, the
+        -- statements and the repayments at the office, entity-wide
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, ARRAY[
+            'cus.customer.view', 'cus.customer.register', 'cus.customer.manage', 'cus.account.manage',
+            'cus.payment.record', 'gov.entity.view', 'prt.location.view', 'rpt.report.run'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code
@@ -183,6 +190,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-000000000331', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-000000000332', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
+    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL)
 ON CONFLICT DO NOTHING;

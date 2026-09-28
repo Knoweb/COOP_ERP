@@ -20,6 +20,8 @@
             "m4trading::api",
             "m4trading::query",
             "m5inventory::api",
-            "m5inventory::query"
+            "m5inventory::query",
+            "m7customers::api",
+            "m7customers::query"
         })
 package lk.coopfed.knoweb.demo;

@@ -1,0 +1,429 @@
+# OpenAPI slice of M7 Customers & Payment Recording, the back office part (27A section 5). The
+# society's members, their credit accounts, the statement, and repayments at the office. The till's
+# operations (lookup by phone for the till, the CPR bundle) come with the till (CR-30-1).
+#   - every operation names its permission in x-permission, the same string as its @CommandHandler
+#   - every mutating operation requires the Idempotency-Key header
+#   - errors are RFC 9457 problem documents whose `code` is a message id
+#   - the shape of a request is written here and nowhere else; a business rule is a handler guard
+# After changing this file run `make gen-clients` and commit web/src/generated/m7customers.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP Customers API
+  version: 0.1.0
+paths:
+  /v1/customers:
+    get:
+      tags: [Customers]
+      operationId: searchCustomers
+      summary: The society's customers matching a name or a phone number, by name
+      x-permission: cus.customer.view
+      parameters:
+        - { in: query, name: q, required: false, schema: { type: string, maxLength: 100 } }
+        - { in: query, name: phone, required: false, schema: { type: string, maxLength: 20 } }
+        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: The matching customers, at most `limit`
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CustomerSummary' }
+    post:
+      tags: [Customers]
+      operationId: registerCustomer
+      summary: Register a customer at the caller's society
+      description: >
+        422 codes: m7.customer.phone_invalid, m7.customer.phone_held (another customer of this
+        society holds the number now; parameter customerId), m7.customer.phone_held_elsewhere,
+        m7.customer.phone_reuse_confirm (a recent holder: send again with confirmedIdentity true
+        once the officer has confirmed it is another person), m7.customer.consent_required,
+        m7.customer.consent_invalid, m7.customer.tag_invalid, m7.customer.attributes_invalid,
+        m7.scope.own_required.
+      x-permission: cus.customer.register
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterCustomerRequest' }
+      responses:
+        '201':
+          description: Registered; the customer card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/{customerId}:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Customers]
+      operationId: getCustomer
+      summary: The customer card, with the account at the caller's society
+      x-permission: cus.customer.view
+      responses:
+        '200':
+          description: The card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '404':
+          description: No such customer, or the caller's scope may not see it (the two look the same on purpose)
+    patch:
+      tags: [Customers]
+      operationId: amendCustomer
+      summary: Amend the names, language, attributes and tags (the whole set)
+      description: "422 codes: m7.customer.not_found, m7.customer.not_active, m7.customer.tag_invalid, m7.customer.attributes_invalid."
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AmendCustomerRequest' }
+      responses:
+        '200':
+          description: Amended; the card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/{customerId}/phone:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Customers]
+      operationId: changePhone
+      summary: Change the customer's primary phone
+      description: "422 codes as registration for the number, and m7.customer.phone_unchanged."
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePhoneRequest' }
+      responses:
+        '200':
+          description: Changed; the card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/{customerId}/deactivate:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Customers]
+      operationId: deactivateCustomer
+      summary: Deactivate the customer
+      description: "422 codes: m7.customer.not_active, m7.customer.open_balance (an open account with a balance)."
+      x-permission: cus.customer.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Deactivated; the card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/{customerId}/accounts:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: openAccount
+      summary: Open the caller's society's credit account for the customer
+      description: >
+        422 codes: m7.customer.not_active, m7.customer.consent_required, m7.account.exists,
+        m7.account.amount_invalid, m7.account.terms_invalid, m7.account.nic_required (a limit
+        above zero needs the NIC), m7.account.nic_mismatch, m7.account.nic_held.
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpenAccountRequest' }
+      responses:
+        '201':
+          description: Opened
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Accounts]
+      operationId: getAccount
+      summary: The account's limit, balance, available amount and ageing
+      x-permission: cus.customer.view
+      responses:
+        '200':
+          description: The account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '404':
+          description: No such account, or the caller's scope may not see it
+  /v1/accounts/{accountId}/statement:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Accounts]
+      operationId: getStatement
+      summary: The postings of the account between two business dates, with the running balance
+      x-permission: cus.customer.view
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The statement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Statement' }
+        '404':
+          description: No such account, or the caller's scope may not see it
+  /v1/accounts/{accountId}/payments:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: recordCustomerPayment
+      summary: Record a repayment at the society office (a CPR from the society's series)
+      description: >
+        422 codes: m7.scope.entity_required, m7.account.not_found, m7.account.not_open,
+        m7.payment.method_invalid, m7.payment.amount_invalid, m7.payment.mode_invalid,
+        m7.payment.charge_invalid, m7.payment.exceeds_open, m7.payment.exceeds_amount.
+      x-permission: cus.payment.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordPaymentRequest' }
+      responses:
+        '201':
+          description: Recorded; the receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPayment' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+components:
+  schemas:
+    Language: { type: string, enum: [en, si, ta] }
+    RegisterCustomerRequest:
+      type: object
+      required: [displayName, phone, consents]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        displayNameSi: { type: [string, 'null'], maxLength: 120 }
+        displayNameTa: { type: [string, 'null'], maxLength: 120 }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: string, minLength: 9, maxLength: 20 }
+        consents:
+          type: array
+          maxItems: 2
+          items: { type: string, enum: [CREDIT_ACCOUNT, STATEMENTS_NOTIFICATIONS] }
+        via: { type: string, enum: [WEB, PAPER] }
+        attributes:
+          type: object
+          maxProperties: 20
+          additionalProperties: { type: string, maxLength: 200 }
+        tags:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 40 }
+        confirmedIdentity: { type: boolean, default: false }
+    AmendCustomerRequest:
+      type: object
+      required: [displayName, language]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        displayNameSi: { type: [string, 'null'], maxLength: 120 }
+        displayNameTa: { type: [string, 'null'], maxLength: 120 }
+        language: { $ref: '#/components/schemas/Language' }
+        attributes:
+          type: object
+          maxProperties: 20
+          additionalProperties: { type: string, maxLength: 200 }
+        tags:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 40 }
+    ChangePhoneRequest:
+      type: object
+      required: [newPhone, reason]
+      properties:
+        newPhone: { type: string, minLength: 9, maxLength: 20 }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+        confirmedIdentity: { type: boolean, default: false }
+    ReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    OpenAccountRequest:
+      type: object
+      required: [creditLimit]
+      properties:
+        creditLimit: { type: number, minimum: 0, maximum: 999999999.99 }
+        termsDays: { type: [integer, 'null'], minimum: 1, maximum: 365 }
+        offlineCap: { type: [number, 'null'], minimum: 0, maximum: 999999999.99 }
+        nic: { type: [string, 'null'], maxLength: 20 }
+    RecordPaymentRequest:
+      type: object
+      required: [method, amount]
+      properties:
+        method: { type: string, enum: [CASH, TRANSFER, DEPOSIT] }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 999999999.99 }
+        reference: { type: [string, 'null'], maxLength: 100 }
+        allocationMode: { type: string, enum: [OLDEST_FIRST, SPECIFIC], default: OLDEST_FIRST }
+        specific:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [chargePostingId, amount]
+            properties:
+              chargePostingId: { type: string, format: uuid }
+              amount: { type: number, exclusiveMinimum: 0 }
+    CustomerSummary:
+      type: object
+      required: [customerId, displayName, language, status]
+      properties:
+        customerId: { type: string, format: uuid }
+        displayName: { type: string }
+        displayNameSi: { type: [string, 'null'] }
+        displayNameTa: { type: [string, 'null'] }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: [string, 'null'], description: The current primary phone in E.164 }
+        status: { type: string, enum: [ACTIVE, INACTIVE, ANONYMISED] }
+        accountId: { type: [string, 'null'], format: uuid }
+        accountNo: { type: [string, 'null'] }
+        creditLimit: { type: [number, 'null'] }
+        balance: { type: [number, 'null'] }
+    CustomerCard:
+      type: object
+      required: [customerId, displayName, language, status, registeredAt, registeredHere, attributes, tags, consents, phones]
+      properties:
+        customerId: { type: string, format: uuid }
+        displayName: { type: string }
+        displayNameSi: { type: [string, 'null'] }
+        displayNameTa: { type: [string, 'null'] }
+        language: { $ref: '#/components/schemas/Language' }
+        phone: { type: [string, 'null'] }
+        nicLast4: { type: [string, 'null'], description: The last four characters of the NIC; the number itself is never kept }
+        status: { type: string, enum: [ACTIVE, INACTIVE, ANONYMISED] }
+        registeredAt: { type: string, format: date-time }
+        registeredHere: { type: boolean, description: The caller's society registered the customer and may amend them }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        consents:
+          type: array
+          items:
+            type: object
+            required: [purpose, grantedVia, grantedAt]
+            properties:
+              purpose: { type: string, enum: [CREDIT_ACCOUNT, STATEMENTS_NOTIFICATIONS] }
+              grantedVia: { type: string, enum: [TILL, WEB, PAPER] }
+              grantedAt: { type: string, format: date-time }
+              withdrawnAt: { type: [string, 'null'], format: date-time }
+        phones:
+          type: array
+          items:
+            type: object
+            required: [phone, validFrom]
+            properties:
+              phone: { type: string }
+              validFrom: { type: string, format: date-time }
+              validTo: { type: [string, 'null'], format: date-time }
+              reason: { type: [string, 'null'] }
+        account:
+          $ref: '#/components/schemas/Account'
+    Account:
+      type: object
+      required: [accountId, accountNo, customerId, creditLimit, balance, available, termsDays, hardBlock, status, openedAt, unallocated, ageing]
+      properties:
+        accountId: { type: string, format: uuid }
+        accountNo: { type: string }
+        customerId: { type: string, format: uuid }
+        creditLimit: { type: number }
+        balance: { type: number, description: The sum of the postings; above zero is owed to the society }
+        available: { type: number, description: The limit less the balance and never below zero }
+        offlineCap: { type: [number, 'null'] }
+        termsDays: { type: integer }
+        hardBlock: { type: boolean }
+        status: { type: string, enum: [OPEN, SUSPENDED, CLOSED] }
+        openedAt: { type: string, format: date-time }
+        oldestUnpaid: { type: [string, 'null'], format: date }
+        unallocated: { type: number, description: What payments hold beyond the charges they settled }
+        ageing:
+          type: object
+          required: [days0To30, days31To60, days61To90, over90]
+          properties:
+            days0To30: { type: number }
+            days31To60: { type: number }
+            days61To90: { type: number }
+            over90: { type: number }
+    Statement:
+      type: object
+      required: [accountId, from, to, openingBalance, closingBalance, lines]
+      properties:
+        accountId: { type: string, format: uuid }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        openingBalance: { type: number }
+        closingBalance: { type: number }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [postingId, businessDate, kind, amount, settled, runningBalance, documentId, limitBreached, offline]
+            properties:
+              postingId: { type: string, format: uuid }
+              businessDate: { type: string, format: date }
+              kind: { type: string, enum: [CHARGE, CREDIT, PAYMENT, ADJUSTMENT, REVERSAL] }
+              amount: { type: number }
+              settled: { type: number, description: "CHARGE: what payments settled of it; PAYMENT: what it settled" }
+              runningBalance: { type: number }
+              documentId: { type: string, format: uuid }
+              documentNumber: { type: [string, 'null'], description: The receipt's or the CPR's number }
+              limitBreached: { type: boolean }
+              offline: { type: boolean }
+    CustomerPayment:
+      type: object
+      required: [documentId, docNumber, accountId, amount, allocated, unallocated, balance]
+      properties:
+        documentId: { type: string, format: uuid }
+        docNumber: { type: string }
+        accountId: { type: string, format: uuid }
+        amount: { type: number }
+        allocated: { type: number }
+        unallocated: { type: number }
+        balance: { type: number, description: The account's balance after the payment }

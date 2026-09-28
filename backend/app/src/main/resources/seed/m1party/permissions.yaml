@@ -429,3 +429,28 @@ permissions:
     module: "m6pos"
     description_en: "See the receipts and till sessions of the shops"
     scope: "LOCATION"
+  # M7 Customers & Payment Recording (27A section 3.1, seed/m7/permissions.yaml, appended here as
+  # M4 and M6 do: M1SeedLoader reads this one file). cus.customer.view is the read code of the
+  # slice's queries (27A lists no read code; one per aggregate, as M1 does, decided 29 September
+  # 2026 on the architect's delegation). The adjustment, reversal, statement, privacy and banking
+  # codes come with their tickets.
+  - code: "cus.customer.view"
+    module: "m7customers"
+    description_en: "See the society's customers, their accounts and statements"
+    scope: "ENTITY"
+  - code: "cus.customer.register"
+    module: "m7customers"
+    description_en: "Register a customer"
+    scope: "LOCATION"
+  - code: "cus.customer.manage"
+    module: "m7customers"
+    description_en: "Amend, re-phone and deactivate a customer"
+    scope: "ENTITY"
+  - code: "cus.account.manage"
+    module: "m7customers"
+    description_en: "Open a customer's credit account"
+    scope: "ENTITY"
+  - code: "cus.payment.record"
+    module: "m7customers"
+    description_en: "Record a customer's repayment"
+    scope: "LOCATION"

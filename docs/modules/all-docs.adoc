@@ -37,6 +37,10 @@ include::module-m3pricing.adoc[]
 plantuml::module-m5inventory.puml[,,format=svg]
 include::module-m5inventory.adoc[]
 
+== M7 Customers & Payment Recording
+plantuml::module-m7customers.puml[,,format=svg]
+include::module-m7customers.adoc[]
+
 == M8 Reporting Pipeline
 plantuml::module-m8reporting.puml[,,format=svg]
 include::module-m8reporting.adoc[]

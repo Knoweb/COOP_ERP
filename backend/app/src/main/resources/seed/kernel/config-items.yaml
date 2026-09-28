@@ -615,3 +615,35 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m4trading
+  # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
+  # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
+  - key: customers.phone_reuse_window_months
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 60 }
+    description_en: How many months after a customer gave up a phone number a new holder must be confirmed as another person
+    description_si: පාරිභෝගිකයෙකු දුරකථන අංකයක් අත්හැරීමෙන් පසු නව හිමිකරු වෙනත් අයෙකු බව තහවුරු කළ යුතු මාස ගණන
+    description_ta: ஒரு வாடிக்கையாளர் தொலைபேசி எண்ணைக் கைவிட்ட பிறகு புதிய உரிமையாளர் வேறு நபர் என உறுதிப்படுத்த வேண்டிய மாதங்கள்
+    default: 12
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m7customers
+  - key: customers.default_terms_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: The credit terms in days of a new customer account when none is given
+    description_si: කිසිවක් නොදුන් විට නව පාරිභෝගික ගිණුමක ණය කාලය දින වලින්
+    description_ta: எதுவும் கொடுக்கப்படாதபோது புதிய வாடிக்கையாளர் கணக்கின் கடன் காலம் நாட்களில்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: cus.account.manage
+    module: m7customers
+  - key: customers.offline_account_cap
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 1000000 }
+    description_en: The most a till may charge to a customer account in one sale while offline, when the account names no cap
+    description_si: ගිණුමේ සීමාවක් නොමැති විට, නොබැඳි අවස්ථාවේ එක් විකිණීමකදී පාරිභෝගික ගිණුමකට අය කළ හැකි උපරිමය
+    description_ta: கணக்கில் வரம்பு இல்லாதபோது, இணைப்பு இல்லாதபோது ஒரு விற்பனையில் வாடிக்கையாளர் கணக்கில் வசூலிக்கக்கூடிய அதிகபட்சம்
+    default: 5000
+    scope_kind: ENTITY
+    change_permission: cus.account.manage
+    module: m7customers

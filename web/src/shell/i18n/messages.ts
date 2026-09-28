@@ -13,6 +13,7 @@ import inventoryMessages from "../../modules/m5inventory/inventory.messages.json
 import tradingMessages from "../../modules/m4trading/trading.messages.json" with { type: "json" };
 import posMessages from "../../modules/m6pos/pos.messages.json" with { type: "json" };
 import reportingMessages from "../../modules/m8reporting/reporting.messages.json" with { type: "json" };
+import customersMessages from "../../modules/m7customers/customers.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
@@ -229,6 +230,7 @@ export const MODULE_CATALOGUES: Catalogue[] = [
   tradingMessages,
   posMessages,
   reportingMessages,
+  customersMessages,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];
 
