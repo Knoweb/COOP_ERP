@@ -110,13 +110,15 @@ class InvoiceQueriesImpl implements InvoiceQueries {
         Optional<InvoiceDisputes.Latest> dispute = disputes.latest(invoiceId);
         boolean disputed = dispute.map(latest -> InvoiceDisputes.DISPUTED.equals(latest.action()))
                 .orElse(false);
+        BigDecimal due = gross.subtract(credited).subtract(settled);
         return Optional.of(new InvoiceBalance(
                 invoiceId,
                 credited,
                 settled,
-                gross.subtract(credited).subtract(settled),
+                due,
                 disputed,
-                disputed ? dispute.get().reason() : null));
+                disputed ? dispute.get().reason() : null,
+                InvoiceBalance.paymentState(settled, due)));
     }
 
     private InvoiceView view(DocumentRecord header, Map<String, Object> row) {

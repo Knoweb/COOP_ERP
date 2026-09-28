@@ -42,6 +42,7 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000303', '0190f000-0000-7000-8000-000000000001', 'Demo: stores and dispatch',        false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000304', '0190f000-0000-7000-8000-000000000001', 'Demo: sales',                      false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000305', '0190f000-0000-7000-8000-000000000001', 'Demo: accounts',                   false, 'OWN', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000306', '0190f000-0000-7000-8000-000000000001', 'Demo: administration',             false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000311', '0190f0de-0000-7000-8000-0000000000e1', 'Demo: buying, selling and prices', false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000312', '0190f0de-0000-7000-8000-0000000000e1', 'Demo: stores and receiving',       false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000313', '0190f0de-0000-7000-8000-0000000000e1', 'Demo: accounts',                   false, 'OWN', 'ACTIVE'),
@@ -86,6 +87,13 @@ WITH job (role_id, codes) AS (
             'bil.payment.record', 'bil.statement.generate', 'inv.opening.countersign', 'inv.stock.view',
             'prt.relationship.view', 'cat.sku.view', 'prt.location.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run']),
+        -- Federation administration (phase 4, docs/demo/07): the society register (register,
+        -- activate, suspend), the Federation's users and their roles, and external grants. Held
+        -- by fed-steward beside the catalogue role; until 28 September 2026 no demo user held
+        -- gov.entity.register, so "Register a society" was offered to nobody in the demo cast.
+        ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY[
+            'gov.entity.view', 'gov.entity.register', 'gov.entity.activate', 'gov.entity.suspend',
+            'gov.user.view', 'gov.user.manage', 'gov.role.manage', 'gov.external.grant', 'prt.location.view']),
         -- distributor commercial: buys from the Federation, prices and sells to its societies
         ('0190f0de-0000-7000-8000-000000000311'::uuid, ARRAY[
             'trd.document.view', 'ord.order.draft', 'ord.order.submit', 'ord.order.accept', 'del.note.draft',
@@ -167,6 +175,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO security.user_role (user_id, role_id, scope_entity_id, scope_location_id)
 VALUES
     ('0190f0de-0000-7000-8000-000000000201', '0190f0de-0000-7000-8000-000000000301', '0190f000-0000-7000-8000-000000000001', NULL),
+    ('0190f0de-0000-7000-8000-000000000201', '0190f0de-0000-7000-8000-000000000306', '0190f000-0000-7000-8000-000000000001', NULL),
     ('0190f0de-0000-7000-8000-000000000202', '0190f0de-0000-7000-8000-000000000302', '0190f000-0000-7000-8000-000000000001', NULL),
     ('0190f0de-0000-7000-8000-000000000203', '0190f0de-0000-7000-8000-000000000303', '0190f000-0000-7000-8000-000000000001', '0190f0de-0000-7000-8000-000000000101'),
     ('0190f0de-0000-7000-8000-000000000204', '0190f0de-0000-7000-8000-000000000304', '0190f000-0000-7000-8000-000000000001', NULL),

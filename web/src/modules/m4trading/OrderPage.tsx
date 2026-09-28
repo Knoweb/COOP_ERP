@@ -10,6 +10,7 @@ import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ReasonCapture } from "../../shell/components/ReasonCapture";
+import { ExposurePanel } from "./ExposurePanel";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
 import { businessToday, canDeliver, errorText, firstOpenEta, orderChip } from "./tradingView";
@@ -56,6 +57,13 @@ export function OrderPage() {
     enabled: deciding,
     retry: false
   });
+  // M4-09: the buyer's exposure with us beside its credit limit, and what accepting would add.
+  const exposures = useQuery({
+    queryKey: ["trading", "exposures", "SELLER"],
+    queryFn: () => api.exposures("SELLER"),
+    enabled: isSeller
+  });
+  const exposure = exposures.data?.find((row) => row.buyerEntityId === order.data?.buyerEntityId);
   const lockHours = relationship.data?.orderLockHoursBeforeEta;
   const requestedEta = order.data?.requestedEta ?? "";
   useEffect(() => {
@@ -193,6 +201,8 @@ export function OrderPage() {
           <Link to={`/trading/delivery-notes/new?orderId=${o.orderId}`}>{t("trading.note.new").text}</Link>
         )}
       </section>
+
+      {isSeller && exposure && <ExposurePanel exposure={exposure} orderValue={deciding ? o.netAmount ?? 0 : undefined} />}
 
       {asking && (
         <ReasonCapture

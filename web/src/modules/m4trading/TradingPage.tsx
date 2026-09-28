@@ -6,13 +6,23 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { EntityName } from "./labels";
 import { useTradingApi, type Side } from "./tradingApi";
-import { deliveryChip, discrepancyChip, errorText, grnChip, orderChip } from "./tradingView";
+import {
+  deliveryChip,
+  discrepancyChip,
+  errorText,
+  grnChip,
+  orderChip,
+  paymentStateChip,
+  percentOfLimit,
+  receiptChip
+} from "./tradingView";
 
 /**
  * The trading desk (doc 30 section 5.4; 24A section 8, demo scope): one page with the registers a
  * user's job needs, each shown only to a user holding its permission. The buyer's requisition
  * book (own orders), the seller's order desk (orders received), the seller's delivery notes and
- * the receiver's incoming deliveries and goods received notes.
+ * the receiver's incoming deliveries and goods received notes. M4-07 and M4-09: the payments
+ * received and made, and the accounts (exposure against the credit limit) both ways.
  */
 export function TradingPage() {
   const t = useT();
@@ -25,6 +35,7 @@ export function TradingPage() {
   const canInvoice = useHasPermission("bil.invoice.issue");
   const canCredit = useHasPermission("bil.creditnote.issue");
   const canDispute = useHasPermission("bil.invoice.dispute");
+  const canPay = useHasPermission("bil.payment.record");
 
   return (
     <main className="shell-page">
@@ -79,9 +90,21 @@ export function TradingPage() {
           <DiscrepancyRegister role="SELLER" />
         </section>
       )}
+      {(canInvoice || canPay) && (
+        <section>
+          <h2>{t("trading.accounts.buyers.title").text}</h2>
+          <AccountRegister role="SELLER" />
+          <h2>{t("trading.payments.received.title").text}</h2>
+          <PaymentRegister role="SELLER" />
+        </section>
+      )}
       <section>
         <h2>{t("trading.invoices.received.title").text}</h2>
         <InvoiceRegister role="BUYER" />
+        <h2>{t("trading.payments.made.title").text}</h2>
+        <PaymentRegister role="BUYER" />
+        <h2>{t("trading.accounts.sellers.title").text}</h2>
+        <AccountRegister role="BUYER" />
       </section>
       {(canReceive || canDispute) && (
         <section>
@@ -288,6 +311,132 @@ function DiscrepancyRegister({ role }: { role: Side }) {
   );
 }
 
+/** The payments received (SELLER) or made (BUYER), with bounced receipts and their reversals, newest first. */
+function PaymentRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const rows = useQuery({ queryKey: ["trading", "payments", role], queryFn: () => api.payments(role) });
+
+  if (rows.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (rows.isError) {
+    return <p role="alert">{errorText(rows.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!rows.data?.length) {
+    return <p>{t("trading.payments.empty").text}</p>;
+  }
+  return (
+    <div className="modern-table-card">
+      <div className="modern-table-scroll">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>{t("trading.column.number").text}</th>
+              <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+              <th>{t("trading.payment.received_on").text}</th>
+              <th>{t("trading.payment.method").text}</th>
+              <th>{t("trading.column.amount").text}</th>
+              <th>{t("trading.column.status").text}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.data.map((row) => (
+              <tr key={row.receiptId}>
+                <td>
+                  <Link to={`/trading/payments/${row.receiptId}`}>{row.docNumber}</Link>
+                </td>
+                <td>
+                  <EntityName entityId={role === "BUYER" ? row.sellerEntityId : row.buyerEntityId} />
+                </td>
+                <td>{row.receivedOn}</td>
+                <td>{t(`trading.payment.method.${row.method}`).text}</td>
+                <td>
+                  <MoneyDisplay amount={row.status === "REVERSAL" ? -row.amount : row.amount} />
+                </td>
+                <td>
+                  <StateChip state={receiptChip(row.status)} label={t(`trading.payment.status.${row.status}`).text} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The exposure of each relationship beside its credit limit (M4-09): the seller's buyers
+ * (SELLER) or the buyer's suppliers (BUYER). Each row opens the account of that relationship.
+ */
+function AccountRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const rows = useQuery({ queryKey: ["trading", "exposures", role], queryFn: () => api.exposures(role) });
+
+  if (rows.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (rows.isError) {
+    return <p role="alert">{errorText(rows.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!rows.data?.length) {
+    return <p>{t("trading.accounts.empty").text}</p>;
+  }
+  return (
+    <div className="modern-table-card">
+      <div className="modern-table-scroll">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+              <th>{t("trading.exposure.amount").text}</th>
+              <th>{t("trading.exposure.limit").text}</th>
+              <th>{t("trading.column.status").text}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.data.map((row) => {
+              const counterparty = role === "BUYER" ? row.sellerEntityId : row.buyerEntityId;
+              const percent = percentOfLimit(row.amount, row.creditLimit);
+              return (
+                <tr key={row.relationshipId}>
+                  <td>
+                    <Link to={`/trading/accounts/${role}/${counterparty}`}>
+                      <EntityName entityId={counterparty} />
+                    </Link>
+                  </td>
+                  <td>
+                    <MoneyDisplay amount={row.amount} />
+                  </td>
+                  <td>
+                    {row.creditLimit === undefined || row.creditLimit === null ? (
+                      t("trading.exposure.no_limit").text
+                    ) : (
+                      <MoneyDisplay amount={row.creditLimit} />
+                    )}
+                  </td>
+                  <td>
+                    {row.warnThresholdPercent !== undefined && row.warnThresholdPercent !== null ? (
+                      <StateChip
+                        state="alert"
+                        label={t("trading.exposure.warning", undefined, { percent: row.warnThresholdPercent }).text}
+                      />
+                    ) : (
+                      percent !== null && t("trading.exposure.percent", undefined, { percent }).text
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function InvoiceRegister({ role }: { role: Side }) {
   const t = useT();
   const api = useTradingApi();
@@ -312,6 +461,8 @@ function InvoiceRegister({ role }: { role: Side }) {
               <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
               <th>{t("trading.invoice.due").text}</th>
               <th>{t("trading.invoice.gross").text}</th>
+              <th>{t("trading.invoice.amount_due").text}</th>
+              <th>{t("trading.column.payment_state").text}</th>
             </tr>
           </thead>
           <tbody>
@@ -326,6 +477,15 @@ function InvoiceRegister({ role }: { role: Side }) {
                 <td>{invoice.dueDate}</td>
                 <td>
                   <MoneyDisplay amount={invoice.grossAmount} />
+                </td>
+                <td>
+                  <MoneyDisplay amount={invoice.amountDue ?? invoice.grossAmount} />
+                </td>
+                <td>
+                  <StateChip
+                    state={paymentStateChip(invoice.paymentState)}
+                    label={t(`trading.invoice.payment_state.${invoice.paymentState ?? "OPEN"}`).text}
+                  />
                 </td>
               </tr>
             ))}

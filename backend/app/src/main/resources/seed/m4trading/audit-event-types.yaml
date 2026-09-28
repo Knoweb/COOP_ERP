@@ -144,3 +144,18 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The A4 copy of an issued credit note stored for printing
+
+  - code: PAYMENT_RECEIPT_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment received from a buyer, recorded and applied to its open invoices
+
+  - code: CHEQUE_CLEARED
+    severity: INFO
+    offline_capturable: false
+    description_en: The cheque of a payment receipt cleared
+
+  - code: CHEQUE_BOUNCED
+    severity: ALERT
+    offline_capturable: false
+    description_en: The cheque of a payment receipt bounced; the receipt is reversed and its invoices reopen

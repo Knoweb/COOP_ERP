@@ -20,6 +20,8 @@ import lk.coopfed.knoweb.m4trading.query.CreditNoteView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
+import lk.coopfed.knoweb.m4trading.query.PaymentQueries;
+import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
 import lk.coopfed.knoweb.m4trading.web.generated.BillingApi;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNotePrintResponse;
@@ -27,6 +29,7 @@ import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteSummary;
 import lk.coopfed.knoweb.m4trading.web.generated.DisputeInvoiceRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoiceLineResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.InvoicePaymentSummary;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoicePrintResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoiceResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueCreditNoteRequest;
@@ -48,9 +51,11 @@ class BillingController implements BillingApi {
     private final IssueCreditNoteHandler issueCreditNote;
     private final InvoiceQueries queries;
     private final CreditNoteQueries creditNotes;
+    private final PaymentQueries payments;
     private final CurrentScope currentScope;
     private final A4Renderer renderer;
 
+    @SuppressWarnings("java:S107") // one controller per tag of the slice
     BillingController(
             IssueInvoiceHandler issue,
             DisputeInvoiceHandler dispute,
@@ -58,8 +63,10 @@ class BillingController implements BillingApi {
             IssueCreditNoteHandler issueCreditNote,
             InvoiceQueries queries,
             CreditNoteQueries creditNotes,
+            PaymentQueries payments,
             CurrentScope currentScope,
             A4Renderer renderer) {
+        this.payments = payments;
         this.issue = issue;
         this.dispute = dispute;
         this.resolveDispute = resolveDispute;
@@ -196,7 +203,25 @@ class BillingController implements BillingApi {
             response.setAmountDue(balance.amountDue());
             response.setDisputed(balance.disputed());
             response.setDisputeReason(balance.disputeReason());
+            response.setSettledAmount(balance.settledAmount());
+            response.setPaymentState(InvoiceResponse.PaymentStateEnum.fromValue(balance.paymentState()));
         });
+        UUID invoiceId = invoice.invoiceId();
+        response.setPayments(payments.receiptsOf(invoiceId, scope).stream()
+                .map(receipt -> {
+                    InvoicePaymentSummary summary = new InvoicePaymentSummary(
+                            receipt.receiptId(),
+                            InvoicePaymentSummary.StatusEnum.fromValue(receipt.status()),
+                            receipt.allocations().stream()
+                                    .filter(allocation -> invoiceId.equals(allocation.invoiceId()))
+                                    .map(PaymentReceiptView.AllocationView::amount)
+                                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+                    summary.setDocNumber(receipt.docNumberDisplay());
+                    summary.setMethod(receipt.method());
+                    summary.setReceivedOn(receipt.receivedOn());
+                    return summary;
+                })
+                .toList());
         response.setCreditNotes(creditNotes.creditNotesOf(invoice.invoiceId(), scope).stream()
                 .map(note -> {
                     CreditNoteSummary summary = new CreditNoteSummary(note.creditNoteId(), note.grossAmount());

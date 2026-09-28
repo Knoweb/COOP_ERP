@@ -25,6 +25,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
 import lk.coopfed.knoweb.m4trading.api.AcceptOrder;
+import lk.coopfed.knoweb.m4trading.api.ExposureWarning;
 import lk.coopfed.knoweb.m4trading.api.InventoryAvailability;
 import lk.coopfed.knoweb.m4trading.api.OrderAccepted;
 import lk.coopfed.knoweb.m4trading.api.OrderAllocated;
@@ -32,7 +33,9 @@ import lk.coopfed.knoweb.m4trading.api.OrderLineSummary;
 import lk.coopfed.knoweb.m4trading.api.TradePricing;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingGuards;
+import lk.coopfed.knoweb.m4trading.internal.queries.ExposureCalculator;
 import lk.coopfed.knoweb.m4trading.internal.queries.OrderStatus;
+import lk.coopfed.knoweb.m4trading.query.ExposureView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +55,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Mutation: {@code allocation_run}, {@code order_allocation} (ACCEPTED), one
  * {@code order_allocation_line} per line with the tier price at the ordered quantity. Audit
  * ORDER_ACCEPTED; events order.accepted.v1 and order.allocated.v1.
+ *
+ * <p>Exposure (M4-09): the buyer's exposure with the seller is computed before and after the
+ * acceptance ({@link ExposureCalculator}); when the acceptance takes it across a threshold of the
+ * relationship's credit limit (trading.exposure_warn_thresholds), exposure.warning.v1 is published
+ * and the audit record carries the exposure. The order is accepted all the same: nothing blocks on
+ * credit (doc 24 FR-BIL-080, ADR-12), so there is no HOLD state and no override to take.
  */
 @Service
 @CommandHandler(permission = "ord.order.accept")
@@ -66,6 +75,7 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
     private final InventoryAvailability availability;
     private final TradePricing pricing;
     private final TradingClock clock;
+    private final ExposureCalculator exposure;
     private final ObjectMapper json;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -77,6 +87,7 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
             InventoryAvailability availability,
             TradePricing pricing,
             TradingClock clock,
+            ExposureCalculator exposure,
             ObjectMapper json,
             AuditFacade audit,
             EventPublisher events) {
@@ -86,6 +97,7 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
         this.availability = availability;
         this.pricing = pricing;
         this.clock = clock;
+        this.exposure = exposure;
         this.json = json;
         this.audit = audit;
         this.events = events;
@@ -112,6 +124,7 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
             throw new ProblemException("m4.order.eta_past");
         }
 
+        ExposureView before = exposure.exposure(relationship, scope);
         List<DocumentLineRecord> lines = documents.findLines(orderId);
         Map<UUID, BigDecimal> open = new HashMap<>();
         for (Map<String, Object> row : jdbc.queryForList(
@@ -227,18 +240,33 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
                     row[3]);
         }
 
+        ExposureView now = exposure.exposure(relationship, scope);
+        Integer crossed = now.warnThresholdPercent() != null
+                        && (before.warnThresholdPercent() == null
+                                || now.warnThresholdPercent() > before.warnThresholdPercent())
+                ? now.warnThresholdPercent()
+                : null;
+
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", OrderStatus.ACCEPTED);
         after.put("allocationRunId", runId);
         after.put("committedEta", eta);
         after.put("lockAt", lockAt);
         after.put("overrides", overrideLog.size());
+        after.put("exposure", now.amount());
+        if (crossed != null) {
+            after.put("exposureWarningPercent", crossed);
+        }
         audit.record(
                 AUDIT_ACCEPTED, Subject.of("order", orderId), Map.of("status", OrderStatus.SUBMITTED), after, scope);
 
         events.publish(new OrderAccepted(
                 orderId, relationshipId, buyer, scope.entityId(), runId, eta, lockAt, List.copyOf(summary)));
         events.publish(new OrderAllocated(orderId, runId, scope.entityId(), buyer, List.copyOf(summary)));
+        if (crossed != null) {
+            events.publish(new ExposureWarning(
+                    relationshipId, scope.entityId(), buyer, now.amount(), now.creditLimit(), crossed, orderId));
+        }
         return runId;
     }
 

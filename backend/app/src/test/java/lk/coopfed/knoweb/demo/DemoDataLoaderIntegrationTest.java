@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -16,6 +17,14 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
+import lk.coopfed.knoweb.m4trading.query.ExposureView;
+import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
+import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
+import lk.coopfed.knoweb.m4trading.query.InvoiceView;
+import lk.coopfed.knoweb.m4trading.query.OrderQueries;
+import lk.coopfed.knoweb.m4trading.query.PaymentQueries;
+import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +61,15 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     PricingQueries pricing;
+
+    @Autowired
+    InvoiceQueries invoices;
+
+    @Autowired
+    PaymentQueries payments;
+
+    @Autowired
+    ExposureQueries exposures;
 
     @BeforeEach
     void theSeedTheDemoStartsFrom() throws Exception {
@@ -122,10 +140,14 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("DispatchDeliveryNote", 34)
                     .containsEntry("CaptureGrn", 29)
                     .containsEntry("ConfirmGrn", 29)
-                    .containsEntry("IssueInvoice", 24);
+                    .containsEntry("IssueInvoice", 24)
+                    // M4-07: eight payments, three cheque outcomes (two cleared, one bounced).
+                    .containsEntry("RecordPaymentReceipt", 8)
+                    .containsEntry("RecordChequeOutcome", 3);
             theHistorySpreadsOverEightWeeks();
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();
+        thePaymentsAndTheCreditLimit();
 
         kernel.reset();
         DemoDataLoader.Report second = loader.load();
@@ -254,6 +276,61 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     assertThat(price.mrpApplied()).isEqualByComparingTo("1150.00");
                     assertThat(price.unitPrice()).isEqualByComparingTo("1100.00");
                 });
+    }
+
+    /**
+     * M4-07 and M4-09: of D101's invoices from the Federation (oldest first) the first two are
+     * settled, the third part-paid, and the fourth open again after its cheque bounced; and
+     * Point Pedro MPCS (M103) owes D102 past the first warning threshold of its credit limit, but
+     * not past the limit.
+     */
+    private void thePaymentsAndTheCreditLimit() {
+        ScopeContext fedAccounts = scopeOf(DemoCast.FED_ACCOUNTS);
+        List<InvoiceView> d101 = invoices.listInvoices(OrderQueries.Role.SELLER, fedAccounts).stream()
+                .filter(invoice -> DemoCast.D101.equals(invoice.buyerEntityId()))
+                .sorted(Comparator.comparing(InvoiceView::taxPointDate).thenComparing(InvoiceView::docNumberDisplay))
+                .toList();
+        assertThat(d101).hasSizeGreaterThanOrEqualTo(4);
+        assertThat(d101.stream()
+                        .limit(4)
+                        .map(invoice -> invoices.balance(invoice.invoiceId(), fedAccounts)
+                                .orElseThrow()
+                                .paymentState())
+                        .toList())
+                .containsExactly(
+                        InvoiceBalance.SETTLED, InvoiceBalance.SETTLED, InvoiceBalance.PART_PAID, InvoiceBalance.OPEN);
+        List<PaymentReceiptView> receipts = payments.listReceipts(OrderQueries.Role.SELLER, fedAccounts);
+        assertThat(receipts)
+                .extracting(PaymentReceiptView::status)
+                .contains(PaymentReceiptView.REVERSED, PaymentReceiptView.REVERSAL);
+        // d101-accounts reads the same payments, read only.
+        assertThat(payments.listReceipts(OrderQueries.Role.BUYER, scopeOf(DemoCast.D101_ACCOUNTS)))
+                .isNotEmpty();
+
+        ExposureView m103 = exposures
+                .exposure(DemoCast.D102, DemoCast.M103, scopeOf(DemoCast.D102_BUYER))
+                .orElseThrow();
+        assertThat(m103.creditLimit()).isEqualByComparingTo(DemoDataLoader.M103_CREDIT_LIMIT);
+        assertThat(m103.amount())
+                .as("M103's exposure %s against its limit", m103.amount())
+                .isGreaterThanOrEqualTo(m103.creditLimit().multiply(new BigDecimal("0.80")))
+                .isLessThan(m103.creditLimit());
+        assertThat(m103.warnThresholdPercent()).isEqualTo(80);
+    }
+
+    private ScopeContext scopeOf(DemoCast.Actor actor) {
+        Scope scope = new Scope(actor.entityId(), actor.locationId());
+        return new ScopeContext(
+                actor.userId(),
+                null,
+                actor.entityId(),
+                List.of(scope),
+                scope,
+                PolicyClass.OWN,
+                Set.of(),
+                clock.instant(),
+                Locale.ENGLISH,
+                null);
     }
 
     /** What the demo consists of, counted as the superuser over the demo's own rows. */

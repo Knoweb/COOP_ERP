@@ -8,9 +8,11 @@
 * `l.c.k.m.query.CreditNoteQueries` (via `l.c.k.m.internal.queries.CreditNoteQueriesImpl`)
 * `l.c.k.m.query.DeliveryQueries` (via `l.c.k.m.internal.queries.DeliveryQueriesImpl`)
 * `l.c.k.m.query.DiscrepancyQueries` (via `l.c.k.m.internal.queries.DiscrepancyQueriesImpl`)
+* `l.c.k.m.query.ExposureQueries` (via `l.c.k.m.internal.queries.ExposureQueriesImpl`)
 * `l.c.k.m.query.GrnQueries` (via `l.c.k.m.internal.queries.GrnQueriesImpl`)
 * `l.c.k.m.query.InvoiceQueries` (via `l.c.k.m.internal.queries.InvoiceQueriesImpl`)
 * `l.c.k.m.query.OrderQueries` (via `l.c.k.m.internal.queries.OrderQueriesImpl`)
+* `l.c.k.m.query.PaymentQueries` (via `l.c.k.m.internal.queries.PaymentQueriesImpl`)
 
 _Others_
 
@@ -34,6 +36,7 @@ _Others_
 * `l.c.k.k.api.Formats` (in Platform Kernel)
 * `l.c.k.k.api.Messages` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
