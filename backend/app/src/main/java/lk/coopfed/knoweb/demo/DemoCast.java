@@ -37,6 +37,7 @@ final class DemoCast {
     static final Actor FED_STEWARD = actor("fed-steward", "000000000201", FEDERATION, null);
     static final Actor FED_PRICING = actor("fed-pricing", "000000000202", FEDERATION, null);
     static final Actor FED_STORES = actor("fed-stores", "000000000203", FEDERATION, FEDERATION_WAREHOUSE);
+    static final Actor FED_SALES = actor("fed-sales", "000000000204", FEDERATION, null);
     static final Actor FED_ACCOUNTS = actor("fed-accounts", "000000000205", FEDERATION, null);
     static final Actor D101_BUYER = actor("d101-buyer", "000000000211", D101, null);
     static final Actor D101_STORES = actor("d101-stores", "000000000212", D101, D101_WAREHOUSE);

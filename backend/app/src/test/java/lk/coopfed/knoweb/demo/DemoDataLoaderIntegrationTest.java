@@ -40,8 +40,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         admin.update(
                 """
                 insert into party.entity (entity_id, entity_code, entity_type, legal_name_en, district,
-                    financial_year_start_month, default_language, status)
-                values (?, 'DEMOFED', 'FEDERATION', 'Cooperative Federation (demo test)', 'Colombo', 1, 'en', 'ACTIVE')
+                    financial_year_start_month, default_language, status, vat_registration_no)
+                values (?, 'DEMOFED', 'FEDERATION', 'Cooperative Federation (demo test)', 'Colombo', 1, 'en', 'ACTIVE',
+                    'VAT-DEMOFED')
                 on conflict (entity_id) do nothing
                 """,
                 DemoCast.FEDERATION);
@@ -67,11 +68,24 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("posted opening balances", 4L)
                 .containsEntry("lots", 200L)
                 .containsEntry("received transfers to the town shop", 1L)
-                .containsEntry("lots with stock at the town shop", 40L);
+                .containsEntry("lots with stock at the town shop", 40L)
+                .containsEntry("orders of the history", 44L);
         if (first.total() > 0) {
             // A fresh database: the loader went through the handlers, which audited and published.
             assertThat(kernel.committedAudit()).isNotEmpty();
             assertThat(kernel.committedEvents()).isNotEmpty();
+            // DEMO-02: 44 orders over five relationships; the last four of each stop at
+            // SUBMITTED, ACCEPTED, DISPATCHED and RECEIVED, the others are invoiced.
+            assertThat(first.commands())
+                    .containsEntry("CreateOrder", 44)
+                    .containsEntry("SubmitOrder", 44)
+                    .containsEntry("AcceptOrder", 39)
+                    .containsEntry("CreateDeliveryNote", 34)
+                    .containsEntry("IssueDeliveryNote", 34)
+                    .containsEntry("DispatchDeliveryNote", 34)
+                    .containsEntry("CaptureGrn", 29)
+                    .containsEntry("ConfirmGrn", 29)
+                    .containsEntry("IssueInvoice", 24);
         }
 
         kernel.reset();
@@ -178,6 +192,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                         admin,
                         "select count(*) from inventory.stock_lot where location_id = ?::uuid and qty_on_hand > 0",
                         DemoCast.M101_TOWN_SHOP.toString()));
+        counts.put(
+                "orders of the history",
+                count(admin, "select count(*) from kernel.document where notes like 'Demo history %'"));
         counts.put(
                 "audit of the demo users",
                 count(admin, "select count(*) from kernel.audit_event where actor_user_id::text like '0190f0de-%'"));
