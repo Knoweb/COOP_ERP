@@ -130,6 +130,16 @@ permissions:
     description_en: "Publish price lists"
     scope: "ENTITY"
     requires_mfa: true
+  # M3-05, discount rules (23A section 3.1): authoring, and activation and withdrawal. The reads
+  # use prc.pricelist.view (a rule is price data of the same entity).
+  - code: "prc.rule.author"
+    module: "m3pricing"
+    description_en: "Author discount rules"
+    scope: "ENTITY"
+  - code: "prc.rule.activate"
+    module: "m3pricing"
+    description_en: "Activate and withdraw discount rules"
+    scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes

@@ -8,7 +8,7 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 
 /** Guards the four price-list handlers share. */
-final class PriceListRules {
+public final class PriceListRules {
 
     private PriceListRules() {}
 
@@ -16,7 +16,7 @@ final class PriceListRules {
      * The owner acts for its own entity, entity-wide (23A section 7: "owner"): a price list
      * belongs to the entity, not to a shop, and the read-only classes write nothing.
      */
-    static void requireOwnerScope(ScopeContext scope) {
+    public static void requireOwnerScope(ScopeContext scope) {
         if (scope == null
                 || !scope.hasActiveScope()
                 || scope.entityId() == null
@@ -31,7 +31,7 @@ final class PriceListRules {
      * entity and no location, and an entity has no business date of its own (BusinessDate,
      * CR-19A-8), as M1's relationships read it.
      */
-    static LocalDate today(Clock clock, ZoneId businessZone) {
+    public static LocalDate today(Clock clock, ZoneId businessZone) {
         return LocalDate.ofInstant(clock.instant(), businessZone);
     }
 }

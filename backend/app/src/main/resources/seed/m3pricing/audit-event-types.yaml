@@ -18,3 +18,20 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Price list published
+
+  # M3-05, discount rules (23A section 7). RULE_AUTHORED covers AuthorRule (AmendDraftRule and
+  # AdoptAdvisoryRule are deferred for the demo).
+  - code: RULE_AUTHORED
+    severity: INFO
+    offline_capturable: false
+    description_en: Discount rule authored as a draft
+
+  - code: RULE_ACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Discount rule activated
+
+  - code: RULE_WITHDRAWN
+    severity: INFO
+    offline_capturable: false
+    description_en: Discount rule withdrawn

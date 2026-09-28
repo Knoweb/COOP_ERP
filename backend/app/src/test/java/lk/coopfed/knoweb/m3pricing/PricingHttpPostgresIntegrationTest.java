@@ -68,6 +68,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     void clean() {
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table pricing.price_list_line, pricing.price_list cascade");
+        admin.execute("truncate table pricing.discount_rule");
         admin.update("delete from party.entity_relationship where relationship_id = ?", RELATIONSHIP);
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
@@ -170,6 +171,70 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                                 null)
                         .getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void theRuleOperationsFollowTheSlice() {
+        ResponseEntity<JsonNode> authored = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules",
+                DISTRIBUTOR,
+                Map.of(
+                        "name", "Rice week",
+                        "kind", "TIME_LIMITED_PRICE",
+                        "predicate", Map.of("skuId", rice),
+                        "benefit", Map.of("kind", "PERCENT_OFF", "value", 10),
+                        "validFrom", today.toString()));
+        assertThat(authored.getStatusCode())
+                .as(String.valueOf(authored.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        String ruleId = authored.getBody().get("ruleId").asText();
+        assertThat(authored.getHeaders().getLocation()).hasToString("/v1/pricing/rules/" + ruleId);
+        assertThat(authored.getBody().get("status").asText()).isEqualTo("DRAFT");
+        assertThat(authored.getBody().get("priority").asInt()).isEqualTo(100);
+        assertThat(authored.getBody().get("predicate").get("skuId").asText()).isEqualTo(rice.toString());
+
+        ResponseEntity<JsonNode> activated =
+                send(HttpMethod.POST, "/v1/pricing/rules/" + ruleId + "/activate", DISTRIBUTOR, null);
+        assertThat(activated.getStatusCode())
+                .as(String.valueOf(activated.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(activated.getBody().get("status").asText()).isEqualTo("ACTIVE");
+
+        ResponseEntity<JsonNode> list = send(HttpMethod.GET, "/v1/pricing/rules?status=ACTIVE", DISTRIBUTOR, null);
+        assertThat(list.getBody()).hasSize(1);
+        assertThat(send(HttpMethod.GET, "/v1/pricing/rules/" + ruleId, FEDERATION, null)
+                        .getStatusCode())
+                .as("another entity's rule")
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        ResponseEntity<JsonNode> withdrawn = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules/" + ruleId + "/withdraw",
+                DISTRIBUTOR,
+                Map.of("reason", "Ended early"));
+        assertThat(withdrawn.getBody().get("status").asText()).isEqualTo("WITHDRAWN");
+
+        ResponseEntity<JsonNode> again = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules/" + ruleId + "/withdraw",
+                DISTRIBUTOR,
+                Map.of("reason", "Ended early"));
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(again.getBody().get("code").asText()).isEqualTo("m3.rule.not_active");
+
+        ResponseEntity<JsonNode> freeItem = send(
+                HttpMethod.POST,
+                "/v1/pricing/rules",
+                DISTRIBUTOR,
+                Map.of(
+                        "name", "Free",
+                        "kind", "FREE_ITEM",
+                        "predicate", Map.of("skuId", rice),
+                        "benefit", Map.of("kind", "FREE_QTY", "value", 1),
+                        "validFrom", today.toString()));
+        assertThat(freeItem.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(freeItem.getBody().get("code").asText()).isEqualTo("m3.rule.kind_not_available");
     }
 
     @Test

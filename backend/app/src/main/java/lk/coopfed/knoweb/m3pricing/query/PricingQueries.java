@@ -48,4 +48,10 @@ public interface PricingQueries {
             BigDecimal quantity,
             LocalDate date,
             ScopeContext scope);
+
+    /** GetRule: one discount rule; empty when it does not exist or the caller may not see it. */
+    Optional<RuleView> getRule(UUID ruleId, ScopeContext scope);
+
+    /** ListRules: the rules visible to the caller, newest validity first; filters when not null. */
+    List<RuleView> listRules(String status, String kind, ScopeContext scope);
 }
