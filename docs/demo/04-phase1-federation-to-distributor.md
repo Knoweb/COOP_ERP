@@ -1,0 +1,33 @@
+# Phase 1: the Federation sells to a distributor
+
+**Story.** As a distributor's buyer, I want to order from the Federation and receive exactly what I confirm on the delivery, so that stock and money only move once goods have actually changed hands, in the exact quantity that arrived.
+
+This is the full order-to-invoice chain: six sign-ins, nine screens. It was walked live on 28 September 2026 and is the spine of the whole demo — do not rush it. The full click path is proved end to end by `web/e2e/trading.spec.ts` (run automatically by the pipeline's stack smoke).
+
+**Who signs in, in order.** `d101-buyer` (Sinhala) → `fed-sales` (English) → `fed-stores` (Sinhala, Federation central warehouse only) → `d101-stores` (Sinhala, Kurunegala warehouse only) → `fed-accounts` (English) → `d101-accounts` (Sinhala, read-only for this step).
+
+## Steps
+
+1. **Order.** `d101-buyer`: **Trading**, **New order**. *Order from*: the Federation. *Deliver to*: Kurunegala warehouse (W01). **Find an item by code or name**, find "Samba rice 5 kg", **Add**, quantity 120; find "Red dhal 1 kg", **Add**, quantity 40. Point out each line already shows the Federation's tier price for that quantity (the rice priced at the "from 100" tier from the pricing demo). Click **Submit order** — it takes D101's own number (`D101-ORD-…`) and shows state "Submitted". Point out: the buyer never sees the Federation's stock on hand — availability is the seller's business, not the buyer's.
+2. **Accept.** `fed-sales`: **Trading**, **Order desk: orders received**, open the D101 order. Point out the **Available** column — the Federation's own stock of each item, shown only now, to the seller. Choose a **Delivery date**, click **Accept**. State becomes "Accepted" with the **Allocated** quantity and tier price per line. (**Reject** asks for a **Reason for rejection** — worth showing once, on a throwaway order, if time allows.)
+3. **Delivery note.** `fed-sales`, on the accepted order: **Prepare the delivery note**. *From warehouse*: Federation central warehouse (FW01). Point out each line starts at the open quantity and the first batch in FEFO **Pick order** (DEMO-2026-*n*); the drop goes to the delivery location the buyer named. Click **Save the delivery note**, then **Issue**. Point out: "Issued: the goods are reserved at the warehouse until they leave" — the note takes the Federation's own number.
+4. **Dispatch.** `fed-stores` (Sinhala, scoped to FW01 only): **Trading**, **Delivery notes sent**, open the note. Type the **Vehicle** and the **Driver**, click **Dispatch**. State becomes "In transit".
+5. **GRN.** `d101-stores` (Sinhala, scoped to W01 only): **Trading**, **Deliveries on their way to us**, open the note, **Receive the goods**. The count starts at what was **Sent**, with the batch, expiry and printed MRP carried from the Federation's own batch. Type **38** for the dhal (instead of the 40 sent) — the line is marked **Short**. Click **Save the count**, then **Confirm receipt**. Point out the confirmation text: "Confirming takes the goods into your stock: from here they are yours" — this is the moment ownership passes (`AGENTS.md`, idea 2). The short line shows "Raised with the seller" — a discrepancy, not a silent adjustment. The card lists the stock received. Click **See the stock position** — Kurunegala warehouse now shows the new lots.
+6. **Invoice.** `fed-accounts`: **Trading**, **Goods received by our buyers**, open the GRN, **Issue the invoice** — a tax invoice at the *received* quantities (38, not 40) and the tier prices, linked to both the GRN and the delivery note. Click **Print** — the A4 PDF opens once the worker has rendered it (a moment after issuing; if it is not ready yet, "Printing … this takes a few seconds" shows, then "The PDF is ready: open it"). Sign out, sign in as `d101-accounts` (Sinhala): **Trading**, **Invoices received**, open the same invoice and read it — this is the "buyer's printed invoice" gap noted below.
+
+## What to point out
+
+- **Ownership passes at the GRN, not at dispatch or at invoice**: the invoice at step 6 bills for 38 units, not the 40 that were sent — because the GRN, not the delivery note, is the one document that fixes what actually changed hands.
+- **Nobody edits another's record**: the buyer's order, the seller's delivery note, the receiver's GRN and the seller's invoice are four separate documents, each written once by the party whose job it is, never edited by the other side. A short delivery is a *discrepancy raised*, not the buyer silently changing the seller's note.
+- **A shop is a location**: FW01 and W01 are both just locations, scoped by row-level security — `fed-stores` cannot see or dispatch from any warehouse but FW01, and `d101-stores` cannot see any warehouse but W01, even though both are on the same screen.
+- **Everything audited**: every one of the six actions above is one command handler — guard, mutation, audit record, event — and each document carries its own sequential number.
+- **Three languages, one system**: the same order desk, delivery note and GRN screens ran in English for the Federation's users and Sinhala for the distributor's, with no separate build.
+
+## What can go wrong
+
+- **The order screen shows no seller to choose from**: the trading relationship between D101 and the Federation is not ACTIVE — check phase 2's pricing/relationship step was loaded by `make demo-data`, or re-run it.
+- **The delivery note has no items to add**: the order was not yet Accepted, or was Accepted with a zero allocation because the Federation's own stock did not cover it — check the **Available** column at the Accept step.
+- **The GRN's batch fields do not fill in**: this was a known race (fixed 28 Sep, `docs/progress/done/2026-09-28-test-trading-e2e-reliable.md`) where the count could be overwritten by the seller's batch data arriving late; if it still happens, wait a moment for the batch column to populate before typing the counted quantity.
+- **"Confirm receipt" is greyed out**: every line needs a typed quantity first, even zero — fill in every line's count, including lines you are not changing from what was sent.
+- **Print never becomes ready**: the PDF renders in a background worker a few seconds after **Issue the invoice** — wait and refresh; if it still fails, the failure message names a code, worth reading out rather than skipping past.
+- **`d101-accounts` cannot print**: this is by design for now, not a bug — the A4 PDF is stored under the seller, so only the seller's own accounts user can print it; the buyer reads the invoice on screen only (see `docs/DEMO.md`, "Still to come").
