@@ -53,3 +53,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 ### 28A (M8 Reporting Implementation Guide)
 
 - `CR-28A-1` — cost of goods sold comes from M5's `stock.moved.v1` event, not from the receipt bundle.
+
+### 30 (Frontend Foundations and UI Module Designs)
+
+- `CR-30-1` — the till is one Kotlin Multiplatform application for Android, Windows and Linux (DR-1 revised), with automatic updates from central on every OS; also touches 26/26A and 17A.
