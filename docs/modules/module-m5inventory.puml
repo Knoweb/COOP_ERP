@@ -9,6 +9,7 @@ top to bottom direction
 !include <C4/C4_Component>
 
 Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApplication", $tags="") {
+  Component(CoopErpApplication.CoopErpApplication.M3PricingRules, "M3 Pricing & Rules", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, "M5 Inventory, Costing, Repack & Loss", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.PlatformKernel, "Platform Kernel", $techn="Module", $descr="", $tags="", $link="")
   Component(CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "M1 Party, Tenancy & Security", $techn="Module", $descr="", $tags="", $link="")
@@ -17,8 +18,12 @@ Container_Boundary("CoopErpApplication.CoopErpApplication_boundary", "CoopErpApp
 
 Rel(CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M2CatalogueBatch, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M3PricingRules, CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M3PricingRules, CoopErpApplication.CoopErpApplication.M2CatalogueBatch, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M3PricingRules, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M1PartyTenancySecurity, "uses", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M2CatalogueBatch, "uses", $techn="", $tags="", $link="")
+Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.M3PricingRules, "depends on", $techn="", $tags="", $link="")
 Rel(CoopErpApplication.CoopErpApplication.M5InventoryCostingRepackLoss, CoopErpApplication.CoopErpApplication.PlatformKernel, "uses", $techn="", $tags="", $link="")
 
 SHOW_LEGEND(true)

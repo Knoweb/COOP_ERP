@@ -35,3 +35,19 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Discount rule withdrawn
+
+  # M3-06 and M3-07 (23A section 7): control prices and the multi-MRP policy.
+  - code: CONTROL_PRICE_ENTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Gazetted control price entered
+
+  - code: CONTROL_PRICE_RESCINDED
+    severity: INFO
+    offline_capturable: false
+    description_en: Gazetted control price rescinded
+
+  - code: MRP_POLICY_SET
+    severity: INFO
+    offline_capturable: false
+    description_en: Multi-MRP policy of an item set

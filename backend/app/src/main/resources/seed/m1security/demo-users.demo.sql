@@ -63,9 +63,11 @@ WITH job (role_id, codes) AS (
             'cat.sku.view', 'cat.sku.create', 'cat.sku.create_local', 'cat.sku.promote', 'cat.sku.deactivate',
             'cat.barcode.manage', 'cat.image.manage', 'cat.tag.manage', 'cat.batch.correct', 'cat.supplier.manage',
             'prc.pricelist.view', 'inv.stock.view', 'prt.location.view', 'gov.entity.view']),
-        -- Federation pricing: the trade price list and the relationships that trade on it
+        -- Federation pricing: the trade price list and the relationships that trade on it; the
+        -- gazetted control prices and the Federation's MRP policy (M3-06, M3-07)
         ('0190f0de-0000-7000-8000-000000000302'::uuid, ARRAY[
             'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish',
+            'prc.controlprice.enter', 'prc.mrp_policy.set',
             'prt.relationship.view', 'prt.relationship.open', 'prt.relationship.activate', 'prt.relationship.amend',
             'cat.sku.view', 'gov.entity.view']),
         -- stores and dispatch, at the Federation warehouse only (assignment below)
@@ -121,8 +123,11 @@ WITH job (role_id, codes) AS (
             'bil.invoice.dispute', 'cat.sku.view', 'prc.pricelist.view', 'prt.relationship.view', 'inv.stock.view',
             'prt.location.view', 'inv.opening.prepare', 'inv.opening.sign', 'gov.entity.view']),
         -- society manager: the second signature (countersign), the shops and their tills; receives
-        -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02)
+        -- the Hettipola shop's transfer, which has no staff user of its own (DEMO-02); and the
+        -- society's shelf prices: its RETAIL list, its MRP policy and its discount rules (M3-06)
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
+            'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish', 'prc.mrp_policy.set',
+            'prc.rule.author', 'prc.rule.activate',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
@@ -148,7 +153,8 @@ WITH job (role_id, codes) AS (
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',
-            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view', 'gov.entity.view'])
+            'inv.stock.view', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view', 'gov.entity.view',
+            'prc.pricelist.view'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code
