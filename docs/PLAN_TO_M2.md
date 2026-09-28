@@ -329,6 +329,7 @@ Added 27 September 2026. The architect's priority is a working demo for cooperat
 | M4-11 | M1's counterparty read of receiving locations (CR-24A-2 option 1); the buyer's masked view of the seller's availability | Before a note serves several buyers, or a buyer changes its delivery place after ordering | The order carries the delivery location meanwhile |
 | M4-11 | The buyer's printed invoice; an invoice of several GRNs from the screen; M4's own invoice template with item names | Before buyers print invoices; with invoice consolidation | The seller prints; the kernel's `document-a4` is used |
 | M4-08 | Invoice disputes; credit and debit notes; consolidation; buyer-side postings; e-invoice; PARTY masking views | Before invoices are corrected, consolidated or submitted | M4-06, M4-07 wholly deferred |
+| DEMO-02 | History spread over past weeks; M101's transfer to its second shop; a till-sales history at the shops through the `make demo-till-sale` path | Before the demo shows trends over time or a shop's receipts history | The trading history is loaded, dated the day of the load (no supported back-dating) |
 | M4-08 | The buyer's VAT number on the invoice | When M1's party projection carries the VAT number (architect) | Recorded empty when not visible |
 
 ## Phase 7 — decisions only the architect can take

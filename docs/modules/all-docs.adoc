@@ -41,11 +41,11 @@ include::module-m5inventory.adoc[]
 plantuml::module-m8reporting.puml[,,format=svg]
 include::module-m8reporting.adoc[]
 
-== Demo data
-plantuml::module-demo.puml[,,format=svg]
-include::module-demo.adoc[]
-
 == M4 Trading Documents
 plantuml::module-m4trading.puml[,,format=svg]
 include::module-m4trading.adoc[]
+
+== Demo data
+plantuml::module-demo.puml[,,format=svg]
+include::module-demo.adoc[]
 

@@ -17,6 +17,8 @@
             "m2catalogue::query",
             "m3pricing::api",
             "m3pricing::query",
+            "m4trading::api",
+            "m4trading::query",
             "m5inventory::api",
             "m5inventory::query"
         })

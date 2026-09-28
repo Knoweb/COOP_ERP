@@ -29,6 +29,22 @@ What is loaded:
 | Phase 3: Kuliyapitiya MPCS's opening stock at its stores (M101 W01), a tenth of a distributor's quantities at the Wayamba price | M5, the same three commands | `m101-buyer` then `m101-manager` |
 | Phase 3: half of every lot at the stores sent to Kuliyapitiya town shop (M101 S01) and received there | M5 `IssueTransfer` (at the stores), `ReceiveTransfer` (at the shop, by the shop's own session) | `m101-manager`, then `m101-shop` |
 
+### The trading history (DEMO-02)
+
+Last, the loader leaves a history of trading so that the Trading, Reports and dashboard screens open with documents in them (`lk.coopfed.knoweb.demo.DemoTradingHistory`). Every document is issued through M4's handlers as the user whose job it is: the buyer orders and submits; the seller's sales user accepts and drafts and issues the delivery note from the seller's stores; the seller's stores user dispatches; the buyer's receiver counts and confirms the GRN (every third order has its last line a tenth short, which raises a discrepancy); the seller's accounts user invoices.
+
+| Relationship | Orders | Buyer / receiver | Seller: sales, stores, accounts |
+|---|---|---|---|
+| Federation to D101 (to Kurunegala W01) | 12 | `d101-buyer` / `d101-stores` | `fed-sales`, `fed-stores`, `fed-accounts` |
+| Federation to D102 (to Jaffna W01) | 8 | `d102-buyer` / `d102-stores` | `fed-sales`, `fed-stores`, `fed-accounts` |
+| D101 to M101 (to Kuliyapitiya stores W01) | 8 | `m101-buyer` | `d101-buyer`, `d101-stores`, `d101-accounts` |
+| D101 to M102 (to Pannala shop) | 8 | `m102-manager` | `d101-buyer`, `d101-stores`, `d101-accounts` |
+| D102 to M103 (to Point Pedro shop) | 8 | `m103-manager` | `d102-buyer`, `d102-stores`, `d102-accounts` |
+
+**Left open for the live walk.** The last four orders of each relationship stop part-way: one **submitted** (to accept at the order desk), one **accepted** (to put on a delivery note), one **in transit** (to receive with a GRN), one **received** (to invoice). The others, 24 in all, are invoiced. Each history order's notes read `Demo history <relationship> week n no. k`; that is how a second run finds them and moves each on from where it stands.
+
+**Dates.** All of the history is dated the day `make demo-data` runs: the handlers take the date from the application's clock and there is no supported way to back-date a document, and dates are not faked in the database.
+
 The catalogue, its prices and the opening quantities are in `backend/app/src/main/resources/demo/catalogue.psv`, one line per SKU; change it there, not in code.
 
 ## Who is who
@@ -90,7 +106,7 @@ A society moves stock from its stores to one of its shops; the shop sells at the
 
 ## Still to come (TODO)
 
-- **M4 demo data.** The loader does not create trading documents; steps 4 to 9 are done live on the screens (M4-11). If the demo should start with documents already in the history (a completed order-to-invoice for D101, an open order for D102), add them to `DemoDataLoader` through M4's handlers, as the users named above.
+- **More history (DEMO-02, deferred).** The history is dated today, not spread over weeks; M101's transfer to Hettipola shop and a history of till sales at the shops are not loaded yet (`make demo-till-sale` makes one sale per run).
 - **The buyer's printed invoice.** The A4 PDF is stored under the seller, so only the seller's accounts can print it; the buyer reads the invoice on the screen.
 - The demo users sign in with a password only; a step that asks for a second factor (publishing a price list, signing a balance) is accepted in the development realm because a fresh password sign-in counts (`COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS`).
 - The till is not part of phase 1: the shops have positions and a primary till. Phase 3's demo till is enrolled by `make demo-till-sale`, not by `make demo-data`; the Android till itself is the till track's.

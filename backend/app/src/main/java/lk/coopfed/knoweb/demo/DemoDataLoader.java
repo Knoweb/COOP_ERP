@@ -74,8 +74,8 @@ import org.springframework.stereotype.Service;
  * zero). The parties and users it acts as are rows of the demo seed (seed/m1party/demo-parties.demo.sql,
  * seed/m1security/demo-users.demo.sql), which must be loaded first.
  *
- * <p>M4 (orders, delivery notes, GRN, invoices) is not loaded: the storyline starts those on the
- * screens, and the demo documents of M4 come when M4 is on main (docs/DEMO.md, "Still to come").
+ * <p>M4's trading history (orders, delivery notes, GRNs, invoices at both tiers) is loaded last,
+ * by {@link DemoTradingHistory} (DEMO-02).
  */
 @Service
 public class DemoDataLoader {
@@ -118,6 +118,7 @@ public class DemoDataLoader {
     private final CatalogueQueries catalogue;
     private final PricingQueries pricing;
     private final InventoryQueries inventory;
+    private final DemoTradingHistory history;
     private final Clock clock;
     private final ZoneId businessZone;
 
@@ -146,6 +147,7 @@ public class DemoDataLoader {
             CatalogueQueries catalogue,
             PricingQueries pricing,
             InventoryQueries inventory,
+            DemoTradingHistory history,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
         this.registerTillPosition = registerTillPosition;
@@ -169,6 +171,7 @@ public class DemoDataLoader {
         this.catalogue = catalogue;
         this.pricing = pricing;
         this.inventory = inventory;
+        this.history = history;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
     }
@@ -199,6 +202,8 @@ public class DemoDataLoader {
         // town shop, whose till sells it (make demo-till-sale).
         societyStock(items, skus);
         shopStockByTransfer();
+        // DEMO-02: the trading history, orders to invoices at both tiers (DemoTradingHistory).
+        history.load(items, skus, this::count);
 
         Report report = new Report(Map.copyOf(counts));
         log.info("Demo data: {} commands issued {}", report.total(), report.commands());

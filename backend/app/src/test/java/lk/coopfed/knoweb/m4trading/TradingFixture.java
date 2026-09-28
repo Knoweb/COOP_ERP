@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m4trading;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -92,6 +93,52 @@ public final class TradingFixture {
         priceList(admin);
         stock(admin, RICE, STOCK);
         stock(admin, DHAL, STOCK);
+    }
+
+    /**
+     * Every trading document of whatever owner, with its kernel rows (the demo's trading history,
+     * DemoDataLoaderIntegrationTest): what a later class that clears {@code kernel.document} needs gone.
+     */
+    public static void cleanAllTrading(JdbcTemplate admin) {
+        List<UUID> ids = admin.queryForList(
+                """
+                select document_id from trading.doc_order
+                union select document_id from trading.doc_delivery
+                union select document_id from trading.doc_grn
+                union select document_id from trading.doc_invoice
+                union select document_id from trading.doc_discrepancy
+                """,
+                UUID.class);
+        for (String table : new String[] {
+            "doc_invoice",
+            "doc_discrepancy_line",
+            "doc_discrepancy",
+            "doc_grn_line",
+            "doc_grn",
+            "doc_delivery_line",
+            "doc_delivery_drop",
+            "doc_delivery",
+            "order_allocation_line",
+            "order_allocation",
+            "allocation_run",
+            "doc_order_line",
+            "doc_order"
+        }) {
+            admin.execute("delete from trading." + table);
+        }
+        if (ids.isEmpty()) {
+            return;
+        }
+        // Ids only, read from the database above: safe to spell into the statement.
+        String in = ids.stream().map(id -> "'" + id + "'").collect(java.util.stream.Collectors.joining(",", "(", ")"));
+        admin.execute(
+                "delete from kernel.document_link where from_document_id in " + in + " or to_document_id in " + in);
+        admin.execute("delete from kernel.document_attachment where document_id in " + in);
+        admin.execute("delete from kernel.document_state_history where document_id in " + in);
+        // One statement for the lines: they refer to each other (GRN line to delivery line), and a
+        // NO ACTION reference is checked at the end of the statement.
+        admin.execute("delete from kernel.document_line where document_id in " + in);
+        admin.execute("delete from kernel.document where document_id in " + in);
     }
 
     public static void clean(JdbcTemplate admin) {
