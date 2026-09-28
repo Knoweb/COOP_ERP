@@ -76,12 +76,12 @@ public class SetLinesHandler implements Handles<SetLines, SetLinesResult> {
         if (!PriceListStore.DRAFT.equals(list.status())) {
             throw new ProblemException("m3.price_list.not_draft");
         }
-        List<Outcome> outcomes = validator.check(command.lines(), scope);
+        LocalDate today = PriceListRules.today(clock, businessZone);
+        List<Outcome> outcomes = validator.check(list.kind(), command.lines(), today, scope);
         if (outcomes.stream().anyMatch(outcome -> !outcome.ok())) {
             return new SetLinesResult(false, outcomes);
         }
 
-        LocalDate today = PriceListRules.today(clock, businessZone);
         int before = jdbc.update("delete from pricing.price_list_line where price_list_id = ?", list.priceListId());
         for (SetLines.Line line : command.lines()) {
             jdbc.update(

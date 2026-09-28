@@ -9,6 +9,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import { chipOf, errorText } from "./priceListState";
+import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
 /**
@@ -59,6 +60,8 @@ export function PricingPage() {
           <h1>{t("pricing.title").text}</h1>
         </div>
       </div>
+
+      <PricingTabs />
 
       {canAuthor && (
         <form onSubmit={submit} className="pricing-filter-bar">
