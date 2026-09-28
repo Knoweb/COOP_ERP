@@ -10,6 +10,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Location, type Transfer } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import "./inventory.css";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, transferLinesOf } from "./stockView";
 
@@ -83,14 +84,17 @@ export function TransfersPage() {
 
   return (
     <main className="shell-page">
-      <Link to="/inventory">{t("inventory.back").text}</Link>
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <h1>{t("inventory.transfer.title").text}</h1>
       <LocationPicker value={locationId} onChange={setLocationId} />
 
       <h2>{t("inventory.transfer.list").text}</h2>
       {transfers.data?.length === 0 && <p>{t("inventory.transfer.none").text}</p>}
       {(transfers.data ?? []).map((transfer: Transfer) => (
-        <section key={transfer.transferId} style={{ marginBottom: "var(--space-3)" }}>
+        <section key={transfer.transferId} className="inventory-section">
           <p>
             {`${nameOf(transfer.fromLocationId)} → ${nameOf(transfer.toLocationId)} `}
             <StateChip
@@ -128,7 +132,7 @@ export function TransfersPage() {
       {canIssue && !locations.isError && (
         <section>
           <h2>{t("inventory.transfer.send").text}</h2>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+          <label className="inventory-form-field">
             {t("inventory.transfer.destination").text}
             <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)}>
               <option value="" />

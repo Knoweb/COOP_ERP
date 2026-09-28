@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { Link } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import "./m1party.css";
 import { useT } from "../../shell/i18n/useT";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { ApiProblem } from "../../shell/api/client";
@@ -54,34 +55,43 @@ export function SocietyRegisterPage() {
 
   return (
     <main className="shell-page">
-      <h1>{t("party.register.title").text}</h1>
+      <div className="page-heading">
+        <div className="page-heading__icon">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <div className="page-heading__copy">
+          <h1>{t("party.register.title").text}</h1>
+        </div>
+        {canRegister && (
+          <div className="page-heading__actions" aria-label={t("party.register.actions").text}>
+            <Link className="modern-btn" to="/party/societies/new">{t("party.register.new").text}</Link>
+            <Link className="modern-btn" to="/party/societies/bulk">{t("party.register.bulk").text}</Link>
+          </div>
+        )}
+      </div>
 
-      {canRegister && (
-        <nav aria-label={t("party.register.actions").text} style={{ display: "flex", gap: "var(--target-gap)", marginBottom: "var(--space-3)" }}>
-          <Link to="/party/societies/new">{t("party.register.new").text}</Link>
-          <Link to="/party/societies/bulk">{t("party.register.bulk").text}</Link>
-        </nav>
-      )}
-
-      <form role="search" onSubmit={(event) => event.preventDefault()} style={{ display: "grid", gap: "var(--target-gap)", marginBottom: "var(--space-3)" }}>
-        <label style={field}>
-          {t("party.filter.search").text}
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} />
+      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel">
+        <label className="modern-field">
+          <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
         </label>
-        <label style={field}>
-          {t("party.filter.status").text}
-          <select value={status} onChange={(event) => setStatus(event.target.value as SocietyStatus | "")}>
-            <option value="">{t("party.filter.status.any").text}</option>
-            {STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {t(statusMessageId(value)).text}
-              </option>
-            ))}
-          </select>
+        <label className="modern-field">
+          <span className="modern-field__label party-filter-label">{t("party.filter.status").text}</span>
+          <div className="modern-select">
+            <select value={status} onChange={(event) => setStatus(event.target.value as SocietyStatus | "")}>
+              <option value="">{t("party.filter.status.any").text}</option>
+              {STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {t(statusMessageId(value)).text}
+                </option>
+              ))}
+            </select>
+            <svg className="modern-select__arrow" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" /></svg>
+          </div>
         </label>
-        <label style={field}>
-          {t("party.filter.district").text}
-          <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} />
+        <label className="modern-field">
+          <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
+          <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
         </label>
       </form>
 
@@ -90,46 +100,46 @@ export function SocietyRegisterPage() {
       {empty && <p>{t("party.list.empty").text}</p>}
 
       {shown.length > 0 && (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th scope="col" style={cell}>{t("party.col.code").text}</th>
-              <th scope="col" style={cell}>{t("party.col.name").text}</th>
-              <th scope="col" style={cell}>{t("party.col.district").text}</th>
-              <th scope="col" style={cell}>{t("party.col.status").text}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((society) => (
-              <tr key={society.entityId}>
-                <td style={cell}>
-                  <Link to={`/party/societies/${society.entityId}`}>{society.entityCode}</Link>
-                </td>
-                <td style={cell}>
-                  <SocietyName society={society} locale={locale} />
-                </td>
-                <td style={cell}>{society.district ?? ""}</td>
-                <td style={cell}>
-                  {society.status && <StateChip state={STATUS_LOOK[society.status]} label={t(statusMessageId(society.status)).text} />}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="modern-table-card">
+          <div className="modern-table-scroll">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t("party.col.code").text}</th>
+                  <th scope="col">{t("party.col.name").text}</th>
+                  <th scope="col">{t("party.col.district").text}</th>
+                  <th scope="col">{t("party.col.status").text}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((society) => (
+                  <tr key={society.entityId}>
+                    <td>
+                      <Link to={`/party/societies/${society.entityId}`}>{society.entityCode}</Link>
+                    </td>
+                    <td>
+                      <SocietyName society={society} locale={locale} />
+                    </td>
+                    <td>{society.district ?? ""}</td>
+                    <td>
+                      {society.status && <StateChip state={STATUS_LOOK[society.status]} label={t(statusMessageId(society.status)).text} />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {societies.hasNextPage && (
-        <button type="button" onClick={() => societies.fetchNextPage()} disabled={societies.isFetchingNextPage} style={{ marginTop: "var(--space-2)" }}>
+        <button type="button" className="modern-btn party-load-more" onClick={() => societies.fetchNextPage()} disabled={societies.isFetchingNextPage}>
           {t("party.list.more").text}
         </button>
       )}
     </main>
   );
 }
-
-const field = { display: "grid", gap: "var(--space-half)" };
-const cell = { textAlign: "left" as const, padding: "var(--space-1)", borderBottom: "var(--border-width) solid var(--color-border)" };
-
 /** The legal name in the user's language, or in English with the EN tag when not translated. */
 export function SocietyName({ society, locale }: { society: Society; locale: string }) {
   const translated = legalNameIn(society, locale);

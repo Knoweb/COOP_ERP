@@ -8,6 +8,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
+import "./catalogue.css";
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
 import { chipOf, EMPTY_FORM, errorText, formOf, languageOf, nameIn, requestOf, type SkuForm } from "./skuView";
@@ -75,7 +76,10 @@ export function SkuPage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(sku.error, t("catalogue.error.not_found").text)}</p>
-        <Link to="/catalogue">{t("catalogue.back").text}</Link>
+        <Link className="back-link" to="/catalogue">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("catalogue.back").text}
+      </Link>
       </main>
     );
   }
@@ -89,14 +93,17 @@ export function SkuPage() {
 
   return (
     <main className="shell-page">
-      <Link to="/catalogue">{t("catalogue.back").text}</Link>
+      <Link className="back-link" to="/catalogue">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("catalogue.back").text}
+      </Link>
       <h1>{nameIn(item, language)}</h1>
-      <p style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+      <p className="catalogue-header-row">
         <span>{item.skuCode}</span>
         <StateChip state={chipOf(item.status)} label={t(`catalogue.status.${item.status}`).text} />
       </p>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: "var(--space-2)" }}>
+      <form onSubmit={submit} className="catalogue-form-row">
         <SkuFields form={form} disabled={!editable} onChange={(change) => setForm((current) => ({ ...current, ...change }))} />
         {editable && (
           <div>
@@ -110,7 +117,7 @@ export function SkuPage() {
       </form>
 
       {item.status === "DRAFT" && (canEditLocal || canShare) && (
-        <section style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+        <section className="catalogue-action-bar">
           {canEditLocal && (
             <button type="button" disabled={activate.isPending} onClick={() => activate.mutate("LOCAL")}>
               {t("catalogue.activate.local").text}
@@ -159,7 +166,7 @@ function Conversions({ skuId, canEdit, baseUom }: { skuId: string; canEdit: bool
   };
 
   return (
-    <section style={{ marginTop: "var(--space-4)" }}>
+    <section className="catalogue-section">
       <h2>{t("catalogue.conversions.title").text}</h2>
       {conversions.data?.length === 0 && <p>{t("catalogue.conversions.empty").text}</p>}
       {conversions.data && conversions.data.length > 0 && (
@@ -185,8 +192,8 @@ function Conversions({ skuId, canEdit, baseUom }: { skuId: string; canEdit: bool
         </table>
       )}
       {canEdit && (
-        <form onSubmit={submit} style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", flexWrap: "wrap" }}>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+        <form onSubmit={submit} className="catalogue-filter-bar">
+          <label className="catalogue-form-field">
             {t("catalogue.field.unit").text}
             <select required value={uomCode} onChange={(event) => setUomCode(event.target.value)}>
               <option value="">{t("catalogue.field.choose").text}</option>
@@ -199,11 +206,11 @@ function Conversions({ skuId, canEdit, baseUom }: { skuId: string; canEdit: bool
                 ))}
             </select>
           </label>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+          <label className="catalogue-form-field">
             {t("catalogue.field.factor").text}
             <input type="number" min="0" step="any" required value={factor} onChange={(event) => setFactor(event.target.value)} />
           </label>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+          <label className="catalogue-form-field">
             {t("catalogue.field.effective_from").text}
             <input type="date" required value={from} onChange={(event) => setFrom(event.target.value)} />
           </label>
@@ -245,7 +252,7 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
   };
 
   return (
-    <section style={{ marginTop: "var(--space-4)" }}>
+    <section className="catalogue-section">
       <h2>{t("catalogue.barcodes.title").text}</h2>
       {barcodes.data?.length === 0 && <p>{t("catalogue.barcodes.empty").text}</p>}
       {barcodes.data && barcodes.data.length > 0 && (
@@ -271,12 +278,12 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
         </table>
       )}
       {canEdit && (
-        <form onSubmit={submit} style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", flexWrap: "wrap" }}>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+        <form onSubmit={submit} className="catalogue-filter-bar">
+          <label className="catalogue-form-field">
             {t("catalogue.field.barcode").text}
             <input type="text" required maxLength={48} value={barcode} onChange={(event) => setBarcode(event.target.value)} />
           </label>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+          <label className="catalogue-form-field">
             {t("catalogue.field.symbology").text}
             <select value={symbology} onChange={(event) => setSymbology(event.target.value as Symbology)}>
               {SYMBOLOGIES.map((value) => (
@@ -286,7 +293,7 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
               ))}
             </select>
           </label>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+          <label className="catalogue-form-field">
             {t("catalogue.field.barcode_unit").text}
             <select value={uomCode} onChange={(event) => setUomCode(event.target.value)}>
               {units.map((unit) => (
@@ -312,7 +319,7 @@ function Batches({ skuId }: { skuId: string }) {
   const batches = useQuery({ queryKey: ["catalogue", "batches", skuId], queryFn: () => api.batches(skuId) });
 
   return (
-    <section style={{ marginTop: "var(--space-4)" }}>
+    <section className="catalogue-section">
       <h2>{t("catalogue.batches.title").text}</h2>
       {batches.data?.length === 0 && <p>{t("catalogue.batches.empty").text}</p>}
       {batches.data && batches.data.length > 0 && (

@@ -94,7 +94,10 @@ export function OrderPage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(order.error, t("trading.error.not_found").text)}</p>
-        <Link to="/trading">{t("trading.back").text}</Link>
+        <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       </main>
     );
   }
@@ -106,7 +109,10 @@ export function OrderPage() {
 
   return (
     <main className="shell-page">
-      <Link to="/trading">{t("trading.back").text}</Link>
+      <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       <DocumentHeader
         code={o.docNumber ?? t("trading.order.draft_number").text}
         title={t("trading.order.title").text}
@@ -158,7 +164,7 @@ export function OrderPage() {
         </tbody>
       </table>
 
-      <section style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "end", marginTop: "var(--space-3)" }}>
+      <section className="trading-filter-bar">
         {isBuyer && canSubmit && o.status === "DRAFT" && (
           <button type="button" disabled={submit.isPending} onClick={() => submit.mutate()}>
             {t("trading.order.submit").text}
@@ -171,7 +177,7 @@ export function OrderPage() {
         )}
         {deciding && (
           <>
-            <label style={{ display: "grid", gap: "var(--space-half)" }}>
+            <label className="trading-form-field">
               {t("trading.field.committed_eta").text}
               <input type="date" min={businessToday()} value={eta} onChange={(event) => setEta(event.target.value)} />
             </label>

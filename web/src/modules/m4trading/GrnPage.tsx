@@ -5,6 +5,7 @@ import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
+import "./trading.css";
 import { useScope } from "../../shell/scope/useScope";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
@@ -90,7 +91,10 @@ export function GrnPage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(grn.error, t("trading.error.not_found").text)}</p>
-        <Link to="/trading">{t("trading.back").text}</Link>
+        <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       </main>
     );
   }
@@ -101,7 +105,10 @@ export function GrnPage() {
 
   return (
     <main className="shell-page">
-      <Link to="/trading">{t("trading.back").text}</Link>
+      <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       <DocumentHeader
         code={g.docNumber ?? t("trading.order.draft_number").text}
         title={t("trading.grn.title").text}
@@ -156,7 +163,7 @@ export function GrnPage() {
       </table>
 
       {isReceiver && canConfirm && g.status === "DRAFT" && (
-        <section style={{ marginTop: "var(--space-3)" }}>
+        <section className="trading-section">
           <p>{t("trading.grn.confirm.explain").text}</p>
           <button type="button" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
             {t("trading.grn.confirm").text}
@@ -166,7 +173,7 @@ export function GrnPage() {
       {confirm.isError && <p role="alert">{errorText(confirm.error, t("trading.error.generic").text)}</p>}
 
       {confirmed && !isReceiver && canInvoice && (
-        <section style={{ marginTop: "var(--space-3)" }}>
+        <section className="trading-section">
           <button type="button" disabled={invoice.isPending} onClick={() => invoice.mutate()}>
             {t("trading.invoice.issue").text}
           </button>
@@ -175,7 +182,7 @@ export function GrnPage() {
       )}
 
       {confirmed && isReceiver && canSeeStock && (
-        <section style={{ marginTop: "var(--space-3)" }}>
+        <section className="trading-section">
           <h2>{t("trading.grn.stock_moved").text}</h2>
           {receipt.data && receipt.data.length === 0 && <p>{t("trading.grn.stock_pending").text}</p>}
           {receipt.data && receipt.data.length > 0 && (

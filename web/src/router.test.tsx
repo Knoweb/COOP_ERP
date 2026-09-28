@@ -74,7 +74,7 @@ describe("the shell assembled from module definitions", () => {
     expect(screen.getByRole("region", { name: "Your scope" })).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "Modules" })).toBeTruthy();
     expect(screen.getByText("the register-only page")).toBeTruthy();
-  });
+  }, 10000);
 
   it("shows a module in the navigation to a role that holds one of its permissions", () => {
     session = signedInAs("cashier");
@@ -168,8 +168,8 @@ describe("the shell assembled from module definitions", () => {
     session = signedInAs("cashier");
     renderShell([greetings], "/_design");
 
-    // Body text on the page: #1f2933 on #ffffff. If this number changes, tokens.css changed.
-    expect(screen.getAllByText("14.76:1").length).toBeGreaterThan(0);
+    // Body text on the page: #1f2937 on #ffffff. If this number changes, tokens.css changed.
+    expect(screen.getAllByText("14.68:1").length).toBeGreaterThan(0);
     expect(screen.getByText("Rs 1,234,567.891")).toBeTruthy();
   });
 

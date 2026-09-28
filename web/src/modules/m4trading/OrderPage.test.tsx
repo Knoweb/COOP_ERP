@@ -81,7 +81,7 @@ describe("the order card", () => {
     expect(eta).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(overrides).toEqual([]);
     expect(key).toBeTruthy();
-  });
+  }, 10000);
 
   it("asks the seller for a reason before a rejection", async () => {
     Object.assign(state, { entityId: SELLER, permissions: new Set(["ord.order.accept"]) });

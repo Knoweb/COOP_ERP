@@ -6,6 +6,7 @@ import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
 import { inLocale, skuText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
+import "./inventory.css";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useInventoryApi, type Sku } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
@@ -66,9 +67,12 @@ export function NewOpeningBalancePage() {
 
   return (
     <main className="shell-page">
-      <Link to="/inventory">{t("inventory.back").text}</Link>
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <h1>{t("inventory.opening.new.title").text}</h1>
-      <form onSubmit={submit} style={{ display: "grid", gap: "var(--space-2)" }}>
+      <form onSubmit={submit} className="inventory-form-row">
         <LocationPicker value={locationId} onChange={setLocationId} />
         <table>
           <thead>
@@ -138,8 +142,8 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
   };
 
   return (
-    <form onSubmit={search} style={{ display: "grid", gap: "var(--space-1)", marginTop: "var(--space-3)" }}>
-      <label style={{ display: "grid", gap: "var(--space-half)" }}>
+    <form onSubmit={search} className="inventory-search-form">
+      <label className="inventory-form-field">
         {t("inventory.field.find_item").text}
         <input type="search" value={q} onChange={(event) => setQ(event.target.value)} />
       </label>
@@ -150,7 +154,7 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
       </div>
       {found?.length === 0 && <p>{t("inventory.find.none").text}</p>}
       {found && found.length > 0 && (
-        <ul style={{ listStyle: "none", padding: 0 }}>
+        <ul className="inventory-list">
           {found.map((sku) => (
             <li key={sku.skuId}>
               <button type="button" onClick={() => onPick(sku)}>

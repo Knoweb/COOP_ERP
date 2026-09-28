@@ -86,7 +86,10 @@ export function NewDeliveryNotePage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(order.error, t("trading.error.not_found").text)}</p>
-        <Link to="/trading">{t("trading.back").text}</Link>
+        <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       </main>
     );
   }
@@ -113,8 +116,8 @@ export function NewDeliveryNotePage() {
       </dl>
       {!o.deliverToLocationId && <p role="alert">{t("trading.note.no_deliver_to").text}</p>}
 
-      <form onSubmit={send} style={{ display: "grid", gap: "var(--space-2)" }}>
-        <label style={{ display: "grid", gap: "var(--space-half)" }}>
+      <form onSubmit={send} className="trading-form-row">
+        <label className="trading-form-field">
           {t("trading.field.from_location").text}
           <select value={fromLocationId} onChange={(event) => setFromLocationId(event.target.value)} required>
             <option value="">{t("trading.field.choose").text}</option>
@@ -125,11 +128,11 @@ export function NewDeliveryNotePage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "grid", gap: "var(--space-half)" }}>
+        <label className="trading-form-field">
           {t("trading.field.vehicle").text}
           <input value={vehicleRef} maxLength={40} onChange={(event) => setVehicleRef(event.target.value)} />
         </label>
-        <label style={{ display: "grid", gap: "var(--space-half)" }}>
+        <label className="trading-form-field">
           {t("trading.field.driver").text}
           <input value={driverName} maxLength={120} onChange={(event) => setDriverName(event.target.value)} />
         </label>

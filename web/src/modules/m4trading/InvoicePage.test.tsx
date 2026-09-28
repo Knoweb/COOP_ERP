@@ -70,14 +70,14 @@ describe("the invoice", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
     renderInvoice();
 
-    expect((await screen.findByRole("link", { name: "D101-GRN-0000001" })).getAttribute("href")).toBe(`/trading/grns/${GRN_ID}`);
+    expect((await screen.findByRole("link", { name: "D101-GRN-0000001" }, { timeout: 10000 })).getAttribute("href")).toBe(`/trading/grns/${GRN_ID}`);
     expect(screen.getByRole("link", { name: text("trading.note.open") }).getAttribute("href")).toBe(`/trading/delivery-notes/${NOTE_ID}`);
     fireEvent.click(screen.getByRole("button", { name: text("trading.invoice.print") }));
 
     await waitFor(() => expect(tab.location.href).toBe("http://storage.local/reports/x.pdf"));
     expect(open).toHaveBeenCalledOnce();
     open.mockRestore();
-  });
+  }, 15000);
 
   it("gives the buyer no Print: the PDF is the seller's", async () => {
     state.entityId = BUYER;

@@ -55,7 +55,10 @@ export function InvoicePage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(invoice.error, t("trading.error.not_found").text)}</p>
-        <Link to="/trading">{t("trading.back").text}</Link>
+        <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       </main>
     );
   }
@@ -65,7 +68,10 @@ export function InvoicePage() {
 
   return (
     <main className="shell-page">
-      <Link to="/trading">{t("trading.back").text}</Link>
+      <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       <DocumentHeader
         code={inv.docNumber ?? t("trading.order.draft_number").text}
         title={t("trading.invoice.title").text}
@@ -140,7 +146,7 @@ export function InvoicePage() {
         </tbody>
       </table>
 
-      <dl className="document-header__facts" style={{ marginTop: "var(--space-3)" }}>
+      <dl className="document-header__facts trading-section">
         <div className="document-header__fact">
           <dt>{t("trading.invoice.net").text}</dt>
           <dd>

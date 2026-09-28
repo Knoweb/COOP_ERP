@@ -58,7 +58,10 @@ export function OpeningBalancePage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(balance.error, t("inventory.error.not_found").text)}</p>
-        <Link to="/inventory">{t("inventory.back").text}</Link>
+        <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       </main>
     );
   }
@@ -66,7 +69,10 @@ export function OpeningBalancePage() {
   const ob = balance.data;
   return (
     <main className="shell-page">
-      <Link to="/inventory">{t("inventory.back").text}</Link>
+      <Link className="back-link" to="/inventory">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("inventory.back").text}
+      </Link>
       <h1>{t("inventory.opening.title").text}</h1>
       <p>
         <StateChip state={chipOf(ob.status)} label={t(`inventory.opening.status.${ob.status}`).text} />
@@ -95,7 +101,7 @@ export function OpeningBalancePage() {
         </tbody>
       </table>
 
-      <section style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+      <section className="inventory-action-bar">
         {ob.status === "DRAFT" && canSign && (
           <button type="button" disabled={sign.isPending} onClick={() => sign.mutate()}>
             {t("inventory.opening.sign").text}

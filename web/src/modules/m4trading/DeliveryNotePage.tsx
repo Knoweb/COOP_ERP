@@ -66,7 +66,10 @@ export function DeliveryNotePage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(note.error, t("trading.error.not_found").text)}</p>
-        <Link to="/trading">{t("trading.back").text}</Link>
+        <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       </main>
     );
   }
@@ -78,7 +81,10 @@ export function DeliveryNotePage() {
 
   return (
     <main className="shell-page">
-      <Link to="/trading">{t("trading.back").text}</Link>
+      <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       <DocumentHeader
         code={n.docNumber ?? t("trading.order.draft_number").text}
         title={t("trading.note.title").text}
@@ -146,7 +152,7 @@ export function DeliveryNotePage() {
         </section>
       ))}
 
-      <section style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "end", marginTop: "var(--space-3)" }}>
+      <section className="trading-filter-bar">
         {isSeller && canIssue && n.status === "DRAFT" && (
           <button type="button" disabled={issue.isPending} onClick={() => issue.mutate()}>
             {t("trading.note.issue").text}
@@ -154,11 +160,11 @@ export function DeliveryNotePage() {
         )}
         {isSeller && canDispatch && n.status === "ISSUED" && (
           <>
-            <label style={{ display: "grid", gap: "var(--space-half)" }}>
+            <label className="trading-form-field">
               {t("trading.field.vehicle").text}
               <input value={vehicleRef} maxLength={40} onChange={(event) => setVehicleRef(event.target.value)} />
             </label>
-            <label style={{ display: "grid", gap: "var(--space-half)" }}>
+            <label className="trading-form-field">
               {t("trading.field.driver").text}
               <input value={driverName} maxLength={120} onChange={(event) => setDriverName(event.target.value)} />
             </label>
