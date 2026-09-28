@@ -7,6 +7,7 @@
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { CustomerCardPage } from "./CustomerCardPage";
 import { CustomersPage } from "./CustomersPage";
+import { PrivacyRequestsPage } from "./PrivacyRequestsPage";
 import { StatementPage } from "./StatementPage";
 
 export const customersModule: ModuleDefinition = {
@@ -14,6 +15,7 @@ export const customersModule: ModuleDefinition = {
 
   routes: [
     { path: "customers", element: <CustomersPage /> },
+    { path: "customers/privacy", element: <PrivacyRequestsPage /> },
     { path: "customers/:customerId", element: <CustomerCardPage /> },
     { path: "customers/:customerId/accounts/:accountId/statement", element: <StatementPage /> }
   ],
@@ -28,6 +30,11 @@ export const customersModule: ModuleDefinition = {
     "cus.customer.register",
     "cus.customer.manage",
     "cus.account.manage",
-    "cus.payment.record"
+    "cus.account.adjust",
+    "cus.account.adjust_approve",
+    "cus.payment.record",
+    "cus.payment.reverse",
+    "cus.privacy.record",
+    "cus.privacy.fulfil"
   ]
 };

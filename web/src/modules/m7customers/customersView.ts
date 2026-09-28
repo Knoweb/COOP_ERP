@@ -6,6 +6,9 @@ import type { ChipState } from "../../shell/components/StateChip";
 
 const BUSINESS_TIME_ZONE = "Asia/Colombo";
 
+/** The problem code the server answers when an action asks for a fresh second factor. */
+export const MFA_REQUIRED = "mfa.required";
+
 /** The problem code the server answers when a recent holder of the phone must be confirmed as another person. */
 export const PHONE_REUSE_CONFIRM = "m7.customer.phone_reuse_confirm";
 
@@ -29,6 +32,45 @@ export function problemCode(error: unknown): string | undefined {
 /** The look of an account's or a customer's status. */
 export function statusChip(status: string): ChipState {
   return status === "OPEN" || status === "ACTIVE" ? "issued" : status === "SUSPENDED" ? "disputed" : "void";
+}
+
+/** What the office may do with an account in its state (doc 27 section 4.2). */
+export function accountActions(status: string): ("suspend" | "reinstate" | "close")[] {
+  if (status === "OPEN") {
+    return ["suspend", "close"];
+  }
+  if (status === "SUSPENDED") {
+    return ["reinstate", "close"];
+  }
+  return [];
+}
+
+/** A repayment line of the statement that may still be reversed: a PAYMENT not reversed yet. */
+export function isReversible(line: { kind: string; reversed: boolean }): boolean {
+  return line.kind === "PAYMENT" && !line.reversed;
+}
+
+/** The limits form's request: only what changed is sent, and nothing when nothing changed. */
+export function limitsChange(
+  account: { creditLimit: number; hardBlock: boolean; offlineCap?: number | null },
+  form: { creditLimit: string; hardBlock: boolean; offlineCap: string }
+): { creditLimit?: number; hardBlock?: boolean; offlineCap?: number } | null {
+  const change: { creditLimit?: number; hardBlock?: boolean; offlineCap?: number } = {};
+  if (form.creditLimit !== "" && Number(form.creditLimit) !== account.creditLimit) {
+    change.creditLimit = Number(form.creditLimit);
+  }
+  if (form.hardBlock !== account.hardBlock) {
+    change.hardBlock = form.hardBlock;
+  }
+  if (form.offlineCap !== "" && Number(form.offlineCap) !== (account.offlineCap ?? null)) {
+    change.offlineCap = Number(form.offlineCap);
+  }
+  return Object.keys(change).length === 0 ? null : change;
+}
+
+/** A higher limit needs a fresh second factor: the form says so before the server does. */
+export function raisesLimit(account: { creditLimit: number }, change: { creditLimit?: number } | null): boolean {
+  return change?.creditLimit !== undefined && change.creditLimit > account.creditLimit;
 }
 
 /** How much of the limit the balance uses, in whole per cent (0 when there is no limit). */

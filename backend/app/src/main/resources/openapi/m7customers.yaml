@@ -1,6 +1,8 @@
 # OpenAPI slice of M7 Customers & Payment Recording, the back office part (27A section 5). The
-# society's members, their credit accounts, the statement, and repayments at the office. The till's
-# operations (lookup by phone for the till, the CPR bundle) come with the till (CR-30-1).
+# society's members, their credit accounts (limits, states, adjustments), the statement,
+# repayments at the office and their reversal, and the data-subject requests. The till reads its
+# customers from the snapshot and uploads its repayments through the sync contract
+# (customer_payment.issued.v1), never through this slice.
 #   - every operation names its permission in x-permission, the same string as its @CommandHandler
 #   - every mutating operation requires the Idempotency-Key header
 #   - errors are RFC 9457 problem documents whose `code` is a message id
@@ -230,6 +232,310 @@ paths:
               schema: { $ref: '#/components/schemas/CustomerPayment' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/limits:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: amendAccountLimits
+      summary: Amend the credit limit, the hard block or the offline cap (a field left out stays as it is)
+      description: >
+        A higher limit asks for a fresh second factor (401 mfa.required). 422 codes:
+        m7.account.not_found, m7.account.closed, m7.account.amount_invalid,
+        m7.account.limits_unchanged.
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AmendLimitsRequest' }
+      responses:
+        '200':
+          description: Amended; the account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/suspend:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: suspendAccount
+      summary: Suspend the account (the tills refuse its tenders; central still posts what they took)
+      description: "422 codes: m7.account.not_found, m7.account.status_invalid."
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Suspended; the account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/reinstate:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: reinstateAccount
+      summary: Open a suspended account again
+      description: "422 codes: m7.account.not_found, m7.account.status_invalid."
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Reinstated; the account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/close:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: closeAccount
+      summary: Close an account with a balance of zero and nothing paid in advance
+      description: "422 codes: m7.account.not_found, m7.account.status_invalid, m7.account.balance_not_zero, m7.account.unallocated_held."
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Closed; the account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/history:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Accounts]
+      operationId: getAccountHistory
+      summary: What changed on the account's limits and state, newest first
+      x-permission: cus.customer.view
+      responses:
+        '200':
+          description: The history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AccountHistoryEntry' }
+  /v1/accounts/{accountId}/adjustments:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Accounts]
+      operationId: listAdjustments
+      summary: The account's adjustments, newest first
+      x-permission: cus.customer.view
+      responses:
+        '200':
+          description: The adjustments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Adjustment' }
+    post:
+      tags: [Accounts]
+      operationId: requestAdjustment
+      summary: Ask for an adjustment of the balance; another person approves it before it is posted
+      description: "422 codes: m7.account.not_found, m7.account.closed, m7.adjustment.amount_invalid, m7.adjustment.user_required."
+      x-permission: cus.account.adjust
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdjustmentRequest' }
+      responses:
+        '201':
+          description: Requested; the adjustment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Adjustment' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/adjustments/{adjustmentId}/approve:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+      - { in: path, name: adjustmentId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: approveAccountAdjustment
+      summary: Approve an adjustment another person asked for, and post it
+      description: "422 codes: m7.adjustment.not_found, m7.adjustment.not_requested, m7.adjustment.same_person, m7.account.closed."
+      x-permission: cus.account.adjust_approve
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Approved and posted; the adjustment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Adjustment' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customer-payments/{documentId}/reverse:
+    parameters:
+      - { in: path, name: documentId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: reverseCustomerPayment
+      summary: Reverse a repayment recorded in error (a REVERSES-linked CPR; its allocations undone)
+      description: >
+        422 codes: m7.scope.entity_required, m7.payment.not_found, m7.payment.not_reversible,
+        m7.payment.reversed_already, m7.account.closed.
+      x-permission: cus.payment.reverse
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '201':
+          description: Reversed; the reversing receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPayment' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/privacy/requests:
+    get:
+      tags: [Privacy]
+      operationId: listPrivacyRequests
+      summary: The society's data-subject requests, newest first
+      x-permission: cus.privacy.record
+      parameters:
+        - { in: query, name: status, required: false, schema: { type: string, enum: [RECEIVED, FULFILLED, REFUSED] } }
+      responses:
+        '200':
+          description: The requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PrivacyRequest' }
+    post:
+      tags: [Privacy]
+      operationId: recordPrivacyRequest
+      summary: Record a customer's request for their data, a correction or erasure
+      description: >
+        422 codes: m7.customer.not_found, m7.privacy.not_registering_society, m7.customer.anonymised,
+        m7.privacy.request_open, m7.privacy.user_required.
+      x-permission: cus.privacy.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrivacyRequestRequest' }
+      responses:
+        '201':
+          description: Received; the request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacyRequest' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/privacy/requests/{requestId}/fulfil:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Privacy]
+      operationId: fulfilPrivacyRequest
+      summary: Fulfil a request (the responsible officer only); an erasure anonymises the customer
+      description: >
+        422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer,
+        m7.privacy.officer_only, m7.privacy.open_balance, m7.customer.anonymised, m7.field.required.
+      x-permission: cus.privacy.fulfil
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FulfilPrivacyRequest' }
+      responses:
+        '200':
+          description: Fulfilled; the request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacyRequest' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/privacy/requests/{requestId}/refuse:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Privacy]
+      operationId: refusePrivacyRequest
+      summary: Refuse a request on a legal ground (the responsible officer only)
+      description: "422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer, m7.privacy.officer_only."
+      x-permission: cus.privacy.fulfil
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefusePrivacyRequest' }
+      responses:
+        '200':
+          description: Refused; the request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacyRequest' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/privacy/requests/{requestId}/export:
+    parameters:
+      - { in: path, name: requestId, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Privacy]
+      operationId: getPrivacyExport
+      summary: The export of a fulfilled access request, every row the society holds about the customer
+      x-permission: cus.privacy.fulfil
+      responses:
+        '200':
+          description: The export, as JSON (tables by name, rows as column to text)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: No fulfilled access request with this id, or the customer was anonymised since
 components:
   schemas:
     Language: { type: string, enum: [en, si, ta] }
@@ -292,6 +598,76 @@ components:
         termsDays: { type: [integer, 'null'], minimum: 1, maximum: 365 }
         offlineCap: { type: [number, 'null'], minimum: 0, maximum: 999999999.99 }
         nic: { type: [string, 'null'], maxLength: 20 }
+    AmendLimitsRequest:
+      type: object
+      required: [reason]
+      properties:
+        creditLimit: { type: [number, 'null'], minimum: 0, maximum: 999999999.99 }
+        hardBlock: { type: [boolean, 'null'] }
+        offlineCap: { type: [number, 'null'], minimum: 0, maximum: 999999999.99 }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    AdjustmentRequest:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount: { type: number, minimum: -999999999.99, maximum: 999999999.99, description: Above zero adds to what the customer owes }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    AccountHistoryEntry:
+      type: object
+      required: [historyId, action, before, after, reason, changedAt]
+      properties:
+        historyId: { type: string, format: uuid }
+        action: { type: string, enum: [LIMITS_AMENDED, SUSPENDED, REINSTATED, CLOSED] }
+        before: { type: object, additionalProperties: true }
+        after: { type: object, additionalProperties: true }
+        reason: { type: string }
+        changedBy: { type: [string, 'null'], format: uuid }
+        changedAt: { type: string, format: date-time }
+    Adjustment:
+      type: object
+      required: [adjustmentId, amount, reason, status, requestedBy, requestedAt]
+      properties:
+        adjustmentId: { type: string, format: uuid }
+        amount: { type: number }
+        reason: { type: string }
+        status: { type: string, enum: [REQUESTED, APPROVED] }
+        requestedBy: { type: string, format: uuid }
+        requestedAt: { type: string, format: date-time }
+        approvedBy: { type: [string, 'null'], format: uuid }
+        approvedAt: { type: [string, 'null'], format: date-time }
+    PrivacyRequestRequest:
+      type: object
+      required: [customerId, kind]
+      properties:
+        customerId: { type: string, format: uuid }
+        kind: { type: string, enum: [ACCESS, CORRECTION, ERASURE] }
+        notes: { type: [string, 'null'], maxLength: 500 }
+    FulfilPrivacyRequest:
+      type: object
+      properties:
+        outcome: { type: [string, 'null'], maxLength: 500, description: What was done; required for a correction }
+    RefusePrivacyRequest:
+      type: object
+      required: [ground]
+      properties:
+        ground: { type: string, minLength: 1, maxLength: 500, description: The legal ground of the refusal }
+    PrivacyRequest:
+      type: object
+      required: [requestId, customerId, customerName, kind, receivedAt, receivedBy, status]
+      properties:
+        requestId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, description: The name as it is now ("Customer" once anonymised) }
+        kind: { type: string, enum: [ACCESS, CORRECTION, ERASURE] }
+        notes: { type: [string, 'null'] }
+        receivedAt: { type: string, format: date-time }
+        receivedBy: { type: string, format: uuid }
+        status: { type: string, enum: [RECEIVED, FULFILLED, REFUSED] }
+        answeredAt: { type: [string, 'null'], format: date-time }
+        answeredBy: { type: [string, 'null'], format: uuid }
+        outcome: { type: [string, 'null'] }
+        exportSha256: { type: [string, 'null'], description: The SHA-256 of the access export handed over }
+        refusalGround: { type: [string, 'null'] }
     RecordPaymentRequest:
       type: object
       required: [method, amount]
@@ -404,7 +780,7 @@ components:
           type: array
           items:
             type: object
-            required: [postingId, businessDate, kind, amount, settled, runningBalance, documentId, limitBreached, offline]
+            required: [postingId, businessDate, kind, amount, settled, runningBalance, documentId, limitBreached, offline, reversed]
             properties:
               postingId: { type: string, format: uuid }
               businessDate: { type: string, format: date }
@@ -416,6 +792,7 @@ components:
               documentNumber: { type: [string, 'null'], description: The receipt's or the CPR's number }
               limitBreached: { type: boolean }
               offline: { type: boolean }
+              reversed: { type: boolean, description: A PAYMENT whose receipt was reversed }
     CustomerPayment:
       type: object
       required: [documentId, docNumber, accountId, amount, allocated, unallocated, balance]

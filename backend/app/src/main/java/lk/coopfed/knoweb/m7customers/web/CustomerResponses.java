@@ -4,11 +4,15 @@ import lk.coopfed.knoweb.m7customers.query.AccountQueries;
 import lk.coopfed.knoweb.m7customers.query.AccountView;
 import lk.coopfed.knoweb.m7customers.query.CustomerCard;
 import lk.coopfed.knoweb.m7customers.query.CustomerSummary;
+import lk.coopfed.knoweb.m7customers.query.PrivacyQueries;
 import lk.coopfed.knoweb.m7customers.web.generated.Account;
 import lk.coopfed.knoweb.m7customers.web.generated.AccountAgeing;
+import lk.coopfed.knoweb.m7customers.web.generated.AccountHistoryEntry;
+import lk.coopfed.knoweb.m7customers.web.generated.Adjustment;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerCardConsentsInner;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerCardPhonesInner;
 import lk.coopfed.knoweb.m7customers.web.generated.Language;
+import lk.coopfed.knoweb.m7customers.web.generated.PrivacyRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.Statement;
 import lk.coopfed.knoweb.m7customers.web.generated.StatementLinesInner;
 
@@ -103,7 +107,48 @@ final class CustomerResponses {
                                 .documentId(line.documentId())
                                 .documentNumber(line.documentNumber())
                                 .limitBreached(line.limitBreached())
-                                .offline(line.offline()))
+                                .offline(line.offline())
+                                .reversed(line.reversed()))
                         .toList());
+    }
+
+    static AccountHistoryEntry history(AccountQueries.HistoryEntry entry) {
+        return new AccountHistoryEntry()
+                .historyId(entry.historyId())
+                .action(AccountHistoryEntry.ActionEnum.fromValue(entry.action()))
+                .before(entry.before())
+                .after(entry.after())
+                .reason(entry.reason())
+                .changedBy(entry.changedBy())
+                .changedAt(entry.changedAt());
+    }
+
+    static Adjustment adjustment(AccountQueries.Adjustment adjustment) {
+        return new Adjustment()
+                .adjustmentId(adjustment.adjustmentId())
+                .amount(adjustment.amount())
+                .reason(adjustment.reason())
+                .status(Adjustment.StatusEnum.fromValue(adjustment.status()))
+                .requestedBy(adjustment.requestedBy())
+                .requestedAt(adjustment.requestedAt())
+                .approvedBy(adjustment.approvedBy())
+                .approvedAt(adjustment.approvedAt() == null ? null : adjustment.approvedAt());
+    }
+
+    static PrivacyRequest privacyRequest(PrivacyQueries.RequestView view) {
+        return new PrivacyRequest()
+                .requestId(view.requestId())
+                .customerId(view.customerId())
+                .customerName(view.customerName())
+                .kind(PrivacyRequest.KindEnum.fromValue(view.kind()))
+                .notes(view.notes())
+                .receivedAt(view.receivedAt())
+                .receivedBy(view.receivedBy())
+                .status(PrivacyRequest.StatusEnum.fromValue(view.status()))
+                .answeredAt(view.answeredAt() == null ? null : view.answeredAt())
+                .answeredBy(view.answeredBy())
+                .outcome(view.outcome())
+                .exportSha256(view.exportSha256())
+                .refusalGround(view.refusalGround());
     }
 }

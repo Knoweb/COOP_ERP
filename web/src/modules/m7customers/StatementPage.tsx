@@ -1,11 +1,15 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiProblem } from "../../shell/api/client";
+import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useFormatDate } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { useCustomersApi } from "./customersApi";
-import { businessToday, errorText, startOfMonthBefore } from "./customersView";
+import { MFA_REQUIRED, businessToday, errorText, isReversible, problemCode, startOfMonthBefore } from "./customersView";
 import "./customers.css";
 
 /**
@@ -22,6 +26,8 @@ export function StatementPage() {
   const today = businessToday();
   const [from, setFrom] = useState(startOfMonthBefore(today, 2));
   const [to, setTo] = useState(today);
+  const canReverse = useHasPermission("cus.payment.reverse");
+  const [reversing, setReversing] = useState<string | null>(null);
   const statement = useQuery({
     queryKey: ["customers", "statement", accountId, from, to],
     queryFn: () => api.statement(accountId, from, to),
@@ -48,6 +54,7 @@ export function StatementPage() {
           <input type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
       </div>
+      {reversing && <ReverseForm documentId={reversing} accountId={accountId} onDone={() => setReversing(null)} />}
       {statement.isLoading && <p>{t("customers.loading").text}</p>}
       {statement.isError && <p role="alert">{errorText(statement.error, t("customers.error.generic").text)}</p>}
       {statement.data && (
@@ -77,7 +84,18 @@ export function StatementPage() {
                       {t(`customers.statement.kind.${line.kind}`).text}
                       {line.limitBreached && <> · {t("customers.statement.breached").text}</>}
                     </td>
-                    <td>{line.documentNumber}</td>
+                    <td>
+                      {line.documentNumber}
+                      {line.reversed && <> · {t("customers.statement.reversed").text}</>}
+                      {canReverse && isReversible(line) && (
+                        <>
+                          {" "}
+                          <button type="button" onClick={() => setReversing(line.documentId)}>
+                            {t("customers.reverse.open").text}
+                          </button>
+                        </>
+                      )}
+                    </td>
                     <td>
                       <MoneyDisplay amount={line.amount} />
                     </td>
@@ -98,5 +116,60 @@ export function StatementPage() {
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * Reverse a repayment recorded in error (27A section 6, ReverseCustomerPayment): a reason, a fresh
+ * second factor, and a reversing receipt that opens the charges it settled again.
+ */
+function ReverseForm({ documentId, accountId, onDone }: { documentId: string; accountId: string; onDone: () => void }) {
+  const t = useT();
+  const api = useCustomersApi();
+  const queryClient = useQueryClient();
+  const key = useIdempotencyKey();
+  const [reason, setReason] = useState("");
+  const reverse = useMutation({
+    mutationFn: () => api.reversePayment(documentId, reason.trim(), key.current()),
+    onSuccess: () => {
+      key.next();
+      queryClient.invalidateQueries({ queryKey: ["customers", "statement", accountId] });
+      queryClient.invalidateQueries({ queryKey: ["customers", "card"] });
+      onDone();
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        key.next();
+      }
+    }
+  });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    reverse.mutate();
+  };
+  return (
+    <form className="customers-form customers-subsection" role="dialog" aria-labelledby="customers-reverse-title" onSubmit={submit}>
+      <h2 id="customers-reverse-title">{t("customers.reverse.title").text}</h2>
+      <p>{t("customers.reverse.explain").text}</p>
+      <label className="customers-field">
+        {t("customers.reason").text}
+        <input maxLength={200} required value={reason} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      <div className="customers-filter-bar">
+        <button type="submit" disabled={reverse.isPending || reason.trim() === ""}>
+          {t("customers.reverse.submit").text}
+        </button>
+        <button type="button" onClick={onDone}>
+          {t("customers.reverse.cancel").text}
+        </button>
+      </div>
+      {reverse.isError && (
+        <p role="alert">
+          {problemCode(reverse.error) === MFA_REQUIRED
+            ? t("customers.limits.step_up_needed").text
+            : errorText(reverse.error, t("customers.error.generic").text)}
+        </p>
+      )}
+    </form>
   );
 }

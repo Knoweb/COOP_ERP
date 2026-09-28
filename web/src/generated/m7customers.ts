@@ -174,6 +174,265 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/{accountId}/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Amend the credit limit, the hard block or the offline cap (a field left out stays as it is)
+         * @description A higher limit asks for a fresh second factor (401 mfa.required). 422 codes: m7.account.not_found, m7.account.closed, m7.account.amount_invalid, m7.account.limits_unchanged.
+         */
+        post: operations["amendAccountLimits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend the account (the tills refuse its tenders; central still posts what they took)
+         * @description 422 codes: m7.account.not_found, m7.account.status_invalid.
+         */
+        post: operations["suspendAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a suspended account again
+         * @description 422 codes: m7.account.not_found, m7.account.status_invalid.
+         */
+        post: operations["reinstateAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close an account with a balance of zero and nothing paid in advance
+         * @description 422 codes: m7.account.not_found, m7.account.status_invalid, m7.account.balance_not_zero, m7.account.unallocated_held.
+         */
+        post: operations["closeAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        /** What changed on the account's limits and state, newest first */
+        get: operations["getAccountHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        /** The account's adjustments, newest first */
+        get: operations["listAdjustments"];
+        put?: never;
+        /**
+         * Ask for an adjustment of the balance; another person approves it before it is posted
+         * @description 422 codes: m7.account.not_found, m7.account.closed, m7.adjustment.amount_invalid, m7.adjustment.user_required.
+         */
+        post: operations["requestAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/adjustments/{adjustmentId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+                adjustmentId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an adjustment another person asked for, and post it
+         * @description 422 codes: m7.adjustment.not_found, m7.adjustment.not_requested, m7.adjustment.same_person, m7.account.closed.
+         */
+        post: operations["approveAccountAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer-payments/{documentId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a repayment recorded in error (a REVERSES-linked CPR; its allocations undone)
+         * @description 422 codes: m7.scope.entity_required, m7.payment.not_found, m7.payment.not_reversible, m7.payment.reversed_already, m7.account.closed.
+         */
+        post: operations["reverseCustomerPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/privacy/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The society's data-subject requests, newest first */
+        get: operations["listPrivacyRequests"];
+        put?: never;
+        /**
+         * Record a customer's request for their data, a correction or erasure
+         * @description 422 codes: m7.customer.not_found, m7.privacy.not_registering_society, m7.customer.anonymised, m7.privacy.request_open, m7.privacy.user_required.
+         */
+        post: operations["recordPrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/privacy/requests/{requestId}/fulfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fulfil a request (the responsible officer only); an erasure anonymises the customer
+         * @description 422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer, m7.privacy.officer_only, m7.privacy.open_balance, m7.customer.anonymised, m7.field.required.
+         */
+        post: operations["fulfilPrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/privacy/requests/{requestId}/refuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refuse a request on a legal ground (the responsible officer only)
+         * @description 422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer, m7.privacy.officer_only.
+         */
+        post: operations["refusePrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/privacy/requests/{requestId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        /** The export of a fulfilled access request, every row the society holds about the customer */
+        get: operations["getPrivacyExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -220,6 +479,90 @@ export interface components {
             termsDays?: number | null;
             offlineCap?: number | null;
             nic?: string | null;
+        };
+        AmendLimitsRequest: {
+            creditLimit?: number | null;
+            hardBlock?: boolean | null;
+            offlineCap?: number | null;
+            reason: string;
+        };
+        AdjustmentRequest: {
+            /** @description Above zero adds to what the customer owes */
+            amount: number;
+            reason: string;
+        };
+        AccountHistoryEntry: {
+            /** Format: uuid */
+            historyId: string;
+            /** @enum {string} */
+            action: "LIMITS_AMENDED" | "SUSPENDED" | "REINSTATED" | "CLOSED";
+            before: {
+                [key: string]: unknown;
+            };
+            after: {
+                [key: string]: unknown;
+            };
+            reason: string;
+            /** Format: uuid */
+            changedBy?: string | null;
+            /** Format: date-time */
+            changedAt: string;
+        };
+        Adjustment: {
+            /** Format: uuid */
+            adjustmentId: string;
+            amount: number;
+            reason: string;
+            /** @enum {string} */
+            status: "REQUESTED" | "APPROVED";
+            /** Format: uuid */
+            requestedBy: string;
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: uuid */
+            approvedBy?: string | null;
+            /** Format: date-time */
+            approvedAt?: string | null;
+        };
+        PrivacyRequestRequest: {
+            /** Format: uuid */
+            customerId: string;
+            /** @enum {string} */
+            kind: "ACCESS" | "CORRECTION" | "ERASURE";
+            notes?: string | null;
+        };
+        FulfilPrivacyRequest: {
+            /** @description What was done; required for a correction */
+            outcome?: string | null;
+        };
+        RefusePrivacyRequest: {
+            /** @description The legal ground of the refusal */
+            ground: string;
+        };
+        PrivacyRequest: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            customerId: string;
+            /** @description The name as it is now ("Customer" once anonymised) */
+            customerName: string;
+            /** @enum {string} */
+            kind: "ACCESS" | "CORRECTION" | "ERASURE";
+            notes?: string | null;
+            /** Format: date-time */
+            receivedAt: string;
+            /** Format: uuid */
+            receivedBy: string;
+            /** @enum {string} */
+            status: "RECEIVED" | "FULFILLED" | "REFUSED";
+            /** Format: date-time */
+            answeredAt?: string | null;
+            /** Format: uuid */
+            answeredBy?: string | null;
+            outcome?: string | null;
+            /** @description The SHA-256 of the access export handed over */
+            exportSha256?: string | null;
+            refusalGround?: string | null;
         };
         RecordPaymentRequest: {
             /** @enum {string} */
@@ -349,6 +692,8 @@ export interface components {
                 documentNumber?: string | null;
                 limitBreached: boolean;
                 offline: boolean;
+                /** @description A PAYMENT whose receipt was reversed */
+                reversed: boolean;
             }[];
         };
         CustomerPayment: {
@@ -714,6 +1059,407 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    amendAccountLimits: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendLimitsRequest"];
+            };
+        };
+        responses: {
+            /** @description Amended; the account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    suspendAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Suspended; the account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reinstateAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Reinstated; the account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    closeAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Closed; the account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getAccountHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountHistoryEntry"][];
+                };
+            };
+        };
+    };
+    listAdjustments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The adjustments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Adjustment"][];
+                };
+            };
+        };
+    };
+    requestAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Requested; the adjustment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Adjustment"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    approveAccountAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+                adjustmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved and posted; the adjustment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Adjustment"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    reverseCustomerPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Reversed; the reversing receipt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPayment"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPrivacyRequests: {
+        parameters: {
+            query?: {
+                status?: "RECEIVED" | "FULFILLED" | "REFUSED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequest"][];
+                };
+            };
+        };
+    };
+    recordPrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description Received; the request */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequest"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    fulfilPrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FulfilPrivacyRequest"];
+            };
+        };
+        responses: {
+            /** @description Fulfilled; the request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequest"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    refusePrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefusePrivacyRequest"];
+            };
+        };
+        responses: {
+            /** @description Refused; the request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequest"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getPrivacyExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The export, as JSON (tables by name, rows as column to text) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No fulfilled access request with this id, or the customer was anonymised since */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
 }

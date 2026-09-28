@@ -31,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>a CHARGE beyond the limit is posted with {@code limit_breached} and a REVIEW
  *       (ACCOUNT_LIMIT_BREACH), and an ALERT (HARD_BLOCK_BYPASSED_OFFLINE) when the account is hard
  *       blocked and the till was offline;</li>
+ *   <li>a CHARGE on an account that is SUSPENDED or CLOSED is posted with a REVIEW
+ *       (ACCOUNT_CHARGED_NOT_OPEN), and an offline CHARGE above the account's offline cap with a
+ *       REVIEW (ACCOUNT_OFFLINE_CAP_EXCEEDED): the till's snapshot was stale;</li>
  *   <li>a tender naming an account the society does not have (or not at all) is not posted, and a
  *       REVIEW (ACCOUNT_TENDER_UNKNOWN) names the receipt, so the society can follow it up.</li>
  * </ul>
@@ -52,6 +55,8 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
     static final String AUDIT_BREACH = "ACCOUNT_LIMIT_BREACH";
     static final String AUDIT_BYPASSED = "HARD_BLOCK_BYPASSED_OFFLINE";
     static final String AUDIT_UNKNOWN = "ACCOUNT_TENDER_UNKNOWN";
+    static final String AUDIT_NOT_OPEN = "ACCOUNT_CHARGED_NOT_OPEN";
+    static final String AUDIT_OVER_CAP = "ACCOUNT_OFFLINE_CAP_EXCEEDED";
 
     private final JdbcTemplate jdbc;
     private final Ledger ledger;
@@ -153,6 +158,22 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
             if (account.hardBlock() && command.offline()) {
                 audit.record(AUDIT_BYPASSED, subject, null, review, scope);
             }
+        }
+        // The till's own rules (27A section 7.3) should have kept these out; a till with a stale
+        // snapshot did not. The sale happened: posted, and flagged for the society.
+        if (charge && !"OPEN".equals(account.status())) {
+            Map<String, Object> review = new LinkedHashMap<>();
+            review.put("status", account.status());
+            review.put("receiptNumber", command.receiptNumber());
+            review.put("amount", amount);
+            audit.record(AUDIT_NOT_OPEN, subject, null, review, scope);
+        }
+        if (charge && command.offline() && account.offlineCap() != null && amount.compareTo(account.offlineCap()) > 0) {
+            Map<String, Object> review = new LinkedHashMap<>();
+            review.put("offlineCap", account.offlineCap());
+            review.put("receiptNumber", command.receiptNumber());
+            review.put("amount", amount);
+            audit.record(AUDIT_OVER_CAP, subject, null, review, scope);
         }
         if (charge) {
             events.publish(new AccountCharged(

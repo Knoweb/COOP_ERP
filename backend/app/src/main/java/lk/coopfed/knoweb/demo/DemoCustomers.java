@@ -20,20 +20,26 @@ import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m7customers.api.ChangeAccountStatus;
+import lk.coopfed.knoweb.m7customers.api.FulfilDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
+import lk.coopfed.knoweb.m7customers.api.RecordDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
 import lk.coopfed.knoweb.m7customers.query.AccountQueries;
 import lk.coopfed.knoweb.m7customers.query.CustomerQueries;
 import lk.coopfed.knoweb.m7customers.query.CustomerSummary;
+import lk.coopfed.knoweb.m7customers.query.PrivacyQueries;
 import org.springframework.stereotype.Service;
 
 /**
  * M7 (back office): the members of Kuliyapitiya MPCS (M101) and its credit book. The society office
  * registers three dozen members with Sinhala, Tamil and English names, half of them with a credit
  * account; their account sales over the eight weeks of the history are charged, and they repay at
- * the office every few weeks. One account (the first) stands near its limit.
+ * the office every few weeks. One account (the first) stands near its limit; one (the second) was
+ * suspended yesterday; one member with no account asked to be forgotten, and the society's
+ * responsible officer (the manager, {@link DemoCast#M101_MANAGER}) erased their identity.
  *
  * <p>Who does what: the office clerk ({@link #M101_OFFICE}, demo-users.demo.sql) registers, opens
  * the accounts and records the repayments through the ordinary handlers. The charges are the till's
@@ -120,6 +126,18 @@ class DemoCustomers {
 
     static final String NUMBER_PREFIX = "DEMO-KHATA-";
 
+    /** The second account (member 3, Sita Kumari) is suspended the day before the load. */
+    static final int SUSPENDED_ACCOUNT = 1;
+
+    static final String SUSPENSION_REASON = "Repayments overdue: suspended until the member calls at the office";
+
+    /** The last member (Rizwan Hameed) has no account, owes nothing, and asked to be forgotten. */
+    static final int ERASED_MEMBER = 35;
+
+    private static final LocalTime SUSPENDED_AT = LocalTime.of(17, 0);
+    private static final LocalTime ERASURE_ASKED_AT = LocalTime.of(11, 0);
+    private static final LocalTime ERASURE_DONE_AT = LocalTime.of(14, 30);
+
     private static final LocalTime REGISTERED = LocalTime.of(9, 30);
     private static final LocalTime REPAID = LocalTime.of(15, 0);
     private static final List<String> METHODS = List.of("CASH", "TRANSFER", "CASH", "DEPOSIT");
@@ -128,26 +146,39 @@ class DemoCustomers {
     private final Handles<OpenAccount, UUID> openAccount;
     private final Handles<PostAccountTender, UUID> postTender;
     private final Handles<RecordCustomerPayment, UUID> recordPayment;
+    private final Handles<ChangeAccountStatus, UUID> changeStatus;
+    private final Handles<RecordDataSubjectRequest, UUID> recordRequest;
+    private final Handles<FulfilDataSubjectRequest, UUID> fulfilRequest;
     private final CustomerQueries customers;
     private final AccountQueries accounts;
+    private final PrivacyQueries privacy;
     private final DemoCalendar calendar;
     private final Clock clock;
 
+    @SuppressWarnings("java:S107") // the handlers and queries of the society's credit book
     DemoCustomers(
             Handles<RegisterCustomer, UUID> register,
             Handles<OpenAccount, UUID> openAccount,
             Handles<PostAccountTender, UUID> postTender,
             Handles<RecordCustomerPayment, UUID> recordPayment,
+            Handles<ChangeAccountStatus, UUID> changeStatus,
+            Handles<RecordDataSubjectRequest, UUID> recordRequest,
+            Handles<FulfilDataSubjectRequest, UUID> fulfilRequest,
             CustomerQueries customers,
             AccountQueries accounts,
+            PrivacyQueries privacy,
             DemoCalendar calendar,
             Clock clock) {
         this.register = register;
         this.openAccount = openAccount;
         this.postTender = postTender;
         this.recordPayment = recordPayment;
+        this.changeStatus = changeStatus;
+        this.recordRequest = recordRequest;
+        this.fulfilRequest = fulfilRequest;
         this.customers = customers;
         this.accounts = accounts;
+        this.privacy = privacy;
         this.calendar = calendar;
         this.clock = clock;
     }
@@ -159,9 +190,16 @@ class DemoCustomers {
     void load(Consumer<String> count) {
         LocalDate today = calendar.today();
         ScopeContext office = scopeOf(M101_OFFICE);
+        // The member whose identity was erased has no phone to be found by any more: the fulfilled
+        // erasure names them.
+        UUID erased =
+                erasure(office).map(PrivacyQueries.RequestView::customerId).orElse(null);
         List<UUID> accountIds = new ArrayList<>();
         for (int i = 0; i < MEMBERS.size(); i++) {
             int index = i;
+            if (index == ERASED_MEMBER && erased != null) {
+                continue;
+            }
             UUID customerId = calendar.at(
                     today.minusDays(REGISTERED_DAYS_AGO),
                     REGISTERED.plusMinutes(i),
@@ -235,6 +273,49 @@ class DemoCustomers {
                 count.accept("RecordCustomerPayment");
             }
         }
+
+        // One account suspended after its last charge: the office stops the tills taking more.
+        UUID suspended = accountIds.get(SUSPENDED_ACCOUNT);
+        if ("OPEN".equals(accounts.account(suspended, office).orElseThrow().status())) {
+            calendar.run(
+                    today.minusDays(1),
+                    SUSPENDED_AT,
+                    () -> changeStatus.handle(
+                            new ChangeAccountStatus(suspended, ChangeAccountStatus.SUSPEND, SUSPENSION_REASON),
+                            scopeOf(M101_OFFICE)));
+            count.accept("ChangeAccountStatus");
+        }
+
+        // One member with nothing owed asked to be forgotten: the office records the request, the
+        // society's responsible officer (the manager) fulfils it and the identity is anonymised.
+        if (erased == null) {
+            UUID member = customers.search(null, phone(ERASED_MEMBER), 1, office).stream()
+                    .findFirst()
+                    .orElseThrow()
+                    .customerId();
+            UUID requestId = calendar.at(
+                    today.minusDays(3),
+                    ERASURE_ASKED_AT,
+                    () -> recordRequest.handle(
+                            new RecordDataSubjectRequest(
+                                    member, RecordDataSubjectRequest.ERASURE, "Asked at the office to be forgotten"),
+                            scopeOf(M101_OFFICE)));
+            count.accept("RecordDataSubjectRequest");
+            calendar.run(
+                    today.minusDays(2),
+                    ERASURE_DONE_AT,
+                    () -> fulfilRequest.handle(
+                            new FulfilDataSubjectRequest(requestId, "No account and nothing owed: identity erased"),
+                            scopeOf(DemoCast.M101_MANAGER)));
+            count.accept("FulfilDataSubjectRequest");
+        }
+    }
+
+    /** The fulfilled erasure of the demo, if it was made. */
+    private Optional<PrivacyQueries.RequestView> erasure(ScopeContext office) {
+        return privacy.requests("FULFILLED", office).stream()
+                .filter(request -> RecordDataSubjectRequest.ERASURE.equals(request.kind()))
+                .findFirst();
     }
 
     /** Every other member has an account. */
