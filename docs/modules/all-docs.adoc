@@ -29,6 +29,10 @@ include::module-m2catalogue.adoc[]
 plantuml::module-m6pos.puml[,,format=svg]
 include::module-m6pos.adoc[]
 
+== M9 Integration
+plantuml::module-m9integration.puml[,,format=svg]
+include::module-m9integration.adoc[]
+
 == M3 Pricing & Rules
 plantuml::module-m3pricing.puml[,,format=svg]
 include::module-m3pricing.adoc[]

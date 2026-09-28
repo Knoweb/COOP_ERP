@@ -40,6 +40,7 @@ class IntegrationTestShardCoverageTest {
                             "lk.coopfed.knoweb.m6pos.",
                             "lk.coopfed.knoweb.m7customers.",
                             "lk.coopfed.knoweb.m8reporting.",
+                            "lk.coopfed.knoweb.m9integration.",
                             "lk.coopfed.knoweb.demo.",
                             "lk.coopfed.knoweb.hello.",
                             "lk.coopfed.knoweb.config.",

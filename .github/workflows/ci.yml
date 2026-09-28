@@ -243,7 +243,7 @@ jobs:
             packages: "lk.coopfed.knoweb.m2catalogue.,lk.coopfed.knoweb.m3pricing.,lk.coopfed.knoweb.m4trading."
           - name: m5inventory+m6pos+m7customers+m8reporting+demo+others
             packages: >-
-              lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,
+              lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,lk.coopfed.knoweb.m9integration.,
               lk.coopfed.knoweb.demo.,lk.coopfed.knoweb.hello.,lk.coopfed.knoweb.config.,
               lk.coopfed.knoweb.testsupport.,lk.coopfed.knoweb.SchemaRulesIntegrationTest,
               lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest,lk.coopfed.knoweb.RuntimeRolesIntegrationTest
