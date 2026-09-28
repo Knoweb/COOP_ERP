@@ -6,7 +6,7 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { useInventoryApi } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
 import { SkuLabel } from "./SkuLabel";
-import { errorText } from "./stockView";
+import { errorText, isSyntheticBatchNo } from "./stockView";
 
 /**
  * The stock position of one location (doc 30 section 5.5; 25A section 8, "Stock position", demo
@@ -65,7 +65,7 @@ export function StockPage() {
                 <td>
                   <SkuLabel skuId={lot.skuId} />
                 </td>
-                <td>{lot.batchNo ?? ""}</td>
+                <td>{isSyntheticBatchNo(lot.batchNo) ? t("inventory.field.batch_not_tracked").text : (lot.batchNo ?? "")}</td>
                 <td>{lot.expiryDate ?? ""}</td>
                 <td>{t(`inventory.condition.${lot.condition}`).text}</td>
                 <td>{lot.qtyOnHand}</td>

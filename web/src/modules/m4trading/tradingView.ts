@@ -15,6 +15,19 @@ import type {
   OrderStatus
 } from "./tradingApi";
 
+// A batch-less SKU still needs a batch row (M2-05, doc 22 section 3.7), so M2 registers a
+// synthetic one numbered `S-<document number>-<line>` (BatchGuards.syntheticBatchNo on the
+// backend). It is not a number anyone printed or should read: the GRN and delivery note screens
+// showed it as if it were a real batch (e.g. "S-OPB-01a0e468-9" for white sugar, the review of
+// 28 September 2026). There is no `synthetic` flag on these read slices yet (a later contract
+// change), so the screen recognises the backend's own fixed shape instead of showing it.
+const SYNTHETIC_BATCH_NO = /^S-.+-\d+$/;
+
+/** Whether a batch number is one M2 invented for a batch-less SKU, not a real, printed one. */
+export function isSyntheticBatchNo(batchNo: string | undefined): boolean {
+  return batchNo !== undefined && SYNTHETIC_BATCH_NO.test(batchNo);
+}
+
 /** The problem's title, which the server has already translated; the fallback otherwise. */
 export function errorText(error: unknown, fallback: string): string {
   return error instanceof ApiProblem && error.problem.title ? error.problem.title : fallback;

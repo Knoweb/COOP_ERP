@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import messages from "./inventory.messages.json" with { type: "json" };
-import { chipOf, lineOf, rowReady, transferLinesOf, type CountedRow } from "./stockView";
+import { chipOf, isSyntheticBatchNo, lineOf, rowReady, transferLinesOf, type CountedRow } from "./stockView";
 import type { LotBalance } from "./inventoryApi";
 
 describe("the transfer form", () => {
@@ -56,6 +56,12 @@ describe("the stock view", () => {
     expect(rowReady({ ...ROW, qty: "0" })).toBe(false);
     expect(rowReady({ ...ROW, unitCost: "" })).toBe(false);
     expect(rowReady({ ...ROW, skuId: "" })).toBe(false);
+  });
+
+  it("recognises M2's own synthetic shape S-<document>-<line>, not a real batch number", () => {
+    expect(isSyntheticBatchNo("S-OPB-01a0e468-9")).toBe(true);
+    expect(isSyntheticBatchNo("DEMO-2026-1")).toBe(false);
+    expect(isSyntheticBatchNo(undefined)).toBe(false);
   });
 
   it("has a text for every state and condition in every language", () => {
