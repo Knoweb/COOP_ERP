@@ -27,9 +27,12 @@ What is loaded:
 | Each distributor's trade list to its societies (tiers from 0 and from 20) | M3, the same commands | `d101-buyer`, `d102-buyer` |
 | Relationships Federation to D101 and D102; D101 to M101 and M102; D102 to M103; all ACTIVE on the lists above | M1 `OpenTradingRelationship`, `ActivateRelationship` | the seller: `fed-pricing`, `d101-buyer`, `d102-buyer` |
 | Opening stock of every SKU at the Federation warehouse and at both distributors' warehouses, batches with expiry and printed MRP | M5 `PrepareOpeningBalance`, `SignOpeningBalance` (stores), `CountersignOpeningBalance` (a second person, accounts) | `fed-stores` then `fed-accounts`; `d101-stores` then `d101-accounts`; `d102-stores` then `d102-accounts` |
-| Phase 3: Kuliyapitiya MPCS's opening stock at its stores (M101 W01), a tenth of a distributor's quantities at the Wayamba price | M5, the same three commands | `m101-buyer` then `m101-manager` |
-| Phase 3: half of every lot at the stores sent to Kuliyapitiya town shop (M101 S01) and received there | M5 `IssueTransfer` (at the stores), `ReceiveTransfer` (at the shop, by the shop's own session) | `m101-manager`, then `m101-shop` |
-| Phase 3: a quarter of every lot left at the stores sent to the Hettipola shop (M101 S02) a month later and received there | M5 `IssueTransfer`, `ReceiveTransfer` (the shop has no staff user of its own, so the manager, entity-wide, receives) | `m101-manager` |
+| Phase 3: Kuliyapitiya MPCS's opening stock at its stores (M101 W01), half a distributor's quantities at the Wayamba price | M5, the same three commands | `m101-buyer` then `m101-manager` |
+| Phase 3: the town shop's first stock (M101 S01), 23 everyday packed items, 26 to 48 of each, sent from the stores and received there | M5 `IssueTransfer` (at the stores), `ReceiveTransfer` (at the shop, by the shop's own session) | `m101-manager`, then `m101-shop` |
+| Phase 3: the Hettipola shop's first stock (M101 S02), 16 items, 12 to 30 of each, sent from the stores a month later and received there | M5 `IssueTransfer`, `ReceiveTransfer` (the shop has no staff user of its own, so the manager, entity-wide, receives) | `m101-manager` |
+| Phase 3: the Pannala (M102) and Point Pedro (M103) shops' opening stock, 20 items each, 12 to 48 of each, counted at the shop (these societies have no stores: their distributor delivers to the shop) | M5 `PrepareOpeningBalance`, `SignOpeningBalance` (the shop's staff), `CountersignOpeningBalance` (the manager) | `m102-shop` then `m102-manager`; `m103-shop` then `m103-manager` |
+
+Each shop's range and quantities are in `lk.coopfed.knoweb.demo.DemoShopStock`: enough for the eight weeks of the till history below, with stock left on the shelves at the end.
 
 ### The trading history (DEMO-02)
 
@@ -55,12 +58,12 @@ After the loader, `make demo-data` sells at the four shops over the same eight w
 
 | Shop | Demo till | Enrolled by | Sale days |
 |---|---|---|---|
-| Kuliyapitiya town shop (M101 S01) | `DEMO-TILL-S01` (the one `make demo-till-sale` uses) | `m101-manager` | 24, from 55 days ago |
-| Hettipola shop (M101 S02) | `DEMO-TILL-M101-S02` | `m101-manager` | from its transfer, a month ago |
-| Pannala shop (M102) | `DEMO-TILL-M102-S01` | `m102-manager` | from its first GRN, 50 days ago |
-| Point Pedro shop (M103) | `DEMO-TILL-M103-S01` | `m103-manager` | from its first GRN, 50 days ago |
+| Kuliyapitiya town shop (M101 S01) | `DEMO-TILL-S01` (the one `make demo-till-sale` uses) | `m101-manager` | 24, from 55 days ago (about 35 receipts) |
+| Hettipola shop (M101 S02) | `DEMO-TILL-M101-S02` | `m101-manager` | 12, from its transfer a month ago (about 18 receipts) |
+| Pannala shop (M102) | `DEMO-TILL-M102-S01` | `m102-manager` | 24, from 55 days ago (about 35 receipts) |
+| Point Pedro shop (M103) | `DEMO-TILL-M103-S01` | `m103-manager` | 24, from 55 days ago (about 35 receipts) |
 
-Each shop's manager registers the shop's demo till on till position 1 when it is not there and issues it a one-time code; the till enrols and takes its snapshot. Then, three days a week (never today, which is `make demo-till-sale`'s), the till opens a session at 08:30 with a float of 2,000, makes one or two cash sales of two items each (one or two of each, only items the shop holds ten or more of, so no lot goes negative), closes at 18:00 with the count equal to what it expects, and uploads. The till's own clock is set to that day, so sessions and receipts carry the day's business date and times and number from the till position's receipt series in date order. M5's stock movements for these sales are recorded at the real time by M5's own listener, as for the trading history.
+Each shop's manager registers the shop's demo till on till position 1 when it is not there and issues it a one-time code; the till enrols and takes its snapshot. Then, three days a week (never today, which is `make demo-till-sale`'s), the till opens a session at 08:30 with a float of 2,000, makes one or two cash sales of one to five items each (one to three of each, only items the shop holds ten or more of, spread over the days so no lot goes negative), closes at 18:00 with the count equal to what it expects, and uploads. The till's own clock is set to that day, so sessions and receipts carry the day's business date and times and number from the till position's receipt series in date order. M5's stock movements for these sales are recorded at the real time by M5's own listener, as for the trading history.
 
 Safe to repeat: a sale day on which the shop's demo till already has a receipt is not sold again, so a second run finds every day done and enrols nothing. It waits for central to apply the sales before it ends, and fails if the relay has not applied them within a minute.
 
@@ -90,6 +93,8 @@ Every demo user signs in at http://localhost:5173 with the password **demo**. Th
 | `m101-shop` | Malani Gunawardena | M101 | **Kuliyapitiya town shop (S01) only** | si | Shop staff; receives the transfer at the shop (phase 3); shows that a shop session cannot write at another location |
 | `m102-manager` | Nimal Bandara | M102 Pannala MPCS | entity-wide | si | The society's manager |
 | `m103-manager` | Selvaraj Yogarajah | M103 Point Pedro MPCS | entity-wide | ta | The society's manager, in Tamil |
+| `m102-shop` | Dilrukshi Senanayake | M102 | **Pannala shop (S01) only** | si | Shop staff; prepares and signs the shop's opening stock, which `m102-manager` countersigns |
+| `m103-shop` | Tharshini Kanagaratnam | M103 | **Point Pedro shop (S01) only** | ta | As `m102-shop`, at Point Pedro |
 
 The roles are narrow (`seed/m1security/demo-users.demo.sql`, "Demo: ..." roles): with the permission check on, a user sees and does only the job above. A location-scoped user (FW01, W01, S01) is refused by row-level security anywhere else (PR #148).
 

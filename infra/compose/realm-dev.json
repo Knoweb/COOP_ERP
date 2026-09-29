@@ -448,6 +448,36 @@
       "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
     },
     {
+      "id": "0190f0de-0000-7000-8000-000000000243",
+      "username": "m102-shop",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m102-shop@coop-erp.test",
+      "firstName": "Dilrukshi",
+      "lastName": "Senanayake",
+      "attributes": {
+        "locale": ["si"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e4"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "id": "0190f0de-0000-7000-8000-000000000253",
+      "username": "m103-shop",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "m103-shop@coop-erp.test",
+      "firstName": "Tharshini",
+      "lastName": "Kanagaratnam",
+      "attributes": {
+        "locale": ["ta"],
+        "ent": ["0190f0de-0000-7000-8000-0000000000e5"],
+        "cls": ["OWN"]
+      },
+      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
       "username": "service-account-coop-erp-backend",
       "enabled": true,
       "serviceAccountClientId": "coop-erp-backend",

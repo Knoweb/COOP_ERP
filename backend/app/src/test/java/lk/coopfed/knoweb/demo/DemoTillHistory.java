@@ -63,14 +63,14 @@ public final class DemoTillHistory {
 
     /**
      * When each shop's history starts, in days before the load: the town shop had its stock at the
-     * set-up, Hettipola a month later, the Pannala and Point Pedro shops at their first GRN of the
-     * trading history (ordered 55 days ago, received four days later).
+     * set-up (its first transfer), Hettipola a month later (its first transfer), the Pannala and
+     * Point Pedro shops at the set-up too (their counted opening stock, DemoShopStock).
      */
     static final Map<UUID, Integer> FIRST_DAY_AGO = Map.of(
             DemoCast.M101_TOWN_SHOP, DemoCalendar.HISTORY_DAYS,
             DemoCast.M101_HETTIPOLA_SHOP, DemoCalendar.SETUP_DAYS_AGO / 2 - 1,
-            DemoCast.M102_SHOP, DemoCalendar.HISTORY_DAYS - 5,
-            DemoCast.M103_SHOP, DemoCalendar.HISTORY_DAYS - 5);
+            DemoCast.M102_SHOP, DemoCalendar.HISTORY_DAYS,
+            DemoCast.M103_SHOP, DemoCalendar.HISTORY_DAYS);
 
     /**
      * The days a shop sells on: three a week over the eight weeks of the trading history (the

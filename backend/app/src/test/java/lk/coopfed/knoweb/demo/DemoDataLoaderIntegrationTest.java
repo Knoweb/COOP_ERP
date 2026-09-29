@@ -143,12 +143,19 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("shelf prices of M101", 40L)
                 .containsEntry("MRP policies of M101", 1L)
                 .containsEntry("active relationships", 5L)
-                .containsEntry("posted opening balances", 4L)
-                // 200, 29 at the Hettipola shop (DEMO-02) and the society's own 5 kg packs (the repack)
-                .containsEntry("lots", 230L)
+                // The Federation, both distributors, Kuliyapitiya's stores, and the Pannala and Point
+                // Pedro shops' own counted opening stock (DemoShopStock).
+                .containsEntry("posted opening balances", 6L)
+                // 40 at each of the four stores, 23 at the town shop, 16 at Hettipola, 20 at each of
+                // Pannala and Point Pedro, and the society's own 5 kg packs (the repack).
+                .containsEntry("lots", 240L)
                 .containsEntry("received transfers to the town shop", 1L)
                 .containsEntry("received transfers to the Hettipola shop", 1L)
-                .containsEntry("lots with stock at the town shop", 40L)
+                // Each shop's first stock: DemoShopStock's everyday range, one lot of each item.
+                .containsEntry("lots with stock at the town shop", (long) DemoShopStock.TOWN_SHOP.size())
+                .containsEntry("lots with stock at the Hettipola shop", (long) DemoShopStock.HETTIPOLA_SHOP.size())
+                .containsEntry("opening lots at the Pannala shop", (long) DemoShopStock.PANNALA_SHOP.size())
+                .containsEntry("opening lots at the Point Pedro shop", (long) DemoShopStock.POINT_PEDRO_SHOP.size())
                 .containsEntry("orders of the history", 44L)
                 // M7: 36 members, every other one with an account (DemoCustomers).
                 .containsEntry("members of M101", 36L)
@@ -597,6 +604,25 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                         admin,
                         "select count(*) from inventory.stock_lot where location_id = ?::uuid and qty_on_hand > 0",
                         DemoCast.M101_TOWN_SHOP.toString()));
+        counts.put(
+                "lots with stock at the Hettipola shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.stock_lot where location_id = ?::uuid and qty_on_hand > 0",
+                        DemoCast.M101_HETTIPOLA_SHOP.toString()));
+        for (Map.Entry<String, UUID> shop : Map.of(
+                        "Pannala", DemoCast.M102_SHOP,
+                        "Point Pedro", DemoCast.M103_SHOP)
+                .entrySet()) {
+            counts.put(
+                    "opening lots at the " + shop.getKey() + " shop",
+                    count(
+                            admin,
+                            "select count(*) from inventory.opening_balance_line l"
+                                    + " join inventory.opening_balance b using (opening_balance_id)"
+                                    + " where b.location_id = ?::uuid and b.status = 'POSTED'",
+                            shop.getValue().toString()));
+        }
         counts.put(
                 "orders of the history",
                 count(admin, "select count(*) from kernel.document where notes like 'Demo history %'"));

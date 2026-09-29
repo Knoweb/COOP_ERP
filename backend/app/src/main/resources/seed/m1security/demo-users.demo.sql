@@ -33,7 +33,11 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE')
+    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE'),
+    -- the shop staff of Pannala and Point Pedro (29 Sep 2026): each counts and signs its shop's
+    -- opening stock, which the society manager countersigns (DemoShopStock)
+    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BACK_OFFICE', 'ACTIVE')
 ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
@@ -55,7 +59,9 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: shop staff',                 false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', 'Demo: society office',             false, 'OWN', 'ACTIVE'),
     ('0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', 'Demo: society manager',            false, 'OWN', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', 'Demo: society manager',            false, 'OWN', 'ACTIVE')
+    ('0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', 'Demo: society manager',            false, 'OWN', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000343', '0190f0de-0000-7000-8000-0000000000e4', 'Demo: shop staff',                 false, 'OWN', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000353', '0190f0de-0000-7000-8000-0000000000e5', 'Demo: shop staff',                 false, 'OWN', 'ACTIVE')
 ON CONFLICT (role_id) DO NOTHING;
 
 -- What each role may do. The same job has the same codes in every entity.
@@ -222,7 +228,9 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
     ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
-    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL)
+    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL),
+    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-000000000343', '0190f0de-0000-7000-8000-0000000000e4', '0190f0de-0000-7000-8000-000000000142'),
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-000000000353', '0190f0de-0000-7000-8000-0000000000e5', '0190f0de-0000-7000-8000-000000000152')
 ON CONFLICT DO NOTHING;
 
 -- M7, the credit book's remainders and the privacy requests (29 September 2026, branch
@@ -254,6 +262,29 @@ WITH job (role_id, codes) AS (
         ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY['int.notify.view', 'int.notify.manage']),
         ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
         ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view'])
+)
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT job.role_id, p.permission_code
+FROM job
+CROSS JOIN LATERAL unnest(job.codes) AS code
+JOIN security.permission p ON p.permission_code = code
+ON CONFLICT DO NOTHING;
+
+-- --- The shop staff of Pannala (M102) and Point Pedro (M103), 29 September 2026: as the town
+-- shop's staff, held to their shop; and, because their societies have no stores (the distributor
+-- delivers to the shop), each prepares and signs the shop's opening stock, which the society
+-- manager countersigns (lk.coopfed.knoweb.demo.DemoShopStock). A block of its own, so that the
+-- other lanes' additions above merge without a conflict.
+WITH job (role_id, codes) AS (
+    VALUES
+        ('0190f0de-0000-7000-8000-000000000343'::uuid, ARRAY[
+            'shop.grn.confirm', 'shop.count.record', 'shop.transfer.receive', 'inv.stock.view',
+            'inv.opening.prepare', 'inv.opening.sign', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view',
+            'gov.entity.view', 'prc.pricelist.view', 'inv.writeoff.request']),
+        ('0190f0de-0000-7000-8000-000000000353'::uuid, ARRAY[
+            'shop.grn.confirm', 'shop.count.record', 'shop.transfer.receive', 'inv.stock.view',
+            'inv.opening.prepare', 'inv.opening.sign', 'cat.sku.view', 'prt.location.view', 'pos.receipt.view',
+            'gov.entity.view', 'prc.pricelist.view', 'inv.writeoff.request'])
 )
 INSERT INTO security.role_permission (role_id, permission_code)
 SELECT job.role_id, p.permission_code
