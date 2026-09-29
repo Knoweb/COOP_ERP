@@ -26,6 +26,7 @@ A run through everything that works today, in the order that builds the story:
 | 8 | [08-languages-and-permissions.md](08-languages-and-permissions.md) | 5 | Switching languages, a user who cannot see a screen |
 | 9 | [09-society-credit-book.md](09-society-credit-book.md) | 6 | The society's members and credit book: accounts, statements, repayments at the office |
 | 10 | [10-stock-control.md](10-stock-control.md) | 8 | Counts with approval, witnessed write-offs, repacking loose rice into society packs |
+| 11 | [11-accounting-and-notifications.md](11-accounting-and-notifications.md) | 6 | The journal export to the accounting package, and the mails in Mailpit |
 
 Run them in this order for a full demo; each file also stands alone if you only need to show one part. Files 4 and 5 are the heart of the story — do not cut them short if time is tight; cut file 7 or 8 instead.
 
