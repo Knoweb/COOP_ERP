@@ -1,13 +1,17 @@
-// Registers the scaffolder proof's throwaway module, m0proof (schema "proof"), in the places a
-// real module is registered by hand: the scaffolder's own MODULES, FlywayConfig,
-// ArchitectureTests (the module list and SCHEMA_OWNERSHIP) and the integration test shards.
+// Frees the name m9integration for the scaffolder proof, in the proof's throwaway working tree.
+//
+// `make test-scaffold` proves that `make new-module` still produces a module that builds and
+// passes. It copies hello into m9integration, the name whose schema ("integration") the database
+// roles, grants and SchemaRulesIntegrationTest already know. Until 29 September 2026 that module
+// was unbuilt; now it is built, so this script first removes the built M9 from the throwaway tree
+// (its own folders and files, and its two lines in the web registry and message index) so that
+// the scaffolder finds the name free again, exactly as before M9 existed.
 //
 // Only `make test-scaffold` runs it, on a clean working tree that the same target resets
 // (`git reset --hard && git clean -fd`) when it is done, so nothing here is ever committed.
-// Until 29 September 2026 the proof scaffolded m9integration, which was then still unbuilt; with
-// M1 to M9 built, no registered module is free to copy into, and m10procurement is reserved
-// with no schema on purpose. A throwaway name keeps the proof exercising the scaffolder exactly
-// as a developer would use it, without registering a schema anywhere real.
+// Everything else that names M9 (FlywayConfig, ArchitectureTests, the CI shards, permissions and
+// demo grants in the seeds) names the module the scaffolder re-creates, or a code/table that is
+// simply unused while the copy is in place.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -15,49 +19,43 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function edit(relative, anchor, insert, where = "after") {
-  const file = path.join(root, relative);
-  const raw = fs.readFileSync(file, "utf8");
-  const crlf = raw.includes("\r\n");
-  const text = raw.replace(/\r\n/g, "\n");
-  if (!text.includes(anchor)) {
-    throw new Error(`${relative}: anchor not found: ${anchor}`);
-  }
-  let out = where === "after" ? text.replace(anchor, anchor + insert) : text.replace(anchor, insert + anchor);
-  if (crlf) {
-    out = out.replace(/\n/g, "\r\n");
-  }
-  fs.writeFileSync(file, out);
+const removed = [
+  "backend/app/src/main/java/lk/coopfed/knoweb/m9integration",
+  "backend/app/src/test/java/lk/coopfed/knoweb/m9integration",
+  "backend/app/src/main/resources/db/migration/m9integration",
+  "backend/app/src/main/resources/seed/m9integration",
+  "backend/app/src/main/resources/i18n/m9integration",
+  "backend/app/src/main/resources/openapi/m9integration.yaml",
+  "web/src/modules/m9integration",
+  "web/src/generated/m9integration.ts",
+  "docs/modules/module-m9integration.adoc",
+  "docs/modules/module-m9integration.puml"
+];
+
+for (const relative of removed) {
+  fs.rmSync(path.join(root, relative), { recursive: true, force: true });
 }
 
-edit(
-  "tools/new-module.mjs",
-  `  m9integration: { schemas: ["integration"], displayName: "M9 Integration" }`,
-  `,\n  m0proof: { schemas: ["proof"], displayName: "Scaffolder proof (throwaway)" }`
-);
+// The web registry and the message index name the built module; the scaffolder adds its own
+// lines for the copy, so the built module's lines go first.
+function dropLines(relative, lines) {
+  const file = path.join(root, relative);
+  const raw = fs.readFileSync(file, "utf8");
+  const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+  const kept = raw.split(/\r?\n/).filter((line) => !lines.some((drop) => line.trim() === drop));
+  if (kept.length !== raw.split(/\r?\n/).length - lines.length) {
+    throw new Error(`${relative}: expected to drop ${lines.length} line(s) naming the built M9`);
+  }
+  fs.writeFileSync(file, kept.join(eol));
+}
 
-edit(
-  "backend/app/src/main/java/lk/coopfed/knoweb/config/FlywayConfig.java",
-  `new ModuleInfo("classpath:db/migration/m9integration", new String[] {"integration"}, "integration"));\n`,
-  `\n        modules.put("m0proof", new ModuleInfo("classpath:db/migration/m0proof", new String[] {"proof"}, "proof"));\n`
-);
+dropLines("web/src/modules/registry.ts", [
+  `import { integrationModule } from "./m9integration/module";`,
+  `integrationModule,`
+]);
+dropLines("web/src/shell/i18n/messages.ts", [
+  `import integrationMessages from "../../modules/m9integration/integration.messages.json" with { type: "json" };`,
+  `integrationMessages,`
+]);
 
-edit(
-  "backend/app/src/test/java/lk/coopfed/knoweb/ArchitectureTests.java",
-  `        "..m10procurement..",\n`,
-  `        "..m0proof..",\n`
-);
-
-edit(
-  "backend/app/src/test/java/lk/coopfed/knoweb/ArchitectureTests.java",
-  `            Map.entry("m9integration", Set.of("integration")),\n`,
-  `            Map.entry("m0proof", Set.of("proof")),\n`
-);
-
-edit(
-  "backend/app/src/test/java/lk/coopfed/knoweb/IntegrationTestShardCoverageTest.java",
-  `"lk.coopfed.knoweb.m9integration.",`,
-  `\n                            "lk.coopfed.knoweb.m0proof.",`
-);
-
-console.log("scaffolder proof: m0proof registered in the throwaway working tree");
+console.log("scaffolder proof: the built m9integration is removed from the throwaway working tree");

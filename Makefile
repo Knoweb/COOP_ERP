@@ -287,22 +287,22 @@ new-module:
 # slice rules, and the integration tests that check every module's schema, grants and
 # policies. The nightly pipeline runs the whole suite on the copy: SCAFFOLD_TESTS="$(SCAFFOLD_ALL)".
 SCAFFOLD_TESTS ?= :app:test --tests "*ArchitectureTests*" --tests "*OpenApiSliceRulesTest*" \
-	:app:integrationTest --tests "lk.coopfed.knoweb.m0proof.*" --tests "*SchemaRulesIntegrationTest*" \
+	:app:integrationTest --tests "lk.coopfed.knoweb.m9integration.*" --tests "*SchemaRulesIntegrationTest*" \
 	--tests "*OwnPoliciesTestTheClassIntegrationTest*" --tests "*RuntimeRolesIntegrationTest*"
 SCAFFOLD_ALL = :app:test :app:integrationTest
 test-scaffold:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "make test-scaffold needs a clean working tree (commit or stash first)." >&2; exit 1; \
 	fi
-	node tools/scaffold-proof-register.mjs
-	node tools/new-module.mjs --name m0proof --schema proof --entity sample
+	node tools/scaffold-proof-prepare.mjs
+	node tools/new-module.mjs --name m9integration --schema integration --entity webhook
 	sh tools/gen-clients.sh
 	@echo "--- a fresh copy carries placeholder permissions, and the check must refuse them"
 	@if node tools/check-permissions.mjs > /dev/null 2>&1; then \
 		echo "check-permissions accepted the scaffold placeholders" >&2; exit 1; \
 	fi
 	@echo "--- replace them, as the developer does in step 1 of the module README"
-	grep -rl "todo\.proof\.sample\." backend/app/src web/src | xargs sed -i "s/todo\.proof\.sample\./prf.sample./g"
+	grep -rl "todo\.integration\.webhook\." backend/app/src web/src | xargs sed -i "s/todo\.integration\.webhook\./int.webhook./g"
 	node tools/check-permissions.mjs
 	cd backend && ./gradlew $(SCAFFOLD_TESTS)
 	node tools/check-schema-ownership.mjs
