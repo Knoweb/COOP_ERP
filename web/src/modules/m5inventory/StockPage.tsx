@@ -86,6 +86,9 @@ export function StockPage() {
         <Link className="action-link" to="/inventory/repacks">
           <span>{t("inventory.repacks.link").text}</span>
         </Link>
+        <Link className="action-link" to="/inventory/transfer-requests">
+          <span>{t("inventory.request.link").text}</span>
+        </Link>
       </div>
 
       <section className="modern-filter-panel modern-filter-panel--stock">

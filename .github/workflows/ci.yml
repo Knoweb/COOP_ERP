@@ -243,7 +243,7 @@ jobs:
             packages: "lk.coopfed.knoweb.m2catalogue.,lk.coopfed.knoweb.m3pricing.,lk.coopfed.knoweb.m4trading."
           - name: m5inventory+m6pos+m7customers+m8reporting+demo+others
             packages: >-
-              lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,
+              lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,lk.coopfed.knoweb.m9integration.,
               lk.coopfed.knoweb.demo.,lk.coopfed.knoweb.hello.,lk.coopfed.knoweb.config.,
               lk.coopfed.knoweb.testsupport.,lk.coopfed.knoweb.SchemaRulesIntegrationTest,
               lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest,lk.coopfed.knoweb.RuntimeRolesIntegrationTest
@@ -824,8 +824,14 @@ jobs:
               gh issue create --title "main is red: the pipeline failed" --label ci-failure --body-file body.md
             fi
           elif [ -n "$open" ]; then
-            gh issue close "$open" --comment "Green again: $RUN_URL"
-            echo "recovered=true" >> "$GITHUB_ENV"
+            # Two main runs can finish within a second of each other; the first closes the issue
+            # and the second must not fail on an issue that is already closed.
+            # Only the run that closes it reports the recovery.
+            if gh issue close "$open" --comment "Green again: $RUN_URL"; then
+              echo "recovered=true" >> "$GITHUB_ENV"
+            else
+              echo "already closed by another run"
+            fi
           fi
 
       # Mail as well, straight from here, so that it does not depend on how each person has set

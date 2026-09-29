@@ -150,6 +150,145 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void limitsStatesAdjustmentsReversalAndPrivacyOverHttp() {
+        String customerId = post(
+                        "/v1/customers",
+                        Map.of(
+                                "displayName", "Gamini Ekanayake",
+                                "phone", "0700000211",
+                                "consents", List.of("CREDIT_ACCOUNT"),
+                                "via", "PAPER"),
+                        OFFICE_USER,
+                        SOCIETY)
+                .getBody()
+                .get("customerId")
+                .asText();
+        String accountId = post(
+                        "/v1/customers/" + customerId + "/accounts",
+                        Map.of("creditLimit", 10000, "nic", "190000000211"),
+                        OFFICE_USER,
+                        SOCIETY)
+                .getBody()
+                .get("accountId")
+                .asText();
+
+        // A lower limit and a hard block: no second factor. A higher limit asks for one (401).
+        ResponseEntity<JsonNode> lowered = post(
+                "/v1/accounts/" + accountId + "/limits",
+                Map.of("creditLimit", 8000, "hardBlock", true, "reason", "Missed a month"),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(lowered.getStatusCode())
+                .as(String.valueOf(lowered.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(lowered.getBody().get("hardBlock").asBoolean()).isTrue();
+        ResponseEntity<JsonNode> raised = post(
+                "/v1/accounts/" + accountId + "/limits",
+                Map.of("creditLimit", 20000, "reason", "Pays on time"),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(raised.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(String.valueOf(raised.getBody())).contains("mfa.required");
+        assertThat(post("/v1/accounts/" + accountId + "/limits", Map.of("creditLimit", 1), OFFICE_USER, SOCIETY)
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<JsonNode> suspended =
+                post("/v1/accounts/" + accountId + "/suspend", Map.of("reason", "Overdue"), OFFICE_USER, SOCIETY);
+        assertThat(suspended.getBody().get("status").asText()).isEqualTo("SUSPENDED");
+        assertThat(post("/v1/accounts/" + accountId + "/suspend", Map.of("reason", "Again"), OFFICE_USER, SOCIETY)
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(post("/v1/accounts/" + accountId + "/reinstate", Map.of("reason", "Paid"), OFFICE_USER, SOCIETY)
+                        .getBody()
+                        .get("status")
+                        .asText())
+                .isEqualTo("OPEN");
+        JsonNode history = get("/v1/accounts/" + accountId + "/history", OFFICE_USER, SOCIETY)
+                .getBody();
+        assertThat(history).hasSize(3);
+        assertThat(history.get(0).get("action").asText()).isEqualTo("REINSTATED");
+        assertThat(get("/v1/accounts/" + accountId + "/history", OTHER_USER, OTHER)
+                        .getBody())
+                .isEmpty();
+
+        // A repayment recorded in error, reversed.
+        String paymentId = post(
+                        "/v1/accounts/" + accountId + "/payments",
+                        Map.of("method", "DEPOSIT", "amount", 400),
+                        OFFICE_USER,
+                        SOCIETY)
+                .getBody()
+                .get("documentId")
+                .asText();
+        ResponseEntity<JsonNode> reversed = post(
+                "/v1/customer-payments/" + paymentId + "/reverse",
+                Map.of("reason", "Deposit bounced"),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(reversed.getStatusCode())
+                .as(String.valueOf(reversed.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(reversed.getBody().get("docNumber").asText()).isEqualTo("M7S-CPR-0000002");
+        assertThat(reversed.getBody().get("balance").decimalValue()).isEqualByComparingTo("0");
+
+        // An adjustment: asked by the office, approved by another clerk.
+        ResponseEntity<JsonNode> asked = post(
+                "/v1/accounts/" + accountId + "/adjustments",
+                Map.of("amount", 150, "reason", "Bank charge on the bounced deposit"),
+                OFFICE_USER,
+                SOCIETY);
+        assertThat(asked.getStatusCode()).as(String.valueOf(asked.getBody())).isEqualTo(HttpStatus.CREATED);
+        String adjustmentId = asked.getBody().get("adjustmentId").asText();
+        String approve = "/v1/accounts/" + accountId + "/adjustments/" + adjustmentId + "/approve";
+        assertThat(post(approve, null, OFFICE_USER, SOCIETY).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        ResponseEntity<JsonNode> approved = post(approve, null, CustomersFixture.SECOND_CLERK, SOCIETY);
+        assertThat(approved.getStatusCode())
+                .as(String.valueOf(approved.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(approved.getBody().get("status").asText()).isEqualTo("APPROVED");
+        assertThat(get("/v1/accounts/" + accountId, OFFICE_USER, SOCIETY)
+                        .getBody()
+                        .get("balance")
+                        .decimalValue())
+                .isEqualByComparingTo("150");
+
+        // An access request: recorded by the office, answered by the responsible officer only.
+        ResponseEntity<JsonNode> recorded =
+                post("/v1/privacy/requests", Map.of("customerId", customerId, "kind", "ACCESS"), OFFICE_USER, SOCIETY);
+        assertThat(recorded.getStatusCode())
+                .as(String.valueOf(recorded.getBody()))
+                .isEqualTo(HttpStatus.CREATED);
+        String requestId = recorded.getBody().get("requestId").asText();
+        assertThat(recorded.getBody().get("customerName").asText()).isEqualTo("Gamini Ekanayake");
+        CustomersFixture.appointOfficer(superuserJdbc());
+        ResponseEntity<JsonNode> notTheOfficer =
+                post("/v1/privacy/requests/" + requestId + "/fulfil", Map.of(), OFFICE_USER, SOCIETY);
+        assertThat(String.valueOf(notTheOfficer.getBody())).contains("m7.privacy.officer_only");
+        ResponseEntity<JsonNode> fulfilled = post(
+                "/v1/privacy/requests/" + requestId + "/fulfil",
+                Map.of("outcome", "Printed and handed over"),
+                CustomersFixture.OFFICER_USER,
+                SOCIETY);
+        assertThat(fulfilled.getStatusCode())
+                .as(String.valueOf(fulfilled.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(fulfilled.getBody().get("status").asText()).isEqualTo("FULFILLED");
+        JsonNode export = get("/v1/privacy/requests/" + requestId + "/export", CustomersFixture.OFFICER_USER, SOCIETY)
+                .getBody();
+        assertThat(export.get("customer").get(0).get("display_name").asText()).isEqualTo("Gamini Ekanayake");
+        assertThat(export.get("postings")).hasSize(3);
+        assertThat(get("/v1/privacy/requests?status=FULFILLED", OFFICE_USER, SOCIETY)
+                        .getBody())
+                .hasSize(1);
+        assertThat(get("/v1/privacy/requests", OTHER_USER, OTHER).getBody()).isEmpty();
+        assertThat(get("/v1/privacy/requests/" + requestId + "/export", OTHER_USER, OTHER)
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
     void theShapeOfARequestIsTheSlicesToRefuseAndARuleIsTheHandlers() {
         ResponseEntity<JsonNode> noPhone =
                 post("/v1/customers", Map.of("displayName", "No phone", "consents", List.of()), OFFICE_USER, SOCIETY);

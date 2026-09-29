@@ -152,3 +152,9 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A repack was reversed and its input restored
+
+  # M4-06 (29 Sep): the goods of an approved claim sent back by the buyer (25A section 6.2, ClaimReturn).
+  - code: STOCK_RETURNED_TO_SELLER
+    severity: INFO
+    offline_capturable: false
+    description_en: The goods of an approved claim left the buyer's stock back to the seller

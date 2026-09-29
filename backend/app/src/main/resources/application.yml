@@ -76,6 +76,21 @@ coop-erp:
   system:
     entity-id: ${COOP_ERP_SYSTEM_ENTITY_ID:}
 
+  # M9 (29A section 6.3): the notification adapters. E-mail goes to an SMTP relay, Mailpit on the
+  # local stack (compose sets the host; on the host the published port 1025); SMS goes to the log
+  # provider, which sends nothing. A real SMS gateway is another provider name with its
+  # credentials in the environment, never here.
+  integration:
+    notify:
+      enabled: ${COOP_ERP_NOTIFY_ENABLED:true}
+    smtp:
+      host: ${COOP_ERP_SMTP_HOST:localhost}
+      port: ${COOP_ERP_SMTP_PORT:1025}
+      from: ${COOP_ERP_SMTP_FROM:notifications@coop-erp.test}
+      timeout-millis: 5000
+    sms:
+      provider: ${COOP_ERP_SMS_PROVIDER:log}
+
   # DEMO-01 (docs/DEMO.md): true only in the one-off container of `make demo-data`, which loads
   # the demo through the command handlers and exits (lk.coopfed.knoweb.demo.DemoDataRunner).
   demo:

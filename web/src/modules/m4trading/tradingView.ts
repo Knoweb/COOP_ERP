@@ -87,6 +87,32 @@ export function discrepancyChip(status: "RAISED" | "SETTLED"): ChipState {
   return status === "RAISED" ? "disputed" : "issued";
 }
 
+/** A claim waits for the seller (disputed), is approved (issued) or rejected (void). */
+export function claimChip(status: "RAISED" | "APPROVED" | "REJECTED"): ChipState {
+  return status === "RAISED" ? "disputed" : status === "APPROVED" ? "issued" : "void";
+}
+
+/**
+ * The accepted quantity of each claimed line as the approval sends it: the seller's figure where it
+ * typed one (0 accepted), the claimed quantity where it left the field alone; null when a figure is
+ * not a number from 0 to the claimed quantity.
+ */
+export function acceptedLines(
+  lines: { claimLineId: string; claimedQty: number }[],
+  typed: Record<string, string>
+): { claimLineId: string; qty: number }[] | null {
+  const accepted: { claimLineId: string; qty: number }[] = [];
+  for (const line of lines) {
+    const text = typed[line.claimLineId];
+    const qty = text === undefined || text.trim() === "" ? line.claimedQty : Number(text);
+    if (!Number.isFinite(qty) || qty < 0 || qty > line.claimedQty) {
+      return null;
+    }
+    accepted.push({ claimLineId: line.claimLineId, qty });
+  }
+  return accepted;
+}
+
 /** An invoice is in force whatever its payments; one still owing is shown as a document still to close. */
 export function paymentStateChip(state: "OPEN" | "PART_PAID" | "SETTLED" | undefined): ChipState {
   return state === "SETTLED" ? "issued" : "draft";

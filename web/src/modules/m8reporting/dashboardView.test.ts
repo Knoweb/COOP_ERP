@@ -12,6 +12,7 @@ describe("dashboard and exception queue view", () => {
     const id = "subject-1";
     expect(exceptionLink({ kind: "CHEQUE_BOUNCED", subjectId: id })).toBe(`/trading/payments/${id}`);
     expect(exceptionLink({ kind: "DISCREPANCY_OPEN", subjectId: id })).toBe(`/trading/discrepancies/${id}`);
+    expect(exceptionLink({ kind: "CLAIM_OPEN", subjectId: id })).toBe(`/trading/claims/${id}`);
     expect(exceptionLink({ kind: "INVOICE_DISPUTED", subjectId: id })).toBe(`/trading/invoices/${id}`);
     expect(
       exceptionLink({ kind: "EXPOSURE_WARNING", subjectId: id, role: "SELLER", counterpartyEntityId: "b" })

@@ -11,7 +11,9 @@ import { StateChip } from "../../shell/components/StateChip";
 import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
+import { AccountManagement } from "./AccountManagement";
 import { useCustomersApi, type Account, type CustomerPayment } from "./customersApi";
+import { PrivacyRequestForm } from "./PrivacyRequestsPage";
 import { errorText, limitUsedPercent, nameIn, statusChip } from "./customersView";
 import "./customers.css";
 
@@ -28,6 +30,7 @@ export function CustomerCardPage() {
   const api = useCustomersApi();
   const formatInstant = useFormatInstant();
   const card = useQuery({ queryKey: ["customers", "card", customerId], queryFn: () => api.customer(customerId) });
+  const canRecordPrivacy = useHasPermission("cus.privacy.record");
 
   if (card.isLoading) {
     return (
@@ -95,6 +98,9 @@ export function CustomerCardPage() {
         <AccountPanel account={customer.account} customerId={customerId} />
       ) : (
         customer.status === "ACTIVE" && <OpenAccountForm customerId={customerId} />
+      )}
+      {canRecordPrivacy && customer.registeredHere && customer.status !== "ANONYMISED" && (
+        <PrivacyRequestForm customerId={customerId} />
       )}
     </main>
   );
@@ -188,6 +194,7 @@ function AccountPanel({ account, customerId }: { account: Account; customerId: s
         <Link to={`/customers/${customerId}/accounts/${account.accountId}/statement`}>{t("customers.statement.open").text}</Link>
       </p>
       {canRecord && account.status !== "CLOSED" && <RepaymentForm account={account} customerId={customerId} />}
+      <AccountManagement account={account} customerId={customerId} />
     </section>
   );
 }

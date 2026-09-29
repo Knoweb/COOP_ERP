@@ -775,3 +775,16 @@ config_items:
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory
+  # M7, the account limits (29 September 2026, branch feat/m7-limits-privacy-snapshot): doc 27
+  # section 4.2 asks for MFA on a limit increase; the step-up window, as M1's credit limit has one.
+  - key: customers.limit_increase_mfa_max_age
+    value_type: DURATION
+    schema: { minimum: "PT1M", maximum: "PT12H" }
+    description_en: How recently the second factor must have been presented to raise a customer's credit limit
+    description_si: පාරිභෝගිකයෙකුගේ ණය සීමාව ඉහළ දැමීමට දෙවන සාධකය ඉදිරිපත් කර තිබිය යුතු මෑත කාලය
+    description_ta: வாடிக்கையாளரின் கடன் வரம்பை உயர்த்த இரண்டாம் காரணி எவ்வளவு சமீபத்தில் வழங்கப்பட்டிருக்க வேண்டும்
+    default: "PT10M"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    sensitive: true
+    module: m7customers

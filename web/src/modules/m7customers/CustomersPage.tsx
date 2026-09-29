@@ -41,6 +41,7 @@ export function CustomersPage() {
   const navigate = useNavigate();
   const key = useIdempotencyKey();
   const canRegister = useHasPermission("cus.customer.register");
+  const canSeePrivacy = useHasPermission("cus.privacy.record");
 
   const [query, setQuery] = useState({ q: "", phone: "" });
   const [search, setSearch] = useState({ q: "", phone: "" });
@@ -101,6 +102,11 @@ export function CustomersPage() {
   return (
     <main className="shell-page">
       <h1>{t("customers.title").text}</h1>
+      {canSeePrivacy && (
+        <p>
+          <Link to="/customers/privacy">{t("customers.privacy.title").text}</Link>
+        </p>
+      )}
 
       <form className="customers-filter-bar" onSubmit={find} role="search">
         <label className="customers-field">

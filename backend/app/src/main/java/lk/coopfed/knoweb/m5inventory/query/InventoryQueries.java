@@ -67,6 +67,12 @@ public interface InventoryQueries {
     /** A transfer of the caller's, seen from its source or its destination, with its lines. */
     Optional<TransferView> transfer(UUID transferId, ScopeContext scope);
 
+    /**
+     * The transfer issued for an M4 transfer request (M4-10), seen from its source or its
+     * destination, or empty while none is issued (or the caller cannot see it).
+     */
+    Optional<TransferView> transferOfRequest(UUID transferRequestId, ScopeContext scope);
+
     /** The transfers leaving or arriving at a location, newest first, with their lines. */
     List<TransferView> transfers(UUID locationId, ScopeContext scope);
 }

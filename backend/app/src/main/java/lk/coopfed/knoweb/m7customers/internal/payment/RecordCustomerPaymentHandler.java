@@ -146,8 +146,8 @@ class RecordCustomerPaymentHandler implements Handles<RecordCustomerPayment, UUI
         jdbc.update(
                 """
                 insert into customers.doc_customer_payment (document_id, account_id, method, reference, amount,
-                    allocation_mode, owner_entity_id)
-                values (?, ?, ?, ?, ?, ?, ?)
+                    allocation_mode, doc_number_display, owner_entity_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 documentId,
                 account.accountId(),
@@ -155,6 +155,7 @@ class RecordCustomerPaymentHandler implements Handles<RecordCustomerPayment, UUI
                 reference,
                 amount,
                 mode,
+                issued.docNumberDisplay(),
                 society);
 
         UUID paymentPostingId = Ids.next();
@@ -249,7 +250,7 @@ class RecordCustomerPaymentHandler implements Handles<RecordCustomerPayment, UUI
     }
 
     /** The one line of a CPR: no item, quantity one, the amount as its total. */
-    private static DocumentLineRecord amountLine(UUID documentId, BigDecimal amount) {
+    static DocumentLineRecord amountLine(UUID documentId, BigDecimal amount) {
         return new DocumentLineRecord(
                 Ids.next(),
                 documentId,

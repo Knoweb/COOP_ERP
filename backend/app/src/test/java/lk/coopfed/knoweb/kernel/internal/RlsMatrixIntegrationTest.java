@@ -304,6 +304,21 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "kernel.numbering_series",
                     "own_read, own_update and own_write admit a NULL location (the ENTITY series) at a location scope",
                     RlsMatrixIntegrationTest::entityWideRowsAtALocation),
+            new Departure(
+                    "integration.notification_template",
+                    "everyone_reads (m9integration V0001): no personal data; the kernel's renderer reads a"
+                            + " template after the commit with no scope at all",
+                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+            new Departure(
+                    "integration.notification_rule",
+                    "everyone_reads (m9integration V0001): no personal data; the kernel's dispatcher reads the"
+                            + " rules in the scope of whichever entity's event it matches",
+                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+            new Departure(
+                    "integration.notification_contact",
+                    "no ext_view on purpose (m9integration V0003): an address is personal data a regulator's"
+                            + " view has no need of; the dispatcher reaches it through notification_recipients()",
+                    RlsMatrixIntegrationTest::externalReadsNothing),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
             // (hello README); K-01 has landed, so hello can add it.
@@ -327,6 +342,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         && !check.scope().is("NONE")
                 ? VISIBLE
                 : null;
+    }
+
+    /** Reference data read by every session, scope or none (the notification templates and rules). */
+    private static String everySessionReadsEverything(Check check) {
+        return check.op() == Op.SELECT ? VISIBLE : null;
     }
 
     /** An insert is admitted only when the caller owns the parent SKU; a made-up row has none. */

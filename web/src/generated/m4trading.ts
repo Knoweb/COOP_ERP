@@ -671,6 +671,221 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The claims the caller's entity raised (BUYER) or that were raised with it (SELLER) */
+        get: operations["listClaims"];
+        put?: never;
+        /**
+         * The buyer claims against the seller for goods of a confirmed GRN (M4-06)
+         * @description Within trading.claim_window_days of the GRN's confirmation. Photographs are added to the raised claim with addClaimPhoto. Problems: m4.claim.kind_invalid, m4.claim.grn_not_found, m4.claim.grn_not_confirmed, m4.claim.no_seller, m4.claim.window_closed, m4.claim.lines_required, m4.claim.line_unknown, m4.claim.line_duplicate, m4.claim.qty_invalid, m4.claim.exceeds_received.
+         */
+        post: operations["raiseClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        /** One claim the caller's entity raised or that was raised with it */
+        get: operations["getClaim"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise the upload of one photograph for a raised claim
+         * @description Answers a URL the client PUTs the bytes to, with the content type given here. Problems: m4.claim.not_found, m4.claim.decided, attachment.content_type_not_allowed, attachment.too_large.
+         */
+        post: operations["addClaimPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller approves the claim in whole or in part; a credit note is issued with it
+         * @description Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending, m4.claim.line_unknown, m4.claim.qty_invalid, m4.claim.nothing_approved, m4.claim.invoice_first, m4.creditnote.exceeds_due.
+         */
+        post: operations["approveClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller rejects the claim, with a reason
+         * @description Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending.
+         */
+        post: operations["rejectClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer sends back the goods of a claim approved with the return required
+         * @description M5 takes them out of the buyer's stock at the GRN's location. Problems: m4.claim.not_found, m4.claim.return_not_required, m4.claim.returned_already.
+         */
+        post: operations["dispatchClaimReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The transfer requests the caller's scope reads, newest first
+         * @description A shop session reads its own requests and those asked of it; the society all of its own.
+         */
+        get: operations["listTransferRequests"];
+        put?: never;
+        /**
+         * A shop asks for stock from another location of its society (M4-10)
+         * @description Problems: m4.transfer.location_not_in_scope, m4.transfer.same_location, m4.transfer.lines_required, m4.transfer.sku_unknown, m4.transfer.sku_duplicate, m4.transfer.qty_invalid.
+         */
+        post: operations["requestTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        /** One transfer request, with the transfer that fulfils it once issued */
+        get: operations["getTransferRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The society approves the request; its stores issue the transfer
+         * @description The society names the location that gives the stock, or keeps the one the shop named. Problems: m4.transfer.request_not_found, m4.transfer.decided, m4.transfer.source_required, m4.transfer.same_location, m4.transfer.location_invalid, m4.transfer.insufficient_stock.
+         */
+        post: operations["approveTransferRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests/{requestId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The society rejects the request, with a reason
+         * @description Problems: m4.transfer.request_not_found, m4.transfer.decided.
+         */
+        post: operations["rejectTransferRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1244,6 +1459,175 @@ export interface components {
             /** Format: date-time */
             asOf: string;
         };
+        DecisionReasonRequest: {
+            reason: string;
+        };
+        RaiseClaimRequest: {
+            /** Format: uuid */
+            grnId: string;
+            /** @enum {string} */
+            kind: "DAMAGED" | "EXPIRED_ON_ARRIVAL" | "WRONG_GOODS" | "QUALITY";
+            /**
+             * @description The buyer offers the goods back; the seller decides
+             * @default false
+             */
+            returnRequested: boolean;
+            note?: string;
+            lines: components["schemas"]["ClaimLineRequest"][];
+        };
+        ClaimLineRequest: {
+            /** Format: uuid */
+            grnLineId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        ClaimPhotoRequest: {
+            contentType: string;
+            /** Format: int64 */
+            contentLength?: number;
+        };
+        ClaimPhotoResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        ApproveClaimRequest: {
+            findings?: string;
+            /** @default false */
+            returnRequired: boolean;
+            /** @description What is accepted of each claimed line; none accepts every line in full */
+            lines?: components["schemas"]["ApproveClaimLineRequest"][];
+        };
+        ApproveClaimLineRequest: {
+            /** Format: uuid */
+            claimLineId: string;
+            qty: number;
+        };
+        ClaimResponse: {
+            /** Format: uuid */
+            claimId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RAISED" | "APPROVED" | "REJECTED";
+            /** @enum {string} */
+            kind: "DAMAGED" | "EXPIRED_ON_ARRIVAL" | "WRONG_GOODS" | "QUALITY";
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: uuid */
+            grnId: string;
+            grnDocNumber?: string;
+            /** Format: date-time */
+            raisedAt?: string;
+            /** Format: date-time */
+            windowEndsAt: string;
+            returnRequested: boolean;
+            note?: string;
+            /**
+             * Format: uuid
+             * @description The seller's invoice of the GRN, once issued
+             */
+            invoiceId?: string;
+            findings?: string;
+            rejectReason?: string;
+            returnRequired: boolean;
+            /** Format: uuid */
+            creditNoteId?: string;
+            creditNoteDocNumber?: string;
+            /** Format: uuid */
+            decidedByUserId?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /** Format: date-time */
+            returnedAt?: string;
+            photos: components["schemas"]["ClaimPhotoStatusResponse"][];
+            lines: components["schemas"]["ClaimLineResponse"][];
+        };
+        ClaimPhotoStatusResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETE" | "FAILED";
+        };
+        ClaimLineResponse: {
+            /** Format: uuid */
+            claimLineId: string;
+            /** Format: uuid */
+            grnLineId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            claimedQty: number;
+            approvedQty?: number;
+            unitPrice?: number;
+        };
+        ApproveTransferRequestRequest: {
+            /**
+             * Format: uuid
+             * @description The society's location that gives the stock; left out, the one the shop named
+             */
+            fromLocationId?: string;
+        };
+        RequestTransferRequest: {
+            /**
+             * Format: uuid
+             * @description The stores asked, when the shop knows them; left out, the society names them when it decides
+             */
+            fromLocationId?: string;
+            /**
+             * Format: uuid
+             * @description The shop that asks; a shop session's own location when left out
+             */
+            toLocationId?: string;
+            reason?: string;
+            lines: components["schemas"]["TransferRequestLineRequest"][];
+        };
+        TransferRequestLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        TransferRequestResponse: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            fromLocationId?: string;
+            /** Format: uuid */
+            toLocationId: string;
+            /** @enum {string} */
+            status: "REQUESTED" | "APPROVED" | "REJECTED";
+            reason?: string;
+            /** Format: uuid */
+            requestedBy?: string;
+            /** Format: date-time */
+            requestedAt: string;
+            rejectReason?: string;
+            /** Format: uuid */
+            decidedBy?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /**
+             * Format: uuid
+             * @description The M5 transfer that fulfils the approved request, once the stores issued it
+             */
+            transferId?: string;
+            /** @enum {string} */
+            transferStatus?: "IN_TRANSIT" | "RECEIVED";
+            lines: components["schemas"]["TransferRequestLineResponse"][];
+        };
+        TransferRequestLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            skuId: string;
+            qty: number;
+        };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
             field: string;
@@ -1296,6 +1680,8 @@ export interface components {
         InvoiceId: string;
         CreditNoteId: string;
         ReceiptId: string;
+        ClaimId: string;
+        TransferRequestId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -2350,6 +2736,349 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    listClaims: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claims, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    raiseClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RaiseClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim, raised */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            /** @description m4.claim.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    addClaimPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimPhotoRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorised */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimPhotoResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    approveClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim, approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim, rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    dispatchClaimReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim, its goods on their way back */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTransferRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transfer requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"][];
+                };
+            };
+        };
+    };
+    requestTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description The request */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getTransferRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            /** @description m4.transfer.request_not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    approveTransferRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveTransferRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description The request, approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectTransferRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The request, rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
 }

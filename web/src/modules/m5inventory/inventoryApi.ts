@@ -7,6 +7,7 @@ import { useApiClient } from "../../shell/api/client";
 import type { components, paths } from "../../generated/m5inventory";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
+import type { components as tradingComponents, paths as tradingPaths } from "../../generated/m4trading";
 
 export type LotBalance = components["schemas"]["LotBalanceResponse"];
 export type Availability = components["schemas"]["AvailabilityResponse"];
@@ -27,11 +28,14 @@ export type Repack = components["schemas"]["RepackResponse"];
 export type ExecuteRepackRequest = components["schemas"]["ExecuteRepackRequest"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
+export type TransferRequest = tradingComponents["schemas"]["TransferRequestResponse"];
+export type RequestTransferRequest = tradingComponents["schemas"]["RequestTransferRequest"];
 
 export function useInventoryApi() {
   const api = useApiClient<paths>();
   const party = useApiClient<partyPaths>();
   const catalogue = useApiClient<cataloguePaths>();
+  const trading = useApiClient<tradingPaths>();
 
   return useMemo(
     () => ({
@@ -113,6 +117,44 @@ export function useInventoryApi() {
       async receiveTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
           params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      // ---- transfer requests (M4-10: M4's slice, the stores' side of a transfer) ---------------
+
+      /** The requests the caller's scope reads: a shop its own, the society all; newest first. */
+      async transferRequests(): Promise<TransferRequest[]> {
+        const { data } = await trading.GET("/v1/trading/transfer-requests");
+        return data ?? [];
+      },
+
+      /** The shop asks for stock; the source is left to the society when the shop does not name it. */
+      async requestTransfer(body: RequestTransferRequest, idempotencyKey: string): Promise<TransferRequest> {
+        const { data } = await trading.POST("/v1/trading/transfer-requests", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      /** The society approves from the location it names (or the one the shop named); M5 issues the transfer. */
+      async approveTransferRequest(
+        requestId: string,
+        fromLocationId: string | undefined,
+        idempotencyKey: string
+      ): Promise<TransferRequest> {
+        const { data } = await trading.POST("/v1/trading/transfer-requests/{requestId}/approve", {
+          params: { path: { requestId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { fromLocationId }
+        });
+        return data!;
+      },
+
+      async rejectTransferRequest(requestId: string, reason: string, idempotencyKey: string): Promise<TransferRequest> {
+        const { data } = await trading.POST("/v1/trading/transfer-requests/{requestId}/reject", {
+          params: { path: { requestId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
         });
         return data!;
       },
@@ -285,6 +327,6 @@ export function useInventoryApi() {
         return data!;
       }
     }),
-    [api, party, catalogue]
+    [api, party, catalogue, trading]
   );
 }

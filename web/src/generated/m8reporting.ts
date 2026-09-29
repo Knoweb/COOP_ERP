@@ -178,7 +178,7 @@ export interface components {
         };
         ExceptionItemResponse: {
             /** @enum {string} */
-            kind: "DISCREPANCY_OPEN" | "INVOICE_DISPUTED" | "CHEQUE_BOUNCED" | "EXPOSURE_WARNING" | "NEGATIVE_STOCK";
+            kind: "DISCREPANCY_OPEN" | "CLAIM_OPEN" | "INVOICE_DISPUTED" | "CHEQUE_BOUNCED" | "EXPOSURE_WARNING" | "NEGATIVE_STOCK";
             /** @enum {string} */
             severity: "ALERT" | "REVIEW";
             /**

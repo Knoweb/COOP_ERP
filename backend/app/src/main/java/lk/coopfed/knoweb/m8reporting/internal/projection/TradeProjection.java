@@ -73,6 +73,10 @@ public class TradeProjection extends Projection {
             Map.entry("cheque.cleared.v1", new String[] {"PAYMENT", "CLEARED"}),
             Map.entry("discrepancy.raised.v1", new String[] {"DISCREPANCY", "RAISED"}),
             Map.entry("discrepancy.settled.v1", new String[] {"DISCREPANCY", "SETTLED"}),
+            // M4-06: a claim raised by the buyer, decided by the seller (V0005).
+            Map.entry("claim.raised.v1", new String[] {"CLAIM", "RAISED"}),
+            Map.entry("claim.approved.v1", new String[] {"CLAIM", "APPROVED"}),
+            Map.entry("claim.rejected.v1", new String[] {"CLAIM", "REJECTED"}),
             // Not a document: a row of its own table (exposure_warning_event).
             Map.entry("exposure.warning.v1", new String[] {null, null}));
 
@@ -288,6 +292,24 @@ public class TradeProjection extends Projection {
                 row.reference = event.uuid("creditNoteId");
                 if (event.instant("settledAt") != null) {
                     row.businessDate = event.instant("settledAt").atZone(zone).toLocalDate();
+                }
+            }
+            case "claim.raised.v1" -> {
+                row.documentId = event.uuid("claimId");
+                row.reference = event.uuid("grnId");
+                row.windowEndsAt = event.instant("windowEndsAt");
+            }
+            case "claim.approved.v1" -> {
+                row.documentId = event.uuid("claimId");
+                row.reference = event.uuid("creditNoteId");
+                if (event.instant("decidedAt") != null) {
+                    row.businessDate = event.instant("decidedAt").atZone(zone).toLocalDate();
+                }
+            }
+            case "claim.rejected.v1" -> {
+                row.documentId = event.uuid("claimId");
+                if (event.instant("decidedAt") != null) {
+                    row.businessDate = event.instant("decidedAt").atZone(zone).toLocalDate();
                 }
             }
             default -> throw new IllegalStateException("Not a trading event: " + event.type());

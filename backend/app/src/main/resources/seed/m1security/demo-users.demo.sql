@@ -185,6 +185,23 @@ CROSS JOIN LATERAL unnest(job.codes) AS code
 JOIN security.permission p ON p.permission_code = code
 ON CONFLICT DO NOTHING;
 
+-- M4-06 claims and M4-10 transfer requests (29 Sep): the buyers raise claims and send the goods
+-- back (distributor commercial, society buyer), the sellers' accounts decide them (Federation and
+-- distributor accounts), and the society manager approves its shops' transfer requests.
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT grant_row.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000311'::uuid, 'del.claim.raise'),
+        ('0190f0de-0000-7000-8000-000000000321'::uuid, 'del.claim.raise'),
+        ('0190f0de-0000-7000-8000-000000000331'::uuid, 'del.claim.raise'),
+        ('0190f0de-0000-7000-8000-000000000305'::uuid, 'del.claim.decide'),
+        ('0190f0de-0000-7000-8000-000000000313'::uuid, 'del.claim.decide'),
+        ('0190f0de-0000-7000-8000-000000000323'::uuid, 'del.claim.decide'),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, 'mpcs.transfer.approve')
+     ) AS grant_row (role_id, permission_code)
+JOIN security.permission p ON p.permission_code = grant_row.permission_code
+ON CONFLICT DO NOTHING;
+
 -- The assignments. NULL location: entity-wide. A location: that location only.
 INSERT INTO security.user_role (user_id, role_id, scope_entity_id, scope_location_id)
 VALUES
@@ -206,4 +223,41 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL)
+ON CONFLICT DO NOTHING;
+
+-- M7, the credit book's remainders and the privacy requests (29 September 2026, branch
+-- feat/m7-limits-privacy-snapshot). The society office (m101-office) asks for adjustments, reverses
+-- a repayment recorded in error and records members' data requests; the manager of Kuliyapitiya
+-- MPCS (m101-manager, Ruwan Dissanayake) is its responsible officer (doc 27 section 3.2; appointed
+-- in seed/m1party/demo-parties.demo.sql): the one who answers those requests and approves the
+-- adjustments the office asks for.
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT job.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'cus.account.adjust'),
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'cus.payment.reverse'),
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'cus.privacy.record'),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, 'cus.customer.view'),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, 'cus.account.adjust_approve'),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, 'cus.privacy.record'),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, 'cus.privacy.fulfil')) AS job (role_id, code)
+JOIN security.permission p ON p.permission_code = job.code
+ON CONFLICT DO NOTHING;
+
+-- --- M9 Integration (29 September 2026): the accounting export and the notification screens.
+-- The accounts desks generate and download their journal exports and read the notification log;
+-- the Federation's administration also activates and retires the federation-wide rules. A block
+-- of its own, so that the other lanes' additions above merge without a conflict.
+WITH job (role_id, codes) AS (
+    VALUES
+        ('0190f0de-0000-7000-8000-000000000305'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
+        ('0190f0de-0000-7000-8000-000000000306'::uuid, ARRAY['int.notify.view', 'int.notify.manage']),
+        ('0190f0de-0000-7000-8000-000000000313'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view']),
+        ('0190f0de-0000-7000-8000-000000000323'::uuid, ARRAY['int.journal.read', 'int.journal.export', 'int.notify.view'])
+)
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT job.role_id, p.permission_code
+FROM job
+CROSS JOIN LATERAL unnest(job.codes) AS code
+JOIN security.permission p ON p.permission_code = code
 ON CONFLICT DO NOTHING;

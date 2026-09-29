@@ -95,6 +95,9 @@ class NotificationDispatcher implements CacheFanoutListener {
 
         JsonNode body = payload.path("payload");
         UUID counterparty = uuid(body.path("counterpartyEntityId").asText(null));
+        if (counterparty == null) {
+            counterparty = otherParty(body, scope.entityId());
+        }
 
         if (RULE_CHANGED.equals(eventType)) {
             // 19A section 10: the cache of active rules is invalidated by M9's change event.
@@ -237,6 +240,25 @@ class NotificationDispatcher implements CacheFanoutListener {
             }
         });
         return arguments;
+    }
+
+    /**
+     * The counterparty of a trading event that names its two parties instead (M4's invoices,
+     * receipts, cheques and exposure warnings carry sellerEntityId and buyerEntityId, no
+     * counterpartyEntityId): the party that is not the event's owner. Added with M9's rules
+     * (29 September 2026), whose ROLE_AT_COUNTERPARTY audience reaches the buyer of the seller's
+     * invoice; null when the owner is neither party or the payload names neither.
+     */
+    static UUID otherParty(JsonNode body, UUID owner) {
+        UUID seller = uuid(body.path("sellerEntityId").asText(null));
+        UUID buyer = uuid(body.path("buyerEntityId").asText(null));
+        if (owner == null || seller == null || buyer == null) {
+            return null;
+        }
+        if (owner.equals(seller)) {
+            return buyer;
+        }
+        return owner.equals(buyer) ? seller : null;
     }
 
     private static UUID uuid(String text) {

@@ -15,6 +15,13 @@ export type CustomerPayment = components["schemas"]["CustomerPayment"];
 export type RegisterCustomerRequest = components["schemas"]["RegisterCustomerRequest"];
 export type OpenAccountRequest = components["schemas"]["OpenAccountRequest"];
 export type RecordPaymentRequest = components["schemas"]["RecordPaymentRequest"];
+export type AmendLimitsRequest = components["schemas"]["AmendLimitsRequest"];
+export type AccountHistoryEntry = components["schemas"]["AccountHistoryEntry"];
+export type Adjustment = components["schemas"]["Adjustment"];
+export type AdjustmentRequest = components["schemas"]["AdjustmentRequest"];
+export type PrivacyRequest = components["schemas"]["PrivacyRequest"];
+export type PrivacyRequestRequest = components["schemas"]["PrivacyRequestRequest"];
+export type AccountAction = "suspend" | "reinstate" | "close";
 
 export function useCustomersApi() {
   const api = useApiClient<paths>();
@@ -61,6 +68,97 @@ export function useCustomersApi() {
           params: { path: { accountId }, query: { from, to } }
         });
         return data ?? null;
+      },
+
+      /** Limit, hard block and offline cap; a higher limit answers 401 until the second factor is fresh. */
+      async amendLimits(accountId: string, request: AmendLimitsRequest, idempotencyKey: string): Promise<Account> {
+        const { data } = await api.POST("/v1/accounts/{accountId}/limits", {
+          params: { path: { accountId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async changeStatus(accountId: string, action: AccountAction, reason: string, idempotencyKey: string): Promise<Account> {
+        const options = {
+          params: { path: { accountId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
+        };
+        const { data } =
+          action === "suspend"
+            ? await api.POST("/v1/accounts/{accountId}/suspend", options)
+            : action === "reinstate"
+              ? await api.POST("/v1/accounts/{accountId}/reinstate", options)
+              : await api.POST("/v1/accounts/{accountId}/close", options);
+        return data!;
+      },
+
+      async history(accountId: string): Promise<AccountHistoryEntry[]> {
+        const { data } = await api.GET("/v1/accounts/{accountId}/history", { params: { path: { accountId } } });
+        return data ?? [];
+      },
+
+      async adjustments(accountId: string): Promise<Adjustment[]> {
+        const { data } = await api.GET("/v1/accounts/{accountId}/adjustments", { params: { path: { accountId } } });
+        return data ?? [];
+      },
+
+      async requestAdjustment(accountId: string, request: AdjustmentRequest, idempotencyKey: string): Promise<Adjustment> {
+        const { data } = await api.POST("/v1/accounts/{accountId}/adjustments", {
+          params: { path: { accountId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async approveAdjustment(accountId: string, adjustmentId: string, idempotencyKey: string): Promise<Adjustment> {
+        const { data } = await api.POST("/v1/accounts/{accountId}/adjustments/{adjustmentId}/approve", {
+          params: { path: { accountId, adjustmentId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async reversePayment(documentId: string, reason: string, idempotencyKey: string): Promise<CustomerPayment> {
+        const { data } = await api.POST("/v1/customer-payments/{documentId}/reverse", {
+          params: { path: { documentId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      async privacyRequests(): Promise<PrivacyRequest[]> {
+        const { data } = await api.GET("/v1/privacy/requests", { params: { query: {} } });
+        return data ?? [];
+      },
+
+      async recordPrivacyRequest(request: PrivacyRequestRequest, idempotencyKey: string): Promise<PrivacyRequest> {
+        const { data } = await api.POST("/v1/privacy/requests", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: request
+        });
+        return data!;
+      },
+
+      async fulfilPrivacyRequest(requestId: string, outcome: string | null, idempotencyKey: string): Promise<PrivacyRequest> {
+        const { data } = await api.POST("/v1/privacy/requests/{requestId}/fulfil", {
+          params: { path: { requestId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { outcome }
+        });
+        return data!;
+      },
+
+      async refusePrivacyRequest(requestId: string, ground: string, idempotencyKey: string): Promise<PrivacyRequest> {
+        const { data } = await api.POST("/v1/privacy/requests/{requestId}/refuse", {
+          params: { path: { requestId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: { ground }
+        });
+        return data!;
+      },
+
+      /** The export of a fulfilled access request, as the JSON the officer hands over. */
+      async privacyExport(requestId: string): Promise<Record<string, unknown> | null> {
+        const { data } = await api.GET("/v1/privacy/requests/{requestId}/export", { params: { path: { requestId } } });
+        return (data as Record<string, unknown> | undefined) ?? null;
       },
 
       async recordPayment(

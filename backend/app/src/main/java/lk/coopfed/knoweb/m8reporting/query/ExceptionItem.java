@@ -9,7 +9,7 @@ import java.util.UUID;
  * "Exception queue"): something that needs a person, worked out from the projections in the
  * caller's scope.
  *
- * @param kind                 DISCREPANCY_OPEN, INVOICE_DISPUTED, CHEQUE_BOUNCED, EXPOSURE_WARNING or
+ * @param kind                 DISCREPANCY_OPEN, CLAIM_OPEN, INVOICE_DISPUTED, CHEQUE_BOUNCED, EXPOSURE_WARNING or
  *                             NEGATIVE_STOCK
  * @param severity             ALERT or REVIEW (doc 19's audit severities)
  * @param subjectId            the discrepancy, invoice, payment receipt, relationship, or the lot's batch

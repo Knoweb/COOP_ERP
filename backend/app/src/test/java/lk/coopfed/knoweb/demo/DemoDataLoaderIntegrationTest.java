@@ -91,6 +91,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     lk.coopfed.knoweb.m7customers.query.AccountQueries accounts;
 
+    @Autowired
+    lk.coopfed.knoweb.m7customers.query.PrivacyQueries privacy;
+
     @BeforeEach
     void theSeedTheDemoStartsFrom() throws Exception {
         JdbcTemplate admin = superuserJdbc();
@@ -176,7 +179,12 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("WitnessWriteOff", 1)
                     .containsEntry("ApproveWriteOff", 1)
                     .containsEntry("DefineRecipe", 1)
-                    .containsEntry("ExecuteRepack", 1);
+                    .containsEntry("ExecuteRepack", 1)
+                    // M4-06, M4-10: a claim raised and approved, a transfer request asked and approved.
+                    .containsEntry("RaiseClaim", 1)
+                    .containsEntry("ApproveClaim", 1)
+                    .containsEntry("RequestTransfer", 1)
+                    .containsEntry("ApproveTransferRequest", 1);
             theHistorySpreadsOverEightWeeks();
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();
@@ -427,6 +435,21 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                         .distinct()
                         .count())
                 .isGreaterThan(5);
+
+        // One account suspended, with its reason in the history; one member erased by the officer.
+        var second = customers.search(null, DemoCustomers.phone(2), 1, office).get(0);
+        assertThat(accounts.account(second.accountId(), office).orElseThrow().status())
+                .isEqualTo("SUSPENDED");
+        assertThat(accounts.history(second.accountId(), office)).singleElement().satisfies(h -> assertThat(h.reason())
+                .isEqualTo(DemoCustomers.SUSPENSION_REASON));
+        assertThat(customers.search(null, DemoCustomers.phone(DemoCustomers.ERASED_MEMBER), 1, office))
+                .isEmpty();
+        assertThat(privacy.requests(null, office)).singleElement().satisfies(request -> {
+            assertThat(request.kind()).isEqualTo("ERASURE");
+            assertThat(request.status()).isEqualTo("FULFILLED");
+            assertThat(request.customerName()).isEqualTo("Customer");
+            assertThat(request.answeredBy()).isEqualTo(DemoCast.M101_MANAGER.userId());
+        });
     }
 
     private ScopeContext scopeOf(DemoCast.Actor actor) {

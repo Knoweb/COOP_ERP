@@ -1,6 +1,14 @@
 import { ApiProblem } from "../../shell/api/client";
 import type { ChipState } from "../../shell/components/StateChip";
-import type { IssueTransferRequest, LotBalance, OpeningBalance, OpeningBalanceLineRequest } from "./inventoryApi";
+import type {
+  IssueTransferRequest,
+  Location,
+  LotBalance,
+  OpeningBalance,
+  OpeningBalanceLineRequest,
+  RequestTransferRequest,
+  TransferRequest
+} from "./inventoryApi";
 
 // A batch-less SKU still needs a batch row (M2-05, doc 22 section 3.7), so M2 registers a
 // synthetic one numbered `S-<document number>-<line>` (BatchGuards.syntheticBatchNo on the
@@ -66,4 +74,36 @@ export function lineOf(row: CountedRow): OpeningBalanceLineRequest {
 /** A row can be sent once it names an item, a quantity above zero and a cost of zero or more. */
 export function rowReady(row: CountedRow): boolean {
   return row.skuId !== "" && Number(row.qty) > 0 && row.unitCost !== "" && Number(row.unitCost) >= 0;
+}
+
+/** A transfer request waits (draft), is approved (issued) or refused (void) (M4-10). */
+export function requestChip(status: TransferRequest["status"]): ChipState {
+  return status === "REQUESTED" ? "draft" : status === "APPROVED" ? "issued" : "void";
+}
+
+/** The lines of a transfer request: the items given a quantity above zero, the others left out. */
+export function requestLinesOf(quantities: Record<string, string>): RequestTransferRequest["lines"] {
+  return Object.entries(quantities)
+    .map(([skuId, text]) => ({ skuId, qty: Number(text) }))
+    .filter((line) => Number.isFinite(line.qty) && line.qty > 0);
+}
+
+/**
+ * The location the society approves a request from: the one it chose on the screen, else the one
+ * the shop named, else its only warehouse; undefined while it must still choose.
+ */
+export function sourceFor(
+  request: TransferRequest,
+  chosen: Record<string, string>,
+  locations: Location[]
+): string | undefined {
+  const picked = chosen[request.requestId];
+  if (picked) {
+    return picked;
+  }
+  if (request.fromLocationId) {
+    return request.fromLocationId;
+  }
+  const warehouses = locations.filter((l) => l.locationType === "WAREHOUSE");
+  return warehouses.length === 1 ? warehouses[0].locationId : undefined;
 }
