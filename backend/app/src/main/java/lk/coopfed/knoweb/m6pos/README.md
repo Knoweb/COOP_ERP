@@ -10,8 +10,8 @@ till: open session -> scan, scan, scan, cash, complete -> close session
   v
 kernel.event_outbox (source = the device, owner = its entity, location = its shop)
   |  consumer framework: OWN scope of the entity at the shop, device on the scope
-  +--> m6.sessions  till_session.opened.v1 / .closed.v1 -> RecordSessionHandler -> pos.till_session(_close)
-  +--> m6.receipts  receipt.issued.v1                  -> RecordReceiptHandler -> pos.receipt, _line, _tender
+  +--> m6.till      till_session.opened.v1 / .closed.v1 -> RecordSessionHandler -> pos.till_session(_close)
+  |    (one queue) receipt.issued.v1                  -> RecordReceiptHandler -> pos.receipt, _line, _tender
   +--> m5.sales     receipt.issued.v1                  -> M5 ApplySaleHandler  -> SALE movements at the shop
 ```
 
@@ -40,13 +40,13 @@ Sessions: `till_session.opened.v1` {`session_id`, `till_position_id`, `operator_
 
 ## Apply and flag, never refuse (AGENTS.md)
 
-A receipt is kept whatever central thinks of it. `RecordReceiptHandler` flags `LOCATION_MISMATCH` (the document names another location than the device's shop; the receipt is kept at the device's shop), `SESSION_UNKNOWN` (its session has not arrived), `NO_LINES`, `DUPLICATE_NUMBER` (another receipt of the series has this number; both are kept, and an ALERT `RECEIPT_NUMBER_DUPLICATED` names the other), with a REVIEW audit record. Every receipt raises its series' next number in the kernel (`NumberingService.observeDeviceNumber`, CR-19A-11, doc 32 section 8), so a till enrolled or put on the position later goes on after the highest number central has applied. M5 flags an oversell (the lot goes negative: `STOCK_LOT_NEGATIVE`, `lot.negative.v1`), a sale from a batch the shop held no lot of (`SALE_WITHOUT_LOT`), and a line with no batch and no lot of its item (`SALE_LINE_UNRESOLVED`, not posted, for a person). The only refusals are of shape: `m6.scope.device_required`, `m6.receipt.malformed`, `m6.session.malformed` (a fact the gateway would have quarantined).
+A receipt is kept whatever central thinks of it. `RecordReceiptHandler` flags `LOCATION_MISMATCH` (the document names another location than the device's shop; the receipt is kept at the device's shop), `SESSION_UNKNOWN` (its session was not applied before it; sessions and receipts share the one consumer `m6.till`, whose queue keeps the device's order, so a session uploaded in the same batch always comes first), `NO_LINES`, `DUPLICATE_NUMBER` (another receipt of the series has this number; both are kept, and an ALERT `RECEIPT_NUMBER_DUPLICATED` names the other), with a REVIEW audit record. Every receipt raises its series' next number in the kernel (`NumberingService.observeDeviceNumber`, CR-19A-11, doc 32 section 8), so a till enrolled or put on the position later goes on after the highest number central has applied. M5 flags an oversell (the lot goes negative: `STOCK_LOT_NEGATIVE`, `lot.negative.v1`), a sale from a batch the shop held no lot of (`SALE_WITHOUT_LOT`), and a line with no batch and no lot of its item (`SALE_LINE_UNRESOLVED`, not posted, for a person). The only refusals are of shape: `m6.scope.device_required`, `m6.receipt.malformed`, `m6.session.malformed` (a fact the gateway would have quarantined).
 
 ## Tests
 
 | Test | What it proves |
 |---|---|
-| `TillSaleEndToEndIntegrationTest` | The `TillSimulator` takes the snapshot, opens a session, sells three items by barcode, closes and uploads; the outbox's events are delivered to `m6.sessions`, `m6.receipts` and `m5.sales` as the consumer framework delivers them: the shop's stock down by what was sold in the device's movement sequence, the receipt with its till-series number and origin OFFLINE, the session closed with its variance, both reads over HTTP, the audit and events, a redelivery changing nothing; an oversell applied and flagged. |
+| `TillSaleEndToEndIntegrationTest` | The `TillSimulator` takes the snapshot, opens a session, sells three items by barcode, closes and uploads; the outbox's events are delivered to `m6.till` and `m5.sales` as the consumer framework delivers them: the shop's stock down by what was sold in the device's movement sequence, the receipt with its till-series number and origin OFFLINE, the session closed with its variance, both reads over HTTP, the audit and events, a redelivery changing nothing; an oversell applied and flagged; a session and its receipts uploaded in one batch, each consumer queue drained in turn (receipt queues first), leave no `SESSION_UNKNOWN`. |
 | `IngestHandlersPostgresIntegrationTest` | A receipt with a location mismatch and an unknown session kept and flagged; every guard with nothing committed. |
 
 ## Deviations from 26A, with reasons

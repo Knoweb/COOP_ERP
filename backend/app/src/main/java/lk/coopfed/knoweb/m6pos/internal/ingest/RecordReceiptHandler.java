@@ -30,8 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
  * a flag on the receipt and a REVIEW audit record ({@code RECEIPT_FLAGGED}), and the receipt is
  * kept. Flags: {@code LOCATION_MISMATCH} (the document names another location than the device's
  * shop; the receipt is kept at the shop the device is enrolled at), {@code SESSION_UNKNOWN} (no
- * session with that id has arrived: a receipt can overtake its session in a batch retry, or the
- * session was lost), {@code NO_LINES}, {@code DUPLICATE_NUMBER} (another receipt of the same
+ * session with that id was applied before the receipt; sessions and receipts share one consumer
+ * queue in the device's own order, so the session was lost or never sent), {@code NO_LINES}, {@code DUPLICATE_NUMBER} (another receipt of the same
  * series already has this number: both are kept, and an ALERT audit record
  * {@code RECEIPT_NUMBER_DUPLICATED} names the other document).
  *

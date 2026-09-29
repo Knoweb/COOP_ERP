@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * receipt a till issued becomes a CHARGE on the customer's account; of a refund or a void, a
  * CREDIT. The sync gateway accepted the till's event into the outbox; the consumer framework
  * delivers it once, in the OWN scope of the device's society at its shop, as it does to M5's
- * {@code m5.sales} and M6's {@code m6.receipts}. This class only reads the payload (doc 32
+ * {@code m5.sales} and M6's {@code m6.till}. This class only reads the payload (doc 32
  * section 3.1: {@code payload.document}, {@code payload.tenders}) and hands each tender to
  * {@link PostAccountTenderHandler}, which audits and publishes.
  *
