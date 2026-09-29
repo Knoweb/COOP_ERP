@@ -332,8 +332,9 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("document.type_unknown");
 
-        // CLM: a registered type nobody owns yet (M4 owns INV since M4-08; M4-06 will own CLM).
-        DocumentRecord unowned = draftOfType(id, "CLM");
+        // DN2: a registered type nobody owns yet (M4 owns INV since M4-08 and CLM since M4-06; the
+        // debit note is still unbuilt). When a module takes DN2, name another unowned type here.
+        DocumentRecord unowned = draftOfType(id, "DN2");
         assertThatThrownBy(() -> inScope(BUYER, () -> issuance.issue(unowned, twoLines(id), scope(BUYER))))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("document.type_unowned");
