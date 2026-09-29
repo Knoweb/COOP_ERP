@@ -467,3 +467,52 @@ permissions:
     module: "m7customers"
     description_en: "Record a customer's repayment"
     scope: "LOCATION"
+  # M7, the account remainders and the privacy workflow (27A section 3.1, appended 29 September
+  # 2026, branch feat/m7-limits-privacy-snapshot). "mfa" in the guide is requires_mfa. The limits,
+  # suspension and closing stay under cus.account.manage, which asks no second factor of its own:
+  # the limit handler asks for one when the limit goes up (doc 27 section 4.2).
+  - code: "cus.account.adjust"
+    module: "m7customers"
+    description_en: "Ask for an adjustment of a customer's balance"
+    scope: "ENTITY"
+  - code: "cus.account.adjust_approve"
+    module: "m7customers"
+    description_en: "Approve an adjustment another person asked for"
+    scope: "ENTITY"
+    requires_mfa: true
+  - code: "cus.payment.reverse"
+    module: "m7customers"
+    description_en: "Reverse a customer's repayment recorded in error"
+    scope: "ENTITY"
+    requires_mfa: true
+  - code: "cus.privacy.record"
+    module: "m7customers"
+    description_en: "Record and read customers' requests for their data, a correction or erasure"
+    scope: "ENTITY"
+  - code: "cus.privacy.fulfil"
+    module: "m7customers"
+    description_en: "Answer customers' data requests as the society's responsible officer"
+    scope: "ENTITY"
+    requires_mfa: true
+  # --- M9 Integration (29A section 3.1, seed/m9/permissions.yaml, appended here as M4, M6 and M7
+  # do: M1SeedLoader reads this one file). The demo scope: the accounting export and the
+  # notification screens. int.notify.view is the read code of the notification log, templates
+  # and rules (29A names no read code; one per aggregate, as M1 does, decided 29 September 2026
+  # on the architect's delegation). int.client.manage, int.journal.ack, int.provider.manage,
+  # int.einvoice.manage and int.api.publish come with their tickets.
+  - code: "int.journal.read"
+    module: "m9integration"
+    description_en: "See the entity's journal exports, their lines and their reconciliation"
+    scope: "ENTITY"
+  - code: "int.journal.export"
+    module: "m9integration"
+    description_en: "Generate a journal export for the accounting package and download it"
+    scope: "ENTITY"
+  - code: "int.notify.view"
+    module: "m9integration"
+    description_en: "See the notification templates, rules and delivery log"
+    scope: "ENTITY"
+  - code: "int.notify.manage"
+    module: "m9integration"
+    description_en: "Activate and retire the federation's notification rules"
+    scope: "FEDERATION"

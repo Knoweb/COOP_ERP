@@ -1,0 +1,17 @@
+# M9 Integration: the audit event types of the commands built so far (29A section 6). Loaded by the
+# kernel's AuditEventTypeSeedLoader, which reads every seed/*/audit-event-types.yaml.
+audit_event_types:
+  - code: JOURNAL_POSTINGS_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: The journal postings of an issued document were recorded for the accounting export
+
+  - code: JOURNAL_EXPORT_GENERATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A journal export was generated for an entity and a period
+
+  - code: NOTIFICATION_RULE_STATUS_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: A notification rule was activated or retired

@@ -196,6 +196,8 @@ dependencies {
     // turns a violation into a problem document with message ids (RequestValidationHandler),
     // so no module handles validation itself. Business rules stay guards in the handler.
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // M9: the SMTP e-mail adapter (29A section 6.3), JavaMail to the configured relay (compose: Mailpit).
+    implementation("org.springframework.boot:spring-boot-starter-mail")
 
     runtimeOnly("org.postgresql:postgresql")
     // /actuator/prometheus (17A S0-02: health and metrics). The version is managed by Spring Boot.

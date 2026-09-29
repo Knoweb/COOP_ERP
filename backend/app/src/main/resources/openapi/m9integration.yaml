@@ -1,0 +1,375 @@
+# OpenAPI slice of M9 Integration (29A section 5), the demo scope: the journal exports (request,
+# run history, lines, the file for the accounting package, the reconciliation, what waits for the
+# next export) and the notification screens (templates and rules read, a federation rule activated
+# or retired, the delivery log). The API clients, providers, e-invoicing and the bundle come with
+# their tickets (module README). After changing this file run `make gen-clients` and commit
+# web/src/generated/m9integration.ts.
+openapi: 3.1.0
+info:
+  title: COOP ERP M9 Integration API
+  version: 0.1.0
+paths:
+  /v1/integration/journal-exports:
+    get:
+      tags: [Integration]
+      operationId: listJournalExports
+      summary: The journal exports of the caller's scope, newest first (the run history)
+      x-permission: int.journal.read
+      responses:
+        '200':
+          description: The exports; an empty list when there are none
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/JournalExportResponse' }
+    post:
+      tags: [Integration]
+      operationId: requestJournalExport
+      summary: Generate the journal of the caller's entity for a period
+      description: >
+        Takes every posting of the period that no earlier export took (each posting is exported
+        once), builds the balanced journal and records its totals and the SHA-256 of its file.
+        Codes this operation can answer with 422: m9.journal.entity_required (a user of the whole
+        entity), m9.journal.period_invalid, m9.journal.nothing_to_export, m9.journal.unbalanced,
+        idempotency.request_mismatch.
+      x-permission: int.journal.export
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestJournalExportRequest' }
+      responses:
+        '201':
+          description: Generated
+          headers:
+            Location:
+              description: Address of the new export
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JournalExportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/journal-exports/{exportId}:
+    get:
+      tags: [Integration]
+      operationId: getJournalExport
+      summary: One journal export
+      x-permission: int.journal.read
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: The export
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JournalExportResponse' }
+        '404':
+          description: No such export, or the caller's scope may not see it (the two look the same on purpose)
+  /v1/integration/journal-exports/{exportId}/lines:
+    get:
+      tags: [Integration]
+      operationId: listJournalLines
+      summary: The lines of an export in their order
+      x-permission: int.journal.read
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: The lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/JournalLineResponse' }
+        '404':
+          description: No such export, or the caller's scope may not see it
+  /v1/integration/journal-exports/{exportId}/file:
+    get:
+      tags: [Integration]
+      operationId: downloadJournalExport
+      summary: The journal file for the accounting package (CSV, two entries per line)
+      description: >
+        entry, date, doc_type, doc_number, line_kind, side, account_role, debit, credit,
+        document_id; the debit entry and the credit entry of every line. The same bytes every
+        time: the SHA-256 of this file is the export's contentHash.
+      x-permission: int.journal.export
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: The CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+        '404':
+          description: No such export, or the caller's scope may not see it
+  /v1/integration/journal-exports/{exportId}/reconciliation:
+    get:
+      tags: [Integration]
+      operationId: getJournalReconciliation
+      summary: Debits against credits, the totals by account role, and the check against what was recorded
+      x-permission: int.journal.read
+      parameters:
+        - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: The reconciliation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconciliationResponse' }
+        '404':
+          description: No such export, or the caller's scope may not see it
+  /v1/integration/journal-postings/pending:
+    get:
+      tags: [Integration]
+      operationId: getPendingPostings
+      summary: What the next export over a period would take
+      description: >
+        The postings of the period that no export took yet. Codes this operation can answer with
+        422: m9.journal.period_invalid.
+      x-permission: int.journal.read
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The count and the amount waiting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingPostingsResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/templates:
+    get:
+      tags: [Integration]
+      operationId: listNotificationTemplates
+      summary: The notification templates, in three languages
+      x-permission: int.notify.view
+      responses:
+        '200':
+          description: The templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/NotificationTemplateResponse' }
+  /v1/integration/rules:
+    get:
+      tags: [Integration]
+      operationId: listNotificationRules
+      summary: The notification rules
+      x-permission: int.notify.view
+      responses:
+        '200':
+          description: The rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/NotificationRuleResponse' }
+  /v1/integration/rules/{ruleId}/activate:
+    post:
+      tags: [Integration]
+      operationId: activateNotificationRule
+      summary: Activate a federation-wide rule
+      description: >
+        Codes this operation can answer with 422: m9.rule.federation_required, m9.rule.not_found,
+        m9.rule.status_unchanged, m9.rule.template_inactive, idempotency.request_mismatch.
+      x-permission: int.notify.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RuleId'
+      responses:
+        '200':
+          description: The rule as it now is
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationRuleResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/rules/{ruleId}/retire:
+    post:
+      tags: [Integration]
+      operationId: retireNotificationRule
+      summary: Retire a federation-wide rule
+      description: >
+        Codes this operation can answer with 422: m9.rule.federation_required, m9.rule.not_found,
+        m9.rule.status_unchanged, idempotency.request_mismatch.
+      x-permission: int.notify.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RuleId'
+      responses:
+        '200':
+          description: The rule as it now is
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationRuleResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/notifications/log:
+    get:
+      tags: [Integration]
+      operationId: listNotificationLog
+      summary: The delivery log of the caller's scope, newest first
+      description: >
+        The kernel's log: status, attempts, the reason of a suppression, the last error; the
+        recipient as the beginning of its hash, never the address or the number (ADR-27).
+        Codes this operation can answer with 422: m9.log.status_invalid.
+      x-permission: int.notify.view
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [QUEUED, SENT, FAILED, SUPPRESSED] }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: The log rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/NotificationLogResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+components:
+  parameters:
+    ExportId:
+      in: path
+      name: exportId
+      required: true
+      schema: { type: string, format: uuid }
+    RuleId:
+      in: path
+      name: ruleId
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    RequestJournalExportRequest:
+      type: object
+      required: [periodFrom, periodTo]
+      properties:
+        periodFrom: { type: string, format: date }
+        periodTo: { type: string, format: date }
+    JournalExportResponse:
+      type: object
+      required: [exportId, periodFrom, periodTo, format, status, lineCount, totalDebit, totalCredit, contentHash,
+        generatedAt]
+      properties:
+        exportId: { type: string, format: uuid }
+        periodFrom: { type: string, format: date }
+        periodTo: { type: string, format: date }
+        format: { type: string, enum: [JSON, CSV, ADAPTER] }
+        status: { type: string, enum: [REQUESTED, GENERATED, FAILED, ACKNOWLEDGED, SUPERSEDED] }
+        lineCount: { type: integer }
+        totalDebit: { type: number }
+        totalCredit: { type: number }
+        contentHash: { type: string, description: SHA-256 of the journal file in lower-case hex }
+        generatedAt:
+          type: string
+          format: date-time
+          description: An instant in UTC (ends in Z). Convert to local time on the screen only.
+    JournalLineResponse:
+      type: object
+      required: [seq, documentId, docType, docNumber, lineKind, side, debitRole, creditRole, amount, businessDate]
+      properties:
+        seq: { type: integer }
+        documentId: { type: string, format: uuid }
+        docType: { type: string }
+        docNumber: { type: string }
+        lineKind: { type: string }
+        side: { type: string, enum: [SELLER, BUYER] }
+        debitRole: { type: string }
+        creditRole: { type: string }
+        amount: { type: number }
+        businessDate: { type: string, format: date }
+        reference: { type: [string, 'null'] }
+    ReconciliationResponse:
+      type: object
+      required: [exportId, lineCount, totalDebit, totalCredit, balanced, matchesRecordedTotals, matchesRecordedHash,
+        accounts]
+      properties:
+        exportId: { type: string, format: uuid }
+        lineCount: { type: integer }
+        totalDebit: { type: number }
+        totalCredit: { type: number }
+        balanced: { type: boolean, description: debits equal credits in total and over the account roles }
+        matchesRecordedTotals: { type: boolean }
+        matchesRecordedHash: { type: boolean }
+        accounts:
+          type: array
+          items: { $ref: '#/components/schemas/AccountTotalResponse' }
+    AccountTotalResponse:
+      type: object
+      required: [role, debit, credit]
+      properties:
+        role: { type: string }
+        debit: { type: number }
+        credit: { type: number }
+    PendingPostingsResponse:
+      type: object
+      required: [postings, amount]
+      properties:
+        postings: { type: integer }
+        amount: { type: number }
+        earliest: { type: [string, 'null'], format: date }
+        latest: { type: [string, 'null'], format: date }
+    NotificationTemplateResponse:
+      type: object
+      required: [templateId, channel, bodyEn, placeholders, status]
+      properties:
+        templateId: { type: string }
+        channel: { type: string, enum: [SMS, EMAIL, IN_APP] }
+        subjectEn: { type: [string, 'null'] }
+        subjectSi: { type: [string, 'null'] }
+        subjectTa: { type: [string, 'null'] }
+        bodyEn: { type: string }
+        bodySi: { type: [string, 'null'] }
+        bodyTa: { type: [string, 'null'] }
+        placeholders:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [DRAFT, ACTIVE, RETIRED] }
+    NotificationRuleResponse:
+      type: object
+      required: [ruleId, name, eventType, templateId, audienceKind, channels, status, federationWide]
+      properties:
+        ruleId: { type: string, format: uuid }
+        name: { type: string }
+        eventType: { type: string }
+        templateId: { type: string }
+        audienceKind: { type: string, enum: [ROLE_AT_COUNTERPARTY, ROLE_AT_OWNER, CUSTOMER, EXPLICIT] }
+        audienceRole: { type: [string, 'null'] }
+        channels:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [DRAFT, ACTIVE, RETIRED] }
+        federationWide: { type: boolean }
+    NotificationLogResponse:
+      type: object
+      required: [notificationId, createdAt, channel, status, attempts, recipientHash]
+      properties:
+        notificationId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        ruleId: { type: [string, 'null'], format: uuid }
+        eventId: { type: [string, 'null'], format: uuid }
+        channel: { type: string, enum: [SMS, EMAIL, IN_APP] }
+        templateId: { type: [string, 'null'] }
+        language: { type: [string, 'null'] }
+        status: { type: string, enum: [QUEUED, SENT, FAILED, SUPPRESSED] }
+        attempts: { type: integer }
+        suppressedReason: { type: [string, 'null'] }
+        lastError: { type: [string, 'null'] }
+        recipientHash: { type: string, description: the first twelve characters of the recipient's hash }
