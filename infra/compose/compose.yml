@@ -149,6 +149,7 @@ services:
       # state inside the container, so `make down` followed by `make up` imports the file again
       # and an edit to it takes effect. Changes made in the admin console are not kept.
       - ./realm-dev.json:/opt/keycloak/data/import/realm-dev.json:ro
+      - ../keycloak/theme/coop:/opt/keycloak/themes/coop:ro
     healthcheck:
       # The image has no curl or wget; bash can open the management port (9000) itself.
       # /dev/tcp is a bash feature, so bash is named: the default shell of an image may be dash.
