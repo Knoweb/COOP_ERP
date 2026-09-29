@@ -15,6 +15,16 @@ The back office part only (M7). The till's own account sales and repayments come
 5. **Register a member.** Name, phone, and the consent to hold a credit account. Type a name like "Perera" to see the likely duplicates (shown, not refused). Use a phone number another member gave up recently to see the confirmation step: the officer confirms it is a different person.
 6. **Open a credit account** on the new member's card, with a limit and the NIC. Only the last four characters of the NIC are ever shown.
 
+## Account controls and privacy
+
+As `m101-office` unless said.
+
+- **A suspended account.** Open Sita Kumari's card: the account shows *Suspended*, and *Changes to the account* has "Repayments overdue: suspended until the member calls at the office". Reinstate it with a reason (Suspend, reinstate or close → Reinstate), then suspend it again. The tills refuse account sales on a suspended account; a sale an offline till took anyway is still posted, with a review record.
+- **Limits.** On K. Perera's card (95 % of the limit), lower the limit or tick the hard block with a reason: saved at once. Raise it: the form says a higher limit needs the second factor, and the server asks for it (401) unless you signed in with it in the last ten minutes.
+- **Reverse a repayment.** Open a statement, press *Reverse* on a repayment, give a reason ("Deposit bounced"): a reversing CPR is issued (`M101-CPR-…`), the repayment is marked reversed, the balance goes back up and the charges it settled are open again. Needs the second factor.
+- **Adjustments.** Ask for an adjustment on the card (amount and reason); it waits for approval. Sign in as `m101-manager` and approve it: it is posted. The clerk who asked cannot approve their own.
+- **Privacy requests.** Members → *Privacy requests*: Rizwan Hameed's erasure is fulfilled by Ruwan Dissanayake (the society's responsible officer); the member shows as "Customer", no phone. To show a new one: on a member's card record an *Access to their data* request; as `m101-manager` open Privacy requests, *Fulfil*, then *Download the export* (every row the society holds about the member). An erasure of a member who owes money is refused until the balance is settled.
+
 ## What to point out
 
 - **A sale at the till is never refused for credit.** A charge over the limit is posted and flagged for review; the society decides what to do, not a rule that fires while the customer waits.
@@ -25,4 +35,4 @@ The back office part only (M7). The till's own account sales and repayments come
 ## What can go wrong
 
 - **No "Members" in the navigation**: sign in as `m101-office`; other demo users do not hold the society office's permissions. A stack loaded before the credit book was added needs `make demo-data` again for the members and the user.
-- **Not here yet**: account sales and repayments at the till, statements by SMS, changing limits and suspending an account, privacy requests (anonymisation).
+- **Not here yet**: account sales and repayments at a real till (the till app is in its desktop trial), statements by SMS, printed statements.

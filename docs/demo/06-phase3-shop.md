@@ -16,6 +16,10 @@
 6. **Central sees it.** Sign back in as `m101-shop` or `m101-manager`: **Stock**, location S01 — the three sold items are down by exactly what was sold.
 7. **The receipts, on screen.** Still `m101-manager` (or `m101-shop`): **Shop receipts**, choose the shop "S01 Kuliyapitiya town shop". The sale from step 5 is at the top: its number (from the till position's own series), time, till, how it was paid, total; a *Flagged* chip if central flagged it (an oversold lot). Open it: the lines with item names, net, tax and total, the tenders, and a link to its **session** (float, opened and closed, counted and expected cash, variance). Below today's sale, eight weeks of earlier sales at every shop: `make demo-data` loads that till history (three trading days a week).
 
+## Asking the stores for stock
+
+`m101-shop` asks, `m101-manager` approves. Sign in as **m101-shop** → Stock → *Transfer requests*: this morning's request "Weekend stock for the town shop", Approved; once the stores' transfer is issued it shows *In transit* with a link to Transfers, where the shop receives it. To ask live: pick the shop, type the quantities wanted for items it sells → *Send the request*. As **m101-manager** → Stock → *Transfer requests*: choose *Send from* (the society's warehouse is preselected when it is the only one) → *Approve*, or give a reason → *Reject*. The Exception queue (reporting) shows an open claim as *Open claim* until the seller decides it.
+
 ## What to point out
 
 - **A shop is a location, not a legal entity**: the shop (S01) belongs to the society (M101), the same way the society's own warehouse (W01) does — the difference the system enforces is only which rows a location-scoped session may touch.
