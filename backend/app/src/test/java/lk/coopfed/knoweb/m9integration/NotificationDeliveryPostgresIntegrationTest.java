@@ -140,10 +140,10 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
         }
         MimeMessage si = byRecipient.get("accounts@buyer-si.coop-erp.test");
         assertThat(si.getSubject()).isEqualTo("ඉන්වොයිසිය D101-INV-000123 නිකුත් කෙරිණි");
-        assertThat(body(si)).contains("රු.").contains("11,800.50").contains("2026-09-04");
+        assertThat(body(si)).contains("රු. 11,800.50").contains("2026-09-04");
         MimeMessage ta = byRecipient.get("accounts@buyer-ta.coop-erp.test");
         assertThat(ta.getSubject()).isEqualTo("விலைப்பட்டியல் D101-INV-000123 வழங்கப்பட்டது");
-        assertThat(body(ta)).contains("ரூ.").contains("11,800.50");
+        assertThat(body(ta)).contains("ரூ. 11,800.50");
         MimeMessage en = byRecipient.get("accounts@buyer-en.coop-erp.test");
         assertThat(en.getSubject()).isEqualTo("Invoice D101-INV-000123 issued");
         assertThat(body(en))
@@ -167,6 +167,37 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
                 .hasSize(12));
         assertThat(queries.log("FAILED", 10, user(SELLER))).isEmpty();
         assertThat(queries.log(null, 10, user(BUYER_SI))).isEmpty();
+    }
+
+    @Test
+    void aSellerCannotReadTheBuyersContactsYetItsInvoiceStillReachesThem() throws Exception {
+        String count = "select count(*) from integration.notification_contact where owner_entity_id = ?";
+        assertThat(inScope(SELLER, () -> jdbc.queryForObject(count, Long.class, BUYER_SI)))
+                .isZero();
+        assertThat(inScope(
+                        SELLER,
+                        () -> jdbc.queryForObject("select count(*) from integration.notification_contact", Long.class)))
+                .isZero();
+        // The buyer reads its own two.
+        assertThat(inScope(BUYER_SI, () -> jdbc.queryForObject(count, Long.class, BUYER_SI)))
+                .isEqualTo(2L);
+        // And a seller session cannot write a contact for the buyer.
+        assertThrows(
+                org.springframework.dao.DataAccessException.class,
+                () -> inScope(
+                        SELLER,
+                        () -> jdbc.update(
+                                "insert into integration.notification_contact"
+                                        + " (contact_id, owner_entity_id, role_code, channel, address, language)"
+                                        + " values (?, ?, 'ACCOUNTS', 'EMAIL', 'x@buyer-si.coop-erp.test', 'si')",
+                                Ids.next(),
+                                BUYER_SI)));
+
+        // The dispatcher, in the seller's scope, still reaches them through the resolver.
+        dispatch("invoice.issued.v1", invoice(BUYER_SI));
+        assertThat(SMTP.messages).hasSize(1);
+        assertThat(parse(SMTP.messages.get(0)).getAllRecipients()[0].toString())
+                .isEqualTo("accounts@buyer-si.coop-erp.test");
     }
 
     @Test

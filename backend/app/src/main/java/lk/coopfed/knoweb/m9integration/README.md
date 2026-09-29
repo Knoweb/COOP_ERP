@@ -20,7 +20,7 @@ screens of those, the Playwright flows.
 | `internal/notify/` | `NotifyConfiguration`: `RuleStore` (the kernel's `NotificationRuleQueries`), `ContactAudience` (ROLE_AT_OWNER, ROLE_AT_COUNTERPARTY), `SmtpEmailChannel`, `SmsChannel` over `SmsGateway` (`LogSmsGateway`); `SetNotificationRuleStatusHandler` |
 | `internal/queries/` | `IntegrationQueriesImpl` |
 | `web/IntegrationController` | The slice `openapi/m9integration.yaml` |
-| `db/migration/m9integration/` | `V0001__integration.sql` (tables, RLS, grants), `V0002__notification_templates_and_rules.sql` (the seeded templates and rules) |
+| `db/migration/m9integration/` | `V0001__integration.sql` (tables, RLS, grants), `V0002__notification_templates_and_rules.sql` (the seeded templates and rules), `V0003__contacts_own_rls_and_resolver.sql` (contacts under own-entity RLS, the recipient resolver) |
 | `seed/m9integration/` | `audit-event-types.yaml`; `notification-contacts.dev.sql` (dev and demo contacts, `.test` addresses and placeholder numbers) |
 | `web/src/modules/m9integration/` | `/integration/journal` (exports), `/integration/notifications` (rules, templates, log) |
 
@@ -85,8 +85,10 @@ own delivery test stands in its test channels).
 4. Templates and rules are rows of a migration, not seed YAML read at start; DefineTemplate,
    DefineRule, the TemplateValidator and entity-owned rules come with their ticket. The read code
    `int.notify.view` is added (29A names none).
-5. Templates, rules and contacts are readable by every session (`USING (true)`): the dispatcher
-   reads them in the event owner's scope and the renderer after the commit with none, and a
-   counterparty's contacts are read in the owner's scope. No operation serves a contact.
+5. Templates and rules are readable by every session (`USING (true)`; no personal data): the
+   dispatcher reads them in the event owner's scope and the renderer after the commit with none.
+   Contacts have own-entity RLS (V0003); the dispatcher reaches a counterparty's addresses only
+   through `integration.notification_recipients(entity, role)`, a SECURITY DEFINER function
+   owned by the migrator (pinned search_path, EXECUTE granted to app_rw).
 6. No IN_APP adapter (the shell's bell does not exist); no rule uses IN_APP. No provider_config
    table: the SMS provider is a configuration property.

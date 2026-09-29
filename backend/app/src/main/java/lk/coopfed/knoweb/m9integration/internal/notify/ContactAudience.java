@@ -41,11 +41,9 @@ class ContactAudience implements NotificationAudience {
         }
         return jdbc
                 .query(
-                        """
-                        select channel, address, language from integration.notification_contact
-                         where owner_entity_id = ? and role_code = ? and status = 'ACTIVE'
-                         order by channel, contact_id
-                        """,
+                        // The one door across entities (m9integration V0003): the table itself
+                        // answers an entity its own contacts only.
+                        "select channel, address, language from integration.notification_recipients(?, ?)",
                         (rs, i) -> new Recipient(
                                 rs.getString("channel"),
                                 rs.getString("address"),

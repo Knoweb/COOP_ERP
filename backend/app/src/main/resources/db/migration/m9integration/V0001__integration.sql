@@ -77,7 +77,6 @@ CREATE TABLE integration.journal_line (
     credit_role            text          NOT NULL,
     amount                 numeric(14,2) NOT NULL CHECK (amount > 0),
     business_date          date          NOT NULL,
-    counterparty_entity_id uuid,
     reference              text,
     owner_entity_id        uuid          NOT NULL,
     CONSTRAINT journal_line_export_seq_uq UNIQUE (export_id, seq),
