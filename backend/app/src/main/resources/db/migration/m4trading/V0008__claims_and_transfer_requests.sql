@@ -142,12 +142,21 @@ CREATE TABLE trading.claim_return (
 ALTER TABLE trading.claim_return ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trading.claim_return FORCE ROW LEVEL SECURITY;
 CREATE POLICY own_read ON trading.claim_return FOR SELECT TO app_rw
-    USING (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+    USING (kernel.scope_class() = 'OWN'
+           AND owner_entity_id = kernel.scope_entity()
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 CREATE POLICY own_write ON trading.claim_return FOR INSERT TO app_rw
-    WITH CHECK (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND owner_entity_id = kernel.scope_entity()
+                AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
+-- A PARTY session reads both sides, as on every trading table. An OWN session reads here only the
+-- returns sent to it (the seller); its own returns it reads through own_read, which keeps a
+-- shop-scoped session to its location. "Owner or counterparty" for OWN too would let a shop read
+-- every return of its entity (RLS matrix, 29 September 2026).
 CREATE POLICY party_read ON trading.claim_return FOR SELECT TO app_rw
-    USING (kernel.scope_class() IN ('OWN', 'PARTY')
-           AND (owner_entity_id = kernel.scope_entity() OR counterparty_entity_id = kernel.scope_entity()));
+    USING ((kernel.scope_class() = 'PARTY'
+            AND (owner_entity_id = kernel.scope_entity() OR counterparty_entity_id = kernel.scope_entity()))
+           OR (kernel.scope_class() = 'OWN' AND counterparty_entity_id = kernel.scope_entity()));
 CREATE POLICY fed_view ON trading.claim_return FOR SELECT TO app_rw
     USING (kernel.scope_class() = 'FEDERATION_VIEW');
 CREATE POLICY ext_view ON trading.claim_return FOR SELECT TO app_rw
