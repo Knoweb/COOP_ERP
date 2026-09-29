@@ -25,7 +25,7 @@ openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
-  version: 1.4.0
+  version: 1.4.1
   x-change-request: CR-21A-6
 
 paths:
@@ -2141,9 +2141,9 @@ components:
 
         responsibleOfficerName:
           description: >-
-            The responsible officer's display name, resolved from the user record when the caller
-            may read it (the society card). Null when there is no officer or the name is not
-            visible; the card then shows the id.
+            The responsible officer's display name, part of the register: whoever may read the
+            entity reads it (m1security V0017). Null when there is no officer or it cannot be
+            resolved; the card then shows the empty value, never the id.
           type:
             - string
             - 'null'

@@ -178,6 +178,76 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
     }
 
     @Test
+    void aPaymentMailNamesTheTenderInWordsInEachLanguage() throws Exception {
+        for (UUID buyer : List.of(BUYER_SI, BUYER_TA, BUYER_EN)) {
+            ObjectNode receipt = json.createObjectNode();
+            receipt.put("receiptId", Ids.next().toString());
+            receipt.put("docNumberDisplay", "D101-PRC-000045");
+            receipt.put("sellerEntityId", SELLER.toString());
+            receipt.put("buyerEntityId", buyer.toString());
+            receipt.put("method", "CHEQUE");
+            receipt.put("amount", new BigDecimal("2500.00"));
+            receipt.put("receivedOn", "2026-08-12");
+            receipt.put("unappliedAmount", new BigDecimal("0.00"));
+            dispatch("payment_receipt.recorded.v1", receipt);
+        }
+
+        Map<String, String> bodies = bodiesByRecipient();
+        assertThat(bodies.get("accounts@buyer-en.coop-erp.test"))
+                .isEqualTo("Your payment D101-PRC-000045 of Rs 2,500.00 (cheque) was recorded on 12/08/2026."
+                        + " Held on account: Rs 0.00.");
+        assertThat(bodies.get("accounts@buyer-si.coop-erp.test"))
+                .contains("(චෙක්පත)")
+                .doesNotContain("CHEQUE");
+        assertThat(bodies.get("accounts@buyer-ta.coop-erp.test"))
+                .contains("(காசோலை)")
+                .doesNotContain("CHEQUE");
+    }
+
+    @Test
+    void aWriteOffMailNamesTheApprovalBandInWordsInEachLanguage() throws Exception {
+        for (String language : List.of("en", "si", "ta")) {
+            superuserJdbc()
+                    .update(
+                            "insert into integration.notification_contact"
+                                    + " (contact_id, owner_entity_id, role_code, channel, address, language)"
+                                    + " values (?, ?, 'MANAGER', 'EMAIL', ?, ?)",
+                            Ids.next(),
+                            SELLER,
+                            "manager-" + language + "@seller.coop-erp.test",
+                            language);
+        }
+        ObjectNode submitted = json.createObjectNode();
+        submitted.put("writeOffId", Ids.next().toString());
+        submitted.put("ownerEntityId", SELLER.toString());
+        submitted.put("locationId", Ids.next().toString());
+        submitted.put("documentNo", "D101-WO-000007");
+        submitted.put("value", new BigDecimal("1200.00"));
+        submitted.put("band", 1);
+        dispatch("writeoff.submitted.v1", submitted);
+
+        Map<String, String> bodies = bodiesByRecipient();
+        assertThat(bodies.get("manager-en@seller.coop-erp.test"))
+                .isEqualTo("Write-off D101-WO-000007 of Rs 1,200.00 (low-value band) was submitted and awaits"
+                        + " your approval.");
+        assertThat(bodies.get("manager-si@seller.coop-erp.test"))
+                .contains("(අඩු වටිනාකම් කාණ්ඩය)")
+                .doesNotContain("කාණ්ඩය 1");
+        assertThat(bodies.get("manager-ta@seller.coop-erp.test"))
+                .contains("(குறைந்த மதிப்புப் பிரிவு)")
+                .doesNotContain("பிரிவு 1");
+    }
+
+    private Map<String, String> bodiesByRecipient() throws Exception {
+        Map<String, String> bodies = new java.util.HashMap<>();
+        for (String raw : SMTP.messages) {
+            MimeMessage message = parse(raw);
+            bodies.put(message.getAllRecipients()[0].toString(), body(message));
+        }
+        return bodies;
+    }
+
+    @Test
     void aSellerCannotReadTheBuyersContactsYetItsInvoiceStillReachesThem() throws Exception {
         String count = "select count(*) from integration.notification_contact where owner_entity_id = ?";
         assertThat(inScope(SELLER, () -> jdbc.queryForObject(count, Long.class, BUYER_SI)))
