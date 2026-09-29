@@ -29,6 +29,10 @@ export type Discrepancy = components["schemas"]["DiscrepancyResponse"];
 export type PaymentReceipt = components["schemas"]["PaymentReceiptResponse"];
 export type RecordPaymentReceiptRequest = components["schemas"]["RecordPaymentReceiptRequest"];
 export type Exposure = components["schemas"]["ExposureResponse"];
+export type Claim = components["schemas"]["ClaimResponse"];
+export type ClaimKind = Claim["kind"];
+export type RaiseClaimRequest = components["schemas"]["RaiseClaimRequest"];
+export type ApproveClaimRequest = components["schemas"]["ApproveClaimRequest"];
 export type Relationship =partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
@@ -374,6 +378,61 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/orders/{orderId}/amend", {
           params: { path: { orderId }, header: { "Idempotency-Key": key } },
           body
+        });
+        return data!;
+      },
+
+      // ---- claims (M4-06) ------------------------------------------------------------------
+
+      /** The claims the caller's entity raised (BUYER) or that were raised with it (SELLER), newest first. */
+      async claims(role: Side): Promise<Claim[]> {
+        const { data } = await api.GET("/v1/trading/claims", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async claim(claimId: string): Promise<Claim> {
+        const { data } = await api.GET("/v1/trading/claims/{claimId}", { params: { path: { claimId } } });
+        return data!;
+      },
+
+      async raiseClaim(body: RaiseClaimRequest, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims", { params: { header: { "Idempotency-Key": key } }, body });
+        return data!;
+      },
+
+      /** Authorises one photograph of the claim, then PUTs its bytes to the store at the URL the server signed. */
+      async addClaimPhoto(claimId: string, file: File, key: string): Promise<void> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/photos", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } },
+          body: { contentType: file.type, contentLength: file.size }
+        });
+        const upload = await fetch(data!.url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+        if (!upload.ok) {
+          throw new Error(`upload ${upload.status}`);
+        }
+      },
+
+      /** The seller approves in whole or in part; the credit note is issued with the approval. */
+      async approveClaim(claimId: string, body: ApproveClaimRequest, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/approve", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      async rejectClaim(claimId: string, reason: string, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/reject", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      /** The buyer sends back the goods of a claim approved with the return required. */
+      async dispatchClaimReturn(claimId: string, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/return", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } }
         });
         return data!;
       },

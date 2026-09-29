@@ -51,8 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 @CommandHandler(permission = "bil.creditnote.issue")
 public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
 
-    static final String CN = "CN";
-    static final String AUDIT_ISSUED = "CREDIT_NOTE_ISSUED";
+    public static final String CN = "CN";
+    public static final String AUDIT_ISSUED = "CREDIT_NOTE_ISSUED";
 
     private final JdbcTemplate jdbc;
     private final DocumentBaseRepository documents;
@@ -169,7 +169,7 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
      * A credit note line for a quantity of an invoice line, at its price and VAT rate: net to the
      * cent, VAT per line to the cent, as the invoice builds its own.
      */
-    static DocumentLineRecord priced(UUID creditNoteId, int lineNo, DocumentLineRecord billed, BigDecimal qty) {
+    public static DocumentLineRecord priced(UUID creditNoteId, int lineNo, DocumentLineRecord billed, BigDecimal qty) {
         BigDecimal net = billed.unitPrice().multiply(qty).setScale(2, RoundingMode.HALF_UP);
         BigDecimal tax = net.multiply(billed.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         return TradingDocuments.line(
@@ -189,14 +189,14 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
     }
 
     /** The invoice's credited amount, recomputed from its CREDITS links, never added to (doc 24 9.4). */
-    static BigDecimal creditedFromLinks(DocumentBaseRepository documents, UUID invoiceId) {
+    public static BigDecimal creditedFromLinks(DocumentBaseRepository documents, UUID invoiceId) {
         return documents.findLinks(invoiceId).stream()
                 .filter(link -> link.linkType() == LinkType.CREDITS && invoiceId.equals(link.toDocumentId()))
                 .map(link -> link.amount() == null ? BigDecimal.ZERO : link.amount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    static Map<String, Object> auditAfter(
+    public static Map<String, Object> auditAfter(
             DocumentRecord issued, UUID invoiceId, UUID discrepancyId, BigDecimal credited) {
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", issued.status());
@@ -212,7 +212,7 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
         return after;
     }
 
-    static CreditNoteIssued issuedEvent(
+    public static CreditNoteIssued issuedEvent(
             DocumentRecord issued, UUID invoiceId, UUID discrepancyId, UUID seller, UUID buyer) {
         return new CreditNoteIssued(
                 issued.id(),

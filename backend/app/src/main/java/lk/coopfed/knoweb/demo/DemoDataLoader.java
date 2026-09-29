@@ -199,6 +199,9 @@ public class DemoDataLoader {
         this.businessZone = ZoneId.of(businessZone);
     }
 
+    @org.springframework.beans.factory.annotation.Autowired // a field, to leave the constructor to the other lanes
+    private DemoClaimsAndTransfers claimsAndTransfers;
+
     /** Loads whatever of the demo is missing, in the order of the storyline. */
     public synchronized Report load() {
         counts = new LinkedHashMap<>();
@@ -226,6 +229,8 @@ public class DemoDataLoader {
         stockOperations.load(this::count);
         // M7: the members of M101 and its credit book (DemoCustomers).
         customers.load(this::count);
+        // M4-06, M4-10: a claim at D101 and a transfer request at the town shop (DemoClaimsAndTransfers).
+        claimsAndTransfers.load(this::count);
 
         Report report = new Report(Map.copyOf(counts));
         log.info("Demo data: {} commands issued {}", report.total(), report.commands());

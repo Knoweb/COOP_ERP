@@ -313,6 +313,15 @@ class InventoryQueriesImpl implements InventoryQueries {
     }
 
     @Override
+    public Optional<TransferView> transferOfRequest(UUID transferRequestId, ScopeContext scope) {
+        if (transferRequestId == null) {
+            return Optional.empty();
+        }
+        return transfersWhere("t.transfer_request_id = ?", transferRequestId).stream()
+                .findFirst();
+    }
+
+    @Override
     public List<TransferView> transfers(UUID locationId, ScopeContext scope) {
         return transfersWhere("(t.location_id = ? or t.to_location_id = ?)", locationId, locationId);
     }

@@ -30,6 +30,8 @@ export function GrnPage() {
   const queryClient = useQueryClient();
   const canConfirm = useHasPermission("shop.grn.confirm");
   const canInvoice = useHasPermission("bil.invoice.issue");
+  // M4-06: the receiver claims against the seller for goods found damaged or expired later.
+  const canClaim = useHasPermission("del.claim.raise");
   // The stock a GRN moved is M5's, read with the receiving permission (inv.stock.receive); a
   // buyer who may not receive is not shown it, rather than being refused (403) on every visit.
   const canSeeStock = useHasPermission("inv.stock.receive");
@@ -183,6 +185,14 @@ export function GrnPage() {
             {t("trading.invoice.issue").text}
           </button>
           {invoice.isError && <p role="alert">{errorText(invoice.error, t("trading.error.generic").text)}</p>}
+        </section>
+      )}
+
+      {confirmed && isReceiver && canClaim && g.sellerEntityId && (
+        <section className="trading-section">
+          <Link className="action-link" to={`/trading/claims/new?grnId=${g.grnId}`}>
+            <span>{t("trading.claim.new").text}</span>
+          </Link>
         </section>
       )}
 

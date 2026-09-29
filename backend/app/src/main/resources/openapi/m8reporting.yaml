@@ -241,7 +241,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [DISCREPANCY_OPEN, INVOICE_DISPUTED, CHEQUE_BOUNCED, EXPOSURE_WARNING, NEGATIVE_STOCK]
+          enum: [DISCREPANCY_OPEN, CLAIM_OPEN, INVOICE_DISPUTED, CHEQUE_BOUNCED, EXPOSURE_WARNING, NEGATIVE_STOCK]
         severity: { type: string, enum: [ALERT, REVIEW] }
         subjectId:
           type: string

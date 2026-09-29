@@ -176,7 +176,12 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("WitnessWriteOff", 1)
                     .containsEntry("ApproveWriteOff", 1)
                     .containsEntry("DefineRecipe", 1)
-                    .containsEntry("ExecuteRepack", 1);
+                    .containsEntry("ExecuteRepack", 1)
+                    // M4-06, M4-10: a claim raised and approved, a transfer request asked and approved.
+                    .containsEntry("RaiseClaim", 1)
+                    .containsEntry("ApproveClaim", 1)
+                    .containsEntry("RequestTransfer", 1)
+                    .containsEntry("ApproveTransferRequest", 1);
             theHistorySpreadsOverEightWeeks();
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();

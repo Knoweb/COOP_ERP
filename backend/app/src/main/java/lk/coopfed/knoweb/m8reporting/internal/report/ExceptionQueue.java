@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>DISCREPANCY_OPEN (REVIEW): a discrepancy raised and not yet settled; escalated once its
  *       window has ended.
+ *   <li>CLAIM_OPEN (REVIEW): a claim raised and not yet decided by the seller (M4-06).
  *   <li>INVOICE_DISPUTED (REVIEW): an invoice disputed and not resolved since.
  *   <li>CHEQUE_BOUNCED (ALERT): a payment whose cheque bounced.
  *   <li>EXPOSURE_WARNING (ALERT): a buyer whose exposure today is at or past the lowest threshold
@@ -73,6 +74,38 @@ class ExceptionQueue {
                             || (window != null && window.toInstant().isBefore(now));
                     items.add(trading(
                             "DISCREPANCY_OPEN",
+                            "REVIEW",
+                            rs.getObject("document_id", UUID.class),
+                            rs.getString("doc_number"),
+                            rs.getObject("seller_entity_id", UUID.class),
+                            rs.getObject("buyer_entity_id", UUID.class),
+                            null,
+                            null,
+                            since,
+                            escalated,
+                            me,
+                            names));
+                });
+
+        // M4-06: a claim raised and not yet decided by the seller; escalated once its window has ended.
+        jdbc.query(
+                """
+                select r.document_id, r.doc_number, r.seller_entity_id, r.buyer_entity_id, r.occurred_at,
+                       r.window_ends_at
+                  from (select distinct on (document_id) * from reporting.trade_document_event
+                         where doc_type = 'CLAIM' and event_kind = 'RAISED'
+                         order by document_id, owner_entity_id) r
+                 where not exists (select 1 from reporting.trade_document_event s
+                                    where s.document_id = r.document_id
+                                      and s.event_kind in ('APPROVED', 'REJECTED'))
+                """,
+                rs -> {
+                    Instant since = rs.getTimestamp("occurred_at").toInstant();
+                    Timestamp window = rs.getTimestamp("window_ends_at");
+                    boolean escalated = since.isBefore(escalateBefore)
+                            || (window != null && window.toInstant().isBefore(now));
+                    items.add(trading(
+                            "CLAIM_OPEN",
                             "REVIEW",
                             rs.getObject("document_id", UUID.class),
                             rs.getString("doc_number"),

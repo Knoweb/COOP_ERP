@@ -8,6 +8,7 @@ import { EntityName } from "./labels";
 import { useTradingApi, type Side } from "./tradingApi";
 import {
   deliveryChip,
+  claimChip,
   discrepancyChip,
   errorText,
   grnChip,
@@ -36,6 +37,8 @@ export function TradingPage() {
   const canCredit = useHasPermission("bil.creditnote.issue");
   const canDispute = useHasPermission("bil.invoice.dispute");
   const canPay = useHasPermission("bil.payment.record");
+  const canRaiseClaim = useHasPermission("del.claim.raise");
+  const canDecideClaim = useHasPermission("del.claim.decide");
 
   return (
     <main className="shell-page">
@@ -90,6 +93,12 @@ export function TradingPage() {
           <DiscrepancyRegister role="SELLER" />
         </section>
       )}
+      {canDecideClaim && (
+        <section>
+          <h2>{t("trading.claims.received.title").text}</h2>
+          <ClaimRegister role="SELLER" />
+        </section>
+      )}
       {(canInvoice || canPay) && (
         <section>
           <h2>{t("trading.accounts.buyers.title").text}</h2>
@@ -110,6 +119,12 @@ export function TradingPage() {
         <section>
           <h2>{t("trading.discrepancies.raised.title").text}</h2>
           <DiscrepancyRegister role="BUYER" />
+        </section>
+      )}
+      {canRaiseClaim && (
+        <section>
+          <h2>{t("trading.claims.raised.title").text}</h2>
+          <ClaimRegister role="BUYER" />
         </section>
       )}
     </main>
@@ -301,6 +316,56 @@ function DiscrepancyRegister({ role }: { role: Side }) {
                 <td>{t(`trading.discrepancy.kind.${row.kind}`).text}</td>
                 <td>
                   <StateChip state={discrepancyChip(row.status)} label={t(`trading.discrepancy.status.${row.status}`).text} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** The claims raised with the seller (SELLER) or raised by the buyer (BUYER), open first (M4-06). */
+function ClaimRegister({ role }: { role: Side }) {
+  const t = useT();
+  const api = useTradingApi();
+  const rows = useQuery({ queryKey: ["trading", "claims", role], queryFn: () => api.claims(role) });
+
+  if (rows.isLoading) {
+    return <p>{t("trading.loading").text}</p>;
+  }
+  if (rows.isError) {
+    return <p role="alert">{errorText(rows.error, t("trading.error.generic").text)}</p>;
+  }
+  if (!rows.data?.length) {
+    return <p>{t("trading.claims.empty").text}</p>;
+  }
+  const sorted = [...rows.data].sort((a, b) => (a.status === b.status ? 0 : a.status === "RAISED" ? -1 : 1));
+  return (
+    <div className="modern-table-card">
+      <div className="modern-table-scroll">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>{t("trading.column.number").text}</th>
+              <th>{t(role === "BUYER" ? "trading.column.seller" : "trading.column.buyer").text}</th>
+              <th>{t("trading.claim.kind").text}</th>
+              <th>{t("trading.column.status").text}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => (
+              <tr key={row.claimId}>
+                <td>
+                  <Link to={`/trading/claims/${row.claimId}`}>{row.docNumber}</Link>
+                </td>
+                <td>
+                  <EntityName entityId={role === "BUYER" ? row.sellerEntityId : row.buyerEntityId} />
+                </td>
+                <td>{t(`trading.claim.kind.${row.kind}`).text}</td>
+                <td>
+                  <StateChip state={claimChip(row.status)} label={t(`trading.claim.status.${row.status}`).text} />
                 </td>
               </tr>
             ))}
