@@ -22,6 +22,15 @@ import org.springframework.stereotype.Component;
  * <p>The receipt bundle is doc 32 section 3.1's: {@code payload.document} (doc 18's column
  * names, the fields the content hash covers), {@code payload.lines}, {@code payload.tenders}
  * and {@code payload.session_id}. The gateway has verified the content hash already.
+ *
+ * <p><b>One consumer, {@value #CONSUMER}, for all three types</b>, so that a till's session is
+ * applied before its receipts. The consumer framework gives each consumer its own queue with one
+ * active consumer, and the relay publishes a device's events in {@code source_seq} order: the
+ * order holds within one queue and never across two. With one queue for sessions and another for
+ * receipts, a receipt uploaded in the same batch as its session was often applied first and
+ * flagged {@code SESSION_UNKNOWN} although nothing was wrong (the desktop till trial, CR-30-1:
+ * one sale in three). Now the flag means what it says: the session did not come before its
+ * receipt in the device's own sequence.
  */
 @Component
 class PosIngestConsumer {
@@ -29,6 +38,9 @@ class PosIngestConsumer {
     static final String RECEIPT_ISSUED = "receipt.issued.v1";
     static final String SESSION_OPENED = "till_session.opened.v1";
     static final String SESSION_CLOSED = "till_session.closed.v1";
+
+    /** The one queue for a till's sessions and receipts; see the class comment. */
+    static final String CONSUMER = "m6.till";
 
     private final Handles<RecordReceipt, UUID> receipts;
     private final Handles<RecordSession, UUID> sessions;
@@ -38,7 +50,7 @@ class PosIngestConsumer {
         this.sessions = sessions;
     }
 
-    @EventConsumer(types = RECEIPT_ISSUED, consumer = "m6.receipts")
+    @EventConsumer(types = RECEIPT_ISSUED, consumer = CONSUMER)
     public void onReceiptIssued(JsonNode payload, ScopeContext scope) {
         JsonNode document = payload.path("document");
         List<RecordReceipt.Line> lines = new ArrayList<>();
@@ -85,7 +97,7 @@ class PosIngestConsumer {
                 scope);
     }
 
-    @EventConsumer(types = SESSION_OPENED, consumer = "m6.sessions")
+    @EventConsumer(types = SESSION_OPENED, consumer = CONSUMER)
     public void onSessionOpened(JsonNode payload, ScopeContext scope) {
         sessions.handle(
                 new RecordSession(
@@ -102,7 +114,7 @@ class PosIngestConsumer {
                 scope);
     }
 
-    @EventConsumer(types = SESSION_CLOSED, consumer = "m6.sessions")
+    @EventConsumer(types = SESSION_CLOSED, consumer = CONSUMER)
     public void onSessionClosed(JsonNode payload, ScopeContext scope) {
         sessions.handle(
                 new RecordSession(
