@@ -1,5 +1,6 @@
 {
   "realm": "coop",
+  "loginTheme": "coop",
   "displayName": "COOP ERP (development)",
   "enabled": true,
   "sslRequired": "none",
