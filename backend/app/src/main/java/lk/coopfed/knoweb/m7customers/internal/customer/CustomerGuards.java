@@ -36,6 +36,14 @@ public final class CustomerGuards {
         }
     }
 
+    /** An amount of money of zero or more, in cents; {@code m7.account.amount_invalid} naming the field otherwise. */
+    public static java.math.BigDecimal money(java.math.BigDecimal amount, String field) {
+        if (amount.signum() < 0 || amount.stripTrailingZeros().scale() > 2) {
+            throw new ProblemException("m7.account.amount_invalid", Map.of("field", field));
+        }
+        return amount.setScale(2);
+    }
+
     public static String requiredText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new ProblemException("m7.field.required", Map.of("field", field));

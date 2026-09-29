@@ -1,10 +1,13 @@
 package lk.coopfed.knoweb.m7customers.internal.queries;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -31,8 +34,11 @@ class AccountQueriesImpl implements AccountQueries {
     private final Ledger ledger;
     private final CustomersClock clock;
 
-    AccountQueriesImpl(JdbcTemplate jdbc, Ledger ledger, CustomersClock clock) {
+    private final ObjectMapper json;
+
+    AccountQueriesImpl(JdbcTemplate jdbc, Ledger ledger, CustomersClock clock, ObjectMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
         this.ledger = ledger;
         this.clock = clock;
     }
@@ -76,21 +82,6 @@ class AccountQueriesImpl implements AccountQueries {
         }
         Row row = found.get();
         List<Allocator.OpenCharge> open = ledger.openCharges(accountId);
-        BigDecimal paid = jdbc.queryForObject(
-                """
-                select coalesce(-sum(amount), 0) from customers.account_posting
-                 where account_id = ? and kind = 'PAYMENT'
-                """,
-                BigDecimal.class,
-                accountId);
-        BigDecimal allocated = jdbc.queryForObject(
-                """
-                select coalesce(sum(a.amount), 0) from customers.allocation a
-                  join customers.account_posting p on p.posting_id = a.payment_posting_id
-                 where p.account_id = ?
-                """,
-                BigDecimal.class,
-                accountId);
         BigDecimal available = row.limit().subtract(row.balance()).max(BigDecimal.ZERO);
         return Optional.of(new AccountView(
                 row.accountId(),
@@ -105,7 +96,7 @@ class AccountQueriesImpl implements AccountQueries {
                 row.status(),
                 row.openedAt(),
                 open.isEmpty() ? null : open.get(0).businessDate(),
-                paid.subtract(allocated),
+                ledger.unallocated(accountId),
                 ageing(open, clock.today())));
     }
 
@@ -125,12 +116,18 @@ class AccountQueriesImpl implements AccountQueries {
         return jdbc
                 .query(
                         """
-                        select p.document_id, d.doc_number_display, p.account_id, p.amount,
+                        select p.document_id, coalesce(p.doc_number_display, d.doc_number_display) as doc_number_display,
+                               p.account_id, p.amount, p.origin, p.reversal_of,
+                               (select r.document_id from customers.doc_customer_payment r
+                                 where r.reversal_of = p.document_id) as reversed_by,
                                (select coalesce(sum(a.amount), 0) from customers.allocation a
                                   join customers.account_posting ap on ap.posting_id = a.payment_posting_id
-                                 where ap.document_id = p.document_id) as allocated
+                                 where ap.document_id = p.document_id and"""
+                                + Ledger.LIVE_ALLOCATION
+                                + """
+                                ) as allocated
                           from customers.doc_customer_payment p
-                          join kernel.document d on d.document_id = p.document_id
+                          left join kernel.document d on d.document_id = p.document_id
                          where p.document_id = ?
                         """,
                         (rs, n) -> new Payment(
@@ -138,7 +135,10 @@ class AccountQueriesImpl implements AccountQueries {
                                 rs.getString("doc_number_display"),
                                 rs.getObject("account_id", UUID.class),
                                 rs.getBigDecimal("amount"),
-                                rs.getBigDecimal("allocated")),
+                                rs.getBigDecimal("allocated"),
+                                rs.getString("origin"),
+                                rs.getObject("reversal_of", UUID.class),
+                                rs.getObject("reversed_by", UUID.class)),
                         documentId)
                 .stream()
                 .findFirst();
@@ -168,18 +168,27 @@ class AccountQueriesImpl implements AccountQueries {
                 UUID documentId,
                 String number,
                 boolean breached,
-                boolean offline) {}
+                boolean offline,
+                boolean reversed) {}
         List<Posting> postings = jdbc.query(
                 """
                 select p.posting_id, p.business_date, p.kind, p.amount, p.document_id, p.receipt_number,
                        p.limit_breached, p.offline,
-                       case when p.kind = 'CHARGE'
+                       case when p.kind in ('CHARGE', 'ADJUSTMENT')
                             then (select coalesce(sum(a.amount), 0) from customers.allocation a
-                                   where a.charge_posting_id = p.posting_id)
+                                   where a.charge_posting_id = p.posting_id and"""
+                        + Ledger.LIVE_ALLOCATION
+                        + """
+                                  )
                             when p.kind = 'PAYMENT'
                             then (select coalesce(sum(a.amount), 0) from customers.allocation a
-                                   where a.payment_posting_id = p.posting_id)
-                            else 0 end as settled
+                                   where a.payment_posting_id = p.posting_id and"""
+                        + Ledger.LIVE_ALLOCATION
+                        + """
+                                  )
+                            else 0 end as settled,
+                       p.kind = 'PAYMENT' and exists (select 1 from customers.doc_customer_payment r
+                                                       where r.reversal_of = p.document_id) as reversed
                   from customers.account_posting p
                  where p.account_id = ? and p.business_date between ? and ?
                  order by p.business_date, p.received_at, p.posting_id
@@ -193,7 +202,8 @@ class AccountQueriesImpl implements AccountQueries {
                         rs.getObject("document_id", UUID.class),
                         rs.getString("receipt_number"),
                         rs.getBoolean("limit_breached"),
-                        rs.getBoolean("offline")),
+                        rs.getBoolean("offline"),
+                        rs.getBoolean("reversed")),
                 accountId,
                 from,
                 to);
@@ -211,8 +221,59 @@ class AccountQueriesImpl implements AccountQueries {
                     posting.documentId(),
                     posting.number(),
                     posting.breached(),
-                    posting.offline()));
+                    posting.offline(),
+                    posting.reversed()));
         }
         return Optional.of(new Statement(accountId, from, to, opening, running, List.copyOf(lines)));
+    }
+
+    @Override
+    public List<HistoryEntry> history(UUID accountId, ScopeContext scope) {
+        return jdbc.query(
+                """
+                select history_id, action, before_value::text as before_value, after_value::text as after_value,
+                       reason, changed_by, changed_at
+                  from customers.account_history where account_id = ?
+                 order by changed_at desc, history_id desc
+                """,
+                (rs, n) -> new HistoryEntry(
+                        rs.getObject("history_id", UUID.class),
+                        rs.getString("action"),
+                        map(rs.getString("before_value")),
+                        map(rs.getString("after_value")),
+                        rs.getString("reason"),
+                        rs.getObject("changed_by", UUID.class),
+                        rs.getTimestamp("changed_at").toInstant()),
+                accountId);
+    }
+
+    @Override
+    public List<Adjustment> adjustments(UUID accountId, ScopeContext scope) {
+        return jdbc.query(
+                """
+                select adjustment_id, amount, reason, status, requested_by, requested_at, approved_by, approved_at
+                  from customers.account_adjustment where account_id = ?
+                 order by requested_at desc, adjustment_id desc
+                """,
+                (rs, n) -> new Adjustment(
+                        rs.getObject("adjustment_id", UUID.class),
+                        rs.getBigDecimal("amount"),
+                        rs.getString("reason"),
+                        rs.getString("status"),
+                        rs.getObject("requested_by", UUID.class),
+                        rs.getTimestamp("requested_at").toInstant(),
+                        rs.getObject("approved_by", UUID.class),
+                        rs.getTimestamp("approved_at") == null
+                                ? null
+                                : rs.getTimestamp("approved_at").toInstant()),
+                accountId);
+    }
+
+    private Map<String, Object> map(String json) {
+        try {
+            return this.json.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return Map.of();
+        }
     }
 }
