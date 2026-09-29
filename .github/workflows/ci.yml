@@ -407,12 +407,12 @@ jobs:
 
       # The shared code's tests on the JVM (commonTest runs as jvmTest), the encrypted database,
       # the printers, the receipt golden images (Sinhala, Tamil) and the desktop screens driven
-      # headless. The desktop's stack test skips itself unless -Ptill.stack=true.
+      # under a virtual display (xvfb). The desktop's stack test skips itself unless -Ptill.stack=true.
       - name: Till JVM tests
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         working-directory: till
         run: >
-          ./gradlew :core:jvmTest :sync:jvmTest :db:jvmTest :peripherals:jvmTest
+          xvfb-run -a ./gradlew :core:jvmTest :sync:jvmTest :db:jvmTest :peripherals:jvmTest
           :peripherals-jvm:test :render:jvmTest :ui:jvmTest :desktop:test
 
       # CR-30-1: the desktop till for Linux, as a folder with its own Java runtime. The Windows
