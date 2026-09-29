@@ -33,14 +33,14 @@ export function MrpPolicyPage() {
     <main className="shell-page">
       <h1>{t("pricing.policy.title").text}</h1>
       <PricingTabs />
-      <p className="pricing-muted">{t("pricing.policy.intro").text}</p>
+      <p className="modern-intro-text">{t("pricing.policy.intro").text}</p>
 
       {canSet && <SetPolicyForm onSet={() => queryClient.invalidateQueries({ queryKey: ["pricing"] })} />}
 
       <section className="pricing-section">
         {policies.isLoading && <p>{t("pricing.list.loading").text}</p>}
         {policies.isError && <p role="alert">{errorText(policies.error, t("pricing.error.generic").text)}</p>}
-        {policies.data?.length === 0 && <p>{t("pricing.policy.empty").text}</p>}
+        {policies.data?.length === 0 && <div className="modern-empty-state">{t("pricing.policy.empty").text}</div>}
         {policies.data && policies.data.length > 0 && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">

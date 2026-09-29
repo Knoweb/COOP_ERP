@@ -61,7 +61,7 @@ export function ShelfPricesPage() {
     <main className="shell-page">
       <h1>{t("pricing.shelf.title").text}</h1>
       <PricingTabs />
-      <p className="pricing-muted">{t("pricing.shelf.intro").text}</p>
+      <p className="modern-intro-text">{t("pricing.shelf.intro").text}</p>
 
       {canAuthor && !hasRetail && (
         <form onSubmit={submit} className="pricing-filter-bar">
@@ -86,7 +86,7 @@ export function ShelfPricesPage() {
       <section>
         {(retail.isLoading || advisory.isLoading) && <p>{t("pricing.list.loading").text}</p>}
         {retail.isError && <p role="alert">{errorText(retail.error, t("pricing.error.generic").text)}</p>}
-        {!retail.isLoading && lists.length === 0 && <p>{t("pricing.shelf.empty").text}</p>}
+        {!retail.isLoading && lists.length === 0 && <div className="modern-empty-state">{t("pricing.shelf.empty").text}</div>}
         {lists.length > 0 && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">

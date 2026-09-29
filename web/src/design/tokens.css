@@ -80,41 +80,48 @@
   /* ---- Colour: neutral surfaces ---------------------------------------------------------- */
 
   --color-surface: #ffffff; /* the page */
-  --color-surface-subtle: #f8f9fb; /* header, table heads, panels */
-  --color-text: #1f2937; /* 14.68:1 on surface, 13.93:1 on subtle */
-  --color-text-muted: #64748b; /* 4.76:1 on surface, 4.52:1 on subtle */
-  --color-border: #e8e8eb; /* decorative divider: carries no meaning, so no contrast demand */
-  --color-border-control: #64748b; /* edge of an input or button: 4.83:1 on surface (needs 3:1) */
+  --color-surface-subtle: #f8f9fb; /* header, table heads, panels (Light Gray) */
+  --color-surface-card: #f3e6f6; /* Soft Purple Tint */
+  --color-text: #1f2937; /* Dark Text Headings */
+  --color-text-muted: #64748b; /* Muted Text */
+  --color-border: #e8e8eb; /* Border */
+  --color-border-control: #64748b; /* edge of an input or button */
 
-  /* ---- Colour: the one accent ------------------------------------------------------------ */
+  /* ---- Colour: brand --------------------------------------------------------------------- */
 
-  /* Links, the primary button, the focus ring, the scope banner's edge. One accent, not three. */
-  --color-accent: #8e0e5b; /* 8.88:1 on surface, 8.43:1 on subtle */
-  --color-on-accent: #ffffff; /* text on an accent background: 8.88:1 */
+  /* Links, the primary button, the focus ring, the scope banner's edge. */
+  --color-accent: #8e0e5b; /* Primary Brand Color */
+  --color-on-accent: #ffffff;
+  --color-accent-light: #f6d7e9; /* Primary Light */
+
+  --color-brand-secondary: #e30613; /* Secondary (Alerts/Important) */
+  --color-brand-accent1: #f18a00; /* Accent 1 (Highlights) */
+  --color-brand-accent2: #ffee00; /* Accent 2 (Tags/Info) */
+  --color-brand-success: #00a651; /* Success (Positive Actions) */
+  --color-brand-info: #00aeef; /* Info (Links/Data) */
+  --color-brand-dark: #2e3192; /* Secondary Brand (Navigation/Headings) */
 
   /* ---- Colour: document states ----------------------------------------------------------- */
 
-  /*
-   * Each state has a text colour and a background made for each other. Colour is never the only
-   * signal (doc 30, P-08): StateChip always adds a symbol and the word. About one man in twelve
-   * cannot tell the green of "issued" from the amber of "disputed".
-   */
-  --color-draft-text: #2e3192; /* 7.56:1 on its background */
-  --color-draft-bg: #e6f6fc;
-  --color-issued-text: #1b5e20; /* 6.93:1 */
-  --color-issued-bg: #ddf6e5;
-  --color-disputed-text: #8a4b00; /* 6.24:1 */
-  --color-disputed-bg: #fff2d9;
-  --color-void-text: #424242; /* 8.66:1 */
-  --color-void-bg: #eeeeee;
-  --color-void-hatch: #e8e8eb; /* the darker stripe of the void hatch; the text is 7.33:1 on it */
-  --color-alert-text: #b00020; /* 6.21:1 on its background, 7.33:1 on surface (field errors) */
-  --color-alert-bg: #fde2e4;
+  --color-draft-text: #2e3192; /* Info / Secondary Brand */
+  --color-draft-bg: #e6f6fc; /* Blue Light */
+
+  --color-issued-text: #00a651; /* Success */
+  --color-issued-bg: #ddf6e5; /* Green Light */
+
+  --color-disputed-text: #f18a00; /* Warning / Accent 1 */
+  --color-disputed-bg: #fff2d9; /* Orange Light */
+
+  --color-void-text: #64748b;
+  --color-void-bg: #f8f9fb;
+  --color-void-hatch: #e8e8eb;
+
+  --color-alert-text: #e30613; /* Error / Secondary */
+  --color-alert-bg: #fde2e4; /* Red Light */
 
   /* ---- Colour: training mode ------------------------------------------------------------- */
 
-  /* A colour used for nothing else, so that practice can never be mistaken for the real thing. */
-  --color-training: #2e3192; /* 9.39:1 against surface, as a frame and as a background */
-  --color-on-training: #ffffff; /* 9.39:1 */
-  --color-training-bg: #fcf8fd; /* the header in training mode; text on it 12.18:1, muted text 5.33:1 */
+  --color-training: #2e3192;
+  --color-on-training: #ffffff;
+  --color-training-bg: #e9e9f8; /* Indigo Light */
 }

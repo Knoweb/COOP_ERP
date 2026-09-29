@@ -65,24 +65,8 @@ export function ScopeBanner() {
           {actingParts.map((part, i) => {
             if (part === "[[USER]]") return <strong key={i} className="scope-user">{session?.displayName ?? ""}</strong>;
             if (part === "[[ENTITY]]") return <strong key={i} className="scope-entity">{entity}</strong>;
-            return <span key={i} className="scope-muted">{part}</span>;
+            return part ? <span key={i} className="scope-muted">{part}</span> : null;
           })}
-        </div>
-      </div>
-      <div className="scope-chips">
-        <div className="scope-chip scope-chip--location">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
-          {location}
-        </div>
-        <div className="scope-chip scope-chip--access">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          </svg>
-          <span className="scope-chip-label">{t("shell.scope.access").text}</span>
-          <span className="scope-chip-value">{t(`shell.scope.class.${scope.policyClass}`).text}</span>
         </div>
       </div>
     </div>
