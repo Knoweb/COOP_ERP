@@ -4,8 +4,17 @@
 // Android draws with its platform text stack (StaticLayout) when the Android screens are built.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.compose.multiplatform)
+}
+
+/** The Skiko native runtime for the OS and CPU Gradle runs on (tests and local runs). */
+fun skikoOs(): String {
+    val os = System.getProperty("os.name").lowercase()
+    val arch = if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) "arm64" else "x64"
+    return when {
+        os.contains("win") -> "windows-$arch"
+        os.contains("mac") -> "macos-$arch"
+        else -> "linux-$arch"
+    }
 }
 
 val tillAndroid = gradle.extensions.extraProperties["till.android"] as Boolean
@@ -40,8 +49,10 @@ kotlin {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-            // Skiko (Skia for the JVM) with the native library of the OS the build runs on.
-            implementation(compose.desktop.currentOs)
+            // Skiko (Skia for the JVM) at the version Compose Multiplatform brings, and the native
+            // library of the OS the build runs on (the desktop app gets its own through Compose).
+            implementation(libs.skiko.awt)
+            runtimeOnly("org.jetbrains.skiko:skiko-awt-runtime-${skikoOs()}:${libs.versions.skiko.get()}")
         }
         jvmTest.dependencies {
             implementation(project(":peripherals-jvm"))
