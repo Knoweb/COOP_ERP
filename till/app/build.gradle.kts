@@ -1,13 +1,15 @@
+// The Android till (CR-30-1: the primary target). It shows the shared greeting from ui for now;
+// wiring it to the shared screens (SQLCipher driver, Android Keystore, the Android rasteriser and
+// printer transports) is the next Android step, see till/README.md.
 plugins {
-    id("com.android.application")
-    kotlin("android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "lk.coopfed.knoweb.till"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "lk.coopfed.knoweb.till"
@@ -15,7 +17,7 @@ android {
         targetSdk = 34
 
         versionCode = 1
-        versionName = "0.0.1"
+        versionName = providers.gradleProperty("till.version").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -28,11 +30,15 @@ android {
     buildFeatures {
         compose = true
     }
+
+    packaging {
+        resources {
+            // Two libraries carry the same licence notices; the APK needs one copy.
+            excludes += setOf("META-INF/{AL2.0,LGPL2.1}", "META-INF/versions/9/OSGI-INF/MANIFEST.MF")
+        }
+    }
 }
 
-// The Kotlin compiler's JVM target, in the compilerOptions DSL. The older form inside the
-// android block (kotlinOptions { jvmTarget = "17" }) is deprecated since Kotlin 2.0 and is an
-// error from Kotlin 2.4 on, so it would break the build the day the till moves Kotlin.
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -40,24 +46,11 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core"))
-    implementation(project(":peripherals"))
-    implementation(project(":sync"))
+    implementation(project(":ui"))
 
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.work.runtime.ktx)
 
-    implementation(platform("androidx.compose:compose-bom:2024.09.03"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
-
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
-
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit4)
 }
