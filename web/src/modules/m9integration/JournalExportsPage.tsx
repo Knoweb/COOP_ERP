@@ -170,8 +170,8 @@ export function JournalExportsPage() {
                             type="button"
                             className="modern-btn"
                             aria-label={t("integration.journal.download.label", undefined, {
-                              from: journal.periodFrom,
-                              to: journal.periodTo
+                              from: formatDate(journal.periodFrom),
+                              to: formatDate(journal.periodTo)
                             }).text}
                             onClick={() => void download(journal)}
                           >
@@ -243,7 +243,7 @@ function ReconciliationPanel({ exportId }: { exportId: string }) {
             <tbody>
               {r.accounts.map((account) => (
                 <tr key={account.role}>
-                  <td>{account.role}</td>
+                  <td title={account.role}>{t(`integration.account_role.${account.role}`, account.role).text}</td>
                   <td className="integration-number">
                     <MoneyDisplay amount={String(account.debit)} />
                   </td>

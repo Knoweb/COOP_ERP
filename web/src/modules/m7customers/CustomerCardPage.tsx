@@ -48,7 +48,7 @@ export function CustomerCardPage() {
     );
   }
   const customer = card.data;
-  const name = nameIn(locale, customer);
+  const name = nameIn(locale, customer, t("customers.erased_member").text);
 
   return (
     <main className="shell-page">

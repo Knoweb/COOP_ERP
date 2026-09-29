@@ -19,7 +19,7 @@ import java.util.UUID;
  * @param counterparty         its name in the caller's language
  * @param subject              for stock: the item and the location, as text
  * @param amount               the money at stake (the cheque, the invoice, the exposure), or the
- *                             quantity below zero for stock
+ *                             quantity below zero for stock, or the quantity at issue on an open discrepancy
  * @param percent              for an exposure warning: the exposure as a percentage of the limit
  * @param since                when the exception arose
  * @param escalated            older than {@code reporting.exception_escalate_after}, or a

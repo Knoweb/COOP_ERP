@@ -232,15 +232,42 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
      */
     private void theHistorySpreadsOverEightWeeks() {
         JdbcTemplate admin = superuserJdbc();
-        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneId.of("Asia/Colombo"));
         String demo = "(owner_entity_id = '" + DemoCast.FEDERATION + "' or owner_entity_id::text like '0190f0de-%')";
 
         LocalDate firstOrder = admin.queryForObject(
                 "select min(business_date) from kernel.document where notes like 'Demo history %'", LocalDate.class);
         LocalDate lastOrder = admin.queryForObject(
                 "select max(business_date) from kernel.document where notes like 'Demo history %'", LocalDate.class);
+        // The last order was placed on the day of the load: every date is read against it, never
+        // against the clock now (the load and the test may straddle midnight).
+        LocalDate today = lastOrder;
         assertThat(firstOrder).isEqualTo(today.minusDays(DemoCalendar.HISTORY_DAYS));
-        assertThat(lastOrder).isEqualTo(today);
+
+        // The last invoiced order of every lane is invoiced on the day of the load, so the
+        // dashboard's "Sales this week" is never empty after a fresh load.
+        Long invoicedToday = admin.queryForObject(
+                "select count(*) from kernel.document where doc_type_code = 'INV' and issued_at is not null"
+                        + " and business_date = ? and " + demo,
+                Long.class,
+                java.sql.Date.valueOf(today));
+        assertThat(invoicedToday).isEqualTo((long) DemoTradingHistory.LANES.size());
+
+        // Most orders were promised for the fifth day (received on the fourth, on time), every
+        // sixth for the third day (late).
+        Map<String, Object> etas = admin.queryForMap(
+                """
+                select count(*) filter (where a.committed_eta = d.business_date + 5) as on_time,
+                       count(*) filter (where a.committed_eta = d.business_date + 3) as late,
+                       count(*) as total
+                  from trading.order_allocation a
+                  join kernel.document d on d.document_id = a.order_id
+                 where d.notes like 'Demo history %' and a.status = 'ACCEPTED'
+                """);
+        long onTime = ((Number) etas.get("on_time")).longValue();
+        long late = ((Number) etas.get("late")).longValue();
+        assertThat(onTime + late).isEqualTo(((Number) etas.get("total")).longValue());
+        assertThat(late).isPositive();
+        assertThat(onTime).isGreaterThan(late * 3);
 
         // Every document of the history is dated within the eight weeks, on at least 20 different days.
         List<String> types = List.of("ORD", "DN", "GRN", "INV");

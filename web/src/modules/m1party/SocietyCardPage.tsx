@@ -141,7 +141,7 @@ export function SocietyCardPage() {
           { label: t("party.field.district").text, value: data.district },
           { label: t("party.field.language").text, value: data.defaultLanguage ? t(`party.language.${data.defaultLanguage}`).text : undefined },
           { label: t("party.field.fy_start").text, value: data.financialYearStartMonth ? t(`party.month.${data.financialYearStartMonth}`).text : undefined },
-          { label: t("party.card.officer").text, value: data.responsibleOfficerUserId },
+          { label: t("party.card.officer").text, value: data.responsibleOfficerName ?? data.responsibleOfficerUserId },
           { label: t("party.card.governance_signed").text, value: data.dataGovernanceSignedOn ? formatDate(data.dataGovernanceSignedOn) : undefined }
         ]}
       >

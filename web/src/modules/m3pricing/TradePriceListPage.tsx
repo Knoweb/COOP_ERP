@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -11,6 +12,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
+import { ListRelationships } from "./ListRelationships";
 import { chipOf, errorText, reasonMessageId } from "./priceListState";
 import "./pricing.css";
 
@@ -27,6 +29,7 @@ type Row = { skuId: string; uomCode: string; tierFromQty: string; price: string 
 export function TradePriceListPage() {
   const { listId = "" } = useParams();
   const t = useT();
+  const formatDate = useFormatDate();
   const api = usePricingApi();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -144,7 +147,7 @@ export function TradePriceListPage() {
       <p className="pricing-header-row">
         <span>{t("pricing.version", undefined, { version: list.version }).text}</span>
         <StateChip state={chipOf(list.status)} label={t(`pricing.status.${list.status.toLowerCase()}`).text} />
-        {list.applyFrom && <span>{t("pricing.applies_from", undefined, { date: list.applyFrom }).text}</span>}
+        {list.applyFrom && <span>{t("pricing.applies_from", undefined, { date: formatDate(list.applyFrom) }).text}</span>}
       </p>
 
       <table>
@@ -248,6 +251,8 @@ export function TradePriceListPage() {
           {nextVersion.isError && <span role="alert">{errorText(nextVersion.error, t("pricing.error.generic").text)}</span>}
         </p>
       )}
+
+      {list.kind === "TRADE" && <ListRelationships list={list} />}
     </main>
   );
 }

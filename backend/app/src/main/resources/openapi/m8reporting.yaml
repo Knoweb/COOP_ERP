@@ -257,7 +257,7 @@ components:
         subject: { type: string, description: 'For stock: the item and the location' }
         amount:
           type: string
-          description: 'The money at stake (plain decimal), or the quantity below zero for stock'
+          description: 'The money at stake (plain decimal), or the quantity below zero for stock, or the quantity at issue on an open discrepancy'
         percent: { type: string, description: 'For an exposure warning: exposure as a percentage of the limit' }
         since: { type: string, format: date-time }
         escalated: { type: boolean }

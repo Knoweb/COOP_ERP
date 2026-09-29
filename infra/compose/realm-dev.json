@@ -9,6 +9,11 @@
   "internationalizationEnabled": true,
   "supportedLocales": ["en", "si", "ta"],
   "defaultLocale": "en",
+  "localizationTexts": {
+    "en": { "locale_en": "English", "locale_si": "සිංහල", "locale_ta": "தமிழ்" },
+    "si": { "locale_en": "English", "locale_si": "සිංහල", "locale_ta": "தமிழ்" },
+    "ta": { "locale_en": "English", "locale_si": "සිංහල", "locale_ta": "தமிழ்" }
+  },
   "accessTokenLifespan": 900,
   "roles": {
     "realm": [

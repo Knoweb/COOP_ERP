@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SplittableRandom;
 import java.util.UUID;
 import lk.coopfed.knoweb.demo.DemoCatalogue.Item;
 import lk.coopfed.knoweb.testsupport.TillSimulator;
@@ -46,8 +47,8 @@ import org.springframework.util.MultiValueMap;
  *
  * <p>Idempotent: a day on which the shop's demo till already has a receipt is not sold again, so a
  * second run finds every day done, enrols nothing and changes nothing. Sales are made only of
- * items the shop holds ten or more of, one or two at a time, so the history does not drive the
- * shops' stock negative.
+ * items the shop holds ten or more of, in varied baskets, never more in all than the shop holds
+ * (DemoTillHistory#salesOf), so the history does not drive the shops' stock negative.
  *
  * <p>Settings as {@link DemoTillSale}: {@code COOP_ERP_API}, {@code COOP_ERP_TOKEN_URL}.
  */
@@ -96,23 +97,61 @@ public final class DemoTillHistory {
         return plan.stream().filter(day -> !sold.contains(day)).toList();
     }
 
+    /** Of each item the shop holds, this many are left on the shelf for {@code make demo-till-sale}. */
+    static final int RESERVE = 2;
+
     /**
-     * The sales of one day: one on odd days of the plan, two on even ones, each of two items taken
-     * in turn from the candidates, one or two of each.
+     * The sales of the days still to sell, per day (a day may have none left to sell): one sale on
+     * odd days of the plan, two on even ones, each a basket of one to five different items drawn
+     * from what the shop holds, one to three of each. The baskets are drawn from a random source
+     * seeded by the shop, the day's place in the plan and the sale's index, so the same stock gives
+     * the same history on every run. What the history sells of an item never goes beyond what the
+     * shop holds less {@link #RESERVE}, spread evenly over the days, so the stock never goes negative
+     * and the last days still sell.
      */
-    static List<List<Sale>> salesOf(int dayIndex, List<Item> candidates) {
-        List<List<Sale>> sales = new ArrayList<>();
-        int count = dayIndex % 2 == 0 ? 2 : 1;
-        for (int s = 0; s < count; s++) {
-            List<Sale> lines = new ArrayList<>();
-            for (int l = 0; l < 2; l++) {
-                Item item = candidates.get((dayIndex * 3 + s * 2 + l) % candidates.size());
-                BigDecimal price = item.printedMrp() != null ? item.printedMrp() : item.distributorPrice();
-                lines.add(new Sale(item.barcode(), BigDecimal.valueOf(1 + (dayIndex + l) % 2), price));
+    static Map<LocalDate, List<List<Sale>>> salesOf(
+            UUID shop, List<LocalDate> plan, List<LocalDate> todo, Map<Item, BigDecimal> held) {
+        List<Item> items = new ArrayList<>(held.keySet());
+        Map<Item, Integer> budget = new LinkedHashMap<>();
+        Map<Item, Integer> used = new LinkedHashMap<>();
+        held.forEach((item, qty) -> {
+            budget.put(item, Math.max(0, qty.intValue() - RESERVE));
+            used.put(item, 0);
+        });
+        Map<LocalDate, List<List<Sale>>> byDay = new LinkedHashMap<>();
+        for (int k = 0; k < todo.size(); k++) {
+            LocalDate day = todo.get(k);
+            int dayIndex = plan.indexOf(day);
+            int count = dayIndex % 2 == 0 ? 2 : 1;
+            List<List<Sale>> sales = new ArrayList<>();
+            for (int s = 0; s < count; s++) {
+                SplittableRandom random = new SplittableRandom(shop.getMostSignificantBits()
+                        ^ shop.getLeastSignificantBits()
+                        ^ (dayIndex * 1_000_003L)
+                        ^ (s * 7_919L));
+                List<Item> shuffled = new ArrayList<>(items);
+                for (int i = shuffled.size() - 1; i > 0; i--) {
+                    java.util.Collections.swap(shuffled, i, random.nextInt(i + 1));
+                }
+                int lines = Math.min(1 + random.nextInt(5), shuffled.size());
+                List<Sale> basket = new ArrayList<>();
+                for (Item item : shuffled.subList(0, lines)) {
+                    int wanted = 1 + random.nextInt(3);
+                    int allowed = budget.get(item) * (k + 1) / todo.size() - used.get(item);
+                    int qty = Math.min(wanted, allowed);
+                    if (qty > 0) {
+                        used.merge(item, qty, Integer::sum);
+                        BigDecimal price = item.printedMrp() != null ? item.printedMrp() : item.distributorPrice();
+                        basket.add(new Sale(item.barcode(), BigDecimal.valueOf(qty), price));
+                    }
+                }
+                if (!basket.isEmpty()) {
+                    sales.add(basket);
+                }
             }
-            sales.add(lines);
+            byDay.put(day, sales);
         }
-        return sales;
+        return byDay;
     }
 
     private final ObjectMapper json = JsonMapper.builder()
@@ -228,20 +267,27 @@ public final class DemoTillHistory {
                 .numberingFrom(rct.path("next_number").asLong());
         till.refreshSnapshot();
 
-        List<Item> candidates = candidates(location, till, manager);
+        Map<Item, BigDecimal> candidates = candidates(location, till, manager);
         if (candidates.isEmpty()) {
             System.out.println("Till history at " + location + ": the shop holds no item to sell, skipped");
             return;
         }
 
         int receipts = 0;
+        Map<LocalDate, List<List<Sale>>> planned = salesOf(location, plan, todo, candidates);
+        List<LocalDate> selling =
+                todo.stream().filter(day -> !planned.get(day).isEmpty()).toList();
+        if (selling.size() < todo.size()) {
+            System.out.println("Till history at " + location + ": " + (todo.size() - selling.size())
+                    + " days have nothing left to sell (the shop's stock), no sale on them");
+        }
+        todo = selling;
         for (LocalDate day : todo) {
-            int dayIndex = plan.indexOf(day);
             till.dayOpen(day);
             till.clockAt(moment(day, LocalTime.of(8, 30)));
             till.openSession(FLOAT);
             BigDecimal taken = BigDecimal.ZERO;
-            List<List<Sale>> sales = salesOf(dayIndex, candidates);
+            List<List<Sale>> sales = planned.get(day);
             for (int s = 0; s < sales.size(); s++) {
                 till.clockAt(moment(day, LocalTime.of(10 + 3 * s, 15)));
                 till.sell(sales.get(s));
@@ -307,8 +353,8 @@ public final class DemoTillHistory {
         return days;
     }
 
-    /** The catalogue's barcoded items the shop holds ten or more of, in catalogue order. */
-    private List<Item> candidates(UUID location, TillSimulator till, HttpHeaders manager) {
+    /** The catalogue's barcoded items the shop holds ten or more of, in catalogue order, with how many. */
+    private Map<Item, BigDecimal> candidates(UUID location, TillSimulator till, HttpHeaders manager) {
         Map<String, BigDecimal> onHand = new LinkedHashMap<>();
         for (JsonNode lot : call(HttpMethod.GET, "/v1/inventory/locations/" + location + "/balances", null, manager)) {
             onHand.merge(lot.path("skuId").asText(), lot.path("qtyOnHand").decimalValue(), BigDecimal::add);
@@ -324,11 +370,12 @@ public final class DemoTillHistory {
                 }
             }
         }
-        List<Item> items = new ArrayList<>();
+        Map<Item, BigDecimal> items = new LinkedHashMap<>();
         for (Item item : DemoCatalogue.load()) {
             String sku = item.barcode() == null ? null : skuOfBarcode.get(item.barcode());
-            if (sku != null && onHand.getOrDefault(sku, BigDecimal.ZERO).compareTo(BigDecimal.TEN) >= 0) {
-                items.add(item);
+            BigDecimal qty = sku == null ? BigDecimal.ZERO : onHand.getOrDefault(sku, BigDecimal.ZERO);
+            if (qty.compareTo(BigDecimal.TEN) >= 0) {
+                items.put(item, qty);
             }
         }
         return items;

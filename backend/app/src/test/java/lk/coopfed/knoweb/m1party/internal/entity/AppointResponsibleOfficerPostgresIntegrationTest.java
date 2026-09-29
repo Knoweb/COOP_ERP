@@ -52,7 +52,14 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
     @BeforeEach
     void seedEntity() {
 
-        superuserJdbc().update("delete from party.entity where entity_id = ?", ENTITY_ID);
+        superuserJdbc().update("delete from security.app_user where user_id = ?", OFFICER_ID);
+        // The entity is kept between tests (the party directory refers to it once an event has
+        // been projected); only its officer is reset.
+        superuserJdbc()
+                .update(
+                        "update party.entity set responsible_officer_user_id = null, data_governance_signed_on = null"
+                                + " where entity_id = ?",
+                        ENTITY_ID);
 
         superuserJdbc()
                 .update(
@@ -64,6 +71,7 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
                     legal_name_en
                 )
                 values (?, ?, 'MPCS', ?)
+                on conflict (entity_id) do nothing
                 """,
                         ENTITY_ID,
                         ENTITY_CODE,
@@ -143,6 +151,36 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
 
         assertThat(kernel.committedEvents())
                 .containsExactly(new EntityUpdated(ENTITY_ID, ENTITY_CODE, "MPCS", "ONBOARDING"));
+    }
+
+    @Test
+    void theEntityCardNamesTheOfficerInsteadOfShowingTheId() {
+
+        superuserJdbc().update("delete from security.app_user where user_id = ?", OFFICER_ID);
+        superuserJdbc()
+                .update(
+                        "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
+                                + " values (?, ?, 'officer-9303', 'Nimal Perera', 'BACK_OFFICE', 'ACTIVE')",
+                        OFFICER_ID,
+                        ENTITY_ID);
+        superuserJdbc()
+                .update(
+                        "update party.entity set responsible_officer_user_id = ? where entity_id = ?",
+                        OFFICER_ID,
+                        ENTITY_ID);
+
+        when(currentScope.get()).thenReturn(ScopeContext.dev(CALLER_USER_ID, ENTITY_ID, null));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(TestIdentityProvider.token(CALLER_USER_ID, ENTITY_ID));
+        headers.set("X-Scope-Entity", ENTITY_ID.toString());
+
+        ResponseEntity<Map> response =
+                http.exchange("/v1/party/entities/" + ENTITY_ID, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody())
+                .containsEntry("responsibleOfficerUserId", OFFICER_ID.toString())
+                .containsEntry("responsibleOfficerName", "Nimal Perera");
     }
 
     @TestConfiguration(proxyBeanMethods = false)

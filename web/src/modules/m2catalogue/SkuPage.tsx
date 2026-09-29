@@ -4,6 +4,8 @@ import { Link, useParams } from "react-router-dom";
 import { useIntl } from "react-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -141,6 +143,7 @@ export function SkuPage() {
 
 function Conversions({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean; baseUom: string }) {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useCatalogueApi();
   const queryClient = useQueryClient();
   const key = useIdempotencyKey();
@@ -184,8 +187,8 @@ function Conversions({ skuId, canEdit, baseUom }: { skuId: string; canEdit: bool
               <tr key={`${row.uomCode}-${row.effectiveFrom}`}>
                 <td>{row.uomCode}</td>
                 <td>{t("catalogue.conversion.factor", undefined, { factor: row.factorToBase, base: baseUom }).text}</td>
-                <td>{row.effectiveFrom}</td>
-                <td>{row.effectiveTo ?? ""}</td>
+                <td>{formatDate(row.effectiveFrom)}</td>
+                <td>{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
               </tr>
             ))}
           </tbody>
@@ -315,6 +318,7 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
 
 function Batches({ skuId }: { skuId: string }) {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useCatalogueApi();
   const batches = useQuery({ queryKey: ["catalogue", "batches", skuId], queryFn: () => api.batches(skuId) });
 
@@ -336,8 +340,8 @@ function Batches({ skuId }: { skuId: string }) {
             {batches.data.map((batch) => (
               <tr key={batch.batchId}>
                 <td>{batch.batchNo}</td>
-                <td>{batch.expiryDate ?? ""}</td>
-                <td>{batch.printedMrp ?? ""}</td>
+                <td>{batch.expiryDate ? formatDate(batch.expiryDate) : ""}</td>
+                <td>{batch.printedMrp != null && <MoneyDisplay amount={batch.printedMrp} />}</td>
                 <td>{t(`catalogue.batch.status.${batch.status}`).text}</td>
               </tr>
             ))}

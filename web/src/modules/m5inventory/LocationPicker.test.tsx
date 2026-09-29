@@ -65,11 +65,11 @@ describe("the location picker", () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("loc-1"));
   });
 
-  it("leaves the choice to the caller when there is more than one location", async () => {
+  it("preselects the first location when there is more than one and the scope names none", async () => {
     locationsResult = () => Promise.resolve([location("loc-1", "L1"), location("loc-2", "L2")]);
     const onChange = renderPicker();
 
-    await screen.findByRole("combobox");
-    expect(onChange).not.toHaveBeenCalled();
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith("loc-1"));
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 });

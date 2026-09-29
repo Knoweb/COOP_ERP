@@ -127,7 +127,16 @@
     "pricing.column.from": "From",
     "pricing.column.to": "To",
     "pricing.column.gazette": "Gazette",
-    "pricing.cancel": "Cancel"
+    "pricing.cancel": "Cancel",
+    "pricing.relationships.title": "Relationships on this list",
+    "pricing.relationships.empty": "No buyer trades on this list yet.",
+    "pricing.relationships.buyer": "Buyer",
+    "pricing.relationships.status": "Status",
+    "pricing.relationships.from": "In force from",
+    "pricing.relationships.status.DRAFT": "Draft",
+    "pricing.relationships.status.ACTIVE": "Active",
+    "pricing.relationships.status.SUSPENDED": "Suspended",
+    "pricing.relationships.status.REPLACED": "Replaced"
   },
   "si": {
     "pricing.nav": "මිල ලැයිස්තු",
@@ -257,7 +266,16 @@
     "pricing.column.from": "සිට",
     "pricing.column.to": "දක්වා",
     "pricing.column.gazette": "ගැසට්",
-    "pricing.cancel": "අවලංගු කරන්න"
+    "pricing.cancel": "අවලංගු කරන්න",
+    "pricing.relationships.title": "මෙම ලැයිස්තුවේ සබඳතා",
+    "pricing.relationships.empty": "මෙම ලැයිස්තුවෙන් තවම කිසිදු ගැනුම්කරුවෙක් වෙළඳාම් නොකරයි.",
+    "pricing.relationships.buyer": "ගැනුම්කරු",
+    "pricing.relationships.status": "තත්ත්වය",
+    "pricing.relationships.from": "බලපැවැත්වෙන දිනය",
+    "pricing.relationships.status.DRAFT": "කෙටුම්පත",
+    "pricing.relationships.status.ACTIVE": "සක්‍රීය",
+    "pricing.relationships.status.SUSPENDED": "අත්හිටුවා ඇත",
+    "pricing.relationships.status.REPLACED": "ප්‍රතිස්ථාපිතයි"
   },
   "ta": {
     "pricing.nav": "விலைப் பட்டியல்கள்",
@@ -387,6 +405,15 @@
     "pricing.column.from": "முதல்",
     "pricing.column.to": "வரை",
     "pricing.column.gazette": "வர்த்தமானி",
-    "pricing.cancel": "ரத்து"
+    "pricing.cancel": "ரத்து",
+    "pricing.relationships.title": "இந்தப் பட்டியலிலுள்ள உறவுகள்",
+    "pricing.relationships.empty": "இந்தப் பட்டியலில் இன்னும் எந்த வாங்குநரும் வர்த்தகம் செய்யவில்லை.",
+    "pricing.relationships.buyer": "வாங்குநர்",
+    "pricing.relationships.status": "நிலை",
+    "pricing.relationships.from": "நடைமுறைக்கு வரும் நாள்",
+    "pricing.relationships.status.DRAFT": "வரைவு",
+    "pricing.relationships.status.ACTIVE": "செயலில்",
+    "pricing.relationships.status.SUSPENDED": "இடைநிறுத்தப்பட்டது",
+    "pricing.relationships.status.REPLACED": "மாற்றப்பட்டது"
   }
 }

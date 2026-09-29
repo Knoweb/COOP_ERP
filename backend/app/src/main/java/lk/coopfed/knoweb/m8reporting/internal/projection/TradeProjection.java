@@ -107,6 +107,7 @@ public class TradeProjection extends Projection {
         LocalDate committedEta;
         Instant windowEndsAt;
         BigDecimal unapplied;
+        BigDecimal qtyAtIssue;
     }
 
     @Override
@@ -286,6 +287,14 @@ public class TradeProjection extends Projection {
                 row.documentId = event.uuid("discrepancyId");
                 row.reference = event.uuid("grnId");
                 row.windowEndsAt = event.instant("windowEndsAt");
+                row.qtyAtIssue = BigDecimal.ZERO;
+                for (JsonNode line : payload.path("lines")) {
+                    BigDecimal variance = ProjectionEvent.decimal(line, "varianceQty");
+                    BigDecimal damaged = ProjectionEvent.decimal(line, "damagedQty");
+                    row.qtyAtIssue = row.qtyAtIssue
+                            .add(variance == null ? BigDecimal.ZERO : variance.abs())
+                            .add(damaged == null ? BigDecimal.ZERO : damaged);
+                }
             }
             case "discrepancy.settled.v1" -> {
                 row.documentId = event.uuid("discrepancyId");
@@ -320,8 +329,9 @@ public class TradeProjection extends Projection {
                 insert into reporting.trade_document_event
                        (document_id, event_kind, owner_entity_id, doc_type, doc_number, counterparty_entity_id,
                         seller_entity_id, buyer_entity_id, relationship_id, reference_document_id, business_date,
-                        occurred_at, net, tax, gross, event_id, due_date, committed_eta, window_ends_at, unapplied)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        occurred_at, net, tax, gross, event_id, due_date, committed_eta, window_ends_at, unapplied,
+                        qty_at_issue)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (document_id, event_kind, owner_entity_id) do nothing
                 """,
                 row.documentId,
@@ -343,7 +353,8 @@ public class TradeProjection extends Projection {
                 row.dueDate == null ? null : Date.valueOf(row.dueDate),
                 row.committedEta == null ? null : Date.valueOf(row.committedEta),
                 row.windowEndsAt == null ? null : Timestamp.from(row.windowEndsAt),
-                row.unapplied);
+                row.unapplied,
+                row.qtyAtIssue);
     }
 
     private void insertLine(

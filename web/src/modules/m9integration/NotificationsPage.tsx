@@ -82,11 +82,13 @@ export function NotificationsPage() {
                   {rules.data.map((rule) => (
                     <tr key={rule.ruleId}>
                       <td>{rule.name}</td>
-                      <td>{rule.eventType}</td>
+                      <td title={rule.eventType}>{t(`integration.event.${rule.eventType}`, rule.eventType).text}</td>
                       <td>
-                        {t(`integration.audience.${rule.audienceKind}`, undefined, { role: rule.audienceRole ?? "" }).text}
+                        {t(`integration.audience.${rule.audienceKind}`, undefined, {
+                          role: rule.audienceRole ? t(`integration.role.${rule.audienceRole}`, rule.audienceRole).text : ""
+                        }).text}
                       </td>
-                      <td>{rule.channels.join(", ")}</td>
+                      <td>{rule.channels.map((channel) => t(`integration.channel.${channel}`, channel).text).join(", ")}</td>
                       <td>
                         <StateChip
                           state={rule.status === "ACTIVE" ? "issued" : rule.status === "DRAFT" ? "draft" : "void"}
@@ -197,10 +199,10 @@ export function NotificationsPage() {
                   {log.data.map((entry) => (
                     <tr key={entry.notificationId}>
                       <td>{formatInstant(entry.createdAt)}</td>
-                      <td>{entry.templateId ?? ""}</td>
-                      <td>{entry.channel}</td>
+                      <td title={entry.templateId ?? undefined}>{entry.templateId ? t(`integration.template.${entry.templateId}`, entry.templateId).text : ""}</td>
+                      <td>{t(`integration.channel.${entry.channel}`, entry.channel).text}</td>
                       <td className="integration-hash">{entry.recipientHash}</td>
-                      <td>{entry.language ?? ""}</td>
+                      <td>{entry.language ? t(`integration.language.${entry.language}`, entry.language).text : ""}</td>
                       <td>
                         <StateChip state={LOG_LOOK[entry.status]} label={t(`integration.log.status.${entry.status}`).text} />
                       </td>

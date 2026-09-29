@@ -873,6 +873,8 @@ export interface components {
             defaultLanguage?: "en" | "si" | "ta" | null;
             /** Format: uuid */
             responsibleOfficerUserId?: string | null;
+            /** @description The responsible officer's display name, resolved from the user record when the caller may read it (the society card). Null when there is no officer or the name is not visible; the card then shows the id. */
+            responsibleOfficerName?: string | null;
             /** Format: date */
             dataGovernanceSignedOn?: string | null;
             /** @enum {string|null} */

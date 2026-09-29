@@ -57,8 +57,9 @@ import org.springframework.stereotype.Service;
  * transit, one accepted, one submitted.
  *
  * <p>Spread over eight weeks: the first order of each relationship was placed
- * {@link DemoCalendar#HISTORY_DAYS} days before the load, the last today, and each step of an order
- * runs on its own later day. The handlers take the date from the application's clock and the
+ * {@link DemoCalendar#HISTORY_DAYS} days before the load, the last invoiced one
+ * {@link #LAST_INVOICED_DAYS_AGO} days before (so invoiced today), the open ones in the last four
+ * days (the last today), and each step of an order runs on its own later day. The handlers take the date from the application's clock and the
  * location's business date as always; the loader runs each step inside kernel.api.HistoricalTime,
  * which only the demo container enables, so nothing is faked in the database and no back-dating
  * path exists in the API (docs/DEMO.md).
@@ -152,6 +153,18 @@ class DemoTradingHistory {
     /** The stages the last orders of a lane stop at, the last order first. */
     private static final List<Stage> OPEN_TAIL =
             List.of(Stage.SUBMITTED, Stage.ACCEPTED, Stage.DISPATCHED, Stage.RECEIVED);
+
+    /**
+     * How many days ago the open orders were placed, the last order first: each as late as its stage
+     * allows (accepted the next day, dispatched on the second, received on the fourth).
+     */
+    private static final List<Integer> TAIL_DAYS_AGO = List.of(0, 1, 2, 4);
+
+    /**
+     * The last invoiced order of each lane was placed this many days ago, so it is invoiced today
+     * (the fifth day) and the dashboard's "Sales this week" is never empty after a fresh load.
+     */
+    static final int LAST_INVOICED_DAYS_AGO = 5;
 
     static final String NOTE_PREFIX = "Demo history ";
 
@@ -258,7 +271,22 @@ class DemoTradingHistory {
      * {@link DemoCalendar#HISTORY_DAYS} days ago, the last today, the others evenly between.
      */
     static int daysAgo(Lane lane, int no) {
-        return (lane.orders() - no) * DemoCalendar.HISTORY_DAYS / (lane.orders() - 1);
+        int fromEnd = lane.orders() - no;
+        if (fromEnd < OPEN_TAIL.size()) {
+            return TAIL_DAYS_AGO.get(fromEnd);
+        }
+        int invoiced = lane.orders() - OPEN_TAIL.size();
+        int span = DemoCalendar.HISTORY_DAYS - LAST_INVOICED_DAYS_AGO;
+        return LAST_INVOICED_DAYS_AGO + (fromEnd - OPEN_TAIL.size()) * span / Math.max(1, invoiced - 1);
+    }
+
+    /**
+     * The ETA the seller commits to: five days after the order, so goods received on the fourth day
+     * arrive on time; every sixth order was promised for the third day and arrives late, so the
+     * on-time tiles read neither 0 nor 100 per cent.
+     */
+    static LocalDate committedEta(int no, LocalDate placed) {
+        return placed.plusDays(no % 6 == 0 ? 3 : 5);
     }
 
     /** One order of the history: its lane, number, key, how far it goes and the day it was placed. */
@@ -291,7 +319,7 @@ class DemoTradingHistory {
                     () -> createOrder.handle(
                             new CreateOrder(
                                     lane.sales().entityId(),
-                                    placed.plusDays(3),
+                                    committedEta(no, placed),
                                     plan.key(),
                                     orderLines(lane, no, items, skus),
                                     lane.deliverTo()),
@@ -318,7 +346,7 @@ class DemoTradingHistory {
                     placed.plusDays(1),
                     ACCEPTED,
                     () -> acceptOrder.handle(
-                            new AcceptOrder(orderId, placed.plusDays(3), List.of()), scopeOf(lane.sales())));
+                            new AcceptOrder(orderId, committedEta(no, placed), List.of()), scopeOf(lane.sales())));
             count.accept("AcceptOrder");
         }
         if (target == Stage.ACCEPTED) {

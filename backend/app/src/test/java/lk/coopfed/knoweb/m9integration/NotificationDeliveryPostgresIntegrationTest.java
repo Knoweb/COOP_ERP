@@ -140,15 +140,23 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
         }
         MimeMessage si = byRecipient.get("accounts@buyer-si.coop-erp.test");
         assertThat(si.getSubject()).isEqualTo("ඉන්වොයිසිය D101-INV-000123 නිකුත් කෙරිණි");
-        assertThat(body(si)).contains("රු. 11,800.50").contains("2026-09-04");
+        assertThat(body(si))
+                .contains("Rs 11,800.50")
+                .doesNotContain("රු")
+                .contains("05/08/2026")
+                .contains("04/09/2026");
         MimeMessage ta = byRecipient.get("accounts@buyer-ta.coop-erp.test");
         assertThat(ta.getSubject()).isEqualTo("விலைப்பட்டியல் D101-INV-000123 வழங்கப்பட்டது");
-        assertThat(body(ta)).contains("ரூ. 11,800.50");
+        assertThat(body(ta))
+                .contains("Rs 11,800.50")
+                .doesNotContain("ரூ")
+                .contains("05/08/2026")
+                .contains("04/09/2026");
         MimeMessage en = byRecipient.get("accounts@buyer-en.coop-erp.test");
         assertThat(en.getSubject()).isEqualTo("Invoice D101-INV-000123 issued");
         assertThat(body(en))
-                .isEqualTo("Invoice D101-INV-000123 has been issued to you for Rs 11,800.50, tax point 2026-08-05,"
-                        + " due 2026-09-04.");
+                .isEqualTo("Invoice D101-INV-000123 has been issued to you for Rs 11,800.50, tax point 05/08/2026,"
+                        + " due 04/09/2026.");
 
         List<Map<String, Object>> log = superuserJdbc()
                 .queryForList(

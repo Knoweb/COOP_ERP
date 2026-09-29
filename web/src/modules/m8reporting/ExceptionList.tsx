@@ -38,7 +38,14 @@ export function ExceptionList() {
         {item.percent && <> ({t("reporting.exception.percent", undefined, { percent: item.percent }).text})</>}
       </>
     ),
-    amount: item.amount ? item.kind === "NEGATIVE_STOCK" ? item.amount : <MoneyDisplay amount={item.amount} /> : undefined,
+    // Stock and an open discrepancy carry a quantity, not money (the discrepancy event has no price).
+    amount: !item.amount
+      ? undefined
+      : item.kind === "NEGATIVE_STOCK"
+        ? item.amount
+        : item.kind === "DISCREPANCY_OPEN"
+          ? t("reporting.exception.qty_at_issue", undefined, { qty: item.amount }).text
+          : <MoneyDisplay amount={item.amount} />,
     since: formatInstant(item.since),
     href: exceptionLink(item),
     linkLabel: t("reporting.exception.view").text

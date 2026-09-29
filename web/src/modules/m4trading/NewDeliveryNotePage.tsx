@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useIntl } from "react-intl";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { EntityName, LocationName, SkuLabel, inLocale } from "./labels";
@@ -28,6 +29,7 @@ export function NewDeliveryNotePage() {
   const [params] = useSearchParams();
   const orderId = params.get("orderId") ?? "";
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useTradingApi();
   const navigate = useNavigate();
   const { locale } = useIntl();
@@ -161,7 +163,7 @@ export function NewDeliveryNotePage() {
                       .filter((lot) => lot.skuId === row.skuId && lot.condition === "GOOD" && lot.qtyOnHand > 0)
                       .map((lot) => (
                         <option key={lot.stockLotId} value={lot.batchId}>
-                          {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ?? ""} (${lot.qtyOnHand})`}
+                          {`${isSyntheticBatchNo(lot.batchNo) ? t("trading.field.batch_not_tracked").text : (lot.batchNo ?? "")} ${lot.expiryDate ? formatDate(lot.expiryDate) : ""} (${lot.qtyOnHand})`}
                         </option>
                       ))}
                   </select>

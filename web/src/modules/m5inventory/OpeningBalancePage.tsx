@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -95,7 +96,9 @@ export function OpeningBalancePage() {
               </td>
               <td>{t(`inventory.condition.${line.condition}`).text}</td>
               <td>{line.qty}</td>
-              <td>{line.unitCost}</td>
+              <td>
+                <MoneyDisplay amount={line.unitCost} />
+              </td>
             </tr>
           ))}
         </tbody>

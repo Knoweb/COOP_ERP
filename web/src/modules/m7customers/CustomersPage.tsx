@@ -138,7 +138,7 @@ export function CustomersPage() {
             </thead>
             <tbody>
               {found.data.map((customer) => {
-                const name = nameIn(locale, customer);
+                const name = nameIn(locale, customer, t("customers.erased_member").text);
                 return (
                   <tr key={customer.customerId}>
                     <td>
@@ -172,7 +172,7 @@ export function CustomersPage() {
                 {t("customers.register.similar").text}{" "}
                 {similar.data.slice(0, 5).map((customer) => (
                   <Link key={customer.customerId} className="customers-similar" to={`/customers/${customer.customerId}`}>
-                    {nameIn(locale, customer).text} ({customer.phone})
+                    {nameIn(locale, customer, t("customers.erased_member").text).text} ({customer.phone})
                   </Link>
                 ))}
               </p>

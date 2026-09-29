@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -19,6 +20,7 @@ import "./pricing.css";
  */
 export function PricingPage() {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = usePricingApi();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -102,7 +104,7 @@ export function PricingPage() {
                       <td>
                         <StateChip state={chipOf(list.status)} label={t(`pricing.status.${list.status.toLowerCase()}`).text} />
                       </td>
-                      <td>{list.applyFrom ?? ""}</td>
+                      <td>{list.applyFrom ? formatDate(list.applyFrom) : ""}</td>
                     </tr>
                   ))}
                 </tbody>
