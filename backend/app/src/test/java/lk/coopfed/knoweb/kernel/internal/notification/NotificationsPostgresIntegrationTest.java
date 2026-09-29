@@ -58,6 +58,9 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     @DynamicPropertySource
     static void systemEntity(DynamicPropertyRegistry registry) {
         registry.add("coop-erp.system.entity-id", FEDERATION::toString);
+        // The test channels and the test rule store stand in for M9's, which would be a second
+        // adapter per channel and a second rule store (M9's NotifyConfiguration).
+        registry.add("coop-erp.integration.notify.enabled", () -> "false");
     }
 
     @Autowired
