@@ -44,7 +44,7 @@ export function ExceptionList() {
       : item.kind === "NEGATIVE_STOCK"
         ? item.amount
         : item.kind === "DISCREPANCY_OPEN"
-          ? t("reporting.exception.qty_at_issue", undefined, { qty: item.amount }).text
+          ? t("reporting.exception.qty_at_issue", undefined, { qty: Number(item.amount) }).text
           : <MoneyDisplay amount={item.amount} />,
     since: formatInstant(item.since),
     href: exceptionLink(item),

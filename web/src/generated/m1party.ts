@@ -873,7 +873,7 @@ export interface components {
             defaultLanguage?: "en" | "si" | "ta" | null;
             /** Format: uuid */
             responsibleOfficerUserId?: string | null;
-            /** @description The responsible officer's display name, resolved from the user record when the caller may read it (the society card). Null when there is no officer or the name is not visible; the card then shows the id. */
+            /** @description The responsible officer's display name, part of the register: whoever may read the entity reads it (m1security V0017). Null when there is no officer or it cannot be resolved; the card then shows the empty value, never the id. */
             responsibleOfficerName?: string | null;
             /** Format: date */
             dataGovernanceSignedOn?: string | null;

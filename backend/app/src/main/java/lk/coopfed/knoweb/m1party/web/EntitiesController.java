@@ -15,7 +15,6 @@ import lk.coopfed.knoweb.m1party.query.EntityFilter;
 import lk.coopfed.knoweb.m1party.query.EntityView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.UserQueries;
-import lk.coopfed.knoweb.m1party.query.UserView;
 import lk.coopfed.knoweb.m1party.web.generated.AppointResponsibleOfficerRequest;
 import lk.coopfed.knoweb.m1party.web.generated.EntitiesApi;
 import lk.coopfed.knoweb.m1party.web.generated.EntityPage;
@@ -150,12 +149,12 @@ class EntitiesController implements EntitiesApi {
 
     // The society card shows the officer by name, not by id (demo walkthrough, 29 September 2026).
     // Only the single-entity read resolves it: a list of 800 societies would cost 800 lookups for
-    // a column nobody shows. The user row is read under the caller's own scope, so a caller who may
-    // not see the officer's user record gets null and the card falls back to the id.
+    // a column nobody shows. The name is part of the register, so a caller who read the entity
+    // reads it too, a Federation session included, without seeing the officer's user record
+    // (m1security V0017). Unresolved, the name stays null and the card shows "Not set", never the id.
     private EntityResponse withOfficerName(EntityResponse response, EntityView view, ScopeContext scope) {
         if (view.responsibleOfficerUserId() != null) {
-            users.getUser(view.responsibleOfficerUserId(), scope)
-                    .map(UserView::displayName)
+            users.appointedOfficerName(view.entityId(), view.responsibleOfficerUserId(), scope)
                     .ifPresent(response::setResponsibleOfficerName);
         }
         return response;
