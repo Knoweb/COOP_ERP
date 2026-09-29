@@ -1,8 +1,10 @@
 package lk.coopfed.knoweb.m7customers.query;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -22,7 +24,26 @@ public interface AccountQueries {
     /** A customer payment receipt (CPR): its number, account and what it settled. */
     Optional<Payment> payment(UUID documentId, ScopeContext scope);
 
-    record Payment(UUID documentId, String docNumber, UUID accountId, BigDecimal amount, BigDecimal allocated) {}
+    /** What changed on the account's limits and state, newest first. */
+    List<HistoryEntry> history(UUID accountId, ScopeContext scope);
+
+    /** The account's adjustments, newest first. */
+    List<Adjustment> adjustments(UUID accountId, ScopeContext scope);
+
+    /**
+     * @param origin     OFFICE (the society's ENTITY series) or TILL (the till's own series)
+     * @param reversalOf the CPR this one reverses; null for a repayment
+     * @param reversedBy the CPR that reversed this one; null while it stands
+     */
+    record Payment(
+            UUID documentId,
+            String docNumber,
+            UUID accountId,
+            BigDecimal amount,
+            BigDecimal allocated,
+            String origin,
+            UUID reversalOf,
+            UUID reversedBy) {}
 
     record Statement(
             UUID accountId,
@@ -34,7 +55,7 @@ public interface AccountQueries {
 
     /**
      * One posting. For a CHARGE {@code settled} is what payments settled of it; for a PAYMENT it
-     * is what the payment settled of the charges.
+     * is what the payment settled of the charges. {@code reversed}: a PAYMENT whose CPR was reversed.
      */
     record Line(
             UUID postingId,
@@ -46,5 +67,27 @@ public interface AccountQueries {
             UUID documentId,
             String documentNumber,
             boolean limitBreached,
-            boolean offline) {}
+            boolean offline,
+            boolean reversed) {}
+
+    /** One change of the account: LIMITS_AMENDED, SUSPENDED, REINSTATED or CLOSED. */
+    record HistoryEntry(
+            UUID historyId,
+            String action,
+            Map<String, Object> before,
+            Map<String, Object> after,
+            String reason,
+            UUID changedBy,
+            Instant changedAt) {}
+
+    /** An adjustment: REQUESTED until another person approves it, then posted. */
+    record Adjustment(
+            UUID adjustmentId,
+            BigDecimal amount,
+            String reason,
+            String status,
+            UUID requestedBy,
+            Instant requestedAt,
+            UUID approvedBy,
+            Instant approvedAt) {}
 }

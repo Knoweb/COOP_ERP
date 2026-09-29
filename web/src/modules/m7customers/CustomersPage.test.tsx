@@ -75,6 +75,8 @@ const api = {
   }),
   openAccount: vi.fn(async () => account),
   account: vi.fn(async () => account),
+  history: vi.fn(async () => []),
+  adjustments: vi.fn(async () => []),
   statement: vi.fn(async () => null),
   recordPayment: vi.fn(async () => ({
     documentId: "d1",
