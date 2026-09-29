@@ -20,6 +20,7 @@ import lk.coopfed.knoweb.m4trading.api.ChequeBounced;
 import lk.coopfed.knoweb.m4trading.api.CreditNoteIssued;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteDispatched;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteIssued;
+import lk.coopfed.knoweb.m4trading.api.DiscrepancyLine;
 import lk.coopfed.knoweb.m4trading.api.DiscrepancyRaised;
 import lk.coopfed.knoweb.m4trading.api.ExposureWarning;
 import lk.coopfed.knoweb.m4trading.api.GrnConfirmed;
@@ -298,7 +299,16 @@ class DashboardAndExceptionsHttpPostgresIntegrationTest extends PostgresIntegrat
                         SELLER,
                         "SHORT",
                         now.minus(1, ChronoUnit.DAYS),
-                        List.of())));
+                        // 3 short and 2 damaged: 5 units at issue on the exception queue.
+                        List.of(new DiscrepancyLine(
+                                Ids.next(),
+                                Ids.next(),
+                                null,
+                                "EA",
+                                new BigDecimal("10"),
+                                new BigDecimal("7"),
+                                new BigDecimal("2"),
+                                new BigDecimal("-3"))))));
         events.add(
                 harness.event(InvoiceDisputed.TYPE, BUYER, now, new InvoiceDisputed(invoice, SELLER, BUYER, "PRICE")));
         for (Delivery event : events) {
@@ -386,6 +396,8 @@ class DashboardAndExceptionsHttpPostgresIntegrationTest extends PostgresIntegrat
         // The discrepancy's window ended yesterday: escalated, so first.
         assertThat(seller.get(0).get("kind").asText()).isEqualTo("DISCREPANCY_OPEN");
         assertThat(seller.get(0).get("escalated").asBoolean()).isTrue();
+        // No price on the event: the quantity at issue, the variance without its sign plus the damaged.
+        assertThat(new BigDecimal(seller.get(0).get("amount").asText())).isEqualByComparingTo("5");
 
         JsonNode bounced = item(seller, "CHEQUE_BOUNCED");
         assertThat(bounced.get("severity").asText()).isEqualTo("ALERT");

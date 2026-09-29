@@ -22,6 +22,8 @@ export type SetMrpPolicyRequest = components["schemas"]["SetMrpPolicyRequest"];
 export type RetailPrice = components["schemas"]["RetailPriceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
+export type Relationship = partyComponents["schemas"]["RelationshipResponse"];
+export type Entity = partyComponents["schemas"]["EntityResponse"];
 
 export function usePricingApi() {
   const api = useApiClient<paths>();
@@ -45,6 +47,17 @@ export function usePricingApi() {
       async locations(): Promise<Location[]> {
         const { data } = await party.GET("/v1/party/locations", { params: { query: { limit: 100 } } });
         return data?.items ?? [];
+      },
+
+      /** The relationships in which the caller sells, from M1's published list; M3 owns none. */
+      async sellerRelationships(): Promise<Relationship[]> {
+        const { data } = await party.GET("/v1/party/relationships", { params: { query: { side: "SELLER" } } });
+        return data ?? [];
+      },
+
+      async entity(entityId: string): Promise<Entity | null> {
+        const { data } = await party.GET("/v1/party/entities/{entityId}", { params: { path: { entityId } } });
+        return data ?? null;
       },
 
       async listPriceLists(kind?: PriceList["kind"]): Promise<PriceList[]> {

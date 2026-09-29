@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { useInventoryApi } from "./inventoryApi";
@@ -11,6 +13,7 @@ import { errorText, isSyntheticBatchNo } from "./stockView";
 
 export function StockPage() {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useInventoryApi();
   const canPrepare = useHasPermission("inv.opening.prepare");
   const [locationId, setLocationId] = useState("");
@@ -157,7 +160,7 @@ export function StockPage() {
                         : (lot.batchNo ?? "")}
                     </td>
 
-                    <td>{lot.expiryDate ?? ""}</td>
+                    <td>{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
 
                     <td>
                       <span className="condition-chip">
@@ -178,7 +181,7 @@ export function StockPage() {
                     </td>
 
                     <td className="numeric-cell">
-                      {lot.unitCost ?? ""}
+                      {lot.unitCost != null && <MoneyDisplay amount={lot.unitCost} />}
                     </td>
                   </tr>
                 ))}

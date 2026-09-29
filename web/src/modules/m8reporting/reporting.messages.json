@@ -122,7 +122,8 @@
     "m8.tile.on_time": "Our deliveries on time (%)",
     "m8.tile.supplier_fill_rate": "Fill rate of deliveries to us (%)",
     "m8.tile.supplier_on_time": "Deliveries to us on time (%)",
-    "m8.tile.exceptions": "Exceptions to look at"
+    "m8.tile.exceptions": "Exceptions to look at",
+    "reporting.exception.qty_at_issue": "{qty} units at issue"
   },
   "si": {
     "reporting.nav": "වාර්තා",
@@ -247,7 +248,8 @@
     "m8.tile.on_time": "නියමිත වේලාවට අපගේ බෙදාහැරීම් (%)",
     "m8.tile.supplier_fill_rate": "අපට ලැබෙන බෙදාහැරීම්වල පිරවුම් අනුපාතය (%)",
     "m8.tile.supplier_on_time": "නියමිත වේලාවට අපට ලැබෙන බෙදාහැරීම් (%)",
-    "m8.tile.exceptions": "සොයා බැලිය යුතු ව්‍යතිරේක"
+    "m8.tile.exceptions": "සොයා බැලිය යුතු ව්‍යතිරේක",
+    "reporting.exception.qty_at_issue": "ඒකක {qty} ක් ගැටලුවට ලක්ව ඇත"
   },
   "ta": {
     "reporting.nav": "அறிக்கைகள்",
@@ -372,6 +374,7 @@
     "m8.tile.on_time": "சரியான நேரத்தில் எமது விநியோகங்கள் (%)",
     "m8.tile.supplier_fill_rate": "எமக்கான விநியோகங்களின் நிரப்பு விகிதம் (%)",
     "m8.tile.supplier_on_time": "சரியான நேரத்தில் எமக்கான விநியோகங்கள் (%)",
-    "m8.tile.exceptions": "கவனிக்க வேண்டிய விதிவிலக்குகள்"
+    "m8.tile.exceptions": "கவனிக்க வேண்டிய விதிவிலக்குகள்",
+    "reporting.exception.qty_at_issue": "{qty} அலகுகள் சிக்கலில்"
   }
 }

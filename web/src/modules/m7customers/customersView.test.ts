@@ -20,6 +20,9 @@ describe("the customer view helpers", () => {
     expect(nameIn("si", customer)).toEqual({ text: "කේ. පෙරේරා", isFallback: false });
     expect(nameIn("ta", customer)).toEqual({ text: "K. Perera", isFallback: true });
     expect(nameIn("en", customer)).toEqual({ text: "K. Perera", isFallback: false });
+    // An erased member: the translated label, never the English placeholder with its tag.
+    const erased = { displayName: "Customer", status: "ANONYMISED" };
+    expect(nameIn("si", erased, "මකා දැමූ සාමාජිකයා")).toEqual({ text: "මකා දැමූ සාමාජිකයා", isFallback: false });
   });
 
   it("reads the problem code and the share of the limit used", () => {

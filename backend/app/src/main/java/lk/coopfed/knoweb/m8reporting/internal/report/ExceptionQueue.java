@@ -60,7 +60,7 @@ class ExceptionQueue {
         jdbc.query(
                 """
                 select r.document_id, r.doc_number, r.seller_entity_id, r.buyer_entity_id, r.occurred_at,
-                       r.window_ends_at
+                       r.window_ends_at, r.qty_at_issue
                   from (select distinct on (document_id) * from reporting.trade_document_event
                          where doc_type = 'DISCREPANCY' and event_kind = 'RAISED'
                          order by document_id, owner_entity_id) r
@@ -79,7 +79,9 @@ class ExceptionQueue {
                             rs.getString("doc_number"),
                             rs.getObject("seller_entity_id", UUID.class),
                             rs.getObject("buyer_entity_id", UUID.class),
-                            null,
+                            // The quantity at issue (V0006), not money: the event carries no price. The
+                            // screen shows it as a quantity, as it does for NEGATIVE_STOCK.
+                            rs.getBigDecimal("qty_at_issue"),
                             null,
                             since,
                             escalated,

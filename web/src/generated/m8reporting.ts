@@ -198,7 +198,7 @@ export interface components {
             counterparty?: string;
             /** @description For stock: the item and the location */
             subject?: string;
-            /** @description The money at stake (plain decimal), or the quantity below zero for stock */
+            /** @description The money at stake (plain decimal), or the quantity below zero for stock, or the quantity at issue on an open discrepancy */
             amount?: string;
             /** @description For an exposure warning: exposure as a percentage of the limit */
             percent?: string;

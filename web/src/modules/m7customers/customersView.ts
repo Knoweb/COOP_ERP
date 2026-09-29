@@ -12,10 +12,18 @@ export const MFA_REQUIRED = "mfa.required";
 /** The problem code the server answers when a recent holder of the phone must be confirmed as another person. */
 export const PHONE_REUSE_CONFIRM = "m7.customer.phone_reuse_confirm";
 
-type Named = { displayName: string; displayNameSi?: string | null; displayNameTa?: string | null };
+type Named = { displayName: string; displayNameSi?: string | null; displayNameTa?: string | null; status?: string };
 
-/** The customer's name in the reader's language, and whether it fell back to the English one. */
-export function nameIn(locale: string, customer: Named): { text: string; isFallback: boolean } {
+/**
+ * The customer's name in the reader's language, and whether it fell back to the English one.
+ * An erased (ANONYMISED) member has no name left: the server keeps an English placeholder
+ * ("Customer"), which would show with the English tag glued to it. It is shown as `erasedText`
+ * instead, already translated, and never as a fallback.
+ */
+export function nameIn(locale: string, customer: Named, erasedText?: string): { text: string; isFallback: boolean } {
+  if (customer.status === "ANONYMISED" && erasedText) {
+    return { text: erasedText, isFallback: false };
+  }
   const translated = locale === "si" ? customer.displayNameSi : locale === "ta" ? customer.displayNameTa : customer.displayName;
   return translated ? { text: translated, isFallback: false } : { text: customer.displayName, isFallback: locale !== "en" };
 }

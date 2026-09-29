@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -23,6 +24,7 @@ import "./pricing.css";
  */
 export function GazettePage() {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = usePricingApi();
   const queryClient = useQueryClient();
   const canEnter = useHasPermission("prc.controlprice.enter");
@@ -70,8 +72,8 @@ export function GazettePage() {
                           <MoneyDisplay amount={row.ceilingPrice} />
                         </td>
                         <td>{row.ceilingUomCode}</td>
-                        <td>{row.effectiveFrom}</td>
-                        <td>{row.effectiveTo ?? ""}</td>
+                        <td>{formatDate(row.effectiveFrom)}</td>
+                        <td>{row.effectiveTo ? formatDate(row.effectiveTo) : ""}</td>
                         <td>{row.gazetteReference}</td>
                         <td>
                           <StateChip state={controlPriceChip(state)} label={t(`pricing.gazette.state.${state}`).text} />

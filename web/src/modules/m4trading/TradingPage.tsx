@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { useFormatDate } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
@@ -379,6 +380,7 @@ function ClaimRegister({ role }: { role: Side }) {
 /** The payments received (SELLER) or made (BUYER), with bounced receipts and their reversals, newest first. */
 function PaymentRegister({ role }: { role: Side }) {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useTradingApi();
   const rows = useQuery({ queryKey: ["trading", "payments", role], queryFn: () => api.payments(role) });
 
@@ -414,7 +416,7 @@ function PaymentRegister({ role }: { role: Side }) {
                 <td>
                   <EntityName entityId={role === "BUYER" ? row.sellerEntityId : row.buyerEntityId} />
                 </td>
-                <td>{row.receivedOn}</td>
+                <td>{formatDate(row.receivedOn)}</td>
                 <td>{t(`trading.payment.method.${row.method}`).text}</td>
                 <td>
                   <MoneyDisplay amount={row.status === "REVERSAL" ? -row.amount : row.amount} />
@@ -504,6 +506,7 @@ function AccountRegister({ role }: { role: Side }) {
 
 function InvoiceRegister({ role }: { role: Side }) {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useTradingApi();
   const invoices = useQuery({ queryKey: ["trading", "invoices", role], queryFn: () => api.invoices(role) });
 
@@ -539,7 +542,7 @@ function InvoiceRegister({ role }: { role: Side }) {
                 <td>
                   <EntityName entityId={role === "BUYER" ? invoice.sellerEntityId : invoice.buyerEntityId} />
                 </td>
-                <td>{invoice.dueDate}</td>
+                <td>{formatDate(invoice.dueDate)}</td>
                 <td>
                   <MoneyDisplay amount={invoice.grossAmount} />
                 </td>

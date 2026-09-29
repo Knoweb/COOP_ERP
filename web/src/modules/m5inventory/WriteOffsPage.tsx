@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatInstant } from "../../shell/i18n/formats";
+import { useFormatInstant, useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -37,6 +37,7 @@ const CATEGORIES: Category[] = [
  */
 export function WriteOffsPage() {
   const t = useT();
+  const formatDate = useFormatDate();
   const api = useInventoryApi();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -166,7 +167,7 @@ export function WriteOffsPage() {
                         <SkuLabel skuId={lot.skuId} />
                       </td>
                       <td>{batch}</td>
-                      <td>{lot.expiryDate ?? ""}</td>
+                      <td>{lot.expiryDate ? formatDate(lot.expiryDate) : ""}</td>
                       <td>{t(`inventory.condition.${lot.condition}`).text}</td>
                       <td className="numeric-cell">{lot.qtyOnHand}</td>
                       <td>
