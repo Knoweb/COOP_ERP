@@ -1,0 +1,4 @@
+.scratch/
+.gradle/
+.kotlin/
+local.properties

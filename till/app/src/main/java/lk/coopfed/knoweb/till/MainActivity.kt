@@ -10,6 +10,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // The shared Compose Multiplatform screen from module ui (CR-30-1).
         setContent {
             HelloScreen()
         }

@@ -12,7 +12,7 @@
 #                     schema, i18n and permission checks, web lint)
 #   test              job build-verify (unit, web) and job integration-test (integration with
 #                     Testcontainers)
-#                     job till (the till JVM tests and the debug APK)
+#                     job till (the till JVM tests, the debug APK and the Linux desktop till)
 #                     job scaffolder (a module copied from hello still builds and passes)
 #   e2e               job stack-smoke (the composed stack with two backend instances: first
 #                     tools/smoke.mjs from outside, then the Playwright run in a browser)
@@ -360,7 +360,8 @@ jobs:
           path: backend/app/build/reports/jacoco/test
           retention-days: 7
 
-  # The till (Android) part of "test" and "package": its JVM tests and the debug APK. Its own
+  # The till part of "test" and "package": its JVM tests, the debug APK and the Linux desktop
+  # distributable (CR-30-1: one Kotlin Multiplatform codebase). Its own
   # job, because it shares nothing with the backend build and took fifty seconds of the
   # critical path when it ran after it.
   # On a pull request that touches neither till/ nor the shared engine the steps are skipped
@@ -402,12 +403,35 @@ jobs:
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
+      # The shared code's tests on the JVM (commonTest runs as jvmTest), the encrypted database,
+      # the printers, the receipt golden images (Sinhala, Tamil) and the desktop screens driven
+      # headless. The desktop's stack test skips itself unless -Ptill.stack=true.
       - name: Till JVM tests
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         working-directory: till
-        run: ./gradlew :core:test :peripherals:test :sync:test
+        run: >
+          ./gradlew :core:jvmTest :sync:jvmTest :db:jvmTest :peripherals:jvmTest
+          :peripherals-jvm:test :render:jvmTest :ui:jvmTest :desktop:test
+
+      # CR-30-1: the desktop till for Linux, as a folder with its own Java runtime. The Windows
+      # MSI needs a Windows runner (jpackage cannot cross-build); none is added yet.
+      - name: Till desktop distributable (Linux)
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
+        working-directory: till
+        run: |
+          ./gradlew :desktop:createDistributable
+          tar -czf coop-till-linux-x64.tar.gz -C desktop/build/compose/binaries/main/app coop-till
+
+      - name: Upload the Linux desktop till
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: till-desktop-linux
+          path: till/coop-till-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Till APK (signed with the debug key)
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
@@ -428,7 +452,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: till-test-reports
-          path: till/*/build/reports/tests
+          path: |
+            till/*/build/reports/tests
+            till/render/build/golden-actual
           retention-days: 7
 
   # S0-13 done criterion: a module scaffolded from hello compiles, keeps the architecture rules
