@@ -5,10 +5,17 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
 
 /**
  * A transfer left its source location and is in transit (doc 25 section 5.3, "transfer.*.v1").
- * Its TRANSFER_OUT movements are each announced by {@code stock.moved.v1}.
+ * Its TRANSFER_OUT movements are each announced by {@code stock.moved.v1}. {@code
+ * transferRequestId} names the M4 transfer request it fulfils, null for one issued by hand.
  */
-public record TransferIssued(UUID transferId, UUID ownerEntityId, UUID fromLocationId, UUID toLocationId, int lines)
+public record TransferIssued(
+        UUID transferId, UUID ownerEntityId, UUID fromLocationId, UUID toLocationId, int lines, UUID transferRequestId)
         implements DomainEvent {
 
     public static final String TYPE = "transfer.issued.v1";
+
+    /** A transfer issued by hand, for no request. */
+    public TransferIssued(UUID transferId, UUID ownerEntityId, UUID fromLocationId, UUID toLocationId, int lines) {
+        this(transferId, ownerEntityId, fromLocationId, toLocationId, lines, null);
+    }
 }

@@ -185,6 +185,23 @@ CROSS JOIN LATERAL unnest(job.codes) AS code
 JOIN security.permission p ON p.permission_code = code
 ON CONFLICT DO NOTHING;
 
+-- M4-06 claims and M4-10 transfer requests (29 Sep): the buyers raise claims and send the goods
+-- back (distributor commercial, society buyer), the sellers' accounts decide them (Federation and
+-- distributor accounts), and the society manager approves its shops' transfer requests.
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT grant_row.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000311'::uuid, 'del.claim.raise'),
+        ('0190f0de-0000-7000-8000-000000000321'::uuid, 'del.claim.raise'),
+        ('0190f0de-0000-7000-8000-000000000331'::uuid, 'del.claim.raise'),
+        ('0190f0de-0000-7000-8000-000000000305'::uuid, 'del.claim.decide'),
+        ('0190f0de-0000-7000-8000-000000000313'::uuid, 'del.claim.decide'),
+        ('0190f0de-0000-7000-8000-000000000323'::uuid, 'del.claim.decide'),
+        ('0190f0de-0000-7000-8000-000000000332'::uuid, 'mpcs.transfer.approve')
+     ) AS grant_row (role_id, permission_code)
+JOIN security.permission p ON p.permission_code = grant_row.permission_code
+ON CONFLICT DO NOTHING;
+
 -- The assignments. NULL location: entity-wide. A location: that location only.
 INSERT INTO security.user_role (user_id, role_id, scope_entity_id, scope_location_id)
 VALUES

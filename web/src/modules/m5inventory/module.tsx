@@ -11,6 +11,7 @@ import { OpeningBalancePage } from "./OpeningBalancePage";
 import { StockCardPage } from "./StockCardPage";
 import { StockPage } from "./StockPage";
 import { TransfersPage } from "./TransfersPage";
+import { TransferRequestsPage } from "./TransferRequestsPage";
 import { CountsPage } from "./CountsPage";
 import { CountPage } from "./CountPage";
 import { WriteOffsPage } from "./WriteOffsPage";
@@ -35,6 +36,8 @@ export const inventoryModule: ModuleDefinition = {
     { path: "inventory/locations/:locationId/skus/:skuId", element: <StockCardPage /> },
     // M5-09 (demo scope): send stock to another location of the entity, receive it there.
     { path: "inventory/transfers", element: <TransfersPage /> },
+    // M4-10: a shop asks its society for stock; the society approves and its stores send it.
+    { path: "inventory/transfer-requests", element: <TransferRequestsPage /> },
     // M5-11, M5-13 and the repack (25A section 8, back office): counts with their adjustment,
     // the damage and expiry register, repacks.
     { path: "inventory/counts", element: <CountsPage /> },
@@ -54,6 +57,8 @@ export const inventoryModule: ModuleDefinition = {
     "inv.opening.sign",
     "inv.opening.countersign",
     "inv.transfer.issue",
-    "shop.transfer.receive"
+    "shop.transfer.receive",
+    "shop.transfer.request",
+    "mpcs.transfer.approve"
   ]
 };

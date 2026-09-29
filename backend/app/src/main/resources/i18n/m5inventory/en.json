@@ -77,5 +77,8 @@
   "m5.repack.insufficient_stock": "The input lot does not hold that much",
   "m5.repack.not_found": "The repack was not found",
   "m5.repack.already_reversed": "This repack was already reversed",
-  "m5.repack.output_touched": "Packs of this repack were already sold, moved or written off; correct it with a write-off or another repack"
+  "m5.repack.output_touched": "Packs of this repack were already sold, moved or written off; correct it with a write-off or another repack",
+  "m5.claim.buyer_mismatch": "The return is applied in the buyer’s own stock only",
+  "m5.claim.location_required": "The return names the location the goods leave",
+  "m5.claim.line_invalid": "A returned line needs a batch and a quantity above zero"
 }

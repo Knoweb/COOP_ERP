@@ -1,7 +1,48 @@
 import { describe, expect, it } from "vitest";
 import messages from "./inventory.messages.json" with { type: "json" };
-import { chipOf, isSyntheticBatchNo, lineOf, rowReady, transferLinesOf, type CountedRow } from "./stockView";
-import type { LotBalance } from "./inventoryApi";
+import {
+  chipOf,
+  isSyntheticBatchNo,
+  lineOf,
+  requestChip,
+  requestLinesOf,
+  rowReady,
+  sourceFor,
+  transferLinesOf,
+  type CountedRow
+} from "./stockView";
+import type { Location, LotBalance, TransferRequest } from "./inventoryApi";
+
+describe("the transfer request (M4-10)", () => {
+  const request = (fromLocationId?: string): TransferRequest => ({
+    requestId: "r",
+    fromLocationId,
+    toLocationId: "shop",
+    status: "REQUESTED",
+    requestedAt: "2026-09-29T02:45:00Z",
+    lines: []
+  });
+  const place = (locationId: string, locationType: "WAREHOUSE" | "SHOP") =>
+    ({ locationId, locationType }) as unknown as Location;
+
+  it("sends only the items given a quantity above zero", () => {
+    expect(requestLinesOf({ a: "6", b: "", c: "0", d: "x" })).toEqual([{ skuId: "a", qty: 6 }]);
+  });
+
+  it("approves from the chosen place, else the shop's, else the only warehouse", () => {
+    const places = [place("stores", "WAREHOUSE"), place("shop", "SHOP")];
+    expect(sourceFor(request(), { r: "other" }, places)).toBe("other");
+    expect(sourceFor(request("named"), {}, places)).toBe("named");
+    expect(sourceFor(request(), {}, places)).toBe("stores");
+    expect(sourceFor(request(), {}, [...places, place("second", "WAREHOUSE")])).toBeUndefined();
+  });
+
+  it("shows a waiting request as a draft and a refused one as void", () => {
+    expect(requestChip("REQUESTED")).toBe("draft");
+    expect(requestChip("APPROVED")).toBe("issued");
+    expect(requestChip("REJECTED")).toBe("void");
+  });
+});
 
 describe("the transfer form", () => {
   const lot = (batchId: string): LotBalance => ({

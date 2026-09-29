@@ -57,6 +57,8 @@ export function exceptionLink(item: {
   switch (item.kind) {
     case "DISCREPANCY_OPEN":
       return `/trading/discrepancies/${item.subjectId}`;
+    case "CLAIM_OPEN":
+      return `/trading/claims/${item.subjectId}`;
     case "INVOICE_DISPUTED":
       return `/trading/invoices/${item.subjectId}`;
     case "CHEQUE_BOUNCED":

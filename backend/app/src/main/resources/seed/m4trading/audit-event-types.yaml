@@ -174,3 +174,44 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The A4 copy of a recorded payment receipt stored for printing
+
+  # M4-06 claims and M4-10 transfer requests (29 Sep). A raised claim waits for the seller: REVIEW.
+  - code: CLAIM_RAISED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: The buyer raised a claim against the seller for goods found damaged, expired, wrong or of poor quality
+
+  - code: CLAIM_PHOTO_ADDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A photograph authorised for upload on a raised claim
+
+  - code: CLAIM_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The seller approved a claim in whole or in part and credited its invoice
+
+  - code: CLAIM_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The seller rejected a claim, with a reason
+
+  - code: CLAIM_RETURN_DISPATCHED
+    severity: INFO
+    offline_capturable: false
+    description_en: The buyer sent the goods of an approved claim back to the seller
+
+  - code: TRANSFER_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A shop asked for stock from another location of its society
+
+  - code: TRANSFER_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The society approved a transfer request; the stores issue the transfer
+
+  - code: TRANSFER_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The society rejected a transfer request, with a reason

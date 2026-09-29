@@ -109,9 +109,19 @@ public final class TradingFixture {
                 union select document_id from trading.doc_discrepancy
                 union select document_id from trading.doc_credit_note
                 union select document_id from trading.doc_payment_receipt
+                union select document_id from trading.doc_claim
                 """,
                 UUID.class);
         for (String table : new String[] {
+            "claim_return",
+            "claim_decision_line",
+            "claim_decision",
+            "claim_photo",
+            "doc_claim_line",
+            "doc_claim",
+            "transfer_request_decision",
+            "transfer_request_line",
+            "transfer_request",
             "cheque_outcome",
             "payment_allocation",
             "cheque",
@@ -152,6 +162,15 @@ public final class TradingFixture {
 
     public static void clean(JdbcTemplate admin) {
         for (String table : new String[] {
+            "claim_return",
+            "claim_decision_line",
+            "claim_decision",
+            "claim_photo",
+            "doc_claim_line",
+            "doc_claim",
+            "transfer_request_decision",
+            "transfer_request_line",
+            "transfer_request",
             "cheque_outcome",
             "payment_allocation",
             "cheque",
@@ -184,10 +203,15 @@ public final class TradingFixture {
                 SELLER,
                 BUYER,
                 STRANGER);
+        admin.update("delete from kernel.document_attachment where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document_state_history where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document_line where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
+        for (String table : new String[] {"transfer_receipt", "transfer_line", "transfer"}) {
+            admin.update(
+                    "delete from inventory." + table + " where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
+        }
         admin.update("delete from inventory.stock_lot where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update(
                 "delete from inventory.stock_movement where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);

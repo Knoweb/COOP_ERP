@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import messages from "./trading.messages.json" with { type: "json" };
 import type { Order, OrderLine } from "./tradingApi";
 import {
+  acceptedLines,
+  claimChip,
   amendReady,
   amendRequest,
   inForce,
@@ -268,5 +270,32 @@ describe("amending an order and the relationship in force", () => {
     expect(amendReady([{ skuId: "a", uomCode: "EA", qty: "0" }])).toBe(false);
     expect(amendReady([{ skuId: "a", uomCode: "EA", qty: "" }])).toBe(false);
     expect(amendRequest(rows, "")).toEqual({ requestedEta: undefined, notes: undefined, lines: [{ skuId: "b", uomCode: "KG", qty: 2.5 }] });
+  });
+});
+
+describe("the claim decision", () => {
+  const lines = [
+    { claimLineId: "a", claimedQty: 3 },
+    { claimLineId: "b", claimedQty: 1 }
+  ];
+
+  it("accepts a line in full unless the seller typed less, and refuses more than claimed", () => {
+    expect(acceptedLines(lines, {})).toEqual([
+      { claimLineId: "a", qty: 3 },
+      { claimLineId: "b", qty: 1 }
+    ]);
+    expect(acceptedLines(lines, { a: "2", b: "0" })).toEqual([
+      { claimLineId: "a", qty: 2 },
+      { claimLineId: "b", qty: 0 }
+    ]);
+    expect(acceptedLines(lines, { a: "4" })).toBeNull();
+    expect(acceptedLines(lines, { b: "-1" })).toBeNull();
+    expect(acceptedLines(lines, { a: "two" })).toBeNull();
+  });
+
+  it("shows an open claim as disputed, an approved one as issued and a rejected one as void", () => {
+    expect(claimChip("RAISED")).toBe("disputed");
+    expect(claimChip("APPROVED")).toBe("issued");
+    expect(claimChip("REJECTED")).toBe("void");
   });
 });
