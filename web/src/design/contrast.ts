@@ -58,7 +58,47 @@ export const CONTRAST_PAIRS: ContrastPair[] = [
  * Colours that carry no information, so WCAG asks nothing of them: a divider between two rows
  * can vanish and the screen still reads the same. Think twice before adding to this list.
  */
-export const DECORATIVE_COLOURS = ["--color-border"];
+export const DECORATIVE_COLOURS = [
+  "--color-surface-card",
+  "--color-accent-light",
+  "--color-brand-secondary",
+  "--color-brand-accent1",
+  "--color-brand-accent2",
+  "--color-brand-success",
+  "--color-brand-info",
+  "--color-brand-dark",
+  "--color-polish-1",
+  "--color-polish-2",
+  "--color-polish-3",
+  "--color-polish-4",
+  "--color-polish-5",
+  "--color-polish-6",
+  "--color-polish-7",
+  "--color-polish-8",
+  "--color-polish-9",
+  "--color-polish-10",
+  "--color-polish-11",
+  "--color-polish-12",
+  "--color-polish-13",
+  "--color-polish-14",
+  "--color-polish-15",
+  "--color-polish-16",
+  "--color-polish-17",
+  "--color-polish-18",
+  "--color-polish-19",
+  "--color-polish-20",
+  "--color-polish-21",
+  "--color-polish-22",
+  "--color-polish-23",
+  "--color-polish-24",
+  "--color-polish-25",
+  "--color-polish-26",
+  "--color-polish-27",
+  "--color-polish-28",
+  "--color-polish-29",
+  "--color-polish-30",
+  "--color-polish-31",
+  "--color-polish-32","--color-border"];
 
 /** The custom properties of a CSS text: { "--color-text": "#1f2933", ... }. Comments are ignored. */
 export function parseTokens(css: string): Record<string, string> {

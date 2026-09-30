@@ -128,9 +128,9 @@ export function StockPage() {
                   <th>{t("inventory.column.batch").text}</th>
                   <th>{t("inventory.column.expiry").text}</th>
                   <th>{t("inventory.column.condition").text}</th>
-                  <th>{t("inventory.column.on_hand").text}</th>
-                  <th>{t("inventory.column.fefo").text}</th>
-                  <th>{t("inventory.column.available").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.on_hand").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.fefo").text}</th>
+                  <th className="numeric-cell">{t("inventory.column.available").text}</th>
                   <th>{t("inventory.column.unit_cost").text}</th>
                 </tr>
               </thead>
