@@ -83,7 +83,7 @@
   --color-surface-subtle: #f8f9fb; /* header, table heads, panels (Light Gray) */
   --color-surface-card: #f3e6f6; /* Soft Purple Tint */
   --color-text: #1f2937; /* Dark Text Headings */
-  --color-text-muted: #64748b; /* Muted Text */
+  --color-text-muted: #475569; /* Muted Text */
   --color-border: #e8e8eb; /* Border */
   --color-border-control: #64748b; /* edge of an input or button */
 
@@ -106,17 +106,17 @@
   --color-draft-text: #2e3192; /* Info / Secondary Brand */
   --color-draft-bg: #e6f6fc; /* Blue Light */
 
-  --color-issued-text: #00a651; /* Success */
+  --color-issued-text: #00763a; /* Success */
   --color-issued-bg: #ddf6e5; /* Green Light */
 
-  --color-disputed-text: #f18a00; /* Warning / Accent 1 */
+  --color-disputed-text: #8a4f00; /* Warning / Accent 1 */
   --color-disputed-bg: #fff2d9; /* Orange Light */
 
-  --color-void-text: #64748b;
+  --color-void-text: #475569;
   --color-void-bg: #f8f9fb;
   --color-void-hatch: #e8e8eb;
 
-  --color-alert-text: #e30613; /* Error / Secondary */
+  --color-alert-text: #c00000; /* Error / Secondary */
   --color-alert-bg: #fde2e4; /* Red Light */
 
   /* ---- Colour: training mode ------------------------------------------------------------- */
@@ -124,4 +124,38 @@
   --color-training: #2e3192;
   --color-on-training: #ffffff;
   --color-training-bg: #e9e9f8; /* Indigo Light */
+
+  /* Auto-generated for dashboard polish */
+  --color-polish-1: rgba(142, 14, 91, 0.15);
+  --color-polish-2: rgba(255, 255, 255, 0.5);
+  --color-polish-3: rgba(0, 0, 0, 0.05);
+  --color-polish-4: #fff;
+  --color-polish-5: rgba(46, 49, 146, 0.2);
+  --color-polish-6: rgba(142, 14, 91, 0.3);
+  --color-polish-7: rgba(46, 49, 146, 0.03);
+  --color-polish-8: rgba(0, 0, 0, 0.1);
+  --color-polish-9: rgba(255, 255, 255, 0.15);
+  --color-polish-10: rgba(255, 255, 255, 0.1);
+  --color-polish-11: rgba(255, 255, 255, 0.2);
+  --color-polish-12: #F3E6F6;
+  --color-polish-13: rgba(142, 14, 91, 0.1);
+  --color-polish-14: rgba(142, 14, 91, 0.05);
+  --color-polish-15: rgba(31, 41, 55, 0.04);
+  --color-polish-16: rgba(255, 255, 255, 0.4);
+  --color-polish-17: rgba(255, 255, 255, 0.8);
+  --color-polish-18: rgba(142, 14, 91, 0.2);
+  --color-polish-19: #CF3392;
+  --color-polish-20: #E05CA9;
+  --color-polish-21: rgba(142, 14, 91, 0.4);
+  --color-polish-22: #F6D7E9;
+  --color-polish-23: rgba(0, 0, 0, 0.04);
+  --color-polish-24: #fdfdfd;
+  --color-polish-25: #8E0E5B;
+  --color-polish-26: #ffffff;
+  --color-polish-27: rgba(142, 14, 91, 0.08);
+  --color-polish-28: rgba(142, 14, 91, 0.06);
+  --color-polish-29: #FDF4F9;
+  --color-polish-30: #00A651;
+  --color-polish-31: #FCEDF5;
+  --color-polish-32: #4a5568;
 }

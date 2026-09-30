@@ -513,10 +513,10 @@ body {
   align-items: center;
   min-height: var(--space-4);
   padding: 0 var(--space-2);
-  border: 1px solid rgba(142, 14, 91, 0.15);
+  border: 1px solid var(--color-polish-1);
   /* Subtle maroon border */
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--color-polish-2);
   /* Semi-transparent white */
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
@@ -581,7 +581,7 @@ textarea {
 button {
   font-weight: 600;
   border: 1px solid var(--color-border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 2px var(--color-polish-3);
 }
 
 button:hover:not(:disabled) {
@@ -592,16 +592,16 @@ button:hover:not(:disabled) {
 
 .approval-bar__button--primary:not(:disabled) {
   background: var(--color-brand-dark);
-  color: #fff;
+  color: var(--color-polish-4);
   border-color: var(--color-brand-dark);
-  box-shadow: 0 2px 8px rgba(46, 49, 146, 0.2);
+  box-shadow: 0 2px 8px var(--color-polish-5);
 }
 
 .approval-bar__button--primary:not(:disabled):hover {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(142, 14, 91, 0.3);
+  color: var(--color-polish-4);
+  box-shadow: 0 4px 12px var(--color-polish-6);
 }
 
 input,
@@ -658,7 +658,7 @@ textarea {
 }
 
 .shell-page tbody tr:hover td {
-  background: rgba(46, 49, 146, 0.03);
+  background: var(--color-polish-7);
   /* slight indigo tint */
 }
 
@@ -712,12 +712,12 @@ textarea {
   width: 260px;
   flex: none;
   background: var(--color-accent);
-  /* Maroon #8E0E5B */
+  /* Maroon var(--color-polish-25) */
   border-right: none;
   display: flex;
   flex-direction: column;
   z-index: 30;
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 4px 0 16px var(--color-polish-8);
 }
 
 .shell-sidebar-brand {
@@ -726,7 +726,7 @@ textarea {
   gap: var(--space-3);
   padding: 0 var(--space-4);
   height: 76px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-polish-9);
   color: var(--color-surface);
   /* White */
   font-weight: var(--font-weight-strong);
@@ -761,21 +761,21 @@ textarea {
   padding: 0 var(--space-4);
   border-left: 4px solid transparent;
   color: var(--color-accent-light);
-  /* Light pink #F6D7E9 */
+  /* Light pink var(--color-polish-22) */
   font-weight: 500;
   text-decoration: none;
   transition: all 0.2s ease;
 }
 
 .shell-sidebar .shell-nav a:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-polish-10);
   /* Slight white overlay */
   color: var(--color-surface);
   /* White */
 }
 
 .shell-sidebar .shell-nav a[aria-current="page"] {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-polish-9);
   /* Stronger overlay */
   border-left-color: var(--color-surface);
   /* White left indicator */
@@ -797,7 +797,7 @@ textarea {
 
 .shell-sidebar-footer {
   padding: var(--space-4);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid var(--color-polish-9);
   margin-top: auto;
 }
 
@@ -826,7 +826,7 @@ textarea {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-polish-11);
   color: var(--color-surface);
   font-weight: bold;
   flex: none;
@@ -853,7 +853,7 @@ textarea {
   gap: var(--space-2);
   width: 100%;
   padding: var(--space-2) 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-polish-10);
   color: var(--color-accent-light);
   border: none;
   border-radius: var(--radius);
@@ -862,7 +862,7 @@ textarea {
 }
 
 .shell-sidebar-footer .btn-signout:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-polish-11);
   color: var(--color-surface);
 }
 
@@ -884,10 +884,10 @@ textarea {
   justify-content: space-between;
   padding: 12px var(--space-6);
   height: 76px;
-  background: #F3E6F6;
+  background: var(--color-polish-12);
   /* Soft Purple Tint */
-  border-bottom: 1px solid rgba(142, 14, 91, 0.1);
-  box-shadow: 0 4px 16px rgba(142, 14, 91, 0.05);
+  border-bottom: 1px solid var(--color-polish-13);
+  box-shadow: 0 4px 16px var(--color-polish-14);
   box-sizing: border-box;
 }
 
@@ -912,7 +912,7 @@ textarea {
   border: none;
   border-radius: 16px;
   background: var(--color-surface);
-  box-shadow: 0 4px 20px rgba(31, 41, 55, 0.04);
+  box-shadow: 0 4px 20px var(--color-polish-15);
 }
 
 .shell-page>h1:first-child {
@@ -949,7 +949,7 @@ textarea {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--color-polish-16);
   color: var(--color-accent);
   box-shadow: none;
 }
@@ -990,20 +990,20 @@ textarea {
 }
 
 .scope-chip--location {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(142, 14, 91, 0.15);
+  background: var(--color-polish-2);
+  border: 1px solid var(--color-polish-1);
   color: var(--color-text-muted);
 }
 
 .scope-chip--access {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(142, 14, 91, 0.15);
+  background: var(--color-polish-2);
+  border: 1px solid var(--color-polish-1);
   color: var(--color-text);
 }
 
 .scope-banner:not(.scope-banner--not-own) .scope-chip--access {
-  background: rgba(255, 255, 255, 0.8);
-  border-color: rgba(142, 14, 91, 0.2);
+  background: var(--color-polish-17);
+  border-color: var(--color-polish-18);
   color: var(--color-accent);
 }
 
@@ -2017,15 +2017,15 @@ textarea {
   align-items: center;
   justify-content: center;
   padding: 10px 24px;
-  background: linear-gradient(135deg, #CF3392, #E05CA9) !important;
-  background-color: #CF3392 !important;
-  color: #fff !important;
+  background: linear-gradient(135deg, var(--color-polish-19), var(--color-polish-20)) !important;
+  background-color: var(--color-polish-19) !important;
+  color: var(--color-polish-4) !important;
   font-weight: 600;
   font-size: 14px;
   border-radius: 50px;
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 4px 15px rgba(142, 14, 91, 0.3);
+  box-shadow: 0 4px 15px var(--color-polish-6);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: none !important;
   cursor: pointer;
@@ -2034,13 +2034,13 @@ textarea {
 
 .modern-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(142, 14, 91, 0.4);
-  color: #fff !important;
+  box-shadow: 0 6px 20px var(--color-polish-21);
+  color: var(--color-polish-4) !important;
 }
 
 .modern-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(142, 14, 91, 0.3);
+  box-shadow: 0 2px 8px var(--color-polish-6);
 }
 
 .page-heading__actions {
@@ -2053,12 +2053,12 @@ textarea {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 24px;
-  background: #F6D7E9;
+  background: var(--color-polish-22);
   padding: 24px;
   border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 8px 30px var(--color-polish-23);
   margin-bottom: 32px;
-  border: 1px solid rgba(142, 14, 91, 0.05);
+  border: 1px solid var(--color-polish-14);
 }
 
 .modern-field {
@@ -2081,7 +2081,7 @@ textarea {
   padding: 12px 16px;
   border-radius: 10px;
   border: 1px solid var(--color-border);
-  background: #fdfdfd;
+  background: var(--color-polish-24);
   font-size: 14px;
   color: var(--color-text);
   transition: all 0.2s ease;
@@ -2091,9 +2091,9 @@ textarea {
 
 .party-filter-input:focus,
 .modern-select select:focus {
-  border-color: #8E0E5B;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(142, 14, 91, 0.1);
+  border-color: var(--color-polish-25);
+  background: var(--color-polish-4);
+  box-shadow: 0 0 0 3px var(--color-polish-13);
 }
 
 .modern-select {
@@ -2114,10 +2114,10 @@ textarea {
 }
 
 .modern-table-card {
-  background: #ffffff;
+  background: var(--color-polish-26);
   border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(142, 14, 91, 0.05);
+  box-shadow: 0 8px 30px var(--color-polish-23);
+  border: 1px solid var(--color-polish-14);
   overflow: hidden;
   margin-bottom: 24px;
 }
@@ -2135,13 +2135,13 @@ textarea {
 
 .modern-table th {
   padding: 12px 12px;
-  background: rgba(142, 14, 91, 0.08);
+  background: var(--color-polish-27);
   color: var(--color-text-muted);
   font-weight: 600;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(142, 14, 91, 0.1);
+  border-bottom: 1px solid var(--color-polish-13);
   white-space: nowrap;
 }
 
@@ -2157,7 +2157,7 @@ textarea {
 
 .modern-table th:not(:last-child),
 .modern-table td:not(:last-child) {
-  border-right: 1px solid rgba(142, 14, 91, 0.06);
+  border-right: 1px solid var(--color-polish-28);
 }
 
 .modern-table tbody tr {
@@ -2165,11 +2165,11 @@ textarea {
 }
 
 .modern-table tbody tr:nth-child(even) {
-  background: #FDF4F9;
+  background: var(--color-polish-29);
 }
 
 .modern-table tbody tr:hover {
-  background: rgba(142, 14, 91, 0.05);
+  background: var(--color-polish-14);
 }
 
 .modern-table tbody tr:last-child td {
@@ -2177,14 +2177,14 @@ textarea {
 }
 
 .modern-table td a {
-  color: #8E0E5B;
+  color: var(--color-polish-25);
   font-weight: 600;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .modern-table td a:hover {
-  color: #00A651;
+  color: var(--color-polish-30);
   text-decoration: underline;
 }
 
@@ -2215,20 +2215,20 @@ textarea {
 }
 
 .pricing-tab:hover {
-  background: rgba(142, 14, 91, 0.05);
-  color: #8E0E5B;
+  background: var(--color-polish-14);
+  color: var(--color-polish-25);
 }
 
 .pricing-tab--active {
-  background: #FCEDF5;
-  color: #8E0E5B;
-  box-shadow: 0 2px 8px rgba(142, 14, 91, 0.1);
+  background: var(--color-polish-31);
+  color: var(--color-polish-25);
+  box-shadow: 0 2px 8px var(--color-polish-13);
 }
 
 .modern-intro-text {
   font-size: 15px;
   line-height: 1.6;
-  color: #4a5568;
+  color: var(--color-polish-32);
   margin-bottom: 32px;
   max-width: 800px;
 }
@@ -2239,10 +2239,10 @@ textarea {
   align-items: center;
   justify-content: center;
   padding: 48px 24px;
-  background: #FDF4F9;
+  background: var(--color-polish-29);
   border-radius: 16px;
-  border: 1px dashed rgba(142, 14, 91, 0.2);
-  color: #8E0E5B;
+  border: 1px dashed var(--color-polish-18);
+  color: var(--color-polish-25);
   font-weight: 500;
   text-align: center;
   margin-top: 24px;
