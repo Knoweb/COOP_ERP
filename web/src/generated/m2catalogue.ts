@@ -215,6 +215,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/skus/{skuId}/images/{imageId}/upload-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Obtain a new upload URL for a pending image
+         * @description If an image upload fails, you can retry it by requesting a new presigned PUT URL. Problems: m2.sku.not_found, m2.image.not_found, m2.image.not_pending.
+         */
+        post: operations["retryImageUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/skus/{skuId}/images/{imageId}/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the public/presigned URL of the image
+         * @description Returns the presigned GET URL for the image or its thumbnail if supported
+         */
+        get: operations["getImageUrl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/skus/{skuId}/barcodes/{barcode}/link": {
         parameters: {
             query?: never;
@@ -392,6 +432,7 @@ export interface components {
             attributes?: {
                 [key: string]: unknown;
             };
+            images?: components["schemas"]["ImageView"][];
         };
         SkuPageResponse: {
             items: components["schemas"]["SkuResponse"][];
@@ -481,6 +522,13 @@ export interface components {
             uploadUrl: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        ImageView: {
+            /** Format: uuid */
+            imageId: string;
+            status: string;
+            thumbKey?: string;
+            objectKey?: string;
         };
         LinkBarcodeToBatchRequest: {
             symbology: components["schemas"]["Symbology"];
@@ -1081,6 +1129,77 @@ export interface operations {
                 };
             };
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    retryImageUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+                imageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload URL generated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploadResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description m2.sku.not_found or m2.image.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getImageUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skuId: string;
+                imageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        url?: string;
+                    };
+                };
+            };
+            /** @description m2.sku.not_found or m2.image.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     linkBarcodeToBatch: {

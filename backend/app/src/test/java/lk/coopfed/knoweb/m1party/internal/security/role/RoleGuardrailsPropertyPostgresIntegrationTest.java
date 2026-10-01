@@ -340,9 +340,6 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
         if (grantor.location() != null && !grantor.location().equals(location)) {
             return "m1.assignment.outside_caller_scope";
         }
-        if (location != null && !grantor.entity().equals(ownerOfLocation.get(location))) {
-            return "m1.assignment.location_not_in_entity";
-        }
         if (!grantor.entity().equals(homeOf.get(user))) {
             return "m1.assignment.user_not_in_scope";
         }
@@ -355,6 +352,9 @@ class RoleGuardrailsPropertyPostgresIntegrationTest extends PostgresIntegrationT
             if (!visible) {
                 return "m1.assignment.user_not_in_scope";
             }
+        }
+        if (location != null && !grantor.entity().equals(ownerOfLocation.get(location))) {
+            return "m1.assignment.location_not_in_entity";
         }
         if (heldBy.get(user).contains(new Held(role, location))) {
             return "m1.assignment.exists";

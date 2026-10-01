@@ -18,6 +18,8 @@ import org.springframework.data.domain.Persistable;
 public class Entity implements Persistable<UUID> {
 
     static final String TYPE_FEDERATION = "FEDERATION";
+    static final String TYPE_DISTRIBUTOR = "DISTRIBUTOR";
+    static final String TYPE_MPCS = "MPCS";
 
     static final String STATUS_ONBOARDING = "ONBOARDING";
     static final String STATUS_ACTIVE = "ACTIVE";
@@ -59,6 +61,9 @@ public class Entity implements Persistable<UUID> {
 
     @Column(name = "responsible_officer_user_id")
     private UUID responsibleOfficerUserId;
+
+    @Column(name = "managing_distributor_id")
+    private UUID managingDistributorId;
 
     @Column(name = "data_governance_signed_on")
     private LocalDate dataGovernanceSignedOn;
@@ -108,8 +113,12 @@ public class Entity implements Persistable<UUID> {
                 id, command, normalizedCode, normalizedType, normalizedLanguage, normalizedFinancialYearStartMonth);
     }
 
-    boolean isFederation() {
+    public boolean isFederation() {
         return TYPE_FEDERATION.equals(entityType);
+    }
+
+    public boolean isDistributor() {
+        return TYPE_DISTRIBUTOR.equals(entityType);
     }
 
     boolean isOnboarding() {
@@ -171,6 +180,14 @@ public class Entity implements Persistable<UUID> {
         return defaultLanguage;
     }
 
+    public UUID managingDistributorId() {
+        return managingDistributorId;
+    }
+
+    public void setManagingDistributorId(UUID managingDistributorId) {
+        this.managingDistributorId = managingDistributorId;
+    }
+
     public Map<String, Object> auditState() {
         Map<String, Object> state = new LinkedHashMap<>();
 
@@ -186,6 +203,7 @@ public class Entity implements Persistable<UUID> {
         state.put("financialYearStartMonth", financialYearStartMonth);
         state.put("defaultLanguage", defaultLanguage);
         state.put("responsibleOfficerUserId", responsibleOfficerUserId);
+        state.put("managingDistributorId", managingDistributorId);
         state.put("dataGovernanceSignedOn", dataGovernanceSignedOn);
         state.put("status", status);
         state.put("ownerEntityId", id);
