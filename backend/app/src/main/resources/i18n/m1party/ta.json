@@ -44,6 +44,7 @@
   "m1.entity.code_invalid": "செல்லுபடியாகும் நிறுவனக் குறியீட்டை உள்ளிடவும்",
   "m1.entity.default_language_invalid": "செல்லுபடியாகும் இயல்புநிலை மொழியைத் தேர்ந்தெடுக்கவும்",
   "m1.entity.federation_exists": "ஒரு கூட்டமைப்பு நிறுவனம் ஏற்கனவே உள்ளது",
+  "m1.entity.federation_or_distributor_required": "கூட்டமைப்பு அல்லது நிர்வாக விநியோகஸ்தரால் மட்டுமே இந்த செயலை செய்ய முடியும்",
   "m1.entity.federation_required": "ஒரு நிறுவனத்தை கூட்டமைப்பு மட்டுமே பதிவு செய்ய முடியும்",
   "m1.entity.financial_year_start_month_invalid": "நிதியாண்டு தொடக்க மாதம் 1 முதல் 12 வரை இருக்க வேண்டும்",
   "m1.entity.legal_name_required": "சட்டப்பூர்வ பெயரை ஆங்கிலத்தில் உள்ளிடவும்",
