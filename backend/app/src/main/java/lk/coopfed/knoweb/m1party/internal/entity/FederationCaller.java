@@ -35,4 +35,21 @@ final class FederationCaller {
         }
         return caller;
     }
+
+    static Entity requireFederationOrDistributor(ScopeContext scope, EntityRepository repository) {
+        if (scope == null
+                || !scope.hasActiveScope()
+                || scope.entityId() == null
+                || scope.locationId() != null
+                || scope.policyClass() != PolicyClass.OWN) {
+            throw new ProblemException("m1.entity.federation_or_distributor_required");
+        }
+        Entity caller = repository
+                .findById(scope.entityId())
+                .orElseThrow(() -> new ProblemException("m1.entity.federation_or_distributor_required"));
+        if (!caller.isFederation() && !caller.isDistributor()) {
+            throw new ProblemException("m1.entity.federation_or_distributor_required");
+        }
+        return caller;
+    }
 }

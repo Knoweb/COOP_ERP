@@ -63,22 +63,50 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
         UUID entityId = scope.entityId();
         // The per-person pair check reads what the user holds and then writes: one command of
         // the entity at a time, or two assignments could each pass and together give both halves.
-        lock.lock(entityId);
-
+        // We lock the target entity where the role is assigned.
         SecurityRecords.RoleRow role = guards.role(command.roleId());
-        boolean ownRole = entityId.equals(role.ownerEntityId());
+
+        if (scope.locationId() != null && !Objects.equals(scope.locationId(), command.scopeLocationId())) {
+            throw new ProblemException(
+                    "m1.assignment.outside_caller_scope",
+                    Map.of("scopeLocationId", String.valueOf(command.scopeLocationId())));
+        }
+
+        SecurityRecords.UserRow user = records.user(command.userId())
+                .orElseThrow(() -> new ProblemException(
+                        "m1.assignment.user_not_in_scope", Map.of("userId", String.valueOf(command.userId()))));
+
+        UUID targetEntityId = user.homeEntityId();
+        if (!entityId.equals(targetEntityId)) {
+            // Distributor can assign roles in the MPCS they manage
+            Boolean isDistributor = jdbc.queryForObject(
+                    "select exists (select 1 from party.entity where entity_id = ? and managing_distributor_id = ?)",
+                    Boolean.class,
+                    targetEntityId,
+                    entityId);
+            if (!Boolean.TRUE.equals(isDistributor)) {
+                throw new ProblemException(
+                        "m1.assignment.user_not_in_scope", Map.of("userId", String.valueOf(command.userId())));
+            }
+        }
+
+        lock.lock(targetEntityId);
+
+        boolean ownRole = targetEntityId.equals(role.ownerEntityId());
         boolean template = role.template() && role.ownerEntityId() == null;
         if (!ownRole && !template) {
             throw new ProblemException("m1.assignment.role_not_in_scope", Map.of("roleId", role.roleId()));
         }
         guards.requireActive(role);
 
-        requireWithinCallerScope(command.scopeLocationId(), scope);
+        if (command.scopeLocationId() != null
+                && !records.locationOwner(command.scopeLocationId())
+                        .map(targetEntityId::equals)
+                        .orElse(false)) {
+            throw new ProblemException(
+                    "m1.assignment.location_not_in_entity", Map.of("scopeLocationId", command.scopeLocationId()));
+        }
 
-        SecurityRecords.UserRow user = records.user(command.userId())
-                .filter(found -> entityId.equals(found.homeEntityId()))
-                .orElseThrow(() -> new ProblemException(
-                        "m1.assignment.user_not_in_scope", Map.of("userId", String.valueOf(command.userId()))));
         if ("DEACTIVATED".equals(user.status())) {
             throw new ProblemException("m1.assignment.user_deactivated", Map.of("userId", user.userId()));
         }
@@ -99,7 +127,7 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
         }
 
         SecurityRecords.Assignment assignment =
-                new SecurityRecords.Assignment(user.userId(), role.roleId(), entityId, command.scopeLocationId());
+                new SecurityRecords.Assignment(user.userId(), role.roleId(), targetEntityId, command.scopeLocationId());
         if (records.assignmentExists(assignment)) {
             throw new ProblemException(
                     "m1.assignment.exists", Map.of("userId", user.userId(), "roleId", role.roleId()));
@@ -110,40 +138,23 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
 
         // What the user holds anywhere in the entity, not only where this caller may see
         // (m1security V0013): a half held at another shop still counts.
-        List<String> wouldHold = new ArrayList<>(records.permissionsAt(entityId, user.userId(), null));
+        List<String> wouldHold = new ArrayList<>(records.permissionsAt(targetEntityId, user.userId(), null));
         wouldHold.addAll(rolePermissions);
-        guards.roleModeConflict(wouldHold, entityId, "m1.assignment.sod_conflict", user.userId());
+        guards.roleModeConflict(wouldHold, targetEntityId, "m1.assignment.sod_conflict", user.userId());
 
         jdbc.update(
                 "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id) values (?, ?, ?, ?)",
                 user.userId(),
                 role.roleId(),
-                entityId,
+                targetEntityId,
                 command.scopeLocationId());
 
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("roleId", role.roleId());
-        after.put("scopeEntityId", entityId);
+        after.put("scopeEntityId", targetEntityId);
         after.put("scopeLocationId", command.scopeLocationId());
         audit.record(AUDIT, Subject.of("user", user.userId()), null, after, scope);
-        events.publish(new RoleAssigned(role.roleId(), user.userId(), entityId, command.scopeLocationId()));
+        events.publish(new RoleAssigned(role.roleId(), user.userId(), targetEntityId, command.scopeLocationId()));
         return role.roleId();
-    }
-
-    /**
-     * An entity-wide caller assigns anywhere in its entity; a caller scoped to a location assigns
-     * at that location alone. A location must be one of the entity's.
-     */
-    private void requireWithinCallerScope(UUID locationId, ScopeContext scope) {
-        if (scope.locationId() != null && !Objects.equals(scope.locationId(), locationId)) {
-            throw new ProblemException(
-                    "m1.assignment.outside_caller_scope", Map.of("scopeLocationId", String.valueOf(locationId)));
-        }
-        if (locationId != null
-                && !records.locationOwner(locationId)
-                        .map(scope.entityId()::equals)
-                        .orElse(false)) {
-            throw new ProblemException("m1.assignment.location_not_in_entity", Map.of("scopeLocationId", locationId));
-        }
     }
 }

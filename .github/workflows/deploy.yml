@@ -1,0 +1,44 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: ${{ secrets.DROPLET_USERNAME }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          # Increase SSH timeout just in case
+          timeout: 120s
+          script: |
+            echo "Starting deployment..."
+            
+            # Check if directory exists, if not clone it
+            if [ ! -d "/root/COOP-ERP" ]; then
+              echo "Project not found on server. Cloning for the first time..."
+              # You must replace this with your actual repository URL if it is private
+              # For private repos, you might need a fine-grained PAT or Deploy Key
+              git clone https://github.com/${{ github.repository }}.git /root/COOP-ERP
+            fi
+            
+            cd /root/COOP-ERP
+            
+            echo "Pulling latest changes..."
+            git fetch --prune
+            git checkout production
+            git pull origin production
+            
+            echo "Building and restarting Docker containers..."
+            # Using make up as specified in the project Makefile
+            make up
+            
+            echo "Deployment completed successfully!"
