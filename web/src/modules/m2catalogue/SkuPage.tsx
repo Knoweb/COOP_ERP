@@ -442,7 +442,10 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
                 {img.barcode || t("catalogue.images.no_barcode")?.text || "No barcode"}
               </div>
-              <StateChip state={img.status === "ACTIVE" ? "success" : "default"} label={t(`catalogue.images.status.${img.status.toLowerCase()}`)?.text || img.status} />
+              <StateChip 
+                state={img.status === "ACTIVE" ? "issued" : img.status === "FAILED" || img.status === "RETIRED" ? "void" : "draft"} 
+                label={t(`catalogue.images.status.${img.status.toLowerCase()}`)?.text || img.status} 
+              />
             </div>
           ))}
         </div>
