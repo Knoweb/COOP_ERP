@@ -50,7 +50,9 @@ import org.springframework.util.MultiValueMap;
  * items the shop holds ten or more of, in varied baskets, never more in all than the shop holds
  * (DemoTillHistory#salesOf), so the history does not drive the shops' stock negative.
  *
- * <p>Settings as {@link DemoTillSale}: {@code COOP_ERP_API}, {@code COOP_ERP_TOKEN_URL}.
+ * <p>Settings as {@link DemoTillSale}: {@code COOP_ERP_API}, {@code COOP_ERP_TOKEN_URL},
+ * {@code COOP_ERP_DEMO_PASSWORD}. On a demo server it runs from the demo-tools image
+ * (infra/demo-tools, infra/deploy/demo-data.sh), which needs no JDK or Gradle there.
  */
 public final class DemoTillHistory {
 
@@ -391,7 +393,7 @@ public final class DemoTillHistory {
                 "grant_type", "password",
                 "client_id", "coop-erp-web",
                 "username", actor.username(),
-                "password", "demo",
+                "password", DemoTillSale.demoPassword(),
                 "scope", "openid")));
         headers.set("X-Scope-Entity", actor.entityId().toString());
         return headers;

@@ -1,0 +1,3 @@
+# Only the built bundle goes to the image build (infra/web-image/Dockerfile).
+*
+!dist

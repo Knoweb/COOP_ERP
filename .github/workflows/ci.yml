@@ -18,12 +18,16 @@
 #                     tools/smoke.mjs from outside, then the Playwright run in a browser)
 #   package           jobs package (pull request) and package-main (main, after the tests) (Jib image, web bundle, shared engine, SBOM; the till APK
 #                     comes from job till)
+#   publish           job package-main, on a push to main only: the backend images, the web image
+#                     and the demo-tools image to GHCR, tagged main and the commit SHA, for the
+#                     demo server of infra/deploy
 #   nightly           job nightly-fresh-clone (the fifteen-minute start of 17A section 13)
 #
 # Not here yet, on purpose:
 #   - Android emulator smoke (e2e): needs the till hello screen (S0-08). stack-smoke covers
 #     what exists today.
-#   - publish: no registry has been chosen (doc 35 is unwritten). Add the job with the registry.
+#   - publish of a production release: doc 35 (deployment) is unwritten. What is published today
+#     (GHCR, by package-main) serves the demo server of infra/deploy only.
 #   - coverage floors: set per module by its implementation guide; hello has none. The report
 #     exists (job integration-test, artefact coverage-report), the gate does not.
 #
@@ -683,6 +687,31 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      # The demo server (infra/deploy) pulls its images from GHCR: the two backend images
+      # `make image` built above, the web image (Caddy with the bundle just built,
+      # infra/web-image) and the demo-tools image (the till simulator for the demo's till history,
+      # infra/demo-tools). On a push to main only, after every test job; a pull request and the
+      # nightly run build and keep nothing here. Tagged main (what deploy.sh pulls) and the commit
+      # SHA (to pin or roll back). The source label links each package to this repository.
+      - name: Publish the demo server images to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          (cd backend && ./gradlew :app:demoToolsDist --console=plain)
+          docker build --quiet -f infra/demo-tools/Dockerfile -t coop-erp/demo-tools:dev backend/app
+          docker build --quiet -f infra/web-image/Dockerfile -t coop-erp/web:dev web
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
+          source="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          for name in backend backend-worker demo-tools web; do
+            echo "FROM coop-erp/$name:dev" | docker build --quiet --label "org.opencontainers.image.source=$source"               --label "org.opencontainers.image.revision=$GITHUB_SHA" -t "$registry/$name:main" -
+            docker tag "$registry/$name:main" "$registry/$name:$GITHUB_SHA"
+            docker push --quiet "$registry/$name:main"
+            docker push --quiet "$registry/$name:$GITHUB_SHA"
+          done
+
   # Every test job of the run, not only the two of the backend: the till tests, the scaffolder
   # proof and the two-instance smoke all run on main, and an artefact of main must not come from
   # a commit any of them failed on (review of 26 September 2026: a shared-engine change that
@@ -693,6 +722,10 @@ jobs:
     needs: [build-verify, integration-test, till, scaffolder, stack-smoke]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
+    # packages: write for the publish steps (a push to main only); the anchor's other steps read.
+    permissions:
+      contents: read
+      packages: write
     steps: *package-steps
 
   # 17A section 13: from a fresh clone to a working stack with one command. Runs every night,

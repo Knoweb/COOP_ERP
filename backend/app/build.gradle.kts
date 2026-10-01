@@ -325,6 +325,22 @@ tasks.register<JavaExec>("demoTillHistory") {
     mainClass.set("lk.coopfed.knoweb.demo.DemoTillHistory")
 }
 
+// The demo-tools image (infra/demo-tools/Dockerfile): the till simulator of the test sources and
+// everything it runs on, as plain jars and class folders, so that a demo server loads the till
+// history (infra/deploy/demo-data.sh) without a JDK or Gradle of its own. The Dockerfile copies
+// build/demo-tools; nothing here runs on a developer machine unless asked.
+tasks.register<Sync>("demoToolsDist") {
+    description = "Collects the till simulator and its class path for the demo-tools image."
+    group = "demo"
+    val classpath = sourceSets["test"].runtimeClasspath
+    into(layout.buildDirectory.dir("demo-tools"))
+    into("lib") { from(classpath.filter { it.isFile }) }
+    into("classes") {
+        from(classpath.filter { it.isDirectory })
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+}
+
 val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"

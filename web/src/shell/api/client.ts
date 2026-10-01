@@ -27,13 +27,15 @@ import createClient, { type Client, type Middleware } from "openapi-fetch";
 import { STEP_UP_ACR_VALUES, type LoginState } from "../auth/oidc";
 import { useSession, type Session } from "../auth/session";
 import { ScopeContext } from "../scope/ScopeContext";
+import { resolveConfig } from "../runtimeConfig";
 import { pendingCommandOf, type PendingCommand } from "./pendingCommand";
 import { problemOf, STEP_UP_REQUIRED, type Problem } from "./problem";
 
 // The problem document and its reader live in problem.ts; screens keep importing them from here.
 export { problemOf, STEP_UP_REQUIRED, type Problem };
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+// From the server's /config.js, else VITE_API_BASE (runtimeConfig.ts).
+const API_BASE = resolveConfig().apiBase;
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /** Put on a request (as a header) to send it without the scope headers; see apiMiddleware. */

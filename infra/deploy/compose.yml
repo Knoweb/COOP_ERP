@@ -1,0 +1,343 @@
+# The DEMO server: the whole system on one machine, with demo data only (infra/deploy/README.md).
+#
+# Never started alone: always with the size file chosen at bootstrap, which sets the memory of
+# every service and the JVM and database tuning that goes with it:
+#   docker compose -f compose.yml -f resources-small.yml  ...   (2 vCPU / 4 GB)
+#   docker compose -f compose.yml -f resources-medium.yml ...   (4 vCPU / 8 GB)
+# The scripts beside this file (bootstrap.sh, deploy.sh, demo-data.sh, backup.sh) do that.
+#
+# How this differs from the laptop stack in infra/compose: images come from a registry (CI
+# publishes them from main), Keycloak runs in production mode with its data in PostgreSQL,
+# every secret is generated at bootstrap into .env (none has a default here), the till snapshot
+# key is the server's own, migrations run strictly in order, and only Caddy publishes ports.
+#
+# A missing variable stops compose with its name (${VAR:?...}), never with an empty password.
+
+name: coop-erp-demo
+
+# Every container logs to Docker's json-file, capped, so that a chatty service cannot fill the
+# disk of a small server: at most 3 files of 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # PostgreSQL 16 with ICU, as the laptop stack (17A section 10). Two databases: the
+  # application's (users and groups from postgres/init/01-roles.sh, the same script as
+  # infra/compose) and Keycloak's (postgres/init/02-keycloak.sh). Its tuning (shared_buffers,
+  # max_connections ...) is the size file's `command`.
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run bootstrap.sh to generate .env}
+      POSTGRES_DB: coop_erp
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=en"
+      MIGRATION_DB_USER: coop_migrator
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:?}
+      APP_DB_USER: coop_app
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
+      RELAY_DB_USER: coop_relay
+      RELAY_DB_PASSWORD: ${RELAY_DB_PASSWORD:?}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d coop_erp"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # The application reaches the database through PgBouncer in transaction pooling, as on the
+  # laptop; Flyway, the outbox relay and Keycloak connect to postgres directly. The pool size is
+  # the size file's.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: coop_erp
+      DB_USER: coop_app
+      DB_PASSWORD: ${APP_DB_PASSWORD:?}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "200"
+      LISTEN_PORT: "6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # The broker. The plain image, without the management console: nobody needs the console on a
+  # demo server, and it costs memory. Its memory watermark is the size file's.
+  rabbitmq:
+    image: rabbitmq:3.13
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      RABBITMQ_DEFAULT_USER: coop
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  # The object store (attachments, printed PDFs), the same frozen Bitnami legacy image as the
+  # laptop stack (see infra/compose/compose.yml for why). The browser reaches its buckets
+  # through Caddy, by pre-signed URL only.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      MINIO_ROOT_USER: coopminio
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+      MINIO_BROWSER: "off"          # no console on a demo server
+    volumes:
+      - minio_data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # One-shot: the four buckets of 17A section 10 (as infra/compose), then it exits.
+  minio-init:
+    image: bitnamilegacy/minio-client:2025.7.21-debian-12-r3
+    restart: "no"
+    logging: *logging
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: coopminio
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        for i in $$(seq 1 30); do
+          if mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then break; fi
+          echo "waiting for minio ($$i)"; sleep 2
+        done
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/attachments local/images local/packages
+        mc mb --ignore-existing --with-lock local/audit-anchors
+        echo "buckets ready"
+
+  # Keycloak in production mode (`start`, not `start-dev`): HTTPS is Caddy's, so Keycloak speaks
+  # plain HTTP inside the network and trusts the X-Forwarded headers Caddy sets. It serves under
+  # /auth (one address for the whole demo, see Caddyfile). Its data is in PostgreSQL, so users
+  # the back office creates survive a restart. The realm (keycloak/realm-coop.json, rendered by
+  # bootstrap.sh from infra/compose/realm-dev.json) is imported on the first start only; an
+  # existing realm is left alone.
+  # `start` and not `start --optimized`: the optimized start needs an image built with these
+  # options (kc.sh build). The plain start does that build itself, which costs about half a
+  # minute at each start and nothing afterwards.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    restart: unless-stopped
+    logging: *logging
+    command: ["start", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      # The health endpoint stays at /health/ready on the management port (9000), as on the laptop.
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
+      KC_HEALTH_ENABLED: "true"
+      # The browser and the backend must see the same issuer: the public address, always.
+      KC_HOSTNAME: ${PUBLIC_URL:?}/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_PROXY_HEADERS: xforwarded
+      # One node: no cluster discovery, the caches stay in this process.
+      KC_CACHE: local
+    volumes:
+      - ./keycloak/realm-coop.json:/opt/keycloak/data/import/realm-coop.json:ro
+      - ./keycloak/theme/coop:/opt/keycloak/themes/coop:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          grep -q '"status": "UP"' <&3
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 90s
+
+  # Catches every mail of the demo; nothing leaves the server. Behind Caddy at /mail, with its
+  # own sign-in.
+  mailpit:
+    image: axllent/mailpit:v1.31.1
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      MP_WEBROOT: /mail
+      MP_UI_AUTH: "${MAIL_USER:-mail}:${MAIL_PASSWORD:?}"
+      MP_MAX_MESSAGES: "5000"
+    volumes:
+      - mailpit_data:/data
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz", "--webroot", "/mail"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+  # The backend: web and worker roles in one container, on the worker image (it carries the
+  # Chromium the A4 renderer prints with). Flyway runs at start, strictly in order. The JVM's
+  # share of the container's memory is the size file's (JAVA_TOOL_OPTIONS).
+  backend:
+    image: ${REGISTRY:-ghcr.io/knoweb/coop_erp}/backend-worker:${IMAGE_TAG:-main}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      COOP_ERP_ROLE: web,worker
+      SPRING_PROFILES_ACTIVE: web,worker
+      COOP_ERP_SYSTEM_ENTITY_ID: 0190f000-0000-7000-8000-000000000001
+      COOP_ERP_SMTP_HOST: mailpit
+      COOP_ERP_SMTP_PORT: "1025"
+      COOP_ERP_SMTP_FROM: ${MAIL_FROM:-notifications@coop-erp.test}
+      OBJECT_STORE_ENDPOINT: http://minio:9000
+      OBJECT_STORE_PUBLIC_ENDPOINT: ${PUBLIC_URL:?}
+      OBJECT_STORE_ACCESS_KEY: coopminio
+      OBJECT_STORE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?}
+      DB_URL: jdbc:postgresql://pgbouncer:6432/coop_erp?prepareThreshold=0
+      DB_USER: coop_app
+      DB_PASSWORD: ${APP_DB_PASSWORD:?}
+      MIGRATION_URL: jdbc:postgresql://postgres:5432/coop_erp
+      MIGRATION_USER: coop_migrator
+      MIGRATION_PASSWORD: ${MIGRATION_DB_PASSWORD:?}
+      COOP_ERP_RELAY_URL: jdbc:postgresql://postgres:5432/coop_erp
+      COOP_ERP_RELAY_USER: coop_relay
+      COOP_ERP_RELAY_PASSWORD: ${RELAY_DB_PASSWORD:?}
+      # Tokens carry the public issuer; the keys and the admin API are fetched inside the network.
+      OIDC_ISSUER: ${PUBLIC_URL:?}/auth/realms/coop
+      OIDC_JWK_SET_URI: http://keycloak:8080/auth/realms/coop/protocol/openid-connect/certs
+      OIDC_STEP_UP_URL: ${PUBLIC_URL:?}/auth/realms/coop/protocol/openid-connect/auth
+      OIDC_TOKEN_ENDPOINT: ${PUBLIC_URL:?}/auth/realms/coop/protocol/openid-connect/token
+      OIDC_ADMIN_URL: http://keycloak:8080/auth
+      OIDC_ADMIN_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?}
+      COOP_ERP_ENFORCE_PERMISSIONS: "true"
+      # DEMO ONLY. The demo realm has no second factor (OTP), so a fresh password sign-in counts
+      # as the step-up, exactly as on a laptop. A real environment sets this false and gives the
+      # realm a second factor (application.yml, coop-erp.security.mfa).
+      COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS: "true"
+      # The server's own till snapshot signing key pair, generated by bootstrap.sh; never the
+      # development key of infra/compose.
+      SYNC_SIGNING_PRIVATE_KEY: ${SYNC_SIGNING_PRIVATE_KEY:?}
+      SYNC_SIGNING_PUBLIC_KEY: ${SYNC_SIGNING_PUBLIC_KEY:?}
+      COOP_ERP_IDEMPOTENCY_SECRET: ${COOP_ERP_IDEMPOTENCY_SECRET:?}
+      COOP_ERP_NOTIFICATION_KEY: ${COOP_ERP_NOTIFICATION_KEY:?}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: coop
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?}
+      WEB_ALLOWED_ORIGINS: ${PUBLIC_URL:?}
+      # The production default, said out loud: a migration older than one applied stops the start.
+      MIGRATION_OUT_OF_ORDER: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /actuator/health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          grep -q '"status":"UP"' <&3
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+
+  # The front door: TLS, the web bundle, and the proxy to the rest (Caddyfile). The web image is
+  # Caddy with the built bundle in /srv (infra/web-image).
+  caddy:
+    image: ${REGISTRY:-ghcr.io/knoweb/coop_erp}/web:${IMAGE_TAG:-main}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CADDY_SITE: ${CADDY_SITE:?}
+      CADDY_TLS: ${CADDY_TLS:?}
+      PUBLIC_URL: ${PUBLIC_URL:?}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data              # certificates and Caddy's own authority: keep them
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+  # Not a service: the till simulator, run once by demo-data.sh (`docker compose run --rm
+  # demo-tools`) to load the demo's till history through the sync contract. The profile keeps
+  # `up` from starting it.
+  demo-tools:
+    image: ${REGISTRY:-ghcr.io/knoweb/coop_erp}/demo-tools:${IMAGE_TAG:-main}
+    profiles: ["tools"]
+    restart: "no"
+    logging: *logging
+    environment:
+      COOP_ERP_API: http://backend:8080
+      COOP_ERP_TOKEN_URL: http://keycloak:8080/auth/realms/coop/protocol/openid-connect/token
+      COOP_ERP_DEMO_PASSWORD: ${DEMO_PASSWORD:?}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  minio_data:
+  mailpit_data:
+  caddy_data:
+  caddy_config:

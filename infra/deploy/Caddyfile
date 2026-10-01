@@ -1,0 +1,86 @@
+# The front door of a demo server (infra/deploy/README.md): the only container with published
+# ports (80 and 443). One address, one certificate, and these paths behind it:
+#
+#   /              the web back office (the files in /srv of the web image)
+#   /config.js     the web client's addresses, from this server's environment (below)
+#   /api/...       the backend (the /api prefix is stripped: the backend serves /v1/...)
+#   /auth/...      Keycloak, which serves under /auth itself (KC_HTTP_RELATIVE_PATH)
+#   /mail/...      Mailpit, the demo's mail catcher (its own sign-in: MAIL_USER, MAIL_PASSWORD)
+#   /attachments/  /images/  /packages/   the object store's buckets, for pre-signed URLs only
+#
+# Why paths and not subdomains: the demo is usually reached by an IP address or an sslip.io
+# name, where there are no subdomains to have; and one origin means no CORS and one certificate.
+#
+# The values in {$...} are read from the container's environment when Caddy starts (compose.yml
+# passes them from .env). CADDY_SITE is the address with its scheme (https://203-0-113-5.sslip.io,
+# https://demo.example.com, https://203.0.113.5); CADDY_TLS is either an e-mail address (a real
+# Let's Encrypt certificate, which needs port 80 reachable from the internet) or "internal"
+# (a certificate from Caddy's own authority, which browsers warn about once).
+
+# HTTP/1.1 and HTTP/2 only. HTTP/3 would need UDP 443 open in the firewall and published by
+# Docker; without it a browser that has heard of HTTP/3 (Alt-Svc) first tries UDP and waits, and
+# page loads stall. Two protocols over TCP are plenty for a demo.
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$CADDY_SITE} {
+	tls {$CADDY_TLS}
+	encode zstd gzip
+
+	# The web client's runtime configuration (web/src/shell/runtimeConfig.ts). Written here, from
+	# PUBLIC_URL, every time the container starts, so the one published web image serves any
+	# address. Never cached: a changed address must reach the next page load.
+	handle /config.js {
+		header Content-Type "text/javascript; charset=utf-8"
+		header Cache-Control "no-store"
+		respond `window.__COOP_ERP_CONFIG__ = \{ "apiBase": "{$PUBLIC_URL}/api", "oidcAuthority": "{$PUBLIC_URL}/auth/realms/coop", "oidcClientId": "coop-erp-web", "stepUpAcrValues": "" \};` 200
+	}
+
+	# The backend. Of its management endpoints only health is public (the smoke check reads it);
+	# metrics stay inside the server.
+	handle_path /api/* {
+		@private {
+			path /actuator/*
+			not path /actuator/health /actuator/health/*
+		}
+		respond @private 404
+		reverse_proxy backend:8080
+	}
+
+	# Keycloak (sign-in pages, tokens, admin console). It knows its public address from
+	# KC_HOSTNAME and reads the scheme from the X-Forwarded headers Caddy sets.
+	redir /auth /auth/
+	handle /auth/* {
+		reverse_proxy keycloak:8080
+	}
+
+	# Mailpit serves under /mail itself (MP_WEBROOT) and asks for its own password (MP_UI_AUTH).
+	redir /mail /mail/
+	handle /mail/* {
+		reverse_proxy mailpit:8025
+	}
+
+	# Pre-signed object URLs (attachments, printed PDFs). The backend signs them for PUBLIC_URL
+	# (OBJECT_STORE_PUBLIC_ENDPOINT) in path style, /<bucket>/<key>; Caddy passes the Host header
+	# on unchanged, so the signature MinIO checks is the one the backend made.
+	@objects path /attachments/* /images/* /packages/*
+	handle @objects {
+		reverse_proxy minio:9000
+	}
+
+	# Everything else is the single-page application: a file when there is one, index.html
+	# otherwise, so that a deep link survives a reload. The hashed files under /assets never
+	# change; everything else is checked on every load.
+	handle {
+		root * /srv
+		@static path /assets/*
+		header @static Cache-Control "public, max-age=31536000, immutable"
+		@page not path /assets/*
+		header @page Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
