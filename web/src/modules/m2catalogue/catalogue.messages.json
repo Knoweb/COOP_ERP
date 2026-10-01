@@ -60,7 +60,14 @@
     "catalogue.batches.title": "Batches",
     "catalogue.batches.empty": "No batch yet. Batches are registered when goods are received.",
     "catalogue.batch.status.REGISTERED": "Registered",
-    "catalogue.batch.status.SUPERSEDED": "Corrected"
+    "catalogue.batch.status.SUPERSEDED": "Corrected",
+    "catalogue.images.title": "Images",
+    "catalogue.images.file": "Image file",
+    "catalogue.images.upload": "Upload image",
+    "catalogue.images.status.hashing": "Computing hash...",
+    "catalogue.images.status.getting_url": "Requesting upload URL...",
+    "catalogue.images.status.uploading": "Uploading to storage...",
+    "catalogue.images.status.done": "Upload successful! The thumbnail will be generated in the background."
   },
   "si": {
     "catalogue.nav": "භාණ්ඩ නාමාවලිය",
@@ -123,7 +130,14 @@
     "catalogue.batches.title": "කාණ්ඩ",
     "catalogue.batches.empty": "තවම කාණ්ඩයක් නැත. භාණ්ඩ ලැබෙන විට කාණ්ඩ ලියාපදිංචි වේ.",
     "catalogue.batch.status.REGISTERED": "ලියාපදිංචි",
-    "catalogue.batch.status.SUPERSEDED": "නිවැරදි කළ"
+    "catalogue.batch.status.SUPERSEDED": "නිවැරදි කළ",
+    "catalogue.images.title": "පින්තූර",
+    "catalogue.images.file": "පින්තූර ගොනුව",
+    "catalogue.images.upload": "පින්තූරය උඩුගත කරන්න",
+    "catalogue.images.status.hashing": "හැෂ් ගණනය කරමින්...",
+    "catalogue.images.status.getting_url": "උඩුගත කිරීමේ URL ඉල්ලමින්...",
+    "catalogue.images.status.uploading": "ආචයනයට උඩුගත කරමින්...",
+    "catalogue.images.status.done": "සාර්ථකයි! පසුබිමෙහි සිඟිති රූපය ජනනය කෙරේ."
   },
   "ta": {
     "catalogue.nav": "பொருள் பட்டியல்",
@@ -186,6 +200,13 @@
     "catalogue.batches.title": "தொகுதிகள்",
     "catalogue.batches.empty": "இன்னும் தொகுதி இல்லை. பொருட்கள் பெறப்படும்போது தொகுதிகள் பதிவாகின்றன.",
     "catalogue.batch.status.REGISTERED": "பதிவானது",
-    "catalogue.batch.status.SUPERSEDED": "திருத்தப்பட்டது"
+    "catalogue.batch.status.SUPERSEDED": "திருத்தப்பட்டது",
+    "catalogue.images.title": "படங்கள்",
+    "catalogue.images.file": "படக் கோப்பு",
+    "catalogue.images.upload": "படத்தை பதிவேற்று",
+    "catalogue.images.status.hashing": "ஹாஷைக் கணக்கிடுகிறது...",
+    "catalogue.images.status.getting_url": "பதிவேற்ற URL ஐக் கோருகிறது...",
+    "catalogue.images.status.uploading": "சேமிப்பகத்தில் பதிவேற்றுகிறது...",
+    "catalogue.images.status.done": "வெற்றிகரமானது! பின்னணியில் சிறுபடம் உருவாக்கப்படும்."
   }
 }

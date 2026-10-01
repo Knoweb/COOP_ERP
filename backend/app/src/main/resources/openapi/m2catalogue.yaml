@@ -563,6 +563,33 @@ paths:
   # job verifies the upload after the URL has expired, makes the thumbnail and shows the image.
   /v1/catalogue/skus/{skuId}/images:
 
+    get:
+      tags: [Image]
+      operationId: listImages
+      summary: The images of a SKU
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: The images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImageResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
     post:
       tags: [Image]
       operationId: attachImage
@@ -1399,6 +1426,26 @@ components:
           description: SHA-256 of the bytes, lower-case hex; the upload is verified against it
           type: string
           pattern: '^[0-9a-fA-F]{64}$'
+
+
+    ImageResponse:
+      type: object
+      required:
+        - imageId
+        - status
+      properties:
+        imageId:
+          type: string
+          format: uuid
+        barcode:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, RETIRED, FAILED]
+        thumbUrl:
+          type: string
+        imageUrl:
+          type: string
 
 
     ImageUploadResponse:

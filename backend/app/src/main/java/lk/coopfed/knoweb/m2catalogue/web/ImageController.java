@@ -10,10 +10,15 @@ import lk.coopfed.knoweb.m2catalogue.internal.image.AttachImageHandler;
 import lk.coopfed.knoweb.m2catalogue.internal.image.RetireImageHandler;
 import lk.coopfed.knoweb.m2catalogue.web.generated.AttachImageRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ImageApi;
+import lk.coopfed.knoweb.m2catalogue.web.generated.ImageResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ImageUploadResponse;
+import lk.coopfed.knoweb.kernel.api.ObjectStorage;
+import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.ImageView;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 /** AttachImage and RetireImage (22A section 4, ImageController; section 5). */
 @RestController
@@ -22,11 +27,15 @@ class ImageController implements ImageApi {
     private final AttachImageHandler attach;
     private final RetireImageHandler retire;
     private final CurrentScope currentScope;
+    private final CatalogueQueries queries;
+    private final ObjectStorage storage;
 
-    ImageController(AttachImageHandler attach, RetireImageHandler retire, CurrentScope currentScope) {
+    ImageController(AttachImageHandler attach, RetireImageHandler retire, CurrentScope currentScope, CatalogueQueries queries, ObjectStorage storage) {
         this.attach = attach;
         this.retire = retire;
         this.currentScope = currentScope;
+        this.queries = queries;
+        this.storage = storage;
     }
 
     @Override
@@ -55,5 +64,24 @@ class ImageController implements ImageApi {
         retire.handle(new RetireImage(skuId, imageId), currentScope.get());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<List<ImageResponse>> listImages(UUID skuId) {
+        List<ImageView> views = queries.images(skuId, currentScope.get());
+        List<ImageResponse> responses = views.stream()
+                .map(view -> {
+                    ImageResponse r = new ImageResponse(view.imageId(), ImageResponse.StatusEnum.valueOf(view.status()));
+                    r.setBarcode(view.barcode());
+                    if (view.objectKeyFull() != null) {
+                        r.setImageUrl(storage.presignGet(view.objectKeyFull(), "image/jpeg", currentScope.get()).toString());
+                    }
+                    if (view.objectKeyThumb() != null) {
+                        r.setThumbUrl(storage.presignGet(view.objectKeyThumb(), "image/webp", currentScope.get()).toString());
+                    }
+                    return r;
+                })
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 }

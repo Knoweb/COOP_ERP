@@ -14,6 +14,9 @@ export type Conversion = components["schemas"]["ConversionResponse"];
 export type Barcode = components["schemas"]["BarcodeResponse"];
 export type Symbology = components["schemas"]["Symbology"];
 export type Batch = components["schemas"]["BatchResponse"];
+export type AttachImageRequest = components["schemas"]["AttachImageRequest"];
+export type ImageResponse = components["schemas"]["ImageResponse"];
+export type ImageUploadResponse = components["schemas"]["ImageUploadResponse"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -51,6 +54,11 @@ export function useCatalogueApi() {
 
       async batches(skuId: string): Promise<Batch[]> {
         const { data } = await api.GET("/v1/catalogue/batches", { params: { query: { skuId } } });
+        return data ?? [];
+      },
+
+      async images(skuId: string): Promise<ImageResponse[]> {
+        const { data } = await api.GET("/v1/catalogue/skus/{skuId}/images", { params: { path: { skuId } } });
         return data ?? [];
       },
 
@@ -98,6 +106,18 @@ export function useCatalogueApi() {
           params: { path: { skuId }, header: { "Idempotency-Key": idempotencyKey } },
           body
         });
+      },
+
+      async attachImage(
+        skuId: string,
+        body: AttachImageRequest,
+        idempotencyKey: string
+      ): Promise<ImageUploadResponse> {
+        const { data } = await api.POST("/v1/catalogue/skus/{skuId}/images", {
+          params: { path: { skuId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
       }
     }),
     [api]

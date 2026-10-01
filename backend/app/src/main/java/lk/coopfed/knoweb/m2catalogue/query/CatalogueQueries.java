@@ -40,4 +40,7 @@ public interface CatalogueQueries {
 
     /** The barcode rows of a SKU visible in the scope (catalogue RLS), ACTIVE first; empty otherwise. */
     List<BarcodeView> barcodes(UUID skuId, ScopeContext scope);
+
+    /** The images of a SKU visible in the scope. */
+    List<ImageView> images(UUID skuId, ScopeContext scope);
 }
