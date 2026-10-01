@@ -13,6 +13,7 @@ import { LocationPicker } from "./LocationPicker";
 import { SkuLabel } from "./SkuLabel";
 import { countChip } from "./stockControl";
 import { errorText } from "./stockView";
+import { PageHeader } from "../../shell/components/PageHeader";
 import "./inventory.css";
 
 /**
@@ -98,15 +99,39 @@ export function CountsPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/inventory">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("inventory.back").text}
-      </Link>
-      <h1>{t("inventory.count.title").text}</h1>
-      <LocationPicker value={locationId} onChange={setLocationId} />
+      <PageHeader
+        icon="stock"
+        title={t("inventory.title").text}
+        actions={
+          <Link className="action-link" to="/inventory">
+            <span>{t("inventory.back").text}</span>
+          </Link>
+        }
+      />
+
+      <div className="inventory-control-links">
+        <Link className="action-link action-link--primary" to="/inventory/counts">
+          <span>{t("inventory.counts.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/write-offs">
+          <span>{t("inventory.writeoffs.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/repacks">
+          <span>{t("inventory.repacks.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/transfer-requests">
+          <span>{t("inventory.request.link").text}</span>
+        </Link>
+      </div>
+
+      <section className="modern-filter-panel modern-filter-panel--stock">
+        <div className="modern-location-picker">
+          <LocationPicker value={locationId} onChange={setLocationId} />
+        </div>
+      </section>
 
       {canSchedule && canRecord && locationId !== "" && (
-        <section className="inventory-section">
+        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)' }}>
           <h2>{t("inventory.count.start_section").text}</h2>
           <label className="inventory-form-field">
             {t("inventory.count.scope").text}
@@ -140,11 +165,15 @@ export function CountsPage() {
         </section>
       )}
 
-      <h2>{t("inventory.count.list").text}</h2>
-      {counts.isError && <p role="alert">{errorText(counts.error, t("inventory.error.generic").text)}</p>}
-      {counts.data?.length === 0 && <p>{t("inventory.count.none").text}</p>}
-      {counts.data && counts.data.length > 0 && (
-        <table>
+      <section className="modern-table-card">
+        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+          <h2>{t("inventory.count.list").text}</h2>
+        </div>
+        {counts.isError && <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(counts.error, t("inventory.error.generic").text)}</p>}
+        {counts.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.count.none").text}</p>}
+        {counts.data && counts.data.length > 0 && (
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
           <thead>
             <tr>
               <th>{t("inventory.count.scheduled_for").text}</th>
@@ -167,14 +196,20 @@ export function CountsPage() {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
+      </section>
 
-      <h2>{t("inventory.negative.title").text}</h2>
-      {negative.data?.length === 0 && <p>{t("inventory.negative.none").text}</p>}
+      <section className="modern-table-card" style={{ marginTop: 'var(--space-4)' }}>
+        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+          <h2>{t("inventory.negative.title").text}</h2>
+        </div>
+      {negative.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.negative.none").text}</p>}
       {negative.data && negative.data.length > 0 && (
-        <table>
+        <div className="modern-table-scroll">
+          <table className="modern-table stock-table">
           <thead>
             <tr>
               <th>{t("inventory.column.item").text}</th>
@@ -204,9 +239,11 @@ export function CountsPage() {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
+      </section>
       {acknowledging && (
         <ReasonCapture
           title={t("inventory.negative.question").text}
