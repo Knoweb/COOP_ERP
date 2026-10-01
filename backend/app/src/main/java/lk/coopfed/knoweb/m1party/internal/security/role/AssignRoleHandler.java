@@ -68,7 +68,8 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
 
         if (scope.locationId() != null && !Objects.equals(scope.locationId(), command.scopeLocationId())) {
             throw new ProblemException(
-                    "m1.assignment.outside_caller_scope", Map.of("scopeLocationId", String.valueOf(command.scopeLocationId())));
+                    "m1.assignment.outside_caller_scope",
+                    Map.of("scopeLocationId", String.valueOf(command.scopeLocationId())));
         }
 
         SecurityRecords.UserRow user = records.user(command.userId())
@@ -102,7 +103,8 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
                 && !records.locationOwner(command.scopeLocationId())
                         .map(targetEntityId::equals)
                         .orElse(false)) {
-            throw new ProblemException("m1.assignment.location_not_in_entity", Map.of("scopeLocationId", command.scopeLocationId()));
+            throw new ProblemException(
+                    "m1.assignment.location_not_in_entity", Map.of("scopeLocationId", command.scopeLocationId()));
         }
 
         if ("DEACTIVATED".equals(user.status())) {
@@ -155,5 +157,4 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
         events.publish(new RoleAssigned(role.roleId(), user.userId(), targetEntityId, command.scopeLocationId()));
         return role.roleId();
     }
-
 }
