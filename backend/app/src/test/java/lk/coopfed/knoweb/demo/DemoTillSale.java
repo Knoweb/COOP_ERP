@@ -43,9 +43,17 @@ import org.springframework.util.MultiValueMap;
  *
  * Each run enrols the till again (a new secret, the same device and sequence) and makes one more
  * sale. Settings: {@code COOP_ERP_API} (default http://localhost:8080) and
- * {@code COOP_ERP_TOKEN_URL} (default the coop realm of the local Keycloak on :8085).
+ * {@code COOP_ERP_TOKEN_URL} (default the coop realm of the local Keycloak on :8085), and
+ * {@code COOP_ERP_DEMO_PASSWORD}, the demo users' password (default {@code demo}, the dev realm's;
+ * a demo server has its own, infra/deploy).
  */
 public final class DemoTillSale {
+
+    /** The demo users' password: the dev realm's {@code demo}, or a demo server's own. */
+    static String demoPassword() {
+        String password = System.getenv("COOP_ERP_DEMO_PASSWORD");
+        return password == null || password.isBlank() ? "demo" : password;
+    }
 
     private static final String SERIAL = "DEMO-TILL-S01";
     private static final String APP_VERSION = "1.0.0";
@@ -73,7 +81,7 @@ public final class DemoTillSale {
 
     private void run() throws Exception {
         UUID shop = DemoCast.M101_TOWN_SHOP;
-        HttpHeaders manager = userHeaders("m101-manager", "demo");
+        HttpHeaders manager = userHeaders("m101-manager", demoPassword());
 
         // 1. The till at the shop, on position 1, with a one-time code.
         UUID position = null;

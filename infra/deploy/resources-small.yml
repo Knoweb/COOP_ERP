@@ -1,0 +1,89 @@
+# Size SMALL: a 2 vCPU / 4 GB server with 2 GB of swap (bootstrap.sh --size small).
+# Used on top of compose.yml:  docker compose -f compose.yml -f resources-small.yml ...
+#
+# Where the numbers come from. On a laptop (2 shared cores, about 4.2 GB of limits), the whole
+# stack running the 26 browser tests with four browsers at once peaked at 1.6 GB: backend 480 MB,
+# Keycloak 626 MB, RabbitMQ 196 MB, PostgreSQL 95 MB (the Vite dev server, the biggest CPU user
+# there, does not exist on a server). The limits below give each service about twice what it
+# was seen to use, and add up to about 4 GB:
+#
+#   backend   1536 MB   heap 55 %, about 850 MB; the rest is metaspace, threads and the
+#                       Chromium the worker prints PDFs with (one print is 150 to 300 MB)
+#   keycloak   900 MB   heap 60 %, about 540 MB; a burst of sign-ins is what uses it
+#   postgres   768 MB   shared_buffers 192 MB (a quarter), effective_cache_size 512 MB
+#   rabbitmq   384 MB   the memory alarm at 192 MB (half), so the broker slows publishers
+#                       before the kernel kills it
+#   caddy      128 MB   TLS and compression of the bundle; tests with four browsers took it
+#                       to 63 MB at a 64 MB limit and to 90 MB without it
+#   minio      256 MB   pgbouncer 32 MB (it used 4)   mailpit 64 MB (it used 25)
+#   total     4068 MB
+#
+# A limit is a ceiling, not a reservation: together the services use far less on an ordinary
+# day, and the 2 GB of swap (swappiness 10) absorbs the rare moment when several reach their
+# ceiling at once. What a small server feels like then: a slow minute when many testers sign in
+# or print at the same moment, not an error.
+#
+# CPU is not split: every service may use both cores. A fixed share would leave a core idle
+# while Keycloak, say, waits for a sign-in burst; shared, whoever is busy gets the CPU.
+#
+# The JVMs read their container's limit (MaxRAMPercentage is a share of mem_limit), so a changed
+# limit moves the heap with it. -XX:+ExitOnOutOfMemoryError: a JVM out of heap stops, and
+# `restart: unless-stopped` starts it fresh, instead of limping on half-broken.
+
+services:
+  postgres:
+    mem_limit: 768m
+    shm_size: 128m
+    # max_connections: PgBouncer's pool (15) + Keycloak's (10) + the relay, Flyway and the seeds
+    # (a handful each) + headroom. Every connection costs memory, so no more than needed.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=192MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=60
+
+  pgbouncer:
+    mem_limit: 32m
+    environment:
+      DEFAULT_POOL_SIZE: "15"
+
+  rabbitmq:
+    mem_limit: 384m
+    environment:
+      # 192 MiB in bytes: the absolute form, because RabbitMQ's own reading of the container's
+      # memory is not trusted on every kernel.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit vm_memory_high_watermark {absolute,201326592}"
+
+  minio:
+    mem_limit: 256m
+
+  minio-init:
+    mem_limit: 64m
+
+  keycloak:
+    mem_limit: 900m
+    environment:
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:+ExitOnOutOfMemoryError"
+      KC_DB_POOL_MAX_SIZE: "10"
+
+  mailpit:
+    mem_limit: 64m
+
+  backend:
+    mem_limit: 1536m
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=55 -XX:+ExitOnOutOfMemoryError"
+      DB_POOL: "10"
+
+  caddy:
+    mem_limit: 128m
+
+  demo-tools:
+    mem_limit: 768m

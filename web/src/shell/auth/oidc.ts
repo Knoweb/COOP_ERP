@@ -10,9 +10,12 @@
 import { InMemoryWebStorage, WebStorageStateStore } from "oidc-client-ts";
 import type { AuthProviderProps } from "react-oidc-context";
 import type { PendingCommand } from "../api/pendingCommand";
+import { resolveConfig } from "../runtimeConfig";
 
-const AUTHORITY = import.meta.env.VITE_OIDC_AUTHORITY || "http://localhost:8085/realms/coop";
-const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || "coop-erp-web";
+// From the server's /config.js, else the VITE_* values of the build (runtimeConfig.ts).
+const CONFIG = resolveConfig();
+const AUTHORITY = CONFIG.oidcAuthority;
+const CLIENT_ID = CONFIG.oidcClientId;
 
 /**
  * What the step-up asks the identity server for, as `acr_values` (doc 19 section 2.2: the
@@ -23,7 +26,7 @@ const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || "coop-erp-web";
  * infra/compose has no OTP, and there a fresh password sign-in counts (`prompt=login` plus the
  * backend's `password-reauth-counts`), so nothing is asked for beyond the sign-in itself.
  */
-export const STEP_UP_ACR_VALUES: string = import.meta.env.VITE_OIDC_STEP_UP_ACR_VALUES || "";
+export const STEP_UP_ACR_VALUES: string = CONFIG.stepUpAcrValues;
 
 /**
  * Where the browser was before it left for the login page, and, after a step-up, the command

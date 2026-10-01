@@ -1,0 +1,16 @@
+# NEVER on a server. Trying the demo package on a laptop that already runs the development stack
+# (infra/compose, project coop-erp, which holds 80-ish ports of its own): Caddy publishes only
+# 8443 instead of 80 and 443, with Caddy's own certificate for localhost.
+#
+#   COOP_ERP_DIR=D:/tmp/coop-erp-deploytest COOP_ERP_PROJECT=coop-erp-deploytest \
+#   COOP_ERP_COMPOSE_EXTRA=compose.local-test.yml \
+#     infra/deploy/bootstrap.sh --no-system --no-pull --size small --domain localhost:8443 --tls internal
+#
+# Set REGISTRY and IMAGE_TAG in that folder's .env to locally built images first (or let them
+# pull from GHCR). Tear down with:
+#   docker compose -p coop-erp-deploytest down -v
+
+services:
+  caddy:
+    ports: !override
+      - "8443:8443"
