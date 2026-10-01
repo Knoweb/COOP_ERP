@@ -14,6 +14,7 @@ import "./catalogue.css";
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
 import { chipOf, EMPTY_FORM, errorText, formOf, languageOf, nameIn, requestOf, type SkuForm } from "./skuView";
+import type { AttachImageRequest } from "./catalogueApi";
 
 const SYMBOLOGIES: Symbology[] = ["EAN13", "EAN8", "UPCA", "GS1_128", "GS1_DATAMATRIX", "GS1_QR", "INTERNAL"];
 
@@ -40,6 +41,7 @@ export function SkuPage() {
   const canEditLocal = useHasPermission("cat.sku.create_local");
   const canShare = useHasPermission("cat.sku.create");
   const canBarcode = useHasPermission("cat.barcode.manage");
+  const canImage = useHasPermission("cat.image.manage");
   const saveKey = useIdempotencyKey();
   const activateKey = useIdempotencyKey();
 
@@ -136,6 +138,7 @@ export function SkuPage() {
 
       <Conversions skuId={skuId} canEdit={canEditLocal && item.status !== "INACTIVE"} baseUom={item.baseUomCode} />
       <Barcodes skuId={skuId} canEdit={canBarcode && (item.status === "LOCAL" || item.status === "SHARED")} baseUom={item.baseUomCode} />
+      <Images skuId={skuId} canEdit={canImage && (item.status === "LOCAL" || item.status === "SHARED")} />
       <Batches skuId={skuId} />
     </main>
   );
@@ -347,6 +350,148 @@ function Batches({ skuId }: { skuId: string }) {
             ))}
           </tbody>
         </table>
+      )}
+    </section>
+  );
+}
+
+function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
+  const t = useT();
+  const api = useCatalogueApi();
+  const queryClient = useQueryClient();
+  const key = useIdempotencyKey();
+  const [file, setFile] = useState<File | null>(null);
+  const [barcode, setBarcode] = useState("");
+  const [uploadStatus, setUploadStatus] = useState<"IDLE" | "HASHING" | "GETTING_URL" | "UPLOADING" | "DONE" | "ERROR">("IDLE");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [lastUploadedUrl, setLastUploadedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const barcodes = useQuery({ queryKey: ["catalogue", "barcodes", skuId], queryFn: () => api.barcodes(skuId) });
+  const images = useQuery({ queryKey: ["catalogue", "images", skuId], queryFn: () => api.images(skuId) });
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!file) return;
+
+    try {
+      setUploadStatus("HASHING");
+      setErrorMsg("");
+      const buffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const sha256Hex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+      setUploadStatus("GETTING_URL");
+      const req: AttachImageRequest = {
+        contentType: file.type,
+        contentLength: file.size,
+        sha256Hex
+      };
+      if (barcode) {
+        req.barcode = barcode;
+      }
+      const response = await api.attachImage(skuId, req, key.current());
+
+      setUploadStatus("UPLOADING");
+      const putResp = await fetch(response.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file
+      });
+      if (!putResp.ok) {
+        throw new Error("Upload to storage failed");
+      }
+
+      setUploadStatus("DONE");
+      key.next();
+      setLastUploadedUrl(previewUrl);
+      setFile(null);
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "images", skuId] });
+    } catch (err) {
+      setUploadStatus("ERROR");
+      setErrorMsg(err instanceof ApiProblem ? errorText(err, t("catalogue.error.generic").text) : t("catalogue.error.generic").text);
+    }
+  };
+
+  return (
+    <section className="catalogue-section">
+      <h2>{t("catalogue.images.title").text}</h2>
+      
+      {images.data && images.data.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(calc(var(--space-8) * 2), 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+          {images.data.map(img => (
+            <div key={img.imageId} style={{ border: 'var(--border-width) solid var(--color-border)', borderRadius: 'var(--radius-2)', padding: 'var(--space-2)', textAlign: 'center' }}>
+              <img 
+                src={img.imageUrl || img.thumbUrl} 
+                alt="SKU" 
+                style={{ width: '100%', height: 120, objectFit: 'contain', marginBottom: 'var(--space-2)' }} 
+              />
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                {img.barcode || t("catalogue.images.no_barcode")?.text || "No barcode"}
+              </div>
+              <StateChip 
+                state={img.status === "ACTIVE" ? "issued" : img.status === "FAILED" || img.status === "RETIRED" ? "void" : "draft"} 
+                label={t(`catalogue.images.status.${img.status.toLowerCase()}`)?.text || img.status} 
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canEdit ? (
+        <form onSubmit={submit} className="catalogue-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+            <label className="catalogue-form-field">
+              {t("catalogue.images.file").text}
+              <input type="file" accept="image/jpeg, image/png" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </label>
+            <label className="catalogue-form-field">
+              {t("catalogue.field.barcode").text}
+              <select value={barcode} onChange={(e) => setBarcode(e.target.value)}>
+                <option value="">{t("catalogue.field.choose").text}</option>
+                {(barcodes.data ?? []).filter(b => b.status === "ACTIVE").map((b) => (
+                  <option key={b.barcode} value={b.barcode}>{b.barcode}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div>
+            <button type="submit" disabled={!file || uploadStatus === "HASHING" || uploadStatus === "GETTING_URL" || uploadStatus === "UPLOADING"}>
+              {t("catalogue.images.upload").text}
+            </button>
+            <span style={{ marginLeft: 'var(--space-3)' }}>
+              {uploadStatus === "HASHING" && t("catalogue.images.status.hashing").text}
+              {uploadStatus === "GETTING_URL" && t("catalogue.images.status.getting_url").text}
+              {uploadStatus === "UPLOADING" && t("catalogue.images.status.uploading").text}
+              {uploadStatus === "DONE" && <span style={{ color: "var(--color-success)" }}>{t("catalogue.images.status.done").text}</span>}
+              {uploadStatus === "ERROR" && <span style={{ color: "var(--color-error)" }}>{errorMsg}</span>}
+            </span>
+          </div>
+          {(previewUrl || lastUploadedUrl) && (
+            <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'center' }}>
+              <img 
+                src={(previewUrl || lastUploadedUrl)!} 
+                alt="Upload preview" 
+                style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 'var(--radius-3)', border: 'var(--border-width) solid var(--color-border)' }} 
+              />
+            </div>
+          )}
+        </form>
+      ) : (
+        <p>{t("catalogue.images.empty")?.text ?? "Images can be attached by the SKU owner."}</p>
       )}
     </section>
   );
