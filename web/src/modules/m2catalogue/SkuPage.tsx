@@ -431,13 +431,13 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
       <h2>{t("catalogue.images.title").text}</h2>
       
       {images.data && images.data.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(calc(var(--space-8) * 2), 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
           {images.data.map(img => (
-            <div key={img.imageId} style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-2)', padding: 'var(--space-2)', textAlign: 'center' }}>
+            <div key={img.imageId} style={{ border: 'var(--border-width) solid var(--color-border)', borderRadius: 'var(--radius-2)', padding: 'var(--space-2)', textAlign: 'center' }}>
               <img 
                 src={img.imageUrl || img.thumbUrl} 
                 alt="SKU" 
-                style={{ width: '100%', height: '120px', objectFit: 'contain', marginBottom: 'var(--space-2)' }} 
+                style={{ width: '100%', height: 120, objectFit: 'contain', marginBottom: 'var(--space-2)' }} 
               />
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
                 {img.barcode || t("catalogue.images.no_barcode")?.text || "No barcode"}
@@ -485,7 +485,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
               <img 
                 src={(previewUrl || lastUploadedUrl)!} 
                 alt="Upload preview" 
-                style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: 'var(--radius-3)', border: '1px solid var(--color-border)' }} 
+                style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 'var(--radius-3)', border: 'var(--border-width) solid var(--color-border)' }} 
               />
             </div>
           )}
