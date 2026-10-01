@@ -168,7 +168,7 @@ services:
 
   # Catches every e-mail the notification service sends; nothing leaves the machine.
   mailpit:
-    image: axllent/mailpit:v1.31.1
+    image: axllent/mailpit:v1.31.3
     ports:
       - "1025:1025"          # SMTP
       - "8025:8025"          # web inbox
