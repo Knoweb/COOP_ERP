@@ -343,7 +343,7 @@ jobs:
       # task a laptop runs after `make test-int` picks up three files here instead of one,
       # with no task change needed.
       - name: Download every shard's coverage data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           pattern: jacoco-exec-*
           path: backend/app/build/jacoco
