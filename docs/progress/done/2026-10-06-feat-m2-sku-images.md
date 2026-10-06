@@ -1,0 +1,1 @@
+- **M2-06 SKU images**: Implemented image upload and retirement with temporary `sessionStorage` preview for instant UX in the web client, and gracefully handled missing or unverified attachments in `ImageController`.

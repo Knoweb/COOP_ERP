@@ -14,6 +14,7 @@ import "./catalogue.css";
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
 import { chipOf, EMPTY_FORM, errorText, formOf, languageOf, nameIn, requestOf, type SkuForm } from "./skuView";
+import type { AttachImageRequest } from "./catalogueApi";
 
 const SYMBOLOGIES: Symbology[] = ["EAN13", "EAN8", "UPCA", "GS1_128", "GS1_DATAMATRIX", "GS1_QR", "INTERNAL"];
 
@@ -40,6 +41,7 @@ export function SkuPage() {
   const canEditLocal = useHasPermission("cat.sku.create_local");
   const canShare = useHasPermission("cat.sku.create");
   const canBarcode = useHasPermission("cat.barcode.manage");
+  const canImage = useHasPermission("cat.image.manage");
   const saveKey = useIdempotencyKey();
   const activateKey = useIdempotencyKey();
 
@@ -136,6 +138,7 @@ export function SkuPage() {
 
       <Conversions skuId={skuId} canEdit={canEditLocal && item.status !== "INACTIVE"} baseUom={item.baseUomCode} />
       <Barcodes skuId={skuId} canEdit={canBarcode && (item.status === "LOCAL" || item.status === "SHARED")} baseUom={item.baseUomCode} />
+      <Images skuId={skuId} canEdit={canImage && (item.status === "LOCAL" || item.status === "SHARED")} />
       <Batches skuId={skuId} />
     </main>
   );
@@ -348,6 +351,242 @@ function Batches({ skuId }: { skuId: string }) {
           </tbody>
         </table>
       )}
+    </section>
+  );
+}
+
+function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
+  const t = useT();
+  const api = useCatalogueApi();
+  const queryClient = useQueryClient();
+  const key = useIdempotencyKey();
+  
+  const [uploadStatus, setUploadStatus] = useState<"IDLE" | "HASHING" | "GETTING_URL" | "UPLOADING" | "DONE" | "ERROR">("IDLE");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [barcode, setBarcode] = useState("");
+  
+  // Initialize from sessionStorage if available to persist preview across refreshes
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(() => {
+    return sessionStorage.getItem(`sku_preview_${skuId}`);
+  });
+  
+  const barcodes = useQuery({ queryKey: ["catalogue", "barcodes", skuId], queryFn: () => api.barcodes(skuId) });
+  const images = useQuery({ queryKey: ["catalogue", "images", skuId], queryFn: () => api.images(skuId) });
+
+  const retire = useMutation({
+    mutationFn: (imageId: string) => api.retireImage(skuId, imageId, key.current()),
+    onSuccess: () => {
+      key.next();
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "images", skuId] });
+      setLocalPreviewUrl(null);
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
+    },
+    onError: (err) => {
+      forgetKeyOnProblem(key)(err);
+      if (err instanceof ApiProblem) {
+        alert(errorText(err, "Failed to remove image"));
+      } else {
+        alert("Failed to remove image");
+      }
+    }
+  });
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    
+    // Set immediate local preview and save to sessionStorage as data URL
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setLocalPreviewUrl(dataUrl);
+      try {
+        sessionStorage.setItem(`sku_preview_${skuId}`, dataUrl);
+      } catch {
+        // Ignore quota exceeded errors
+      }
+    };
+    reader.readAsDataURL(selectedFile);
+    
+    try {
+      setUploadStatus("HASHING");
+      setErrorMsg("");
+      const buffer = await selectedFile.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const sha256Hex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+      setUploadStatus("GETTING_URL");
+      const req: AttachImageRequest = {
+        contentType: selectedFile.type,
+        contentLength: selectedFile.size,
+        sha256Hex
+      };
+      
+      if (barcode) {
+        req.barcode = barcode;
+      }
+      
+      const response = await api.attachImage(skuId, req, key.current());
+
+      setUploadStatus("UPLOADING");
+      const putResp = await fetch(response.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": selectedFile.type,
+        },
+        body: selectedFile
+      });
+      if (!putResp.ok) {
+        throw new Error("Upload to storage failed");
+      }
+
+      setUploadStatus("DONE");
+      key.next();
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "images", skuId] });
+      
+      setTimeout(() => {
+        setUploadStatus("IDLE");
+      }, 3000);
+    } catch (err) {
+      setUploadStatus("ERROR");
+      setLocalPreviewUrl(null); // Clear preview on error
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
+      setErrorMsg(err instanceof ApiProblem ? errorText(err, t("catalogue.error.generic").text) : t("catalogue.error.generic").text);
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const activeImage = images.data?.find(img => img.status === "ACTIVE" || img.status === "PENDING");
+  
+  // Clear sessionStorage if the image is actually active from the backend
+  if (activeImage?.imageUrl || activeImage?.thumbUrl) {
+    if (localPreviewUrl) {
+      setLocalPreviewUrl(null);
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
+    }
+  }
+  
+  // Decide which URL to show: either local preview (highest priority right after upload) or the backend URL
+  const displayUrl = localPreviewUrl || activeImage?.imageUrl || activeImage?.thumbUrl;
+  
+  return (
+    <section className="catalogue-section">
+      <h2 className="catalogue-section-title">
+        Item Details
+      </h2>
+      
+      <div className="catalogue-image-layout">
+        {/* Left Card: The Image itself */}
+        <div className="catalogue-image-card">
+        <h3 className="catalogue-image-title">
+          Item Image
+        </h3>
+        
+        <div className="catalogue-image-box">
+          {activeImage || localPreviewUrl ? (
+            displayUrl ? (
+              <img 
+                src={displayUrl} 
+                alt="SKU" 
+                className="catalogue-image-img" 
+              />
+            ) : (
+              <div className="catalogue-image-processing">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="catalogue-image-processing-icon">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <div className="catalogue-image-processing-text">Processing image...</div>
+                <div className="catalogue-image-processing-subtext">Please wait up to 15 minutes.</div>
+              </div>
+            )
+          ) : (
+            <div className="catalogue-image-no-image">No image uploaded</div>
+          )}
+        </div>
+        
+        {canEdit && (
+          <div className="catalogue-image-actions">
+            <label className={`catalogue-image-btn catalogue-image-btn-primary ${(uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR") ? "catalogue-image-btn-primary-disabled" : ""}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              {activeImage ? "Change Image" : "Upload Image"}
+              <input 
+                type="file" 
+                accept="image/jpeg, image/png" 
+                style={{ display: 'none' }} 
+                onChange={handleFileChange}
+                disabled={uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR"}
+              />
+            </label>
+            
+            {activeImage && (
+              <button 
+                type="button"
+                onClick={() => retire.mutate(activeImage.imageId)}
+                disabled={retire.isPending}
+                className={`catalogue-image-btn catalogue-image-btn-error`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+                Remove
+              </button>
+            )}
+          </div>
+        )}
+
+        {uploadStatus !== "IDLE" && uploadStatus !== "DONE" && (
+          <div className="catalogue-image-status">
+            {uploadStatus === "HASHING" && t("catalogue.images.status.hashing").text}
+            {uploadStatus === "GETTING_URL" && t("catalogue.images.status.getting_url").text}
+            {uploadStatus === "UPLOADING" && t("catalogue.images.status.uploading").text}
+            {uploadStatus === "ERROR" && <span className="catalogue-image-status-error">{errorMsg}</span>}
+          </div>
+        )}
+        
+        <div className="catalogue-image-formats">
+          Supported formats: JPG, PNG (Max 2MB)
+        </div>
+      </div>
+      
+      {/* Right panel: Upload Settings (Barcode) */}
+      {canEdit && (
+        <div className="catalogue-image-settings-panel">
+            <h3 className="catalogue-image-settings-title">
+              Upload Settings
+            </h3>
+            <p className="catalogue-image-settings-desc">
+              Select a barcode before uploading an image if the image is specific to a variant.
+            </p>
+            
+            <label className="catalogue-form-field">
+              <span className="catalogue-image-settings-label">
+                {t("catalogue.field.barcode").text}
+              </span>
+              <select 
+                value={barcode} 
+                onChange={(e) => setBarcode(e.target.value)}
+                className="catalogue-image-settings-select"
+              >
+                <option value="">{t("catalogue.field.choose").text}</option>
+                {(barcodes.data ?? []).filter(b => b.status === "ACTIVE").map((b) => (
+                  <option key={b.barcode} value={b.barcode}>{b.barcode}</option>
+                ))}
+              </select>
+            </label>
+        </div>
+      )}
+      
+      </div>
     </section>
   );
 }
