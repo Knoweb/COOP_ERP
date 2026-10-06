@@ -8,7 +8,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useCatalogueApi, type SkuStatus } from "./catalogueApi";
 import { chipOf, errorText, languageOf, nameIn } from "./skuView";
-import css from "./catalogue.css";
+import "./catalogue.css";
 
 const STATUSES: SkuStatus[] = ["DRAFT", "LOCAL", "SHARED", "INACTIVE"];
 
@@ -37,19 +37,19 @@ function SkuThumbnail({ skuId }: { skuId: string }) {
   const displayUrl = localPreviewUrl || activeImage?.thumbUrl || activeImage?.imageUrl;
 
   if (images.isLoading && !displayUrl) {
-    return <div className={css.catalogueThumbnailPlaceholder} />;
+    return <div className="catalogue-thumbnail-placeholder" />;
   }
 
   if (displayUrl) {
     return (
-      <div className={css.catalogueThumbnailContainer}>
-        <img src={displayUrl} alt="Thumbnail" className={css.catalogueThumbnailImage} />
+      <div className="catalogue-thumbnail-container">
+        <img src={displayUrl} alt="Thumbnail" className="catalogue-thumbnail-image" />
       </div>
     );
   }
 
   return (
-    <div className={css.catalogueThumbnailPlaceholder}>
+    <div className="catalogue-thumbnail-placeholder">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
         <circle cx="8.5" cy="8.5" r="1.5"></circle>

@@ -473,43 +473,43 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   
   return (
     <section className="catalogue-section">
-      <h2 className={css.catalogueSectionTitle}>
+      <h2 className="catalogue-section-title">
         Item Details
       </h2>
       
-      <div className={css.catalogueImageLayout}>
+      <div className="catalogue-image-layout">
         {/* Left Card: The Image itself */}
-        <div className={css.catalogueImageCard}>
-        <h3 className={css.catalogueImageTitle}>
+        <div className="catalogue-image-card">
+        <h3 className="catalogue-image-title">
           Item Image
         </h3>
         
-        <div className={css.catalogueImageBox}>
+        <div className="catalogue-image-box">
           {activeImage || localPreviewUrl ? (
             displayUrl ? (
               <img 
                 src={displayUrl} 
                 alt="SKU" 
-                className={css.catalogueImageImg} 
+                className="catalogue-image-img" 
               />
             ) : (
-              <div className={css.catalogueImageProcessing}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={css.catalogueImageProcessingIcon}>
+              <div className="catalogue-image-processing">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="catalogue-image-processing-icon">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <div className={css.catalogueImageProcessingText}>Processing image...</div>
-                <div className={css.catalogueImageProcessingSubtext}>Please wait up to 15 minutes.</div>
+                <div className="catalogue-image-processing-text">Processing image...</div>
+                <div className="catalogue-image-processing-subtext">Please wait up to 15 minutes.</div>
               </div>
             )
           ) : (
-            <div className={css.catalogueImageNoImage}>No image uploaded</div>
+            <div className="catalogue-image-no-image">No image uploaded</div>
           )}
         </div>
         
         {canEdit && (
-          <div className={css.catalogueImageActions}>
-            <label className={`${css.catalogueImageBtn} ${css.catalogueImageBtnPrimary} ${(uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR") ? css.catalogueImageBtnPrimaryDisabled : ""}`}>
+          <div className="catalogue-image-actions">
+            <label className={`catalogue-image-btn catalogue-image-btn-primary ${(uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR") ? "catalogue-image-btn-primary-disabled" : ""}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -530,7 +530,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
                 type="button"
                 onClick={() => retire.mutate(activeImage.imageId)}
                 disabled={retire.isPending}
-                className={`${css.catalogueImageBtn} ${css.catalogueImageBtnError}`}
+                className={`catalogue-image-btn catalogue-image-btn-error`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/>
@@ -545,37 +545,37 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
         )}
 
         {uploadStatus !== "IDLE" && uploadStatus !== "DONE" && (
-          <div className={css.catalogueImageStatus}>
+          <div className="catalogue-image-status">
             {uploadStatus === "HASHING" && t("catalogue.images.status.hashing").text}
             {uploadStatus === "GETTING_URL" && t("catalogue.images.status.getting_url").text}
             {uploadStatus === "UPLOADING" && t("catalogue.images.status.uploading").text}
-            {uploadStatus === "ERROR" && <span className={css.catalogueImageStatusError}>{errorMsg}</span>}
+            {uploadStatus === "ERROR" && <span className="catalogue-image-status-error">{errorMsg}</span>}
           </div>
         )}
         
-        <div className={css.catalogueImageFormats}>
+        <div className="catalogue-image-formats">
           Supported formats: JPG, PNG (Max 2MB)
         </div>
       </div>
       
       {/* Right panel: Upload Settings (Barcode) */}
       {canEdit && (
-        <div className={css.catalogueImageSettingsPanel}>
-            <h3 className={css.catalogueImageSettingsTitle}>
+        <div className="catalogue-image-settings-panel">
+            <h3 className="catalogue-image-settings-title">
               Upload Settings
             </h3>
-            <p className={css.catalogueImageSettingsDesc}>
+            <p className="catalogue-image-settings-desc">
               Select a barcode before uploading an image if the image is specific to a variant.
             </p>
             
-            <label className={css.catalogueFormField}>
-              <span className={css.catalogueImageSettingsLabel}>
+            <label className="catalogue-form-field">
+              <span className="catalogue-image-settings-label">
                 {t("catalogue.field.barcode").text}
               </span>
               <select 
                 value={barcode} 
                 onChange={(e) => setBarcode(e.target.value)}
-                className={css.catalogueImageSettingsSelect}
+                className="catalogue-image-settings-select"
               >
                 <option value="">{t("catalogue.field.choose").text}</option>
                 {(barcodes.data ?? []).filter(b => b.status === "ACTIVE").map((b) => (
