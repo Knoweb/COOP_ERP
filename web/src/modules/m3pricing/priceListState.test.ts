@@ -20,7 +20,9 @@ const REASONS = [
   "m3.price_list.line.above_control_price",
   "m3.price_list.line.above_shelf_mrp",
   "m3.price_list.line.retail_precision",
-  "m3.price_list.line.tier_not_allowed"
+  "m3.price_list.line.tier_not_allowed",
+  // CR-23A-1: no free goods through a shelf price
+  "m3.price_list.line.price_zero"
 ];
 
 // The enums of the slice the screens turn into message ids: every value needs its text.

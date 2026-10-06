@@ -42,6 +42,13 @@ audit_event_types:
     offline_capturable: false
     description_en: Gazetted control price entered
 
+  # CR-23A-1 (wave 2): a ceiling entered to take effect before today, to the gazette's own
+  # date; carries the superseded ceiling's end date as it was before the entry.
+  - code: CONTROL_PRICE_RETROSPECTIVE
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Gazetted control price entered with an effective date in the past
+
   - code: CONTROL_PRICE_RESCINDED
     severity: INFO
     offline_capturable: false

@@ -48,6 +48,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Every guard of the four relationship handlers as a failing case with its message id (21A
@@ -76,6 +77,7 @@ class RelationshipHandlersTest {
     private final ConfigRegistry config = mock(ConfigRegistry.class);
     private final TradePriceListCheck priceLists = mock(TradePriceListCheck.class);
     private final PermissionResolver permissions = mock(PermissionResolver.class);
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final AuditFacade audit = mock(AuditFacade.class);
     private final EventPublisher events = mock(EventPublisher.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -87,10 +89,10 @@ class RelationshipHandlersTest {
 
     @BeforeEach
     void setUp() {
-        open = new OpenTradingRelationshipHandler(repository, standing, config, audit, events);
-        activate = new ActivateRelationshipHandler(repository, priceLists, audit, events);
-        amend = new AmendRelationshipTermsHandler(
-                repository, priceLists, Optional.of(permissions), config, clock, ZONE, audit, events);
+        CreditLimitGate gate = new CreditLimitGate(permissions, config, clock);
+        open = new OpenTradingRelationshipHandler(repository, standing, gate, config, audit, events);
+        activate = new ActivateRelationshipHandler(repository, priceLists, gate, jdbc, audit, events);
+        amend = new AmendRelationshipTermsHandler(repository, priceLists, gate, jdbc, clock, ZONE, audit, events);
         suspend = new SuspendRelationshipHandler(repository, clock, ZONE, audit, events);
 
         when(standing.of(FEDERATION)).thenReturn(Optional.of(new Standing("FEDERATION", "ACTIVE")));
@@ -101,8 +103,7 @@ class RelationshipHandlersTest {
         when(repository.lockForUpdate(any())).thenAnswer(call -> call.getArgument(0));
         when(priceLists.refusal(any(), any(), any())).thenReturn(Optional.empty());
         when(permissions.allows(any(), anyString())).thenReturn(true);
-        when(config.getDuration(eq(AmendRelationshipTermsHandler.MFA_MAX_AGE), any(), any()))
-                .thenReturn(Duration.ofMinutes(10));
+        when(config.getDuration(eq(CreditLimitGate.MFA_MAX_AGE), any(), any())).thenReturn(Duration.ofMinutes(10));
     }
 
     // ---- OpenTradingRelationship -----------------------------------------------------------
@@ -133,6 +134,37 @@ class RelationshipHandlersTest {
             refused(
                     () -> open.handle(openTo(SOCIETY, APRIL, null), atShop(DISTRIBUTOR)),
                     "m1.relationship.seller_scope_required");
+        }
+
+        // CR-21A-7 (M1A-06): a credit limit is gated where it is set.
+
+        @Test
+        void aLimitWithTheCreditLimitPermissionAndAFreshSecondFactorIsOpened() {
+            open.handle(openWithLimit(SOCIETY), withFreshMfa(DISTRIBUTOR));
+
+            verify(permissions).allows(any(), eq("bil.creditlimit.change"));
+            verify(audit).record(eq("RELATIONSHIP_OPENED"), any(), eq(null), any(), any());
+        }
+
+        @Test
+        void aLimitWithoutTheCreditLimitPermissionIsRefused() {
+            when(permissions.allows(any(), eq("bil.creditlimit.change"))).thenReturn(false);
+            refused(
+                    () -> open.handle(openWithLimit(SOCIETY), withFreshMfa(DISTRIBUTOR)),
+                    "m1.relationship.credit_limit_permission_required");
+        }
+
+        @Test
+        void aLimitWithoutAFreshSecondFactorIsRefused() {
+            refused(() -> open.handle(openWithLimit(SOCIETY), own(DISTRIBUTOR)), "mfa.required");
+            ScopeContext stale = scope(DISTRIBUTOR, null, PolicyClass.OWN, NOW.minus(Duration.ofMinutes(11)));
+            refused(() -> open.handle(openWithLimit(SOCIETY), stale), "mfa.required");
+        }
+
+        @Test
+        void termsWithoutALimitNeedNeitherTheLimitPermissionNorTheSecondFactor() {
+            open.handle(openTo(SOCIETY, APRIL, null), own(DISTRIBUTOR));
+            verify(permissions, never()).allows(any(), anyString());
         }
 
         @Test
@@ -255,6 +287,54 @@ class RelationshipHandlersTest {
             refused(
                     () -> activate.handle(new ActivateRelationship(UUID.randomUUID()), own(DISTRIBUTOR)),
                     "m1.relationship.not_found");
+        }
+
+        // CR-21A-7 (M1A-06) and M8 D6: a draft with a limit is gated, and the limit is an event.
+
+        @Test
+        void aDraftWithALimitPublishesTheOpeningLimitAndMarksThePair() {
+            Relationship draft = draftWithLimit(DISTRIBUTOR, SOCIETY);
+            ScopeContext seller = withFreshMfa(DISTRIBUTOR);
+
+            activate.handle(new ActivateRelationship(draft.getId()), seller);
+
+            assertThat(draft.isActive()).isTrue();
+            verify(jdbc).update(RelationshipRules.MARK_LIMIT_ANNOUNCED, DISTRIBUTOR, SOCIETY, draft.getId());
+            verify(audit).record(eq("RELATIONSHIP_ACTIVATED"), any(), any(), any(), eq(seller));
+            verify(audit).record(eq("CREDIT_LIMIT_CHANGED"), any(), any(), any(), eq(seller));
+            ArgumentCaptor<DomainEvent> published = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(events, times(2)).publish(published.capture());
+            assertThat(published.getAllValues().get(1))
+                    .isEqualTo(new CreditLimitChanged(
+                            draft.getId(), null, null, draft.creditLimit(), APRIL, DISTRIBUTOR, SOCIETY));
+        }
+
+        @Test
+        void aDraftWithALimitIsRefusedWithoutTheCreditLimitPermission() {
+            Relationship draft = draftWithLimit(DISTRIBUTOR, SOCIETY);
+            when(permissions.allows(any(), eq("bil.creditlimit.change"))).thenReturn(false);
+            refused(
+                    () -> activate.handle(new ActivateRelationship(draft.getId()), withFreshMfa(DISTRIBUTOR)),
+                    "m1.relationship.credit_limit_permission_required");
+            assertThat(draft.isDraft()).isTrue();
+            verifyNoInteractions(jdbc);
+        }
+
+        @Test
+        void aDraftWithALimitIsRefusedWithoutAFreshSecondFactor() {
+            Relationship draft = draftWithLimit(DISTRIBUTOR, SOCIETY);
+            refused(() -> activate.handle(new ActivateRelationship(draft.getId()), own(DISTRIBUTOR)), "mfa.required");
+            assertThat(draft.isDraft()).isTrue();
+        }
+
+        @Test
+        void aDraftWithoutALimitPublishesNoLimitAndMarksNothing() {
+            Relationship draft = draft(DISTRIBUTOR, SOCIETY);
+
+            activate.handle(new ActivateRelationship(draft.getId()), own(DISTRIBUTOR));
+
+            verify(events, times(1)).publish(any());
+            verifyNoInteractions(jdbc);
         }
 
         @Test
@@ -450,8 +530,8 @@ class RelationshipHandlersTest {
             AmendRelationshipTermsHandler lateEvening = new AmendRelationshipTermsHandler(
                     repository,
                     priceLists,
-                    Optional.of(permissions),
-                    config,
+                    new CreditLimitGate(permissions, config, clock),
+                    jdbc,
                     Clock.fixed(Instant.parse("2026-06-14T20:00:00Z"), ZoneOffset.UTC),
                     ZONE,
                     audit,
@@ -626,16 +706,29 @@ class RelationshipHandlersTest {
         }
 
         @Test
-        void withoutAPermissionResolverTheLimitPermissionIsNotYetChecked() {
-            // K-03b is not on main: no resolver bean exists, and the check is skipped rather than
-            // refusing every limit change. The second factor is still required.
-            AmendRelationshipTermsHandler withoutResolver = new AmendRelationshipTermsHandler(
-                    repository, priceLists, Optional.empty(), config, clock, ZONE, audit, events);
+        void aLimitChangeMarksThePairAnnouncedSoTheBackfillLeavesIt() {
             Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
 
-            withoutResolver.handle(limitTo(current, "5000000", JULY, "X"), withFreshMfa(DISTRIBUTOR));
+            UUID next = amend.handle(limitTo(current, "5000000", JULY, "X"), withFreshMfa(DISTRIBUTOR));
 
-            verify(events).publish(any(CreditLimitChanged.class));
+            verify(jdbc).update(RelationshipRules.MARK_LIMIT_ANNOUNCED, DISTRIBUTOR, SOCIETY, next);
+            ArgumentCaptor<DomainEvent> published = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(events, times(2)).publish(published.capture());
+            assertThat(published.getAllValues().get(1)).isInstanceOfSatisfying(CreditLimitChanged.class, e -> {
+                assertThat(e.sellerEntityId()).isEqualTo(DISTRIBUTOR);
+                assertThat(e.buyerEntityId()).isEqualTo(SOCIETY);
+            });
+        }
+
+        @Test
+        void anAmendmentThatKeepsTheLimitMarksNothing() {
+            Relationship current = found(active(DISTRIBUTOR, SOCIETY, APRIL, null));
+
+            amend.handle(
+                    new AmendRelationshipTerms(current.getId(), JULY, null, null, 45, null, null, null, "TERMS", null),
+                    own(DISTRIBUTOR));
+
+            verifyNoInteractions(jdbc);
         }
     }
 
@@ -780,9 +873,14 @@ class RelationshipHandlersTest {
         verifyNoInteractions(audit, events);
     }
 
+    /** Terms with no credit limit: the limit's gate (CR-21A-7) has tests of its own. */
     private static OpenTradingRelationship openTo(UUID buyer, LocalDate from, LocalDate to) {
+        return new OpenTradingRelationship(buyer, PRICE_LIST, null, 30, null, null, null, from, to);
+    }
+
+    private static OpenTradingRelationship openWithLimit(UUID buyer) {
         return new OpenTradingRelationship(
-                buyer, PRICE_LIST, new BigDecimal("3000000.00"), 30, null, null, null, from, to);
+                buyer, PRICE_LIST, new BigDecimal("3000000.00"), 30, null, null, null, APRIL, null);
     }
 
     private static AmendRelationshipTerms limitTo(Relationship r, String limit, LocalDate from, String reason) {
@@ -794,7 +892,13 @@ class RelationshipHandlersTest {
         return new Relationship.Terms(priceList, limit, paymentDays, (short) 7, (short) 24, "FCFS");
     }
 
+    /** A draft with no credit limit: the limit's gate (CR-21A-7) has tests of its own. */
     private Relationship draft(UUID seller, UUID buyer) {
+        return found(
+                Relationship.open(UUID.randomUUID(), seller, buyer, terms(PRICE_LIST, null, (short) 30), APRIL, null));
+    }
+
+    private Relationship draftWithLimit(UUID seller, UUID buyer) {
         return found(Relationship.open(
                 UUID.randomUUID(),
                 seller,
