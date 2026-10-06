@@ -120,6 +120,29 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
                 .isFalse();
     }
 
+    /**
+     * The sync quarantine (kernel V0084; CR-32-1 item 2): app_rw may write the four resolution
+     * columns and nothing else, the raw event included (only kernel.sync_quarantine_drop_raw nulls
+     * it), and never delete a row: a quarantined fact is resolved, never purged.
+     */
+    @Test
+    void theQuarantineTakesOnlyItsResolutionColumns() {
+        JdbcTemplate db = superuserJdbc();
+        assertThat(problemsOf(db)).noneMatch(problem -> problem.startsWith("kernel.sync_quarantine:"));
+        List<String> updatable = db.queryForList(
+                """
+                select column_name from information_schema.column_privileges
+                 where table_schema = 'kernel' and table_name = 'sync_quarantine'
+                   and grantee = 'app_rw' and privilege_type = 'UPDATE'
+                 order by column_name
+                """,
+                String.class);
+        assertThat(updatable).containsExactly("resolution", "resolution_reason", "resolved_at", "resolved_by_user_id");
+        assertThat(db.queryForObject(
+                        "select has_table_privilege('app_rw', 'kernel.sync_quarantine', 'DELETE')", Boolean.class))
+                .isFalse();
+    }
+
     /** Proof that the rules bite: tables that break each of them are reported, by name. */
     @Test
     void aTableThatBreaksTheRulesIsReported() {

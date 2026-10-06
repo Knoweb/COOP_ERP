@@ -16,9 +16,10 @@
 #     sync.device_token_not_allowed). So x-permission on a device operation is not a
 #     permission of the catalogue that a role could hold: "sync.device" names the device
 #     principal itself. The enrolment exchange is called before the device holds any token;
-#     its enrolment code is its credential ("sync.enrolment_code"). Two operations are an
+#     its enrolment code is its credential ("sync.enrolment_code"). Three operations are an
 #     administrator's, with a user token and a permission of the catalogue: issuing an
-#     enrolment code and the sequence reset of doc 32 section 8 (sys.device.enrol).
+#     enrolment code and the sequence reset of doc 32 section 8 (sys.device.enrol), and
+#     resolving a quarantined event (sync.quarantine.resolve; wave 2, CR-32-1 item 2).
 #   - Mutating operations carry the Idempotency-Key like every other (the till sends the
 #     batch_id, or a fresh UUID); the effect is idempotent by database state as doc 32 S3
 #     requires, so any instance answers a resend the same way.
@@ -108,13 +109,14 @@ paths:
         it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap
         (params.expected_seq: resend from there), 409 sync.batch_in_flight
         (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent
-        (the events are not first_seq..last_seq), 426 sync.app_below_floor (the application is
-        below sync.app_version_floor and its grace, sync.app_version_floor.grace, is over;
-        params.floor and params.grace_ended_at; within the grace the batch is taken and the
-        acknowledgement carries a FLOOR_NOTICE, doc 31 section 6), 429
+        (the events are not first_seq..last_seq), 429
         sync.rate_limited (params.retry_after in seconds: the device's batches per minute or
         bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403
-        for the device (see the Refused response).
+        for the device (see the Refused response). A device below the application floor
+        (sync.app_version_floor) is never refused here: facts are always accepted (CR-30-1
+        point 4, CR-32-1 item 1), and the acknowledgement carries a FLOOR_NOTICE, within the
+        grace (sync.app_version_floor.grace) and after it. A plain body is accepted and counted
+        like a gzip one (at most coop-erp.sync.max-uncompressed-bytes read; 413 beyond).
       x-permission: sync.device
       parameters:
         - $ref: '#/components/parameters/DeviceId'
@@ -134,7 +136,6 @@ paths:
         '403': { $ref: '#/components/responses/Refused' }
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/Refused' }
-        '426': { $ref: '#/components/responses/Refused' }
         '429': { $ref: '#/components/responses/Refused' }
   /v1/sync/devices/{device_id}/sequence-reset:
     post:
@@ -173,6 +174,43 @@ paths:
         '403': { $ref: '#/components/responses/Refused' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/sync/quarantine/{quarantine_id}/resolve:
+    post:
+      tags: [Sync]
+      operationId: resolveQuarantine
+      summary: Mark a quarantined till event repaired or discarded (an administrator, CR-32-1 item 2)
+      description: >
+        A quarantined event (doc 32 sections 3.3 step 6 and 7) is a fact the till sent that central
+        could not accept; it is never purged by time (S4). An administrator of the device's
+        entity, with a user token, resolves it once: REPAIRED when the till resent a correct
+        copy (doc 32 section 8), DISCARDED when nothing will; with a reason code and, when
+        needed, a text. The row stays as the record that a fact was refused and why; its raw
+        event is removed sync.quarantine.raw_retention_days after the resolution. Audited
+        (SYNC_QUARANTINE_RESOLVED) and published (sync.quarantine.resolved.v1). Codes: 403
+        permission.denied, 401 mfa.required, 404 sync.quarantine.not_found (none the caller can
+        see), 422 sync.quarantine.already_resolved.
+      x-permission: sync.quarantine.resolve
+      parameters:
+        - in: path
+          name: quarantine_id
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuarantineResolution' }
+      responses:
+        '200':
+          description: The row as resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResolvedQuarantine' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403': { $ref: '#/components/responses/Refused' }
+        '404': { $ref: '#/components/responses/Refused' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/sync/devices/{device_id}/heartbeat:
     post:
       tags: [Sync]
@@ -202,6 +240,7 @@ paths:
               schema: { $ref: '#/components/schemas/HeartbeatResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '403': { $ref: '#/components/responses/Refused' }
+        '429': { $ref: '#/components/responses/Refused' }
   /v1/sync/locations/{location_id}/changes:
     get:
       tags: [Sync]
@@ -213,7 +252,11 @@ paths:
         version. Read in version order, a page at a time. full_snapshot_required is true when
         since is 0 or older than the change-log retention (sync.change_log.retention, doc 32
         DR-4): the device then takes a full snapshot. The location must be the device's own
-        (403 sync.location_mismatch).
+        (403 sync.location_mismatch). 426 sync.app_below_floor (params.floor,
+        params.grace_ended_at): the application the device last reported is below
+        sync.app_version_floor and its grace is over; central withholds reference data, never
+        facts (CR-32-1 item 1). 429 sync.rate_limited: the device's requests per minute
+        (sync.rate.requests_per_minute) are spent.
       x-permission: sync.device
       parameters:
         - $ref: '#/components/parameters/LocationId'
@@ -233,6 +276,8 @@ paths:
               schema: { $ref: '#/components/schemas/ChangePage' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '403': { $ref: '#/components/responses/Refused' }
+        '426': { $ref: '#/components/responses/Refused' }
+        '429': { $ref: '#/components/responses/Refused' }
   /v1/sync/locations/{location_id}/snapshot:
     get:
       tags: [Sync]
@@ -249,7 +294,12 @@ paths:
         each table's hash, and swaps it in with the version in one local transaction. A row
         with apply_from later than the shop's business date is held until that day's open.
         The change log itself is readable at /changes. The location must be the device's own
-        (403 sync.location_mismatch).
+        (403 sync.location_mismatch). 426 sync.app_below_floor (params.floor,
+        params.grace_ended_at): the application the device last reported is below
+        sync.app_version_floor and its grace is over; the till keeps selling on the snapshot it
+        holds and its staleness warning tells the supervisor (CR-32-1 item 1). 429
+        sync.rate_limited: the device's requests per minute are spent, or the bytes it was sent
+        this hour (sync.rate.bytes_per_hour, which an answer is charged against).
       x-permission: sync.device
       parameters:
         - $ref: '#/components/parameters/LocationId'
@@ -265,6 +315,8 @@ paths:
               schema: { $ref: '#/components/schemas/SnapshotDelta' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '403': { $ref: '#/components/responses/Refused' }
+        '426': { $ref: '#/components/responses/Refused' }
+        '429': { $ref: '#/components/responses/Refused' }
   /v1/sync/attachments/presign:
     post:
       tags: [Sync]
@@ -292,6 +344,7 @@ paths:
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '403': { $ref: '#/components/responses/Refused' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+        '429': { $ref: '#/components/responses/Refused' }
 components:
   parameters:
     DeviceId:
@@ -359,6 +412,33 @@ components:
           pattern: '^[A-Z][A-Z0-9_]*$'
           description: Why the device cannot produce expected_seq, e.g. OUTBOX_LOST, DATABASE_CORRUPTED
         reason_text: { type: [string, 'null'], maxLength: 500 }
+    QuarantineResolution:
+      type: object
+      required: [resolution, reason_code]
+      properties:
+        resolution:
+          type: string
+          enum: [REPAIRED, DISCARDED]
+          description: REPAIRED, the till resent a correct copy; DISCARDED, nothing will be
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          description: Why, e.g. RESENT_CORRECTED, TEST_EVENT, DUPLICATE_OF_APPLIED
+        reason_text: { type: [string, 'null'], maxLength: 500 }
+    ResolvedQuarantine:
+      type: object
+      required: [quarantine_id, device_id, device_seq, reason, resolution, resolved_at]
+      properties:
+        quarantine_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        device_seq: { type: integer, format: int64 }
+        reason:
+          type: string
+          description: Why it was quarantined, SCHEMA, DUPLICATE_ID, HASH, TOO_LARGE or FORBIDDEN_FIELD
+        resolution: { type: string, enum: [REPAIRED, DISCARDED] }
+        resolved_at: { type: string, format: date-time }
     SequenceGap:
       type: object
       required: [gap_id, device_id, from_seq, to_seq, recorded_at]
