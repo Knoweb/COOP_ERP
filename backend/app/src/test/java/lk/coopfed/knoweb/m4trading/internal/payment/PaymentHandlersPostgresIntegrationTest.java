@@ -37,6 +37,7 @@ import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.ConfirmGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueInvoiceHandler;
+import lk.coopfed.knoweb.m4trading.query.CreditNoteQueries;
 import lk.coopfed.knoweb.m4trading.query.DeliveryQueries;
 import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
 import lk.coopfed.knoweb.m4trading.query.ExposureView;
@@ -56,7 +57,8 @@ import org.springframework.context.annotation.Import;
 /**
  * M4-07 and M4-09 (24A section 6.3): a payment settles invoices (chosen, or oldest first) and holds
  * what is left on account; a bounced cheque reverses the receipt and reopens the invoice, which can
- * then be paid again; a credit note cannot credit what was paid; the exposure sums open invoices
+ * then be paid again; a credit note of a paid invoice holds its money unapplied (CR-24A-3 item 2);
+ * the exposure sums open invoices
  * and accepted orders less what is on account, and an acceptance across a threshold of the credit
  * limit warns without refusing. Every guard, and what each audits and publishes.
  */
@@ -89,6 +91,9 @@ class PaymentHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     InvoiceQueries invoices;
+
+    @Autowired
+    CreditNoteQueries creditNotes;
 
     @Autowired
     PaymentQueries payments;
@@ -328,7 +333,10 @@ class PaymentHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aCreditNoteCannotCreditWhatWasPaid() {
+    void aCreditNoteOfAPaidInvoiceHoldsItsMoneyUnapplied() {
+        // CR-24A-3 item 2 (B-1): the credit note is issued for the goods in full; the invoice owes
+        // nothing, so none of its money applies there and the whole of it is unapplied, lowering
+        // the exposure until ApplyCreditNote applies it to another invoice.
         UUID invoiceId = invoiced();
         record.handle(payment("TRANSFER", "1736.00", null, List.of()), seller());
         UUID riceLine = invoices.getInvoice(invoiceId, seller()).orElseThrow().lines().stream()
@@ -338,13 +346,25 @@ class PaymentHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .lineId();
         kernel.reset();
 
-        refused(
-                () -> issueCreditNote.handle(
-                        new IssueCreditNote(
-                                invoiceId, List.of(new IssueCreditNote.Line(riceLine, BigDecimal.ONE)), "damaged"),
-                        seller()),
-                "m4.creditnote.exceeds_due");
-        assertThat(kernel.committedEvents()).isEmpty();
+        UUID creditNoteId = issueCreditNote.handle(
+                new IssueCreditNote(invoiceId, List.of(new IssueCreditNote.Line(riceLine, BigDecimal.ONE)), "damaged"),
+                seller());
+
+        assertThat(creditNotes.getCreditNote(creditNoteId, buyer()).orElseThrow())
+                .satisfies(note -> {
+                    assertThat(note.grossAmount()).isEqualByComparingTo("141.60");
+                    assertThat(note.appliedAmount()).isEqualByComparingTo("0");
+                    assertThat(note.unappliedAmount()).isEqualByComparingTo("141.60");
+                });
+        InvoiceBalance balance = invoices.balance(invoiceId, seller()).orElseThrow();
+        assertThat(balance.creditedAmount()).isEqualByComparingTo("0");
+        assertThat(balance.amountDue()).isEqualByComparingTo("0");
+        assertThat(exposures.exposure(SELLER, BUYER, seller()).orElseThrow().unappliedCredits())
+                .isEqualByComparingTo("141.60");
+        assertThat(kernel.committedAudit())
+                .extracting(audit -> audit.eventType())
+                .contains("CREDIT_NOTE_ISSUED");
+        assertThat(kernel.committedEvents()).hasAtLeastOneElementOfType(JournalPostingsReady.class);
     }
 
     @Test

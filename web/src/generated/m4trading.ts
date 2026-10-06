@@ -437,7 +437,7 @@ export interface paths {
         put?: never;
         /**
          * The seller credits chosen quantities of lines of its invoice
-         * @description At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.qty_invalid, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+         * @description At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead. Each invoice line at most once, and no more than the line has left uncredited by earlier credit notes (a settlement or a claim may have credited it). The credit note's money applies to the invoice as far as it is still due; the rest stays on the credit note, unapplied, and applyCreditNote applies it later. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.line_duplicate, m4.creditnote.qty_invalid, m4.creditnote.exceeds_billed, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
          */
         post: operations["issueCreditNote"];
         delete?: never;
@@ -481,6 +481,28 @@ export interface paths {
         get: operations["getCreditNotePrint"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes/{creditNoteId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller applies money a credit note holds unapplied to an open invoice of the same buyer
+         * @description A credit note's money applies to the invoice it credits only as far as that invoice was still due; the rest is its unapplied amount (CR-24A-3 item 2). This applies it, with no amount as much as fits, to an issued, undisputed invoice of the same seller and buyer. No money moves and nothing is refunded. Asks for a fresh second factor. Problems: m4.creditnote.not_found, m4.creditnote.not_seller, m4.invoice.not_found, m4.invoice.not_issued, m4.creditnote.invoice_not_ours, m4.creditnote.invoice_disputed, m4.creditnote.applied_already, m4.creditnote.amount_invalid, m4.creditnote.exceeds_unapplied, m4.creditnote.exceeds_due.
+         */
+        post: operations["applyCreditNote"];
         delete?: never;
         options?: never;
         head?: never;
@@ -536,7 +558,7 @@ export interface paths {
         put?: never;
         /**
          * The seller accepts the buyer's count and settles the discrepancy
-         * @description The invoice bills the received quantity, so a short quantity is settled with no money; damaged quantity the invoice charged is credited by a credit note issued in the same act. Asks for a fresh second factor. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+         * @description The invoice bills the received quantity, so a short quantity is settled with no money; damaged quantity the invoice charged is credited by a credit note issued in the same act, no more than the line has left uncredited; the money applies to the invoice as far as it is still due and the rest stays on the credit note, unapplied. Asks for a fresh second factor. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
          */
         post: operations["settleDiscrepancy"];
         delete?: never;
@@ -746,7 +768,7 @@ export interface paths {
         put?: never;
         /**
          * The seller approves the claim in whole or in part; a credit note is issued with it
-         * @description Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending, m4.claim.line_unknown, m4.claim.qty_invalid, m4.claim.nothing_approved, m4.claim.invoice_first, m4.creditnote.exceeds_due.
+         * @description Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending, m4.claim.line_unknown, m4.claim.qty_invalid, m4.claim.nothing_approved, m4.claim.invoice_first, m4.creditnote.exceeds_billed (an accepted quantity above what its invoice line has left uncredited is refused, not capped). The credit note's money applies to the invoice as far as it is still due; the rest stays on the credit note, unapplied.
          */
         post: operations["approveClaim"];
         delete?: never;
@@ -1184,6 +1206,8 @@ export interface components {
             disputed?: boolean;
             disputeReason?: string;
             creditNotes?: components["schemas"]["CreditNoteSummary"][];
+            /** @description For the seller, while something is due: its credit notes to this buyer that still hold money unapplied, which applyCreditNote can apply to this invoice */
+            availableCredits?: components["schemas"]["CreditNoteSummary"][];
             lines: components["schemas"]["InvoiceLineResponse"][];
         };
         CreditNoteSummary: {
@@ -1191,6 +1215,16 @@ export interface components {
             creditNoteId: string;
             docNumber?: string;
             grossAmount: number;
+            /** @description What of it was applied to invoices */
+            appliedAmount?: number;
+            /** @description What it still holds for the buyer, to apply to an open invoice */
+            unappliedAmount?: number;
+        };
+        ApplyCreditNoteRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description What to apply; absent, as much as fits */
+            amount?: number;
         };
         DisputeInvoiceRequest: {
             reason: string;
@@ -1233,6 +1267,10 @@ export interface components {
             netAmount: number;
             taxAmount: number;
             grossAmount: number;
+            /** @description What of it was applied to invoices (to its own invoice as far as that was due, then by applyCreditNote) */
+            appliedAmount?: number;
+            /** @description What it still holds for the buyer */
+            unappliedAmount?: number;
             lines: components["schemas"]["CreditNoteLineResponse"][];
         };
         CreditNoteLineResponse: {
@@ -1453,6 +1491,8 @@ export interface components {
             openInvoices: number;
             acceptedNotInvoiced: number;
             unappliedReceipts: number;
+            /** @description What the seller's credit notes to the buyer hold unapplied; subtracted */
+            unappliedCredits?: number;
             amount: number;
             /** @description The highest configured percentage of the limit the amount has reached */
             warnThresholdPercent?: number;
@@ -2467,6 +2507,37 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    applyCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyCreditNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The credit note, with what it applied and what it still holds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };

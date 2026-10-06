@@ -45,7 +45,11 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>a short quantity was never billed and is settled with no money;
  *   <li>damaged quantity is inside the received quantity ({@code doc_grn_line} CHECK damaged_qty
  *       &lt;= received_qty) and so was billed: it is credited, at the invoice line's price and VAT
- *       rate, by a credit note issued in the same act, never more than the line billed;
+ *       rate, by a credit note issued in the same act, never more than the line has left
+ *       uncredited by earlier credit notes ({@link InvoiceCredits}; wave 2, M4MONEY-01); when
+ *       nothing is left the discrepancy settles with no money;
+ *   <li>the credit note's money applies to the invoice as far as it is still due; the rest stays
+ *       on the credit note, unapplied (B-1), so a paid invoice no longer blocks the settlement;
  *   <li>an over-delivered quantity was billed at the received quantity and is not credited here.
  * </ul>
  *
@@ -70,6 +74,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
     private final TradingSeries series;
     private final PostingMapper postings;
     private final InvoiceSettlements settlements;
+    private final InvoiceCredits credits;
     private final TradingClock clock;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -83,6 +88,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
             TradingSeries series,
             PostingMapper postings,
             InvoiceSettlements settlements,
+            InvoiceCredits credits,
             TradingClock clock,
             AuditFacade audit,
             EventPublisher events) {
@@ -93,6 +99,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
         this.series = series;
         this.postings = postings;
         this.settlements = settlements;
+        this.credits = credits;
         this.clock = clock;
         this.audit = audit;
         this.events = events;
@@ -142,6 +149,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
         DocumentRecord issued = null;
         UUID invoiceId = null;
         BigDecimal credited = null;
+        BigDecimal applied = BigDecimal.ZERO;
         List<Posting> journal = List.of();
         if (!damagedByGrnLine.isEmpty()) {
             Optional<UUID> invoice = jdbc
@@ -157,7 +165,10 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                 throw new ProblemException("m4.discrepancy.invoice_first");
             }
             invoiceId = invoice.get();
+            // Locked before the lines and the credits are read (InvoiceCredits).
+            documents.lockForLinking(invoiceId);
             List<DocumentLineRecord> invoiceLines = documents.findLines(invoiceId);
+            Map<UUID, InvoiceCredits.Credited> creditedByLine = credits.creditedByLine(invoiceId);
             creditNoteId = Ids.next();
             List<DocumentLineRecord> lines = new ArrayList<>();
             int lineNo = 0;
@@ -168,9 +179,16 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                 if (billed.isEmpty()) {
                     continue; // nothing of this GRN line was billed, so nothing to credit
                 }
-                BigDecimal qty = damaged.getValue().min(billed.get().qty());
+                // A claim may have credited some of the line already: credit the damaged quantity
+                // only as far as the line has anything left uncredited.
+                InvoiceCredits.Credited left = InvoiceCredits.remaining(
+                        billed.get(), creditedByLine.get(billed.get().id()));
+                BigDecimal qty = damaged.getValue().min(left.qty());
+                if (qty.signum() <= 0) {
+                    continue;
+                }
                 lineNo++;
-                lines.add(IssueCreditNoteHandler.priced(creditNoteId, lineNo, billed.get(), qty));
+                lines.add(InvoiceCredits.priced(creditNoteId, lineNo, billed.get(), left, qty));
             }
             if (lines.isEmpty()) {
                 creditNoteId = null;
@@ -190,8 +208,10 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                         documents.findByIdForUpdate(creditNoteId).orElseThrow(),
                         documents.findLines(creditNoteId),
                         scope);
-                settlements.requireDue(invoiceId, issued.grossAmount());
-                links.link(creditNoteId, invoiceId, LinkType.CREDITS, issued.grossAmount(), scope);
+                applied = settlements.applyUpToDue(invoiceId, issued.grossAmount());
+                if (applied.signum() > 0) {
+                    links.link(creditNoteId, invoiceId, LinkType.CREDITS, applied, scope);
+                }
                 jdbc.update(
                         """
                         insert into trading.doc_credit_note (document_id, invoice_document_id, discrepancy_document_id,
@@ -240,7 +260,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                     IssueCreditNoteHandler.AUDIT_ISSUED,
                     Subject.of("credit_note", creditNoteId),
                     null,
-                    IssueCreditNoteHandler.auditAfter(issued, invoiceId, discrepancyId, credited),
+                    IssueCreditNoteHandler.auditAfter(issued, invoiceId, discrepancyId, credited, applied),
                     scope);
         }
 

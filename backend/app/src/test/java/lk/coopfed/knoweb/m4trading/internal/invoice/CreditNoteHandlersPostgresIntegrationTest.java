@@ -319,6 +319,11 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
                         new IssueCreditNote(
                                 invoiceId, List.of(new IssueCreditNote.Line(dhal, new BigDecimal("999"))), "x"),
                         seller()),
+                "m4.creditnote.exceeds_billed");
+        refused(
+                () -> issueCreditNote.handle(
+                        new IssueCreditNote(invoiceId, List.of(new IssueCreditNote.Line(dhal, BigDecimal.ZERO)), "x"),
+                        seller()),
                 "m4.creditnote.qty_invalid");
         assertThat(kernel.committedEvents()).isEmpty();
 
