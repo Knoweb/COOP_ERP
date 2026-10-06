@@ -230,7 +230,9 @@
     "inventory.request.source": "Send from",
     "inventory.request.approve": "Approve",
     "inventory.request.reject_reason": "Reason for rejecting",
-    "inventory.request.reject": "Reject"
+    "inventory.request.reject": "Reject",
+    "inventory.lot.expired": "Expired",
+    "inventory.repack.variance_reason": "Reason, when fewer packs were made than expected"
   },
   "si": {
     "inventory.nav": "තොගය",
@@ -463,7 +465,9 @@
     "inventory.request.source": "යවන ස්ථානය",
     "inventory.request.approve": "අනුමත කරන්න",
     "inventory.request.reject_reason": "ප්‍රතික්ෂේප කිරීමට හේතුව",
-    "inventory.request.reject": "ප්‍රතික්ෂේප කරන්න"
+    "inventory.request.reject": "ප්‍රතික්ෂේප කරන්න",
+    "inventory.lot.expired": "කල් ඉකුත් වී ඇත",
+    "inventory.repack.variance_reason": "අපේක්ෂිත ප්‍රමාණයට වඩා අඩු පැකට් සෑදූ විට, හේතුව"
   },
   "ta": {
     "inventory.nav": "இருப்பு",
@@ -696,6 +700,8 @@
     "inventory.request.source": "அனுப்பும் இடம்",
     "inventory.request.approve": "ஏற்றுக்கொள்ளுங்கள்",
     "inventory.request.reject_reason": "நிராகரிப்பதற்கான காரணம்",
-    "inventory.request.reject": "நிராகரியுங்கள்"
+    "inventory.request.reject": "நிராகரியுங்கள்",
+    "inventory.lot.expired": "காலாவதியானது",
+    "inventory.repack.variance_reason": "எதிர்பார்த்ததை விடக் குறைவான பொதிகள் உருவானால், காரணம்"
   }
 }

@@ -44,7 +44,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e67f-0000-7000-8000-000000000002");
     private static final UUID CLERK = UUID.fromString("0190e67f-0000-7000-8000-000000000010");
-    private static final UUID MANAGER = UUID.fromString("0190e67f-0000-7000-8000-000000000011");
+    private static final UUID WITNESS = UUID.fromString("0190e67f-0000-7000-8000-000000000012");
 
     @Autowired
     TestRestTemplate http;
@@ -59,6 +59,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     private UUID stores;
     private UUID rice;
     private UUID riceBatch;
+    private UUID manager;
 
     @BeforeEach
     void arrange() {
@@ -69,6 +70,8 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         rice = fixture.sku(MPCS, "RICE5");
         riceBatch = fixture.batch(rice, MPCS, "R1", LocalDate.of(2027, 3, 31));
         post(stores, riceBatch, MovementType.RECEIPT, "50", "100");
+        // The manager approves within band 1 (a grant without a limit, wave 2: M5-09).
+        manager = fixture.userWithAll(MPCS, null, "inv.adjust.approve", "inv.writeoff.approve");
     }
 
     @AfterEach
@@ -116,7 +119,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
         JsonNode approved =
-                post("/v1/inventory/counts/" + task + "/approve", null, MANAGER).getBody();
+                post("/v1/inventory/counts/" + task + "/approve", null, manager).getBody();
         assertThat(approved.get("status").asText()).isEqualTo("CLOSED");
         assertThat(approved.get("outcome").asText()).isEqualTo("APPROVED");
         assertThat(get("/v1/inventory/counts?locationId=" + stores).getBody()).hasSize(1);
@@ -124,7 +127,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         .getBody()
                         .get("reviewedBy")
                         .asText())
-                .isEqualTo(MANAGER.toString());
+                .isEqualTo(manager.toString());
         assertThat(get("/v1/inventory/counts/" + Ids.next()).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
         String second = post("/v1/inventory/counts", Map.of("locationId", stores, "scopeKind", "FULL"), CLERK)
@@ -136,7 +139,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 "/v1/inventory/counts/" + second + "/submit",
                 Map.of("lines", List.of(Map.of("batchId", riceBatch, "countedQty", 30))),
                 CLERK);
-        JsonNode rejected = post("/v1/inventory/counts/" + second + "/reject", Map.of("reason", "Count again"), MANAGER)
+        JsonNode rejected = post("/v1/inventory/counts/" + second + "/reject", Map.of("reason", "Count again"), manager)
                 .getBody();
         assertThat(rejected.get("outcome").asText()).isEqualTo("REJECTED");
         assertThat(onHand()).isEqualByComparingTo("44");
@@ -194,10 +197,11 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         "update kernel.document_attachment set status = 'COMPLETE' where attachment_id = ?::uuid",
                         upload.get("attachmentId").asText());
 
-        JsonNode witnessed = post("/v1/inventory/write-offs/" + id + "/witness", null, MANAGER)
+        // wave 2, M5-10: another person witnesses in person; the manager approves.
+        JsonNode witnessed = post("/v1/inventory/write-offs/" + id + "/witness", null, WITNESS)
                 .getBody();
         assertThat(witnessed.get("status").asText()).isEqualTo("WITNESSED");
-        JsonNode posted = post("/v1/inventory/write-offs/" + id + "/approve", null, MANAGER)
+        JsonNode posted = post("/v1/inventory/write-offs/" + id + "/approve", null, manager)
                 .getBody();
         assertThat(posted.get("status").asText()).isEqualTo("POSTED");
         assertThat(posted.get("value").decimalValue()).isEqualByComparingTo("200.00");
@@ -220,7 +224,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .get("writeOffId")
                 .asText();
         post("/v1/inventory/write-offs/" + other + "/submit", null, CLERK);
-        JsonNode rejected = post("/v1/inventory/write-offs/" + other + "/reject", Map.of("reason", "In date"), MANAGER)
+        JsonNode rejected = post("/v1/inventory/write-offs/" + other + "/reject", Map.of("reason", "In date"), manager)
                 .getBody();
         assertThat(rejected.get("status").asText()).isEqualTo("REJECTED");
         assertThat(get("/v1/inventory/write-offs?locationId=" + stores).getBody())
@@ -277,7 +281,7 @@ class StockControlHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(get("/v1/inventory/repacks/" + id).getBody().get("status").asText())
                 .isEqualTo("EXECUTED");
 
-        JsonNode reversed = post("/v1/inventory/repacks/" + id + "/reverse", Map.of("reason", "Wrong pack"), MANAGER)
+        JsonNode reversed = post("/v1/inventory/repacks/" + id + "/reverse", Map.of("reason", "Wrong pack"), manager)
                 .getBody();
         assertThat(reversed.get("status").asText()).isEqualTo("REVERSED");
 

@@ -899,6 +899,50 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m7customers
+  # wave 2, PR 10 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-expired-stock.md (6)
+  # and 2026-10-06-wave2-stock-approvals.md (5), (6); CR-25A-1 items 1, 4 and 5): the shelf life a
+  # delivery note to another entity must leave, the value a count variance may have and the value a
+  # count may post before a second person looks, and how far a repack's yield may stray.
+  - key: inventory.dispatch_min_shelf_life_days
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 3650 }
+    description_en: The fewest days of shelf life a lot must have left to be picked for a delivery note to another entity
+    description_si: වෙනත් ආයතනයකට බෙදාහැරීමේ සටහනක් සඳහා තෝරා ගැනීමට කාණ්ඩයක ඉතිරිව තිබිය යුතු අවම කල් ඉකුත් වීමේ දින ගණන
+    description_ta: வேறொரு நிறுவனத்துக்கான விநியோகக் குறிப்புக்குத் தேர்ந்தெடுக்க ஒரு தொகுதியில் மீதமிருக்க வேண்டிய குறைந்தபட்ச காலாவதி நாட்கள்
+    default: 0
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.count_tolerance_value
+    value_type: DECIMAL
+    schema: { minimum: 0 }
+    description_en: The highest value of one count variance that posts without approval, even within the quantity tolerance (Rs)
+    description_si: ප්‍රමාණ ඉවසීම තුළ වුවද, අනුමැතියකින් තොරව සටහන් වන එක් ගණන් කිරීමේ වෙනසක උපරිම වටිනාකම (රු)
+    description_ta: அளவுச் சகிப்புக்குள் இருந்தாலும், ஒப்புதல் இன்றிப் பதிவாகும் ஒரு எண்ணிக்கை வேறுபாட்டின் உயர் மதிப்பு (ரூ)
+    default: "1000"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.count_autopost_value_cap
+    value_type: DECIMAL
+    schema: { minimum: 0 }
+    description_en: The highest total value of the variances one count may post without approval; above it every variance waits for approval (Rs)
+    description_si: එක් ගණන් කිරීමකට අනුමැතියකින් තොරව සටහන් කළ හැකි වෙනස්කම්වල උපරිම මුළු වටිනාකම; ඊට ඉහළින් සෑම වෙනසක්ම අනුමැතිය බලාපොරොත්තු වේ (රු)
+    description_ta: ஒரு எண்ணிக்கை ஒப்புதல் இன்றிப் பதியக்கூடிய வேறுபாடுகளின் உயர் மொத்த மதிப்பு; அதற்கு மேல் ஒவ்வொரு வேறுபாடும் ஒப்புதலுக்குக் காத்திருக்கும் (ரூ)
+    default: "10000"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.repack_yield_tolerance_pct
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 100 }
+    description_en: How far, in per cent, a repack's output may differ from the recipe's expected output before it is refused (more) or needs a reason (less)
+    description_si: ප්‍රතික්ෂේප කිරීමට (වැඩි) හෝ හේතුවක් අවශ්‍ය වීමට (අඩු) පෙර නැවත ඇසුරුම් කිරීමක නිමැවුම වට්ටෝරුවේ අපේක්ෂිත නිමැවුමෙන් වෙනස් විය හැකි ප්‍රතිශතය
+    description_ta: மறுபொதியின் வெளியீடு செய்முறையின் எதிர்பார்த்த வெளியீட்டிலிருந்து மறுக்கப்படும் (அதிகம்) அல்லது காரணம் தேவைப்படும் (குறைவு) முன் வேறுபடக்கூடிய சதவீதம்
+    default: "2"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
   # wave 2, PR 08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-trading-projections.md
   # (7), CR-28A-2): the longest period and the most rows one report answers, the row cap applied in SQL.
   - key: reporting.max_period_days

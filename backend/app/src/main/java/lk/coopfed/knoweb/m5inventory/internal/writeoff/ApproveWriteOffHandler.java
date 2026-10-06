@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.m5inventory.internal.writeoff;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,21 +23,26 @@ import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
 import lk.coopfed.knoweb.m5inventory.api.WriteOffPosted;
 import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
+import lk.coopfed.knoweb.m5inventory.internal.control.StockOnHand;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ApproveWriteOff (25A section 6.3: "WITNESSED; approver ≠ requester; value (Σ qty × avg cost) ≤
- * approver band; MFA → APPROVED → WRITE_OFF movements → POSTED"; doc 25 flow 6.4). The witness may
- * also approve (the MPCS accountant as remote witness, flow 6.4); the requester never.
+ * approver band; MFA → APPROVED → WRITE_OFF movements → POSTED"; doc 25 flow 6.4). The requester
+ * never approves; since wave 2 (M5-10, CR-25A-1 item 3) neither does the in-person witness: only
+ * the remote witness of a single-staff location (the MPCS accountant, flow 6.4) may also approve.
  *
  * <p>Guards, in order: an OWN scope; the write-off visible ({@code m5.writeoff.not_found});
  * WITNESSED ({@code m5.writeoff.not_witnessed}); the approver not the requester
- * ({@code m5.writeoff.approver_is_requester}, and the kernel's {@code sod.same_person} for the pair
- * inv.writeoff.request / inv.writeoff.approve); each lot still holding its quantity
- * ({@code m5.writeoff.insufficient_stock}); the value, recomputed at the entity average now, within
- * the approver's limit ({@code m5.approval.limit_exceeded}). The fresh second factor is the kernel's.
+ * ({@code m5.writeoff.approver_is_requester}); the approver not the in-person witness
+ * ({@code m5.writeoff.approver_is_witness}); the kernel's {@code sod.same_person} for the pair
+ * inv.writeoff.request / inv.writeoff.approve; each lot, locked in the ledger's order, still
+ * holding its quantity ({@code m5.writeoff.insufficient_stock}, M5-12); the value, recomputed now
+ * (the entity average, else the lot's cost; a line of no cost routes to band 2), within the
+ * approver's limit, which fails closed ({@code m5.approval.limit_exceeded}, M5-09). The fresh
+ * second factor is the kernel's.
  *
  * <p>Mutation: WRITE_OFF per line, citing the WOF document, at the entity average; POSTED with the
  * approver and the value. The loss is the entity's that owns the lot (ADR-03). Audit
@@ -88,17 +94,26 @@ class ApproveWriteOffHandler implements Handles<ApproveWriteOff, UUID> {
         if (scope.userId() == null || scope.userId().equals(writeOff.requestedBy())) {
             throw new ProblemException("m5.writeoff.approver_is_requester");
         }
+        if (scope.userId().equals(writeOff.witnessUserId()) && !writeOff.remoteWitness()) {
+            // wave 2, M5-10: three people where three exist. Only a single-staff location's remote
+            // witness, who holds the approval and has the photographs as the third eye, may approve.
+            throw new ProblemException("m5.writeoff.approver_is_witness");
+        }
         sod.assertDistinct(scope, "inv.writeoff.request", "inv.writeoff.approve", writeOff.requestedBy());
         List<WriteOffStore.Line> lines = store.lines(writeOff.writeOffId());
+        Map<StockOnHand.LotRef, BigDecimal> held = store.lockLots(writeOff.locationId(), lines);
+        Map<StockOnHand.LotRef, BigDecimal> wanted = new LinkedHashMap<>();
         for (WriteOffStore.Line line : lines) {
-            if (store.onHand(writeOff.locationId(), line.batchId(), line.condition())
-                            .compareTo(line.qty())
-                    < 0) {
-                throw new ProblemException("m5.writeoff.insufficient_stock", Map.of("batchId", line.batchId()));
-            }
+            wanted.merge(new StockOnHand.LotRef(line.batchId(), line.condition()), line.qty(), BigDecimal::add);
         }
-        BigDecimal value = store.value(lines, scope);
-        policy.requireWithinLimit(value, "inv.writeoff.approve", scope);
+        wanted.forEach((lot, qty) -> {
+            if (held.get(lot).compareTo(qty) < 0) {
+                throw new ProblemException("m5.writeoff.insufficient_stock", Map.of("batchId", lot.batchId()));
+            }
+        });
+        WriteOffStore.Valuation valuation = store.value(lines, writeOff.locationId(), scope);
+        BigDecimal value = valuation.value();
+        policy.requireWithinLimit(value, valuation.zeroCostLine(), "inv.writeoff.approve", scope);
 
         List<Movement> movements = lines.stream()
                 .map(line -> new Movement(
@@ -111,7 +126,7 @@ class ApproveWriteOffHandler implements Handles<ApproveWriteOff, UUID> {
                         line.lineId()))
                 .toList();
         ledger.post(new PostMovements(writeOff.writeOffId(), null, null, movements), scope);
-        int band = policy.band(value, scope);
+        int band = policy.band(value, valuation.zeroCostLine(), scope);
         jdbc.update(
                 """
                 update inventory.write_off

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,19 +51,24 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@code m5.recipe.retired}); both quantities above zero with three decimals at most
  * ({@code m5.repack.qty_invalid}); the input batch known to M2 ({@code m5.batch.not_found}) and of
  * the recipe's input item ({@code m5.repack.input_mismatch}); its GOOD lot at the location
- * holding the quantity ({@code m5.repack.insufficient_stock}); M2's own guards on the output batch
- * (an expiry or an MRP where the output item needs one).
+ * holding the quantity ({@code m5.repack.insufficient_stock}); the yield (wave 2, M5-18;
+ * {@code inventory.repack_yield_tolerance_pct}, 2 % of the expected output): more packs than the
+ * tolerance allows are refused ({@code m5.repack.yield_out_of_range}: sellable stock from
+ * nothing), fewer need a reason ({@code m5.repack.yield_reason_required}); M2's own guards on the
+ * output batch (an expiry or an MRP where the output item needs one).
  *
  * <p>Mutation: REPACK_CONSUME of the input at the entity average; the output batch registered in
  * M2 with the input batch's expiry; REPACK_PRODUCE of the actual output at the consumed value
  * divided by it (which re-averages the output item); the repack row with the yield variance.
- * Audit {@code REPACK_EXECUTED}; event {@code repack.executed.v1}.
+ * Audit {@code REPACK_EXECUTED}, and {@code REPACK_YIELD_EXCEPTION} (REVIEW) with the reason for a
+ * shortfall beyond the tolerance; event {@code repack.executed.v1}.
  */
 @Service
 @CommandHandler(permission = "inv.repack.execute")
 class ExecuteRepackHandler implements Handles<ExecuteRepack, UUID> {
 
     static final String AUDIT_EXECUTED = "REPACK_EXECUTED";
+    static final String AUDIT_YIELD_EXCEPTION = "REPACK_YIELD_EXCEPTION";
 
     private final RepackStore store;
     private final ControlPolicy policy;
@@ -117,6 +123,33 @@ class ExecuteRepackHandler implements Handles<ExecuteRepack, UUID> {
         if (store.goodOnHand(command.locationId(), input.batchId()).compareTo(command.inputQty()) < 0) {
             throw new ProblemException("m5.repack.insufficient_stock", Map.of("batchId", input.batchId()));
         }
+        BigDecimal expected = command.inputQty()
+                .multiply(recipe.outputQty())
+                .multiply(BigDecimal.valueOf(100).subtract(recipe.expectedLossPct()))
+                .divide(recipe.inputQty().multiply(BigDecimal.valueOf(100)), 3, RoundingMode.HALF_UP);
+        // wave 2, M5-18: packs made from nothing are refused; a real shortfall is a loss that must be
+        // explained and seen (a till's repack bundle, when it comes, flags and never refuses).
+        BigDecimal tolerance = expected.multiply(policy.repackYieldTolerancePct(scope))
+                .divide(BigDecimal.valueOf(100), 3, RoundingMode.HALF_UP);
+        if (command.actualOutputQty().compareTo(expected.add(tolerance)) > 0) {
+            throw new ProblemException(
+                    "m5.repack.yield_out_of_range",
+                    Map.of(
+                            "expected", expected.toPlainString(),
+                            "actual", command.actualOutputQty().toPlainString()));
+        }
+        boolean shortfall = command.actualOutputQty().compareTo(expected.subtract(tolerance)) < 0;
+        String reason =
+                command.varianceReason() == null || command.varianceReason().isBlank()
+                        ? null
+                        : command.varianceReason().strip();
+        if (shortfall && reason == null) {
+            throw new ProblemException(
+                    "m5.repack.yield_reason_required",
+                    Map.of(
+                            "expected", expected.toPlainString(),
+                            "actual", command.actualOutputQty().toPlainString()));
+        }
 
         UUID id = Ids.next();
         List<PostedMovement> consumed = ledger.post(
@@ -162,10 +195,6 @@ class ExecuteRepackHandler implements Handles<ExecuteRepack, UUID> {
                                 outputCost,
                                 null))),
                 scope);
-        BigDecimal expected = command.inputQty()
-                .multiply(recipe.outputQty())
-                .multiply(BigDecimal.valueOf(100).subtract(recipe.expectedLossPct()))
-                .divide(recipe.inputQty().multiply(BigDecimal.valueOf(100)), 3, RoundingMode.HALF_UP);
         BigDecimal variance = expected.subtract(command.actualOutputQty());
         jdbc.update(
                 """
@@ -205,6 +234,13 @@ class ExecuteRepackHandler implements Handles<ExecuteRepack, UUID> {
                         "outputUnitCost", outputCost.toPlainString(),
                         "outputBatchId", output.batchId()),
                 scope);
+        if (shortfall) {
+            Map<String, Object> exception = new LinkedHashMap<>();
+            exception.put("expectedOutputQty", expected.toPlainString());
+            exception.put("actualOutputQty", command.actualOutputQty().toPlainString());
+            exception.put("tolerancePct", policy.repackYieldTolerancePct(scope).toPlainString());
+            audit.record(AUDIT_YIELD_EXCEPTION, Subject.of("repack", id), null, exception, scope, reason);
+        }
         events.publish(new RepackExecuted(
                 id,
                 scope.entityId(),
