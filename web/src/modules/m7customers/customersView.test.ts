@@ -3,7 +3,6 @@ import { ApiProblem } from "../../shell/api/client";
 import {
   MFA_REQUIRED,
   accountActions,
-  businessToday,
   isReversible,
   limitUsedPercent,
   limitsChange,
@@ -37,9 +36,7 @@ describe("the customer view helpers", () => {
     expect(statusChip("CLOSED")).toBe("void");
   });
 
-  it("dates in the business time zone, and the start of a month before", () => {
-    // 20:00 UTC on the 28th is already the 29th in Colombo (UTC+5:30).
-    expect(businessToday(new Date("2026-09-28T20:00:00Z"))).toBe("2026-09-29");
+  it("finds the start of a month before", () => {
     expect(startOfMonthBefore("2026-09-29", 2)).toBe("2026-07-01");
     expect(startOfMonthBefore("2026-01-15", 2)).toBe("2025-11-01");
   });

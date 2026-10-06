@@ -46,7 +46,7 @@ describe("the search for style literals", () => {
 
 describe("the web modules", () => {
   // Every source file of every module, as text. Test files are left out: they hold sample data.
-  const sources = import.meta.glob(["../modules/**/*.{ts,tsx,css}", "!../modules/**/*.test.{ts,tsx}"], {
+  const sources = import.meta.glob(["../modules/**/*.{ts,tsx,css}", "../shell/**/*.{ts,tsx}", "!../modules/**/*.test.{ts,tsx}", "!../shell/**/*.test.{ts,tsx}"], {
     query: "?raw",
     import: "default",
     eager: true

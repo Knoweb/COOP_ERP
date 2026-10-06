@@ -71,7 +71,9 @@ export type RequestContext = {
    * that was refused so that it can be taken again after the sign-in; null when the command
    * cannot be carried (a file upload). Optional for tests.
    */
-  stepUp?: (pending: PendingCommand | null) => void;
+  stepUp?: (pending: PendingCommand | null, interrupted: boolean) => void;
+  /** The API base a kept command must sit under; the page's own by default. For tests. */
+  apiBase?: string;
 };
 
 export function apiMiddleware(getContext: () => RequestContext): Middleware {
@@ -107,7 +109,7 @@ export function apiMiddleware(getContext: () => RequestContext): Middleware {
         request.headers.set("X-Scope-Location", locationId);
       }
       if (MUTATING.has(request.method)) {
-        pendingOf.set(request, await pendingCommandOf(request));
+        pendingOf.set(request, await pendingCommandOf(request, getContext().apiBase ?? API_BASE));
       }
       return request;
     },
@@ -117,7 +119,8 @@ export function apiMiddleware(getContext: () => RequestContext): Middleware {
         const problem = await problemOf(response);
         if (response.status === 401 && problem.code === STEP_UP_REQUIRED && !steppingUp) {
           steppingUp = true;
-          getContext().stepUp?.(pendingOf.get(request) ?? null);
+          // `interrupted`: a command (not a read) was cut off; when it is not kept, the person is told.
+          getContext().stepUp?.(pendingOf.get(request) ?? null, pendingOf.has(request));
         }
         throw new ApiProblem(problem);
       }
@@ -149,10 +152,11 @@ export function useApiClient<Paths extends object>(options?: { locationId: strin
     // Step-up (doc 19 section 2.2: "the challenge is at the action, not at login"): a fresh
     // sign-in at the identity server, which asks for the second factor (acr_values names it
     // where the realm has one; oidc.ts), and back to this page with the refused command.
-    const stepUp = (pending: PendingCommand | null) => {
+    const stepUp = (pending: PendingCommand | null, interrupted: boolean) => {
       const state: LoginState = {
         returnTo: window.location.pathname + window.location.search,
-        pendingCommand: pending ?? undefined
+        pendingCommand: pending ?? undefined,
+        commandNotKept: interrupted && pending === null ? true : undefined
       };
       void auth.signinRedirect({
         prompt: "login",

@@ -4,7 +4,7 @@ import { useIntl } from "react-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { locationText } from "../../shell/i18n/localName";
-import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
+import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { openServerFile } from "../../shell/api/openServerFile";
@@ -45,7 +45,7 @@ export function ReportPage() {
     enabled: definition?.location === true
   });
 
-  const [form, setForm] = useState({ ...defaultPeriod(new Date()), locationId: "" });
+  const [form, setForm] = useState({ ...defaultPeriod(businessToday()), locationId: "" });
   const [query, setQuery] = useState<ReportQuery | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [run, setRun] = useState<ReportRun | null>(null);

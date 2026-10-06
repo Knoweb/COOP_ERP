@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
+import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
@@ -25,7 +25,7 @@ export function JournalExportsPage() {
   const canExport = useHasPermission("int.journal.export");
   const exportKey = useIdempotencyKey();
 
-  const [period, setPeriod] = useState(() => defaultExportPeriod(new Date()));
+  const [period, setPeriod] = useState(() => defaultExportPeriod(businessToday()));
   const [message, setMessage] = useState<{ kind: "status" | "alert"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);

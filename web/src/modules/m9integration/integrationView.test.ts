@@ -1,17 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { defaultExportPeriod, isoDay, journalFileName, templateText } from "./integrationView";
+import { defaultExportPeriod, journalFileName, templateText } from "./integrationView";
 import messages from "./integration.messages.json";
 import { integrationModule } from "./module";
 
 describe("the export form", () => {
-  it("opens on the first of the month two months back to today, from the local day", () => {
+  it("opens on the first of the month two months back to the business day", () => {
     // A fixed date: the test never depends on today (Asia/Colombo midnight).
-    expect(defaultExportPeriod(new Date(2026, 8, 29, 23, 30))).toEqual({ from: "2026-07-01", to: "2026-09-29" });
-    expect(defaultExportPeriod(new Date(2026, 0, 15))).toEqual({ from: "2025-11-01", to: "2026-01-15" });
-  });
-
-  it("writes a calendar day with two-digit month and day", () => {
-    expect(isoDay(new Date(2026, 2, 5))).toBe("2026-03-05");
+    expect(defaultExportPeriod("2026-09-29")).toEqual({ from: "2026-07-01", to: "2026-09-29" });
+    expect(defaultExportPeriod("2026-01-15")).toEqual({ from: "2025-11-01", to: "2026-01-15" });
   });
 
   it("names the file after the period", () => {

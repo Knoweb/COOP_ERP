@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { csvFileName, defaultPeriod, isNumeric, isoDay, queryOf } from "./reportView";
+import { csvFileName, defaultPeriod, isNumeric, queryOf } from "./reportView";
 
 describe("report view", () => {
-  it("writes a calendar date as the API does", () => {
-    expect(isoDay(new Date(2026, 8, 7))).toBe("2026-09-07");
-  });
-
   it("opens a period report on the month so far", () => {
-    expect(defaultPeriod(new Date(2026, 8, 27))).toEqual({ from: "2026-09-01", to: "2026-09-27" });
+    expect(defaultPeriod("2026-09-27")).toEqual({ from: "2026-09-01", to: "2026-09-27" });
   });
 
   it("sends only the parameters the definition takes", () => {

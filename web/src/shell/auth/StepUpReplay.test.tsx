@@ -14,7 +14,13 @@ const session = {
 vi.mock("./session", () => ({ useSession: () => session }));
 
 let broughtBack: PendingCommand | null = null;
+let notKept = false;
 vi.mock("./oidc", () => ({
+  takeCommandNotKept: () => {
+    const flag = notKept;
+    notKept = false;
+    return flag;
+  },
   takePendingCommand: () => {
     const pending = broughtBack;
     broughtBack = null;
@@ -45,6 +51,7 @@ function renderReplay() {
 describe("the replay after a step-up", () => {
   beforeEach(() => {
     broughtBack = null;
+    notKept = false;
     replay.mockReset();
   });
   afterEach(cleanup);
@@ -52,6 +59,14 @@ describe("the replay after a step-up", () => {
   it("shows nothing when no sign-in brought a command back", () => {
     renderReplay();
     expect(document.body.querySelector(".step-up-replay")).toBeNull();
+    expect(replay).not.toHaveBeenCalled();
+  });
+
+  it("asks for the details again when the command that was cut off was not kept, and replays nothing", async () => {
+    notKept = true;
+    renderReplay();
+
+    expect((await screen.findByRole("status")).textContent).toBe("Your sign-in was refreshed. Enter the details again.");
     expect(replay).not.toHaveBeenCalled();
   });
 

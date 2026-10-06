@@ -4,7 +4,8 @@
 
 import { useMemo } from "react";
 import { useApiClient } from "../../shell/api/client";
-import { businessToday, inForce } from "./tradingView";
+import { businessToday } from "../../shell/i18n/formats";
+import { inForce } from "./tradingView";
 import type { components, paths } from "../../generated/m4trading";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
