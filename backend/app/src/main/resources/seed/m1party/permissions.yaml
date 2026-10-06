@@ -516,3 +516,11 @@ permissions:
     module: "m9integration"
     description_en: "Activate and retire the federation's notification rules"
     scope: "FEDERATION"
+  # wave 2, PR 03 (CR-32-1 item 2, decided 6 October 2026): an administrator of the society
+  # resolves a quarantined till event (REPAIRED or DISCARDED, with a reason, once). The kernel's
+  # operation (openapi/sync.yaml, resolveQuarantine); listed here because M1SeedLoader reads this
+  # one file.
+  - code: "sync.quarantine.resolve"
+    module: "kernel"
+    description_en: "Resolve a till event the sync gateway quarantined, as repaired or discarded"
+    scope: "ENTITY"

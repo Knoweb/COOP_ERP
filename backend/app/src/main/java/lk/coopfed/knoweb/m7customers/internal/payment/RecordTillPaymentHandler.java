@@ -117,7 +117,8 @@ class RecordTillPaymentHandler implements Handles<RecordTillPayment, UUID> {
             flags.add("CLOSED_ACCOUNT");
         }
         if (command.seriesId() != null && command.docNumber() != null) {
-            numbering.observeDeviceNumber(command.seriesId(), command.docNumber());
+            // Only the device's own series at its shop moves (wave 2, M6-04, the kernel's rule).
+            numbering.observeDeviceNumber(command.seriesId(), command.docNumber(), scope);
         }
 
         jdbc.update(

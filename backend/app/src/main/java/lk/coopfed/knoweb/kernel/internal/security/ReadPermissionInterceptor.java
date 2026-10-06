@@ -52,9 +52,18 @@ public class ReadPermissionInterceptor implements HandlerInterceptor {
         this.transactions = transactions;
     }
 
+    /**
+     * A GET, or a HEAD, which Spring MVC serves from the GET mapping by running the same handler
+     * (wave 2, TWK-19): its status and Content-Length answer "exists, and this big", so it is
+     * checked as the GET it is. OPTIONS is answered by CORS before any handler and is left alone.
+     */
+    static boolean isRead(String method) {
+        return "GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method);
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (!(handler instanceof HandlerMethod) || !"GET".equalsIgnoreCase(request.getMethod())) {
+        if (!(handler instanceof HandlerMethod) || !isRead(request.getMethod())) {
             return true;
         }
         Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
