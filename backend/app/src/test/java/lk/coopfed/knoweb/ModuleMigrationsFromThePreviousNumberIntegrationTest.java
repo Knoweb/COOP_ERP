@@ -17,7 +17,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 /**
  * The demo server's situation (wave 2 fix plan, "a Flyway test start on a database at the previous
  * migration"): a database whose every stream stands at the number before this pull request's
- * migrations (kernel {@code V0085}, m1party {@code V0014}, m1security {@code V0017}, m2catalogue
+ * migrations (kernel {@code V0085}, m1party {@code V0014}, m1security {@code V0018} since PR 11, m2catalogue
  * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0006}) migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
  * FlywayConfig} runs the streams. The streams depend on each other at run time only (a policy
@@ -36,7 +36,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("kernel", "85");
         streams.put("hello", null);
         streams.put("m1party", "14");
-        streams.put("m1security", "17");
+        // Wave 2 PR 11 (m1security V0019): from V0018, where the demo server stands after PR 05.
+        streams.put("m1security", "18");
         streams.put("m2catalogue", "7");
         streams.put("m3pricing", "5");
         streams.put("m4trading", null);
@@ -106,7 +107,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         assertThat(after)
                 .containsEntry("kernel", 86)
                 .containsEntry("m1party", 15)
-                .containsEntry("m1security", 18)
+                .containsEntry("m1security", 19)
                 .containsEntry("m2catalogue", 8)
                 .containsEntry("m3pricing", 6)
                 .containsEntry("m5inventory", 7);
