@@ -2,10 +2,10 @@
 # Change a version here only, and say why in the pull request.
 [versions]
 kotlin = "2.3.21"
-compose-multiplatform = "1.12.1"
+compose-multiplatform = "1.11.1"
 compose-material3 = "1.9.0"
 # Skia for the JVM: keep it the version compose-multiplatform brings (render uses it directly).
-skiko = "0.150.1"
+skiko = "0.144.6"
 agp = "8.13.2"
 sqldelight = "2.4.0"
 ktor = "3.6.0"
@@ -16,7 +16,7 @@ kotlinx-datetime = "0.7.1"
 sqlite-jdbc-crypt = "3.53.4.0"
 bouncycastle = "1.86"
 jna = "5.19.1"
-androidx-core = "1.19.1"
+androidx-core = "1.13.1"
 androidx-activity = "1.9.2"
 androidx-work = "2.12.0"
 junit4 = "4.13.2"
