@@ -131,8 +131,16 @@ class RepackPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aWrongRecipeIsReversedWhileThePacksAreUntouchedAndTheLooseRiceComesBack() {
         UUID recipe = define.handle(recipe("R-012 rice 1 kg"), own(MPCS));
+        // 19.6 expected, 19 made: 3 % short, beyond the 2 % tolerance, so the shortfall carries a reason.
         UUID id = execute.handle(
-                new ExecuteRepack(recipe, stores, looseBatch, new BigDecimal("20"), new BigDecimal("19"), null),
+                new ExecuteRepack(
+                        recipe,
+                        stores,
+                        looseBatch,
+                        new BigDecimal("20"),
+                        new BigDecimal("19"),
+                        null,
+                        "A torn sack, swept up"),
                 own(MPCS));
         assertThat(control.repack(id, own(MPCS)).orElseThrow().varianceQty()).isEqualByComparingTo("0.6");
 
@@ -150,6 +158,60 @@ class RepackPostgresIntegrationTest extends PostgresIntegrationTest {
                 .contains("REPACK_REVERSED");
         assertThat(events(RepackReversed.class)).hasSize(1);
         assertProblem(() -> reverse.handle(new ReverseRepack(id, "again"), own(MPCS)), "m5.repack.already_reversed");
+    }
+
+    @Test
+    void packsBeyondTheYieldToleranceAreRefusedAndAShortfallBeyondItNeedsAReasonAndIsFlagged() {
+        UUID recipe = define.handle(recipe("R-012 rice 1 kg"), own(MPCS));
+        kernel.reset();
+
+        // 50 kg should make 49 packs; 2 % above is 49.98: 50 packs are sellable stock from nothing.
+        assertProblem(
+                () -> execute.handle(
+                        new ExecuteRepack(recipe, stores, looseBatch, new BigDecimal("50"), new BigDecimal("50"), null),
+                        own(MPCS)),
+                "m5.repack.yield_out_of_range");
+        // 2 % below is 48.02: 45 packs need a reason.
+        assertProblem(
+                () -> execute.handle(
+                        new ExecuteRepack(recipe, stores, looseBatch, new BigDecimal("50"), new BigDecimal("45"), null),
+                        own(MPCS)),
+                "m5.repack.yield_reason_required");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(onHand(loose)).isEqualByComparingTo("50");
+
+        UUID id = execute.handle(
+                new ExecuteRepack(
+                        recipe,
+                        stores,
+                        looseBatch,
+                        new BigDecimal("50"),
+                        new BigDecimal("45"),
+                        null,
+                        "Damp rice, sieved"),
+                own(MPCS));
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("REPACK_YIELD_EXCEPTION"))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.subject().id()).isEqualTo(id);
+                    assertThat(a.reason()).isEqualTo("Damp rice, sieved");
+                });
+        assertThat(onHand(pack)).isEqualByComparingTo("45");
+    }
+
+    @Test
+    void aRepackWithinTheYieldToleranceNeedsNoReason() {
+        UUID recipe = define.handle(recipe("R-012 rice 1 kg"), own(MPCS));
+        kernel.reset();
+        // 48.5 of 49 expected: 1 % short.
+        execute.handle(
+                new ExecuteRepack(recipe, stores, looseBatch, new BigDecimal("50"), new BigDecimal("48.5"), null),
+                own(MPCS));
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .doesNotContain("REPACK_YIELD_EXCEPTION");
     }
 
     @Test

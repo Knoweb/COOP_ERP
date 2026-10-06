@@ -340,9 +340,12 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "integration.notification_contact",
-                    "no ext_view on purpose (m9integration V0003): an address is personal data a regulator's"
-                            + " view has no need of; the dispatcher reaches it through notification_recipients()",
-                    RlsMatrixIntegrationTest::externalReadsNothing),
+                    "own_* only (m9integration V0003, fed_view dropped by V0006; wave 2, M9-06 and"
+                            + " 2026-10-06-wave2-member-identity-visibility.md (1)): an address is personal data"
+                            + " that neither the Federation's view nor a regulator's reads; the dispatcher reaches"
+                            + " it through notification_recipients(), which answers an OWN caller for the"
+                            + " entities it trades with",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
             // (hello README); K-01 has landed, so hello can add it.

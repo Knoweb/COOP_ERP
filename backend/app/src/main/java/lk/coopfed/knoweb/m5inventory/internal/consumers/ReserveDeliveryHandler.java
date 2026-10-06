@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m5inventory.internal.consumers;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,8 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m5inventory.api.PickListCreated;
 import lk.coopfed.knoweb.m5inventory.internal.consumers.ConsumerStore.Candidate;
+import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
+import lk.coopfed.knoweb.m5inventory.internal.control.ControlPolicy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
  * and a quantity above zero ({@code m5.delivery.line_invalid}). A delivery note that has its pick
  * list already gets the same one back.
  *
- * <p>Mutation: a pick list; per line, the seller's GOOD lots of the item with free stock, FEFO
+ * <p>Mutation: a pick list; per line, the seller's in-date GOOD lots of the item with free stock
+ * and at least {@code inventory.dispatch_min_shelf_life_days} of life left (wave 2, M5-01), FEFO
  * across its locations (the delivery note does not say which warehouse it leaves from: decided on
  * the architect's delegation, recorded in the README), taken in order until the line is covered; a
  * row with no lot for what is short. Audit {@code PICK_LIST_CREATED}; event
@@ -46,12 +50,22 @@ class ReserveDeliveryHandler implements Handles<ReserveDelivery, UUID> {
     static final String AUDIT_CREATED = "PICK_LIST_CREATED";
 
     private final ConsumerStore store;
+    private final ControlPolicy policy;
+    private final BusinessDay businessDay;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
-    ReserveDeliveryHandler(ConsumerStore store, JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+    ReserveDeliveryHandler(
+            ConsumerStore store,
+            ControlPolicy policy,
+            BusinessDay businessDay,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
         this.store = store;
+        this.policy = policy;
+        this.businessDay = businessDay;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -78,13 +92,16 @@ class ReserveDeliveryHandler implements Handles<ReserveDelivery, UUID> {
                 scope.entityId(),
                 command.deliveryNoteId());
 
+        // wave 2, M5-01: an expired lot never leaves on a delivery note, nor one with less shelf life
+        // left than the seller asks of what it sends to another entity (0 days by default).
+        LocalDate expiresFrom = businessDay.today().plusDays(policy.dispatchMinShelfLifeDays(scope));
         // What this list takes of each lot, so two lines of one item do not take the same units.
         Map<UUID, BigDecimal> takenHere = new HashMap<>();
         BigDecimal picked = BigDecimal.ZERO;
         BigDecimal shortQty = BigDecimal.ZERO;
         for (ReserveDelivery.Line line : command.lines()) {
             BigDecimal remaining = line.qty();
-            List<Candidate> candidates = store.lockCandidates(line.skuId(), line.batchId());
+            List<Candidate> candidates = store.lockCandidates(line.skuId(), line.batchId(), expiresFrom);
             for (Candidate lot : candidates) {
                 if (remaining.signum() <= 0) {
                     break;

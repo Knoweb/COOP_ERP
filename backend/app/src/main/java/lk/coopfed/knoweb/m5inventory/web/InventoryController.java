@@ -255,7 +255,8 @@ class InventoryController implements InventoryApi {
                         lot.negative())
                 .batchNo(batchNo)
                 .expiryDate(lot.expiryDate())
-                .fefoRank(lot.fefoRank());
+                .fefoRank(lot.fefoRank())
+                .expired(lot.expired());
         return showCost ? response.unitCost(lot.unitCost()) : response;
     }
 

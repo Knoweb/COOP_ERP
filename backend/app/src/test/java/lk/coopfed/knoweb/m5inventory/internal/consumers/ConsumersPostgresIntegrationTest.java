@@ -4,6 +4,7 @@ import static lk.coopfed.knoweb.m5inventory.InventoryFixture.own;
 import static lk.coopfed.knoweb.m5inventory.InventoryFixture.system;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +27,7 @@ import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
 import lk.coopfed.knoweb.m5inventory.api.StockMoved;
 import lk.coopfed.knoweb.m5inventory.api.StockReceived;
+import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
@@ -70,6 +72,12 @@ class ConsumersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     ObjectMapper mapper;
+
+    @Autowired
+    BusinessDay businessDay;
+
+    @Autowired
+    lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
 
     private InventoryFixture fixture;
     private UUID federationWarehouse;
@@ -212,6 +220,94 @@ class ConsumersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualByComparingTo("2"));
     }
 
+    // ---- wave 2: expired stock never leaves, short rows are picked again at dispatch ---------
+
+    @Test
+    void anExpiredLotIsNeverReservedForADeliveryNote() {
+        LocalDate today = businessDay.today();
+        UUID gone = fixture.batch(sku, FEDERATION, "G1", today.minusDays(3));
+        post(receipt(federationWarehouse, gone, "50", "800"));
+        kernel.reset();
+
+        UUID deliveryNote = Ids.next();
+        deliveries.onIssued(issued(deliveryNote, FEDERATION, Ids.next(), sku, null, "15"), system(FEDERATION));
+        assumeTrue(today.equals(businessDay.today()), "the run crossed midnight in Colombo");
+
+        assertThat(queries.pickList(deliveryNote, own(FEDERATION)).orElseThrow().lines())
+                .extracting(PickListView.Pick::batchId, p -> p.qty().intValue())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(early, 10), org.assertj.core.groups.Tuple.tuple(late, 5));
+    }
+
+    @Test
+    void theSellersMinimumShelfLifeLeavesShortDatedLotsOutOfADeliveryNote() {
+        LocalDate today = businessDay.today();
+        UUID shortDated = fixture.batch(sku, FEDERATION, "S1", today.plusDays(10));
+        post(receipt(federationWarehouse, shortDated, "50", "800"));
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, scope_location_id, value, changed_by)"
+                                + " values ('inventory.dispatch_min_shelf_life_days', ?, null, '30'::jsonb, ?)",
+                        FEDERATION,
+                        InventoryFixture.USER);
+        config.invalidate("inventory.dispatch_min_shelf_life_days");
+        try {
+            kernel.reset();
+            UUID deliveryNote = Ids.next();
+            deliveries.onIssued(issued(deliveryNote, FEDERATION, Ids.next(), sku, null, "12"), system(FEDERATION));
+
+            // Ten days left is less than the thirty the Federation asks of what it sends: FEFO starts later.
+            assertThat(queries.pickList(deliveryNote, own(FEDERATION))
+                            .orElseThrow()
+                            .lines())
+                    .extracting(PickListView.Pick::batchId, p -> p.qty().intValue())
+                    .containsExactly(
+                            org.assertj.core.groups.Tuple.tuple(early, 10),
+                            org.assertj.core.groups.Tuple.tuple(late, 2));
+        } finally {
+            superuserJdbc()
+                    .update("delete from kernel.config_value where key = 'inventory.dispatch_min_shelf_life_days'");
+            config.invalidate("inventory.dispatch_min_shelf_life_days");
+        }
+    }
+
+    @Test
+    void aShortRowIsPickedAgainAtDispatchAndWhatIsStillMissingIsFlaggedNeverPostedNegative() {
+        // 25 ordered, 20 held: 5 short at the reservation.
+        UUID deliveryNote = Ids.next();
+        UUID line = Ids.next();
+        deliveries.onIssued(issued(deliveryNote, FEDERATION, line, sku, null, "25"), system(FEDERATION));
+        assertThat(queries.pickList(deliveryNote, own(FEDERATION)).orElseThrow().lines())
+                .filteredOn(p -> p.stockLotId() == null)
+                .singleElement()
+                .satisfies(p -> assertThat(p.qty()).isEqualByComparingTo("5"));
+
+        // A GRN of 3 lands before the vehicle leaves.
+        UUID fresh = fixture.batch(sku, FEDERATION, "N1", LocalDate.of(2028, 3, 31));
+        post(receipt(federationWarehouse, fresh, "3", "900"));
+        kernel.reset();
+
+        deliveries.onDispatched(dispatched(deliveryNote, FEDERATION), system(FEDERATION));
+
+        assertThat(queries.movementsOf(deliveryNote, own(FEDERATION)))
+                .extracting(m -> m.batchId(), m -> m.qtyDelta().intValue())
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(early, -10),
+                        org.assertj.core.groups.Tuple.tuple(late, -10),
+                        org.assertj.core.groups.Tuple.tuple(fresh, -3));
+        assertThat(lots(federationWarehouse, FEDERATION))
+                .allSatisfy(l -> assertThat(l.qtyOnHand().signum()).isZero());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("STOCK_POSTED", "PICK_LIST_DISPATCHED", "PICK_SHORT_DISPATCHED");
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("PICK_SHORT_DISPATCHED"))
+                .singleElement()
+                .satisfies(a -> assertThat(a.after().toString()).contains(line.toString(), "qty=2"));
+        assertThat(events(PickListDispatched.class)).singleElement().satisfies(e -> assertThat(e.movements())
+                .isEqualTo(3));
+    }
+
     // ---- guards: nothing is committed ------------------------------------------------------
 
     @Test
@@ -349,6 +445,12 @@ class ConsumersPostgresIntegrationTest extends PostgresIntegrationTest {
                 new BigDecimal(qty),
                 new BigDecimal(cost),
                 null);
+    }
+
+    private void post(Movement... movements) {
+        outer.run(
+                own(FEDERATION),
+                () -> ledger.post(new PostMovements(Ids.next(), null, null, List.of(movements)), own(FEDERATION)));
     }
 
     private BigDecimal available(UUID location) {

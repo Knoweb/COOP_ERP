@@ -12,13 +12,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness;
+import lk.coopfed.knoweb.m8reporting.api.ExportReportCsv;
 import lk.coopfed.knoweb.m8reporting.api.ReportRunCompleted;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
@@ -30,6 +33,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * A print run from request to outcome (28A section 7, render/ReportRunWorker), with a renderer
@@ -49,6 +54,9 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
     Handles<CompleteReportRun, String> complete;
 
     @Autowired
+    Handles<ExportReportCsv, ReportTable> export;
+
+    @Autowired
     ReportingQueries queries;
 
     @Autowired
@@ -59,6 +67,9 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     ObjectMapper mapper;
+
+    @Autowired
+    PlatformTransactionManager transactions;
 
     private JdbcTemplate admin;
 
@@ -120,6 +131,69 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
         var run = queries.run(runId, ScopeContext.dev(USER, ENTITY, null)).orElseThrow();
         assertThat(run.status()).isEqualTo("FAILED");
         assertThat(run.errorCode()).isEqualTo("report.timeout");
+    }
+
+    /**
+     * Wave 2, M8-12: delivered as the kernel's dispatcher delivers it, inside one transaction of
+     * its own. The read throws (the payload names a report the catalogue does not have) in the
+     * worker's read-only transaction, so the dispatcher's still commits the outcome: FAILED with
+     * the read's message id, not a retry that dead-letters a run left REQUESTED.
+     */
+    @Test
+    void aRunWhoseReadThrowsEndsFailedThroughTheDispatchersTransaction() {
+        UUID runId = request.handle(
+                new RequestReportRun("stock-position", null, null, null, "en"), ScopeContext.dev(USER, ENTITY, null));
+        kernel.reset();
+
+        new TransactionTemplate(transactions).executeWithoutResult(status -> worker(new RecordingRenderer(null))
+                .onRequested(payload(runId, "no-such-report", null, null, "en"), system()));
+
+        var run = queries.run(runId, ScopeContext.dev(USER, ENTITY, null)).orElseThrow();
+        assertThat(run.status()).isEqualTo("FAILED");
+        assertThat(run.errorCode()).isEqualTo("m8.report.unknown");
+        assertThat(kernel.committedAudit()).extracting(a -> a.eventType()).containsExactly("REPORT_RUN_COMPLETED");
+        assertThat(kernel.committedEvents())
+                .containsExactly(new ReportRunCompleted(runId, "stock-position", "FAILED", null, "m8.report.unknown"));
+    }
+
+    @Test
+    void aFailureThatIsNotAProblemIsRecordedFailedWithTheGenericMessageId() {
+        UUID runId = request.handle(
+                new RequestReportRun("stock-position", null, null, null, "en"), ScopeContext.dev(USER, ENTITY, null));
+
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(status -> worker(new RecordingRenderer(new IllegalStateException("store down")))
+                        .onRequested(payload(runId, "stock-position", null, null, "en"), system()));
+
+        var run = queries.run(runId, ScopeContext.dev(USER, ENTITY, null)).orElseThrow();
+        assertThat(run.status()).isEqualTo("FAILED");
+        assertThat(run.errorCode()).isEqualTo("m8.run.render_failed");
+    }
+
+    @Test
+    void aCsvExportIsRefusedToAClassThatWritesNothingAndCommitsNothing() {
+        ScopeContext own = ScopeContext.dev(USER, ENTITY, null);
+        ScopeContext federationView = new ScopeContext(
+                USER,
+                null,
+                ENTITY,
+                own.scopes(),
+                own.activeScope(),
+                PolicyClass.FEDERATION_VIEW,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                Ids.next());
+        ProblemException refused = assertThrows(
+                ProblemException.class,
+                () -> export.handle(new ExportReportCsv("stock-position", null, null, null), federationView));
+        assertThat(refused.messageId()).isEqualTo("m8.export.own_required");
+
+        ProblemException unknown = assertThrows(
+                ProblemException.class, () -> export.handle(new ExportReportCsv("no-such", null, null, null), own));
+        assertThat(unknown.messageId()).isEqualTo("m8.report.unknown");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test
@@ -191,7 +265,7 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
     // ---- helpers -----------------------------------------------------------------------------
 
     private ReportRunWorker worker(A4Renderer renderer) {
-        return new ReportRunWorker(queries, renderer, printModel, complete);
+        return new ReportRunWorker(queries, renderer, printModel, complete, transactions);
     }
 
     private ObjectNode payload(UUID runId, String reportId, String from, String to, String language) {
@@ -212,13 +286,13 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
     /** Stands in for Chromium: records what it was asked to print, or fails as told. */
     static final class RecordingRenderer implements A4Renderer {
 
-        private final ProblemException failure;
+        private final RuntimeException failure;
         String templateId;
         Map<String, Object> data;
         Locale language;
         final List<ScopeContext> scopes = new ArrayList<>();
 
-        RecordingRenderer(ProblemException failure) {
+        RecordingRenderer(RuntimeException failure) {
             this.failure = failure;
         }
 
