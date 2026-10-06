@@ -1,18 +1,14 @@
 package lk.coopfed.knoweb.m9integration.internal.journal;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.JournalLineView;
 
 /**
- * The journal file for the accounting package (29A section 6.2, ExportWriter; the format CSV of
- * {@code journal_export.format}): RFC 4180, UTF-8, one header line, then for every journal line
- * its two entries, the debit and the credit, so that the file reads as a double-entry journal
- * that any package imports and that balances line by line.
+ * The journal file as written before m9integration V0006 (format version 1; 29A section 6.2,
+ * ExportWriter; the format CSV of {@code journal_export.format}): RFC 4180, UTF-8, one header
+ * line, then for every journal line its two entries, the debit and the credit, so that the file
+ * reads as a double-entry journal that any package imports and that balances line by line.
  *
  * <pre>
  * entry,date,doc_type,doc_number,line_kind,side,account_role,debit,credit,document_id
@@ -20,17 +16,25 @@ import lk.coopfed.knoweb.m9integration.query.IntegrationQueries.JournalLineView;
  * 1,2026-09-14,INV,M042-INV-0007712,GOODS,SELLER,REVENUE,0.00,24850.00,…
  * </pre>
  *
- * Account roles, never account numbers: the chart of accounts is mapped when the accounting
- * system is chosen (doc 10 J-02). The same lines always give the same bytes, so the content hash
- * recorded at generation proves later that the export was not altered.
+ * <p><b>FROZEN. This class never changes.</b> An export made before V0006 has no stored file: its
+ * download is rebuilt by this writer from its lines, and its recorded hash is the hash of what
+ * this writer gives. An edit here, however small (the header, the escaping, a rounding), would make
+ * every one of those exports fail its reconciliation and hand the accountant a file that is not the
+ * one the package imported (wave 2, M9-05; {@code
+ * docs/progress/deviations/2026-10-06-wave2-journal-export.md} (1)). A change to the format is a
+ * new writer with the next version number ({@link JournalFileV2}), and the exports made with it
+ * store their bytes.
+ *
+ * <p>Account roles, never account numbers: the chart of accounts is mapped when the accounting
+ * system is chosen (doc 10 J-02). The same lines always give the same bytes.
  */
-public final class JournalFile {
+public final class JournalFileV1 {
 
     static final String HEADER = "entry,date,doc_type,doc_number,line_kind,side,account_role,debit,credit,document_id";
 
     private static final String ZERO = "0.00";
 
-    private JournalFile() {}
+    private JournalFileV1() {}
 
     public static String csv(List<JournalLineView> lines) {
         StringBuilder csv = new StringBuilder(HEADER).append("\r\n");
@@ -39,16 +43,6 @@ public final class JournalFile {
             row(csv, line, line.creditRole(), ZERO, money(line.amount()));
         }
         return csv.toString();
-    }
-
-    /** The SHA-256 of the file's bytes, in lower-case hex (64 characters, journal_export.content_hash). */
-    public static String sha256(String content) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(content.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is part of every JDK", e);
-        }
     }
 
     private static void row(StringBuilder csv, JournalLineView line, String role, String debit, String credit) {

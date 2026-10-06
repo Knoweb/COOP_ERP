@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -137,8 +138,12 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                     || !java.util.Objects.equals(relationshipId, grn.relationshipId())) {
                 throw new ProblemException("m4.invoice.one_buyer");
             }
-            jdbc.queryForList("select pg_advisory_xact_lock(hashtext(?::text))", "invoice-" + grnId);
             received.add(grn);
+        }
+        // One lock per GRN, taken in sorted order, never the request's: two invoices of [A, B]
+        // and [B, A] at once would otherwise deadlock (wave 2, M4MONEY-12).
+        for (UUID grnId : new TreeSet<>(grnIds)) {
+            jdbc.queryForList("select pg_advisory_xact_lock(hashtext(?::text))", "invoice-" + grnId);
         }
         Integer invoiced = jdbc.queryForObject(
                 "select count(*) from trading.doc_invoice where grn_document_ids && ?::uuid[]", Integer.class, (Object)
@@ -231,8 +236,11 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 taxPoint,
                 dueDate);
 
-        List<Posting> journal =
-                postings.postings(INV, "GOODS", "SELLER", Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+        // Both sides of the invoice (wave 2, CR-24A-3 item 5): the seller's receivable and the
+        // buyer's payable travel on one event; M9 files each under its own party (CR-19A-13).
+        Map<String, BigDecimal> amounts = Map.of("net", issued.netAmount(), "tax", issued.taxAmount());
+        List<Posting> journal = new ArrayList<>(postings.postings(INV, "GOODS", "SELLER", amounts));
+        journal.addAll(postings.postings(INV, "GOODS", "BUYER", amounts));
 
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", issued.status());
@@ -258,7 +266,8 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 issued.taxAmount(),
                 issued.grossAmount(),
                 issued.contentHash()));
-        events.publish(new JournalPostingsReady(invoiceId, INV, issued.docNumberDisplay(), seller, journal));
+        events.publish(new JournalPostingsReady(
+                invoiceId, INV, issued.docNumberDisplay(), seller, journal, issued.businessDate(), buyerId));
         return invoiceId;
     }
 }

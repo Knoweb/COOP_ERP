@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m5inventory.internal.availability;
 
 import java.math.BigDecimal;
 import java.sql.Array;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.EntityCost;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
@@ -31,28 +33,48 @@ import org.springframework.transaction.annotation.Transactional;
  * security filters; no query names an owner. The FEFO rank ranks the GOOD lots with stock at a
  * location for a SKU by expiry, none last, then by when they were received (25A section 7,
  * "FefoService"); the lot's id breaks a tie so the order is the same on every call.
+ *
+ * <p><b>Expired stock</b> (wave 2, M5-01; {@code docs/progress/deviations/2026-10-06-wave2-expired-stock.md}):
+ * a lot whose expiry date is before the business date ({@link BusinessDay}, passed into every query
+ * as a parameter, never SQL {@code current_date}) has no rank, is never available, never picked and
+ * never a price candidate; {@link #balances} still shows it, flagged {@code expired}, so the stock
+ * book shows what has to be written off. A lot expiring today is still sellable today.
  */
 @Service
 @Transactional(readOnly = true)
 class InventoryQueriesImpl implements InventoryQueries {
 
-    /** A lot with its FEFO rank among the sellable lots of its location and SKU. */
+    /**
+     * A lot with its FEFO rank among the sellable lots of its location and SKU, whether it is
+     * expired, and what the open pick lists reserve of it. The first parameter is the business date.
+     */
     private static final String RANKED_LOTS =
             """
             select l.stock_lot_id, l.owner_entity_id, l.location_id, l.sku_id, l.batch_id, l.expiry_date,
                    l.condition, l.qty_on_hand, l.unit_cost, l.received_at, l.negative_since,
+                   coalesce(l.expiry_date < d.today, false) as expired,
+                   coalesce((select sum(p.qty)
+                               from inventory.pick_list_line p
+                               join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
+                              where pl.status = 'OPEN' and p.stock_lot_id = l.stock_lot_id), 0) as reserved,
                    case when l.condition = 'GOOD' and l.qty_on_hand > 0
+                             and (l.expiry_date is null or l.expiry_date >= d.today)
                         then row_number() over (
-                                 partition by l.location_id, l.sku_id, (l.condition = 'GOOD' and l.qty_on_hand > 0)
+                                 partition by l.location_id, l.sku_id,
+                                              (l.condition = 'GOOD' and l.qty_on_hand > 0
+                                               and (l.expiry_date is null or l.expiry_date >= d.today))
                                  order by l.expiry_date nulls last, l.received_at, l.stock_lot_id)
                    end as fefo_rank
               from inventory.stock_lot l
+             cross join (select ?::date as today) d
             """;
 
     private final JdbcTemplate jdbc;
+    private final BusinessDay businessDay;
 
-    InventoryQueriesImpl(JdbcTemplate jdbc) {
+    InventoryQueriesImpl(JdbcTemplate jdbc, BusinessDay businessDay) {
         this.jdbc = jdbc;
+        this.businessDay = businessDay;
     }
 
     @Override
@@ -62,6 +84,7 @@ class InventoryQueriesImpl implements InventoryQueries {
                         + " where (?::uuid is null or sku_id = ?) and (? or qty_on_hand <> 0)"
                         + " order by fefo_rank is null, sku_id, fefo_rank, condition, expiry_date nulls last, stock_lot_id",
                 InventoryQueriesImpl::lot,
+                today(),
                 locationId,
                 skuId,
                 skuId,
@@ -73,8 +96,11 @@ class InventoryQueriesImpl implements InventoryQueries {
         if (locationIds.isEmpty() || skuIds.isEmpty()) {
             return List.of();
         }
+        Date today = today();
         return jdbc.query(
                 connection -> {
+                    // The open picks reserve units of lots that are still in date: a pick of a lot
+                    // that expired since is not taken twice off what remains.
                     PreparedStatement ps = connection.prepareStatement(
                             """
                             select loc.id as location_id, sku.id as sku_id,
@@ -82,18 +108,23 @@ class InventoryQueriesImpl implements InventoryQueries {
                                    - coalesce((select sum(p.qty)
                                                  from inventory.pick_list_line p
                                                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
+                                                 join inventory.stock_lot r on r.stock_lot_id = p.stock_lot_id
                                                 where pl.status = 'OPEN'
-                                                  and p.location_id = loc.id and p.sku_id = sku.id), 0) as on_hand
+                                                  and p.location_id = loc.id and p.sku_id = sku.id
+                                                  and (r.expiry_date is null or r.expiry_date >= ?)), 0) as on_hand
                               from unnest(?::uuid[]) as loc (id)
                              cross join unnest(?::uuid[]) as sku (id)
                               left join inventory.stock_lot l
                                 on l.location_id = loc.id and l.sku_id = sku.id
                                and l.condition = 'GOOD' and l.qty_on_hand > 0
+                               and (l.expiry_date is null or l.expiry_date >= ?)
                              group by loc.id, sku.id
                              order by loc.id, sku.id
                             """);
-                    ps.setArray(1, uuids(connection, locationIds));
-                    ps.setArray(2, uuids(connection, skuIds));
+                    ps.setDate(1, today);
+                    ps.setArray(2, uuids(connection, locationIds));
+                    ps.setArray(3, uuids(connection, skuIds));
+                    ps.setDate(4, today);
                     return ps;
                 },
                 (rs, n) -> new Availability(
@@ -102,12 +133,18 @@ class InventoryQueriesImpl implements InventoryQueries {
                         nonNegative(rs.getBigDecimal("on_hand"))));
     }
 
+    /**
+     * The in-date GOOD lots with stock in FEFO order, each with what is free of it: its quantity
+     * less what the open pick lists reserve (wave 2, observation of the M5 fix review: a transfer
+     * must not take units a delivery note already holds). A lot with nothing free is left out.
+     */
     @Override
     public List<LotBalance> pickBatches(UUID locationId, UUID skuId, ScopeContext scope) {
         return jdbc.query(
                 "select * from (" + RANKED_LOTS + " where l.location_id = ? and l.sku_id = ?) ranked"
-                        + " where fefo_rank is not null order by fefo_rank",
-                InventoryQueriesImpl::lot,
+                        + " where fefo_rank is not null and qty_on_hand - reserved > 0 order by fefo_rank",
+                (rs, n) -> withQty(lot(rs, n), rs.getBigDecimal("qty_on_hand").subtract(rs.getBigDecimal("reserved"))),
+                today(),
                 locationId,
                 skuId);
     }
@@ -117,13 +154,15 @@ class InventoryQueriesImpl implements InventoryQueries {
         if (locationIds.isEmpty()) {
             return List.of();
         }
+        Date today = today();
         return jdbc.query(
                 connection -> {
                     PreparedStatement ps = connection.prepareStatement("select * from (" + RANKED_LOTS
                             + " where l.location_id = any (?::uuid[]) and l.sku_id = ?) ranked"
                             + " where fefo_rank is not null order by location_id, fefo_rank");
-                    ps.setArray(1, uuids(connection, locationIds));
-                    ps.setObject(2, skuId);
+                    ps.setDate(1, today);
+                    ps.setArray(2, uuids(connection, locationIds));
+                    ps.setObject(3, skuId);
                     return ps;
                 },
                 InventoryQueriesImpl::lot);
@@ -399,6 +438,28 @@ class InventoryQueriesImpl implements InventoryQueries {
                 ranked ? (int) rank : null,
                 rs.getBigDecimal("unit_cost"),
                 received == null ? null : received.toInstant(),
-                rs.getObject("negative_since") != null);
+                rs.getObject("negative_since") != null,
+                rs.getBoolean("expired"));
+    }
+
+    private static LotBalance withQty(LotBalance lot, BigDecimal qty) {
+        return new LotBalance(
+                lot.stockLotId(),
+                lot.ownerEntityId(),
+                lot.locationId(),
+                lot.skuId(),
+                lot.batchId(),
+                lot.expiryDate(),
+                lot.condition(),
+                qty,
+                lot.fefoRank(),
+                lot.unitCost(),
+                lot.receivedAt(),
+                lot.negative(),
+                lot.expired());
+    }
+
+    private Date today() {
+        return Date.valueOf(businessDay.today());
     }
 }

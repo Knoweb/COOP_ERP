@@ -794,6 +794,8 @@ export interface components {
             qtyOnHand: number;
             fefoRank?: number;
             negative: boolean;
+            /** @description The lot's expiry date is before the business date; it has no FEFO rank and leaves by a write-off */
+            expired?: boolean;
             /** @description The lot's acquisition cost; only for a user of the owning entity, never for a till */
             unitCost?: number;
         };
@@ -827,6 +829,11 @@ export interface components {
             condition: "GOOD" | "DAMAGED";
             countedQty?: number;
             skipReason?: string;
+            /**
+             * Format: date-time
+             * @description When the lot was counted (the form stamps the line); the line is measured against the lot as it stood then
+             */
+            countedAt?: string;
         };
         ReasonRequest: {
             reason: string;
@@ -1024,6 +1031,8 @@ export interface components {
             inputQty: number;
             actualOutputQty: number;
             printedMrp?: number;
+            /** @description Why fewer packs were made than the recipe expects; required when the shortfall is beyond the yield tolerance */
+            varianceReason?: string;
         };
         RepackResponse: {
             /** Format: uuid */

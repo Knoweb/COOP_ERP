@@ -35,6 +35,7 @@ import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingDocuments;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingGuards;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingSeries;
+import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceCredits;
 import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceSettlements;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.posting.PostingMapper;
@@ -46,17 +47,21 @@ import org.springframework.transaction.annotation.Transactional;
  * ApproveClaim (24A section 6; doc 24 section 4.5: "seller; attachments COMPLETE; credit note
  * issued in the same transaction (CREDITS link)"). The seller accepts the claim in whole or in
  * part; what it accepts is credited on its invoice of the GRN at the invoice line's price and VAT
- * rate, never more than the line billed (the credit note path of SettleDiscrepancy).
+ * rate, never more than the line has left uncredited by earlier credit notes, whichever path
+ * issued them ({@link InvoiceCredits}; wave 2, M4MONEY-01).
  *
  * <p>Guards, in order: the seller's entity-wide OWN scope; a claim raised with the caller ({@code
  * m4.claim.not_found}); not decided (an advisory lock per claim; {@code m4.claim.decided}); every
  * photograph COMPLETE ({@code m4.claim.evidence_pending}); each accepted line a line of the claim
  * ({@code m4.claim.line_unknown}) once, 0 &lt;= qty &lt;= claimed ({@code m4.claim.qty_invalid}),
  * something accepted ({@code m4.claim.nothing_approved}: reject instead); the seller's issued
- * invoice of the GRN billing the lines ({@code m4.claim.invoice_first}); the credit within what is
- * still due ({@code m4.creditnote.exceeds_due}).
+ * invoice of the GRN billing the lines ({@code m4.claim.invoice_first}); under the invoice's lock,
+ * each accepted quantity no more than its invoice line has left uncredited ({@code
+ * m4.creditnote.exceeds_billed}: refused, never capped, so the decision and the credit note agree).
+ * The credit's money applies to the invoice as far as it is still due and the rest stays on the
+ * credit note, unapplied (B-1).
  *
- * <p>Mutation: the credit note (CN from the seller's ENTITY series, CREDITS link, {@code
+ * <p>Mutation: the credit note (CN from the seller's ENTITY series, CREDITS link when anything is due, {@code
  * doc_credit_note} naming the claim, the invoice's credited cache); the seller's own rows {@code
  * claim_decision} (APPROVED) and {@code claim_decision_line}. The buyer's claim is never written
  * (AGENTS.md idea 3). Audit CLAIM_APPROVED and CREDIT_NOTE_ISSUED; events claim.approved.v1,
@@ -77,6 +82,7 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
     private final TradingSeries series;
     private final PostingMapper postings;
     private final InvoiceSettlements settlements;
+    private final InvoiceCredits credits;
     private final TradingClock clock;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -92,6 +98,7 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
             TradingSeries series,
             PostingMapper postings,
             InvoiceSettlements settlements,
+            InvoiceCredits credits,
             TradingClock clock,
             AuditFacade audit,
             EventPublisher events) {
@@ -104,6 +111,7 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
         this.series = series;
         this.postings = postings;
         this.settlements = settlements;
+        this.credits = credits;
         this.clock = clock;
         this.audit = audit;
         this.events = events;
@@ -139,7 +147,10 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
             throw new ProblemException("m4.claim.invoice_first");
         }
         UUID invoiceId = invoice.get();
+        // Locked before the lines and the credits are read (InvoiceCredits).
+        documents.lockForLinking(invoiceId);
         List<DocumentLineRecord> invoiceLines = documents.findLines(invoiceId);
+        Map<UUID, InvoiceCredits.Credited> creditedByLine = credits.creditedByLine(invoiceId);
         UUID creditNoteId = Ids.next();
         List<DocumentLineRecord> creditLines = new ArrayList<>();
         List<ClaimLine> accepted = new ArrayList<>();
@@ -152,8 +163,12 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                     .filter(candidate -> line.grnLineId().equals(candidate.referenceLineId()))
                     .findFirst()
                     .orElseThrow(() -> new ProblemException("m4.claim.invoice_first"));
-            creditLines.add(
-                    IssueCreditNoteHandler.priced(creditNoteId, creditLines.size() + 1, billed, qty.min(billed.qty())));
+            // Refused, not capped: the decision line and the credit note always agree, and the
+            // seller approves less or rejects (wave 2, M4MONEY-01).
+            InvoiceCredits.Credited credited = creditedByLine.get(billed.id());
+            InvoiceCredits.Credited left = InvoiceCredits.remaining(billed, credited);
+            IssueCreditNoteHandler.requireWithinBilled(billed, credited, left, qty);
+            creditLines.add(InvoiceCredits.priced(creditNoteId, creditLines.size() + 1, billed, left, qty));
             accepted.add(new ClaimLine(
                     line.claimLineId(), line.grnLineId(), line.skuId(), line.batchId(), line.uomCode(), qty));
         }
@@ -168,8 +183,11 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
         series.ensureEntitySeries(IssueCreditNoteHandler.CN, scope);
         DocumentRecord issued = issuance.issue(
                 documents.findByIdForUpdate(creditNoteId).orElseThrow(), documents.findLines(creditNoteId), scope);
-        settlements.requireDue(invoiceId, issued.grossAmount());
-        links.link(creditNoteId, invoiceId, LinkType.CREDITS, issued.grossAmount(), scope);
+        // The money applies as far as the invoice is still due; the rest stays unapplied (B-1).
+        BigDecimal applied = settlements.applyUpToDue(invoiceId, issued.grossAmount());
+        if (applied.signum() > 0) {
+            links.link(creditNoteId, invoiceId, LinkType.CREDITS, applied, scope);
+        }
         jdbc.update(
                 "insert into trading.doc_credit_note (document_id, invoice_document_id, claim_document_id, reason)"
                         + " values (?, ?, ?, ?)",
@@ -179,11 +197,7 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                 reason);
         BigDecimal credited = IssueCreditNoteHandler.creditedFromLinks(documents, invoiceId);
         jdbc.update("update trading.doc_invoice set credited_amount = ? where document_id = ?", credited, invoiceId);
-        List<Posting> journal = postings.postings(
-                IssueCreditNoteHandler.CN,
-                "GOODS",
-                "SELLER",
-                Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+        List<Posting> journal = IssueCreditNoteHandler.bothSides(postings, issued);
 
         Instant decidedAt = clock.now();
         String findings = command.findings() == null || command.findings().isBlank()
@@ -232,7 +246,7 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                 IssueCreditNoteHandler.AUDIT_ISSUED,
                 Subject.of("credit_note", creditNoteId),
                 null,
-                IssueCreditNoteHandler.auditAfter(issued, invoiceId, null, credited),
+                IssueCreditNoteHandler.auditAfter(issued, invoiceId, null, credited, applied),
                 scope);
 
         events.publish(new ClaimApproved(
@@ -247,7 +261,13 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                 List.copyOf(accepted)));
         events.publish(IssueCreditNoteHandler.issuedEvent(issued, invoiceId, null, seller, buyer));
         events.publish(new JournalPostingsReady(
-                creditNoteId, IssueCreditNoteHandler.CN, issued.docNumberDisplay(), seller, journal));
+                creditNoteId,
+                IssueCreditNoteHandler.CN,
+                issued.docNumberDisplay(),
+                seller,
+                journal,
+                issued.businessDate(),
+                buyer));
         return creditNoteId;
     }
 

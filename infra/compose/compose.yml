@@ -133,7 +133,7 @@ services:
   # Keycloak stands in for the identity provider (doc 10 E-01). Code never talks to it
   # directly: IdentityProviderClient in kernel.api hides it.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.4
+    image: quay.io/keycloak/keycloak:26.8.0
     command: ["start-dev", "--import-realm"]
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}

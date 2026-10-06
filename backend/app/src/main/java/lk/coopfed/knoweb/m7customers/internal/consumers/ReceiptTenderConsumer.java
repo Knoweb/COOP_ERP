@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.m7customers.internal.consumers;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.Handles;
@@ -56,14 +57,18 @@ class ReceiptTenderConsumer {
             if (!ACCOUNT.equals(text(tender, "kind"))) {
                 continue;
             }
+            // What cannot be read is handed over as null and the handler flags the tender (wave 2,
+            // M7CR-06): one bad tender must not roll back the receipt's other tenders, nor
+            // dead-letter the event. Only the document id itself must parse: with no document there
+            // is no subject to flag, and the gateway's bundle validation makes that a contract breach.
             post.handle(
                     new PostAccountTender(
                             kind,
                             uuid(tender, "customer_account_id"),
                             decimal(tender, "amount"),
-                            uuid(document, "document_id"),
+                            UUID.fromString(text(document, "document_id")),
                             text(document, "doc_number_display"),
-                            tender.path("seq").asInt(),
+                            tenderSeq(tender),
                             uuid(document, "location_id"),
                             date(document, "business_date"),
                             uuid(document, "operator_user_id"),
@@ -77,19 +82,48 @@ class ReceiptTenderConsumer {
         return value.isMissingNode() || value.isNull() ? null : value.asText();
     }
 
+    /** A UUID from its text; null when absent or not one. */
     private static UUID uuid(JsonNode node, String field) {
         String value = text(node, field);
-        return value == null || value.isBlank() ? null : UUID.fromString(value);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException notAUuid) {
+            return null;
+        }
     }
 
-    /** A decimal from its text, never through a double. */
+    /** A decimal from its text, never through a double; null when absent or not one. */
     private static BigDecimal decimal(JsonNode node, String field) {
         String value = text(node, field);
-        return value == null ? null : new BigDecimal(value);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
     }
 
+    /** A date from its ISO text; null when absent or not one. */
     private static LocalDate date(JsonNode node, String field) {
         String value = text(node, field);
-        return value == null ? null : LocalDate.parse(value);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException notADate) {
+            return null;
+        }
+    }
+
+    /** The tender's number; null when the till sent none or not a whole number. */
+    private static Integer tenderSeq(JsonNode tender) {
+        JsonNode seq = tender.path("seq");
+        return seq.isIntegralNumber() ? seq.asInt() : null;
     }
 }

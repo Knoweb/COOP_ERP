@@ -3,6 +3,7 @@
   "m9.journal.nothing_to_export": "Nothing to export: every posting from {from} to {to} is already in an export",
   "m9.journal.own_required": "Journal postings are recorded for one entity",
   "m9.journal.period_invalid": "Give a period whose start is not after its end",
+  "m9.journal.period_open": "The period to {to} is still open on {today}; tick provisional to export it anyway, marked PROVISIONAL",
   "m9.journal.postings_malformed": "The journal postings of the document are incomplete",
   "m9.journal.unbalanced": "The journal does not balance; the export was not generated",
   "m9.log.status_invalid": "Unknown delivery status {status}",

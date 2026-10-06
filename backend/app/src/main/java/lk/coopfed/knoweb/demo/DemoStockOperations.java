@@ -72,6 +72,10 @@ class DemoStockOperations {
 
     private static final BigDecimal PACK_KG = new BigDecimal("5");
 
+    /** The society office (Shanthi Wijeratne), the write-off's in-person witness; as DemoCustomers has her. */
+    private static final Actor M101_OFFICE =
+            new Actor("m101-office", UUID.fromString("0190f0de-0000-7000-8000-000000000234"), DemoCast.M101, null);
+
     private final Handles<ScheduleCount, UUID> scheduleCount;
     private final Handles<StartCount, UUID> startCount;
     private final Handles<SubmitCount, UUID> submitCount;
@@ -197,7 +201,7 @@ class DemoStockOperations {
                 .min(Comparator.comparing(CountView::scheduledAt).thenComparing(CountView::taskId));
     }
 
-    // ---- the write-off: damaged flour, witnessed and approved by the manager ------------------
+    // ---- the write-off: damaged flour, witnessed by the office and approved by the manager ----
 
     private void writeOffDamagedFlour(Consumer<String> count) {
         ScopeContext buyer = scopeOf(DemoCast.M101_BUYER);
@@ -229,6 +233,10 @@ class DemoStockOperations {
         count.accept("SubmitWriteOff");
     }
 
+    /**
+     * The society office witnesses in person and the manager approves: since wave 2 (M5-10) the
+     * approver may not be the in-person witness, so three people see a write-off where three exist.
+     */
     private void witnessAndApprove(Consumer<String> count) {
         ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
         Optional<WriteOffView> writeOff = firstWriteOff(manager);
@@ -237,7 +245,7 @@ class DemoStockOperations {
         }
         UUID id = writeOff.get().writeOffId();
         if ("REQUESTED".equals(writeOff.get().status())) {
-            witnessWriteOff.handle(new WitnessWriteOff(id), manager);
+            witnessWriteOff.handle(new WitnessWriteOff(id), scopeOf(M101_OFFICE));
             count.accept("WitnessWriteOff");
         }
         if ("WITNESSED".equals(control.writeOff(id, manager).orElseThrow().status())) {

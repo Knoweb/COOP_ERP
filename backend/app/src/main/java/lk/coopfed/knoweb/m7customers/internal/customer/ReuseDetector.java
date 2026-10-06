@@ -25,7 +25,9 @@ import org.springframework.stereotype.Component;
  *   <li>otherwise the number is CLEAR.</li>
  * </ul>
  * Row-level security hides the phones of other societies, so the holders come from {@code
- * customers.phone_holders}, which answers ids only, never a name.
+ * customers.phone_holders}, which (wave 2, RLS-03) answers an OWN caller its own customers' ids,
+ * whether the caller holds the number, and when each holder let it go; another society's customer
+ * is a row with no id. Nothing here names a person.
  */
 @Component
 public class ReuseDetector {
@@ -42,10 +44,28 @@ public class ReuseDetector {
     /**
      * What the check found.
      *
-     * @param holders the customers concerned: the current holder, or the recent holders
-     * @param holderEntityId the society that registered the current holder (CONFLICT only)
+     * @param ownHolders   the customers concerned that the caller's society registered: the current
+     *                     holder, or the recent holders
+     * @param otherHolders how many customers of other societies are concerned
+     * @param heldByCaller whether the current holder (CONFLICT only) is the caller's customer
      */
-    record Outcome(Kind kind, List<UUID> holders, UUID holderEntityId) {}
+    record Outcome(Kind kind, List<UUID> ownHolders, int otherHolders, boolean heldByCaller) {}
+
+    /** The previous holders a confirmation covered, for the audit record: own ids and a count of others. */
+    public record Confirmed(List<UUID> ownHolders, int otherHolders) {
+
+        static final Confirmed NONE = new Confirmed(List.of(), 0);
+
+        /** Writes itself into an audit map, only when there is something to say. */
+        public void describe(Map<String, Object> after) {
+            if (!ownHolders.isEmpty()) {
+                after.put("previousHolders", ownHolders);
+            }
+            if (otherHolders > 0) {
+                after.put("previousHoldersElsewhere", otherHolders);
+            }
+        }
+    }
 
     private final JdbcTemplate jdbc;
     private final ConfigRegistry config;
@@ -59,49 +79,60 @@ public class ReuseDetector {
 
     /** 27A section 6.1, for {@code phone} (E.164) and the customer about to hold it (null when new). */
     Outcome check(String phone, UUID forCustomer, ScopeContext scope) {
-        record Holder(UUID customerId, UUID ownerEntityId, Instant validTo) {}
+        record Holder(UUID ownCustomerId, boolean heldByCaller, Instant validTo) {}
         List<Holder> holders = jdbc.query(
-                "select customer_id, owner_entity_id, valid_to from customers.phone_holders(?)",
+                "select own_customer_id, held_by_caller, valid_to from customers.phone_holders(?)",
                 (rs, n) -> {
                     Timestamp validTo = rs.getTimestamp("valid_to");
                     return new Holder(
-                            rs.getObject("customer_id", UUID.class),
-                            rs.getObject("owner_entity_id", UUID.class),
+                            rs.getObject("own_customer_id", UUID.class),
+                            rs.getBoolean("held_by_caller"),
                             validTo == null ? null : validTo.toInstant());
                 },
                 phone);
         for (Holder holder : holders) {
-            if (holder.validTo() == null && !holder.customerId().equals(forCustomer)) {
-                return new Outcome(Kind.CONFLICT, List.of(holder.customerId()), holder.ownerEntityId());
+            boolean itself =
+                    holder.ownCustomerId() != null && holder.ownCustomerId().equals(forCustomer);
+            if (holder.validTo() == null && !itself) {
+                return new Outcome(
+                        Kind.CONFLICT,
+                        holder.ownCustomerId() == null ? List.of() : List.of(holder.ownCustomerId()),
+                        holder.ownCustomerId() == null ? 1 : 0,
+                        holder.heldByCaller());
             }
         }
         int months = config.getInt(WINDOW_KEY, scope, DEFAULT_WINDOW_MONTHS);
         Instant since = clock.now().atOffset(ZoneOffset.UTC).minusMonths(months).toInstant();
-        List<UUID> recent = holders.stream()
+        List<Holder> recent = holders.stream()
                 .filter(h -> h.validTo() != null && h.validTo().isAfter(since))
-                .map(Holder::customerId)
-                .filter(id -> !id.equals(forCustomer))
+                .filter(h -> h.ownCustomerId() == null || !h.ownCustomerId().equals(forCustomer))
+                .toList();
+        List<UUID> own = recent.stream()
+                .map(Holder::ownCustomerId)
+                .filter(id -> id != null)
                 .distinct()
                 .toList();
+        int others =
+                (int) recent.stream().filter(h -> h.ownCustomerId() == null).count();
         return recent.isEmpty()
-                ? new Outcome(Kind.CLEAR, List.of(), null)
-                : new Outcome(Kind.NEEDS_CONFIRMATION, recent, null);
+                ? new Outcome(Kind.CLEAR, List.of(), 0, false)
+                : new Outcome(Kind.NEEDS_CONFIRMATION, own, others, false);
     }
 
     /**
      * The check turned into the handlers' guard: a CONFLICT is refused (with the holder's id when
      * the caller's society registered them, so the screen can open that card; with nothing when
      * another society did), a NEEDS_CONFIRMATION is refused until confirmed. Answers the previous
-     * holders a confirmation covered, for the audit record (ids only).
+     * holders a confirmation covered, for the audit record (own ids and a count only).
      */
-    List<UUID> guard(String phone, UUID forCustomer, boolean confirmed, ScopeContext scope) {
+    Confirmed guard(String phone, UUID forCustomer, boolean confirmed, ScopeContext scope) {
         Outcome outcome = check(phone, forCustomer, scope);
         switch (outcome.kind()) {
             case CONFLICT -> {
-                if (scope.entityId().equals(outcome.holderEntityId())) {
+                if (outcome.heldByCaller() && !outcome.ownHolders().isEmpty()) {
                     throw new ProblemException(
                             "m7.customer.phone_held",
-                            Map.of("customerId", outcome.holders().get(0).toString()));
+                            Map.of("customerId", outcome.ownHolders().get(0).toString()));
                 }
                 throw new ProblemException("m7.customer.phone_held_elsewhere");
             }
@@ -109,12 +140,12 @@ public class ReuseDetector {
                 if (!confirmed) {
                     throw new ProblemException(
                             "m7.customer.phone_reuse_confirm",
-                            Map.of("holders", outcome.holders().size()));
+                            Map.of("holders", outcome.ownHolders().size() + outcome.otherHolders()));
                 }
-                return outcome.holders();
+                return new Confirmed(outcome.ownHolders(), outcome.otherHolders());
             }
             default -> {
-                return List.of();
+                return Confirmed.NONE;
             }
         }
     }

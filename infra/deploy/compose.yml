@@ -203,7 +203,7 @@ services:
   # options (kc.sh build). The plain start does that build itself, which costs about half a
   # minute at each start and nothing afterwards.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.4
+    image: quay.io/keycloak/keycloak:26.8.0
     restart: unless-stopped
     logging: *logging
     <<: *hardened
@@ -257,7 +257,7 @@ services:
   # Catches every mail of the demo; nothing leaves the server. Behind Caddy at /mail, with its
   # own sign-in.
   mailpit:
-    image: axllent/mailpit:v1.31.1
+    image: axllent/mailpit:v1.31.4
     restart: unless-stopped
     logging: *logging
     <<: *hardened
@@ -285,9 +285,14 @@ services:
       COOP_ERP_ROLE: web,worker
       SPRING_PROFILES_ACTIVE: web,worker
       COOP_ERP_SYSTEM_ENTITY_ID: 0190f000-0000-7000-8000-000000000001
-      COOP_ERP_SMTP_HOST: mailpit
-      COOP_ERP_SMTP_PORT: "1025"
+      COOP_ERP_SMTP_HOST: ${COOP_ERP_SMTP_HOST:-mailpit}
+      COOP_ERP_SMTP_PORT: ${COOP_ERP_SMTP_PORT:-1025}
       COOP_ERP_SMTP_FROM: ${MAIL_FROM:-notifications@coop-erp.test}
+      # A real relay (wave 2, M9-11): the account and STARTTLS or SSL from .env; the demo keeps
+      # Mailpit on the stack's own network with NONE, which the backend allows for a bare host.
+      COOP_ERP_SMTP_USERNAME: ${COOP_ERP_SMTP_USERNAME:-}
+      COOP_ERP_SMTP_PASSWORD: ${COOP_ERP_SMTP_PASSWORD:-}
+      COOP_ERP_SMTP_SECURITY: ${COOP_ERP_SMTP_SECURITY:-NONE}
       OBJECT_STORE_ENDPOINT: http://minio:9000
       OBJECT_STORE_PUBLIC_ENDPOINT: ${PUBLIC_URL:?}
       # The backend's own object-store user (minio-init), not MinIO's root.

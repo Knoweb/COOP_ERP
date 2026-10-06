@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
+import lk.coopfed.knoweb.kernel.api.LinkType;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -39,9 +40,38 @@ public class InvoiceSettlements {
     }
 
     /**
-     * A credit of {@code amount} fits in what is still due on the invoice, which is locked first:
-     * the kernel's CREDITS check sees only the links, not what payments settled.
+     * How much of a credit note's {@code gross} is applied to the invoice it credits: what is still
+     * due on the invoice, at most the gross, and zero when nothing is due (decision B-1 of {@code
+     * docs/progress/deviations/2026-10-06-wave2-credit-once-per-line.md}, CR-24A-3 item 2). The
+     * invoice is locked first: the kernel's CREDITS check sees only the links, not what payments
+     * settled. The rest is the credit note's unapplied amount, applied later by ApplyCreditNote;
+     * the caller writes the CREDITS link only when the amount returned is above zero (the kernel
+     * requires a positive amount).
      */
+    public BigDecimal applyUpToDue(UUID invoiceId, BigDecimal gross) {
+        documents.lockForLinking(invoiceId);
+        BigDecimal due = amountDue(invoiceId).max(BigDecimal.ZERO);
+        return gross == null ? BigDecimal.ZERO : gross.min(due);
+    }
+
+    /** What a credit note applied to invoices: the sum of its CREDITS links. */
+    public BigDecimal appliedOf(UUID creditNoteId) {
+        return documents.findLinks(creditNoteId).stream()
+                .filter(link -> link.linkType() == LinkType.CREDITS && creditNoteId.equals(link.fromDocumentId()))
+                .map(link -> link.amount() == null ? BigDecimal.ZERO : link.amount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** What a credit note holds unapplied: its gross less what it applied, never stored. */
+    public BigDecimal unappliedOf(UUID creditNoteId) {
+        BigDecimal gross = documents
+                .findById(creditNoteId)
+                .map(DocumentRecord::grossAmount)
+                .orElse(BigDecimal.ZERO);
+        return (gross == null ? BigDecimal.ZERO : gross).subtract(appliedOf(creditNoteId));
+    }
+
+    /** The credit is no more than is still due on the invoice ({@code m4.creditnote.exceeds_due}). */
     public void requireDue(UUID invoiceId, BigDecimal amount) {
         documents.lockForLinking(invoiceId);
         BigDecimal due = amountDue(invoiceId);

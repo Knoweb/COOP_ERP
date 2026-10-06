@@ -63,6 +63,36 @@ class RelationshipQueriesImpl implements RelationshipQueries {
     }
 
     @Override
+    public Optional<RelationshipView> settlementRelationship(
+            UUID sellerEntityId, UUID buyerEntityId, LocalDate onDate, ScopeContext scope) {
+        if (sellerEntityId == null || buyerEntityId == null || onDate == null || !hasScope(scope)) {
+            return Optional.empty();
+        }
+        // The row in force on the day first (an ACTIVE one before a SUSPENDED one, as only ACTIVE
+        // rows are kept apart by the A-I3 exclusion constraint); else the most recent row.
+        return jdbc
+                .query(
+                        SELECT
+                                + """
+                                 where seller_entity_id = ?
+                                   and buyer_entity_id = ?
+                                   and status in ('ACTIVE', 'SUSPENDED')
+                                 order by (effective_from <= ? and (effective_to is null or effective_to >= ?)) desc,
+                                          (status = 'ACTIVE') desc,
+                                          effective_from desc,
+                                          relationship_id desc
+                                 limit 1
+                                """,
+                        RelationshipQueriesImpl::map,
+                        sellerEntityId,
+                        buyerEntityId,
+                        onDate,
+                        onDate)
+                .stream()
+                .findFirst();
+    }
+
+    @Override
     public Optional<RelationshipView> getRelationship(UUID relationshipId, ScopeContext scope) {
         if (relationshipId == null || !hasScope(scope)) {
             return Optional.empty();

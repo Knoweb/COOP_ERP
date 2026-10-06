@@ -33,8 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Guards, in order: an OWN scope; the task visible ({@code m5.count.not_found}); in
  * VARIANCE_REVIEW ({@code m5.adjustment.not_in_review}); the approver not the person who submitted
  * the count ({@code m5.adjustment.approver_is_requester}, and the kernel's {@code sod.same_person}
- * for the pair inv.adjust.request / inv.adjust.approve); the value within the approver's limit
- * ({@code m5.approval.limit_exceeded}: the next band acts). The fresh second factor is the
+ * for the pair inv.adjust.request / inv.adjust.approve); the value within the approver's limit,
+ * which fails closed since wave 2 (M5-09: no grant at the entity is no authority, a grant without
+ * a limit approves band 1 only, a variance of no cost needs band 2; {@code
+ * m5.approval.limit_exceeded}: the next band acts). The fresh second factor is the
  * kernel's (the permission requires it).
  *
  * <p>Mutation: COUNT_ADJUST for each variance beyond tolerance, citing the count, as recorded at
@@ -91,9 +93,15 @@ class ApproveAdjustmentHandler implements Handles<ApproveAdjustment, UUID> {
             throw new ProblemException("m5.adjustment.approver_is_requester");
         }
         sod.assertDistinct(scope, "inv.adjust.request", "inv.adjust.approve", task.submittedBy());
-        policy.requireWithinLimit(task.reviewValue(), "inv.adjust.approve", scope);
+        List<CountStore.Line> lines = store.lines(task.taskId());
+        // wave 2, M5-09: a variance of an item with no cost routes the adjustment to band 2.
+        boolean zeroCostLine = lines.stream()
+                .anyMatch(line -> !line.withinTolerance()
+                        && line.varianceQty().signum() != 0
+                        && line.unitCost().signum() == 0);
+        policy.requireWithinLimit(task.reviewValue(), zeroCostLine, "inv.adjust.approve", scope);
 
-        List<Movement> movements = store.lines(task.taskId()).stream()
+        List<Movement> movements = lines.stream()
                 .filter(line -> !line.withinTolerance() && line.varianceQty().signum() != 0)
                 .map(line -> new Movement(
                         task.locationId(),

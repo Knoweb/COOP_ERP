@@ -80,6 +80,42 @@ public class TradeProjection extends Projection {
             // Not a document: a row of its own table (exposure_warning_event).
             Map.entry("exposure.warning.v1", new String[] {null, null}));
 
+    /**
+     * Where an event names the location of its owner's document (wave 2, RLS-08 and M8-07,
+     * decision D4): the buyer's receiving location on a GRN and a discrepancy, the buyer's location
+     * on a claim, the seller's dispatching location on a delivery note. The row then carries it,
+     * and a shop session reads the rows of its own shop only, as it reads kernel.document.
+     */
+    private static final Map<String, String> OWNER_LOCATION = Map.of(
+            "grn.confirmed.v1", "receiverLocationId",
+            "discrepancy.raised.v1", "receiverLocationId",
+            "claim.raised.v1", "locationId",
+            "delivery_note.issued.v1", "fromLocationId");
+
+    /** The field of each event that names its document, for a later event's location. */
+    private static final Map<String, String> DOCUMENT = Map.ofEntries(
+            Map.entry("order.submitted.v1", "orderId"),
+            Map.entry("order.accepted.v1", "orderId"),
+            Map.entry("order.rejected.v1", "orderId"),
+            Map.entry("order.cancelled.v1", "orderId"),
+            Map.entry("delivery_note.issued.v1", "deliveryNoteId"),
+            Map.entry("delivery_note.dispatched.v1", "deliveryNoteId"),
+            Map.entry("grn.confirmed.v1", "grnId"),
+            Map.entry("invoice.issued.v1", "invoiceId"),
+            Map.entry("invoice.disputed.v1", "invoiceId"),
+            Map.entry("invoice.dispute_resolved.v1", "invoiceId"),
+            Map.entry("credit_note.issued.v1", "creditNoteId"),
+            Map.entry("payment_receipt.recorded.v1", "receiptId"),
+            Map.entry("payment_receipt.reversed.v1", "reversalId"),
+            Map.entry("payment_receipt.applied.v1", "applicationId"),
+            Map.entry("cheque.bounced.v1", "receiptId"),
+            Map.entry("cheque.cleared.v1", "receiptId"),
+            Map.entry("discrepancy.raised.v1", "discrepancyId"),
+            Map.entry("discrepancy.settled.v1", "discrepancyId"),
+            Map.entry("claim.raised.v1", "claimId"),
+            Map.entry("claim.approved.v1", "claimId"),
+            Map.entry("claim.rejected.v1", "claimId"));
+
     private final ZoneId zone;
 
     TradeProjection(
@@ -108,6 +144,43 @@ public class TradeProjection extends Projection {
         Instant windowEndsAt;
         BigDecimal unapplied;
         BigDecimal qtyAtIssue;
+        UUID location;
+    }
+
+    /**
+     * The owner's location of the row (wave 2, decision D4): the one the event names (a GRN, a
+     * discrepancy, a claim, a delivery note); otherwise the one an earlier event of the same
+     * document on the owner's side named (a delivery note's dispatch follows its issue);
+     * otherwise the location of the session that published it, which is NULL for the entity-wide
+     * work of orders, invoices and payments (kernel V0061 keeps a shop session off those
+     * documents), and which own_write requires of a row written in a shop's scope.
+     */
+    private UUID location(ProjectionEvent event, UUID owner, ScopeContext scope) {
+        String named = OWNER_LOCATION.get(event.type());
+        if (named != null && event.uuid(named) != null) {
+            return event.uuid(named);
+        }
+        UUID document = event.uuid(DOCUMENT.get(event.type()));
+        if (document != null) {
+            UUID earlier = jdbc
+                    .queryForList(
+                            """
+                            select location_id from reporting.trade_document_event
+                             where document_id = ? and owner_entity_id = ? and location_id is not null
+                             order by occurred_at, event_id
+                             limit 1
+                            """,
+                            UUID.class,
+                            document,
+                            owner)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+            if (earlier != null) {
+                return earlier;
+            }
+        }
+        return scope.locationId();
     }
 
     @Override
@@ -120,11 +193,12 @@ public class TradeProjection extends Projection {
         JsonNode payload = event.payload();
 
         if (event.type().equals("exposure.warning.v1")) {
-            insertWarning(event, owner, counterparty, seller, buyer);
+            insertWarning(event, owner, counterparty, seller, buyer, scope.locationId());
             return;
         }
 
         Row row = new Row();
+        row.location = location(event, owner, scope);
         row.number = event.string("docNumberDisplay");
         row.businessDate = event.occurredAt().atZone(zone).toLocalDate();
 
@@ -145,7 +219,13 @@ public class TradeProjection extends Projection {
             case "delivery_note.issued.v1" -> {
                 row.documentId = event.uuid("deliveryNoteId");
                 for (JsonNode order : payload.path("orderIds")) {
-                    insertLink(row.documentId, UUID.fromString(order.asText()), "ORDER", owner, counterparty);
+                    insertLink(
+                            row.documentId,
+                            UUID.fromString(order.asText()),
+                            "ORDER",
+                            owner,
+                            counterparty,
+                            row.location);
                 }
             }
             case "delivery_note.dispatched.v1" -> row.documentId = event.uuid("deliveryNoteId");
@@ -183,7 +263,7 @@ public class TradeProjection extends Projection {
                 row.tax = event.decimal("taxAmount");
                 row.gross = event.decimal("grossAmount");
                 for (JsonNode grn : payload.path("grnIds")) {
-                    insertLink(row.documentId, UUID.fromString(grn.asText()), "GRN", owner, counterparty);
+                    insertLink(row.documentId, UUID.fromString(grn.asText()), "GRN", owner, counterparty, row.location);
                 }
             }
             case "invoice.disputed.v1", "invoice.dispute_resolved.v1" -> row.documentId = event.uuid("invoiceId");
@@ -204,7 +284,8 @@ public class TradeProjection extends Projection {
                             buyer,
                             row.businessDate,
                             row.gross,
-                            event);
+                            event,
+                            row.location);
                 }
             }
             case "payment_receipt.recorded.v1" -> {
@@ -225,7 +306,8 @@ public class TradeProjection extends Projection {
                             buyer,
                             row.businessDate,
                             ProjectionEvent.decimal(settlement, "amount"),
-                            event);
+                            event,
+                            row.location);
                 }
             }
             case "payment_receipt.applied.v1" -> {
@@ -248,7 +330,8 @@ public class TradeProjection extends Projection {
                             buyer,
                             row.businessDate,
                             ProjectionEvent.decimal(settlement, "amount"),
-                            event);
+                            event,
+                            row.location);
                 }
             }
             case "payment_receipt.reversed.v1" -> {
@@ -269,7 +352,8 @@ public class TradeProjection extends Projection {
                             buyer,
                             row.businessDate,
                             amount.negate(),
-                            event);
+                            event,
+                            row.location);
                 }
                 // What the reversal takes back beyond the invoices it reopens was on account.
                 row.unapplied = row.gross == null ? null : reopened.subtract(row.gross);
@@ -330,9 +414,9 @@ public class TradeProjection extends Projection {
                        (document_id, event_kind, owner_entity_id, doc_type, doc_number, counterparty_entity_id,
                         seller_entity_id, buyer_entity_id, relationship_id, reference_document_id, business_date,
                         occurred_at, net, tax, gross, event_id, due_date, committed_eta, window_ends_at, unapplied,
-                        qty_at_issue)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                on conflict (document_id, event_kind, owner_entity_id) do nothing
+                        qty_at_issue, location_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict (event_id) do nothing
                 """,
                 row.documentId,
                 kind[1],
@@ -354,7 +438,8 @@ public class TradeProjection extends Projection {
                 row.committedEta == null ? null : Date.valueOf(row.committedEta),
                 row.windowEndsAt == null ? null : Timestamp.from(row.windowEndsAt),
                 row.unapplied,
-                row.qtyAtIssue);
+                row.qtyAtIssue,
+                row.location);
     }
 
     private void insertLine(
@@ -375,8 +460,8 @@ public class TradeProjection extends Projection {
                 """
                 insert into reporting.trade_line_fact
                        (line_id, measure, document_id, owner_entity_id, counterparty_entity_id, seller_entity_id,
-                        buyer_entity_id, sku_id, business_date, qty, value, expected_qty)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        buyer_entity_id, sku_id, business_date, qty, value, expected_qty, location_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (line_id, measure) do nothing
                 """,
                 ProjectionEvent.uuid(line, "lineId"),
@@ -390,22 +475,25 @@ public class TradeProjection extends Projection {
                 Date.valueOf(row.businessDate),
                 qty,
                 value,
-                expectedQty);
+                expectedQty,
+                row.location);
     }
 
-    private void insertLink(UUID document, UUID linked, String kind, UUID owner, UUID counterparty) {
+    private void insertLink(UUID document, UUID linked, String kind, UUID owner, UUID counterparty, UUID location) {
         jdbc.update(
                 """
                 insert into reporting.trade_document_link
-                       (document_id, linked_document_id, link_kind, owner_entity_id, counterparty_entity_id)
-                values (?, ?, ?, ?, ?)
+                       (document_id, linked_document_id, link_kind, owner_entity_id, counterparty_entity_id,
+                        location_id)
+                values (?, ?, ?, ?, ?, ?)
                 on conflict (document_id, linked_document_id) do nothing
                 """,
                 document,
                 linked,
                 kind,
                 owner,
-                counterparty);
+                counterparty,
+                location);
     }
 
     private void insertSettlement(
@@ -418,7 +506,8 @@ public class TradeProjection extends Projection {
             UUID buyer,
             LocalDate businessDate,
             BigDecimal amount,
-            ProjectionEvent event) {
+            ProjectionEvent event,
+            UUID location) {
         if (invoice == null || amount == null) {
             return;
         }
@@ -426,8 +515,8 @@ public class TradeProjection extends Projection {
                 """
                 insert into reporting.trade_settlement_fact
                        (source_document_id, invoice_id, kind, owner_entity_id, counterparty_entity_id,
-                        seller_entity_id, buyer_entity_id, business_date, amount, event_id)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        seller_entity_id, buyer_entity_id, business_date, amount, event_id, location_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (source_document_id, invoice_id, kind) do nothing
                 """,
                 source,
@@ -439,16 +528,18 @@ public class TradeProjection extends Projection {
                 buyer,
                 Date.valueOf(businessDate),
                 amount,
-                event.eventId());
+                event.eventId(),
+                location);
     }
 
-    private void insertWarning(ProjectionEvent event, UUID owner, UUID counterparty, UUID seller, UUID buyer) {
+    private void insertWarning(
+            ProjectionEvent event, UUID owner, UUID counterparty, UUID seller, UUID buyer, UUID location) {
         jdbc.update(
                 """
                 insert into reporting.exposure_warning_event
                        (event_id, owner_entity_id, counterparty_entity_id, relationship_id, seller_entity_id,
-                        buyer_entity_id, amount, credit_limit, threshold_percent, order_id, occurred_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        buyer_entity_id, amount, credit_limit, threshold_percent, order_id, occurred_at, location_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (event_id) do nothing
                 """,
                 event.eventId(),
@@ -461,7 +552,8 @@ public class TradeProjection extends Projection {
                 event.decimal("creditLimit"),
                 event.payload().path("thresholdPercent").asInt(),
                 event.uuid("orderId"),
-                Timestamp.from(event.occurredAt()));
+                Timestamp.from(event.occurredAt()),
+                location);
     }
 
     /** Quantity times price, to the cent; none when either is missing. */

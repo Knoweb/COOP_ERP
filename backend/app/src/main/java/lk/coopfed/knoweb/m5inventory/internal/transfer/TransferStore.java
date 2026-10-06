@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 class TransferStore {
 
-    record Header(UUID transferId, UUID ownerEntityId, UUID fromLocationId, UUID toLocationId) {}
+    record Header(UUID transferId, UUID ownerEntityId, UUID fromLocationId, UUID toLocationId, UUID issuedBy) {}
 
     record Line(UUID lineId, int lineNo, UUID batchId, UUID skuId, BigDecimal qty, BigDecimal unitCost) {}
 
@@ -30,7 +30,7 @@ class TransferStore {
         return jdbc
                 .query(
                         """
-                        select transfer_id, owner_entity_id, location_id, to_location_id
+                        select transfer_id, owner_entity_id, location_id, to_location_id, issued_by
                           from inventory.transfer
                          where transfer_id = ?
                         """,
@@ -38,7 +38,8 @@ class TransferStore {
                                 rs.getObject("transfer_id", UUID.class),
                                 rs.getObject("owner_entity_id", UUID.class),
                                 rs.getObject("location_id", UUID.class),
-                                rs.getObject("to_location_id", UUID.class)),
+                                rs.getObject("to_location_id", UUID.class),
+                                rs.getObject("issued_by", UUID.class)),
                         transferId)
                 .stream()
                 .findFirst();
@@ -70,13 +71,19 @@ class TransferStore {
                 transferId));
     }
 
-    /** What the GOOD lot of the batch holds at the location; zero when there is none. */
-    BigDecimal goodOnHand(UUID locationId, UUID batchId) {
-        List<BigDecimal> found = jdbc.queryForList(
-                "select qty_on_hand from inventory.stock_lot where location_id = ? and batch_id = ? and condition = 'GOOD'",
+    /** What the open pick lists of delivery notes hold of the GOOD lot of the batch at the location. */
+    BigDecimal reserved(UUID locationId, UUID batchId) {
+        BigDecimal held = jdbc.queryForObject(
+                """
+                select coalesce(sum(p.qty), 0)
+                  from inventory.pick_list_line p
+                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
+                  join inventory.stock_lot l on l.stock_lot_id = p.stock_lot_id
+                 where pl.status = 'OPEN' and l.location_id = ? and l.batch_id = ? and l.condition = 'GOOD'
+                """,
                 BigDecimal.class,
                 locationId,
                 batchId);
-        return found.isEmpty() ? BigDecimal.ZERO : found.get(0);
+        return held == null ? BigDecimal.ZERO : held;
     }
 }
