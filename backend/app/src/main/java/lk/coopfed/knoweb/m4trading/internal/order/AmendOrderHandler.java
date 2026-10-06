@@ -112,6 +112,9 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
         if (!OrderStatus.DRAFT.equals(status) && !OrderStatus.SUBMITTED.equals(status)) {
             throw new ProblemException("m4.order.not_amendable", Map.of("status", status));
         }
+        // The seller's decision takes the same lock: read the allocation only once it is held
+        // (wave 2, M4MONEY-06).
+        OrderLocks.lock(jdbc, amendedId);
         List<String> decision = jdbc.queryForList(
                 "select status from trading.order_allocation where order_id = ?", String.class, amendedId);
         if (!decision.isEmpty()) {

@@ -21,13 +21,23 @@
 # vatRegistrationNo; the schema's field already existed (an OWN caller's own entity always had
 # it), only the counterparty's read of it was withheld. No field, operation or permission was
 # removed or renamed; the version records a visibility change, not a shape change.
+#
+# CR-21A-7 (accepted 6 October 2026, wave 2): api only, the slice's shape unchanged.
+# CreditLimitChanged gains sellerEntityId and buyerEntityId, and the job-only command
+# AnnounceCreditLimit is added; both additive.
+#
+# 1.4.2 (CR-21A-7 section 6.1, accepted 6 October 2026, wave 2): the query contract
+# RelationshipQueries gains settlementRelationship (the pair's ACTIVE or SUSPENDED row a payment
+# is recorded under, M4MONEY-08). Java only, additive; the slice's shape is unchanged. The patch
+# version is raised because x-change-request already names CR-21A-7 for the change above, and
+# tools/check-frozen-contracts.mjs needs a higher version or a different change request.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
-  # 1.4.2 (CR-18-2, wave 2): the user and device administration reads carry x-federation-view: false;
-  # no request or response changes shape.
-  version: 1.4.2
+  # 1.4.3 (CR-18-2, wave 2): the user and device administration reads carry x-federation-view: false;
+  # no request or response changes shape. 1.4.2 (CR-21A-7) is described in the header above.
+  version: 1.4.3
   x-change-request: CR-18-2
 
 paths:

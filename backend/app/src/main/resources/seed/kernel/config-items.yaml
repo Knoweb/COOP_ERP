@@ -819,6 +819,51 @@ config_items:
     default: 2
     scope_kind: FEDERATION
     change_permission: sys.config.manage
+  # wave 2, PR 13 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
+  # (2), (4)): how far a till receipt's totals may disagree before it is flagged, how far a receipt
+  # number may run ahead of its series before it is a jump, and the longest page of receipts or sessions.
+  - key: pos.receipt.total_tolerance
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 100 }
+    description_en: How many rupees a till receipt's gross may differ from its net plus tax, its lines or its tenders before central flags it
+    description_si: මධ්‍යස්ථානය සලකුණු කිරීමට පෙර මුදල් යන්ත්‍ර රිසිට්පතක මුළු මුදල එහි ශුද්ධ මුදල හා බද්ද, පේළි හෝ ගෙවීම් වලින් වෙනස් විය හැකි රුපියල්
+    description_ta: மையம் குறியிடும் முன் பணப்பெட்டி ரசீதின் மொத்தம் அதன் நிகர மற்றும் வரி, வரிகள் அல்லது செலுத்துகைகளிலிருந்து வேறுபடக்கூடிய ரூபாய்
+    default: 0.01
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m6pos
+  - key: pos.series.max_jump
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 1000000 }
+    description_en: How far past its series' next number a till receipt's number may be before central flags a jump and moves the series by this much only
+    description_si: මධ්‍යස්ථානය පැනීමක් ලෙස සලකුණු කර ශ්‍රේණිය මෙපමණක් පමණක් ඉදිරියට ගෙන යාමට පෙර, මුදල් යන්ත්‍ර රිසිට්පත් අංකයක් එහි ශ්‍රේණියේ ඊළඟ අංකයට වඩා ඉදිරියෙන් තිබිය හැකි දුර
+    description_ta: மையம் ஒரு தாவலாகக் குறியிட்டு வரிசையை இவ்வளவு மட்டுமே நகர்த்தும் முன், பணப்பெட்டி ரசீது எண் அதன் வரிசையின் அடுத்த எண்ணை விட எவ்வளவு முன்னால் இருக்கலாம்
+    default: 10000
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m6pos
+  - key: pos.list.max_page
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 1000 }
+    description_en: The most receipts or till sessions one page of a shop's list shows
+    description_si: සාප්පුවක ලැයිස්තුවේ එක් පිටුවක පෙන්වන උපරිම රිසිට්පත් හෝ මුදල් යන්ත්‍ර සැසි ගණන
+    description_ta: ஒரு கடையின் பட்டியலின் ஒரு பக்கம் காட்டும் அதிகபட்ச ரசீதுகள் அல்லது பணப்பெட்டி அமர்வுகள்
+    default: 200
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m6pos
+  # wave 2, PR 12 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-pricing-rules.md
+  # (3), CR-23A-1): how far back a control price may take effect, to the gazette's own date.
+  - key: pricing.control_price_backdate_days
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 31 }
+    description_en: How many days before today a control price may take effect, to match the gazette's own date; an older date is refused
+    description_si: ගැසට් පත්‍රයේම දිනයට ගැළපෙන පරිදි පාලන මිලක් බලපැවැත්විය හැක්කේ අද දිනට පෙර දින කීයක සිටද; ඊට පැරණි දිනයක් ප්‍රතික්ෂේප වේ
+    description_ta: வர்த்தமானியின் சொந்தத் திகதிக்கு ஏற்ப, இன்றைக்கு எத்தனை நாட்கள் முன்பிருந்து கட்டுப்பாட்டு விலை நடைமுறைக்கு வரலாம்; அதைவிடப் பழைய திகதி மறுக்கப்படும்
+    default: 7
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m3pricing
   # wave 2, PR 09 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-m7-erasure-and-retention.md
   # (1), (2), (3); CR-27A-1): the limit above which a customer account needs the NIC (doc 27 section
   # 7, until now hard-coded as "above zero"), how long after its last account closed a customer's

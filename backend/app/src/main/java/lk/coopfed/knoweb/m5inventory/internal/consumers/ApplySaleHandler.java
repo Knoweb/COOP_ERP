@@ -57,6 +57,8 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
     static final String AUDIT_SOLD = "STOCK_SOLD";
     static final String AUDIT_WITHOUT_LOT = "SALE_WITHOUT_LOT";
     static final String AUDIT_UNRESOLVED = "SALE_LINE_UNRESOLVED";
+    static final String AUDIT_BATCH_SUBSTITUTED = "SALE_BATCH_SUBSTITUTED";
+    static final String AUDIT_LINE_SKIPPED = "SALE_LINE_SKIPPED";
 
     private final StockLedger ledger;
     private final ConsumerStore store;
@@ -100,14 +102,20 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
         List<Movement> movements = new ArrayList<>();
         List<Integer> withoutLot = new ArrayList<>();
         List<Integer> unresolved = new ArrayList<>();
+        List<Integer> skipped = new ArrayList<>();
+        List<Integer> substituted = new ArrayList<>();
         for (ApplySale.Line line : command.lines()) {
             if (line.qty() == null || line.qty().signum() <= 0) {
+                skipped.add(line.lineNo());
                 continue;
             }
             Optional<UUID> batch = resolveBatch(line, shop, scope);
             if (batch.isEmpty()) {
                 unresolved.add(line.lineNo());
                 continue;
+            }
+            if (line.batchId() != null && !line.batchId().equals(batch.get())) {
+                substituted.add(line.lineNo());
             }
             if (!lotExists(shop, batch.get())) {
                 withoutLot.add(line.lineNo());
@@ -147,6 +155,28 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
                     Map.of("lines", unresolved),
                     scope,
                     "No batch and no lot of the item at the shop: the line is not posted and needs a person");
+        }
+        // Wave 2, M6-06 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
+        // (2)): the two traces of a sale line that was not deducted as sent. A line with no batch taking
+        // the FEFO lot is the normal path (the till sends none) and stays silent; nothing restocks here
+        // (a return is its own fact, receipt.refunded.v1, deferred with M6-07).
+        if (!substituted.isEmpty()) {
+            audit.record(
+                    AUDIT_BATCH_SUBSTITUTED,
+                    Subject.of("document", command.documentId()),
+                    null,
+                    Map.of("lines", substituted),
+                    scope,
+                    "The till named a batch the catalogue does not know for the item; the shop's first lot was used");
+        }
+        if (!skipped.isEmpty()) {
+            audit.record(
+                    AUDIT_LINE_SKIPPED,
+                    Subject.of("document", command.documentId()),
+                    null,
+                    Map.of("lines", skipped),
+                    scope,
+                    "A sale line with no quantity, or one of zero or less, was not deducted");
         }
         events.publish(
                 new StockSold(command.documentId(), scope.entityId(), shop, movements.size(), unresolved.size()));

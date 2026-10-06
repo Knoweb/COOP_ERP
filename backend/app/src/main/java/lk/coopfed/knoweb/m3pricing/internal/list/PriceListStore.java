@@ -55,6 +55,20 @@ public class PriceListStore {
                 .findFirst();
     }
 
+    /**
+     * The list row, locked until the transaction ends (M3-05): a second publish of the same draft
+     * waits here, then reads the row as the first left it (PUBLISHED) and is refused.
+     */
+    Optional<PriceListView> findForUpdate(UUID priceListId) {
+        return jdbc
+                .query(
+                        "select " + LIST_COLUMNS + " from pricing.price_list where price_list_id = ? for update",
+                        PriceListStore::list,
+                        priceListId)
+                .stream()
+                .findFirst();
+    }
+
     public List<PriceListView> list(String kind, String status) {
         StringBuilder sql = new StringBuilder("select " + LIST_COLUMNS + " from pricing.price_list where true");
         List<Object> args = new ArrayList<>();

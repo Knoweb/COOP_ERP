@@ -12,6 +12,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.UpdateUser;
 import lk.coopfed.knoweb.m1party.api.UserUpdated;
+import lk.coopfed.knoweb.m1party.internal.security.EntityLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,8 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
  * an enabled login would keep every assigned role usable from the back office. One that comes
  * back to the back office has the login enabled again, with the credentials it had. 21A section
  * 6 names no guard for the kind, so the change is allowed and the login follows it, rather than
- * refused. EXTERNAL is a kind a user is created with and keeps: it decides the policy class,
- * not a detail.
+ * refused; a change that closes the back office takes DeactivateUser's last-manager guard and the
+ * rank rule of {@link UserRank} (CR-21A-7). EXTERNAL is a kind a user is created with and keeps:
+ * it decides the policy class, not a detail.
  */
 @Service
 @CommandHandler(permission = "gov.user.manage", requiresMfa = true)
@@ -33,13 +35,25 @@ class UpdateUserHandler implements Handles<UpdateUser, UUID> {
     static final String AUDIT_UPDATED = "USER_UPDATED";
 
     private final AppUserRepository users;
+    private final UserFacts facts;
+    private final UserRank rank;
+    private final EntityLock lock;
     private final IdentityProviderClient provider;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     UpdateUserHandler(
-            AppUserRepository users, IdentityProviderClient provider, AuditFacade audit, EventPublisher events) {
+            AppUserRepository users,
+            UserFacts facts,
+            UserRank rank,
+            EntityLock lock,
+            IdentityProviderClient provider,
+            AuditFacade audit,
+            EventPublisher events) {
         this.users = users;
+        this.facts = facts;
+        this.rank = rank;
+        this.lock = lock;
         this.provider = provider;
         this.audit = audit;
         this.events = events;
@@ -69,8 +83,23 @@ class UpdateUserHandler implements Handles<UpdateUser, UUID> {
             throw new ProblemException("m1.user.kind_change_invalid", Map.of("from", user.userKind(), "to", kind));
         }
 
-        Map<String, Object> before = user.auditState();
         boolean hadLogin = user.hasLogin();
+        boolean closesBackOffice = hadLogin && !AppUser.BACK_OFFICE.equals(kind) && !AppUser.BOTH.equals(kind);
+        if (closesBackOffice) {
+            // Closing the back office disables the login as DeactivateUser does, so it takes
+            // DeactivateUser's guards (CR-21A-7): one security command of the entity at a time,
+            // because the last-manager guard counts and then writes; never the last user manager;
+            // and never a user who holds a sensitive permission the caller does not.
+            UUID entityId = user.homeEntityId();
+            lock.lock(entityId);
+            if (facts.holdsUserManage(user.getId(), entityId)
+                    && !facts.anotherUserManagerExists(user.getId(), entityId)) {
+                throw new ProblemException("m1.user.last_user_manager", Map.of("userId", user.getId()));
+            }
+            rank.requireCallerNotOutranked(user, scope);
+        }
+
+        Map<String, Object> before = user.auditState();
 
         user.changeDetails(displayName, language, kind);
         users.saveAndFlush(user);

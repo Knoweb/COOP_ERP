@@ -320,6 +320,15 @@ export function useTradingApi() {
         return data!;
       },
 
+      /** Applies what a credit note holds unapplied to an open invoice of the same buyer (CR-24A-3 item 2). */
+      async applyCreditNote(creditNoteId: string, invoiceId: string, key: string): Promise<CreditNote> {
+        const { data } = await api.POST("/v1/trading/credit-notes/{creditNoteId}/apply", {
+          params: { path: { creditNoteId }, header: { "Idempotency-Key": key } },
+          body: { invoiceId }
+        });
+        return data!;
+      },
+
       async disputeInvoice(invoiceId: string, reason: string, key: string): Promise<Invoice> {
         const { data } = await api.POST("/v1/trading/invoices/{invoiceId}/dispute", {
           params: { path: { invoiceId }, header: { "Idempotency-Key": key } },
