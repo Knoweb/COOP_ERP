@@ -6,6 +6,8 @@ Reviewed 6 October 2026 against `main` at 91e550d8. Each area had one reviewer a
 
 A second pass reviewed the proposed fix of every finding (is the issue real, is the fix correct, is it the best business solution): `docs/reviews/wave2-fixreview-<area>.md`. Those files group the findings into fix groups, list the corrections to the verifiers' suggested fixes, and recommend decisions. The recommendations are not accepted until recorded in `docs/progress/deviations/`.
 
+**Decided 6 October 2026, on the architect's delegation:** every "decide then build" item is recorded in `docs/progress/deviations/2026-10-06-wave2-*.md` (23 files); the decisions that change a design document are the change requests `CR-18-2`, `CR-19A-12`, `CR-19A-13`, `CR-21A-7`, `CR-23A-1`, `CR-24A-3`, `CR-25A-1`, `CR-27A-1`, `CR-28A-2`, `CR-29-1`, `CR-30-2`, `CR-32-1`; the fix pull requests, their migration numbers, order and parallel sets are `docs/reviews/wave2-fix-plan.md`. Where two fix reviews disagreed (the buyer's postings, the contact door, the notification hash's legacy rows, the projections' PARTY policy) the decision file says which was taken and why.
+
 ## Counts (after verification; four findings were dropped)
 
 | Area | File | High | Medium | Low | Dropped |
