@@ -21,7 +21,7 @@ public final class SharedKeycloak {
     private static final String REALM_FILE = "../../infra/compose/realm-dev.json";
 
     @SuppressWarnings("resource")
-    public static final GenericContainer<?> CONTAINER = new GenericContainer<>("quay.io/keycloak/keycloak:26.7.4")
+    public static final GenericContainer<?> CONTAINER = new GenericContainer<>("quay.io/keycloak/keycloak:26.8.0")
             .withCommand("start-dev", "--import-realm")
             .withEnv("KEYCLOAK_ADMIN", "admin")
             .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
