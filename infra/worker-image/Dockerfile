@@ -9,9 +9,13 @@
 #
 # Debian 13 packages Chromium as a plain package (Ubuntu, the base of eclipse-temurin, ships
 # it as a snap, which does not run in a container).
-FROM eclipse-temurin:21-jre AS jre
+#
+# Both bases are pinned by digest (wave 2, DEPLOY-15); Dependabot proposes the next ones. The apt
+# chromium package is not pinned: Debian drops a superseded version from its mirror and the build
+# would break; the base digest and the image's SBOM say what was installed.
+FROM eclipse-temurin:21-jre@sha256:cff19e6215689161eb6162c11b86b0c60ddf802164f2eaf48d570f8fb79a36c5 AS jre
 
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends chromium ca-certificates \
     && rm -rf /var/lib/apt/lists/*
