@@ -26,8 +26,34 @@ class SmsChannel implements NotificationChannel {
         return "SMS";
     }
 
+    /**
+     * A gateway's failure is rethrown without its text, as the SMTP adapter does: a provider's
+     * message can quote the number or the body, and the kernel keeps the failure on its log and,
+     * when it gives up, in the insert-only audit (wave 2, M9-10). The original goes along as the
+     * cause, which the kernel writes to the application log at DEBUG only.
+     */
     @Override
     public String send(Outgoing outgoing) {
-        return gateway.send(outgoing.notificationId(), outgoing.recipient(), outgoing.body());
+        try {
+            return gateway.send(outgoing.notificationId(), outgoing.recipient(), outgoing.body());
+        } catch (RuntimeException e) {
+            SendFailed failed = new SendFailed(
+                    categoryOf(e),
+                    "SMS gateway did not take notification " + outgoing.notificationId() + " ("
+                            + e.getClass().getSimpleName() + ")");
+            failed.initCause(e);
+            throw failed;
+        }
+    }
+
+    /** A gateway that times out says so in its exception's type; the rest is not known yet (DR-4). */
+    static FailureCategory categoryOf(RuntimeException e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.net.SocketTimeoutException
+                    || cause instanceof java.util.concurrent.TimeoutException) {
+                return FailureCategory.TIMEOUT;
+            }
+        }
+        return FailureCategory.UNKNOWN;
     }
 }

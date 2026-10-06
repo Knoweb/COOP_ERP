@@ -205,6 +205,7 @@ RABBITMQ_PASSWORD=$(rand)
 MINIO_ROOT_PASSWORD=$(rand)
 COOP_ERP_IDEMPOTENCY_SECRET=$(rand 32)
 COOP_ERP_NOTIFICATION_KEY=$(openssl rand -base64 32)
+COOP_ERP_NOTIFICATION_RECIPIENT_KEY=$(openssl rand -base64 32)
 SYNC_SIGNING_PRIVATE_KEY=$priv
 SYNC_SIGNING_PUBLIC_KEY=$pub
 BACKUP_KEEP=14
@@ -219,6 +220,7 @@ EOF
 ADDRESS_CHANGED=0
 if [ -f "$APP_DIR/.env" ]; then
   say "$APP_DIR/.env exists: kept (no password is regenerated)"
+  env_ensure_key COOP_ERP_NOTIFICATION_RECIPIENT_KEY
   if [ "$SIZE" != "$EXISTING_SIZE" ]; then env_set COOP_ERP_SIZE "$SIZE"; echo "  size set to $SIZE"; fi
   if [ "$ADDRESS_GIVEN" -eq 1 ] && [ "$PUBLIC_URL" != "$(env_get PUBLIC_URL)" ]; then
     env_set PUBLIC_URL "$PUBLIC_URL"

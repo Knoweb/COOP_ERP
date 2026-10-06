@@ -329,8 +329,20 @@ export interface components {
             attempts: number;
             suppressedReason?: string | null;
             lastError?: string | null;
-            /** @description the first twelve characters of the recipient's hash */
-            recipientHash: string;
+            /**
+             * Format: uuid
+             * @description the entity whose contact the recipient is, when the audience named it (wave 2, M9-07)
+             */
+            recipientEntityId?: string | null;
+            /** @description the role the recipient was reached as (ACCOUNTS, MANAGER), when the audience named one */
+            audienceRole?: string | null;
+            /** @description eight characters of the recipient's keyed hash, to tell two numbers of one role apart; never reversible without the key */
+            recipientTag?: string | null;
+            /**
+             * Format: date-time
+             * @description when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)
+             */
+            nextAttemptAt?: string | null;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */

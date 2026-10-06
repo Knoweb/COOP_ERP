@@ -118,11 +118,14 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
         SMTP.messages.clear();
         SMTP.failNext.set(0);
         invoke("invalidateRules");
-        // No quiet hours for the seller in this test: the clock is whatever it is.
-        inScope(SELLER, () -> {
-            config.set("notification.sms.quiet_hours", ConfigScope.entity(SELLER), "", scope(SELLER), "test");
-            return null;
-        });
+        // No quiet hours for the buyers in this test: the clock is whatever it is. The buyers',
+        // not the seller's: the window of the entity whose contact is reached holds (CR-19A-12).
+        for (UUID buyer : List.of(BUYER_SI, BUYER_TA, BUYER_EN)) {
+            inScope(buyer, () -> {
+                config.set("notification.sms.quiet_hours", ConfigScope.entity(buyer), "", scope(buyer), "test");
+                return null;
+            });
+        }
         kernel.reset();
     }
 
@@ -170,9 +173,16 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
             assertThat(row.get("owner_entity_id")).isEqualTo(SELLER);
         });
 
-        // The seller's delivery log on the screen: newest first, hashes cut short.
-        assertThat(queries.log(null, 10, user(SELLER))).hasSize(3).allSatisfy(entry -> assertThat(entry.recipientHash())
-                .hasSize(12));
+        // The seller's delivery log on the screen: whose desk was reached, never a hash a reader
+        // could reverse (M9-07): the buyer, the role, eight characters of the keyed hash.
+        assertThat(queries.log(null, 10, user(SELLER)))
+                .hasSize(3)
+                .allSatisfy(entry -> {
+                    assertThat(entry.audienceRole()).isEqualTo("ACCOUNTS");
+                    assertThat(entry.recipientTag()).hasSize(8);
+                })
+                .extracting(IntegrationQueries.LogEntry::recipientEntityId)
+                .containsExactlyInAnyOrder(BUYER_SI, BUYER_TA, BUYER_EN);
         assertThat(queries.log("FAILED", 10, user(SELLER))).isEmpty();
         assertThat(queries.log(null, 10, user(BUYER_SI))).isEmpty();
     }
@@ -297,8 +307,9 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
                         + " from kernel.notification_log");
         assertThat(failed.get("status")).isEqualTo("QUEUED");
         assertThat(((Number) failed.get("attempts")).intValue()).isEqualTo(1);
+        // The class and a category, never the relay's or the adapter's text (wave 2, TWK-21).
         assertThat(String.valueOf(failed.get("last_error")))
-                .contains("SMTP relay")
+                .isEqualTo("IllegalStateException: UNKNOWN")
                 .doesNotContain("buyer-en");
         // The kernel's first backoff (19A section 10): a minute after the failed attempt.
         assertThat(((Timestamp) failed.get("next_attempt_at")).toInstant())

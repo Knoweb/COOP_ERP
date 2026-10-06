@@ -44,10 +44,15 @@ class ContactAudience implements NotificationAudience {
                         // The one door across entities (m9integration V0003): the table itself
                         // answers an entity its own contacts only.
                         "select channel, address, language from integration.notification_recipients(?, ?)",
+                        // The entity and the role go on the kernel's log, so its screen says who
+                        // was reached without a hash, and the entity's quiet hours hold (wave 2,
+                        // CR-19A-12).
                         (rs, i) -> new Recipient(
                                 rs.getString("channel"),
                                 rs.getString("address"),
-                                rs.getString("language").strip()),
+                                rs.getString("language").strip(),
+                                entity,
+                                spec),
                         entity,
                         spec)
                 .stream()

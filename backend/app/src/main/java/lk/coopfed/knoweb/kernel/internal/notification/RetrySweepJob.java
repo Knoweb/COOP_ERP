@@ -54,7 +54,8 @@ class RetrySweepJob {
                     row.recipientHash(),
                     row.templateId(),
                     row.eventId(),
-                    row.ownerEntityId())) {
+                    row.ownerEntityId(),
+                    row.recipientEntityId())) {
                 attempted++;
             }
         }

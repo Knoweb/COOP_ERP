@@ -171,9 +171,15 @@ coop-erp:
   # (`openssl rand -base64 32`), the same on every instance. No default outside development:
   # empty, the backend starts only against a development issuer, with a fixed development key.
   # To change it, move the old key to pending-key-previous for 24 hours (the longest a row lives).
+  #
+  # Wave 2 (6 Oct 2026, TWK-20, M9-07): the recipient on kernel.notification_log is an HMAC-SHA-256
+  # under recipient-hash-key, its own key (base64 of 32 random bytes, the same on every instance),
+  # never pending-key, which rotates. The same rule: no default outside development. Rotate it
+  # only in a maintenance window: an event replayed across a rotation may notify once more.
   notification:
     pending-key: ${COOP_ERP_NOTIFICATION_KEY:}
     pending-key-previous: ${COOP_ERP_NOTIFICATION_KEY_PREVIOUS:}
+    recipient-hash-key: ${COOP_ERP_NOTIFICATION_RECIPIENT_KEY:}
 
   # The per-instance cache fan-out (doc 19 section 8, 19A section 3): every instance, in every
   # role, holds an exclusive queue on the domain exchange for the events that empty its
