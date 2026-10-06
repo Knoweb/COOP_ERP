@@ -4,6 +4,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonObject
@@ -65,6 +68,94 @@ class SnapshotVerificationTest {
         assertFailsWith<SnapshotRejected> { till.service.refreshSnapshot() }
         assertEquals(7, till.store.loadSnapshot().version)
         assertNotNull(till.service.catalogue.byBarcode(TillFixture.DHAL))
+    }
+
+    // ---- continuity and freshness (TWK-01) ----
+
+    private val sugar = Samples.sku("0190f0de-0000-7000-8000-0000000a0003", "Sugar 1kg", "සීනි 1kg", "4790000000035")
+
+    @Test
+    fun aSignedSnapshotOlderThanTheOneTheTillHoldsIsRefused() = runTest {
+        val till = TillFixture().enrolled()
+        till.central.snapshotAnswer = Samples.snapshotAnswer(6, till.rows)
+
+        val refusal = assertFailsWith<SnapshotRejected> { till.service.refreshSnapshot() }
+
+        assertEquals("The snapshot is version 6, older than the version 7 this till holds", refusal.message)
+        assertEquals(7, till.store.loadSnapshot().version)
+    }
+
+    @Test
+    fun aDeltaFromAnotherVersionIsNotAppliedAndAFullSnapshotIsAskedForInstead() = runTest {
+        val till = TillFixture().enrolled()
+        val gapped = Samples.snapshotAnswer(11, listOf(sugar), since = 10, full = false)
+        val full = Samples.snapshotAnswer(11, till.rows + sugar)
+        till.central.snapshotFor = { since -> if (since == 0L) full else gapped }
+
+        assertEquals(11, till.service.refreshSnapshot())
+
+        assertEquals(listOf(0L, 7L, 0L), till.central.snapshotRequests)
+        assertNotNull(till.service.catalogue.byBarcode("4790000000035"))
+        assertNotNull(till.service.catalogue.byBarcode(TillFixture.DHAL))
+    }
+
+    @Test
+    fun aGappedDeltaIsRefusedWhenNoFullSnapshotComesBack() = runTest {
+        val till = TillFixture().enrolled()
+        till.central.snapshotAnswer = Samples.snapshotAnswer(11, listOf(sugar), since = 10, full = false)
+
+        val refusal = assertFailsWith<SnapshotRejected> { till.service.refreshSnapshot() }
+
+        assertEquals("The snapshot delta starts at version 10, but this till holds version 7", refusal.message)
+        assertEquals(7, till.store.loadSnapshot().version)
+        assertNull(till.service.catalogue.byBarcode("4790000000035"))
+    }
+
+    @Test
+    fun aDeltaFromTheVersionTheTillHoldsIsApplied() = runTest {
+        val till = TillFixture().enrolled()
+        val dhalGone = SnapshotRow("sku", Samples.SKU_DHAL, null, null)
+        till.central.snapshotAnswer = Samples.snapshotAnswer(8, listOf(sugar, dhalGone), since = 7, full = false)
+
+        assertEquals(8, till.service.refreshSnapshot())
+
+        assertNotNull(till.service.catalogue.byBarcode("4790000000035"))
+        assertNull(till.service.catalogue.byBarcode(TillFixture.DHAL))
+        assertNotNull(till.service.catalogue.byBarcode(TillFixture.RICE))
+    }
+
+    @Test
+    fun aFullSnapshotIsAcceptedWhateverSinceItCarries() = runTest {
+        val till = TillFixture().enrolled()
+        till.central.snapshotAnswer = Samples.snapshotAnswer(9, till.rows, since = 3)
+
+        assertEquals(9, till.service.refreshSnapshot())
+    }
+
+    @Test
+    fun aSnapshotSignedWithAnotherKeyThanTheEnrolledOneIsRefused() = runTest {
+        val till = TillFixture().enrolled()
+        till.central.snapshotAnswer = Samples.snapshotAnswer(8, till.rows, keyId = "k2")
+
+        val refusal = assertFailsWith<SnapshotRejected> { till.service.refreshSnapshot() }
+
+        assertEquals("The snapshot is signed with key \"k2\", not with the key this till enrolled with (\"k1\")", refusal.message)
+        assertEquals(7, till.store.loadSnapshot().version)
+    }
+
+    @Test
+    fun theSupervisorIsWarnedWhenCentralHasNotConfirmedTheSnapshotForThreeDays() = runTest {
+        val till = TillFixture().enrolled()
+        till.clock.advance(2.days)
+        till.service.syncOnce()
+        assertTrue(till.service.status.value.banners.none { it.startsWith("The snapshot was last confirmed") })
+
+        till.clock.advance(2.days)
+        till.service.syncOnce()
+        assertTrue(till.service.status.value.banners.any { it.startsWith("The snapshot was last confirmed") })
+
+        till.service.refreshSnapshot()
+        assertTrue(till.service.status.value.banners.none { it.startsWith("The snapshot was last confirmed") })
     }
 
     @Test

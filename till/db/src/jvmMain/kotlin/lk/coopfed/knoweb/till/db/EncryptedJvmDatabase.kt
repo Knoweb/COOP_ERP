@@ -27,6 +27,11 @@ object EncryptedJvmDatabase {
         // Readers wait for a writer instead of failing at once (the upload runs beside the sale).
         properties["busy_timeout"] = "5000"
         properties["journal_mode"] = "WAL"
+        // A committed sale survives a power cut, not only a crash (TWK-06): in WAL mode a level
+        // below FULL may lose the last commits, and with them a receipt already printed, whose
+        // number and device sequence would then be issued again. A sale is a few rows; FULL costs
+        // nothing a cashier notices.
+        properties["synchronous"] = "FULL"
         return JdbcSqliteDriver("jdbc:sqlite:${file.toAbsolutePath()}", properties, TillDatabase.Schema)
     }
 }

@@ -38,7 +38,7 @@ import lk.coopfed.knoweb.till.desktop.DesktopConfig
  *    puts it on till position 2 (position 1 is the demo till's);
  * 3. issues a one-time enrolment code;
  * 4. writes (read as m101-buyer) the society's published shelf prices as the till's price book (central's snapshot has
- *    no price table yet) and the device id and code for the enrol form.
+ *    no price table yet) and the device id and code for the enrol form, with the trial cashier opt-in.
  *
  * Settings: COOP_ERP_API (default http://localhost:8080), COOP_ERP_TOKEN_URL (the local Keycloak),
  * COOP_TILL_HOME (the till's data folder), TILL_POSITION_NO (default 2).
@@ -131,7 +131,9 @@ fun main() = runBlocking {
     Files.writeString(home.resolve("prices.csv"), (listOf("# sku_id or barcode,price: $source (trial price book)") + prices.distinct()).joinToString("\n"))
     Files.writeString(
         home.resolve("enrol-prefill.properties"),
-        "server=$api\ndevice_id=$deviceId\ncode=$code\nhardware_serial=$serial\n",
+        // trial_cashier=true is the trial's explicit opt-in to the stand-in cashier (TWK-04): the demo
+        // stack has no till user with a PIN at the shop. A pilot till is never given this file.
+        "server=$api\ndevice_id=$deviceId\ncode=$code\nhardware_serial=$serial\ntrial_cashier=true\n",
     )
     println("Device id:        $deviceId")
     println("Enrolment code:   $code   (one use; valid until the time the back office shows)")
