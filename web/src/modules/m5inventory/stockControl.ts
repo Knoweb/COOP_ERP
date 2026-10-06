@@ -5,8 +5,17 @@ import type { Count, CountLineRequest, LotBalance, Recipe, RequestWriteOffReques
 // the pages so vitest can prove them. The server decides everything that matters (tolerance,
 // bands, who may act); the screen only shows what a person typed and what comes next.
 
-/** What a counter typed against one lot: a quantity, or a reason to skip it. */
-export type CountEntry = { counted: string; skip: string };
+/**
+ * What a counter typed against one lot: a quantity, or a reason to skip it, and when the quantity
+ * was typed (an ISO instant): the server measures the line against the lot as it stood then, so a
+ * sale between counting the shelf and pressing submit is no surplus (wave 2, M5-13).
+ */
+export type CountEntry = { counted: string; skip: string; countedAt?: string };
+
+/** A counted quantity typed now: the entry with the quantity and the moment it was typed. */
+export function countedNow(entry: CountEntry, counted: string, now: Date = new Date()): CountEntry {
+  return { ...entry, counted, countedAt: now.toISOString() };
+}
 
 export function lotKey(batchId: string, condition: string): string {
   return `${batchId}/${condition}`;
@@ -24,7 +33,8 @@ export function quantityOf(text: string | undefined): number | null {
 /**
  * The variance to show once a quantity is entered (25A section 8: "variance shown only after
  * entry"): counted minus what the book said at the start. Null before entry. The server measures
- * again against the book at submit, so sales made meanwhile are not a variance.
+ * again against the lot as it stood when the line was counted, so sales made meanwhile are not a
+ * variance.
  */
 export function varianceOf(expected: number, entry: CountEntry | undefined): number | null {
   const counted = quantityOf(entry?.counted);
@@ -45,7 +55,11 @@ export function countLinesOf(count: Count, entries: Record<string, CountEntry>):
     const counted = quantityOf(entry?.counted);
     const skip = (entry?.skip ?? "").trim();
     if (counted !== null) {
-      lines.push({ batchId: lot.batchId, condition: lot.condition, countedQty: counted });
+      lines.push(
+        entry?.countedAt
+          ? { batchId: lot.batchId, condition: lot.condition, countedQty: counted, countedAt: entry.countedAt }
+          : { batchId: lot.batchId, condition: lot.condition, countedQty: counted }
+      );
     } else if (skip !== "") {
       lines.push({ batchId: lot.batchId, condition: lot.condition, skipReason: skip });
     } else {

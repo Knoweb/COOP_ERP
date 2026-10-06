@@ -219,6 +219,9 @@ class ClaimHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(event.businessDate())
                     .isNotNull()
                     .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), creditNoteId));
+            // The buyer's side rides along for the buyer's books (wave 2, CR-24A-3 item 5).
+            assertThat(event.counterpartyEntityId()).isEqualTo(BUYER);
+            assertThat(event.postings()).extracting(posting -> posting.side()).contains("SELLER", "BUYER");
         });
 
         kernel.reset();

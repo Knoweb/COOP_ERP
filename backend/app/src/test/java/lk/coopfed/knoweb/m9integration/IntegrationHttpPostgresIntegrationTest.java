@@ -43,8 +43,8 @@ class IntegrationHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void arrange() {
         superuserJdbc()
-                .execute("truncate table integration.journal_line, integration.journal_export,"
-                        + " integration.journal_posting");
+                .execute("truncate table integration.journal_line, integration.journal_export_file,"
+                        + " integration.journal_export, integration.journal_posting");
         superuserJdbc()
                 .update("update integration.notification_rule set status = 'ACTIVE' where rule_id = ?::uuid", RULE);
         UUID invoice = Ids.next();
@@ -69,6 +69,7 @@ class IntegrationHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         String exportId = created.getBody().path("exportId").asText();
         assertThat(created.getHeaders().getLocation()).hasToString("/v1/integration/journal-exports/" + exportId);
         assertThat(created.getBody().path("status").asText()).isEqualTo("GENERATED");
+        assertThat(created.getBody().path("provisional").asBoolean()).isFalse();
         assertThat(created.getBody().path("lineCount").asInt()).isEqualTo(3);
         assertThat(created.getBody().path("totalDebit").decimalValue()).isEqualByComparingTo("3360.00");
         assertThat(created.getBody().path("contentHash").asText()).hasSize(64);
@@ -93,6 +94,13 @@ class IntegrationHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .startsWith("journal_2026-08-01_2026-08-31_")
                 .endsWith(".csv");
         assertThat(file.getBody().lines()).hasSize(7);
+        assertThat(file.getBody()).endsWith(",FINAL\r\n");
+
+        // Nothing is due for a supplement: the one export took everything of its period.
+        ResponseEntity<JsonNode> due = get("/v1/integration/journal-postings/supplement-due", as(SELLER));
+        assertThat(due.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(due.getBody().path("postings").asInt()).isZero();
+        assertThat(due.getBody().path("upTo").asText()).isEqualTo("2026-08-31");
 
         ResponseEntity<JsonNode> reconciliation =
                 get("/v1/integration/journal-exports/" + exportId + "/reconciliation", as(SELLER));
@@ -125,6 +133,33 @@ class IntegrationHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 as(SELLER));
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(again.getBody().path("code").asText()).isEqualTo("m9.journal.nothing_to_export");
+    }
+
+    @Test
+    void anOpenPeriodNeedsTheProvisionalFlagAndNamesTheFileSo() {
+        // A period ending far ahead is open whatever the day; without the flag, refused.
+        ResponseEntity<JsonNode> refused = post(
+                "/v1/integration/journal-exports",
+                Map.of("periodFrom", "2026-08-01", "periodTo", "2099-12-31"),
+                as(SELLER));
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getBody().path("code").asText()).isEqualTo("m9.journal.period_open");
+
+        ResponseEntity<JsonNode> created = post(
+                "/v1/integration/journal-exports",
+                Map.of("periodFrom", "2026-08-01", "periodTo", "2099-12-31", "provisional", true),
+                as(SELLER));
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody().path("provisional").asBoolean()).isTrue();
+        String exportId = created.getBody().path("exportId").asText();
+        ResponseEntity<String> file = http.exchange(
+                "/v1/integration/journal-exports/" + exportId + "/file",
+                HttpMethod.GET,
+                new HttpEntity<>(as(SELLER)),
+                String.class);
+        assertThat(file.getHeaders().getContentDisposition().getFilename())
+                .startsWith("journal_2026-08-01_2099-12-31_PROVISIONAL_");
+        assertThat(file.getBody()).endsWith(",PROVISIONAL\r\n");
     }
 
     @Test

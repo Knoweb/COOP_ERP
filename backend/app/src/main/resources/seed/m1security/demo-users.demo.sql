@@ -323,3 +323,15 @@ FROM (VALUES
      ) AS grant_row (role_id, permission_code)
 JOIN security.permission p ON p.permission_code = grant_row.permission_code
 ON CONFLICT DO NOTHING;
+
+-- wave 2, PR 10 (CR-25A-1 item 3; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (3)).
+-- A block of its own, so the other lanes' additions above merge without a conflict. The approver of
+-- a write-off may no longer be its in-person witness (M5-10): the society office (m101-office)
+-- witnesses the demo's damaged flour at the stores and the manager approves it (DemoStockOperations).
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT grant_row.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'inv.writeoff.witness')
+     ) AS grant_row (role_id, permission_code)
+JOIN security.permission p ON p.permission_code = grant_row.permission_code
+ON CONFLICT DO NOTHING;

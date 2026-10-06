@@ -243,10 +243,17 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
             assertThat(event.contentHash()).hasSize(64);
         });
         assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
+            // Both sides (wave 2, CR-24A-3 item 5): the seller's reversal, and the buyer's payable
+            // reduced against its inventory and VAT input (CN GOODS BUYER), for the buyer's books.
+            assertThat(event.counterpartyEntityId()).isEqualTo(BUYER);
             assertThat(event.postings())
-                    .extracting(posting -> posting.debitRole() + "/" + posting.creditRole() + "="
+                    .extracting(posting -> posting.side() + " " + posting.debitRole() + "/" + posting.creditRole() + "="
                             + posting.amount().toPlainString())
-                    .containsExactlyInAnyOrder("REVENUE/RECEIVABLE=240.00", "VAT_OUTPUT/RECEIVABLE=43.20");
+                    .containsExactlyInAnyOrder(
+                            "SELLER REVENUE/RECEIVABLE=240.00",
+                            "SELLER VAT_OUTPUT/RECEIVABLE=43.20",
+                            "BUYER PAYABLE/INVENTORY=240.00",
+                            "BUYER PAYABLE/VAT_INPUT=43.20");
             // SettleDiscrepancy's credit note dates its postings by its own business date (CR-29-1 item 4).
             assertThat(event.businessDate())
                     .isNotNull()

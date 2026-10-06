@@ -42,6 +42,9 @@ class ChangeLogPurgeIntegrationTest extends SyncIntegrationTest {
     PlatformTransactionManager transactions;
 
     @Autowired
+    SystemScope systemScope;
+
+    @Autowired
     JdbcTemplate appJdbc;
 
     private final ScopeContext federation = SystemScope.own(OTHER_ENTITY, null);
@@ -176,9 +179,9 @@ class ChangeLogPurgeIntegrationTest extends SyncIntegrationTest {
     }
 
     private long publish(LocalDate applyFrom, Change... changes) {
-        return new TransactionTemplate(transactions)
-                .execute(status ->
-                        changeLog.append(new Target(ENTITY, SHOP), List.of(changes), applyFrom, false, federation));
+        return systemScope.inOwnTransaction(
+                federation,
+                () -> changeLog.append(new Target(ENTITY, SHOP), List.of(changes), applyFrom, false, federation));
     }
 
     private void recordedAgo(long version, Duration ago) {

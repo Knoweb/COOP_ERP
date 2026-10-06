@@ -3,6 +3,7 @@
   "m9.journal.nothing_to_export": "අපනයනය කිරීමට කිසිවක් නැත: {from} සිට {to} දක්වා සියලු සටහන් දැනටමත් අපනයනයක ඇත",
   "m9.journal.own_required": "ජර්නල් සටහන් වාර්තා කරන්නේ එක් ආයතනයක් සඳහා ය",
   "m9.journal.period_invalid": "ආරම්භය අවසානයට පසු නොවන කාල සීමාවක් දෙන්න",
+  "m9.journal.period_open": "{to} දක්වා කාල සීමාව {today} දිනයේ තවමත් විවෘතයි; කෙසේ වෙතත් අපනයනය කිරීමට PROVISIONAL ලෙස සලකුණු කර තාවකාලික යන්න තෝරන්න",
   "m9.journal.postings_malformed": "ලේඛනයේ ජර්නල් සටහන් අසම්පූර්ණ ය",
   "m9.journal.unbalanced": "ජර්නලය සමබර නොවේ; අපනයනය ජනනය නොකෙරිණි",
   "m9.log.status_invalid": "නොදන්නා බෙදාහැරීමේ තත්ත්වය {status}",

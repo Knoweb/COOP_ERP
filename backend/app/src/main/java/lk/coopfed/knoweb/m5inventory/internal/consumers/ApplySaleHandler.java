@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m5inventory.internal.consumers;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,13 +15,16 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.m2catalogue.query.BatchFilter;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
+import lk.coopfed.knoweb.m2catalogue.query.BatchView;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.Movement;
 import lk.coopfed.knoweb.m5inventory.api.MovementType;
 import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
 import lk.coopfed.knoweb.m5inventory.api.StockSold;
+import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,8 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>a batch the shop never held gets its lot at the entity average; audit
  *       {@code SALE_WITHOUT_LOT} (REVIEW; 25A DR-5);
  *   <li>a line whose batch is missing or unknown to M2 takes the shop's first lot of the item in
- *       FEFO order; with no lot of the item at all it cannot be posted, and is recorded as
- *       {@code SALE_LINE_UNRESOLVED} (REVIEW) for a person to settle, never dropped silently.
+ *       FEFO order, expired lots included (the units came from somewhere); with no lot of the item
+ *       at all it posts against the item's newest batch M2 knows, creating the lot below zero
+ *       (wave 2, M5-05); only an item M2 does not know is {@code SALE_LINE_UNRESOLVED} (REVIEW),
+ *       for a person to settle, never dropped silently;
+ *   <li>a batch past its expiry on the receipt's business date is {@code SALE_OF_EXPIRED}
+ *       (REVIEW; wave 2, M5-01).
  * </ul>
  *
  * <p>Guards (the shape, not business rules): the device's OWN scope at its shop
@@ -59,10 +67,12 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
     static final String AUDIT_UNRESOLVED = "SALE_LINE_UNRESOLVED";
     static final String AUDIT_BATCH_SUBSTITUTED = "SALE_BATCH_SUBSTITUTED";
     static final String AUDIT_LINE_SKIPPED = "SALE_LINE_SKIPPED";
+    static final String AUDIT_SALE_OF_EXPIRED = "SALE_OF_EXPIRED";
 
     private final StockLedger ledger;
     private final ConsumerStore store;
     private final BatchQueries batches;
+    private final BusinessDay businessDay;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -71,12 +81,14 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
             StockLedger ledger,
             ConsumerStore store,
             BatchQueries batches,
+            BusinessDay businessDay,
             JdbcTemplate jdbc,
             AuditFacade audit,
             EventPublisher events) {
         this.ledger = ledger;
         this.store = store;
         this.batches = batches;
+        this.businessDay = businessDay;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -104,6 +116,8 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
         List<Integer> unresolved = new ArrayList<>();
         List<Integer> skipped = new ArrayList<>();
         List<Integer> substituted = new ArrayList<>();
+        List<Integer> expired = new ArrayList<>();
+        LocalDate saleDate = businessDay.dateOf(command.issuedAt());
         for (ApplySale.Line line : command.lines()) {
             if (line.qty() == null || line.qty().signum() <= 0) {
                 skipped.add(line.lineNo());
@@ -119,6 +133,9 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
             }
             if (!lotExists(shop, batch.get())) {
                 withoutLot.add(line.lineNo());
+            }
+            if (BusinessDay.expired(expiryOf(batch.get(), scope), saleDate)) {
+                expired.add(line.lineNo());
             }
             movements.add(new Movement(
                     shop,
@@ -154,7 +171,7 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
                     null,
                     Map.of("lines", unresolved),
                     scope,
-                    "No batch and no lot of the item at the shop: the line is not posted and needs a person");
+                    "The catalogue knows no batch of the item: the line is not posted and needs a person");
         }
         // Wave 2, M6-06 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
         // (2)): the two traces of a sale line that was not deducted as sent. A line with no batch taking
@@ -178,6 +195,18 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
                     scope,
                     "A sale line with no quantity, or one of zero or less, was not deducted");
         }
+        // Wave 2, M5-01 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-expired-stock.md (3)):
+        // a sale is a fact and the lot is where the units came from, so it posts; selling a batch past
+        // its expiry on the receipt's own date is an offence to look into.
+        if (!expired.isEmpty()) {
+            audit.record(
+                    AUDIT_SALE_OF_EXPIRED,
+                    Subject.of("document", command.documentId()),
+                    null,
+                    Map.of("lines", expired, "saleDate", saleDate.toString()),
+                    scope,
+                    "A till sold from a batch past its expiry date");
+        }
         events.publish(
                 new StockSold(command.documentId(), scope.entityId(), shop, movements.size(), unresolved.size()));
         return movements.size();
@@ -197,7 +226,7 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
             return Optional.empty();
         }
         // FEFO among the lots with stock, then any lot of the item (one already oversold).
-        return jdbc
+        Optional<UUID> lot = jdbc
                 .queryForList(
                         """
                         select batch_id from inventory.stock_lot
@@ -210,6 +239,28 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
                         line.skuId())
                 .stream()
                 .findFirst();
+        if (lot.isPresent()) {
+            return lot;
+        }
+        // Wave 2, M5-05 (2026-10-06-wave2-stock-movements.md (6)): the shop never held the item, so its
+        // book was nothing and the units were unrecorded stock; the sale posts against the item's
+        // newest batch M2 knows, the ledger creates the lot below zero (SALE_WITHOUT_LOT, lot.negative)
+        // and the negative-lots screen asks a person about it. Unresolved only for an item M2 lacks.
+        return newestBatchOf(line.skuId(), scope);
+    }
+
+    /** The newest batch of the item that M2 knows, a correction's replacement before the one it superseded. */
+    private Optional<UUID> newestBatchOf(UUID skuId, ScopeContext scope) {
+        List<BatchView> known = batches.listBatches(new BatchFilter(skuId, null, null, 10), scope);
+        return known.stream()
+                .filter(b -> !"SUPERSEDED".equals(b.status()))
+                .findFirst()
+                .or(() -> known.stream().findFirst())
+                .map(BatchView::batchId);
+    }
+
+    private LocalDate expiryOf(UUID batchId, ScopeContext scope) {
+        return batches.getBatch(batchId, scope).map(BatchView::expiryDate).orElse(null);
     }
 
     private boolean lotExists(UUID location, UUID batch) {

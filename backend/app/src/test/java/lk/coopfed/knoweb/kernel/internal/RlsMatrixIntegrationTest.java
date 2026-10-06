@@ -45,9 +45,16 @@ import org.junit.jupiter.api.Test;
  * settings {@code ScopeConnectionCustomizer} sets, and is rolled back to that savepoint.
  *
  * <p>Rows: entity A has one row at location 1 whose counterparty is B and, when the table has a
- * location column, one more row entity-wide (or at location 2 when a location is required);
- * entity B has one row at its own location whose counterparty is A; entity C has one row and
- * trades with nobody.
+ * location column, one more row entity-wide (or at location 2 when a location is required),
+ * addressed to location 1 where the table has a {@code to_location_id} or {@code
+ * from_location_id}; entity B has one row at its own location whose counterparty is A and, when
+ * the table has a location column, one more at its second location (so a PARTY session at B's
+ * first location is held to it, RLS-11); entity C has one row and trades with nobody. Scopes on
+ * a table with a location add OWN and PARTY at a location.
+ *
+ * <p>The tables keyed on a document rather than an owner (the rows of a document: lines, links,
+ * history, attachments, every module's extension table) run a matrix of their own against
+ * made-up {@code kernel.document} headers: {@link #everyRowOfADocumentFollowsItsHeader()}.
  *
  * <p>On a table with a location, three more cells (PLAN_TO_M2 6.12): OWN at location 1 cannot
  * insert at location 2 of its own entity, nor with no location, nor move its row to location 2;
@@ -65,6 +72,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
     private static final UUID LOCATION_1 = UUID.fromString("00000000-0000-0000-0000-000000000101");
     private static final UUID LOCATION_2 = UUID.fromString("00000000-0000-0000-0000-000000000102");
     private static final UUID LOCATION_B = UUID.fromString("00000000-0000-0000-0000-000000000b01");
+    private static final UUID LOCATION_B2 = UUID.fromString("00000000-0000-0000-0000-000000000b02");
     private static final UUID LOCATION_C = UUID.fromString("00000000-0000-0000-0000-000000000c01");
 
     private static final String VISIBLE = "visible";
@@ -100,8 +108,16 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         }
     }
 
-    /** A fixture row, by what the policies look at. */
-    record Row(String label, UUID owner, UUID location, UUID counterparty) {}
+    /**
+     * A fixture row, by what the policies look at. {@code addressedTo} fills a {@code
+     * to_location_id} or {@code from_location_id} column (the shop a transfer or a request is
+     * addressed to, which dest_read and source_read admit); null leaves it made up.
+     */
+    record Row(String label, UUID owner, UUID location, UUID counterparty, UUID addressedTo) {
+        Row(String label, UUID owner, UUID location, UUID counterparty) {
+            this(label, owner, location, counterparty, null);
+        }
+    }
 
     /** One cell of the matrix: an operation, in a scope, on a row (none for INSERT). */
     record Check(Op op, Scope scope, String row) {
@@ -142,7 +158,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         }
         scopes.add(Scope.of("PARTY(B)", "PARTY", B, null, Set.of()));
         if (shape.hasLocation()) {
+            // PARTY at a location (RLS-11, RLS-17 d): its own entity's rows at its location only,
+            // and every row it is the counterparty of. B has two locations, so the owner-side
+            // location line is exercised; A's shop reads as PARTY too.
             scopes.add(Scope.of("PARTY(B@B)", "PARTY", B, LOCATION_B, Set.of()));
+            scopes.add(Scope.of("PARTY(A@1)", "PARTY", A, LOCATION_1, Set.of()));
         }
         scopes.add(Scope.of("FEDERATION_VIEW(A)", "FEDERATION_VIEW", A, null, Set.of()));
         scopes.add(Scope.of("EXTERNAL(A,{C})", "EXTERNAL_TIMEBOXED", A, null, Set.of(C)));
@@ -158,9 +178,14 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         List<Row> rows = new ArrayList<>();
         rows.add(new Row("A@1 with B", A, LOCATION_1, B));
         if (shape.hasLocation()) {
-            rows.add(new Row("A wide", A, shape.locationRequired() ? LOCATION_2 : null, null));
+            // Addressed to location 1: what a shop at location 1 reads of a transfer sent to it
+            // (dest_read) or a request asking it (source_read), on the tables that have one.
+            rows.add(new Row("A wide", A, shape.locationRequired() ? LOCATION_2 : null, null, LOCATION_1));
         }
         rows.add(new Row("B with A", B, LOCATION_B, A));
+        if (shape.hasLocation()) {
+            rows.add(new Row("B@B2 with A", B, LOCATION_B2, A));
+        }
         rows.add(new Row("C alone", C, LOCATION_C, null));
         return rows;
     }
@@ -340,9 +365,38 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "integration.notification_contact",
-                    "no ext_view on purpose (m9integration V0003): an address is personal data a regulator's"
-                            + " view has no need of; the dispatcher reaches it through notification_recipients()",
-                    RlsMatrixIntegrationTest::externalReadsNothing),
+                    "own_* only (m9integration V0003, fed_view dropped by V0006; wave 2, M9-06 and"
+                            + " 2026-10-06-wave2-member-identity-visibility.md (1)): an address is personal data"
+                            + " that neither the Federation's view nor a regulator's reads; the dispatcher reaches"
+                            + " it through notification_recipients(), which answers an OWN caller for the"
+                            + " entities it trades with",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            // A shop reads what is addressed to it at another shop of its entity (wave 2, RLS-17 d):
+            // the fixture's "A wide" row is at location 2 and addressed to location 1.
+            new Departure(
+                    "inventory.transfer",
+                    "dest_read (m5inventory V0004): the receiving shop reads a transfer sent to it",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_line",
+                    "dest_read (m5inventory V0004): the receiving shop reads the lines of a transfer sent to it",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "inventory.transfer_receipt",
+                    "source_read (m5inventory V0004): the sending shop reads the receipt of its transfer",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "trading.transfer_request",
+                    "source_read (m4trading V0008): the stores read what is asked of them",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "trading.transfer_request_line",
+                    "source_read (m4trading V0008): the stores read the lines asked of them",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "trading.transfer_request_decision",
+                    "dest_read (m4trading V0008): the asking shop reads the decision on its request",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
             // (hello README); K-01 has landed, so hello can add it.
@@ -418,6 +472,16 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                 : null;
     }
 
+    /** OWN at location 1 reads the owner's row at location 2 that is addressed to location 1. */
+    private static String addressedToTheShop(Check check) {
+        return check.op() == Op.SELECT
+                        && check.scope().is("OWN")
+                        && LOCATION_1.equals(check.scope().location())
+                        && "A wide".equals(check.row())
+                ? VISIBLE
+                : null;
+    }
+
     private static String externalReadsNothing(Check check) {
         return check.op() == Op.SELECT && check.scope().is("EXTERNAL_TIMEBOXED") ? HIDDEN : null;
     }
@@ -446,7 +510,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void everyRealTableSatisfiesTheMatrixOrSaysWhyNot() throws SQLException {
-        List<String> tables = ownedTables();
+        List<String> tables =
+                ownedTables().stream().filter(Keyed::owned).map(Keyed::table).toList();
         assertThat(tables)
                 .as("discovery found the owned tables")
                 .contains("kernel.document", "party.location", "hello.greeting", "kernel.object_upload");
@@ -466,6 +531,230 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         assertThat(mismatches)
                 .as("cells where a real table departs from the matrix and no exception says why")
                 .isEmpty();
+    }
+
+    // ---- the rows of a document -----------------------------------------------------------------
+
+    /**
+     * The rows of a document whose write policy does not refuse a row under a header issued in an
+     * earlier transaction, and why (RLS_POLICY_TEMPLATE.md, "The rows of a document";
+     * {@code 2026-10-06-wave2-extension-rows-after-issue.md} (1), (2)). Every other one does.
+     */
+    private static final Map<String, String> WRITTEN_AFTER_ISSUE = Map.of(
+            "kernel.document_attachment",
+            "attachments may be added to an issued document (the template's rule, decision (1))",
+            "kernel.document_state_history",
+            "a status change after issue (a cancel, a settlement) is recorded against the issued document",
+            "kernel.document_link",
+            "a correcting document links the issued original; a kernel row, not a module's extension table",
+            "trading.claim_photo",
+            "photographs may be added to an issued claim, as attachments (decision (1))",
+            "trading.payment_allocation",
+            "an insert-only fact about an issued receipt, not an extension row (decision (2))",
+            "trading.cheque",
+            "an insert-only fact about an issued receipt, not an extension row (decision (2))");
+
+    /**
+     * The rows of a document written before issue only, not even in the issuing transaction:
+     * kernel V0055 holds {@code kernel.document_line} to {@code kernel.document_unissued}.
+     */
+    private static final Set<String> WRITTEN_BEFORE_ISSUE_ONLY = Set.of("kernel.document_line");
+
+    /**
+     * RLS-17 (a), (f): the tables keyed on a document rather than an owner (kernel.document_line,
+     * link, history, attachment, and every module's extension table) follow their header, read
+     * and write, under every class. Each runs against made-up kernel.document headers, one per
+     * fixture row of the matrix (OWN at the header's location, PARTY as counterparty, PARTY at a
+     * location, FEDERATION_VIEW, EXTERNAL by grant, NONE, no scope): a row is visible exactly when
+     * its header is, under kernel.document's own policies (which follow the template), and the
+     * owner inserts one, in an OWN scope at the header's location or entity-wide, under an
+     * unissued header. Then {@code kernel.document_open_for_write} (kernel V0086): an insert under
+     * a header issued in this transaction passes, under one issued in an earlier (committed)
+     * transaction is refused, except where {@link #WRITTEN_AFTER_ISSUE} says why not.
+     */
+    @Test
+    void everyRowOfADocumentFollowsItsHeader() throws SQLException {
+        List<Keyed> tables =
+                ownedTables().stream().filter(keyed -> !keyed.owned()).toList();
+        List<String> names = tables.stream().map(Keyed::table).toList();
+        assertThat(names)
+                .as("discovery found the rows of a document")
+                .contains(
+                        "kernel.document_line",
+                        "kernel.document_link",
+                        "kernel.document_attachment",
+                        "trading.doc_order",
+                        "trading.doc_grn_line",
+                        "trading.claim_photo",
+                        "trading.payment_allocation");
+        assertThat(WRITTEN_AFTER_ISSUE.keySet())
+                .as("every table written after issue is a row of a document")
+                .allSatisfy(table -> assertThat(names).contains(table));
+        assertThat(WRITTEN_BEFORE_ISSUE_ONLY)
+                .as("every table written before issue only is a row of a document")
+                .allSatisfy(table -> assertThat(names).contains(table));
+
+        // Issued in an earlier transaction: committed, so its xmin is not the matrix's
+        // transaction, and removed afterwards.
+        UUID earlier = UUID.randomUUID();
+        try (Connection db = superuser()) {
+            db.setAutoCommit(false);
+            try (Statement st = db.createStatement()) {
+                st.execute("set local session_replication_role = replica");
+                st.execute(header(earlier, new Row("issued earlier", A, LOCATION_1, B), true));
+            }
+            db.commit();
+        }
+        List<String> mismatches = new ArrayList<>();
+        try {
+            for (Keyed keyed : tables) {
+                try (Connection db = superuser()) {
+                    mismatches.addAll(runDocumentMatrix(db, keyed, earlier));
+                }
+            }
+        } finally {
+            try (Connection db = superuser()) {
+                db.setAutoCommit(false);
+                try (Statement st = db.createStatement()) {
+                    st.execute("set local session_replication_role = replica");
+                    st.execute("delete from kernel.document where document_id = '" + earlier + "'");
+                }
+                db.commit();
+            }
+        }
+        assertThat(mismatches)
+                .as("cells where a row of a document does not follow its header")
+                .isEmpty();
+    }
+
+    /** kernel.document as the header's policies see it: a location and a counterparty. */
+    private static final Shape HEADER =
+            new Shape("kernel.document", true, false, "counterparty_entity_id", Set.of("SELECT", "INSERT", "UPDATE"));
+
+    private List<String> runDocumentMatrix(Connection db, Keyed keyed, UUID earlier) throws SQLException {
+        String table = keyed.table();
+        db.setAutoCommit(false);
+        try (Statement st = db.createStatement()) {
+            st.execute("set local session_replication_role = replica");
+            for (String constraint : strings(
+                    st,
+                    "select conname from pg_constraint where contype = 'c' and conrelid = '" + table + "'::regclass")) {
+                st.execute("alter table " + table + " drop constraint " + quote(constraint));
+            }
+            Columns columns = columns(st, table);
+            Set<String> granted = granted(st, table);
+            List<Scope> scopes = scopes(HEADER);
+            List<Row> rows = rows(HEADER);
+
+            Map<String, UUID> headers = new LinkedHashMap<>();
+            for (Row row : rows) {
+                UUID id = UUID.randomUUID();
+                headers.put(row.label(), id);
+                st.execute(header(id, row, false));
+            }
+            // Issued in this transaction: the header's xmin is the current transaction's id.
+            UUID now = UUID.randomUUID();
+            st.execute(header(now, new Row("issued now", A, LOCATION_1, B), true));
+
+            Map<String, String> actual = new TreeMap<>();
+            Map<String, String> expected = new TreeMap<>();
+
+            // INSERT first, before any row exists, so a key made of the document alone (one
+            // extension row per document) cannot collide with the fixture.
+            for (Scope scope : scopes) {
+                for (Row row : rows) {
+                    Check check = new Check(Op.INSERT, scope, "under " + row.label());
+                    expected.put(
+                            check.key(),
+                            granted.contains("INSERT") && scope.is("OWN") && ownRow(HEADER, scope, row)
+                                    ? DONE
+                                    : REFUSED);
+                    String sql = columns.insertUnder(keyed.documentKeys(), headers.get(row.label()));
+                    actual.put(check.key(), asApp(st, scope, () -> st.executeUpdate(sql) == 1 ? DONE : HIDDEN));
+                }
+            }
+            Scope owner = scopes.get(0);
+            Check issuedNow = new Check(Op.INSERT, owner, "under A@1 issued in this transaction");
+            expected.put(
+                    issuedNow.key(),
+                    granted.contains("INSERT") && !WRITTEN_BEFORE_ISSUE_ONLY.contains(table) ? DONE : REFUSED);
+            actual.put(
+                    issuedNow.key(),
+                    asApp(
+                            st,
+                            owner,
+                            () -> st.executeUpdate(columns.insertUnder(keyed.documentKeys(), now)) == 1
+                                    ? DONE
+                                    : HIDDEN));
+            Check issuedEarlier = new Check(Op.INSERT, owner, "under A@1 issued in an earlier transaction");
+            expected.put(
+                    issuedEarlier.key(),
+                    granted.contains("INSERT") && WRITTEN_AFTER_ISSUE.containsKey(table) ? DONE : REFUSED);
+            actual.put(
+                    issuedEarlier.key(),
+                    asApp(
+                            st,
+                            owner,
+                            () -> st.executeUpdate(columns.insertUnder(keyed.documentKeys(), earlier)) == 1
+                                    ? DONE
+                                    : HIDDEN));
+
+            Map<String, String> tids = new LinkedHashMap<>();
+            for (Row row : rows) {
+                try (ResultSet rs = st.executeQuery(columns.insertUnder(keyed.documentKeys(), headers.get(row.label()))
+                        + " returning tableoid::regclass::text || '/' || ctid::text")) {
+                    rs.next();
+                    tids.put(row.label(), rs.getString(1));
+                }
+            }
+            for (Scope scope : scopes) {
+                String read = asApp(
+                        st,
+                        scope,
+                        () -> String.join(
+                                ";",
+                                strings(
+                                        st,
+                                        "select t.tableoid::regclass::text || '/' || t.ctid::text from " + table
+                                                + " t")));
+                for (Row row : rows) {
+                    Check check = new Check(Op.SELECT, scope, "under " + row.label());
+                    expected.put(
+                            check.key(),
+                            !granted.contains("SELECT") ? REFUSED : reads(HEADER, scope, row) ? VISIBLE : HIDDEN);
+                    actual.put(
+                            check.key(),
+                            read.equals(REFUSED) || read.startsWith("error ")
+                                    ? read
+                                    : List.of(read.split(";")).contains(tids.get(row.label())) ? VISIBLE : HIDDEN);
+                }
+            }
+
+            List<String> mismatches = new ArrayList<>();
+            expected.forEach((key, want) -> {
+                String got = actual.get(key);
+                if (!want.equals(got)) {
+                    mismatches.add(table + ": " + key + ": expected " + want + ", got " + got);
+                }
+            });
+            return mismatches;
+        } finally {
+            db.rollback();
+        }
+    }
+
+    /** A made-up kernel.document header for the fixture row, unissued or issued. */
+    private static String header(UUID id, Row row, boolean issued) {
+        String columns = "document_id, doc_type_code, owner_entity_id, counterparty_entity_id, location_id, status";
+        String values = literal(id) + ", 'ZZ', " + literal(row.owner()) + ", "
+                + (row.counterparty() == null ? "null" : literal(row.counterparty())) + ", "
+                + (row.location() == null ? "null" : literal(row.location())) + ", "
+                + (issued ? "'ISSUED'" : "'DRAFT'");
+        if (issued) {
+            columns += ", series_id, doc_number, doc_number_display, issued_at, business_date, content_hash";
+            values += ", gen_random_uuid(), 1, 'ZZ-1', now(), date '2026-01-01', rpad('0', 64, '0')";
+        }
+        return "insert into kernel.document (" + columns + ") values (" + values + ")";
     }
 
     @Test
@@ -579,8 +868,9 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
 
             Map<String, String> tids = new LinkedHashMap<>();
             for (Row row : rows) {
-                try (ResultSet rs = st.executeQuery(columns.insert(row.owner(), row.location(), row.counterparty())
-                        + " returning tableoid::regclass::text || '/' || ctid::text")) {
+                try (ResultSet rs = st.executeQuery(
+                        columns.insert(row.owner(), row.location(), row.counterparty(), row.addressedTo())
+                                + " returning tableoid::regclass::text || '/' || ctid::text")) {
                     rs.next();
                     tids.put(row.label(), rs.getString(1));
                 }
@@ -735,7 +1025,30 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
 
     record Column(String name, String type, boolean notNull, boolean hasDefault, boolean generated, String expr) {}
 
+    /** The columns that address a row to another shop of the owner (dest_read, source_read). */
+    static final Set<String> ADDRESSED = Set.of("to_location_id", "from_location_id");
+
     record Columns(String table, List<Column> list) {
+
+        /**
+         * A row of a document (no owner column): every column in {@code keys} names the made-up
+         * header, every other required column a made-up value.
+         */
+        String insertUnder(Set<String> keys, UUID header) {
+            Map<String, String> values = new LinkedHashMap<>();
+            for (Column column : list) {
+                if (column.generated()) {
+                    continue;
+                }
+                if (keys.contains(column.name())) {
+                    values.put(column.name(), literal(header));
+                } else if (column.notNull() && !column.hasDefault()) {
+                    values.put(column.name(), made(column.type()));
+                }
+            }
+            return "insert into " + table + " (" + String.join(", ", values.keySet()) + ") values ("
+                    + String.join(", ", values.values()) + ")";
+        }
 
         Column find(String name) {
             return list.stream().filter(c -> c.name().equals(name)).findFirst().orElse(null);
@@ -774,6 +1087,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         }
 
         String insert(UUID owner, UUID location, UUID counterparty) {
+            return insert(owner, location, counterparty, null);
+        }
+
+        String insert(UUID owner, UUID location, UUID counterparty, UUID addressedTo) {
             Map<String, String> values = new LinkedHashMap<>();
             String cp = counterpartyColumn();
             for (Column column : list) {
@@ -782,6 +1099,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                 }
                 if (column.name().equals(ownerSource())) {
                     values.put(column.name(), literal(owner));
+                } else if (addressedTo != null && ADDRESSED.contains(column.name())) {
+                    values.put(column.name(), literal(addressedTo));
                 } else if (column.name().equals("location_id")) {
                     UUID at = location == null && column.notNull() ? UUID.randomUUID() : location;
                     values.put(column.name(), at == null ? "null" : literal(at));
@@ -863,20 +1182,60 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         return granted;
     }
 
-    private static List<String> ownedTables() {
-        return superuserJdbc()
-                .queryForList(
+    /**
+     * A table the matrices cover: keyed on its owner ({@code owner_entity_id}), or on the document
+     * whose rows it holds ({@code documentKeys}: the columns its policies hand to {@code
+     * kernel.document_visible} or {@code kernel.document_owned}, else {@code document_id}).
+     */
+    record Keyed(String table, Set<String> documentKeys) {
+        boolean owned() {
+            return documentKeys.isEmpty();
+        }
+    }
+
+    private static final Pattern DOCUMENT_KEY = Pattern.compile("kernel\\.document_(?:visible|owned)\\((\\w+)\\)");
+
+    /**
+     * Every parent table of every schema keyed on {@code owner_entity_id} or on a document: a
+     * {@code document_id} column with no owner of its own, or a policy that asks the header
+     * (RLS-17 a). A new table of either kind is covered the day its migration lands.
+     */
+    private static List<Keyed> ownedTables() {
+        List<Keyed> keyed = new ArrayList<>();
+        superuserJdbc()
+                .query(
                         """
-                        select n.nspname || '.' || c.relname
+                        select n.nspname || '.' || c.relname as name,
+                               exists (select 1 from pg_attribute a where a.attrelid = c.oid
+                                        and a.attname = 'owner_entity_id' and not a.attisdropped) as owned,
+                               coalesce((select string_agg(coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' '
+                                                           || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), ' ')
+                                           from pg_policy p where p.polrelid = c.oid), '') as policies
                           from pg_class c
                           join pg_namespace n on n.oid = c.relnamespace
                          where c.relkind in ('r', 'p') and not c.relispartition
                            and n.nspname not like 'pg\\_%' and n.nspname <> 'information_schema'
-                           and exists (select 1 from pg_attribute a where a.attrelid = c.oid
-                                        and a.attname = 'owner_entity_id' and not a.attisdropped)
+                           and (exists (select 1 from pg_attribute a where a.attrelid = c.oid
+                                         and a.attname in ('owner_entity_id', 'document_id') and not a.attisdropped)
+                                or exists (select 1 from pg_policy p where p.polrelid = c.oid
+                                            and coalesce(pg_get_expr(p.polqual, p.polrelid), '')
+                                                || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '')
+                                                like '%kernel.document\\_visible(%'))
                          order by 1
                         """,
-                        String.class);
+                        row -> {
+                            if (row.getBoolean("owned")) {
+                                keyed.add(new Keyed(row.getString("name"), Set.of()));
+                                return;
+                            }
+                            Set<String> keys = new java.util.TreeSet<>();
+                            Matcher key = DOCUMENT_KEY.matcher(row.getString("policies"));
+                            while (key.find()) {
+                                keys.add(key.group(1));
+                            }
+                            keyed.add(new Keyed(row.getString("name"), keys.isEmpty() ? Set.of("document_id") : keys));
+                        });
+        return keyed;
     }
 
     private static List<String> strings(Statement st, String sql) throws SQLException {

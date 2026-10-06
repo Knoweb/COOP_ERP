@@ -80,7 +80,7 @@ export function RepacksPage() {
   const reverseKey = useIdempotencyKey();
   const [locationId, setLocationId] = useState("");
   const [draft, setDraft] = useState({ name: "", inputSkuId: "", inputQty: "", outputSkuId: "", outputQty: "", loss: "0" });
-  const [run, setRun] = useState({ recipeId: "", batchId: "", inputQty: "", actual: "" });
+  const [run, setRun] = useState({ recipeId: "", batchId: "", inputQty: "", actual: "", reason: "" });
   const [reversing, setReversing] = useState<string | null>(null);
 
   const recipes = useQuery({ queryKey: ["inventory", "recipes"], queryFn: () => api.recipes() });
@@ -144,13 +144,14 @@ export function RepacksPage() {
           locationId,
           inputBatchId: run.batchId,
           inputQty: inputQty ?? 0,
-          actualOutputQty: actual ?? 0
+          actualOutputQty: actual ?? 0,
+          ...(run.reason.trim() === "" ? {} : { varianceReason: run.reason.trim() })
         },
         executeKey.current()
       ),
     onSuccess: () => {
       executeKey.next();
-      setRun({ recipeId: "", batchId: "", inputQty: "", actual: "" });
+      setRun({ recipeId: "", batchId: "", inputQty: "", actual: "", reason: "" });
       refresh();
     },
     onError: forget(executeKey)
@@ -337,6 +338,10 @@ export function RepacksPage() {
           <label className="inventory-form-field">
             {t("inventory.repack.actual").text}
             <input inputMode="decimal" value={run.actual} onChange={(event) => setRun({ ...run, actual: event.target.value })} />
+          </label>
+          <label className="inventory-form-field">
+            {t("inventory.repack.variance_reason").text}
+            <input value={run.reason} onChange={(event) => setRun({ ...run, reason: event.target.value })} />
           </label>
           <div className="inventory-action-bar">
             <button type="button" disabled={!runReady || execute.isPending} onClick={() => execute.mutate()}>
