@@ -864,6 +864,41 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m3pricing
+  # wave 2, PR 09 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-m7-erasure-and-retention.md
+  # (1), (2), (3); CR-27A-1): the limit above which a customer account needs the NIC (doc 27 section
+  # 7, until now hard-coded as "above zero"), how long after its last account closed a customer's
+  # erasure waits (the two-day offline window plus a day), and how long the society's accounting
+  # records about an erased customer are kept (doc 10 L-05; the purge job waits for doc 10 D-02).
+  - key: customers.nic_required_above_limit
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 999999999.99 }
+    description_en: The credit limit above which a customer account needs the customer's NIC recorded
+    description_si: පාරිභෝගික ගිණුමකට පාරිභෝගිකයාගේ ජාතික හැඳුනුම්පත් අංකය වාර්තා කිරීම අවශ්‍ය වන ණය සීමාව
+    description_ta: வாடிக்கையாளர் கணக்கிற்கு வாடிக்கையாளரின் அடையாள அட்டை எண் பதிவு செய்யப்பட வேண்டிய கடன் வரம்பு
+    default: 0
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m7customers
+  - key: customers.erasure_wait_days
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 90 }
+    description_en: How many days after a customer's last account was closed their erasure may be fulfilled, so that the shops' offline sales have arrived
+    description_si: සාප්පුවල නොබැඳි විකුණුම් ලැබී ඇති බවට පාරිභෝගිකයාගේ අවසන් ගිණුම වැසීමෙන් පසු මකා දැමීම ඉටු කළ හැකි දින ගණන
+    description_ta: கடைகளின் இணைப்பற்ற விற்பனைகள் வந்து சேர, வாடிக்கையாளரின் கடைசிக் கணக்கு மூடப்பட்ட பின் அழித்தலை நிறைவேற்றக்கூடிய நாட்கள்
+    default: 3
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m7customers
+  - key: customers.retention_years
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 30 }
+    description_en: How many years the society's accounting records about an erased customer are kept before they may be purged
+    description_si: මකා දැමූ පාරිභෝගිකයෙකු ගැන සමිතියේ ගිණුම් වාර්තා ඉවත් කිරීමට පෙර තබා ගන්නා වසර ගණන
+    description_ta: அழிக்கப்பட்ட வாடிக்கையாளர் பற்றிய சங்கத்தின் கணக்குப் பதிவுகள் நீக்கப்படுவதற்கு முன் வைக்கப்படும் ஆண்டுகள்
+    default: 7
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m7customers
   # wave 2, PR 10 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-expired-stock.md (6)
   # and 2026-10-06-wave2-stock-approvals.md (5), (6); CR-25A-1 items 1, 4 and 5): the shelf life a
   # delivery note to another entity must leave, the value a count variance may have and the value a

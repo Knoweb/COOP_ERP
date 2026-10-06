@@ -35,8 +35,10 @@ openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
-  version: 1.4.2
-  x-change-request: CR-21A-7
+  # 1.4.3 (CR-18-2, wave 2): the user and device administration reads carry x-federation-view: false;
+  # no request or response changes shape. 1.4.2 (CR-21A-7) is described in the header above.
+  version: 1.4.3
+  x-change-request: CR-18-2
 
 paths:
 
@@ -1123,6 +1125,8 @@ paths:
       operationId: listDevices
       summary: List the devices visible in the caller's scope, with the position each holds
       x-permission: sys.device.view
+      # Staff administration is the entity's (CR-18-2): a FEDERATION_VIEW session does not resolve this read.
+      x-federation-view: false
 
       parameters:
 
@@ -1199,6 +1203,7 @@ paths:
       operationId: getDevice
       summary: Get one device visible in the caller's scope
       x-permission: sys.device.view
+      x-federation-view: false
 
       parameters:
 
@@ -1708,6 +1713,8 @@ paths:
         work at that shop (an assignment there or an entity-wide one), never a sibling shop's
         operators. Never a PIN or its hash.
       x-permission: gov.user.view
+      # Staff administration is the entity's (CR-18-2): a FEDERATION_VIEW session does not resolve this read.
+      x-federation-view: false
       parameters:
 
         - in: query
@@ -1802,6 +1809,7 @@ paths:
       operationId: getUser
       summary: Get one user visible in the caller's scope
       x-permission: gov.user.view
+      x-federation-view: false
 
       parameters:
 

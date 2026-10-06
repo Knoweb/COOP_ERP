@@ -18,7 +18,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * The demo server's situation (wave 2 fix plan, "a Flyway test start on a database at the previous
  * migration"): a database whose every stream stands at the number before this pull request's
  * migrations (kernel {@code V0085}, m1party {@code V0014}, m1security {@code V0018} since PR 11, m2catalogue
- * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0006}) migrates to the new numbers
+ * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09)
+ * migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
  * FlywayConfig} runs the streams. The streams depend on each other at run time only (a policy
  * naming a kernel function, M2's trigger calling an M5 function), so each later number must apply
@@ -42,9 +43,10 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m3pricing", "5");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        streams.put("m5inventory", "6");
+        // Wave 2, PR 10: m5inventory V0008 (count_line.counted_at) on a database at V0007.
+        streams.put("m5inventory", "7");
         streams.put("m6pos", null);
-        streams.put("m7customers", null);
+        streams.put("m7customers", "2");
         streams.put("m8reporting", null);
         streams.put("m9integration", null);
         return streams;
@@ -111,7 +113,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 19)
                 .containsEntry("m2catalogue", 8)
                 .containsEntry("m3pricing", 6)
-                .containsEntry("m5inventory", 7);
+                .containsEntry("m5inventory", 8);
 
         // What the new numbers leave in place, read from the catalogue.
         List<String> functions = admin.queryForList(
@@ -144,6 +146,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
                         String.class))
                 .contains("kernel.document_open_for_write(document_id)");
+
+        // Wave 2, PR 10: m5inventory V0008 over a database at V0007.
+        assertThat(admin.queryForObject(
+                        "select count(*) from information_schema.columns where table_schema = 'inventory'"
+                                + " and table_name = 'count_line' and column_name = 'counted_at'",
+                        Integer.class))
+                .isEqualTo(1);
     }
 
     /** One stream as FlywayConfig runs it, strict. */

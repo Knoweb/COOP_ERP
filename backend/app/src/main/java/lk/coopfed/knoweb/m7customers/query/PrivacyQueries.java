@@ -2,24 +2,22 @@ package lk.coopfed.knoweb.m7customers.query;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 
-/** The data-subject requests of the caller's society (27A section 8, "Privacy requests"). */
+/**
+ * The data-subject requests of the caller's society (27A section 8, "Privacy requests"). The
+ * access export is not a read of this interface: it is handed over by the command {@code
+ * DownloadAccessExport}, so that the hand-over is the responsible officer's and audited (doc 27
+ * section 9.3; wave 2, M7CR-11).
+ */
 public interface PrivacyQueries {
 
     /** The society's requests, newest first; {@code status} null for all of them. */
     List<RequestView> requests(String status, ScopeContext scope);
 
     Optional<RequestView> request(UUID requestId, ScopeContext scope);
-
-    /**
-     * The export of a FULFILLED access request, rebuilt from the rows as they are now; empty when
-     * the request is not a fulfilled ACCESS or the customer has been anonymised since.
-     */
-    Optional<Map<String, Object>> accessExport(UUID requestId, ScopeContext scope);
 
     /**
      * @param customerName the customer's name as it is now ("Customer" once anonymised)
