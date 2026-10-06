@@ -449,6 +449,9 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
         setUploadStatus("IDLE");
       }, 3000);
     } catch (err) {
+      // The server answered: that action is finished, the next file is a new one. A failed
+      // storage PUT is not an answer; its retry carries the same key and renews the PENDING row.
+      forgetKeyOnProblem(key)(err);
       setUploadStatus("ERROR");
       setLocalPreviewUrl(null); // Clear preview on error
       sessionStorage.removeItem(`sku_preview_${skuId}`);

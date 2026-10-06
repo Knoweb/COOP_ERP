@@ -7,6 +7,7 @@ import { locationText } from "../../shell/i18n/localName";
 import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { openServerFile } from "../../shell/api/openServerFile";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useReportingApi, type ReportQuery, type ReportRun } from "./reportingApi";
 import { csvFileName, defaultPeriod, errorText, isNumeric, queryOf } from "./reportView";
@@ -289,8 +290,7 @@ export function ReportPage() {
                               type="button"
                               className="modern-btn"
                               onClick={() =>
-                                api.run(earlier.runId).then(
-                                  (fresh) => fresh.downloadUrl && window.open(fresh.downloadUrl, "_blank", "noreferrer"),
+                                openServerFile(() => api.run(earlier.runId).then((fresh) => fresh.downloadUrl)).catch(
                                   (error) => setExportError(errorText(error, t("reporting.error.generic").text))
                                 )
                               }
