@@ -154,7 +154,8 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
                 auditAfter(issued, invoiceId, null, credited, applied),
                 scope);
         events.publish(issuedEvent(issued, invoiceId, null, seller, invoice.counterpartyEntityId()));
-        events.publish(new JournalPostingsReady(creditNoteId, CN, issued.docNumberDisplay(), seller, journal));
+        events.publish(new JournalPostingsReady(
+                creditNoteId, CN, issued.docNumberDisplay(), seller, journal, issued.businessDate()));
         return creditNoteId;
     }
 

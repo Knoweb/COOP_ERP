@@ -220,7 +220,12 @@ public class RecordChequeOutcomeHandler implements Handles<RecordChequeOutcome, 
         events.publish(new PaymentReceiptReversed(
                 reversalId, reversal.docNumberDisplay(), receiptId, seller, buyer, amount, reopened, reason));
         events.publish(new JournalPostingsReady(
-                reversalId, RecordPaymentReceiptHandler.PRC, reversal.docNumberDisplay(), seller, journal));
+                reversalId,
+                RecordPaymentReceiptHandler.PRC,
+                reversal.docNumberDisplay(),
+                seller,
+                journal,
+                reversal.businessDate()));
         return reversalId;
     }
 

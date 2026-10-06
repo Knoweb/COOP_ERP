@@ -5,9 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
@@ -25,16 +31,16 @@ import org.springframework.stereotype.Component;
  *
  * <pre>
  *   openInvoices        = sum(gross - credited - settled) of the seller's issued invoices to the buyer
- *   acceptedNotInvoiced = sum(allocated qty (less what the buyer cancelled) x tier price) of the
- *                         seller's ACCEPTED orders from the buyer that no invoice covers yet
+ *   acceptedNotInvoiced = per line of the seller's ACCEPTED orders from the buyer, what will still be
+ *                         billed (undispatched, on its way, or received and not invoiced) x tier price
  *   unappliedReceipts   = sum(amount - settled) of the seller's receipts from the buyer, not reversed
  *   unappliedCredits    = sum(gross - Σ CREDITS links) of the seller's credit notes to the buyer
  *   amount              = openInvoices + acceptedNotInvoiced - unappliedReceipts - unappliedCredits
  * </pre>
  *
- * <p>An order counts as invoiced once an invoice bills a GRN of a drop that carried it: the demo
- * delivers an order on one note, so what was received is billed and a short quantity is not owed
- * (DR-2). The tier price is net of VAT, as 24A's formula has it. Nothing is stored (the
+ * <p>The accepted part is counted per order line (wave 2, M4MONEY-14), so an order delivered on two
+ * notes keeps the second note's goods in the exposure after the first is invoiced, and a short
+ * quantity is not owed (DR-2). The tier price is net of VAT, as 24A's formula has it. Nothing is stored (the
  * relationship_exposure cache of 24A is not built; see the module README), so there is no stale
  * figure and no consumer to replay.
  */
@@ -137,38 +143,144 @@ public class ExposureCalculator {
         return sum;
     }
 
+    /**
+     * What the buyer's accepted orders will still be billed, per order line (wave 2, CR-24A-3 item
+     * 6, M4MONEY-14), at the line's tier price: the allocated quantity not yet dispatched (less what
+     * the buyer cancelled), plus per delivery line of an issued note either its dispatched quantity
+     * while no confirmed GRN names its drop (goods on their way will be billed), or else its share
+     * of what the GRN received and no invoice has billed yet. All floored at 0: a short quantity is
+     * never owed (DR-2), an invoiced one is in {@link #openInvoices}, and a cancelled order owes
+     * nothing.
+     */
     BigDecimal acceptedNotInvoiced(UUID seller, UUID buyer) {
-        BigDecimal sum = BigDecimal.ZERO;
-        List<Map<String, Object>> rows = jdbc.queryForList(
+        Map<UUID, OrderLine> lines = new LinkedHashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
                 """
-                select oa.order_id,
-                       sum(greatest(least(oal.allocated_qty, ol.requested_qty - ol.cancelled_qty), 0)
-                           * coalesce(oal.tier_price, 0)) as value
+                select oa.order_id, oal.order_line_id, coalesce(oal.tier_price, 0) as tier_price,
+                       greatest(least(oal.allocated_qty, ol.requested_qty - ol.cancelled_qty) - oal.fulfilled_qty, 0)
+                           as undispatched
                   from trading.order_allocation oa
                   join trading.order_allocation_line oal on oal.order_id = oa.order_id
                   join trading.doc_order_line ol on ol.line_id = oal.order_line_id
                  where oa.owner_entity_id = ? and oa.counterparty_entity_id = ? and oa.status = 'ACCEPTED'
-                   and not exists (
-                       select 1 from trading.doc_delivery_line dl
-                         join trading.doc_grn g on g.drop_id = dl.drop_id
-                         join trading.doc_invoice i on g.document_id = any (i.grn_document_ids)
-                        where dl.order_id = oa.order_id)
-                 group by oa.order_id
                 """,
                 seller,
-                buyer);
-        for (Map<String, Object> row : rows) {
-            // A cancelled order owes nothing, whatever the seller allocated to it.
-            boolean cancelled = documents
-                    .findById((UUID) row.get("order_id"))
-                    .map(order -> !OrderStatus.SUBMITTED.equals(order.status()))
-                    .orElse(true);
-            if (!cancelled) {
-                sum = sum.add(((BigDecimal) row.get("value")).setScale(2, RoundingMode.HALF_UP));
+                buyer)) {
+            lines.put(
+                    (UUID) row.get("order_line_id"),
+                    new OrderLine((UUID) row.get("order_id"), (BigDecimal) row.get("tier_price"), (BigDecimal)
+                            row.get("undispatched")));
+        }
+        // A cancelled order owes nothing, whatever the seller allocated or dispatched to it.
+        Set<UUID> open = new HashSet<>();
+        for (UUID orderId :
+                lines.values().stream().map(OrderLine::orderId).distinct().toList()) {
+            boolean submitted = documents
+                    .findById(orderId)
+                    .map(order -> OrderStatus.SUBMITTED.equals(order.status()))
+                    .orElse(false);
+            if (submitted) {
+                open.add(orderId);
             }
+        }
+        if (open.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        Map<UUID, BigDecimal> uninvoiced = new HashMap<>();
+        lines.forEach((lineId, line) -> uninvoiced.put(lineId, line.undispatched()));
+        for (List<DeliveryLine> sameItemOnADrop : deliveryLines(open)) {
+            DeliveryLine first = sameItemOnADrop.get(0);
+            Optional<BigDecimal> received = receivedNotInvoiced(first.dropId(), first.skuId());
+            if (received.isEmpty()) {
+                // No confirmed GRN names the drop: on its way, and billed when it is received.
+                sameItemOnADrop.forEach(
+                        line -> uninvoiced.merge(line.orderLineId(), line.dispatchedQty(), BigDecimal::add));
+                continue;
+            }
+            // A GRN line counts an item of a drop once, whichever order lines it came from; its
+            // uninvoiced quantity is shared out over them in line order, the last taking the rest.
+            BigDecimal remaining = received.get();
+            for (int i = 0; i < sameItemOnADrop.size(); i++) {
+                DeliveryLine line = sameItemOnADrop.get(i);
+                BigDecimal share = i == sameItemOnADrop.size() - 1
+                        ? remaining
+                        : line.dispatchedQty().min(remaining);
+                remaining = remaining.subtract(share);
+                uninvoiced.merge(line.orderLineId(), share, BigDecimal::add);
+            }
+        }
+
+        Map<UUID, BigDecimal> byOrder = new LinkedHashMap<>();
+        lines.forEach((lineId, line) -> {
+            if (open.contains(line.orderId())) {
+                byOrder.merge(line.orderId(), uninvoiced.get(lineId).multiply(line.tierPrice()), BigDecimal::add);
+            }
+        });
+        BigDecimal sum = BigDecimal.ZERO;
+        for (BigDecimal value : byOrder.values()) {
+            sum = sum.add(value.setScale(2, RoundingMode.HALF_UP));
         }
         return sum;
     }
+
+    /** The delivery lines of issued notes for these orders, grouped by drop and item, each group in line order. */
+    private List<List<DeliveryLine>> deliveryLines(Set<UUID> orderIds) {
+        Map<String, List<DeliveryLine>> groups = new LinkedHashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                """
+                select dl.line_id, dl.order_line_id, dl.drop_id, dl.dispatched_qty, kl.sku_id
+                  from trading.doc_delivery_line dl
+                  join kernel.document dn on dn.document_id = dl.document_id and dn.issued_at is not null
+                  join kernel.document_line kl on kl.document_line_id = dl.line_id
+                 where dl.order_id = any (?::uuid[])
+                 order by dl.drop_id, kl.sku_id, dl.line_id
+                """,
+                (Object) orderIds.toArray(new UUID[0]))) {
+            DeliveryLine line = new DeliveryLine(
+                    (UUID) row.get("order_line_id"), (UUID) row.get("drop_id"), (UUID) row.get("sku_id"), (BigDecimal)
+                            row.get("dispatched_qty"));
+            groups.computeIfAbsent(line.dropId() + "|" + line.skuId(), key -> new ArrayList<>())
+                    .add(line);
+        }
+        return List.copyOf(groups.values());
+    }
+
+    /**
+     * What the confirmed GRN of a drop received of an item and no issued invoice line (referencing
+     * its GRN line) has billed yet, floored at 0; empty when no confirmed GRN names the drop.
+     */
+    private Optional<BigDecimal> receivedNotInvoiced(UUID dropId, UUID skuId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select coalesce(sum(gx.received_qty) filter (where kl.sku_id = ?), 0) as received,
+                       coalesce(sum((select coalesce(sum(il.qty), 0)
+                                       from kernel.document_line il
+                                       join kernel.document i on i.document_id = il.document_id
+                                      where il.reference_line_id = kl.document_line_id
+                                        and i.doc_type_code = 'INV' and i.issued_at is not null))
+                                filter (where kl.sku_id = ?), 0) as invoiced
+                  from trading.doc_grn g
+                  join kernel.document gd on gd.document_id = g.document_id and gd.issued_at is not null
+                  join trading.doc_grn_line gx on gx.document_id = g.document_id
+                  join kernel.document_line kl on kl.document_line_id = gx.line_id
+                 where g.drop_id = ? and g.reversal_of is null
+                having count(*) > 0
+                """,
+                skuId,
+                skuId,
+                dropId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        BigDecimal received = (BigDecimal) rows.get(0).get("received");
+        BigDecimal invoiced = (BigDecimal) rows.get(0).get("invoiced");
+        return Optional.of(received.subtract(invoiced).max(BigDecimal.ZERO));
+    }
+
+    private record OrderLine(UUID orderId, BigDecimal tierPrice, BigDecimal undispatched) {}
+
+    private record DeliveryLine(UUID orderLineId, UUID dropId, UUID skuId, BigDecimal dispatchedQty) {}
 
     BigDecimal unappliedReceipts(UUID seller, UUID buyer) {
         BigDecimal sum = jdbc.queryForObject(

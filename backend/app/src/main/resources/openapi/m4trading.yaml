@@ -1019,7 +1019,9 @@ paths:
         With no settlements the payment settles the buyer's open, undisputed invoices oldest
         first; what is left stays on the buyer's account (unapplied). Problems:
         m4.payment.method_invalid, m4.payment.amount_invalid, m4.payment.received_in_future,
-        m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.invoice_invalid,
+        m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.cheque_recorded (the
+        same cheque, by bank and number, on an earlier receipt from this buyer that did not bounce),
+        m4.payment.invoice_invalid,
         m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued,
         m4.payment.exceeds_due, m4.payment.exceeds_receipt.
       x-permission: bil.payment.record

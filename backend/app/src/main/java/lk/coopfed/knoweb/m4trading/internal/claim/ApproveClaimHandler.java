@@ -265,7 +265,12 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                 List.copyOf(accepted)));
         events.publish(IssueCreditNoteHandler.issuedEvent(issued, invoiceId, null, seller, buyer));
         events.publish(new JournalPostingsReady(
-                creditNoteId, IssueCreditNoteHandler.CN, issued.docNumberDisplay(), seller, journal));
+                creditNoteId,
+                IssueCreditNoteHandler.CN,
+                issued.docNumberDisplay(),
+                seller,
+                journal,
+                issued.businessDate()));
         return creditNoteId;
     }
 

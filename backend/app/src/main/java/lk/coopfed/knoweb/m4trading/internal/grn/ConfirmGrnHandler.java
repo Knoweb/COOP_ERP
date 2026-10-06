@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m4trading.internal.grn;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,6 +40,8 @@ import lk.coopfed.knoweb.m4trading.api.DiscrepancyLine;
 import lk.coopfed.knoweb.m4trading.api.DiscrepancyRaised;
 import lk.coopfed.knoweb.m4trading.api.GrnConfirmed;
 import lk.coopfed.knoweb.m4trading.api.GrnLineConfirmed;
+import lk.coopfed.knoweb.m4trading.api.JournalPostingsReady;
+import lk.coopfed.knoweb.m4trading.api.Posting;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingClock;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingDocuments;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingGuards;
@@ -47,6 +50,7 @@ import lk.coopfed.knoweb.m4trading.internal.grn.DiscrepancyDetector.Finding;
 import lk.coopfed.knoweb.m4trading.internal.grn.DiscrepancyDetector.Variance;
 import lk.coopfed.knoweb.m4trading.internal.grn.GrnReads.Grn;
 import lk.coopfed.knoweb.m4trading.internal.grn.GrnReads.GrnLine;
+import lk.coopfed.knoweb.m4trading.internal.posting.PostingMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +68,10 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link DiscrepancyDetector} finds a variance, the discrepancy document at the GRN's location
  * (#142, #148) from the receiver's ENTITY series, its lines, a DISPUTES link to the GRN and its
  * window from the relationship. Audit GRN_CONFIRMED (and DISCREPANCY_RAISED); events
- * grn.confirmed.v1, whose lines carry the batch ids (frozen at M4-05), and discrepancy.raised.v1.
+ * grn.confirmed.v1, whose lines carry the batch ids (frozen at M4-05), discrepancy.raised.v1, and
+ * journal.postings_ready.v1 with the receiver's own postings (GRN GOODS BUYER: inventory against the
+ * GRN accrual, at {@link #cost}; a GRN of a local supplier is the receiver's purchase too), in the
+ * receiver's scope, so the buyer's books have their goods (wave 2, CR-24A-3 item 5, M4MONEY-10).
  */
 @Service
 @CommandHandler(permission = "shop.grn.confirm")
@@ -85,6 +92,7 @@ public class ConfirmGrnHandler implements Handles<ConfirmGrn, String> {
     private final RelationshipQueries relationships;
     private final CatalogueQueries catalogue;
     private final BatchRegistration batches;
+    private final PostingMapper postings;
     private final TradingClock clock;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -101,6 +109,7 @@ public class ConfirmGrnHandler implements Handles<ConfirmGrn, String> {
             RelationshipQueries relationships,
             CatalogueQueries catalogue,
             BatchRegistration batches,
+            PostingMapper postings,
             TradingClock clock,
             AuditFacade audit,
             EventPublisher events) {
@@ -115,6 +124,7 @@ public class ConfirmGrnHandler implements Handles<ConfirmGrn, String> {
         this.relationships = relationships;
         this.catalogue = catalogue;
         this.batches = batches;
+        this.postings = postings;
         this.clock = clock;
         this.audit = audit;
         this.events = events;
@@ -227,6 +237,10 @@ public class ConfirmGrnHandler implements Handles<ConfirmGrn, String> {
             raised = raise(grn, finding.get(), batchOfLine, scope);
         }
 
+        // 4. the buyer's books (wave 2, CR-24A-3 item 5): GRN GOODS BUYER, inventory against the
+        // GRN accrual, at what the invoice will bill for these lines.
+        List<Posting> journal = postings.postings(GrnReads.GRN, "GOODS", "BUYER", Map.of("cost", cost(grn.lines())));
+
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", GrnReads.CONFIRMED);
         after.put("docNumber", issued.docNumberDisplay());
@@ -258,7 +272,28 @@ public class ConfirmGrnHandler implements Handles<ConfirmGrn, String> {
         if (raised != null) {
             events.publish(raised);
         }
+        if (!journal.isEmpty()) {
+            events.publish(new JournalPostingsReady(
+                    grnId, GrnReads.GRN, issued.docNumberDisplay(), scope.entityId(), journal, issued.businessDate()));
+        }
         return issued.docNumberDisplay();
+    }
+
+    /**
+     * The cost of what was received: per line, the received quantity at the line's unit cost (the
+     * delivery note's price snapshot, the trade price the invoice bills at), rounded to the cent
+     * per line exactly as IssueInvoice rounds its net, so the GRN accrual this posts is what the
+     * invoice of this GRN clears (doc 24 section 3.9; wave 2, CR-24A-3 item 5).
+     */
+    static BigDecimal cost(List<GrnLine> lines) {
+        BigDecimal cost = BigDecimal.ZERO;
+        for (GrnLine line : lines) {
+            if (line.receivedQty().signum() <= 0 || line.unitCost() == null) {
+                continue;
+            }
+            cost = cost.add(line.unitCost().multiply(line.receivedQty()).setScale(2, RoundingMode.HALF_UP));
+        }
+        return cost;
     }
 
     private DiscrepancyRaised raise(Grn grn, Finding finding, Map<UUID, UUID> batchOfLine, ScopeContext scope) {

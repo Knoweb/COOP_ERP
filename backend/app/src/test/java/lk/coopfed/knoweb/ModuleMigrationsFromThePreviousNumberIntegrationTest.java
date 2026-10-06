@@ -39,7 +39,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m1security", "17");
         streams.put("m2catalogue", "7");
         streams.put("m3pricing", "5");
-        streams.put("m4trading", null);
+        // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
+        streams.put("m4trading", "9");
         streams.put("m5inventory", "6");
         streams.put("m6pos", null);
         streams.put("m7customers", null);
@@ -134,6 +135,14 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                                 + " and tablename = 'control_price' and policyname = 'own_write'",
                         String.class))
                 .contains("kernel.system_entity()");
+
+        // Wave 2, PR 07: m4trading V0010 over a database at V0009.
+        assertThat(after).containsEntry("m4trading", 10);
+        assertThat(admin.queryForObject(
+                        "select with_check from pg_policies where schemaname = 'trading'"
+                                + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
+                        String.class))
+                .contains("kernel.document_open_for_write(document_id)");
     }
 
     /** One stream as FlywayConfig runs it, strict. */
