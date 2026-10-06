@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -53,7 +54,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e67c-0000-7000-8000-000000000002");
-    private static final UUID APPROVER = UUID.fromString("0190e67c-0000-7000-8000-000000000020");
 
     @Autowired
     ScheduleCountHandler schedule;
@@ -85,12 +85,16 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     OuterCommand outer;
 
+    @Autowired
+    lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
+
     private InventoryFixture fixture;
     private UUID stores;
     private UUID rice;
     private UUID riceBatch;
     private UUID dhal;
     private UUID dhalBatch;
+    private UUID approver;
 
     @BeforeEach
     void arrange() {
@@ -104,6 +108,8 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
         dhalBatch = fixture.batch(dhal, MPCS, "D1", LocalDate.of(2027, 5, 31));
         post(MovementType.RECEIPT, riceBatch, "50", "100");
         post(MovementType.RECEIPT, dhalBatch, "10", "300");
+        // A grant without a limit approves band 1 (Rs 25,000) since wave 2 (M5-09).
+        approver = fixture.userWith(MPCS, "inv.adjust.approve", null);
         kernel.reset();
     }
 
@@ -143,11 +149,126 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
         });
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
-                .contains("COUNT_SUBMITTED", "STOCK_POSTED");
+                .contains("COUNT_SUBMITTED", "STOCK_POSTED", "COUNT_TOLERANCE_CLEARED");
+        // wave 2, M5-14: the variance cleared by tolerance is on the exception report.
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("COUNT_TOLERANCE_CLEARED"))
+                .singleElement()
+                .satisfies(a -> assertThat(a.after().toString()).contains(riceBatch.toString(), "-1"));
         assertThat(events(CountSubmitted.class)).singleElement().satisfies(e -> {
             assertThat(e.postedLines()).isEqualTo(1);
             assertThat(e.reviewLines()).isZero();
         });
+    }
+
+    // ---- wave 2: the value tolerance, the cap, stock from nothing, the counted moment ----------
+
+    @Test
+    void aVarianceWithinTheQuantityToleranceButWorthMoreThanTheValueToleranceWaits() {
+        UUID tea = fixture.sku(MPCS, "TEA400");
+        UUID teaBatch = fixture.batch(tea, MPCS, "T1", LocalDate.of(2028, 1, 31));
+        post(MovementType.RECEIPT, teaBatch, "20", "800");
+        UUID task = schedule.handle(new ScheduleCount(stores, "SKUS", List.of(tea), null), own(MPCS));
+        start.handle(new StartCount(task), own(MPCS));
+        kernel.reset();
+
+        // Two units short: inside the 2-unit tolerance, but Rs 1,600 is above Rs 1,000.
+        submit.handle(new SubmitCount(task, List.of(counted(teaBatch, "18"))), own(MPCS));
+
+        CountView review = control.count(task, own(MPCS)).orElseThrow();
+        assertThat(review.status()).isEqualTo("VARIANCE_REVIEW");
+        assertThat(review.reviewValue()).isEqualByComparingTo("1600.00");
+        assertThat(review.lines()).singleElement().satisfies(l -> assertThat(l.withinTolerance())
+                .isFalse());
+        assertThat(inventory.movementsOf(task, own(MPCS))).isEmpty();
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("COUNT_SUBMITTED");
+    }
+
+    @Test
+    void aCountWhoseClearedVariancesAddUpToMoreThanTheCapWaitsWhole() {
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, scope_location_id, value, changed_by)"
+                                + " values ('inventory.count_autopost_value_cap', ?, null, '500'::jsonb, ?)",
+                        MPCS,
+                        InventoryFixture.USER);
+        config.invalidate("inventory.count_autopost_value_cap");
+        try {
+            UUID task = schedule.handle(new ScheduleCount(stores, "FULL", List.of(), null), own(MPCS));
+            start.handle(new StartCount(task), own(MPCS));
+            kernel.reset();
+
+            // Rice one short (Rs 100) and dhal two short (Rs 600): each within tolerance, Rs 700 together.
+            submit.handle(new SubmitCount(task, List.of(counted(riceBatch, "49"), counted(dhalBatch, "8"))), own(MPCS));
+
+            CountView review = control.count(task, own(MPCS)).orElseThrow();
+            assertThat(review.status()).isEqualTo("VARIANCE_REVIEW");
+            assertThat(review.reviewValue()).isEqualByComparingTo("700.00");
+            assertThat(review.lines()).noneMatch(CountView.Line::withinTolerance);
+            assertThat(inventory.movementsOf(task, own(MPCS))).isEmpty();
+            assertThat(kernel.committedAudit())
+                    .extracting(KernelRecorder.AuditRecord::eventType)
+                    .doesNotContain("COUNT_TOLERANCE_CLEARED", "STOCK_POSTED");
+        } finally {
+            superuserJdbc().update("delete from kernel.config_value where key = 'inventory.count_autopost_value_cap'");
+            config.invalidate("inventory.count_autopost_value_cap");
+        }
+    }
+
+    @Test
+    void aSurplusOnALotWhoseBookHeldNothingIsAlwaysLookedAt() {
+        UUID found = fixture.batch(rice, MPCS, "R2", LocalDate.of(2027, 8, 31));
+        UUID task = schedule.handle(new ScheduleCount(stores, "FULL", List.of(), null), own(MPCS));
+        start.handle(new StartCount(task), own(MPCS));
+
+        // One bag of a batch the book never held: within the 2-unit tolerance, but stock from nothing.
+        submit.handle(
+                new SubmitCount(task, List.of(counted(riceBatch, "50"), counted(dhalBatch, "10"), counted(found, "1"))),
+                own(MPCS));
+
+        CountView review = control.count(task, own(MPCS)).orElseThrow();
+        assertThat(review.status()).isEqualTo("VARIANCE_REVIEW");
+        assertThat(review.lines())
+                .filteredOn(l -> l.batchId().equals(found))
+                .singleElement()
+                .satisfies(l -> {
+                    assertThat(l.varianceQty()).isEqualByComparingTo("1");
+                    assertThat(l.withinTolerance()).isFalse();
+                });
+        assertThat(inventory.movementsOf(task, own(MPCS))).isEmpty();
+    }
+
+    @Test
+    void aLineIsMeasuredAgainstTheLotAsItStoodWhenItWasCountedSoALaterSaleIsNoSurplus() {
+        UUID task = schedule.handle(new ScheduleCount(stores, "SKUS", List.of(rice), null), own(MPCS));
+        start.handle(new StartCount(task), own(MPCS));
+        // The shelf holds 50 and is counted now; then the till sells five before the sheet is submitted.
+        Instant countedAt = Instant.now();
+        post(MovementType.SALE, riceBatch, "-5", null, countedAt.plusSeconds(1));
+
+        submit.handle(
+                new SubmitCount(
+                        task,
+                        List.of(new SubmitCount.Line(
+                                riceBatch, LotCondition.GOOD, new BigDecimal("50"), null, countedAt))),
+                own(MPCS));
+
+        CountView closed = control.count(task, own(MPCS)).orElseThrow();
+        assertThat(closed.status()).isEqualTo("CLOSED");
+        assertThat(closed.lines()).singleElement().satisfies(l -> {
+            assertThat(l.expectedQty()).isEqualByComparingTo("50");
+            assertThat(l.varianceQty()).isEqualByComparingTo("0");
+        });
+        assertThat(onHand(riceBatch)).isEqualByComparingTo("45");
+        assertThat(inventory.movementsOf(task, own(MPCS))).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select counted_at is not null from inventory.count_line where task_id = ?",
+                                Boolean.class,
+                                task))
+                .isTrue();
     }
 
     @Test
@@ -200,12 +321,12 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> approve.handle(new ApproveAdjustment(task), own(MPCS)), "m5.adjustment.approver_is_requester");
         assertThat(kernel.committedAudit()).isEmpty();
 
-        approve.handle(new ApproveAdjustment(task), own(MPCS, APPROVER));
+        approve.handle(new ApproveAdjustment(task), own(MPCS, approver));
 
         CountView closed = control.count(task, own(MPCS)).orElseThrow();
         assertThat(closed.status()).isEqualTo("CLOSED");
         assertThat(closed.outcome()).isEqualTo("APPROVED");
-        assertThat(closed.reviewedBy()).isEqualTo(APPROVER);
+        assertThat(closed.reviewedBy()).isEqualTo(approver);
         assertThat(onHand(riceBatch)).isEqualByComparingTo("40");
         assertThat(inventory.movementsOf(task, own(MPCS)))
                 .extracting(MovementView::qtyDelta)
@@ -215,11 +336,11 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains("ADJUSTMENT_APPROVED", "STOCK_POSTED");
         assertThat(events(AdjustmentApproved.class)).singleElement().satisfies(e -> {
-            assertThat(e.approverUserId()).isEqualTo(APPROVER);
+            assertThat(e.approverUserId()).isEqualTo(approver);
             assertThat(e.value()).isEqualByComparingTo("1000.00");
         });
         assertProblem(
-                () -> approve.handle(new ApproveAdjustment(task), own(MPCS, APPROVER)), "m5.adjustment.not_in_review");
+                () -> approve.handle(new ApproveAdjustment(task), own(MPCS, approver)), "m5.adjustment.not_in_review");
     }
 
     @Test
@@ -227,10 +348,10 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID task = counted("40");
 
         kernel.reset();
-        assertProblem(() -> reject.handle(new RejectAdjustment(task, " "), own(MPCS, APPROVER)), "m5.reason_required");
+        assertProblem(() -> reject.handle(new RejectAdjustment(task, " "), own(MPCS, approver)), "m5.reason_required");
         assertThat(kernel.committedAudit()).isEmpty();
 
-        reject.handle(new RejectAdjustment(task, "Count again, the back shelf was missed"), own(MPCS, APPROVER));
+        reject.handle(new RejectAdjustment(task, "Count again, the back shelf was missed"), own(MPCS, approver));
 
         CountView closed = control.count(task, own(MPCS)).orElseThrow();
         assertThat(closed.outcome()).isEqualTo("REJECTED");
@@ -292,7 +413,7 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
                         new SubmitCount(task, List.of(counted(riceBatch, "50"), counted(Ids.next(), "1"))), own(MPCS)),
                 "m5.batch.not_found");
         assertProblem(
-                () -> approve.handle(new ApproveAdjustment(task), own(MPCS, APPROVER)), "m5.adjustment.not_in_review");
+                () -> approve.handle(new ApproveAdjustment(task), own(MPCS, approver)), "m5.adjustment.not_in_review");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
 
@@ -352,13 +473,17 @@ class StockCountPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void post(MovementType type, UUID batch, String qty, String cost) {
+        post(type, batch, qty, cost, null);
+    }
+
+    private void post(MovementType type, UUID batch, String qty, String cost, Instant occurredAt) {
         ScopeContext scope = own(MPCS);
         outer.run(
                 scope,
                 () -> ledger.post(
                         new PostMovements(
                                 Ids.next(),
-                                null,
+                                occurredAt,
                                 null,
                                 List.of(new Movement(
                                         stores,

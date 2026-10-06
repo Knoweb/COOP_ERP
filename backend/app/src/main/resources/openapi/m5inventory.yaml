@@ -1019,6 +1019,9 @@ components:
         qtyOnHand: { type: number }
         fefoRank: { type: integer }
         negative: { type: boolean }
+        expired:
+          type: boolean
+          description: The lot's expiry date is before the business date; it has no FEFO rank and leaves by a write-off
         unitCost:
           type: number
           description: The lot's acquisition cost; only for a user of the owning entity, never for a till
@@ -1057,6 +1060,10 @@ components:
         condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
         countedQty: { type: number, minimum: 0 }
         skipReason: { type: string, maxLength: 200 }
+        countedAt:
+          type: string
+          format: date-time
+          description: When the lot was counted (the form stamps the line); the line is measured against the lot as it stood then
     ReasonRequest:
       type: object
       required: [reason]
@@ -1239,6 +1246,10 @@ components:
         inputQty: { type: number, exclusiveMinimum: 0 }
         actualOutputQty: { type: number, exclusiveMinimum: 0 }
         printedMrp: { type: number, exclusiveMinimum: 0 }
+        varianceReason:
+          type: string
+          maxLength: 500
+          description: Why fewer packs were made than the recipe expects; required when the shortfall is beyond the yield tolerance
     RepackResponse:
       type: object
       required: [repackId, locationId, recipeId, inputBatchId, inputSkuId, inputQty, outputSkuId, outputBatchId,

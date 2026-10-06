@@ -163,11 +163,25 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                                 UUID.class,
                                 id))
                 .containsExactly(shop);
+        // wave 2, M5-16: the same person issued and received it; allowed, and flagged.
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
-                .contains("STOCK_POSTED", "TRANSFER_RECEIVED");
+                .contains("STOCK_POSTED", "TRANSFER_RECEIVED", "TRANSFER_SELF_RECEIVED");
         assertThat(events(TransferReceived.class)).singleElement().satisfies(e -> assertThat(e.toLocationId())
                 .isEqualTo(shop));
+    }
+
+    @Test
+    void aTransferReceivedByAnotherPersonIsNotFlagged() {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        kernel.reset();
+
+        receive.handle(new ReceiveTransfer(id), own(MPCS, Ids.next()));
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("TRANSFER_RECEIVED")
+                .doesNotContain("TRANSFER_SELF_RECEIVED");
     }
 
     @Test

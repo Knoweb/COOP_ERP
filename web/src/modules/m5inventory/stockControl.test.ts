@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Count, LotBalance, Recipe, WriteOff } from "./inventoryApi";
 import {
   countChip,
+  countedNow,
   countLinesOf,
   expectedOutputOf,
   lotKey,
@@ -58,6 +59,17 @@ describe("the stocktake sheet", () => {
       countLinesOf(counting, { [rice]: { counted: "35", skip: "" }, [dhal]: { counted: "", skip: "Shelf blocked" } })
     ).toEqual([
       { batchId: RICE, condition: "GOOD", countedQty: 35 },
+      { batchId: DHAL, condition: "GOOD", skipReason: "Shelf blocked" }
+    ]);
+  });
+
+  it("stamps each counted line with the moment its quantity was typed and sends it", () => {
+    const rice = lotKey(RICE, "GOOD");
+    const dhal = lotKey(DHAL, "GOOD");
+    const typed = countedNow({ counted: "", skip: "" }, "35", new Date("2026-10-07T04:30:00Z"));
+    expect(typed).toEqual({ counted: "35", skip: "", countedAt: "2026-10-07T04:30:00.000Z" });
+    expect(countLinesOf(counting, { [rice]: typed, [dhal]: { counted: "", skip: "Shelf blocked" } })).toEqual([
+      { batchId: RICE, condition: "GOOD", countedQty: 35, countedAt: "2026-10-07T04:30:00.000Z" },
       { batchId: DHAL, condition: "GOOD", skipReason: "Shelf blocked" }
     ]);
   });
