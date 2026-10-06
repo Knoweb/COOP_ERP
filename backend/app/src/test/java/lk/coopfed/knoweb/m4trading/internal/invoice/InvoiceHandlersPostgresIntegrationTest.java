@@ -133,10 +133,18 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(event.businessDate())
                     .isNotNull()
                     .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), event.documentId()));
+            // Both sides on one event (wave 2, CR-24A-3 item 5): the seller's receivable against
+            // revenue and VAT output, and the buyer's accrual and VAT input against its payable,
+            // which the kernel delivers to the buyer (CR-19A-13).
+            assertThat(event.counterpartyEntityId()).isEqualTo(BUYER);
             assertThat(event.postings())
-                    .extracting(posting ->
-                            posting.creditRole() + "=" + posting.amount().toPlainString())
-                    .containsExactlyInAnyOrder("REVENUE=1280.00", "VAT_OUTPUT=172.80");
+                    .extracting(posting -> posting.side() + " " + posting.debitRole() + "/" + posting.creditRole() + "="
+                            + posting.amount().toPlainString())
+                    .containsExactlyInAnyOrder(
+                            "SELLER RECEIVABLE/REVENUE=1280.00",
+                            "SELLER RECEIVABLE/VAT_OUTPUT=172.80",
+                            "BUYER GRN_ACCRUAL/PAYABLE=1280.00",
+                            "BUYER VAT_INPUT/PAYABLE=172.80");
         });
 
         kernel.reset();
