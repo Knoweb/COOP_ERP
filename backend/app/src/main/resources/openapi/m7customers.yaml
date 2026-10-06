@@ -683,7 +683,10 @@ components:
         hardBlock: { type: [boolean, 'null'] }
         offlineCap: { type: [number, 'null'], minimum: 0, maximum: 999999999.99 }
         reason: { type: string, minLength: 1, maxLength: 200 }
-        nic: { type: [string, 'null'], maxLength: 20, description: The NIC, when the limit rises above the threshold and none is recorded; only its hash and last four are kept }
+        nic:
+          type: [string, 'null']
+          maxLength: 20
+          description: The NIC, when the limit rises above the threshold and none is recorded; only its hash and last four are kept
     RecaptureNicRequest:
       type: object
       required: [nic, reason]

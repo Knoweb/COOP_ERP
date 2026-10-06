@@ -532,7 +532,7 @@ export interface components {
             hardBlock?: boolean | null;
             offlineCap?: number | null;
             reason: string;
-            /** @description The NIC */
+            /** @description The NIC, when the limit rises above the threshold and none is recorded; only its hash and last four are kept */
             nic?: string | null;
         };
         RecaptureNicRequest: {
