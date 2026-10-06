@@ -1,0 +1,41 @@
+.integration-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+  margin-bottom: var(--space-4);
+}
+
+.integration-label {
+  display: block;
+  margin-bottom: var(--space-half);
+}
+
+.integration-number {
+  text-align: right;
+}
+
+.integration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.integration-muted {
+  color: var(--color-text-muted);
+}
+
+.integration-templates {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.integration-template {
+  padding: var(--space-3);
+}
+
+.integration-subject {
+  font-weight: var(--font-weight-strong);
+}

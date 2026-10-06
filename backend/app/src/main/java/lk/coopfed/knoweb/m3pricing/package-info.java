@@ -4,7 +4,9 @@
  * <p>allowedDependencies: the kernel; the shared engine (central calls the same functions the
  * till runs, 23A section 6); and, of the modules 23A section 4 names, those this code uses
  * today: M1's api (TradePriceListCheck, which M3 answers) and query (relationships), M2's query
- * (SKUs and batches). M5's query arrives with the retail ceiling check (M3-06).
+ * (SKUs and batches). M5's in-stock batches are not read through M5's query (the layer rule keeps
+ * master data from reading transactions): M3 publishes {@code api.InStockBatchQuery} and M5
+ * answers it (M3-06), as M5 answers M2's InventoryLotQuery.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M3 Pricing & Rules",

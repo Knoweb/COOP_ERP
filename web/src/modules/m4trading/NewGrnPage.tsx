@@ -119,7 +119,10 @@ export function NewGrnPage() {
     return (
       <main className="shell-page">
         <p role="alert">{errorText(note.error, t("trading.error.not_found").text)}</p>
-        <Link to="/trading">{t("trading.back").text}</Link>
+        <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       </main>
     );
   }
@@ -150,7 +153,7 @@ export function NewGrnPage() {
       <p>
         {t("trading.field.receive_at").text}: <LocationName locationId={drop.shipToLocationId} />
       </p>
-      <form onSubmit={send} style={{ display: "grid", gap: "var(--space-2)" }}>
+      <form onSubmit={send} className="trading-form-row">
         <table>
           <thead>
             <tr>

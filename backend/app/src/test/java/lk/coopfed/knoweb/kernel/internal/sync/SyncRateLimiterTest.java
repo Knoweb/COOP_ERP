@@ -96,6 +96,42 @@ class SyncRateLimiterTest {
         assertThatCode(() -> limiter.admit(scope, TILL_A, 100).close()).doesNotThrowAnyException();
     }
 
+    /** Wave 2, TWK-25: the heartbeat, the snapshot, the change log and the presign have a bucket too. */
+    @Test
+    void aDeviceThatSpentItsRequestsOnHeartbeatsIsToldToWaitAndAnotherIsNot() {
+        when(config.getInt(eq("sync.rate.requests_per_minute"), any(), anyInt()))
+                .thenReturn(30);
+        for (int i = 0; i < 30; i++) {
+            limiter.admitRequest(scope, TILL_A, false);
+        }
+
+        ProblemException refused = refusal(() -> limiter.admitRequest(scope, TILL_A, false));
+
+        assertThat(refused.messageId()).isEqualTo("sync.rate_limited");
+        // Thirty a minute: the next one is two seconds away.
+        assertThat(refused.parameters()).containsEntry("retry_after", 2L);
+        assertThatCode(() -> limiter.admitRequest(scope, TILL_B, false)).doesNotThrowAnyException();
+        clock.advance(Duration.ofSeconds(2));
+        assertThatCode(() -> limiter.admitRequest(scope, TILL_A, false)).doesNotThrowAnyException();
+    }
+
+    /** A snapshot's answer costs the hourly byte bucket; the next download waits until it refills. */
+    @Test
+    void aDownloadIsChargedItsBytesAndTheNextWaitsWhileTheBucketIsSpent() {
+        when(config.getInt(eq("sync.rate.requests_per_minute"), any(), anyInt()))
+                .thenReturn(30);
+        limits(100, 10_000, 5);
+        limiter.admitRequest(scope, TILL_A, true);
+        limiter.chargeBytes(scope, TILL_A, 12_000);
+
+        ProblemException refused = refusal(() -> limiter.admitRequest(scope, TILL_A, true));
+
+        // Two thousand bytes in debt, plus one to start: 2,001 at ten thousand an hour, 721 seconds.
+        assertThat(refused.parameters()).containsEntry("retry_after", 721L);
+        // A heartbeat sends nothing heavy and is not held by the byte bucket.
+        assertThatCode(() -> limiter.admitRequest(scope, TILL_A, false)).doesNotThrowAnyException();
+    }
+
     private void limits(int batchesPerMinute, int bytesPerHour, int concurrent) {
         when(config.getInt(eq("sync.rate.batches_per_minute"), any(), anyInt())).thenReturn(batchesPerMinute);
         when(config.getInt(eq("sync.rate.bytes_per_hour"), any(), anyInt())).thenReturn(bytesPerHour);

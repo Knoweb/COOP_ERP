@@ -11,18 +11,21 @@ import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
+import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardTile;
+import lk.coopfed.knoweb.m8reporting.web.generated.ExceptionItemResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportColumn;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDataResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDefinitionResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportRunResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportingApi;
 import lk.coopfed.knoweb.m8reporting.web.generated.RequestReportRunRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.TrendPoint;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -68,10 +71,57 @@ class ReportingController implements ReportingApi {
                                 tile.labelId(),
                                 tile.value().toPlainString(),
                                 DashboardTile.KindEnum.fromValue(tile.kind()))
-                        .drillReportId(tile.drillReportId()))
+                        .drillReportId(tile.drillReportId())
+                        .trend(tile.trend().stream()
+                                .map(point -> new TrendPoint(
+                                        point.from(), point.value().toPlainString()))
+                                .toList()))
                 .toList());
         response.setFreshness(dashboard.freshness());
         return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<List<ExceptionItemResponse>> listExceptions() {
+        return ResponseEntity.ok(queries.exceptions(currentScope.get()).stream()
+                .map(ReportingController::toResponse)
+                .toList());
+    }
+
+    private static ExceptionItemResponse toResponse(ExceptionItem item) {
+        ExceptionItemResponse response = new ExceptionItemResponse(
+                ExceptionItemResponse.KindEnum.fromValue(item.kind()),
+                ExceptionItemResponse.SeverityEnum.fromValue(item.severity()),
+                item.subjectId(),
+                item.since(),
+                item.escalated());
+        response.setDocumentNumber(item.documentNumber());
+        response.setRole(item.role() == null ? null : ExceptionItemResponse.RoleEnum.fromValue(item.role()));
+        response.setCounterpartyEntityId(item.counterpartyEntityId());
+        response.setCounterparty(item.counterparty());
+        response.setSubject(item.subject());
+        response.setAmount(item.amount() == null ? null : item.amount().toPlainString());
+        response.setPercent(item.percent() == null ? null : item.percent().toPlainString());
+        return response;
+    }
+
+    @Override
+    public ResponseEntity<List<ReportRunResponse>> listReportRuns(String reportId) {
+        ScopeContext scope = currentScope.get();
+        // The history lists the runs only; a download link is asked for per run (getReportRun).
+        return ResponseEntity.ok(queries.runs(reportId, scope).stream()
+                .map(run -> {
+                    ReportRunResponse response = new ReportRunResponse(
+                            run.runId(),
+                            run.reportId(),
+                            ReportRunResponse.StatusEnum.fromValue(run.status()),
+                            run.language(),
+                            run.requestedAt());
+                    response.setErrorCode(run.errorCode());
+                    response.setCompletedAt(run.completedAt());
+                    return response;
+                })
+                .toList());
     }
 
     @Override

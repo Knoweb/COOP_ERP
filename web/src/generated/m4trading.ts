@@ -108,6 +108,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/orders/{orderId}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer amends its order before the seller decides it; the answer is the next version
+         * @description The lines (the whole set), their quantities and the requested delivery date. The next version is a new order that names the one it amends; the amended order is CANCELLED (reason ORDER_AMENDED). A submitted order's next version is submitted at once and the seller accepts it afresh. Problems: m4.order.not_found, m4.order.not_buyer, m4.order.not_amendable, m4.order.relationship_inactive, m4.order.eta_past, m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active, m4.order.uom_invalid, m4.order.qty_not_positive.
+         */
+        post: operations["amendOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/orders/{orderId}/accept": {
         parameters: {
             query?: never;
@@ -349,11 +371,537 @@ export interface paths {
         };
         /**
          * A fresh link to the printed A4 copy of the seller's invoice (M4-11)
-         * @description The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity is refused (report.scope_mismatch).
+         * @description The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it has, the answer is m4.invoice.print_not_ready. The PDF is stored under the seller; the buyer prints the same PDF through this invoice. Any other entity does not see the invoice (m4.invoice.not_found).
          */
         get: operations["getInvoicePrint"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices/{invoiceId}/dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer disputes an invoice it received, with a reason
+         * @description Problems: m4.invoice.not_found, m4.invoice.not_buyer, m4.invoice.disputed_already.
+         */
+        post: operations["disputeInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/invoices/{invoiceId}/resolve-dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller or the buyer closes the open dispute of an invoice
+         * @description Problems: m4.invoice.not_found, m4.invoice.not_disputed.
+         */
+        post: operations["resolveInvoiceDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller credits chosen quantities of lines of its invoice
+         * @description At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead. Each invoice line at most once, and no more than the line has left uncredited by earlier credit notes (a settlement or a claim may have credited it). The credit note's money applies to the invoice as far as it is still due; the rest stays on the credit note, unapplied, and applyCreditNote applies it later. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.line_duplicate, m4.creditnote.qty_invalid, m4.creditnote.exceeds_billed, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+         */
+        post: operations["issueCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes/{creditNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        /** One credit note the caller's entity issued or received */
+        get: operations["getCreditNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes/{creditNoteId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's credit note
+         * @description As for the invoice: printed by the worker after the issue (m4.creditnote.print_not_ready until then), stored under the seller, printed by either party through the credit note.
+         */
+        get: operations["getCreditNotePrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/credit-notes/{creditNoteId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller applies money a credit note holds unapplied to an open invoice of the same buyer
+         * @description A credit note's money applies to the invoice it credits only as far as that invoice was still due; the rest is its unapplied amount (CR-24A-3 item 2). This applies it, with no amount as much as fits, to an issued, undisputed invoice of the same seller and buyer. No money moves and nothing is refunded. Asks for a fresh second factor. Problems: m4.creditnote.not_found, m4.creditnote.not_seller, m4.invoice.not_found, m4.invoice.not_issued, m4.creditnote.invoice_not_ours, m4.creditnote.invoice_disputed, m4.creditnote.applied_already, m4.creditnote.amount_invalid, m4.creditnote.exceeds_unapplied, m4.creditnote.exceeds_due.
+         */
+        post: operations["applyCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The discrepancies the caller's entity raised (BUYER) or that were raised with it (SELLER) */
+        get: operations["listDiscrepancies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies/{discrepancyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        /** One discrepancy the caller's entity raised or that was raised with it */
+        get: operations["getDiscrepancy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/discrepancies/{discrepancyId}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller accepts the buyer's count and settles the discrepancy
+         * @description The invoice bills the received quantity, so a short quantity is settled with no money; damaged quantity the invoice charged is credited by a credit note issued in the same act, no more than the line has left uncredited; the money applies to the invoice as far as it is still due and the rest stays on the credit note, unapplied. Asks for a fresh second factor. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+         */
+        post: operations["settleDiscrepancy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The payments the caller's entity received (SELLER) or made (BUYER), newest first */
+        get: operations["listPaymentReceipts"];
+        put?: never;
+        /**
+         * The seller records a payment received from a buyer and settles its invoices
+         * @description With no settlements the payment settles the buyer's open, undisputed invoices oldest first; what is left stays on the buyer's account (unapplied). Problems: m4.payment.method_invalid, m4.payment.amount_invalid, m4.payment.received_in_future, m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.cheque_recorded (the same cheque, by bank and number, on an earlier receipt from this buyer that did not bounce), m4.payment.invoice_invalid, m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued, m4.payment.exceeds_due, m4.payment.exceeds_receipt.
+         */
+        post: operations["recordPaymentReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        /** One payment receipt, for its seller or its buyer */
+        get: operations["getPaymentReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}/cheque-outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The cheque of a receipt cleared or bounced
+         * @description A bounced cheque reverses the receipt (a PRC reversal) and reopens the invoices it settled. Problems: m4.payment.outcome_invalid, m4.payment.not_found, m4.payment.not_seller, m4.payment.not_cheque, m4.payment.outcome_recorded.
+         */
+        post: operations["recordChequeOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller applies money a receipt left on account to the buyer's later open invoices
+         * @description With no settlements the money on account settles the buyer's open, undisputed invoices oldest first; with settlements, each chosen invoice as the payment form does. The allocation rows belong to the receipt, so a bounced cheque reverses them too. Problems: m4.payment.not_found, m4.payment.not_seller, m4.payment.not_recorded, m4.payment.nothing_on_account, m4.payment.invoice_invalid, m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued, m4.payment.amount_invalid, m4.payment.exceeds_due, m4.payment.exceeds_on_account, m4.payment.nothing_to_apply.
+         */
+        post: operations["applyPaymentReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/payment-receipts/{receiptId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's payment receipt
+         * @description As for the invoice: printed by the worker after the receipt is recorded (m4.payment.print_not_ready until then), stored under the seller, printed by either party through the receipt.
+         */
+        get: operations["getPaymentReceiptPrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The exposure of every relationship in which the caller's entity sells (SELLER) or buys (BUYER)
+         * @description Open invoice balances plus accepted orders not yet invoiced, less payments held on account, beside the relationship's credit limit. Computed when read; it warns, never blocks (ADR-12).
+         */
+        get: operations["listExposures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The claims the caller's entity raised (BUYER) or that were raised with it (SELLER) */
+        get: operations["listClaims"];
+        put?: never;
+        /**
+         * The buyer claims against the seller for goods of a confirmed GRN (M4-06)
+         * @description Within trading.claim_window_days of the GRN's confirmation. Photographs are added to the raised claim with addClaimPhoto. Problems: m4.claim.kind_invalid, m4.claim.grn_not_found, m4.claim.grn_not_confirmed, m4.claim.no_seller, m4.claim.window_closed, m4.claim.lines_required, m4.claim.line_unknown, m4.claim.line_duplicate, m4.claim.qty_invalid, m4.claim.exceeds_received.
+         */
+        post: operations["raiseClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        /** One claim the caller's entity raised or that was raised with it */
+        get: operations["getClaim"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise the upload of one photograph for a raised claim
+         * @description Answers a URL the client PUTs the bytes to, with the content type given here. Problems: m4.claim.not_found, m4.claim.decided, attachment.content_type_not_allowed, attachment.too_large.
+         */
+        post: operations["addClaimPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller approves the claim in whole or in part; a credit note is issued with it
+         * @description Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending, m4.claim.line_unknown, m4.claim.qty_invalid, m4.claim.nothing_approved, m4.claim.invoice_first, m4.creditnote.exceeds_billed (an accepted quantity above what its invoice line has left uncredited is refused, not capped). The credit note's money applies to the invoice as far as it is still due; the rest stays on the credit note, unapplied.
+         */
+        post: operations["approveClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller rejects the claim, with a reason
+         * @description Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending.
+         */
+        post: operations["rejectClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/claims/{claimId}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The buyer sends back the goods of a claim approved with the return required
+         * @description M5 takes them out of the buyer's stock at the GRN's location. Problems: m4.claim.not_found, m4.claim.return_not_required, m4.claim.returned_already.
+         */
+        post: operations["dispatchClaimReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The transfer requests the caller's scope reads, newest first
+         * @description A shop session reads its own requests and those asked of it; the society all of its own.
+         */
+        get: operations["listTransferRequests"];
+        put?: never;
+        /**
+         * A shop asks for stock from another location of its society (M4-10)
+         * @description Problems: m4.transfer.location_not_in_scope, m4.transfer.same_location, m4.transfer.lines_required, m4.transfer.sku_unknown, m4.transfer.sku_duplicate, m4.transfer.qty_invalid.
+         */
+        post: operations["requestTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        /** One transfer request, with the transfer that fulfils it once issued */
+        get: operations["getTransferRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The society approves the request; its stores issue the transfer
+         * @description The society names the location that gives the stock, or keeps the one the shop named. Problems: m4.transfer.request_not_found, m4.transfer.decided, m4.transfer.source_required, m4.transfer.same_location, m4.transfer.location_invalid, m4.transfer.insufficient_stock.
+         */
+        post: operations["approveTransferRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/transfer-requests/{requestId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The society rejects the request, with a reason
+         * @description Problems: m4.transfer.request_not_found, m4.transfer.decided.
+         */
+        post: operations["rejectTransferRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -380,6 +928,12 @@ export interface components {
              * @description One of the buyer's own locations, where the goods are to be delivered (CR-24A-2)
              */
             deliverToLocationId?: string;
+            lines: components["schemas"]["OrderLineRequest"][];
+        };
+        AmendOrderRequest: {
+            /** Format: date */
+            requestedEta?: string;
+            notes?: string;
             lines: components["schemas"]["OrderLineRequest"][];
         };
         OrderLineRequest: {
@@ -415,6 +969,18 @@ export interface components {
             /** Format: uuid */
             deliverToLocationId?: string;
             deliverTo?: components["schemas"]["DeliveryPointResponse"];
+            /** @description 1, or the version of an amendment (each amendment is a new order) */
+            version?: number;
+            /**
+             * Format: uuid
+             * @description The order this version amends
+             */
+            amendsOrderId?: string;
+            /**
+             * Format: uuid
+             * @description The next version, when the buyer amended this order
+             */
+            amendedByOrderId?: string;
             lines: components["schemas"]["OrderLineResponse"][];
         };
         /** @description The buyer's delivery location as it was when the order was drafted: its code, names and address, copied in the buyer's session, so that the seller, who may not read the buyer's locations, can name it (CR-24A-2 as revised). Never changed after. */
@@ -626,7 +1192,165 @@ export interface components {
             netAmount: number;
             taxAmount: number;
             grossAmount: number;
+            /** @description What the invoice's credit notes took off it */
+            creditedAmount?: number;
+            /** @description The gross amount less what was credited and settled */
+            amountDue?: number;
+            /** @description What payments settled of it, net of bounced cheques */
+            settledAmount?: number;
+            /** @enum {string} */
+            paymentState?: "OPEN" | "PART_PAID" | "SETTLED";
+            /** @description The receipts (and reversals) that settled part of it, oldest first */
+            payments?: components["schemas"]["InvoicePaymentSummary"][];
+            /** @description The buyer disputes the invoice now */
+            disputed?: boolean;
+            disputeReason?: string;
+            creditNotes?: components["schemas"]["CreditNoteSummary"][];
+            /** @description For the seller, while something is due: its credit notes to this buyer that still hold money unapplied, which applyCreditNote can apply to this invoice */
+            availableCredits?: components["schemas"]["CreditNoteSummary"][];
             lines: components["schemas"]["InvoiceLineResponse"][];
+        };
+        CreditNoteSummary: {
+            /** Format: uuid */
+            creditNoteId: string;
+            docNumber?: string;
+            grossAmount: number;
+            /** @description What of it was applied to invoices */
+            appliedAmount?: number;
+            /** @description What it still holds for the buyer, to apply to an open invoice */
+            unappliedAmount?: number;
+        };
+        ApplyCreditNoteRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description What to apply; absent, as much as fits */
+            amount?: number;
+        };
+        DisputeInvoiceRequest: {
+            reason: string;
+        };
+        ResolveInvoiceDisputeRequest: {
+            note?: string;
+        };
+        SettleDiscrepancyRequest: {
+            reason: string;
+        };
+        IssueCreditNoteRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description Invoice lines and quantities to credit */
+            lines: components["schemas"]["CreditNoteLineRequest"][];
+            reason: string;
+        };
+        CreditNoteLineRequest: {
+            /** Format: uuid */
+            invoiceLineId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        CreditNoteResponse: {
+            /** Format: uuid */
+            creditNoteId: string;
+            docNumber?: string;
+            status: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceDocNumber?: string;
+            /** Format: uuid */
+            discrepancyId?: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            reason: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            netAmount: number;
+            taxAmount: number;
+            grossAmount: number;
+            /** @description What of it was applied to invoices (to its own invoice as far as that was due, then by applyCreditNote) */
+            appliedAmount?: number;
+            /** @description What it still holds for the buyer */
+            unappliedAmount?: number;
+            lines: components["schemas"]["CreditNoteLineResponse"][];
+        };
+        CreditNoteLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            qty: number;
+            unitPrice: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            /** Format: uuid */
+            invoiceLineId?: string;
+        };
+        CreditNotePrintResponse: {
+            /** Format: uuid */
+            creditNoteId: string;
+            /** Format: uri */
+            url: string;
+        };
+        DiscrepancyResponse: {
+            /** Format: uuid */
+            discrepancyId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RAISED" | "SETTLED";
+            /** @enum {string} */
+            kind: "SHORT" | "OVER" | "DAMAGED" | "MIXED";
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            grnId: string;
+            grnDocNumber?: string;
+            /** Format: uuid */
+            deliveryNoteId?: string;
+            /** Format: date-time */
+            raisedAt?: string;
+            /** Format: date-time */
+            windowEndsAt: string;
+            /**
+             * Format: uuid
+             * @description The seller's invoice of the GRN, once issued
+             */
+            invoiceId?: string;
+            /**
+             * Format: uuid
+             * @description The credit note for damaged quantity the invoice charged, issued at settlement; none when nothing billed needed crediting (a short quantity is never billed)
+             */
+            creditNoteId?: string;
+            creditNoteDocNumber?: string;
+            /** Format: date-time */
+            settledAt?: string;
+            /** Format: uuid */
+            settledByUserId?: string;
+            settlementReason?: string;
+            lines: components["schemas"]["DiscrepancyLineResponse"][];
+        };
+        DiscrepancyLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            grnLineId: string;
+            /** Format: uuid */
+            skuId?: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode?: string;
+            expectedQty?: number;
+            receivedQty: number;
+            damagedQty: number;
+            /** @description Received less expected; negative when short */
+            varianceQty: number;
+            unitPrice?: number;
         };
         InvoiceLineResponse: {
             /** Format: uuid */
@@ -650,6 +1374,299 @@ export interface components {
             invoiceId: string;
             /** Format: uri */
             url: string;
+        };
+        InvoicePaymentSummary: {
+            /** Format: uuid */
+            receiptId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RECORDED" | "REVERSED" | "REVERSAL";
+            method?: string;
+            /** Format: date */
+            receivedOn?: string;
+            /** @description What this receipt settled of the invoice; negative on a reversal */
+            amount: number;
+        };
+        RecordPaymentReceiptRequest: {
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** @enum {string} */
+            method: "CASH" | "CHEQUE" | "TRANSFER" | "DEPOSIT";
+            amount: number;
+            /** @description The bank reference, deposit slip or cash receipt book number */
+            reference?: string;
+            /**
+             * Format: date
+             * @description When the money was received; today when left out
+             */
+            receivedOn?: string;
+            cheque?: components["schemas"]["ChequeRequest"];
+            /** @description Chosen invoices and amounts; left out, the open invoices are settled oldest first */
+            settlements?: components["schemas"]["SettlementRequest"][];
+        };
+        ApplyPaymentReceiptRequest: {
+            /** @description Chosen invoices and amounts; left out, the open invoices are settled oldest first */
+            settlements?: components["schemas"]["SettlementRequest"][];
+        };
+        PaymentReceiptPrintResponse: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uri */
+            url: string;
+        };
+        ChequeRequest: {
+            bank: string;
+            chequeNo: string;
+            /** Format: date */
+            dated: string;
+        };
+        SettlementRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            amount: number;
+        };
+        ChequeOutcomeRequest: {
+            /** @enum {string} */
+            outcome: "CLEARED" | "BOUNCED";
+            reason?: string;
+        };
+        PaymentReceiptResponse: {
+            /** Format: uuid */
+            receiptId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RECORDED" | "REVERSED" | "REVERSAL";
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            method: string;
+            reference?: string;
+            /** Format: date */
+            receivedOn: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            amount: number;
+            /** @description What stays on the buyer's account; zero once reversed */
+            unappliedAmount: number;
+            /**
+             * Format: uuid
+             * @description On a reversal, the receipt it reverses
+             */
+            reversalOf?: string;
+            /**
+             * Format: uuid
+             * @description On a reversed receipt, its reversal
+             */
+            reversedBy?: string;
+            reason?: string;
+            cheque?: components["schemas"]["ChequeResponse"];
+            allocations: components["schemas"]["AllocationResponse"][];
+        };
+        ChequeResponse: {
+            bank: string;
+            chequeNo: string;
+            /** Format: date */
+            dated: string;
+            /** @enum {string} */
+            outcome?: "CLEARED" | "BOUNCED";
+            /** Format: date-time */
+            outcomeAt?: string;
+        };
+        AllocationResponse: {
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNumber?: string;
+            amount: number;
+        };
+        ExposureResponse: {
+            /** Format: uuid */
+            relationshipId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** @description The relationship's credit limit (M1); absent when it sets none */
+            creditLimit?: number;
+            openInvoices: number;
+            acceptedNotInvoiced: number;
+            unappliedReceipts: number;
+            /** @description What the seller's credit notes to the buyer hold unapplied; subtracted */
+            unappliedCredits?: number;
+            amount: number;
+            /** @description The highest configured percentage of the limit the amount has reached */
+            warnThresholdPercent?: number;
+            /** Format: date-time */
+            asOf: string;
+        };
+        DecisionReasonRequest: {
+            reason: string;
+        };
+        RaiseClaimRequest: {
+            /** Format: uuid */
+            grnId: string;
+            /** @enum {string} */
+            kind: "DAMAGED" | "EXPIRED_ON_ARRIVAL" | "WRONG_GOODS" | "QUALITY";
+            /**
+             * @description The buyer offers the goods back; the seller decides
+             * @default false
+             */
+            returnRequested: boolean;
+            note?: string;
+            lines: components["schemas"]["ClaimLineRequest"][];
+        };
+        ClaimLineRequest: {
+            /** Format: uuid */
+            grnLineId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        ClaimPhotoRequest: {
+            contentType: string;
+            /** Format: int64 */
+            contentLength?: number;
+        };
+        ClaimPhotoResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        ApproveClaimRequest: {
+            findings?: string;
+            /** @default false */
+            returnRequired: boolean;
+            /** @description What is accepted of each claimed line; none accepts every line in full */
+            lines?: components["schemas"]["ApproveClaimLineRequest"][];
+        };
+        ApproveClaimLineRequest: {
+            /** Format: uuid */
+            claimLineId: string;
+            qty: number;
+        };
+        ClaimResponse: {
+            /** Format: uuid */
+            claimId: string;
+            docNumber?: string;
+            /** @enum {string} */
+            status: "RAISED" | "APPROVED" | "REJECTED";
+            /** @enum {string} */
+            kind: "DAMAGED" | "EXPIRED_ON_ARRIVAL" | "WRONG_GOODS" | "QUALITY";
+            /** Format: uuid */
+            buyerEntityId: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: uuid */
+            grnId: string;
+            grnDocNumber?: string;
+            /** Format: date-time */
+            raisedAt?: string;
+            /** Format: date-time */
+            windowEndsAt: string;
+            returnRequested: boolean;
+            note?: string;
+            /**
+             * Format: uuid
+             * @description The seller's invoice of the GRN, once issued
+             */
+            invoiceId?: string;
+            findings?: string;
+            rejectReason?: string;
+            returnRequired: boolean;
+            /** Format: uuid */
+            creditNoteId?: string;
+            creditNoteDocNumber?: string;
+            /** Format: uuid */
+            decidedByUserId?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /** Format: date-time */
+            returnedAt?: string;
+            photos: components["schemas"]["ClaimPhotoStatusResponse"][];
+            lines: components["schemas"]["ClaimLineResponse"][];
+        };
+        ClaimPhotoStatusResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETE" | "FAILED";
+        };
+        ClaimLineResponse: {
+            /** Format: uuid */
+            claimLineId: string;
+            /** Format: uuid */
+            grnLineId: string;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            claimedQty: number;
+            approvedQty?: number;
+            unitPrice?: number;
+        };
+        ApproveTransferRequestRequest: {
+            /**
+             * Format: uuid
+             * @description The society's location that gives the stock; left out, the one the shop named
+             */
+            fromLocationId?: string;
+        };
+        RequestTransferRequest: {
+            /**
+             * Format: uuid
+             * @description The stores asked, when the shop knows them; left out, the society names them when it decides
+             */
+            fromLocationId?: string;
+            /**
+             * Format: uuid
+             * @description The shop that asks; a shop session's own location when left out
+             */
+            toLocationId?: string;
+            reason?: string;
+            lines: components["schemas"]["TransferRequestLineRequest"][];
+        };
+        TransferRequestLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        TransferRequestResponse: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            fromLocationId?: string;
+            /** Format: uuid */
+            toLocationId: string;
+            /** @enum {string} */
+            status: "REQUESTED" | "APPROVED" | "REJECTED";
+            reason?: string;
+            /** Format: uuid */
+            requestedBy?: string;
+            /** Format: date-time */
+            requestedAt: string;
+            rejectReason?: string;
+            /** Format: uuid */
+            decidedBy?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /**
+             * Format: uuid
+             * @description The M5 transfer that fulfils the approved request, once the stores issued it
+             */
+            transferId?: string;
+            /** @enum {string} */
+            transferStatus?: "IN_TRANSIT" | "RECEIVED";
+            lines: components["schemas"]["TransferRequestLineResponse"][];
+        };
+        TransferRequestLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            skuId: string;
+            qty: number;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -700,6 +1717,11 @@ export interface components {
         OrderId: string;
         DeliveryNoteId: string;
         GrnId: string;
+        InvoiceId: string;
+        CreditNoteId: string;
+        ReceiptId: string;
+        ClaimId: string;
+        TransferRequestId: string;
         /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
         IdempotencyKey: string;
     };
@@ -864,6 +1886,37 @@ export interface operations {
         responses: {
             /** @description The cancelled order */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    amendOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderId: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The next version of the order */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1300,6 +2353,802 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    disputeInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisputeInvoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description The invoice, disputed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    resolveInvoiceDispute: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                invoiceId: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveInvoiceDisputeRequest"];
+            };
+        };
+        responses: {
+            /** @description The invoice, no longer disputed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    issueCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueCreditNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued credit note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getCreditNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The credit note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteResponse"];
+                };
+            };
+            /** @description m4.creditnote.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getCreditNotePrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNotePrintResponse"];
+                };
+            };
+            /** @description m4.creditnote.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    applyCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                creditNoteId: components["parameters"]["CreditNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyCreditNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The credit note, with what it applied and what it still holds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listDiscrepancies: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discrepancies, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    getDiscrepancy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discrepancy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"];
+                };
+            };
+            /** @description m4.discrepancy.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    settleDiscrepancy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleDiscrepancyRequest"];
+            };
+        };
+        responses: {
+            /** @description The discrepancy, settled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listPaymentReceipts: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipts, with their reversals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    recordPaymentReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPaymentReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued receipt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getPaymentReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    recordChequeOutcome: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChequeOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description The receipt, with the cheque's outcome (and its reversal when bounced) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    applyPaymentReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyPaymentReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description The receipt, with what it now settles and what is left on account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getPaymentReceiptPrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: components["parameters"]["ReceiptId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptPrintResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listExposures: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The exposures */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    listClaims: {
+        parameters: {
+            query: {
+                role: "BUYER" | "SELLER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claims, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    raiseClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RaiseClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim, raised */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            /** @description m4.claim.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    addClaimPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimPhotoRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorised */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimPhotoResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    approveClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim, approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim, rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    dispatchClaimReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                claimId: components["parameters"]["ClaimId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim, its goods on their way back */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTransferRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transfer requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"][];
+                };
+            };
+        };
+    };
+    requestTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description The request */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getTransferRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            /** @description m4.transfer.request_not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    approveTransferRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveTransferRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description The request, approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    rejectTransferRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                requestId: components["parameters"]["TransferRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The request, rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRequestResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };

@@ -1,13 +1,22 @@
-# Federation defaults (owner NULL). The second pair is 21A section 3.3's self-review guard:
-# whoever reviews an entity's audit trail is not the one who manages its users. It replaced a
-# pair over the retired gov.entity.manage (CR-21A-1 item 1, 27 September 2026; m1security V0014
-# removes the old row from existing databases).
+# Federation defaults (owner NULL). The first pair is 21A section 3.3's self-review guard:
+# whoever reviews an entity's audit trail is not the one who manages its users, at INSTANCE,
+# enforced where its instance exists (the exception acknowledgement of 28A). It replaced a pair
+# over the retired gov.entity.manage (CR-21A-1 item 1, 27 September 2026; m1security V0014
+# removes the old row from existing databases). The gov.role.manage/gov.user.manage pair of
+# M1-08, in neither doc 21 nor 21A and enforced by no handler, was removed (CR-21A-7, wave 2;
+# m1security V0019 deletes it from existing databases): the code guardrails protect those codes.
 pairs:
-  - id: "01921319-dfc4-7264-b580-c11df5ed4c53"
-    permission_a: "gov.role.manage"
-    permission_b: "gov.user.manage"
-    mode: "INSTANCE"
   - id: "01998f2a-3c41-7d5e-8b62-4a1f0c9e7d23"
     permission_a: "gov.audit.review"
     permission_b: "gov.user.manage"
+    mode: "INSTANCE"
+  # M5 (25A section 6.3, "Sod.assertDistinct(request, approve, requester)"): whoever asks for a stock
+  # adjustment or a write-off does not approve the same one.
+  - id: "0199a5e0-0000-7000-8000-000000000501"
+    permission_a: "inv.adjust.approve"
+    permission_b: "inv.adjust.request"
+    mode: "INSTANCE"
+  - id: "0199a5e0-0000-7000-8000-000000000502"
+    permission_a: "inv.writeoff.approve"
+    permission_b: "inv.writeoff.request"
     mode: "INSTANCE"

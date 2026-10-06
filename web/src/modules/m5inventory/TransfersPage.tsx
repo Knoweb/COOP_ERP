@@ -10,8 +10,10 @@ import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Location, type Transfer } from "./inventoryApi";
 import { LocationPicker } from "./LocationPicker";
+import "./inventory.css";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, transferLinesOf } from "./stockView";
+import { PageHeader } from "../../shell/components/PageHeader";
 
 /**
  * Transfers between two locations of the entity (doc 25 flow 6.6; 25A section 8, "Transfer
@@ -83,14 +85,28 @@ export function TransfersPage() {
 
   return (
     <main className="shell-page">
-      <Link to="/inventory">{t("inventory.back").text}</Link>
-      <h1>{t("inventory.transfer.title").text}</h1>
-      <LocationPicker value={locationId} onChange={setLocationId} />
+      <PageHeader
+        icon="stock"
+        title={t("inventory.transfer.title").text}
+        actions={
+          <Link className="action-link" to="/inventory">
+            <span>{t("inventory.back").text}</span>
+          </Link>
+        }
+      />
+      <section className="modern-filter-panel modern-filter-panel--stock">
+        <div className="modern-location-picker">
+          <LocationPicker value={locationId} onChange={setLocationId} />
+        </div>
+      </section>
 
-      <h2>{t("inventory.transfer.list").text}</h2>
-      {transfers.data?.length === 0 && <p>{t("inventory.transfer.none").text}</p>}
+      <section className="modern-table-card">
+        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+          <h2>{t("inventory.transfer.list").text}</h2>
+        </div>
+      {transfers.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.transfer.none").text}</p>}
       {(transfers.data ?? []).map((transfer: Transfer) => (
-        <section key={transfer.transferId} style={{ marginBottom: "var(--space-3)" }}>
+        <section key={transfer.transferId} className="inventory-section" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
           <p>
             {`${nameOf(transfer.fromLocationId)} → ${nameOf(transfer.toLocationId)} `}
             <StateChip
@@ -98,7 +114,8 @@ export function TransfersPage() {
               label={t(`inventory.transfer.status.${transfer.status}`).text}
             />
           </p>
-          <table>
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
             <thead>
               <tr>
                 <th>{t("inventory.column.item").text}</th>
@@ -115,7 +132,8 @@ export function TransfersPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
           {transfer.status === "IN_TRANSIT" && transfer.toLocationId === locationId && canReceive && (
             <button type="button" disabled={receive.isPending} onClick={() => receive.mutate(transfer.transferId)}>
               {t("inventory.transfer.receive").text}
@@ -123,12 +141,13 @@ export function TransfersPage() {
           )}
         </section>
       ))}
-      {receive.isError && <p role="alert">{errorText(receive.error, t("inventory.error.generic").text)}</p>}
+      {receive.isError && <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(receive.error, t("inventory.error.generic").text)}</p>}
+      </section>
 
       {canIssue && !locations.isError && (
-        <section>
+        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
           <h2>{t("inventory.transfer.send").text}</h2>
-          <label style={{ display: "grid", gap: "var(--space-half)" }}>
+          <label className="inventory-form-field">
             {t("inventory.transfer.destination").text}
             <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)}>
               <option value="" />
@@ -141,7 +160,8 @@ export function TransfersPage() {
           </label>
           {sendable.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
           {sendable.length > 0 && (
-            <table>
+            <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
+              <table className="modern-table stock-table">
               <thead>
                 <tr>
                   <th>{t("inventory.column.item").text}</th>
@@ -169,7 +189,8 @@ export function TransfersPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
           <button
             type="button"

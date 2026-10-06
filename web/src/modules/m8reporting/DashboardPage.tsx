@@ -1,15 +1,18 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatInstant } from "../../shell/i18n/formats";
+import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
-import { useReportingApi } from "./reportingApi";
-import { errorText } from "./reportView";
+import { useReportingApi, type Tile } from "./reportingApi";
+import { errorText, tileLink, trendHeights } from "./reportView";
+import { ExceptionList } from "./ExceptionList";
+import "./reporting.css";
 
 /**
- * The dashboard (28A section 8, demo scope): a handful of counts for the caller's scope, each a
- * tile with its value, and the reports. A tile that has a report opens it. The stock value is a
- * cost and only comes for the owner's users and the Federation view.
+ * The dashboard (28A section 8): the tiles the server has for the caller's scope (they are data,
+ * seed/m8reporting/dashboard-tiles.yaml), each with its value, an eight-week trend where it has
+ * one, and a link to its report; then the exception queue and the reports. Nothing is added up
+ * here: every figure is the server's.
  */
 export function DashboardPage() {
   const t = useT();
@@ -34,37 +37,16 @@ export function DashboardPage() {
               ? t("reporting.freshness", undefined, { when: formatInstant(dashboard.data.freshness) }).text
               : t("reporting.freshness.none").text}
           </p>
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 0,
-              display: "grid",
-              gap: "var(--space-2)",
-              gridTemplateColumns: "repeat(auto-fill, minmax(calc(var(--space-8) * 3), 1fr))"
-            }}
-          >
+          <ul className="modern-dashboard-tiles">
             {dashboard.data.tiles.map((tile) => (
-              <li
-                key={tile.tileId}
-                style={{
-                  border: "var(--border-width) solid var(--color-border)",
-                  padding: "var(--space-2)",
-                  display: "grid",
-                  gap: "var(--space-1)"
-                }}
-              >
-                <span>{t(tile.labelId).text}</span>
-                <strong style={{ fontSize: "var(--font-size-xl)" }}>
-                  {tile.kind === "MONEY" ? <MoneyDisplay amount={tile.value} /> : tile.value}
-                </strong>
-                {tile.drillReportId && (
-                  <Link to={`/reporting/reports/${tile.drillReportId}`}>{t("reporting.dashboard.open").text}</Link>
-                )}
-              </li>
+              <TileCard key={tile.tileId} tile={tile} />
             ))}
           </ul>
         </>
       )}
+
+      <h2>{t("reporting.exceptions.title").text}</h2>
+      <ExceptionList />
 
       <h2>{t("reporting.reports.title").text}</h2>
       {definitions.data && (
@@ -79,5 +61,71 @@ export function DashboardPage() {
         </ul>
       )}
     </main>
+  );
+}
+
+function TileCard({ tile }: { tile: Tile }) {
+  const t = useT();
+  const link = tileLink(tile.drillReportId);
+  const label = t(tile.labelId).text;
+  return (
+    <li className="modern-dashboard-tile" aria-label={label}>
+      <span className="modern-dashboard-tile__label">{label}</span>
+      <span className="modern-dashboard-tile__value">
+        <TileValue kind={tile.kind} value={tile.value} />
+      </span>
+      {tile.trend && tile.trend.length > 0 && <Trend points={tile.trend} />}
+      {link && (
+        <Link className="modern-dashboard-tile__link" to={link}>
+          {tile.drillReportId === "exceptions" ? t("reporting.exceptions.open").text : t("reporting.dashboard.open").text}
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+        </Link>
+      )}
+    </li>
+  );
+}
+
+function TileValue({ kind, value }: { kind: string; value: string }) {
+  const t = useT();
+  if (kind === "MONEY") {
+    return <MoneyDisplay amount={value} />;
+  }
+  if (kind === "PERCENT") {
+    return <>{t("reporting.percent", undefined, { value }).text}</>;
+  }
+  return <>{value}</>;
+}
+
+/**
+ * The eight weeks ending today as small bars, one series in the accent colour. Each bar says its
+ * week and figure on hover (title) and to a screen reader (the list's labels), so the trend is
+ * never a picture only.
+ */
+function Trend({ points }: { points: NonNullable<Tile["trend"]> }) {
+  const t = useT();
+  const formatDate = useFormatDate();
+  const heights = trendHeights(points.map((point) => point.value));
+  const width = 100 / points.length;
+  return (
+    <svg
+      className="reporting-trend"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={t("reporting.trend.label").text}
+    >
+      {points.map((point, index) => {
+        const text = t("reporting.trend.week", undefined, {
+          from: formatDate(point.from),
+          value: point.value
+        }).text;
+        const height = Math.max(heights[index], 2);
+        return (
+          <rect key={point.from} x={index * width + 1} y={100 - height} width={width - 2} height={height} rx="1">
+            <title>{text}</title>
+          </rect>
+        );
+      })}
+    </svg>
   );
 }

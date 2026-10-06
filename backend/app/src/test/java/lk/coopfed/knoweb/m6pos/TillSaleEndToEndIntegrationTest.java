@@ -5,12 +5,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.event.EventConsumerDispatcher;
@@ -61,6 +68,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     private static final UUID DEVICE = UUID.fromString("0190e6a0-0000-7000-8000-000000000301");
     private static final UUID SERIES = UUID.fromString("0190e6a0-0000-7000-8000-000000000401");
     private static final UUID REPLACEMENT = UUID.fromString("0190e6a0-0000-7000-8000-000000000302");
+    private static final java.time.ZoneId COLOMBO = java.time.ZoneId.of("Asia/Colombo");
 
     @Autowired
     TestRestTemplate http;
@@ -151,6 +159,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         rice = item(db, "RICE5", "4790001000011", "10");
         dhal = item(db, "DHAL1", "4790001000028", "10");
         soap = item(db, "SOAP1", "4790001000035", "10");
+        // The position's series held by the till, as M1 registers it at enrolment: a receipt of
+        // a series the device does not hold at its shop is flagged SERIES_FOREIGN (wave 2, M6-04).
+        registerTheSeries();
         kernel.reset();
     }
 
@@ -190,13 +201,18 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
 
         // The receipt shows centrally, as issued from the till's series, and the session closed.
         ScopeContext office = own(MPCS);
-        assertThat(pos.receipts(SHOP, office)).singleElement().satisfies(r -> {
+        assertThat(receiptsAt(office)).singleElement().satisfies(r -> {
             assertThat(r.documentId()).isEqualTo(receipt);
             assertThat(r.docNumberDisplay()).isEqualTo("M6S1-1-1");
             assertThat(r.grossAmount()).isEqualByComparingTo("3565.00");
             assertThat(r.sessionId()).isEqualTo(session);
             assertThat(r.flags()).isEmpty();
             assertThat(r.lines()).hasSize(3);
+            assertThat(r.tenders()).singleElement().satisfies(t -> {
+                assertThat(t.kind()).isEqualTo("CASH");
+                assertThat(t.amount()).isEqualByComparingTo("3565.00");
+            });
+            assertThat(r.netAmount()).isEqualByComparingTo("3565.00");
         });
         assertThat(superuserJdbc()
                         .queryForMap(
@@ -204,7 +220,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("series_id", SERIES)
                 .containsEntry("doc_number", 1L)
                 .containsEntry("origin", "OFFLINE");
-        assertThat(pos.sessions(SHOP, office)).singleElement().satisfies(s -> {
+        assertThat(sessionsAt(office)).singleElement().satisfies(s -> {
             assertThat(s.closedAt()).isNotNull();
             assertThat(s.variance()).isEqualByComparingTo("0");
         });
@@ -224,27 +240,57 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .filteredOn(TillSessionRecorded.class::isInstance)
                 .hasSize(2);
 
-        // Over HTTP, the office reads the receipt; the shop's own session too.
+        // Over HTTP, the office reads the receipt on its business day, and on its own; the shop's
+        // own session too. The day is the one the receipt was issued on in the business time zone,
+        // never "today", so a run across midnight reads the same page.
+        LocalDate day = LocalDate.ofInstant(receiptsAt(office).getFirst().issuedAt(), COLOMBO);
         JsonNode receipts = http.exchange(
-                        "/v1/pos/receipts?locationId=" + SHOP,
+                        "/v1/pos/receipts?locationId=" + SHOP + "&businessDate=" + day,
                         HttpMethod.GET,
                         new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
                         JsonNode.class)
                 .getBody();
-        assertThat(receipts).hasSize(1);
-        assertThat(receipts.get(0).get("docNumberDisplay").asText()).isEqualTo("M6S1-1-1");
+        assertThat(receipts.get("items")).hasSize(1);
+        assertThat(receipts.has("nextCursor") && !receipts.get("nextCursor").isNull())
+                .isFalse();
+        assertThat(receipts.get("items").get(0).get("docNumberDisplay").asText())
+                .isEqualTo("M6S1-1-1");
+        assertThat(receipts.get("items")
+                        .get(0)
+                        .get("tenders")
+                        .get(0)
+                        .get("kind")
+                        .asText())
+                .isEqualTo("CASH");
+        JsonNode one = http.exchange(
+                        "/v1/pos/receipts/" + receipt,
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(one.get("lines")).hasSize(3);
         JsonNode sessions = http.exchange(
-                        "/v1/pos/sessions?locationId=" + SHOP,
+                        "/v1/pos/sessions?locationId=" + SHOP + "&businessDate="
+                                + LocalDate.ofInstant(
+                                        sessionsAt(office).getFirst().openedAt(), COLOMBO),
                         HttpMethod.GET,
                         new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
                         JsonNode.class)
                 .getBody();
-        assertThat(sessions.get(0).get("status").asText()).isEqualTo("CLOSED");
+        assertThat(sessions.get("items").get(0).get("status").asText()).isEqualTo("CLOSED");
+        assertThat(http.exchange(
+                                "/v1/pos/sessions/" + session,
+                                HttpMethod.GET,
+                                new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                                JsonNode.class)
+                        .getBody()
+                        .get("closedAt"))
+                .isNotNull();
 
         // A redelivery of every event changes nothing.
         deliverTheTillsEvents();
         assertThat(onHand(rice)).isEqualByComparingTo("8");
-        assertThat(pos.receipts(SHOP, office)).hasSize(1);
+        assertThat(receiptsAt(office)).hasSize(1);
     }
 
     @Test
@@ -262,10 +308,49 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .contains("RECEIPT_RECORDED", "STOCK_SOLD", "STOCK_LOT_NEGATIVE");
     }
 
+    /**
+     * The desktop till trial's bug (CR-30-1): a session and its receipts uploaded in one batch,
+     * the receipts' queue drained before the sessions' queue. The session must still be applied
+     * first, so no receipt is flagged SESSION_UNKNOWN.
+     */
+    @Test
+    void aSessionUploadedWithItsReceiptsIsAppliedBeforeThemWhateverQueueDrainsFirst() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        UUID session = till.openSession(BigDecimal.ZERO);
+        till.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))));
+        till.sell(List.of(new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))));
+        till.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+        till.closeSession(new BigDecimal("1925.00"));
+
+        // One batch: the session and its three receipts reach central together.
+        till.drain(50, Instant.now().plusSeconds(30));
+        assertThat(till.pending()).isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(distinct batch_id) from kernel.sync_event where device_id = ?",
+                                Long.class,
+                                DEVICE))
+                .isEqualTo(1L);
+        deliverQueueByQueueReceiptsFirst(DEVICE);
+
+        assertThat(receiptsAt(own(MPCS))).hasSize(3).allSatisfy(r -> {
+            assertThat(r.sessionId()).isEqualTo(session);
+            assertThat(r.flags()).isEmpty();
+        });
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("TILL_SESSION_OPENED", "RECEIPT_RECORDED", "TILL_SESSION_CLOSED")
+                .doesNotContain("RECEIPT_FLAGGED");
+        assertThat(kernel.committedEvents())
+                .filteredOn(ReceiptRecorded.class::isInstance)
+                .map(ReceiptRecorded.class::cast)
+                .hasSize(3)
+                .allSatisfy(e -> assertThat(e.flags()).isEmpty());
+    }
+
     @Test
     void aReplacementTillOnThePositionContinuesTheNumbersCentralHasSeen() throws Exception {
-        registerTheSeries();
-
         TillSimulator first = till();
         first.refreshSnapshot();
         first.openSession(BigDecimal.ZERO);
@@ -293,7 +378,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(numberOf(two)).isEqualTo(2L);
         assertThat(numberOf(three)).isEqualTo(3L);
         assertThat(nextNumber()).isEqualTo(4L);
-        assertThat(pos.receipts(SHOP, own(MPCS))).hasSize(3).allSatisfy(r -> assertThat(r.flags())
+        assertThat(receiptsAt(own(MPCS))).hasSize(3).allSatisfy(r -> assertThat(r.flags())
                 .isEmpty());
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
@@ -302,8 +387,6 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDuplicateNumberIsStoredAndFlaggedNeverRefused() throws Exception {
-        registerTheSeries();
-
         TillSimulator first = till();
         first.refreshSnapshot();
         first.openSession(BigDecimal.ZERO);
@@ -324,11 +407,11 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         // Both receipts are kept; the second carries the flag, and an ALERT names the first.
         assertThat(numberOf(original)).isEqualTo(1L);
         assertThat(numberOf(duplicate)).isEqualTo(1L);
-        assertThat(pos.receipts(SHOP, own(MPCS)))
+        assertThat(receiptsAt(own(MPCS)))
                 .filteredOn(r -> r.documentId().equals(duplicate))
                 .singleElement()
                 .satisfies(r -> assertThat(r.flags()).containsExactly("DUPLICATE_NUMBER"));
-        assertThat(pos.receipts(SHOP, own(MPCS)))
+        assertThat(receiptsAt(own(MPCS)))
                 .filteredOn(r -> r.documentId().equals(original))
                 .singleElement()
                 .satisfies(r -> assertThat(r.flags()).isEmpty());
@@ -348,10 +431,124 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(nextNumber()).isEqualTo(2L);
     }
 
+    /**
+     * Wave 2, M6-01 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
+     * (1)): a receipt the till sent in the wrong shape (here two lines with the same line_no,
+     * under a hash that matches) is quarantined at the gateway, before the outbox, so it reaches
+     * none of the modules that consume the same event: M6 records no receipt, M5 deducts no stock,
+     * M7 posts no tender, M8 counts no sale. The session and the good receipt after it are applied.
+     */
+    @Test
+    void aMalformedReceiptIsQuarantinedAtTheGatewayAndReachesNoModule() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID malformed = till.sell(
+                List.of(
+                        new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00")),
+                        new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))),
+                payload -> {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+                    lines.get(1).put("line_no", 1);
+                });
+        UUID good = till.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+        till.drain(50, Instant.now().plusSeconds(30));
+        assertThat(till.pending()).isZero();
+
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select reason from kernel.sync_quarantine where device_id = ?", String.class, DEVICE))
+                .containsExactly("SCHEMA");
+        assertThat(outboxOf(DEVICE))
+                .extracting(OutboxMessage::aggregateId)
+                .doesNotContain(malformed)
+                .contains(good);
+
+        deliverTheTillsEvents();
+
+        assertThat(receiptsAt(own(MPCS))).extracting(r -> r.documentId()).containsExactly(good);
+        assertThat(onHand(rice))
+                .as("M5 deducted nothing for the quarantined receipt")
+                .isEqualByComparingTo("10");
+        assertThat(onHand(dhal)).isEqualByComparingTo("10");
+        assertThat(onHand(soap)).isEqualByComparingTo("9");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?",
+                                Long.class,
+                                malformed))
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from reporting.shop_sale_fact where receipt_id = ?",
+                                Long.class,
+                                malformed))
+                .as("M8 counted no sale")
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.event_outbox where source = ? and aggregate_id = ?",
+                                Long.class,
+                                DEVICE.toString(),
+                                malformed))
+                .as("no consumer (M5, M6, M7 m7.tenders, M8) can see what never reached the outbox")
+                .isZero();
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("SYNC_EVENT_QUARANTINED");
+    }
+
+    /**
+     * Wave 2, M6-02: a bundle in the right shape whose gross disagrees with its lines and its
+     * tender passes the gateway, is applied by every module, and is flagged in M6 for a person,
+     * never refused; the receipts list's flagged filter finds it and only it.
+     */
+    @Test
+    void aReceiptWhoseTotalsDisagreeIsAppliedAndFlagged() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID odd = till.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))), payload -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> document = (Map<String, Object>) payload.get("document");
+            document.put("gross_amount", "1500.00");
+        });
+        UUID fine = till.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+        till.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents();
+
+        assertThat(onHand(rice)).as("M5 applied the sale").isEqualByComparingTo("9");
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(odd))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("TOTAL_MISMATCH", "TENDER_MISMATCH"));
+        assertThat(pos.receipts(new PosQueries.ReceiptFilter(SHOP, null, true, null, null), own(MPCS))
+                        .items())
+                .extracting(PosQueries.ReceiptView::documentId)
+                .containsExactly(odd)
+                .doesNotContain(fine);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_FLAGGED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TOTAL_MISMATCH"));
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {
         return till(DEVICE);
+    }
+
+    /** The shop's receipts on every day, one long page (no day filter: a run across midnight stays right). */
+    private List<PosQueries.ReceiptView> receiptsAt(ScopeContext scope) {
+        return pos.receipts(new PosQueries.ReceiptFilter(SHOP, null, false, null, 200), scope)
+                .items();
+    }
+
+    private List<PosQueries.SessionView> sessionsAt(ScopeContext scope) {
+        return pos.sessions(new PosQueries.SessionFilter(SHOP, null, null, 200), scope)
+                .items();
     }
 
     private TillSimulator till(UUID device) {
@@ -414,7 +611,21 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     private void deliverTheTillsEvents(UUID device) {
-        List<OutboxMessage> messages = superuserJdbc()
+        List<OutboxMessage> messages = outboxOf(device);
+        Map<String, Set<String>> queues = consumerQueues();
+        assertThat(messages).isNotEmpty();
+        for (OutboxMessage message : messages) {
+            for (Map.Entry<String, Set<String>> queue : queues.entrySet()) {
+                if (queue.getValue().contains(message.eventType())) {
+                    deliver(queue.getKey(), message);
+                }
+            }
+        }
+    }
+
+    /** The device's accepted events, in its own order. */
+    private List<OutboxMessage> outboxOf(UUID device) {
+        return superuserJdbc()
                 .query(
                         """
                         select event_id, event_type, occurred_at, source, source_seq, owner_entity_id, location_id,
@@ -440,18 +651,56 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                                 rs.getString("engine_version"),
                                 rs.getString("payload")),
                         device.toString());
-        Map<String, List<String>> consumers = Map.of(
-                "till_session.opened.v1", List.of("m6.sessions"),
-                "till_session.closed.v1", List.of("m6.sessions"),
-                "receipt.issued.v1", List.of("m6.receipts", "m5.sales"));
-        assertThat(messages).isNotEmpty();
-        for (OutboxMessage message : messages) {
-            for (String consumer : consumers.getOrDefault(message.eventType(), List.of())) {
-                assertThat(dispatcher().deliver(consumer, message, 1))
-                        .as(consumer + " applies " + message.eventType())
-                        .isIn(DeliveryResult.APPLIED, DeliveryResult.DUPLICATE);
+    }
+
+    /**
+     * What the broker does when the queues are drained at different speeds: each consumer has its
+     * own queue, in the device's order (one active consumer, the relay publishing by
+     * {@code source_seq}), but nothing orders one queue against another. The worst case is taken:
+     * every queue that holds receipts is drained before any other.
+     */
+    private void deliverQueueByQueueReceiptsFirst(UUID device) {
+        List<OutboxMessage> messages = outboxOf(device);
+        List<Map.Entry<String, Set<String>>> queues =
+                new ArrayList<>(consumerQueues().entrySet());
+        queues.sort(Comparator.comparing(queue -> !queue.getValue().contains("receipt.issued.v1")));
+        for (Map.Entry<String, Set<String>> queue : queues) {
+            for (OutboxMessage message : messages) {
+                if (queue.getValue().contains(message.eventType())) {
+                    deliver(queue.getKey(), message);
+                }
             }
         }
+    }
+
+    private void deliver(String consumer, OutboxMessage message) {
+        assertThat(dispatcher().deliver(consumer, message, 1))
+                .as(consumer + " applies " + message.eventType())
+                .isIn(DeliveryResult.APPLIED, DeliveryResult.DUPLICATE);
+    }
+
+    /**
+     * The queues the till's facts go to, read from the {@code @EventConsumer} annotations of M6's
+     * and M5's consumers, so the test follows the production wiring instead of restating it.
+     */
+    private static Map<String, Set<String>> consumerQueues() {
+        Map<String, Set<String>> queues = new TreeMap<>();
+        for (String type : List.of(
+                "lk.coopfed.knoweb.m6pos.internal.ingest.PosIngestConsumer",
+                "lk.coopfed.knoweb.m5inventory.internal.consumers.SaleConsumer")) {
+            try {
+                for (Method method : Class.forName(type).getDeclaredMethods()) {
+                    EventConsumer annotation = method.getAnnotation(EventConsumer.class);
+                    if (annotation != null) {
+                        queues.computeIfAbsent(annotation.consumer(), ignored -> new TreeSet<>())
+                                .addAll(List.of(annotation.types()));
+                    }
+                }
+            } catch (ClassNotFoundException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        return queues;
     }
 
     /** An item of the society with a barcode, and a GOOD lot of it at the shop. */

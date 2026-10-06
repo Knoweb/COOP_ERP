@@ -6,21 +6,30 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 
 /**
- * The credit limit of a relationship changed with an amendment (doc 21 flow 6.4); M4 recomputes
- * its exposure warning from it. The limit is informative (ADR-12): nothing is blocked by it.
+ * The credit limit of a relationship changed (doc 21 flow 6.4): with an amendment, with the
+ * activation of a draft that carries a limit (null to the opening limit), or once for a
+ * relationship activated before activation published it (the backfill's announcement; wave 2,
+ * CR-21A-7 and the M8 decision D6). M4 recomputes its exposure warning from it and M8 projects
+ * the current limit of each pair from it. The limit is informative (ADR-12): nothing is blocked
+ * by it.
  *
- * @param relationshipId         the new row, which carries the new limit
- * @param previousRelationshipId the row that carried the old limit
+ * @param relationshipId         the row that carries the new limit
+ * @param previousRelationshipId the row that carried the old limit; null at activation and in an
+ *                               announcement
  * @param previousCreditLimit    null when there was none
  * @param creditLimit            the new limit
  * @param effectiveFrom          the first day of the new limit
+ * @param sellerEntityId         the seller, whose relationship it is (added in wave 2, additive)
+ * @param buyerEntityId          the buyer the limit is extended to (added in wave 2, additive)
  */
 public record CreditLimitChanged(
         UUID relationshipId,
         UUID previousRelationshipId,
         BigDecimal previousCreditLimit,
         BigDecimal creditLimit,
-        LocalDate effectiveFrom)
+        LocalDate effectiveFrom,
+        UUID sellerEntityId,
+        UUID buyerEntityId)
         implements DomainEvent {
 
     public static final String TYPE = "credit_limit.changed.v1";

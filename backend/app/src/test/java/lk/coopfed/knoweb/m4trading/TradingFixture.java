@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m4trading;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -49,6 +50,15 @@ public final class TradingFixture {
         return LocalDate.now(ZoneId.of("Asia/Colombo"));
     }
 
+    /**
+     * The business date the kernel gave a document when it issued it: what its postings carry
+     * (CR-29-1 item 4), read back rather than compared with today, so a run across midnight holds.
+     */
+    public static LocalDate businessDateOf(JdbcTemplate admin, UUID documentId) {
+        return admin.queryForObject(
+                "select business_date from kernel.document where document_id = ?", LocalDate.class, documentId);
+    }
+
     public static ScopeContext seller() {
         return ScopeContext.dev(SELLER_USER, SELLER, null);
     }
@@ -94,8 +104,89 @@ public final class TradingFixture {
         stock(admin, DHAL, STOCK);
     }
 
+    /**
+     * Every trading document of whatever owner, with its kernel rows (the demo's trading history,
+     * DemoDataLoaderIntegrationTest): what a later class that clears {@code kernel.document} needs gone.
+     */
+    public static void cleanAllTrading(JdbcTemplate admin) {
+        List<UUID> ids = admin.queryForList(
+                """
+                select document_id from trading.doc_order
+                union select document_id from trading.doc_delivery
+                union select document_id from trading.doc_grn
+                union select document_id from trading.doc_invoice
+                union select document_id from trading.doc_discrepancy
+                union select document_id from trading.doc_credit_note
+                union select document_id from trading.doc_payment_receipt
+                union select document_id from trading.doc_claim
+                """,
+                UUID.class);
+        for (String table : new String[] {
+            "claim_return",
+            "claim_decision_line",
+            "claim_decision",
+            "claim_photo",
+            "doc_claim_line",
+            "doc_claim",
+            "transfer_request_decision",
+            "transfer_request_line",
+            "transfer_request",
+            "cheque_outcome",
+            "payment_allocation",
+            "cheque",
+            "doc_payment_receipt",
+            "invoice_dispute",
+            "discrepancy_settlement",
+            "doc_credit_note",
+            "doc_invoice",
+            "doc_discrepancy_line",
+            "doc_discrepancy",
+            "doc_grn_line",
+            "doc_grn",
+            "doc_delivery_line",
+            "doc_delivery_drop",
+            "doc_delivery",
+            "order_allocation_line",
+            "order_allocation",
+            "allocation_run",
+            "doc_order_line",
+            "doc_order"
+        }) {
+            admin.execute("delete from trading." + table);
+        }
+        if (ids.isEmpty()) {
+            return;
+        }
+        // Ids only, read from the database above: safe to spell into the statement.
+        String in = ids.stream().map(id -> "'" + id + "'").collect(java.util.stream.Collectors.joining(",", "(", ")"));
+        admin.execute(
+                "delete from kernel.document_link where from_document_id in " + in + " or to_document_id in " + in);
+        admin.execute("delete from kernel.document_attachment where document_id in " + in);
+        admin.execute("delete from kernel.document_state_history where document_id in " + in);
+        // One statement for the lines: they refer to each other (GRN line to delivery line), and a
+        // NO ACTION reference is checked at the end of the statement.
+        admin.execute("delete from kernel.document_line where document_id in " + in);
+        admin.execute("delete from kernel.document where document_id in " + in);
+    }
+
     public static void clean(JdbcTemplate admin) {
         for (String table : new String[] {
+            "claim_return",
+            "claim_decision_line",
+            "claim_decision",
+            "claim_photo",
+            "doc_claim_line",
+            "doc_claim",
+            "transfer_request_decision",
+            "transfer_request_line",
+            "transfer_request",
+            "cheque_outcome",
+            "payment_allocation",
+            "cheque",
+            "doc_payment_receipt",
+            "invoice_dispute",
+            "discrepancy_settlement",
+            "doc_credit_note",
             "doc_invoice",
             "doc_discrepancy_line",
             "doc_discrepancy",
@@ -121,10 +212,15 @@ public final class TradingFixture {
                 SELLER,
                 BUYER,
                 STRANGER);
+        admin.update("delete from kernel.document_attachment where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document_state_history where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document_line where document_id in " + ours, SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.document where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
+        for (String table : new String[] {"transfer_receipt", "transfer_line", "transfer"}) {
+            admin.update(
+                    "delete from inventory." + table + " where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
+        }
         admin.update("delete from inventory.stock_lot where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update(
                 "delete from inventory.stock_movement where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
@@ -137,7 +233,11 @@ public final class TradingFixture {
         admin.update("update pricing.price_list set status = 'DRAFT' where price_list_id = ?", PRICE_LIST);
         admin.update("delete from pricing.price_list_line where price_list_id = ?", PRICE_LIST);
         admin.update("delete from pricing.price_list where price_list_id = ?", PRICE_LIST);
-        admin.update("delete from party.entity_relationship where relationship_id = ?", RELATIONSHIP);
+        // Every row of the pair: an amendment of the terms (AmendOrderPostgresIntegrationTest) adds one.
+        admin.update(
+                "delete from party.entity_relationship where seller_entity_id = ? and buyer_entity_id = ?",
+                SELLER,
+                BUYER);
         admin.update("delete from party.location where location_id in (?, ?, ?)", WAREHOUSE, SHOP, SELLER_WAREHOUSE);
         admin.update("delete from party.entity_party_directory where entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from party.entity where entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);

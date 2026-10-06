@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.demo;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,8 +75,8 @@ import org.springframework.stereotype.Service;
  * zero). The parties and users it acts as are rows of the demo seed (seed/m1party/demo-parties.demo.sql,
  * seed/m1security/demo-users.demo.sql), which must be loaded first.
  *
- * <p>M4 (orders, delivery notes, GRN, invoices) is not loaded: the storyline starts those on the
- * screens, and the demo documents of M4 come when M4 is on main (docs/DEMO.md, "Still to come").
+ * <p>M4's trading history (orders, delivery notes, GRNs, invoices at both tiers) is loaded last,
+ * by {@link DemoTradingHistory} (DEMO-02).
  */
 @Service
 public class DemoDataLoader {
@@ -118,8 +119,21 @@ public class DemoDataLoader {
     private final CatalogueQueries catalogue;
     private final PricingQueries pricing;
     private final InventoryQueries inventory;
+    private final DemoTradingHistory history;
+    private final DemoRetailPricing retailPricing;
+    private final DemoPayments payments;
+    private final DemoStockOperations stockOperations;
+    private final DemoCustomers customers;
+    private final DemoCalendar calendar;
     private final Clock clock;
     private final ZoneId businessZone;
+
+    /**
+     * The credit limit of D102 to Point Pedro MPCS (M103): a little above the exposure its trading
+     * history leaves (DemoTradingHistory, lane D102-M103), so the order desk shows it past the
+     * first warning threshold (80 %). Warn only: nothing is blocked on credit (ADR-12).
+     */
+    static final BigDecimal M103_CREDIT_LIMIT = new BigDecimal("27000.00");
 
     private Map<String, Integer> counts;
 
@@ -146,8 +160,15 @@ public class DemoDataLoader {
             CatalogueQueries catalogue,
             PricingQueries pricing,
             InventoryQueries inventory,
+            DemoTradingHistory history,
+            DemoRetailPricing retailPricing,
+            DemoPayments payments,
+            DemoStockOperations stockOperations,
+            DemoCustomers customers,
+            DemoCalendar calendar,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone) {
+        this.calendar = calendar;
         this.registerTillPosition = registerTillPosition;
         this.setPrimaryTill = setPrimaryTill;
         this.createSku = createSku;
@@ -169,15 +190,57 @@ public class DemoDataLoader {
         this.catalogue = catalogue;
         this.pricing = pricing;
         this.inventory = inventory;
+        this.history = history;
+        this.retailPricing = retailPricing;
+        this.payments = payments;
+        this.stockOperations = stockOperations;
+        this.customers = customers;
         this.clock = clock;
         this.businessZone = ZoneId.of(businessZone);
     }
+
+    @org.springframework.beans.factory.annotation.Autowired // a field, to leave the constructor to the other lanes
+    private DemoClaimsAndTransfers claimsAndTransfers;
 
     /** Loads whatever of the demo is missing, in the order of the storyline. */
     public synchronized Report load() {
         counts = new LinkedHashMap<>();
         List<Item> items = DemoCatalogue.load();
+        LocalDate today = calendar.today();
 
+        // DEMO-02: the demo opened for business eight weeks and a few days ago, so that the
+        // history after it has prices, relationships and stock on the days it was traded.
+        Map<String, UUID> skus = new HashMap<>();
+        calendar.run(today.minusDays(DemoCalendar.SETUP_DAYS_AGO), LocalTime.of(8, 0), () -> skus.putAll(setUp(items)));
+        // M3-06, M3-07: the control prices, the milk powder policy and the society's shelf price
+        // list, the same morning, once the society's stock is on its shelves (DemoRetailPricing).
+        calendar.run(
+                today.minusDays(DemoCalendar.SETUP_DAYS_AGO),
+                LocalTime.of(9, 0),
+                () -> retailPricing.load(items, skus, this::count));
+        // The Hettipola shop got its first stock a month later.
+        calendar.run(
+                today.minusDays(DemoCalendar.SETUP_DAYS_AGO / 2),
+                LocalTime.of(8, 0),
+                () -> hettipolaStockByTransfer(skus));
+        // DEMO-02: the trading history, orders to invoices at both tiers (DemoTradingHistory).
+        history.load(items, skus, this::count);
+        // M4-07: the buyers paid some of it (DemoPayments).
+        payments.load(this::count);
+        // M5-11, M5-13: a count, a write-off and a repack at the society's stores (DemoStockOperations).
+        stockOperations.load(this::count);
+        // M7: the members of M101 and its credit book (DemoCustomers).
+        customers.load(this::count);
+        // M4-06, M4-10: a claim at D101 and a transfer request at the town shop (DemoClaimsAndTransfers).
+        claimsAndTransfers.load(this::count);
+
+        Report report = new Report(Map.copyOf(counts));
+        log.info("Demo data: {} commands issued {}", report.total(), report.commands());
+        return report;
+    }
+
+    /** Master data and opening stock, in the order of the storyline; answers the SKU ids by English name. */
+    private Map<String, UUID> setUp(List<Item> items) {
         tills();
         Map<String, UUID> skus = catalogue(items);
         UUID federationList = federationPriceList(items, skus);
@@ -188,7 +251,10 @@ public class DemoDataLoader {
         for (Distributor distributor : DemoCast.DISTRIBUTORS) {
             UUID list = distributorPriceList(distributor, items, skus);
             for (UUID society : distributor.societies()) {
-                relationship(distributor.commercial(), society, list, new BigDecimal("5000000.00"), 30);
+                // M4-09: Point Pedro MPCS (M103) buys from D102 on a limit its history nearly
+                // reaches, so its exposure shows the warning (warn only, ADR-12).
+                BigDecimal limit = DemoCast.M103.equals(society) ? M103_CREDIT_LIMIT : new BigDecimal("5000000.00");
+                relationship(distributor.commercial(), society, list, limit, 30);
             }
         }
         openingStock(DemoCast.FED_STORES, DemoCast.FED_ACCOUNTS, items, skus, true);
@@ -196,13 +262,13 @@ public class DemoDataLoader {
             openingStock(distributor.stores(), distributor.accounts(), items, skus, false);
         }
         // Phase 3, the shop: Kuliyapitiya MPCS holds stock at its stores and sends some to its
-        // town shop, whose till sells it (make demo-till-sale).
+        // town shop, whose till sells it (make demo-till-sale); Pannala and Point Pedro, which have
+        // no stores, count their shops' opening stock (DemoShopStock).
         societyStock(items, skus);
-        shopStockByTransfer();
-
-        Report report = new Report(Map.copyOf(counts));
-        log.info("Demo data: {} commands issued {}", report.total(), report.commands());
-        return report;
+        shopStockByTransfer(skus);
+        shopOpeningStock(DemoCast.M102_SHOP_STAFF, DemoCast.M102_MANAGER, DemoShopStock.PANNALA_SHOP, items, skus);
+        shopOpeningStock(DemoCast.M103_SHOP_STAFF, DemoCast.M103_MANAGER, DemoShopStock.POINT_PEDRO_SHOP, items, skus);
+        return skus;
     }
 
     // ---- M1: till positions and the primary till of every shop -----------------------------
@@ -447,12 +513,14 @@ public class DemoDataLoader {
         count("CountersignOpeningBalance");
     }
 
-    // ---- M5, phase 3: the society's stores stock and a transfer to its town shop ---------------------
+    // ---- M5, phase 3: the society's stores stock and the shops' first stock ----------------------
 
     /**
-     * Kuliyapitiya MPCS's opening stock at its stores (W01): a tenth of a distributor's quantity of
-     * each item, at the distributor's price (what the society paid). Prepared and signed by the
-     * society buyer, countersigned by the society manager.
+     * Kuliyapitiya MPCS's opening stock at its stores (W01): half a distributor's quantity of each
+     * item, at the distributor's price (what the society paid), enough for both its shops' first
+     * transfers (DemoShopStock) with stock left for the count, the write-off and the repack
+     * (DemoStockOperations). Prepared and signed by the society buyer, countersigned by the society
+     * manager.
      */
     private void societyStock(List<Item> items, Map<String, UUID> skus) {
         Actor buyer = DemoCast.M101_BUYER;
@@ -463,19 +531,9 @@ public class DemoDataLoader {
         LocalDate today = today();
         List<OpeningBalanceLine> lines = new ArrayList<>();
         for (Item item : items) {
-            BigDecimal tenth = item.distributorQty().divide(BigDecimal.TEN, 0, java.math.RoundingMode.DOWN);
-            BigDecimal qty = tenth.signum() > 0 ? tenth : BigDecimal.ONE;
-            String batchNo = item.batchTracked() ? "DEMO-" + today.getYear() + "-" + item.lineNo() : null;
-            LocalDate expiry = item.expiryTracked() ? today.plusDays(item.shelfLifeDays()) : null;
-            lines.add(new OpeningBalanceLine(
-                    null,
-                    LotCondition.GOOD,
-                    qty,
-                    item.distributorPrice(),
-                    skus.get(item.nameEn()),
-                    batchNo,
-                    expiry,
-                    item.hasPrintedMrp() ? item.printedMrp() : null));
+            BigDecimal half = item.distributorQty().divide(BigDecimal.TWO, 0, java.math.RoundingMode.DOWN);
+            BigDecimal qty = half.signum() > 0 ? half : BigDecimal.ONE;
+            lines.add(openingLine(item, qty, skus, today));
         }
         UUID balance = prepareOpeningBalance.handle(new PrepareOpeningBalance(DemoCast.M101_WAREHOUSE, lines), scope);
         count("PrepareOpeningBalance");
@@ -486,23 +544,89 @@ public class DemoDataLoader {
     }
 
     /**
-     * The society manager sends half of every GOOD lot at the stores to the town shop (M5-09), and
-     * the shop's own staff member receives it at the shop: each writes only its own location's rows.
-     * Skipped when a transfer to the shop exists; one left in transit is received.
+     * The opening stock of a shop with no society stores behind it (Pannala, Point Pedro: the
+     * distributor delivers to the shop), counted on the day the shop went live: prepared and signed
+     * by the shop's staff member, countersigned by the society manager, at the distributor's price.
+     * Skipped once the shop holds any lot (on a stack loaded before this the shop already has its
+     * GRNs, and M5 refuses an opening balance at a location with movements).
      */
-    private void shopStockByTransfer() {
+    private void shopOpeningStock(
+            Actor staff, Actor manager, List<DemoShopStock.Shelf> shelves, List<Item> items, Map<String, UUID> skus) {
+        ScopeContext scope = scopeOf(staff);
+        if (!inventory.skusWithLots(staff.locationId(), scope).isEmpty()) {
+            return;
+        }
+        LocalDate today = today();
+        Map<String, Item> byName = new HashMap<>();
+        items.forEach(item -> byName.put(item.nameEn(), item));
+        List<OpeningBalanceLine> lines = new ArrayList<>();
+        for (DemoShopStock.Shelf shelf : shelves) {
+            Item item = byName.get(shelf.nameEn());
+            if (item == null) {
+                throw new IllegalStateException("Demo shop stock: no catalogue item named " + shelf.nameEn());
+            }
+            lines.add(openingLine(item, BigDecimal.valueOf(shelf.qty()), skus, today));
+        }
+        UUID balance = prepareOpeningBalance.handle(new PrepareOpeningBalance(staff.locationId(), lines), scope);
+        count("PrepareOpeningBalance");
+        signOpeningBalance.handle(new SignOpeningBalance(balance), scope);
+        count("SignOpeningBalance");
+        countersignOpeningBalance.handle(new CountersignOpeningBalance(balance), scopeOf(manager));
+        count("CountersignOpeningBalance");
+    }
+
+    /** A line of a society's opening stock: the demo batch of the item, at the distributor's price. */
+    private static OpeningBalanceLine openingLine(Item item, BigDecimal qty, Map<String, UUID> skus, LocalDate today) {
+        String batchNo = item.batchTracked() ? "DEMO-" + today.getYear() + "-" + item.lineNo() : null;
+        LocalDate expiry = item.expiryTracked() ? today.plusDays(item.shelfLifeDays()) : null;
+        return new OpeningBalanceLine(
+                null,
+                LotCondition.GOOD,
+                qty,
+                item.distributorPrice(),
+                skus.get(item.nameEn()),
+                batchNo,
+                expiry,
+                item.hasPrintedMrp() ? item.printedMrp() : null);
+    }
+
+    /**
+     * The transfer lines that send each shelf's quantity from the society's GOOD lots at the
+     * stores, lot by lot, never more than a lot holds (less when the stores hold less).
+     */
+    private List<IssueTransfer.Line> fromTheStores(
+            List<DemoShopStock.Shelf> shelves, Map<String, UUID> skus, ScopeContext manager) {
+        List<LotBalance> lots = inventory.balances(DemoCast.M101_WAREHOUSE, null, false, manager);
+        List<IssueTransfer.Line> lines = new ArrayList<>();
+        for (DemoShopStock.Shelf shelf : shelves) {
+            UUID sku = skus.get(shelf.nameEn());
+            BigDecimal wanted = BigDecimal.valueOf(shelf.qty());
+            for (LotBalance lot : lots) {
+                if (wanted.signum() > 0
+                        && lot.skuId().equals(sku)
+                        && "GOOD".equals(lot.condition())
+                        && lot.qtyOnHand().signum() > 0) {
+                    BigDecimal sent = wanted.min(lot.qtyOnHand());
+                    lines.add(new IssueTransfer.Line(lot.batchId(), sent));
+                    wanted = wanted.subtract(sent);
+                }
+            }
+        }
+        return lines;
+    }
+
+    /**
+     * The society manager sends the town shop its first stock from the stores (M5-09,
+     * DemoShopStock#TOWN_SHOP), and the shop's own staff member receives it at the shop: each
+     * writes only its own location's rows. Skipped when a transfer to the shop exists; one left in
+     * transit is received.
+     */
+    private void shopStockByTransfer(Map<String, UUID> skus) {
         ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
         ScopeContext shop = scopeOf(DemoCast.M101_SHOP_STAFF);
         List<TransferView> existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
         if (existing.isEmpty()) {
-            List<IssueTransfer.Line> lines = new ArrayList<>();
-            for (LotBalance lot : inventory.balances(DemoCast.M101_WAREHOUSE, null, false, manager)) {
-                if (!"GOOD".equals(lot.condition()) || lot.qtyOnHand().signum() <= 0) {
-                    continue;
-                }
-                BigDecimal half = lot.qtyOnHand().divide(BigDecimal.valueOf(2), 0, java.math.RoundingMode.DOWN);
-                lines.add(new IssueTransfer.Line(lot.batchId(), half.signum() > 0 ? half : lot.qtyOnHand()));
-            }
+            List<IssueTransfer.Line> lines = fromTheStores(DemoShopStock.TOWN_SHOP, skus, manager);
             if (lines.isEmpty()) {
                 return;
             }
@@ -513,6 +637,34 @@ public class DemoDataLoader {
         for (TransferView transfer : existing) {
             if ("IN_TRANSIT".equals(transfer.status()) && DemoCast.M101_TOWN_SHOP.equals(transfer.toLocationId())) {
                 receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), shop);
+                count("ReceiveTransfer");
+            }
+        }
+    }
+
+    /**
+     * The society manager sends the Hettipola shop its first stock a month later
+     * (DemoShopStock#HETTIPOLA_SHOP) and receives it there himself: the shop has no staff user of
+     * its own in the demo, and the manager works entity-wide. Skipped when a transfer to the shop
+     * exists; one left in transit is received.
+     */
+    private void hettipolaStockByTransfer(Map<String, UUID> skus) {
+        ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
+        List<TransferView> existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
+        if (existing.isEmpty()) {
+            List<IssueTransfer.Line> lines = fromTheStores(DemoShopStock.HETTIPOLA_SHOP, skus, manager);
+            if (lines.isEmpty()) {
+                return;
+            }
+            issueTransfer.handle(
+                    new IssueTransfer(DemoCast.M101_WAREHOUSE, DemoCast.M101_HETTIPOLA_SHOP, lines), manager);
+            count("IssueTransfer");
+            existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
+        }
+        for (TransferView transfer : existing) {
+            if ("IN_TRANSIT".equals(transfer.status())
+                    && DemoCast.M101_HETTIPOLA_SHOP.equals(transfer.toLocationId())) {
+                receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), manager);
                 count("ReceiveTransfer");
             }
         }

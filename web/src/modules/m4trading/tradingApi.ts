@@ -4,6 +4,8 @@
 
 import { useMemo } from "react";
 import { useApiClient } from "../../shell/api/client";
+import { businessToday } from "../../shell/i18n/formats";
+import { inForce } from "./tradingView";
 import type { components, paths } from "../../generated/m4trading";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
@@ -15,12 +17,23 @@ export type DeliveryPoint = components["schemas"]["DeliveryPointResponse"];
 export type OrderLine = components["schemas"]["OrderLineResponse"];
 export type OrderStatus = components["schemas"]["OrderStatus"];
 export type CreateOrderRequest = components["schemas"]["CreateOrderRequest"];
+export type AmendOrderRequest = components["schemas"]["AmendOrderRequest"];
+export type ApplyPaymentReceiptRequest = components["schemas"]["ApplyPaymentReceiptRequest"];
 export type AllocationOverride = components["schemas"]["AllocationOverride"];
 export type DeliveryNote = components["schemas"]["DeliveryNoteResponse"];
 export type CreateDeliveryNoteRequest = components["schemas"]["CreateDeliveryNoteRequest"];
 export type Grn = components["schemas"]["GrnResponse"];
 export type CaptureGrnRequest = components["schemas"]["CaptureGrnRequest"];
 export type Invoice = components["schemas"]["InvoiceResponse"];
+export type CreditNote = components["schemas"]["CreditNoteResponse"];
+export type Discrepancy = components["schemas"]["DiscrepancyResponse"];
+export type PaymentReceipt = components["schemas"]["PaymentReceiptResponse"];
+export type RecordPaymentReceiptRequest = components["schemas"]["RecordPaymentReceiptRequest"];
+export type Exposure = components["schemas"]["ExposureResponse"];
+export type Claim = components["schemas"]["ClaimResponse"];
+export type ClaimKind = Claim["kind"];
+export type RaiseClaimRequest = components["schemas"]["RaiseClaimRequest"];
+export type ApproveClaimRequest = components["schemas"]["ApproveClaimRequest"];
 export type Relationship =partyComponents["schemas"]["RelationshipResponse"];
 export type Entity = partyComponents["schemas"]["EntityResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
@@ -94,16 +107,66 @@ export function useTradingApi() {
         return data!;
       },
 
-      /** A fresh link to the A4 PDF of the seller's invoice; refused until the worker printed it. */
+      /** A fresh link to the A4 PDF of the invoice, for its seller or its buyer; refused until the worker printed it. */
       async invoicePrint(invoiceId: string): Promise<string> {
         const { data } = await api.GET("/v1/trading/invoices/{invoiceId}/print", { params: { path: { invoiceId } } });
         return data!.url;
       },
 
-      /** The ACTIVE relationships in which the caller's entity buys: the sellers it can order from. */
+      async discrepancies(role: Side): Promise<Discrepancy[]> {
+        const { data } = await api.GET("/v1/trading/discrepancies", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async discrepancy(discrepancyId: string): Promise<Discrepancy> {
+        const { data } = await api.GET("/v1/trading/discrepancies/{discrepancyId}", {
+          params: { path: { discrepancyId } }
+        });
+        return data!;
+      },
+
+      async creditNote(creditNoteId: string): Promise<CreditNote> {
+        const { data } = await api.GET("/v1/trading/credit-notes/{creditNoteId}", {
+          params: { path: { creditNoteId } }
+        });
+        return data!;
+      },
+
+      /** A fresh link to the A4 PDF of the credit note, for its seller or its buyer; refused until the worker printed it. */
+      async creditNotePrint(creditNoteId: string): Promise<string> {
+        const { data } = await api.GET("/v1/trading/credit-notes/{creditNoteId}/print", {
+          params: { path: { creditNoteId } }
+        });
+        return data!.url;
+      },
+
+      /** The payments the caller's entity received (SELLER) or made (BUYER), with their reversals, newest first. */
+      async payments(role: Side): Promise<PaymentReceipt[]> {
+        const { data } = await api.GET("/v1/trading/payment-receipts", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async payment(receiptId: string): Promise<PaymentReceipt> {
+        const { data } = await api.GET("/v1/trading/payment-receipts/{receiptId}", {
+          params: { path: { receiptId } }
+        });
+        return data!;
+      },
+
+      /** The exposure of each relationship in which the caller sells (SELLER) or buys (BUYER), with its credit limit. */
+      async exposures(role: Side): Promise<Exposure[]> {
+        const { data } = await api.GET("/v1/trading/exposures", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      /**
+       * The relationships in force today in which the caller's entity buys: the sellers it can
+       * order from. An amendment of the terms (a new credit limit) closes the ACTIVE row and
+       * opens the next, so a pair has one row in force, not one per ACTIVE row.
+       */
       async sellers(): Promise<Relationship[]> {
         const { data } = await party.GET("/v1/party/relationships", { params: { query: { side: "BUYER" } } });
-        return (data ?? []).filter((row) => row.status === "ACTIVE");
+        return (data ?? []).filter((row) => inForce(row, businessToday()));
       },
 
       async relationship(relationshipId: string): Promise<Relationship | null> {
@@ -241,6 +304,145 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/invoices", {
           params: { header: { "Idempotency-Key": key } },
           body: { grnIds }
+        });
+        return data!;
+      },
+
+      /**
+       * The seller accepts the buyer's count. A short quantity was never billed and is settled with no
+       * money; damaged quantity the invoice charged is credited by a credit note issued with it.
+       */
+      async settleDiscrepancy(discrepancyId: string, reason: string, key: string): Promise<Discrepancy> {
+        const { data } = await api.POST("/v1/trading/discrepancies/{discrepancyId}/settle", {
+          params: { path: { discrepancyId }, header: { "Idempotency-Key": key } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      /** Applies what a credit note holds unapplied to an open invoice of the same buyer (CR-24A-3 item 2). */
+      async applyCreditNote(creditNoteId: string, invoiceId: string, key: string): Promise<CreditNote> {
+        const { data } = await api.POST("/v1/trading/credit-notes/{creditNoteId}/apply", {
+          params: { path: { creditNoteId }, header: { "Idempotency-Key": key } },
+          body: { invoiceId }
+        });
+        return data!;
+      },
+
+      async disputeInvoice(invoiceId: string, reason: string, key: string): Promise<Invoice> {
+        const { data } = await api.POST("/v1/trading/invoices/{invoiceId}/dispute", {
+          params: { path: { invoiceId }, header: { "Idempotency-Key": key } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      async resolveInvoiceDispute(invoiceId: string, key: string): Promise<Invoice> {
+        const { data } = await api.POST("/v1/trading/invoices/{invoiceId}/resolve-dispute", {
+          params: { path: { invoiceId }, header: { "Idempotency-Key": key } },
+          body: {}
+        });
+        return data!;
+      },
+
+      /**
+       * The seller records a payment from a buyer. With no settlements it settles the buyer's open
+       * invoices oldest first, and what is left stays on the buyer's account.
+       */
+      async recordPayment(body: RecordPaymentReceiptRequest, key: string): Promise<PaymentReceipt> {
+        const { data } = await api.POST("/v1/trading/payment-receipts", {
+          params: { header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      /** The cheque of a receipt cleared, or bounced (which reverses the receipt and reopens its invoices). */
+      async chequeOutcome(receiptId: string, outcome: "CLEARED" | "BOUNCED", reason: string, key: string): Promise<PaymentReceipt> {
+        const { data } = await api.POST("/v1/trading/payment-receipts/{receiptId}/cheque-outcome", {
+          params: { path: { receiptId }, header: { "Idempotency-Key": key } },
+          body: { outcome, reason: reason.trim() === "" ? undefined : reason.trim() }
+        });
+        return data!;
+      },
+
+      /** Money the receipt holds on account settles the buyer's open invoices (oldest first, or those chosen). */
+      async applyPayment(receiptId: string, body: ApplyPaymentReceiptRequest, key: string): Promise<PaymentReceipt> {
+        const { data } = await api.POST("/v1/trading/payment-receipts/{receiptId}/apply", {
+          params: { path: { receiptId }, header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      /** A fresh link to the A4 PDF of the receipt, for its seller or its buyer; refused until the worker printed it. */
+      async paymentPrint(receiptId: string): Promise<string> {
+        const { data } = await api.GET("/v1/trading/payment-receipts/{receiptId}/print", {
+          params: { path: { receiptId } }
+        });
+        return data!.url;
+      },
+
+      /** The buyer amends its undecided order; the answer is the next version (a new order). */
+      async amendOrder(orderId: string, body: AmendOrderRequest, key: string): Promise<Order> {
+        const { data } = await api.POST("/v1/trading/orders/{orderId}/amend", {
+          params: { path: { orderId }, header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      // ---- claims (M4-06) ------------------------------------------------------------------
+
+      /** The claims the caller's entity raised (BUYER) or that were raised with it (SELLER), newest first. */
+      async claims(role: Side): Promise<Claim[]> {
+        const { data } = await api.GET("/v1/trading/claims", { params: { query: { role } } });
+        return data ?? [];
+      },
+
+      async claim(claimId: string): Promise<Claim> {
+        const { data } = await api.GET("/v1/trading/claims/{claimId}", { params: { path: { claimId } } });
+        return data!;
+      },
+
+      async raiseClaim(body: RaiseClaimRequest, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims", { params: { header: { "Idempotency-Key": key } }, body });
+        return data!;
+      },
+
+      /** Authorises one photograph of the claim, then PUTs its bytes to the store at the URL the server signed. */
+      async addClaimPhoto(claimId: string, file: File, key: string): Promise<void> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/photos", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } },
+          body: { contentType: file.type, contentLength: file.size }
+        });
+        const upload = await fetch(data!.url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+        if (!upload.ok) {
+          throw new Error(`upload ${upload.status}`);
+        }
+      },
+
+      /** The seller approves in whole or in part; the credit note is issued with the approval. */
+      async approveClaim(claimId: string, body: ApproveClaimRequest, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/approve", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } },
+          body
+        });
+        return data!;
+      },
+
+      async rejectClaim(claimId: string, reason: string, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/reject", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } },
+          body: { reason }
+        });
+        return data!;
+      },
+
+      /** The buyer sends back the goods of a claim approved with the return required. */
+      async dispatchClaimReturn(claimId: string, key: string): Promise<Claim> {
+        const { data } = await api.POST("/v1/trading/claims/{claimId}/return", {
+          params: { path: { claimId }, header: { "Idempotency-Key": key } }
         });
         return data!;
       },

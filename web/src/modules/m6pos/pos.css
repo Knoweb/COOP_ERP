@@ -1,0 +1,55 @@
+/* The layout of the shop's receipt screens. Tokens only (design/tokens.css); the look of tables,
+   chips and headers belongs to the shell. */
+
+.pos-field {
+  display: grid;
+  gap: var(--space-half);
+}
+
+.pos-section {
+  margin-top: var(--space-3);
+}
+
+.pos-totals dl,
+dl.pos-totals {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.pos-totals dl > div,
+dl.pos-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pos-totals dd {
+  margin: 0;
+}
+
+.pos-flags {
+  margin-top: var(--space-2);
+}
+
+.pos-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.pos-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.pos-flag-list {
+  margin: var(--space-half) 0 0;
+  padding-left: var(--space-2);
+}
+
+.pos-more {
+  margin-top: var(--space-2);
+}

@@ -52,6 +52,9 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
     ReportingQueries queries;
 
     @Autowired
+    ReportCatalogue catalogue;
+
+    @Autowired
     ReportPrintModel printModel;
 
     @Autowired
@@ -154,7 +157,7 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
         ReportTable table = new ReportTable(
                 "invoices-issued",
                 "m8.report.invoices_issued.title",
-                ReportCatalogue.INVOICES.columns(),
+                catalogue.find("invoices-issued").orElseThrow().columns(),
                 List.of(Map.of(
                         "date", "2026-09-27",
                         "number", "F-INV-1",
@@ -239,6 +242,11 @@ class ReportRunPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Override
         public URI presignGet(String objectKey, ScopeContext ctx) {
+            return URI.create("http://objects.test/" + objectKey);
+        }
+
+        @Override
+        public URI presignGetOfParty(String objectKey, UUID ownerEntityId, ScopeContext ctx) {
             return URI.create("http://objects.test/" + objectKey);
         }
     }

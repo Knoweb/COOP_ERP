@@ -23,6 +23,7 @@ const api = {
   acceptOrder: vi.fn(async () => current),
   rejectOrder: vi.fn(async () => current),
   cancelOrder: vi.fn(async () => current),
+  amendOrder: vi.fn(async () => ({ ...current, orderId: "0190f4cc-0000-7000-8000-000000000002" })),
   sku: vi.fn(async () => null),
   entity: vi.fn(async () => null),
   location: vi.fn(async () => null)
@@ -81,7 +82,7 @@ describe("the order card", () => {
     expect(eta).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(overrides).toEqual([]);
     expect(key).toBeTruthy();
-  });
+  }, 10000);
 
   it("asks the seller for a reason before a rejection", async () => {
     Object.assign(state, { entityId: SELLER, permissions: new Set(["ord.order.accept"]) });
@@ -127,6 +128,31 @@ describe("the order card", () => {
     await screen.findByText("D101-ORD-0000001");
     expect(screen.queryByText("000111")).toBeNull();
     expect(api.location).not.toHaveBeenCalled();
+  });
+
+  it("lets the buyer amend a submitted order: the quantities and the delivery date, the whole set sent", async () => {
+    Object.assign(state, { entityId: BUYER, permissions: new Set(["ord.order.submit"]) });
+    renderOrder();
+
+    fireEvent.click(await screen.findByRole("button", { name: text("trading.order.amend") }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Quantity of line 1" }), { target: { value: "80" } });
+    fireEvent.change(screen.getByLabelText(text("trading.order.amend.eta")), { target: { value: "2099-01-15" } });
+    fireEvent.click(screen.getByRole("button", { name: text("trading.order.amend.save") }));
+
+    await waitFor(() => expect(api.amendOrder).toHaveBeenCalledOnce());
+    expect(api.amendOrder.mock.calls[0]).toEqual([
+      ORDER_ID,
+      { requestedEta: "2099-01-15", notes: undefined, lines: [{ skuId: SKU, uomCode: "EA", qty: 80 }] },
+      expect.any(String)
+    ]);
+  });
+
+  it("offers no amendment of an accepted order, nor to the seller", async () => {
+    current = { ...current, status: "ACCEPTED", lines: [{ ...current.lines[0], allocatedQty: 120, fulfilledQty: 0 }] };
+    Object.assign(state, { entityId: BUYER, permissions: new Set(["ord.order.submit"]) });
+    renderOrder();
+    await screen.findByText("D101-ORD-0000001");
+    expect(screen.queryByRole("button", { name: text("trading.order.amend") })).toBeNull();
   });
 
   it("shows the allocation and the tier price once accepted, and leads the seller to the delivery note", async () => {

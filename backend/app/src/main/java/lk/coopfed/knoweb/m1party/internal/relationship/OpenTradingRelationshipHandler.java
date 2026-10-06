@@ -22,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * OpenTradingRelationship (21A section 6; doc 21 sections 3.2 and 4.2): the seller writes the
- * terms it offers the buyer, in DRAFT. Nothing trades under a DRAFT; activation does that.
+ * terms it offers the buyer, in DRAFT. Nothing trades under a DRAFT; activation does that. Terms
+ * with a credit limit also need {@code bil.creditlimit.change} and a fresh second factor
+ * ({@link CreditLimitGate}).
  */
 @Service
 @CommandHandler(permission = "prt.relationship.open")
@@ -35,6 +37,7 @@ class OpenTradingRelationshipHandler implements Handles<OpenTradingRelationship,
 
     private final RelationshipRepository repository;
     private final TradingStanding standing;
+    private final CreditLimitGate creditLimitGate;
     private final ConfigRegistry config;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -42,11 +45,13 @@ class OpenTradingRelationshipHandler implements Handles<OpenTradingRelationship,
     OpenTradingRelationshipHandler(
             RelationshipRepository repository,
             TradingStanding standing,
+            CreditLimitGate creditLimitGate,
             ConfigRegistry config,
             AuditFacade audit,
             EventPublisher events) {
         this.repository = repository;
         this.standing = standing;
+        this.creditLimitGate = creditLimitGate;
         this.config = config;
         this.audit = audit;
         this.events = events;
@@ -89,6 +94,12 @@ class OpenTradingRelationshipHandler implements Handles<OpenTradingRelationship,
             throw new ProblemException("m1.relationship.effective_range_invalid");
         }
         Relationship.Terms terms = terms(command);
+
+        // 5b. a credit limit is gated where it is set (CR-21A-7): an unreviewed figure in a draft
+        //     would otherwise reach the audit trail and, at activation, the buyer's exposure.
+        if (terms.creditLimit() != null) {
+            creditLimitGate.require(scope);
+        }
 
         // 6. no ACTIVE row of the pair overlaps (pre-check; the exclusion constraint is the backstop).
         UUID id = Ids.next();

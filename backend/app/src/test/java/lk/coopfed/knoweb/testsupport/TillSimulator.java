@@ -150,6 +150,24 @@ public final class TillSimulator {
         return deviceId;
     }
 
+    /** The till's own clock: the real time unless {@link #clockAt} set a moment. */
+    private Instant clockAt;
+
+    private Instant now() {
+        return clockAt != null ? clockAt : Instant.now();
+    }
+
+    /**
+     * The till's clock reads this moment from now on (null: the real time again), for the demo's
+     * history of sales (DEMO-02b): the session, receipt and event times are the till's facts, so a
+     * sale made "last month" carries last month's times. The batch's device_clock stays real: it
+     * is when the till talks to central.
+     */
+    public TillSimulator clockAt(Instant moment) {
+        this.clockAt = moment;
+        return this;
+    }
+
     /** The application version the till reports from now on (doc 31: the floor is compared with it). */
     public TillSimulator runningVersion(String version) {
         this.appVersion = version;
@@ -175,7 +193,7 @@ public final class TillSimulator {
     public long record(String eventType, Map<String, Object> payload) {
         long seq = nextSeq++;
         TillEvent event =
-                new TillEvent(UUID.randomUUID(), eventType, seq, Instant.now(), payload).actorUserId(UUID.randomUUID());
+                new TillEvent(UUID.randomUUID(), eventType, seq, now(), payload).actorUserId(UUID.randomUUID());
         outbox.put(seq, event);
         return seq;
     }
@@ -250,7 +268,7 @@ public final class TillSimulator {
         payload.put("till_position_id", String.valueOf(tillPositionId));
         payload.put("operator_user_id", operator.toString());
         payload.put("business_date", businessDate.toString());
-        payload.put("opened_at", Instant.now().toString());
+        payload.put("opened_at", now().toString());
         payload.put("float_amount", floatAmount.toPlainString());
         record("till_session.opened.v1", payload);
         return sessionId;
@@ -266,6 +284,15 @@ public final class TillSimulator {
      * @return the receipt's document id
      */
     public UUID sell(List<Sale> sales) {
+        return sell(sales, payload -> {});
+    }
+
+    /**
+     * The same sale, with the payload changed by {@code tamper} before it is hashed: a till with a
+     * bug that sends a bundle of the wrong shape under a hash that matches it (the gateway's shape
+     * check, wave 2, is what such a bundle meets).
+     */
+    public UUID sell(List<Sale> sales, java.util.function.Consumer<Map<String, Object>> tamper) {
         if (sessionId == null || seriesId == null) {
             throw new IllegalStateException("Open a session and say what the till sells as first");
         }
@@ -300,7 +327,7 @@ public final class TillSimulator {
         document.put("location_id", locationId.toString());
         document.put("till_position_id", String.valueOf(tillPositionId));
         document.put("device_id", deviceId.toString());
-        document.put("issued_at", Instant.now().toString());
+        document.put("issued_at", now().toString());
         document.put("business_date", businessDate.toString());
         document.put("operator_user_id", operator.toString());
         document.put("currency", "LKR");
@@ -315,17 +342,18 @@ public final class TillSimulator {
         payload.put("tenders", List.of(Map.of("seq", 1, "kind", "CASH", "amount", gross.toPlainString())));
         payload.put("session_id", sessionId.toString());
         cashTaken = cashTaken.add(gross);
+        tamper.accept(payload);
 
         // The content hash by the kernel's rule (doc 18: SHA-256 over the canonical header and
         // lines), so that the gateway accepts the bundle; the conformance cases of the hash are
         // the gateway's own tests.
         String hash = lk.coopfed.knoweb.kernel.internal.document.BundleHash.of(
-                json.valueToTree(document), json.valueToTree(lines));
+                json.valueToTree(payload.get("document")), json.valueToTree(payload.get("lines")));
         payload.put("content_hash", hash);
         long recorded = nextSeq++;
         outbox.put(
                 recorded,
-                new TillEvent(UUID.randomUUID(), "receipt.issued.v1", recorded, Instant.now(), payload)
+                new TillEvent(UUID.randomUUID(), "receipt.issued.v1", recorded, now(), payload)
                         .actorUserId(operator)
                         .aggregateType("receipt")
                         .aggregateId(documentId)
@@ -341,7 +369,7 @@ public final class TillSimulator {
         payload.put("till_position_id", String.valueOf(tillPositionId));
         payload.put("operator_user_id", operator.toString());
         payload.put("business_date", businessDate.toString());
-        payload.put("closed_at", Instant.now().toString());
+        payload.put("closed_at", now().toString());
         payload.put("counted_cash", counted.toPlainString());
         payload.put("expected_cash", expected.toPlainString());
         payload.put("variance", counted.subtract(expected).toPlainString());

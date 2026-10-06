@@ -210,6 +210,45 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/orders/{orderId}/amend:
+
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+
+    post:
+      tags: [Order]
+      operationId: amendOrder
+      summary: The buyer amends its order before the seller decides it; the answer is the next version
+      description: >
+        The lines (the whole set), their quantities and the requested delivery date. The next
+        version is a new order that names the one it amends; the amended order is CANCELLED
+        (reason ORDER_AMENDED). A submitted order's next version is submitted at once and the
+        seller accepts it afresh. Problems: m4.order.not_found, m4.order.not_buyer,
+        m4.order.not_amendable, m4.order.relationship_inactive, m4.order.eta_past,
+        m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
+        m4.order.uom_invalid, m4.order.qty_not_positive.
+      x-permission: ord.order.submit
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmendOrderRequest'
+      responses:
+        '201':
+          description: The next version of the order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/trading/orders/{orderId}/accept:
 
     parameters:
@@ -632,8 +671,9 @@ paths:
       summary: A fresh link to the printed A4 copy of the seller's invoice (M4-11)
       description: >
         The worker prints an issued invoice to A4 after the issue (InvoicePrintConsumer); until it
-        has, the answer is m4.invoice.print_not_ready. The PDF is the seller's: another entity
-        is refused (report.scope_mismatch).
+        has, the answer is m4.invoice.print_not_ready. The PDF is stored under the seller; the buyer
+        prints the same PDF through this invoice. Any other entity does not see the invoice
+        (m4.invoice.not_found).
       x-permission: trd.document.view
       responses:
         '200':
@@ -648,6 +688,860 @@ paths:
             application/problem+json:
               schema:
                 $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/invoices/{invoiceId}/dispute:
+
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+
+    post:
+      tags: [Billing]
+      operationId: disputeInvoice
+      summary: The buyer disputes an invoice it received, with a reason
+      description: >
+        Problems: m4.invoice.not_found, m4.invoice.not_buyer, m4.invoice.disputed_already.
+      x-permission: bil.invoice.dispute
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisputeInvoiceRequest'
+      responses:
+        '200':
+          description: The invoice, disputed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/invoices/{invoiceId}/resolve-dispute:
+
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+
+    post:
+      tags: [Billing]
+      operationId: resolveInvoiceDispute
+      summary: The seller or the buyer closes the open dispute of an invoice
+      description: >
+        Problems: m4.invoice.not_found, m4.invoice.not_disputed.
+      x-permission: bil.invoice.dispute
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveInvoiceDisputeRequest'
+      responses:
+        '200':
+          description: The invoice, no longer disputed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/credit-notes:
+
+    post:
+      tags: [Billing]
+      operationId: issueCreditNote
+      summary: The seller credits chosen quantities of lines of its invoice
+      description: >
+        At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead.
+        Each invoice line at most once, and no more than the line has left uncredited by earlier
+        credit notes (a settlement or a claim may have credited it). The credit note's money applies
+        to the invoice as far as it is still due; the rest stays on the credit note, unapplied, and
+        applyCreditNote applies it later. Asks for a fresh second factor. Problems:
+        m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued,
+        m4.creditnote.line_unknown, m4.creditnote.line_duplicate, m4.creditnote.qty_invalid,
+        m4.creditnote.exceeds_billed, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueCreditNoteRequest'
+      responses:
+        '201':
+          description: The issued credit note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/credit-notes/{creditNoteId}:
+
+    parameters:
+      - $ref: '#/components/parameters/CreditNoteId'
+
+    get:
+      tags: [Billing]
+      operationId: getCreditNote
+      summary: One credit note the caller's entity issued or received
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The credit note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '404':
+          description: m4.creditnote.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/credit-notes/{creditNoteId}/print:
+
+    parameters:
+      - $ref: '#/components/parameters/CreditNoteId'
+
+    get:
+      tags: [Billing]
+      operationId: getCreditNotePrint
+      summary: A fresh link to the printed A4 copy of the seller's credit note
+      description: >
+        As for the invoice: printed by the worker after the issue (m4.creditnote.print_not_ready
+        until then), stored under the seller, printed by either party through the credit note.
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNotePrintResponse'
+        '404':
+          description: m4.creditnote.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/credit-notes/{creditNoteId}/apply:
+
+    parameters:
+      - $ref: '#/components/parameters/CreditNoteId'
+
+    post:
+      tags: [Billing]
+      operationId: applyCreditNote
+      summary: The seller applies money a credit note holds unapplied to an open invoice of the same buyer
+      description: >
+        A credit note's money applies to the invoice it credits only as far as that invoice was
+        still due; the rest is its unapplied amount (CR-24A-3 item 2). This applies it, with no
+        amount as much as fits, to an issued, undisputed invoice of the same seller and buyer. No
+        money moves and nothing is refunded. Asks for a fresh second factor. Problems:
+        m4.creditnote.not_found, m4.creditnote.not_seller, m4.invoice.not_found,
+        m4.invoice.not_issued, m4.creditnote.invoice_not_ours, m4.creditnote.invoice_disputed,
+        m4.creditnote.applied_already, m4.creditnote.amount_invalid,
+        m4.creditnote.exceeds_unapplied, m4.creditnote.exceeds_due.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyCreditNoteRequest'
+      responses:
+        '200':
+          description: The credit note, with what it applied and what it still holds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/discrepancies:
+
+    get:
+      tags: [Dispute]
+      operationId: listDiscrepancies
+      summary: The discrepancies the caller's entity raised (BUYER) or that were raised with it (SELLER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The discrepancies, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscrepancyResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+  /v1/trading/discrepancies/{discrepancyId}:
+
+    parameters:
+      - in: path
+        name: discrepancyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Dispute]
+      operationId: getDiscrepancy
+      summary: One discrepancy the caller's entity raised or that was raised with it
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The discrepancy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyResponse'
+        '404':
+          description: m4.discrepancy.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/discrepancies/{discrepancyId}/settle:
+
+    parameters:
+      - in: path
+        name: discrepancyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      tags: [Dispute]
+      operationId: settleDiscrepancy
+      summary: The seller accepts the buyer's count and settles the discrepancy
+      description: >
+        The invoice bills the received quantity, so a short quantity is settled with no money;
+        damaged quantity the invoice charged is credited by a credit note issued in the same act, no
+        more than the line has left uncredited; the money applies to the invoice as far as it is
+        still due and the rest stays on the credit note, unapplied.
+        Asks for a fresh second factor. Problems: m4.discrepancy.not_found,
+        m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettleDiscrepancyRequest'
+      responses:
+        '200':
+          description: The discrepancy, settled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts:
+
+    get:
+      tags: [Payment]
+      operationId: listPaymentReceipts
+      summary: The payments the caller's entity received (SELLER) or made (BUYER), newest first
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The receipts, with their reversals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Payment]
+      operationId: recordPaymentReceipt
+      summary: The seller records a payment received from a buyer and settles its invoices
+      description: >
+        With no settlements the payment settles the buyer's open, undisputed invoices oldest
+        first; what is left stays on the buyer's account (unapplied). Problems:
+        m4.payment.method_invalid, m4.payment.amount_invalid, m4.payment.received_in_future,
+        m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.cheque_recorded (the
+        same cheque, by bank and number, on an earlier receipt from this buyer that did not bounce),
+        m4.payment.invoice_invalid,
+        m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued,
+        m4.payment.exceeds_due, m4.payment.exceeds_receipt.
+      x-permission: bil.payment.record
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordPaymentReceiptRequest'
+      responses:
+        '201':
+          description: The issued receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    get:
+      tags: [Payment]
+      operationId: getPaymentReceipt
+      summary: One payment receipt, for its seller or its buyer
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}/cheque-outcome:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    post:
+      tags: [Payment]
+      operationId: recordChequeOutcome
+      summary: The cheque of a receipt cleared or bounced
+      description: >
+        A bounced cheque reverses the receipt (a PRC reversal) and reopens the invoices it settled.
+        Problems: m4.payment.outcome_invalid, m4.payment.not_found, m4.payment.not_seller,
+        m4.payment.not_cheque, m4.payment.outcome_recorded.
+      x-permission: bil.payment.record
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChequeOutcomeRequest'
+      responses:
+        '200':
+          description: The receipt, with the cheque's outcome (and its reversal when bounced)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}/apply:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    post:
+      tags: [Payment]
+      operationId: applyPaymentReceipt
+      summary: The seller applies money a receipt left on account to the buyer's later open invoices
+      description: >
+        With no settlements the money on account settles the buyer's open, undisputed invoices
+        oldest first; with settlements, each chosen invoice as the payment form does. The
+        allocation rows belong to the receipt, so a bounced cheque reverses them too. Problems:
+        m4.payment.not_found, m4.payment.not_seller, m4.payment.not_recorded,
+        m4.payment.nothing_on_account, m4.payment.invoice_invalid, m4.invoice.not_found,
+        m4.payment.invoice_not_ours, m4.invoice.not_issued, m4.payment.amount_invalid,
+        m4.payment.exceeds_due, m4.payment.exceeds_on_account, m4.payment.nothing_to_apply.
+      x-permission: bil.payment.record
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPaymentReceiptRequest'
+      responses:
+        '200':
+          description: The receipt, with what it now settles and what is left on account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/payment-receipts/{receiptId}/print:
+
+    parameters:
+      - $ref: '#/components/parameters/ReceiptId'
+
+    get:
+      tags: [Payment]
+      operationId: getPaymentReceiptPrint
+      summary: A fresh link to the printed A4 copy of the seller's payment receipt
+      description: >
+        As for the invoice: printed by the worker after the receipt is recorded
+        (m4.payment.print_not_ready until then), stored under the seller, printed by either
+        party through the receipt.
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReceiptPrintResponse'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/exposures:
+
+    get:
+      tags: [Payment]
+      operationId: listExposures
+      summary: The exposure of every relationship in which the caller's entity sells (SELLER) or buys (BUYER)
+      description: >
+        Open invoice balances plus accepted orders not yet invoiced, less payments held on
+        account, beside the relationship's credit limit. Computed when read; it warns, never blocks
+        (ADR-12).
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The exposures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExposureResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+  /v1/trading/claims:
+
+    get:
+      tags: [Claim]
+      operationId: listClaims
+      summary: The claims the caller's entity raised (BUYER) or that were raised with it (SELLER)
+      x-permission: trd.document.view
+      parameters:
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [BUYER, SELLER]
+      responses:
+        '200':
+          description: The claims, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Claim]
+      operationId: raiseClaim
+      summary: The buyer claims against the seller for goods of a confirmed GRN (M4-06)
+      description: >
+        Within trading.claim_window_days of the GRN's confirmation. Photographs are added to the
+        raised claim with addClaimPhoto. Problems: m4.claim.kind_invalid, m4.claim.grn_not_found,
+        m4.claim.grn_not_confirmed, m4.claim.no_seller, m4.claim.window_closed,
+        m4.claim.lines_required, m4.claim.line_unknown, m4.claim.line_duplicate,
+        m4.claim.qty_invalid, m4.claim.exceeds_received.
+      x-permission: del.claim.raise
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RaiseClaimRequest'
+      responses:
+        '201':
+          description: The claim, raised
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/claims/{claimId}:
+
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+
+    get:
+      tags: [Claim]
+      operationId: getClaim
+      summary: One claim the caller's entity raised or that was raised with it
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The claim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '404':
+          description: m4.claim.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/claims/{claimId}/photos:
+
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+
+    post:
+      tags: [Claim]
+      operationId: addClaimPhoto
+      summary: Authorise the upload of one photograph for a raised claim
+      description: >
+        Answers a URL the client PUTs the bytes to, with the content type given here. Problems:
+        m4.claim.not_found, m4.claim.decided, attachment.content_type_not_allowed,
+        attachment.too_large.
+      x-permission: del.claim.raise
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimPhotoRequest'
+      responses:
+        '200':
+          description: Authorised
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimPhotoResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/claims/{claimId}/approve:
+
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+
+    post:
+      tags: [Claim]
+      operationId: approveClaim
+      summary: The seller approves the claim in whole or in part; a credit note is issued with it
+      description: >
+        Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending,
+        m4.claim.line_unknown, m4.claim.qty_invalid, m4.claim.nothing_approved,
+        m4.claim.invoice_first, m4.creditnote.exceeds_billed (an accepted quantity above what its
+        invoice line has left uncredited is refused, not capped). The credit note's money applies to
+        the invoice as far as it is still due; the rest stays on the credit note, unapplied.
+      x-permission: del.claim.decide
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveClaimRequest'
+      responses:
+        '200':
+          description: The claim, approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/claims/{claimId}/reject:
+
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+
+    post:
+      tags: [Claim]
+      operationId: rejectClaim
+      summary: The seller rejects the claim, with a reason
+      description: >
+        Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending.
+      x-permission: del.claim.decide
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionReasonRequest'
+      responses:
+        '200':
+          description: The claim, rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/claims/{claimId}/return:
+
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+
+    post:
+      tags: [Claim]
+      operationId: dispatchClaimReturn
+      summary: The buyer sends back the goods of a claim approved with the return required
+      description: >
+        M5 takes them out of the buyer's stock at the GRN's location. Problems:
+        m4.claim.not_found, m4.claim.return_not_required, m4.claim.returned_already.
+      x-permission: del.claim.raise
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The claim, its goods on their way back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/transfer-requests:
+
+    get:
+      tags: [TransferRequest]
+      operationId: listTransferRequests
+      summary: The transfer requests the caller's scope reads, newest first
+      description: A shop session reads its own requests and those asked of it; the society all of its own.
+      x-permission: inv.stock.view
+      responses:
+        '200':
+          description: The transfer requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransferRequestResponse'
+
+    post:
+      tags: [TransferRequest]
+      operationId: requestTransfer
+      summary: A shop asks for stock from another location of its society (M4-10)
+      description: >
+        Problems: m4.transfer.location_not_in_scope, m4.transfer.same_location,
+        m4.transfer.lines_required, m4.transfer.sku_unknown, m4.transfer.sku_duplicate,
+        m4.transfer.qty_invalid.
+      x-permission: shop.transfer.request
+      x-scope: LOCATION
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestTransferRequest'
+      responses:
+        '201':
+          description: The request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferRequestResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/transfer-requests/{requestId}:
+
+    parameters:
+      - $ref: '#/components/parameters/TransferRequestId'
+
+    get:
+      tags: [TransferRequest]
+      operationId: getTransferRequest
+      summary: One transfer request, with the transfer that fulfils it once issued
+      x-permission: inv.stock.view
+      responses:
+        '200':
+          description: The request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferRequestResponse'
+        '404':
+          description: m4.transfer.request_not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/transfer-requests/{requestId}/approve:
+
+    parameters:
+      - $ref: '#/components/parameters/TransferRequestId'
+
+    post:
+      tags: [TransferRequest]
+      operationId: approveTransferRequest
+      summary: The society approves the request; its stores issue the transfer
+      description: >
+        The society names the location that gives the stock, or keeps the one the shop named.
+        Problems: m4.transfer.request_not_found, m4.transfer.decided, m4.transfer.source_required,
+        m4.transfer.same_location, m4.transfer.location_invalid, m4.transfer.insufficient_stock.
+      x-permission: mpcs.transfer.approve
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveTransferRequestRequest'
+      responses:
+        '200':
+          description: The request, approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferRequestResponse'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/transfer-requests/{requestId}/reject:
+
+    parameters:
+      - $ref: '#/components/parameters/TransferRequestId'
+
+    post:
+      tags: [TransferRequest]
+      operationId: rejectTransferRequest
+      summary: The society rejects the request, with a reason
+      description: >
+        Problems: m4.transfer.request_not_found, m4.transfer.decided.
+      x-permission: mpcs.transfer.approve
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionReasonRequest'
+      responses:
+        '200':
+          description: The request, rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferRequestResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
@@ -676,6 +1570,46 @@ components:
     GrnId:
       in: path
       name: grnId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    InvoiceId:
+      in: path
+      name: invoiceId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CreditNoteId:
+      in: path
+      name: creditNoteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ReceiptId:
+      in: path
+      name: receiptId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ClaimId:
+      in: path
+      name: claimId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    TransferRequestId:
+      in: path
+      name: requestId
       required: true
       schema:
         type: string
@@ -719,6 +1653,23 @@ components:
           description: One of the buyer's own locations, where the goods are to be delivered (CR-24A-2)
           type: string
           format: uuid
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/OrderLineRequest'
+
+    AmendOrderRequest:
+      type: object
+      required: [lines]
+      properties:
+        requestedEta:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 500
         lines:
           type: array
           minItems: 1
@@ -786,6 +1737,17 @@ components:
           format: uuid
         deliverTo:
           $ref: '#/components/schemas/DeliveryPointResponse'
+        version:
+          description: 1, or the version of an amendment (each amendment is a new order)
+          type: integer
+        amendsOrderId:
+          description: The order this version amends
+          type: string
+          format: uuid
+        amendedByOrderId:
+          description: The next version, when the buyer amended this order
+          type: string
+          format: uuid
         lines:
           type: array
           items:
@@ -1219,10 +2181,308 @@ components:
           type: number
         grossAmount:
           type: number
+        creditedAmount:
+          type: number
+          description: What the invoice's credit notes took off it
+        amountDue:
+          type: number
+          description: The gross amount less what was credited and settled
+        settledAmount:
+          type: number
+          description: What payments settled of it, net of bounced cheques
+        paymentState:
+          type: string
+          enum: [OPEN, PART_PAID, SETTLED]
+        payments:
+          type: array
+          description: The receipts (and reversals) that settled part of it, oldest first
+          items:
+            $ref: '#/components/schemas/InvoicePaymentSummary'
+        disputed:
+          type: boolean
+          description: The buyer disputes the invoice now
+        disputeReason:
+          type: string
+        creditNotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditNoteSummary'
+        availableCredits:
+          type: array
+          description: >
+            For the seller, while something is due: its credit notes to this buyer that still hold
+            money unapplied, which applyCreditNote can apply to this invoice
+          items:
+            $ref: '#/components/schemas/CreditNoteSummary'
         lines:
           type: array
           items:
             $ref: '#/components/schemas/InvoiceLineResponse'
+
+    CreditNoteSummary:
+      type: object
+      required: [creditNoteId, grossAmount]
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        grossAmount:
+          type: number
+        appliedAmount:
+          type: number
+          description: What of it was applied to invoices
+        unappliedAmount:
+          type: number
+          description: What it still holds for the buyer, to apply to an open invoice
+
+    ApplyCreditNoteRequest:
+      type: object
+      required: [invoiceId]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 999999999999.99
+          description: What to apply; absent, as much as fits
+
+    DisputeInvoiceRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    ResolveInvoiceDisputeRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 500
+
+    SettleDiscrepancyRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    IssueCreditNoteRequest:
+      type: object
+      required: [invoiceId, lines, reason]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: Invoice lines and quantities to credit
+          items:
+            $ref: '#/components/schemas/CreditNoteLineRequest'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    CreditNoteLineRequest:
+      type: object
+      required: [invoiceLineId, qty]
+      properties:
+        invoiceLineId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+
+    CreditNoteResponse:
+      type: object
+      required: [creditNoteId, status, invoiceId, sellerEntityId, buyerEntityId, reason, netAmount, taxAmount,
+        grossAmount, lines]
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceDocNumber:
+          type: string
+        discrepancyId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        netAmount:
+          type: number
+        taxAmount:
+          type: number
+        grossAmount:
+          type: number
+        appliedAmount:
+          type: number
+          description: What of it was applied to invoices (to its own invoice as far as that was due, then by applyCreditNote)
+        unappliedAmount:
+          type: number
+          description: What it still holds for the buyer
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditNoteLineResponse'
+
+    CreditNoteLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, qty, unitPrice, taxRatePercent, taxAmount, lineTotal]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        qty:
+          type: number
+        unitPrice:
+          type: number
+        taxRatePercent:
+          type: number
+        taxAmount:
+          type: number
+        lineTotal:
+          type: number
+        invoiceLineId:
+          type: string
+          format: uuid
+
+    CreditNotePrintResponse:
+      type: object
+      required: [creditNoteId, url]
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+
+    DiscrepancyResponse:
+      type: object
+      required: [discrepancyId, status, kind, buyerEntityId, sellerEntityId, grnId, windowEndsAt, lines]
+      properties:
+        discrepancyId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RAISED, SETTLED]
+        kind:
+          type: string
+          enum: [SHORT, OVER, DAMAGED, MIXED]
+        buyerEntityId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        grnId:
+          type: string
+          format: uuid
+        grnDocNumber:
+          type: string
+        deliveryNoteId:
+          type: string
+          format: uuid
+        raisedAt:
+          type: string
+          format: date-time
+        windowEndsAt:
+          type: string
+          format: date-time
+        invoiceId:
+          type: string
+          format: uuid
+          description: The seller's invoice of the GRN, once issued
+        creditNoteId:
+          type: string
+          format: uuid
+          description: >
+            The credit note for damaged quantity the invoice charged, issued at settlement; none
+            when nothing billed needed crediting (a short quantity is never billed)
+        creditNoteDocNumber:
+          type: string
+        settledAt:
+          type: string
+          format: date-time
+        settledByUserId:
+          type: string
+          format: uuid
+        settlementReason:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscrepancyLineResponse'
+
+    DiscrepancyLineResponse:
+      type: object
+      required: [lineId, grnLineId, receivedQty, damagedQty, varianceQty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        grnLineId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        expectedQty:
+          type: number
+        receivedQty:
+          type: number
+        damagedQty:
+          type: number
+        varianceQty:
+          type: number
+          description: Received less expected; negative when short
+        unitPrice:
+          type: number
 
     InvoiceLineResponse:
       type: object
@@ -1265,5 +2525,534 @@ components:
         url:
           type: string
           format: uri
+
+    InvoicePaymentSummary:
+      type: object
+      required: [receiptId, status, amount]
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RECORDED, REVERSED, REVERSAL]
+        method:
+          type: string
+        receivedOn:
+          type: string
+          format: date
+        amount:
+          type: number
+          description: What this receipt settled of the invoice; negative on a reversal
+
+    RecordPaymentReceiptRequest:
+      type: object
+      required: [buyerEntityId, method, amount]
+      properties:
+        buyerEntityId:
+          type: string
+          format: uuid
+        method:
+          type: string
+          enum: [CASH, CHEQUE, TRANSFER, DEPOSIT]
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 999999999999.99
+        reference:
+          type: string
+          maxLength: 100
+          description: The bank reference, deposit slip or cash receipt book number
+        receivedOn:
+          type: string
+          format: date
+          description: When the money was received; today when left out
+        cheque:
+          $ref: '#/components/schemas/ChequeRequest'
+        settlements:
+          type: array
+          maxItems: 200
+          description: Chosen invoices and amounts; left out, the open invoices are settled oldest first
+          items:
+            $ref: '#/components/schemas/SettlementRequest'
+
+    ApplyPaymentReceiptRequest:
+      type: object
+      properties:
+        settlements:
+          type: array
+          maxItems: 200
+          description: Chosen invoices and amounts; left out, the open invoices are settled oldest first
+          items:
+            $ref: '#/components/schemas/SettlementRequest'
+
+    PaymentReceiptPrintResponse:
+      type: object
+      required: [receiptId, url]
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+
+    ChequeRequest:
+      type: object
+      required: [bank, chequeNo, dated]
+      properties:
+        bank:
+          type: string
+          minLength: 1
+          maxLength: 100
+        chequeNo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        dated:
+          type: string
+          format: date
+
+    SettlementRequest:
+      type: object
+      required: [invoiceId, amount]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          exclusiveMinimum: 0
+
+    ChequeOutcomeRequest:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [CLEARED, BOUNCED]
+        reason:
+          type: string
+          maxLength: 500
+
+    PaymentReceiptResponse:
+      type: object
+      required: [receiptId, status, sellerEntityId, buyerEntityId, method, receivedOn, amount, unappliedAmount,
+        allocations]
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RECORDED, REVERSED, REVERSAL]
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        method:
+          type: string
+        reference:
+          type: string
+        receivedOn:
+          type: string
+          format: date
+        issuedAt:
+          type: string
+          format: date-time
+        amount:
+          type: number
+        unappliedAmount:
+          type: number
+          description: What stays on the buyer's account; zero once reversed
+        reversalOf:
+          type: string
+          format: uuid
+          description: On a reversal, the receipt it reverses
+        reversedBy:
+          type: string
+          format: uuid
+          description: On a reversed receipt, its reversal
+        reason:
+          type: string
+        cheque:
+          $ref: '#/components/schemas/ChequeResponse'
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AllocationResponse'
+
+    ChequeResponse:
+      type: object
+      required: [bank, chequeNo, dated]
+      properties:
+        bank:
+          type: string
+        chequeNo:
+          type: string
+        dated:
+          type: string
+          format: date
+        outcome:
+          type: string
+          enum: [CLEARED, BOUNCED]
+        outcomeAt:
+          type: string
+          format: date-time
+
+    AllocationResponse:
+      type: object
+      required: [invoiceId, amount]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        amount:
+          type: number
+
+    ExposureResponse:
+      type: object
+      required: [relationshipId, sellerEntityId, buyerEntityId, openInvoices, acceptedNotInvoiced,
+        unappliedReceipts, amount, asOf]
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        creditLimit:
+          type: number
+          description: The relationship's credit limit (M1); absent when it sets none
+        openInvoices:
+          type: number
+        acceptedNotInvoiced:
+          type: number
+        unappliedReceipts:
+          type: number
+        unappliedCredits:
+          type: number
+          description: What the seller's credit notes to the buyer hold unapplied; subtracted
+        amount:
+          type: number
+        warnThresholdPercent:
+          type: integer
+          description: The highest configured percentage of the limit the amount has reached
+        asOf:
+          type: string
+          format: date-time
+
+    DecisionReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    RaiseClaimRequest:
+      type: object
+      required: [grnId, kind, lines]
+      properties:
+        grnId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [DAMAGED, EXPIRED_ON_ARRIVAL, WRONG_GOODS, QUALITY]
+        returnRequested:
+          type: boolean
+          default: false
+          description: The buyer offers the goods back; the seller decides
+        note:
+          type: string
+          maxLength: 500
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/ClaimLineRequest'
+
+    ClaimLineRequest:
+      type: object
+      required: [grnLineId, qty]
+      properties:
+        grnLineId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+
+    ClaimPhotoRequest:
+      type: object
+      required: [contentType]
+      properties:
+        contentType:
+          type: string
+          maxLength: 100
+        contentLength:
+          type: integer
+          format: int64
+          minimum: 1
+
+    ClaimPhotoResponse:
+      type: object
+      required: [attachmentId, url, expiresAt]
+      properties:
+        attachmentId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    ApproveClaimRequest:
+      type: object
+      properties:
+        findings:
+          type: string
+          maxLength: 500
+        returnRequired:
+          type: boolean
+          default: false
+        lines:
+          type: array
+          maxItems: 200
+          description: What is accepted of each claimed line; none accepts every line in full
+          items:
+            $ref: '#/components/schemas/ApproveClaimLineRequest'
+
+    ApproveClaimLineRequest:
+      type: object
+      required: [claimLineId, qty]
+      properties:
+        claimLineId:
+          type: string
+          format: uuid
+        qty:
+          type: number
+          minimum: 0
+          maximum: 99999999999
+
+    ClaimResponse:
+      type: object
+      required: [claimId, status, kind, buyerEntityId, sellerEntityId, grnId, windowEndsAt, returnRequested,
+                 returnRequired, photos, lines]
+      properties:
+        claimId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+          enum: [RAISED, APPROVED, REJECTED]
+        kind:
+          type: string
+          enum: [DAMAGED, EXPIRED_ON_ARRIVAL, WRONG_GOODS, QUALITY]
+        buyerEntityId:
+          type: string
+          format: uuid
+        sellerEntityId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        grnId:
+          type: string
+          format: uuid
+        grnDocNumber:
+          type: string
+        raisedAt:
+          type: string
+          format: date-time
+        windowEndsAt:
+          type: string
+          format: date-time
+        returnRequested:
+          type: boolean
+        note:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+          description: The seller's invoice of the GRN, once issued
+        findings:
+          type: string
+        rejectReason:
+          type: string
+        returnRequired:
+          type: boolean
+        creditNoteId:
+          type: string
+          format: uuid
+        creditNoteDocNumber:
+          type: string
+        decidedByUserId:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        returnedAt:
+          type: string
+          format: date-time
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimPhotoStatusResponse'
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimLineResponse'
+
+    ClaimPhotoStatusResponse:
+      type: object
+      required: [attachmentId, status]
+      properties:
+        attachmentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, COMPLETE, FAILED]
+
+    ClaimLineResponse:
+      type: object
+      required: [claimLineId, grnLineId, skuId, uomCode, claimedQty]
+      properties:
+        claimLineId:
+          type: string
+          format: uuid
+        grnLineId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        claimedQty:
+          type: number
+        approvedQty:
+          type: number
+        unitPrice:
+          type: number
+
+    ApproveTransferRequestRequest:
+      type: object
+      properties:
+        fromLocationId:
+          type: string
+          format: uuid
+          description: The society's location that gives the stock; left out, the one the shop named
+
+    RequestTransferRequest:
+      type: object
+      required: [lines]
+      properties:
+        fromLocationId:
+          type: string
+          format: uuid
+          description: The stores asked, when the shop knows them; left out, the society names them when it decides
+        toLocationId:
+          type: string
+          format: uuid
+          description: The shop that asks; a shop session's own location when left out
+        reason:
+          type: string
+          maxLength: 500
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/TransferRequestLineRequest'
+
+    TransferRequestLineRequest:
+      type: object
+      required: [skuId, qty]
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+
+    TransferRequestResponse:
+      type: object
+      required: [requestId, toLocationId, status, requestedAt, lines]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        fromLocationId:
+          type: string
+          format: uuid
+        toLocationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [REQUESTED, APPROVED, REJECTED]
+        reason:
+          type: string
+        requestedBy:
+          type: string
+          format: uuid
+        requestedAt:
+          type: string
+          format: date-time
+        rejectReason:
+          type: string
+        decidedBy:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        transferId:
+          type: string
+          format: uuid
+          description: The M5 transfer that fulfils the approved request, once the stores issued it
+        transferStatus:
+          type: string
+          enum: [IN_TRANSIT, RECEIVED]
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferRequestLineResponse'
+
+    TransferRequestLineResponse:
+      type: object
+      required: [lineId, skuId, qty]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        qty:
+          type: number
 
     # @@SCHEMAS@@

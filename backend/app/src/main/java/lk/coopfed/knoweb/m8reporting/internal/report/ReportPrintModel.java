@@ -96,11 +96,15 @@ class ReportPrintModel {
             case ReportCatalogue.MONEY -> formats.money(new BigDecimal(value), locale);
             case ReportCatalogue.QTY -> formats.quantity(new BigDecimal(value), locale);
             case ReportCatalogue.DATE -> formats.date(LocalDate.parse(value));
+            case ReportCatalogue.PERCENT -> value + " %";
             default -> value;
         };
     }
 
     private static boolean numeric(Column column) {
-        return column.kind().equals(ReportCatalogue.MONEY) || column.kind().equals(ReportCatalogue.QTY);
+        return column.kind().equals(ReportCatalogue.MONEY)
+                || column.kind().equals(ReportCatalogue.QTY)
+                || column.kind().equals(ReportCatalogue.COUNT)
+                || column.kind().equals(ReportCatalogue.PERCENT);
     }
 }

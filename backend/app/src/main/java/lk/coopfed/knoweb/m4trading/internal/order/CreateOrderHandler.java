@@ -1,9 +1,6 @@
 package lk.coopfed.knoweb.m4trading.internal.order;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,8 +19,6 @@ import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
-import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
-import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m4trading.api.CreateOrder;
 import lk.coopfed.knoweb.m4trading.api.OrderCreated;
 import lk.coopfed.knoweb.m4trading.api.OrderLineSummary;
@@ -55,8 +50,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
     private final DocumentBaseRepository documents;
     private final RelationshipQueries relationships;
     private final PartyQueries parties;
-    private final CatalogueQueries catalogue;
-    private final TradePricing pricing;
+    private final OrderLinePricer pricer;
     private final TradingClock clock;
     private final AuditFacade audit;
     private final EventPublisher events;
@@ -66,8 +60,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
             DocumentBaseRepository documents,
             RelationshipQueries relationships,
             PartyQueries parties,
-            CatalogueQueries catalogue,
-            TradePricing pricing,
+            OrderLinePricer pricer,
             TradingClock clock,
             AuditFacade audit,
             EventPublisher events) {
@@ -75,8 +68,7 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
         this.documents = documents;
         this.relationships = relationships;
         this.parties = parties;
-        this.catalogue = catalogue;
-        this.pricing = pricing;
+        this.pricer = pricer;
         this.clock = clock;
         this.audit = audit;
         this.events = events;
@@ -112,41 +104,10 @@ public class CreateOrderHandler implements Handles<CreateOrder, UUID> {
                     .filter(location -> buyer.equals(location.ownerEntityId()))
                     .orElseThrow(() -> new ProblemException("m4.order.deliver_to_unknown"));
         }
-        if (command.lines() == null || command.lines().isEmpty()) {
-            throw new ProblemException("m4.order.lines_required");
-        }
-
         UUID orderId = Ids.next();
-        List<DocumentLineRecord> lines = new ArrayList<>();
-        List<OrderLineSummary> summary = new ArrayList<>();
-        int lineNo = 0;
-        for (CreateOrder.Line line : command.lines()) {
-            UUID skuId = TradingGuards.required(line.skuId(), "skuId");
-            SkuView sku = catalogue
-                    .getSku(skuId, scope)
-                    .orElseThrow(() -> new ProblemException("m4.order.sku_not_found", Map.of("skuId", skuId)));
-            if (!TradingGuards.tradable(sku)) {
-                throw new ProblemException("m4.order.sku_not_active", Map.of("skuId", skuId));
-            }
-            String uom = line.uomCode() == null
-                    ? sku.baseUomCode()
-                    : line.uomCode().strip().toUpperCase();
-            if (!uom.equals(sku.baseUomCode())) {
-                throw new ProblemException("m4.order.uom_invalid", Map.of("skuId", skuId, "uomCode", uom));
-            }
-            TradingGuards.requirePositive(line.qty(), "m4.order.qty_not_positive", skuId);
-
-            BigDecimal price = pricing.resolve(
-                            relationship.relationshipId(), seller, buyer, skuId, uom, line.qty(), today, scope)
-                    .map(TradePricing.TradePrice::unitPrice)
-                    .orElse(null);
-            BigDecimal total = price == null ? null : price.multiply(line.qty()).setScale(2, RoundingMode.HALF_UP);
-            UUID lineId = Ids.next();
-            lineNo++;
-            lines.add(TradingDocuments.line(
-                    lineId, orderId, lineNo, skuId, null, uom, line.qty(), price, null, null, total, null, null));
-            summary.add(new OrderLineSummary(lineId, lineNo, skuId, uom, line.qty(), null, null));
-        }
+        OrderLinePricer.Priced priced = pricer.price(orderId, command.lines(), relationship, buyer, today, scope);
+        List<DocumentLineRecord> lines = priced.lines();
+        List<OrderLineSummary> summary = priced.summary();
 
         documents.save(TradingDocuments.draft(
                 orderId, OrderTypeHandler.ORD, buyer, seller, null, scope.userId(), null, command.notes()));

@@ -5,18 +5,27 @@
 // M4-11 (demo scope, doc 30 section 5.4; 24A section 8): the trading desk with the buyer's
 // requisition book and the seller's order desk, the order card (submit, accept, reject), the
 // delivery note (draft, issue, dispatch), the goods received note (count, confirm) and the
-// invoice (issue, read, print). The other screens of 24A section 8 follow after the demo
+// invoice (issue, read, print, dispute), the discrepancy a short GRN raises and the credit note
+// that settles it (M4-08, 28 Sep); the payment receipts, the account of each relationship and the
+// exposure against the credit limit (M4-07, M4-09, 29 Sep). The other screens of 24A section 8 follow after the demo
 // (docs/PLAN_TO_M2.md, "Deferred after the demo").
+// M4-06 (29 Sep): the claim a buyer raises on a confirmed GRN and the seller decides.
 
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
+import { AccountPage } from "./AccountPage";
+import { ClaimPage } from "./ClaimPage";
+import { CreditNotePage } from "./CreditNotePage";
 import { DeliveryNotePage } from "./DeliveryNotePage";
+import { DiscrepancyPage } from "./DiscrepancyPage";
 import { GrnPage } from "./GrnPage";
 import { InvoicePage } from "./InvoicePage";
+import { NewClaimPage } from "./NewClaimPage";
 import { NewDeliveryNotePage } from "./NewDeliveryNotePage";
 import { NewGrnPage } from "./NewGrnPage";
 import { NewOrderPage } from "./NewOrderPage";
 import { OrderPage } from "./OrderPage";
+import { PaymentPage } from "./PaymentPage";
 import { TradingPage } from "./TradingPage";
 
 export const tradingModule: ModuleDefinition = {
@@ -51,7 +60,20 @@ export const tradingModule: ModuleDefinition = {
       )
     },
     { path: "trading/grns/:grnId", element: <GrnPage /> },
-    { path: "trading/invoices/:invoiceId", element: <InvoicePage /> }
+    { path: "trading/invoices/:invoiceId", element: <InvoicePage /> },
+    { path: "trading/discrepancies/:discrepancyId", element: <DiscrepancyPage /> },
+    {
+      path: "trading/claims/new",
+      element: (
+        <RequirePermission anyOf={["del.claim.raise"]}>
+          <NewClaimPage />
+        </RequirePermission>
+      )
+    },
+    { path: "trading/claims/:claimId", element: <ClaimPage /> },
+    { path: "trading/credit-notes/:creditNoteId", element: <CreditNotePage /> },
+    { path: "trading/payments/:receiptId", element: <PaymentPage /> },
+    { path: "trading/accounts/:role/:counterpartyId", element: <AccountPage /> }
   ],
 
   // The label is a message id of trading.messages.json, never literal text.
@@ -67,6 +89,11 @@ export const tradingModule: ModuleDefinition = {
     "del.note.issue",
     "del.note.dispatch",
     "shop.grn.confirm",
-    "bil.invoice.issue"
+    "bil.invoice.issue",
+    "bil.invoice.dispute",
+    "bil.creditnote.issue",
+    "bil.payment.record",
+    "del.claim.raise",
+    "del.claim.decide"
   ]
 };

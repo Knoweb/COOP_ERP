@@ -151,6 +151,18 @@ class A4RendererPostgresIntegrationTest extends PostgresIntegrationTest {
         refused(
                 () -> renderer.presignGet("objects/m2catalogue/" + ENTITY + "/x.pdf", own(ENTITY)),
                 "report.scope_mismatch");
+
+        // A party to the document (the buyer of the seller's invoice) gets the link of the owner's
+        // key it names; a key that is not the owner's report is refused.
+        assertThat(renderer.presignGetOfParty(rendered.objectKey(), ENTITY, own(STRANGER)))
+                .isNotNull();
+        refused(
+                () -> renderer.presignGetOfParty(rendered.objectKey(), STRANGER, own(STRANGER)),
+                "report.scope_mismatch");
+        refused(
+                () -> renderer.presignGetOfParty("objects/m2catalogue/" + ENTITY + "/x.pdf", ENTITY, own(STRANGER)),
+                "report.scope_mismatch");
+        refused(() -> renderer.presignGetOfParty(rendered.objectKey(), ENTITY, null), "report.scope_mismatch");
     }
 
     @Test

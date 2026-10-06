@@ -153,6 +153,106 @@ class PricingEngineTest {
         assertNull(fresh.ruleId)
     }
 
+    private val markdown30 = Rule(
+        ruleId = id(25), kind = RuleKind.EXPIRY_MARKDOWN, priority = 10,
+        validFrom = LocalDate.of(2026, 1, 1), validTo = null, skuId = sku, daysToExpiry = 5,
+        benefitKind = BenefitKind.PERCENT_OFF, benefitValue = BigDecimal("30")
+    )
+
+    private fun resolveOne(ix: PricingSnapshotIndex, input: LineInput = LineInput(sku, "EA", Quantity.of("1"))) =
+        BasketResolver.resolve(Basket(listOf(input)), ix, today, TenderKind.CARD).lines.single()
+
+    @Test
+    fun underAutoLowestTheMarkdownFollowsTheFefoFirstBatchNotTheLowestMrp() {
+        // The near-expiry units carry the higher MRP; the lowest MRP is on fresh stock.
+        val nearHigh = batch1040.copy(expiry = today.plusDays(2))
+        val line = resolveOne(index(rules = listOf(markdown30), batches = listOf(batch980, nearHigh)))
+        assertTrue(line.markdown)
+        assertEquals(nearHigh.batchId, line.batch?.batchId, "the line is stamped with the marked-down batch")
+        assertEquals(Money.of("980.00"), line.mrpApplied, "mrpApplied stays the policy's MRP")
+        assertEquals(Money.of("686.00"), line.unitPrice)
+    }
+
+    @Test
+    fun withoutAMarkdownTheLineKeepsTheLowestMrpBatch() {
+        val line = resolveOne(index(rules = listOf(markdown30)))
+        assertNull(line.ruleId)
+        assertEquals(batch980.batchId, line.batch?.batchId)
+    }
+
+    @Test
+    fun theScannedBatchDecidesTheMarkdownUnderBarcodeResolved() {
+        val nearHigh = batch1040.copy(expiry = today.plusDays(2))
+        val ix = index(policy = Policy(PolicyKind.BARCODE_RESOLVED), rules = listOf(markdown30), batches = listOf(batch980, nearHigh))
+        val fresh = resolveOne(ix, LineInput(sku, "EA", Quantity.of("1"), scannedBatchId = batch980.batchId))
+        assertNull(fresh.ruleId, "the scanned batch is fresh, so the near-expiry batch elsewhere does not count")
+        assertEquals(batch980.batchId, fresh.batch?.batchId)
+
+        val near = resolveOne(ix, LineInput(sku, "EA", Quantity.of("1"), scannedBatchId = nearHigh.batchId))
+        assertTrue(near.markdown)
+        assertEquals(nearHigh.batchId, near.batch?.batchId)
+        assertEquals(Money.of("728.00"), near.unitPrice)
+    }
+
+    @Test
+    fun thePickedBatchDecidesTheMarkdownUnderPicker() {
+        val nearHigh = batch1040.copy(expiry = today.plusDays(2))
+        val ix = index(
+            policy = Policy(PolicyKind.PICKER, Money.of("20.00"), BigDecimal("5")),
+            rules = listOf(markdown30), batches = listOf(batch980, nearHigh)
+        )
+        val picked = resolveOne(ix, LineInput(sku, "EA", Quantity.of("1"), pickedBatchId = batch980.batchId))
+        assertNull(picked.ruleId)
+        val pickedNear = resolveOne(ix, LineInput(sku, "EA", Quantity.of("1"), pickedBatchId = nearHigh.batchId))
+        assertTrue(pickedNear.markdown)
+        assertEquals(nearHigh.batchId, pickedNear.batch?.batchId)
+    }
+
+    @Test
+    fun aMarkdownNeverAppliesPastExpiry() {
+        val expired = batch980.copy(expiry = today.minusDays(1))
+        val ix = index(policy = Policy(PolicyKind.BARCODE_RESOLVED), rules = listOf(markdown30), batches = listOf(expired, batch1040))
+        val line = resolveOne(ix, LineInput(sku, "EA", Quantity.of("1"), scannedBatchId = expired.batchId))
+        assertNull(line.ruleId, "days < 0 never matches")
+
+        val onTheDay = batch980.copy(expiry = today)
+        val lastDay = resolveOne(index(rules = listOf(markdown30), batches = listOf(onTheDay)))
+        assertTrue(lastDay.markdown, "days = 0: sellable through the printed date, and marked down")
+    }
+
+    @Test
+    fun anExpiredBatchIsNotAPriceCandidate() {
+        val expiredLow = batch980.copy(expiry = today.minusDays(1))
+        val line = resolveOne(index(batches = listOf(expiredLow, batch1040)))
+        assertEquals(batch1040.batchId, line.batch?.batchId)
+        assertEquals(Money.of("1040.00"), line.unitPrice, "the expired batch's lower MRP does not set the price")
+        assertFalse(PriceResolver.isCandidate(expiredLow, today))
+        assertTrue(PriceResolver.isCandidate(expiredLow, today.minusDays(1)))
+        assertFalse(PriceResolver.isCandidate(batch1040.copy(onHand = Quantity.ZERO), today))
+        assertTrue(PriceResolver.isCandidate(batch1040.copy(expiry = null), today))
+    }
+
+    @Test
+    fun aZeroBenefitRuleIsDroppedBeforePrecedence() {
+        // Priority 1, but a fixed price above the base price gives this line nothing.
+        val fixedAbove = Rule(
+            ruleId = id(26), kind = RuleKind.TIME_LIMITED_PRICE, priority = 1,
+            validFrom = LocalDate.of(2026, 1, 1), validTo = null, skuId = sku,
+            benefitKind = BenefitKind.FIXED_PRICE, benefitValue = BigDecimal("1200.00")
+        )
+        val line = resolveOne(index(rules = listOf(fixedAbove, fivePercent)))
+        assertEquals(fivePercent.ruleId, line.ruleId)
+        assertEquals(Money.of("931.00"), line.unitPrice)
+    }
+
+    @Test
+    fun theResultCarriesEngineVersionTwo() {
+        val result = BasketResolver.resolve(
+            Basket(listOf(LineInput(sku, "EA", Quantity.of("1")))), index(), today, TenderKind.CARD
+        )
+        assertEquals("0.2.0", result.engineVersion)
+    }
+
     @Test
     fun theLowerPriorityNumberWinsAndBenefitsNeverCompound() {
         val tenOff = fivePercent.copy(ruleId = id(23), priority = 200, benefitValue = BigDecimal("10"))

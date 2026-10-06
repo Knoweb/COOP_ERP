@@ -4,7 +4,7 @@ Standing instructions for working in this repository. They apply to every person
 
 ## What this system is (five sentences)
 
-A national retail and distribution platform for Sri Lanka's cooperative federation: the Federation (COOPFED) sells to about 75 distributors, who sell to about 800 multi-purpose cooperative societies (MPCS), who run about 4,000 shops growing to 10,000. Goods are ordered, delivered, received, sold at the till and paid for; stock is counted, written off and repacked; customers buy on credit (the khata); everything is reported to the federation. Shops must keep selling for two days with no connectivity, in Sinhala, Tamil or English. The backend is one Spring Boot application divided into nine modules with strict boundaries; the till is a native Android application; they talk through a sync contract that never merges data. Version 1 records money and never moves it.
+A national retail and distribution platform for Sri Lanka's cooperative federation: the Federation (COOPFED) sells to about 75 distributors, who sell to about 800 multi-purpose cooperative societies (MPCS), who run about 4,000 shops growing to 10,000. Goods are ordered, delivered, received, sold at the till and paid for; stock is counted, written off and repacked; customers buy on credit (the khata); everything is reported to the federation. Shops must keep selling for two days with no connectivity, in Sinhala, Tamil or English. The backend is one Spring Boot application divided into nine modules with strict boundaries; the till is one Kotlin Multiplatform application for Android, Windows and Linux (CR-30-1); they talk through a sync contract that never merges data. Version 1 records money and never moves it.
 
 ## Three ideas that explain every design choice
 
@@ -37,7 +37,7 @@ If two documents disagree: the register decides versions; the design document's 
 
 ## Stack (fixed)
 
-Java 21, Spring Boot 3.5, Spring Modulith 1.4 (CR-17A-2; 17A section 3 says 3.3 / 1.2 until it is re-issued), PostgreSQL 16 (ICU collations, `pg_trgm`, `btree_gist`, `pgcrypto`), Flyway, Gradle (Kotlin DSL), Testcontainers, ArchUnit. Web: React 18, TypeScript 5, Vite, TanStack Query, OpenAPI-generated clients. Till: Kotlin 2, Jetpack Compose, Room + SQLCipher, WorkManager, Hilt, minSdk 30. Shared engine: pure Kotlin JVM library used by backend and till. Local: docker compose (PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit). Identity provider and broker are assumptions behind interfaces (`IdentityProviderClient`, `BrokerAdapter`); do not couple code to Keycloak or RabbitMQ specifics.
+Java 21, Spring Boot 3.5, Spring Modulith 1.4 (CR-17A-2; 17A section 3 says 3.3 / 1.2 until it is re-issued), PostgreSQL 16 (ICU collations, `pg_trgm`, `btree_gist`, `pgcrypto`), Flyway, Gradle (Kotlin DSL), Testcontainers, ArchUnit. Web: React 18, TypeScript 5, Vite, TanStack Query, OpenAPI-generated clients. Till (CR-30-1, replacing 17A's Android-only stack): Kotlin Multiplatform with Compose Multiplatform, Android (primary) and desktop JVM for Windows 10/11 and Linux, business rules in `commonMain`, SQLDelight over encrypted SQLite (SQLCipher on Android, sqlite-jdbc-crypt on desktop), versions pinned in `till/gradle/libs.versions.toml`; see `till/README.md`. Shared engine: pure Kotlin JVM library used by backend and till. Local: docker compose (PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak, Mailpit). Identity provider and broker are assumptions behind interfaces (`IdentityProviderClient`, `BrokerAdapter`); do not couple code to Keycloak or RabbitMQ specifics.
 
 ## Repository layout (from 17A)
 
@@ -49,7 +49,7 @@ backend/app/src/main/java/lk/coopfed/knoweb/
 backend/app/src/main/resources/db/migration/<module>/   openapi/<module>.yaml   seed/<module>/   i18n/<module>/{en,si,ta}.json
 backend/shared-engine/                                   pure Kotlin: money, tax, price resolution, rules, envelope, counters
 web/src/shell/  web/src/modules/<module>/  web/src/generated/
-till/app/ till/core/ till/peripherals/ till/sync/
+till/core/ till/sync/ till/db/ till/peripherals/ till/peripherals-jvm/ till/render/ till/ui/ till/app/ (Android) till/desktop/
 docs/design/  docs/adr/  docs/sources/                   design PDFs, ADR markdown mirrors, document sources
 ```
 

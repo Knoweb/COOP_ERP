@@ -73,7 +73,30 @@ public abstract class Projection {
         }
         apply(event, scope);
         state.advance(name, consumer, event, scope);
+        // Counted once the rows are committed, so a dashboard never caches what is not yet there.
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            APPLIED.incrementAndGet();
+                        }
+                    });
+        } else {
+            APPLIED.incrementAndGet();
+        }
     }
+
+    /**
+     * How many events the projections of this instance have applied since it started. The
+     * dashboard's cache keys on it, so an event applied here shows at once; one applied by
+     * another instance (the worker) shows once the cache's time is up.
+     */
+    public static long applied() {
+        return APPLIED.get();
+    }
+
+    private static final java.util.concurrent.atomic.AtomicLong APPLIED = new java.util.concurrent.atomic.AtomicLong();
 
     /** Applies one event; must change nothing when applied a second time. */
     protected abstract void apply(ProjectionEvent event, ScopeContext scope);

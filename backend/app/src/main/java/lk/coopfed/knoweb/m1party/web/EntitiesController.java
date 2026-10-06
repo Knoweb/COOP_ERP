@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.m1party.api.SuspendEntity;
 import lk.coopfed.knoweb.m1party.query.EntityFilter;
 import lk.coopfed.knoweb.m1party.query.EntityView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m1party.query.UserQueries;
 import lk.coopfed.knoweb.m1party.web.generated.AppointResponsibleOfficerRequest;
 import lk.coopfed.knoweb.m1party.web.generated.EntitiesApi;
 import lk.coopfed.knoweb.m1party.web.generated.EntityPage;
@@ -32,6 +33,7 @@ class EntitiesController implements EntitiesApi {
     private final Handles<SuspendEntity, UUID> suspendEntity;
     private final Handles<ReinstateEntity, UUID> reinstateEntity;
     private final PartyQueries queries;
+    private final UserQueries users;
     private final CurrentScope currentScope;
 
     EntitiesController(
@@ -41,6 +43,7 @@ class EntitiesController implements EntitiesApi {
             Handles<SuspendEntity, UUID> suspendEntity,
             Handles<ReinstateEntity, UUID> reinstateEntity,
             PartyQueries queries,
+            UserQueries users,
             CurrentScope currentScope) {
 
         this.registerEntity = registerEntity;
@@ -49,6 +52,7 @@ class EntitiesController implements EntitiesApi {
         this.suspendEntity = suspendEntity;
         this.reinstateEntity = reinstateEntity;
         this.queries = queries;
+        this.users = users;
         this.currentScope = currentScope;
     }
 
@@ -117,8 +121,9 @@ class EntitiesController implements EntitiesApi {
     @Override
     public ResponseEntity<EntityResponse> getEntity(UUID entityId) {
 
-        return queries.getEntity(entityId, currentScope.get())
-                .map(EntitiesController::toResponse)
+        ScopeContext scope = currentScope.get();
+        return queries.getEntity(entityId, scope)
+                .map(view -> withOfficerName(toResponse(view), view, scope))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -140,6 +145,19 @@ class EntitiesController implements EntitiesApi {
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    // The society card shows the officer by name, not by id (demo walkthrough, 29 September 2026).
+    // Only the single-entity read resolves it: a list of 800 societies would cost 800 lookups for
+    // a column nobody shows. The name is part of the register, so a caller who read the entity
+    // reads it too, a Federation session included, without seeing the officer's user record
+    // (m1security V0017). Unresolved, the name stays null and the card shows "Not set", never the id.
+    private EntityResponse withOfficerName(EntityResponse response, EntityView view, ScopeContext scope) {
+        if (view.responsibleOfficerUserId() != null) {
+            users.appointedOfficerName(view.entityId(), view.responsibleOfficerUserId(), scope)
+                    .ifPresent(response::setResponsibleOfficerName);
+        }
+        return response;
     }
 
     private static EntityResponse toResponse(EntityView view) {

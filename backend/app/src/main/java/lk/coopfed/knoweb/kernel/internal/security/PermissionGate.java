@@ -39,7 +39,7 @@ public class PermissionGate {
     public PermissionGate(
             PermissionResolver permissions,
             StepUp stepUp,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions,
+            @Value("${coop-erp.security.enforce-permissions:true}") boolean enforcePermissions,
             @Value("${coop-erp.security.oidc.step-up-url:}") String stepUpUrl) {
         this.permissions = permissions;
         this.stepUp = stepUp;

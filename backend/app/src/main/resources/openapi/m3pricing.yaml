@@ -1,5 +1,7 @@
 # OpenAPI slice of the pricing module (23A section 5). Built so far: TRADE price lists (M3-04)
-# and the trade price of an order line. The other operations of 23A section 5 arrive with their
+# and the trade price of an order line; discount rules: author, activate, withdraw (M3-05);
+# control prices, the MRP policy, RETAIL and ADVISORY lists and the retail price at a shop
+# (M3-06, M3-07). The other operations of 23A section 5 arrive with their
 # tickets. Rules every slice obeys (AGENTS.md): x-permission on every operation, the same string
 # as the @CommandHandler; Idempotency-Key on every mutating operation; errors are problem
 # documents whose `code` is a message id; the shape of a request lives here and the kernel
@@ -7,7 +9,7 @@
 openapi: 3.1.0
 info:
   title: COOP ERP Pricing API
-  version: 0.2.0
+  version: 0.4.0
 paths:
   /v1/pricing/lists:
     get:
@@ -40,8 +42,10 @@ paths:
       operationId: createPriceList
       summary: Create a price list, version 1, as a draft of the caller's entity
       description: >
-        Codes this operation can answer with 422: m3.price_list.kind_not_available (only TRADE is
-        available so far), scope.invalid (not an entity-wide OWN scope), request.field.required.
+        Codes this operation can answer with 422: m3.price_list.kind_not_available,
+        m3.price_list.retail_mpcs_only (a RETAIL list is a society's), m3.price_list.retail_exists
+        (one per society; draft a new version instead), m3.price_list.advisory_federation_only,
+        scope.invalid (not an entity-wide OWN scope), request.field.required.
       x-permission: prc.pricelist.author
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -124,8 +128,11 @@ paths:
         Answers one outcome per line, in the order given. The lines are stored only when every
         line is accepted (saved true); a refused line carries its reason (a message id:
         m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing,
-        .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete). An
-        accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the
+        .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete; and
+        for RETAIL and ADVISORY .above_control_price, .above_shelf_mrp (RETAIL: the lowest printed MRP in
+        stock at the society's locations), .retail_precision, .tier_not_allowed; and for RETAIL
+        .price_zero: a shelf price is above zero, CR-23A-1), with the binding
+        ceiling in ceilingKind, ceilingValue and ceilingRef. An accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the
         SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with
         422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
       x-permission: prc.pricelist.author
@@ -155,7 +162,8 @@ paths:
       operationId: publishPriceList
       summary: Publish a draft from a date; the previous published version is superseded
       description: >
-        A second factor is required (TRADE). Codes this operation can answer with 422:
+        A second factor is required (every kind). The lines are checked again against the
+        ceilings in force on applyFrom. Codes this operation can answer with 422:
         m3.price_list.not_found, m3.price_list.not_draft, m3.price_list.apply_from_past,
         m3.price_list.no_lines, m3.price_list.lines_invalid, scope.invalid.
       x-permission: prc.pricelist.publish
@@ -213,8 +221,391 @@ paths:
               schema: { $ref: '#/components/schemas/TradePriceResponse' }
         '404':
           description: No visible relationship, no bound list in force, or no line for the SKU and unit
+  /v1/pricing/resolve/retail:
+    get:
+      tags: [Pricing]
+      operationId: resolveRetailPrice
+      summary: The shelf price of a SKU at a shop on a date (tax-inclusive, per unit), under the MRP and control ceilings
+      description: >
+        Steps 1 to 4 of doc 23 section 3.5 through the shared engine: the society's published
+        RETAIL line in force, the printed MRP of the batches in stock at the location under the
+        effective MRP policy, and the control price; the lowest of them, with the bound that set it
+        (capReason). Rules are not applied. 23A section 5 has resolveBasket (POST, a whole basket);
+        this is its one-line, read-only form, a GET like resolveTradePrice.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uom
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: qty
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The price, or why the item is not sellable there
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetailPriceResponse' }
+        '404':
+          description: The location or the SKU is not visible in the caller's scope
+  /v1/pricing/advisory-lines:
+    get:
+      tags: [Pricing]
+      operationId: listAdvisoryLines
+      summary: The Federation's published ADVISORY prices in force on a date (read by every scope)
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The advisory lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PriceListLineResponse' }
+  /v1/pricing/control-prices:
+    get:
+      tags: [Pricing]
+      operationId: listControlPrices
+      summary: The gazetted control prices, newest first by SKU; those in force on a date when one is given
+      description: >
+        Without inForceOn the answer is the whole history (a row is never removed: a later gazette
+        closes it, a rescission ends it). Read by every authenticated scope.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: skuId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: inForceOn
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The control prices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ControlPriceResponse' }
+    post:
+      tags: [Pricing]
+      operationId: enterControlPrice
+      summary: Enter a gazetted control price for a SKU from a date (the Federation, with a second factor)
+      description: >
+        The ceiling of the same SKU in force on effectiveFrom is closed at effectiveFrom - 1.
+        effectiveFrom may be up to pricing.control_price_backdate_days (default 7) before today, to
+        the gazette's own date; such an entry is audited for review. Codes
+        this operation can answer with 422: m3.control_price.federation_only,
+        m3.control_price.sku_not_active, m3.control_price.uom_invalid,
+        m3.control_price.ceiling_invalid, m3.control_price.dates_invalid,
+        m3.control_price.effective_from_past, m3.control_price.overlap,
+        request.field.required, scope.invalid.
+      x-permission: prc.controlprice.enter
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnterControlPriceRequest' }
+      responses:
+        '201':
+          description: Entered
+          headers:
+            Location:
+              description: Address of the control price
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ControlPriceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/control-prices/{controlPriceId}/rescind:
+    parameters:
+      - in: path
+        name: controlPriceId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: rescindControlPrice
+      summary: End a control price early, by the gazette that withdraws it
+      description: >
+        Codes this operation can answer with 422: m3.control_price.federation_only,
+        m3.control_price.not_found, m3.control_price.last_day_invalid,
+        m3.control_price.last_day_past, request.field.required, scope.invalid.
+      x-permission: prc.controlprice.enter
+      x-mfa: true
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RescindControlPriceRequest' }
+      responses:
+        '200':
+          description: The control price with its new last day
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ControlPriceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/mrp-policies:
+    get:
+      tags: [Pricing]
+      operationId: listMrpPolicies
+      summary: The MRP policies that apply at the caller's entity (its own, and the Federation's where it has none)
+      description: A SKU not listed has the default policy (pricing.default_mrp_policy).
+      x-permission: prc.pricelist.view
+      responses:
+        '200':
+          description: The policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MrpPolicyResponse' }
+    put:
+      tags: [Pricing]
+      operationId: setMrpPolicy
+      summary: Set the caller's MRP policy for a SKU (replaces its previous one)
+      description: >
+        Codes this operation can answer with 422: m3.mrp_policy.sku_not_active,
+        m3.mrp_policy.policy_invalid, m3.mrp_policy.gap_not_allowed, m3.mrp_policy.gap_invalid,
+        scope.invalid.
+      x-permission: prc.mrp_policy.set
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetMrpPolicyRequest' }
+      responses:
+        '200':
+          description: The effective policy of the SKU after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MrpPolicyResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/mrp-policies/effective:
+    get:
+      tags: [Pricing]
+      operationId: getEffectiveMrpPolicy
+      summary: The MRP policy that applies to a SKU at the caller's entity, and where it comes from
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The effective policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MrpPolicyResponse' }
+  /v1/pricing/rules:
+    get:
+      tags: [Pricing]
+      operationId: listRules
+      summary: The discount rules visible in the caller's scope, newest validity first
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [DRAFT, ACTIVE, EXPIRED, WITHDRAWN] }
+        - in: query
+          name: kind
+          required: false
+          schema: { type: string, enum: [TIME_LIMITED_PRICE, QUANTITY_BREAK, BILL_THRESHOLD, FREE_ITEM, EXPIRY_MARKDOWN] }
+      responses:
+        '200':
+          description: The rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RuleResponse' }
+    post:
+      tags: [Pricing]
+      operationId: authorRule
+      summary: Author a discount rule of the caller's entity, as a draft
+      description: >
+        The predicate and benefit follow the closed vocabulary of doc 23 section 3.3, per kind.
+        Codes this operation can answer with 422: m3.rule.kind_not_available (FREE_ITEM, not yet),
+        m3.rule.kind_invalid, m3.rule.sku_required, m3.rule.sku_not_active, m3.rule.uom_invalid,
+        m3.rule.field_not_allowed, m3.rule.min_qty_required, m3.rule.days_to_expiry_required,
+        m3.rule.not_expiry_tracked, m3.rule.bill_total_required, m3.rule.benefit_not_allowed,
+        m3.rule.benefit_value_invalid, m3.rule.validity_invalid, m3.rule.priority_invalid,
+        scope.invalid, request.field.required.
+      x-permission: prc.rule.author
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthorRuleRequest' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: Address of the new rule
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/rules/{ruleId}:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Pricing]
+      operationId: getRule
+      summary: One discount rule
+      x-permission: prc.pricelist.view
+      responses:
+        '200':
+          description: The rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '404':
+          description: No such rule, or the caller's scope may not see it
+  /v1/pricing/rules/{ruleId}/activate:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: activateRule
+      summary: Activate a draft rule; it applies at the owner's shops from its first valid date
+      description: >
+        Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_draft,
+        m3.rule.valid_from_past, the vocabulary codes of authorRule (checked again), scope.invalid.
+      x-permission: prc.rule.activate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The active rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/rules/{ruleId}/withdraw:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Pricing]
+      operationId: withdrawRule
+      summary: Withdraw an active rule, for a reason
+      description: >
+        Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_active,
+        scope.invalid.
+      x-permission: prc.rule.activate
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithdrawRuleRequest' }
+      responses:
+        '200':
+          description: The withdrawn rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
+    RulePredicate:
+      type: object
+      description: >
+        The closed vocabulary of doc 23 section 3.3. TIME_LIMITED_PRICE needs skuId (uomCode
+        optional); QUANTITY_BREAK skuId and minQty; EXPIRY_MARKDOWN skuId and daysToExpiry;
+        BILL_THRESHOLD billTotalFrom. A field a kind does not use is left out.
+      properties:
+        skuId: { type: [string, 'null'], format: uuid }
+        uomCode: { type: [string, 'null'], minLength: 1, maxLength: 10 }
+        minQty: { type: [number, 'null'], exclusiveMinimum: 0 }
+        daysToExpiry: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
+        billTotalFrom: { type: [number, 'null'], exclusiveMinimum: 0 }
+    RuleBenefit:
+      type: object
+      required: [kind, value]
+      properties:
+        kind: { type: string, enum: [FIXED_PRICE, PERCENT_OFF, AMOUNT_OFF, FREE_QTY] }
+        value: { type: number, minimum: 0, description: The price or the percentage or the rupees off }
+    AuthorRuleRequest:
+      type: object
+      required: [name, kind, predicate, benefit, validFrom]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { type: string, enum: [TIME_LIMITED_PRICE, QUANTITY_BREAK, BILL_THRESHOLD, FREE_ITEM, EXPIRY_MARKDOWN] }
+        predicate: { $ref: '#/components/schemas/RulePredicate' }
+        benefit: { $ref: '#/components/schemas/RuleBenefit' }
+        priority: { type: [integer, 'null'], minimum: 0, maximum: 32767, description: Lower applies first; 100 when left out }
+        validFrom: { type: string, format: date }
+        validTo: { type: [string, 'null'], format: date }
+    WithdrawRuleRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    RuleResponse:
+      type: object
+      required: [ruleId, ownerEntityId, name, kind, predicate, benefit, priority, validFrom, status, createdAt]
+      properties:
+        ruleId: { type: string, format: uuid }
+        ownerEntityId: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [TIME_LIMITED_PRICE, QUANTITY_BREAK, BILL_THRESHOLD, FREE_ITEM, EXPIRY_MARKDOWN] }
+        predicate: { $ref: '#/components/schemas/RulePredicate' }
+        benefit: { $ref: '#/components/schemas/RuleBenefit' }
+        priority: { type: integer }
+        validFrom: { type: string, format: date }
+        validTo: { type: [string, 'null'], format: date }
+        status: { type: string, enum: [DRAFT, ACTIVE, EXPIRED, WITHDRAWN] }
+        createdAt: { type: string, format: date-time }
     CreatePriceListRequest:
       type: object
       required: [kind, name]
@@ -241,7 +632,13 @@ components:
         skuId: { type: string, format: uuid }
         uomCode: { type: string, minLength: 1, maxLength: 10 }
         tierFromQty: { type: number, minimum: 0, description: The quantity from which the price applies; 0 is the base price }
-        price: { type: number, minimum: 0, description: Unit price (tax-exclusive for TRADE) with at most four decimals }
+        price:
+          type: number
+          minimum: 0
+          description: >
+            Unit price (tax-exclusive for TRADE) with at most four decimals. A RETAIL price is above
+            zero (m3.price_list.line.price_zero); the request does not name the list's kind, so that
+            bound is the handler's guard, not this schema's.
     SetLinesResponse:
       type: object
       required: [saved, outcomes]
@@ -260,6 +657,79 @@ components:
         ok: { type: boolean }
         reason: { type: [string, 'null'], description: The message id of the refusal }
         review: { type: [string, 'null'], description: The message id of a review raised on an accepted line }
+        ceilingKind:
+          type: [string, 'null']
+          description: CONTROL_PRICE or MRP, the binding ceiling of a RETAIL or ADVISORY line (refused or not), or the MRP a TRADE line is reviewed against
+        ceilingValue: { type: [number, 'null'] }
+        ceilingRef: { type: [string, 'null'], description: 'The gazette reference of a control price, the batch number of an MRP' }
+    RetailPriceResponse:
+      type: object
+      required: [locationId, skuId, uomCode, sellable, capReason, policy, engineVersion]
+      properties:
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        uomCode: { type: string }
+        sellable: { type: boolean }
+        reason: { type: [string, 'null'], description: 'Why not sellable: price.no_list_line or price.needs_pick' }
+        priceListId: { type: [string, 'null'], format: uuid, description: The RETAIL version the list price was read from }
+        listPrice: { type: [number, 'null'], description: 'The retail list line, tax-inclusive' }
+        unitPrice: { type: [number, 'null'], description: 'min(list, batch term, control term), tax-inclusive' }
+        mrpApplied: { type: [number, 'null'], description: The printed MRP the policy chose }
+        controlPrice: { type: [number, 'null'], description: The control price in force }
+        capReason: { type: string, enum: [NONE, MRP_LOWEST, MRP_BARCODE, MRP_PICKED, CONTROL_PRICE] }
+        policy: { type: string, enum: [AUTO_LOWEST, BARCODE_RESOLVED, PICKER] }
+        batchId: { type: [string, 'null'], format: uuid }
+        engineVersion: { type: string }
+    EnterControlPriceRequest:
+      type: object
+      required: [skuId, ceilingPrice, ceilingUomCode, effectiveFrom, gazetteReference]
+      properties:
+        skuId: { type: string, format: uuid }
+        ceilingPrice: { type: number, exclusiveMinimum: 0, description: 'The maximum retail price, tax-inclusive, two decimals' }
+        ceilingUomCode: { type: string, minLength: 1, maxLength: 10 }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, 'null'], format: date }
+        gazetteReference: { type: string, minLength: 1, maxLength: 80 }
+    RescindControlPriceRequest:
+      type: object
+      required: [lastDay, reason, gazetteReference]
+      properties:
+        lastDay: { type: string, format: date, description: The last day the ceiling holds }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+        gazetteReference: { type: string, minLength: 1, maxLength: 80 }
+    ControlPriceResponse:
+      type: object
+      required: [controlPriceId, skuId, ceilingPrice, ceilingUomCode, effectiveFrom, gazetteReference, enteredAt]
+      properties:
+        controlPriceId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        ceilingPrice: { type: number }
+        ceilingUomCode: { type: string }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, 'null'], format: date }
+        gazetteReference: { type: string }
+        enteredBy: { type: [string, 'null'], format: uuid }
+        enteredAt: { type: string, format: date-time }
+    SetMrpPolicyRequest:
+      type: object
+      required: [skuId, policy]
+      properties:
+        skuId: { type: string, format: uuid }
+        policy: { type: string, enum: [AUTO_LOWEST, BARCODE_RESOLVED, PICKER] }
+        gapAmount: { type: [number, 'null'], minimum: 0, description: 'PICKER only: rupees between the lowest and highest MRP above which the till asks' }
+        gapPercent: { type: [number, 'null'], minimum: 0, maximum: 100, description: 'PICKER only: the same as a percentage of the lowest MRP' }
+    MrpPolicyResponse:
+      type: object
+      required: [skuId, policy, source]
+      properties:
+        policyId: { type: [string, 'null'], format: uuid }
+        skuId: { type: string, format: uuid }
+        policy: { type: string, enum: [AUTO_LOWEST, BARCODE_RESOLVED, PICKER] }
+        gapAmount: { type: [number, 'null'] }
+        gapPercent: { type: [number, 'null'] }
+        ownerEntityId: { type: [string, 'null'], format: uuid }
+        source: { type: string, enum: [OWN, FEDERATION, DEFAULT], description: 'Whose row applies: the caller''s, the Federation''s, or none (the configured default)' }
+        setAt: { type: [string, 'null'], format: date-time }
     PriceListResponse:
       type: object
       required: [priceListId, rootPriceListId, kind, name, version, status, createdAt]

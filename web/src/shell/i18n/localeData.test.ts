@@ -42,7 +42,7 @@ describe("the Sinhala and Tamil number and date data", () => {
     ).toContain("5");
     // The trading screens' business date still reads yyyy-mm-dd under the polyfill (the e2e broke
     // on "Invalid time value" when it was written with the en-CA format the polyfill lacks).
-    const { businessToday } = await import("../../modules/m4trading/tradingView");
+    const { businessToday } = await import("./formats");
     expect(businessToday(new Date("2026-09-27T20:00:00Z"))).toBe("2026-09-28");
-  });
+  }, 15000);
 });

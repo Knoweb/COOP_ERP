@@ -9,10 +9,13 @@
 
 import { InMemoryWebStorage, WebStorageStateStore } from "oidc-client-ts";
 import type { AuthProviderProps } from "react-oidc-context";
-import type { PendingCommand } from "../api/pendingCommand";
+import { mayKeep, type PendingCommand } from "../api/pendingCommand";
+import { resolveConfig } from "../runtimeConfig";
 
-const AUTHORITY = import.meta.env.VITE_OIDC_AUTHORITY || "http://localhost:8085/realms/coop";
-const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || "coop-erp-web";
+// From the server's /config.js, else the VITE_* values of the build (runtimeConfig.ts).
+const CONFIG = resolveConfig();
+const AUTHORITY = CONFIG.oidcAuthority;
+const CLIENT_ID = CONFIG.oidcClientId;
 
 /**
  * What the step-up asks the identity server for, as `acr_values` (doc 19 section 2.2: the
@@ -23,7 +26,7 @@ const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || "coop-erp-web";
  * infra/compose has no OTP, and there a fresh password sign-in counts (`prompt=login` plus the
  * backend's `password-reauth-counts`), so nothing is asked for beyond the sign-in itself.
  */
-export const STEP_UP_ACR_VALUES: string = import.meta.env.VITE_OIDC_STEP_UP_ACR_VALUES || "";
+export const STEP_UP_ACR_VALUES: string = CONFIG.stepUpAcrValues;
 
 /**
  * Where the browser was before it left for the login page, and, after a step-up, the command
@@ -31,18 +34,31 @@ export const STEP_UP_ACR_VALUES: string = import.meta.env.VITE_OIDC_STEP_UP_ACR_
  * state of the login request; the library keeps it in session storage until the browser is
  * back, so a page unload does not lose it.
  */
-export type LoginState = { returnTo?: string; pendingCommand?: PendingCommand };
+export type LoginState = {
+  returnTo?: string;
+  pendingCommand?: PendingCommand;
+  /** A command was refused for a fresh sign-in but must not be kept (personal data in its body, a file, a foreign URL). */
+  commandNotKept?: boolean;
+};
 
 // The command the sign-in brought back, until the shell takes it: set by the callback below,
 // read once by takePendingCommand(). A module variable, because the callback runs before any
 // component of the shell exists.
 let broughtBack: PendingCommand | null = null;
+let notKept = false;
 
 /** The command to replay after this sign-in, once; null when there is none (or it was taken). */
 export function takePendingCommand(): PendingCommand | null {
   const pending = broughtBack;
   broughtBack = null;
   return pending;
+}
+
+/** True once after a sign-in that interrupted a command which was not kept: the person enters it again. */
+export function takeCommandNotKept(): boolean {
+  const flag = notKept;
+  notKept = false;
+  return flag;
 }
 
 export const oidcConfig: AuthProviderProps = {
@@ -60,7 +76,10 @@ export const oidcConfig: AuthProviderProps = {
   // command a step-up interrupted, if there was one.
   onSigninCallback: (user) => {
     const state = (user?.state as LoginState | undefined) ?? {};
-    broughtBack = state.pendingCommand ?? null;
+    // Checked again here: the state sat in session storage, where a crafted one could name any URL.
+    const kept = state.pendingCommand && mayKeep(state.pendingCommand, CONFIG.apiBase) ? state.pendingCommand : null;
+    broughtBack = kept;
+    notKept = kept === null && (state.commandNotKept === true || state.pendingCommand !== undefined);
     window.history.replaceState({}, document.title, state.returnTo || window.location.pathname);
   }
 };

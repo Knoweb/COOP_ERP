@@ -3,13 +3,14 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useIntl } from "react-intl";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { businessToday } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { EntityOption, inLocale, skuText } from "./labels";
 import { useTradingApi, type Sku } from "./tradingApi";
-import { businessToday, errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
+import { errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
 
 /**
  * The requisition book (doc 30 section 5.4; 24A section 8, "Requisition", demo scope): the buyer
@@ -71,10 +72,13 @@ export function NewOrderPage() {
 
   return (
     <main className="shell-page">
-      <Link to="/trading">{t("trading.back").text}</Link>
+      <Link className="back-link" to="/trading">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("trading.back").text}
+      </Link>
       <h1>{t("trading.order.new.title").text}</h1>
-      <form onSubmit={send} style={{ display: "grid", gap: "var(--space-2)" }}>
-        <label style={{ display: "grid", gap: "var(--space-half)" }}>
+      <form onSubmit={send} className="trading-form-row">
+        <label className="trading-form-field">
           {t("trading.field.seller").text}
           <select value={relationshipId} onChange={(event) => setRelationshipId(event.target.value)} required>
             <option value="">{t("trading.field.choose").text}</option>
@@ -84,7 +88,7 @@ export function NewOrderPage() {
           </select>
         </label>
         {sellers.data?.length === 0 && <p>{t("trading.sellers.none").text}</p>}
-        <label style={{ display: "grid", gap: "var(--space-half)" }}>
+        <label className="trading-form-field">
           {t("trading.field.deliver_to").text}
           <select value={deliverTo} onChange={(event) => setDeliverTo(event.target.value)} required>
             <option value="">{t("trading.field.choose").text}</option>
@@ -179,8 +183,8 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
   const nameOf = (sku: Sku) => inLocale(locale, sku.nameEn, sku.nameSi, sku.nameTa);
 
   return (
-    <form onSubmit={search} style={{ display: "grid", gap: "var(--space-1)", marginTop: "var(--space-3)" }}>
-      <label style={{ display: "grid", gap: "var(--space-half)" }}>
+    <form onSubmit={search} className="trading-search-form">
+      <label className="trading-form-field">
         {t("trading.field.find_item").text}
         <input type="search" value={q} onChange={(event) => setQ(event.target.value)} />
       </label>
@@ -191,7 +195,7 @@ function SkuFinder({ onPick }: { onPick: (sku: Sku) => void }) {
       </div>
       {found?.length === 0 && <p>{t("trading.find.none").text}</p>}
       {found && found.length > 0 && (
-        <ul style={{ listStyle: "none", padding: 0 }}>
+        <ul className="trading-list">
           {found.map((sku) => (
             <li key={sku.skuId}>
               <button type="button" onClick={() => onPick(sku)}>

@@ -129,7 +129,8 @@ class OutboxPayloadValidationPostgresIntegrationTest extends PostgresIntegration
         OutboxWriter writer = new OutboxWriter(
                 jdbc,
                 new com.fasterxml.jackson.databind.ObjectMapper(),
-                listeners.getBeanProvider(PublishedEventListener.class));
+                listeners.getBeanProvider(PublishedEventListener.class),
+                java.time.Clock.systemUTC());
 
         int[] synchronisations = new int[2];
 

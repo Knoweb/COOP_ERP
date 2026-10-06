@@ -130,6 +130,29 @@ permissions:
     description_en: "Publish price lists"
     scope: "ENTITY"
     requires_mfa: true
+  # M3-05, discount rules (23A section 3.1): authoring, and activation and withdrawal. The reads
+  # use prc.pricelist.view (a rule is price data of the same entity).
+  - code: "prc.rule.author"
+    module: "m3pricing"
+    description_en: "Author discount rules"
+    scope: "ENTITY"
+  - code: "prc.rule.activate"
+    module: "m3pricing"
+    description_en: "Activate and withdraw discount rules"
+    scope: "ENTITY"
+  # M3-06 and M3-07 (23A section 3.1): "prc.controlprice.enter (F, mfa)" enters and rescinds the
+  # gazetted control prices; "prc.mrp_policy.set (ENTITY; tags F)" sets a SKU's multi-MRP policy
+  # (tag scope is deferred). The second factor of prc.pricelist.publish now covers RETAIL and
+  # ADVISORY lists too (M3-06, decided on the architect's delegation).
+  - code: "prc.controlprice.enter"
+    module: "m3pricing"
+    description_en: "Enter and rescind gazetted control prices"
+    scope: "FEDERATION"
+    requires_mfa: true
+  - code: "prc.mrp_policy.set"
+    module: "m3pricing"
+    description_en: "Set the multi-MRP policy of an item"
+    scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes
@@ -344,6 +367,7 @@ permissions:
     description_en: "Approve or reject stock adjustments"
     scope: "ENTITY"
     requires_mfa: true
+    limits_schema: { properties: { max_value: { type: "number", minimum: 0 } }, required: ["max_value"] }
   - code: "inv.writeoff.request"
     module: "m5inventory"
     description_en: "Request a write-off"
@@ -357,6 +381,7 @@ permissions:
     description_en: "Approve or reject a write-off"
     scope: "ENTITY"
     requires_mfa: true
+    limits_schema: { properties: { max_value: { type: "number", minimum: 0 } }, required: ["max_value"] }
   - code: "inv.recipe.manage"
     module: "m5inventory"
     description_en: "Define and retire repack recipes"
@@ -419,3 +444,90 @@ permissions:
     module: "m6pos"
     description_en: "See the receipts and till sessions of the shops"
     scope: "LOCATION"
+  # M7 Customers & Payment Recording (27A section 3.1, seed/m7/permissions.yaml, appended here as
+  # M4 and M6 do: M1SeedLoader reads this one file). cus.customer.view is the read code of the
+  # slice's queries (27A lists no read code; one per aggregate, as M1 does, decided 29 September
+  # 2026 on the architect's delegation). The adjustment, reversal, statement, privacy and banking
+  # codes come with their tickets.
+  - code: "cus.customer.view"
+    module: "m7customers"
+    description_en: "See the society's customers, their accounts and statements"
+    scope: "ENTITY"
+  - code: "cus.customer.register"
+    module: "m7customers"
+    description_en: "Register a customer"
+    scope: "LOCATION"
+  - code: "cus.customer.manage"
+    module: "m7customers"
+    description_en: "Amend, re-phone and deactivate a customer"
+    scope: "ENTITY"
+  - code: "cus.account.manage"
+    module: "m7customers"
+    description_en: "Open a customer's credit account"
+    scope: "ENTITY"
+  - code: "cus.payment.record"
+    module: "m7customers"
+    description_en: "Record a customer's repayment"
+    scope: "LOCATION"
+  # M7, the account remainders and the privacy workflow (27A section 3.1, appended 29 September
+  # 2026, branch feat/m7-limits-privacy-snapshot). "mfa" in the guide is requires_mfa. The limits,
+  # suspension and closing stay under cus.account.manage, which asks no second factor of its own:
+  # the limit handler asks for one when the limit goes up (doc 27 section 4.2).
+  - code: "cus.account.adjust"
+    module: "m7customers"
+    description_en: "Ask for an adjustment of a customer's balance"
+    scope: "ENTITY"
+  - code: "cus.account.adjust_approve"
+    module: "m7customers"
+    description_en: "Approve an adjustment another person asked for"
+    scope: "ENTITY"
+    requires_mfa: true
+  - code: "cus.payment.reverse"
+    module: "m7customers"
+    description_en: "Reverse a customer's repayment recorded in error"
+    scope: "ENTITY"
+    requires_mfa: true
+  - code: "cus.privacy.record"
+    module: "m7customers"
+    description_en: "Record and read customers' requests for their data, a correction or erasure"
+    scope: "ENTITY"
+  - code: "cus.privacy.fulfil"
+    module: "m7customers"
+    description_en: "Answer customers' data requests as the society's responsible officer"
+    scope: "ENTITY"
+    requires_mfa: true
+  # --- M9 Integration (29A section 3.1, seed/m9/permissions.yaml, appended here as M4, M6 and M7
+  # do: M1SeedLoader reads this one file). The demo scope: the accounting export and the
+  # notification screens. int.notify.view is the read code of the notification log, templates
+  # and rules (29A names no read code; one per aggregate, as M1 does, decided 29 September 2026
+  # on the architect's delegation). int.client.manage, int.journal.ack, int.provider.manage,
+  # int.einvoice.manage and int.api.publish come with their tickets.
+  - code: "int.journal.read"
+    module: "m9integration"
+    description_en: "See the entity's journal exports, their lines and their reconciliation"
+    scope: "ENTITY"
+  - code: "int.journal.export"
+    module: "m9integration"
+    description_en: "Generate a journal export for the accounting package and download it"
+    scope: "ENTITY"
+  - code: "int.notify.view"
+    module: "m9integration"
+    description_en: "See the notification templates, rules and delivery log"
+    scope: "ENTITY"
+  - code: "int.notify.manage"
+    module: "m9integration"
+    description_en: "Activate and retire the federation's notification rules"
+    scope: "FEDERATION"
+  # wave 2, PR 03 (CR-32-1 item 2, decided 6 October 2026): an administrator of the society
+  # resolves a quarantined till event (REPAIRED or DISCARDED, with a reason, once). The kernel's
+  # operation (openapi/sync.yaml, resolveQuarantine); listed here because M1SeedLoader reads this
+  # one file.
+  - code: "sync.quarantine.resolve"
+    module: "kernel"
+    description_en: "Resolve a till event the sync gateway quarantined, as repaired or discarded"
+    scope: "ENTITY"
+  # wave 2, PR 11 (CR-21A-7; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (1)): no
+  # new code. inv.writeoff.approve and inv.adjust.approve above now carry a limits_schema with
+  # max_value required, so a role grants each up to a value (doc 25 section 7: "writeoff_bands as
+  # role limits (M1)"); M1SeedLoader writes it with a new catalogue row, and m1security V0019 sets
+  # it on an existing database, since the loader never updates a row.

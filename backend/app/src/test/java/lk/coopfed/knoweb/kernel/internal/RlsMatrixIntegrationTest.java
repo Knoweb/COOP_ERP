@@ -258,6 +258,18 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             // catalogue.supplier follows the template since m2catalogue V0007: beyond it, a supplier
             // is read by everyone once a batch cites it (cited_read), which no made-up row is.
             new Departure(
+                    "pricing.control_price",
+                    "the Federation's rows only (m3pricing V0006; wave 2, RLS-04): a gazetted ceiling is law"
+                            + " every class but NONE reads (23A section 3), and only the Federation writes one;"
+                            + " the matrix's made-up rows belong to A, B and C, so nobody reads them and nobody"
+                            + " inserts one (RetailPricingPostgresIntegrationTest reads the Federation's row)",
+                    RlsMatrixIntegrationTest::federationRowsOnly),
+            new Departure(
+                    "pricing.mrp_policy",
+                    "everyone_reads (m3pricing V0005): a society's effective policy falls back to the"
+                            + " Federation's row for the item (EffectivePolicy)",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
@@ -294,6 +306,43 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "kernel.numbering_series",
                     "own_read, own_update and own_write admit a NULL location (the ENTITY series) at a location scope",
                     RlsMatrixIntegrationTest::entityWideRowsAtALocation),
+            new Departure(
+                    "integration.notification_template",
+                    "everyone_reads (m9integration V0001): no personal data; the kernel's renderer reads a"
+                            + " template after the commit with no scope at all",
+                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+            new Departure(
+                    "integration.notification_rule",
+                    "everyone_reads (m9integration V0001): no personal data; the kernel's dispatcher reads the"
+                            + " rules in the scope of whichever entity's event it matches",
+                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+            // Member identity is the society's (CR-18-2, m7customers V0003; wave 2, RLS-01, RLS-02):
+            // FEDERATION_VIEW and EXTERNAL_TIMEBOXED read no personal data of a natural person by
+            // policy. The credit book (customer_account, the postings, allocations, history,
+            // adjustments, the CPRs) keeps the template: money, no name.
+            new Departure(
+                    "customers.customer",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): a member's name, NIC hash and status are the"
+                            + " society's; identity reaches the Federation only through an audited query or export",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.customer_phone",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): a member's phone numbers are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.customer_consent",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): a member's consents are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.data_subject_request",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): its notes and outcome are free text about"
+                            + " the person, redacted at an erasure and read by the society alone until then",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "integration.notification_contact",
+                    "no ext_view on purpose (m9integration V0003): an address is personal data a regulator's"
+                            + " view has no need of; the dispatcher reaches it through notification_recipients()",
+                    RlsMatrixIntegrationTest::externalReadsNothing),
             // ---- found by the matrix, to fix in the owning module ------------------------------
             // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
             // (hello README); K-01 has landed, so hello can add it.
@@ -317,6 +366,25 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         && !check.scope().is("NONE")
                 ? VISIBLE
                 : null;
+    }
+
+    /**
+     * Rows the Federation alone writes and everyone reads (the fed_admin form of CR-21A-1 item 2 on
+     * {@code kernel.system_entity()}): a made-up row owned by another entity is hidden to every
+     * class and an insert of one is refused. UPDATE, DELETE and MOVE keep the template's answer
+     * (the table grants UPDATE on one column and no DELETE, so both are refused before any policy).
+     */
+    private static String federationRowsOnly(Check check) {
+        return switch (check.op()) {
+            case SELECT -> HIDDEN;
+            case INSERT -> REFUSED;
+            default -> null;
+        };
+    }
+
+    /** Reference data read by every session, scope or none (the notification templates and rules). */
+    private static String everySessionReadsEverything(Check check) {
+        return check.op() == Op.SELECT ? VISIBLE : null;
     }
 
     /** An insert is admitted only when the caller owns the parent SKU; a made-up row has none. */

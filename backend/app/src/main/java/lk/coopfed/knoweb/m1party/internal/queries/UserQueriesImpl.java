@@ -44,6 +44,15 @@ class UserQueriesImpl implements UserQueries {
     }
 
     @Override
+    public Optional<String> appointedOfficerName(UUID entityId, UUID officerUserId, ScopeContext scope) {
+        if (entityId == null || officerUserId == null || scope == null || !scope.hasActiveScope()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(jdbc.queryForObject(
+                "select security.appointed_officer_name(?, ?)", String.class, entityId, officerUserId));
+    }
+
+    @Override
     public UserPage listUsers(UserFilter filter, ScopeContext scope) {
         if (scope == null || !scope.hasActiveScope()) {
             return new UserPage(List.of(), null);

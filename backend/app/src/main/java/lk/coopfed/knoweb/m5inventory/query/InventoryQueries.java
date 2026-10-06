@@ -51,6 +51,13 @@ public interface InventoryQueries {
     /** The movements a document caused (a GRN's receipts, a delivery note's dispatch, an OPB), in ledger order. */
     List<MovementView> movementsOf(UUID documentId, ScopeContext scope);
 
+    /**
+     * The stock card of a SKU at a location (25A section 8): every movement of the SKU there, in
+     * ledger order (received, source, sequence), each with the running quantity after it. The
+     * running quantity is summed by the database, never by the screen.
+     */
+    List<StockCardLine> stockCard(UUID locationId, UUID skuId, ScopeContext scope);
+
     /** GetPickList(dn): the pick list of a delivery note of the caller's. */
     Optional<PickListView> pickList(UUID deliveryDocumentId, ScopeContext scope);
 
@@ -59,6 +66,12 @@ public interface InventoryQueries {
 
     /** A transfer of the caller's, seen from its source or its destination, with its lines. */
     Optional<TransferView> transfer(UUID transferId, ScopeContext scope);
+
+    /**
+     * The transfer issued for an M4 transfer request (M4-10), seen from its source or its
+     * destination, or empty while none is issued (or the caller cannot see it).
+     */
+    Optional<TransferView> transferOfRequest(UUID transferRequestId, ScopeContext scope);
 
     /** The transfers leaving or arriving at a location, newest first, with their lines. */
     List<TransferView> transfers(UUID locationId, ScopeContext scope);

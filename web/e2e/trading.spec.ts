@@ -1,4 +1,4 @@
-// Phase 1 of the demo through the browser (docs/DEMO.md, steps 4 to 9; M4-11): the Federation
+// Phase 1 of the demo through the browser (docs/DEMO.md, steps 4 to 11; M4-11): the Federation
 // sells to the Wayamba distributor, each step signed in as the demo user whose job it is. Needs
 // the demo data (`make demo-data`; the stack smoke loads it before the e2e run).
 //
@@ -107,10 +107,52 @@ test("the Federation sells to D101: order, acceptance, delivery note, dispatch, 
   const invoicePath = new URL(page.url()).pathname;
   await page.context().close();
 
-  // d101-accounts reads the same invoice; the printed copy is the seller's.
+  // d101-accounts reads the same invoice and prints the same PDF, stored under the seller.
   const buyerAccounts = DEMO.d101Accounts;
   page = await as(buyerAccounts, invoicePath);
   await expect(page.getByRole("heading", { name: textOf(buyerAccounts, "trading.invoice.title") })).toBeVisible();
-  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.invoice.print") })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.invoice.print") })).toBeVisible();
+  await page.context().close();
+
+  // 10. Settle the short delivery: fed-accounts opens the discrepancy the GRN raised (from the
+  // GRN it invoiced) and accepts the count. The invoice billed the 38 received, so the 2 short bags
+  // were never billed: the discrepancy is settled with no money and no credit note (no double credit).
+  page = await as(accounts, grnPath);
+  await page.getByRole("link", { name: textOf(accounts, "trading.grn.discrepancy_raised") }).click();
+  await expect(page).toHaveURL(/\/trading\/discrepancies\/[0-9a-f-]{36}$/);
+  await expect(page.getByText(textOf(accounts, "trading.discrepancy.status.RAISED"), { exact: true })).toBeVisible();
+  const discrepancyPath = new URL(page.url()).pathname;
+  await page.getByRole("button", { name: textOf(accounts, "trading.discrepancy.settle") }).click();
+  await expect(page.getByText(textOf(accounts, "trading.discrepancy.status.SETTLED"), { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(discrepancyPath + "$"));
+  await expect(page.getByRole("link", { name: /CN-/ })).toHaveCount(0);
+  await page.context().close();
+
+  // d101-accounts sees the discrepancy settled (read only), and the invoice with nothing credited.
+  page = await as(buyerAccounts, discrepancyPath);
+  await expect(page.getByText(textOf(buyerAccounts, "trading.discrepancy.status.SETTLED"), { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.discrepancy.settle") })).toHaveCount(0);
+  await page.goto(invoicePath);
+  await expect(page.getByRole("heading", { name: textOf(buyerAccounts, "trading.invoice.title") })).toBeVisible();
+  await expect(page.getByRole("link", { name: /CN-/ })).toHaveCount(0);
+  await expect(page.getByText(textOf(buyerAccounts, "trading.invoice.credited"), { exact: true })).toHaveCount(0);
+  await page.context().close();
+
+  // 11. Payment: fed-accounts records D101's bank transfer against the invoice (the form starts at
+  // the amount due); the invoice reads Settled, and d101-accounts sees it settled with the receipt,
+  // read only.
+  page = await as(accounts, invoicePath);
+  await expect(page.getByRole("heading", { name: textOf(accounts, "trading.invoice.title") })).toBeVisible();
+  await page.getByLabel(textOf(accounts, "trading.payment.reference")).fill("TT-1001");
+  await page.getByRole("button", { name: textOf(accounts, "trading.payment.record") }).click();
+  await expect(page.getByText(textOf(accounts, "trading.invoice.payment_state.SETTLED"), { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /PRC-/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: textOf(accounts, "trading.payment.record") })).toHaveCount(0);
+  await page.context().close();
+
+  page = await as(buyerAccounts, invoicePath);
+  await expect(page.getByText(textOf(buyerAccounts, "trading.invoice.payment_state.SETTLED"), { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /PRC-/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: textOf(buyerAccounts, "trading.payment.record") })).toHaveCount(0);
   await page.context().close();
 });

@@ -35,19 +35,43 @@ export function ScopeBanner() {
   // A location narrows the scope to one shop or warehouse; without one it is the whole entity.
   const location = scope.locationId ?? t("shell.scope.location_all").text;
 
+  // Split acting string to style user and entity names strongly
+  const rawActing = t("shell.scope.acting_for", undefined, { user: "[[USER]]", entity: "[[ENTITY]]" }).text;
+  const actingParts = rawActing.split(/(\[\[USER\]\]|\[\[ENTITY\]\])/);
+
   return (
     <div
       className={scope.policyClass === "OWN" ? "scope-banner" : "scope-banner scope-banner--not-own"}
       role="region"
       aria-label={t("shell.scope.label").text}
     >
-      <span className="scope-banner__who">
-        {t("shell.scope.acting_for", undefined, { user: session?.displayName ?? "", entity }).text}
-      </span>
-      <span className="scope-banner__location">{location}</span>
-      <span className="scope-banner__class">
-        {t("shell.scope.access").text} <strong>{t(`shell.scope.class.${scope.policyClass}`).text}</strong>
-      </span>
+      <div className="scope-acting">
+        <div className="scope-acting__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+            <path d="M9 22v-4h6v4"></path>
+            <path d="M8 6h.01"></path>
+            <path d="M16 6h.01"></path>
+            <path d="M12 6h.01"></path>
+            <path d="M12 10h.01"></path>
+            <path d="M12 14h.01"></path>
+            <path d="M16 10h.01"></path>
+            <path d="M16 14h.01"></path>
+            <path d="M8 10h.01"></path>
+            <path d="M8 14h.01"></path>
+          </svg>
+        </div>
+        <div className="scope-acting__text">
+          {actingParts.map((part, i) => {
+            if (part === "[[USER]]") return <strong key={i} className="scope-user">{session?.displayName ?? ""}</strong>;
+            if (part === "[[ENTITY]]") return <strong key={i} className="scope-entity">{entity}</strong>;
+            return part ? <span key={i} className="scope-muted">{part}</span> : null;
+          })}
+        </div>
+        <div className="visually-hidden">
+          {location} {t("shell.scope.access").text} {t(`shell.scope.class.${scope.policyClass}`).text}
+        </div>
+      </div>
     </div>
   );
 }

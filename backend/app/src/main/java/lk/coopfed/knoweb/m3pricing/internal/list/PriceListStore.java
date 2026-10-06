@@ -23,6 +23,8 @@ import org.springframework.stereotype.Component;
 public class PriceListStore {
 
     static final String TRADE = "TRADE";
+    static final String RETAIL = "RETAIL";
+    static final String ADVISORY = "ADVISORY";
     static final String DRAFT = "DRAFT";
     static final String PUBLISHED = "PUBLISHED";
     static final String SUPERSEDED = "SUPERSEDED";
@@ -47,6 +49,20 @@ public class PriceListStore {
         return jdbc
                 .query(
                         "select " + LIST_COLUMNS + " from pricing.price_list where price_list_id = ?",
+                        PriceListStore::list,
+                        priceListId)
+                .stream()
+                .findFirst();
+    }
+
+    /**
+     * The list row, locked until the transaction ends (M3-05): a second publish of the same draft
+     * waits here, then reads the row as the first left it (PUBLISHED) and is refused.
+     */
+    Optional<PriceListView> findForUpdate(UUID priceListId) {
+        return jdbc
+                .query(
+                        "select " + LIST_COLUMNS + " from pricing.price_list where price_list_id = ? for update",
                         PriceListStore::list,
                         priceListId)
                 .stream()
@@ -86,6 +102,31 @@ public class PriceListStore {
                         rootPriceListId)
                 .stream()
                 .findFirst();
+    }
+
+    /**
+     * The root id of the caller's own list of a kind, if it has one (RETAIL: at most one per society,
+     * doc 23 section 3.1; its versions share the root). Read in the owner's scope.
+     */
+    public Optional<UUID> rootOfKind(String kind, UUID ownerEntityId) {
+        return jdbc
+                .queryForList(
+                        "select distinct root_price_list_id from pricing.price_list where kind = ? and owner_entity_id = ?",
+                        UUID.class,
+                        kind,
+                        ownerEntityId)
+                .stream()
+                .findFirst();
+    }
+
+    /** The newest ADVISORY version in force on the date, of any Federation list (readable by every scope). */
+    public List<PriceListView> advisoryInForce(LocalDate date) {
+        return jdbc.query(
+                "select distinct on (root_price_list_id) " + LIST_COLUMNS + " from pricing.price_list"
+                        + " where kind = 'ADVISORY' and status in ('PUBLISHED', 'SUPERSEDED') and apply_from <= ?"
+                        + " order by root_price_list_id, version desc",
+                PriceListStore::list,
+                Date.valueOf(date));
     }
 
     boolean draftExists(UUID rootPriceListId) {

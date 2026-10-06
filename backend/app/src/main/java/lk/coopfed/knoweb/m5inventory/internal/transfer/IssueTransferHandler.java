@@ -105,6 +105,16 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
         for (IssueTransfer.Line line : command.lines()) {
             requireLine(line);
         }
+        if (command.transferRequestId() != null) {
+            // A request is fulfilled once: a redelivered approval finds the transfer it issued.
+            List<UUID> issued = jdbc.queryForList(
+                    "select transfer_id from inventory.transfer where transfer_request_id = ?",
+                    UUID.class,
+                    command.transferRequestId());
+            if (!issued.isEmpty()) {
+                return issued.get(0);
+            }
+        }
         List<UUID> skus = new ArrayList<>();
         Map<UUID, BigDecimal> perBatch = new LinkedHashMap<>();
         for (IssueTransfer.Line line : command.lines()) {
@@ -121,13 +131,14 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
 
         UUID id = Ids.next();
         jdbc.update(
-                "insert into inventory.transfer (transfer_id, owner_entity_id, location_id, to_location_id, issued_by)"
-                        + " values (?, ?, ?, ?, ?)",
+                "insert into inventory.transfer (transfer_id, owner_entity_id, location_id, to_location_id, issued_by,"
+                        + " transfer_request_id) values (?, ?, ?, ?, ?, ?)",
                 id,
                 scope.entityId(),
                 from,
                 to,
-                scope.userId());
+                scope.userId(),
+                command.transferRequestId());
         List<UUID> lineIds = new ArrayList<>();
         List<Movement> movements = new ArrayList<>();
         for (IssueTransfer.Line line : command.lines()) {
@@ -164,23 +175,22 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
                     posted.get(i).unitCostAtMovement());
         }
 
-        audit.record(
-                AUDIT_ISSUED,
-                Subject.of("transfer", id),
-                null,
-                Map.of(
-                        "fromLocationId",
-                        from,
-                        "toLocationId",
-                        to,
-                        "status",
-                        "IN_TRANSIT",
-                        "lines",
-                        command.lines().size()),
-                scope);
+        audit.record(AUDIT_ISSUED, Subject.of("transfer", id), null, auditAfter(from, to, command), scope);
         events.publish(new TransferIssued(
-                id, scope.entityId(), from, to, command.lines().size()));
+                id, scope.entityId(), from, to, command.lines().size(), command.transferRequestId()));
         return id;
+    }
+
+    private static Map<String, Object> auditAfter(UUID from, UUID to, IssueTransfer command) {
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("fromLocationId", from);
+        after.put("toLocationId", to);
+        after.put("status", "IN_TRANSIT");
+        after.put("lines", command.lines().size());
+        if (command.transferRequestId() != null) {
+            after.put("transferRequestId", command.transferRequestId());
+        }
+        return after;
     }
 
     /** A location of the scope entity that the scope reads (M1). */

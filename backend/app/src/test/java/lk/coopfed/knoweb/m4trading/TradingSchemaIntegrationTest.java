@@ -46,6 +46,23 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_discrepancy", FOLLOWS_HEADER),
             Map.entry("doc_discrepancy_line", FOLLOWS_HEADER),
             Map.entry("doc_invoice", FOLLOWS_HEADER_UPDATED),
+            Map.entry("doc_credit_note", FOLLOWS_HEADER_UPDATED),
+            Map.entry("invoice_dispute", TEMPLATE_WITH_PARTY),
+            Map.entry("discrepancy_settlement", TEMPLATE_WITH_PARTY),
+            Map.entry("doc_payment_receipt", FOLLOWS_HEADER_UPDATED),
+            Map.entry("payment_allocation", FOLLOWS_HEADER),
+            Map.entry("cheque", FOLLOWS_HEADER),
+            Map.entry("cheque_outcome", TEMPLATE_WITH_PARTY),
+            // M4-06 claims and M4-10 transfer requests (V0008).
+            Map.entry("doc_claim", FOLLOWS_HEADER),
+            Map.entry("doc_claim_line", FOLLOWS_HEADER),
+            Map.entry("claim_photo", FOLLOWS_HEADER),
+            Map.entry("claim_decision", TEMPLATE_WITH_PARTY),
+            Map.entry("claim_decision_line", TEMPLATE_WITH_PARTY),
+            Map.entry("claim_return", TEMPLATE_WITH_PARTY),
+            Map.entry("transfer_request", with(TEMPLATE, "source_read")),
+            Map.entry("transfer_request_line", with(TEMPLATE, "source_read")),
+            Map.entry("transfer_request_decision", with(TEMPLATE, "dest_read")),
             Map.entry("posting_map", Set.of("reference_read", "seed_reference")));
 
     /** The columns app_rw may update, per table; a table not named here grants no UPDATE. */
@@ -64,7 +81,9 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             "doc_grn", Set.of("confirmed_by", "confirmed_at"),
             "doc_grn_line", Set.of("batch_id", "unit_cost"),
             "order_allocation_line", Set.of("fulfilled_qty"),
-            "doc_invoice", Set.of("print_object_key"));
+            "doc_invoice", Set.of("print_object_key", "credited_amount", "settled_amount"),
+            "doc_credit_note", Set.of("print_object_key"),
+            "doc_payment_receipt", Set.of("print_object_key"));
 
     @Test
     void theTradingSchemaHoldsTheTablesOfM401() {
@@ -113,10 +132,16 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(policies).isNotEmpty();
         for (Map<String, Object> policy : policies) {
             String where = policy.get("tablename") + "." + policy.get("policyname");
+            // A receipt's allocation and cheque rows name their header as receipt_document_id (V0006).
+            // A claim photograph names its claim as claim_document_id (V0008).
             if ("document_read".equals(policy.get("policyname"))) {
-                assertThat((String) policy.get("qual")).as(where).contains("kernel.document_visible(document_id)");
+                assertThat((String) policy.get("qual"))
+                        .as(where)
+                        .containsPattern("kernel\\.document_visible\\((receipt_|claim_)?document_id\\)");
             } else {
-                assertThat((String) policy.get("with_check")).as(where).contains("kernel.document_owned(document_id)");
+                assertThat((String) policy.get("with_check"))
+                        .as(where)
+                        .containsPattern("kernel\\.document_owned\\((receipt_|claim_)?document_id\\)");
             }
         }
     }

@@ -13,9 +13,29 @@ export interface paths {
         };
         /**
          * The dashboard tiles of the caller's scope
-         * @description Open orders (submitted, not yet accepted, rejected or cancelled), deliveries in transit (dispatched, no GRN confirmed against them), GRNs confirmed today (the business date), and, for the owner's users and the Federation view, the stock value at the entity average. Each count covers the documents the caller is a party to.
+         * @description The tiles of seed/m8reporting/dashboard-tiles.yaml that have something for the caller's scope: sales and purchases (invoiced, net) and the shop's sales with their eight-week trend, receivables and payables with what is overdue, the highest exposure against a known credit limit, fill rate and on-time delivery (eight weeks), the open exceptions, open orders, deliveries in transit, GRNs confirmed today and, for the owner's users and the Federation view, the stock value at the entity average. Kept for reporting.dashboard_cache_seconds.
          */
         get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The exception queue of the caller's scope
+         * @description Open discrepancies, disputed invoices, bounced cheques, buyers at or past their exposure warning and stock lots below zero that the caller is a party to or owns; escalated first, then alerts, oldest first. An item is escalated once older than reporting.exception_escalate_after, or a discrepancy past its window.
+         */
+        get: operations["listExceptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -88,7 +108,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * The latest print runs of a report, newest first
+         * @description The last twenty runs of the report the caller's entity requested (at the caller's location, for a user bound to one). Code this operation can answer with 422: m8.report.unknown.
+         */
+        get: operations["listReportRuns"];
         put?: never;
         /**
          * Print a report to an A4 PDF
@@ -134,11 +158,53 @@ export interface components {
             tileId: string;
             /** @description The message id of the tile's name */
             labelId: string;
-            /** @description A count, or an amount (plain decimal) for kind MONEY */
+            /** @description A count, an amount (plain decimal) for kind MONEY, a percentage (one decimal) for kind PERCENT */
             value: string;
             /** @enum {string} */
-            kind: "COUNT" | "MONEY";
+            kind: "COUNT" | "MONEY" | "PERCENT";
+            /** @description The report the tile opens; "exceptions" for the exception queue */
             drillReportId?: string;
+            /** @description For a trend tile, the eight weeks ending today, oldest first; the value is the last */
+            trend?: components["schemas"]["TrendPoint"][];
+        };
+        TrendPoint: {
+            /**
+             * Format: date
+             * @description The first day of the week
+             */
+            from: string;
+            /** @description The week's figure, a plain decimal */
+            value: string;
+        };
+        ExceptionItemResponse: {
+            /** @enum {string} */
+            kind: "DISCREPANCY_OPEN" | "CLAIM_OPEN" | "INVOICE_DISPUTED" | "CHEQUE_BOUNCED" | "EXPOSURE_WARNING" | "NEGATIVE_STOCK";
+            /** @enum {string} */
+            severity: "ALERT" | "REVIEW";
+            /**
+             * Format: uuid
+             * @description The discrepancy, invoice, payment receipt, relationship, or the lot's batch
+             */
+            subjectId: string;
+            documentNumber?: string;
+            /**
+             * @description The caller's side of a trading item
+             * @enum {string}
+             */
+            role?: "SELLER" | "BUYER";
+            /** Format: uuid */
+            counterpartyEntityId?: string;
+            /** @description The other party's name in the caller's language */
+            counterparty?: string;
+            /** @description For stock: the item and the location */
+            subject?: string;
+            /** @description The money at stake (plain decimal), or the quantity below zero for stock, or the quantity at issue on an open discrepancy */
+            amount?: string;
+            /** @description For an exposure warning: exposure as a percentage of the limit */
+            percent?: string;
+            /** Format: date-time */
+            since: string;
+            escalated: boolean;
         };
         ReportDefinitionResponse: {
             reportId: string;
@@ -153,7 +219,7 @@ export interface components {
             key: string;
             labelId: string;
             /** @enum {string} */
-            kind: "TEXT" | "DATE" | "QTY" | "MONEY";
+            kind: "TEXT" | "DATE" | "QTY" | "COUNT" | "MONEY" | "PERCENT";
         };
         ReportDataResponse: {
             reportId: string;
@@ -282,6 +348,26 @@ export interface operations {
             };
         };
     };
+    listExceptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionItemResponse"][];
+                };
+            };
+        };
+    };
     listReports: {
         parameters: {
             query?: never;
@@ -358,6 +444,30 @@ export interface operations {
                 };
                 content: {
                     "text/csv": string;
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listReportRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The runs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunResponse"][];
                 };
             };
             400: components["responses"]["RequestProblem"];

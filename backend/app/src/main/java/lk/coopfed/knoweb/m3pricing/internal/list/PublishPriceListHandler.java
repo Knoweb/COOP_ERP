@@ -30,13 +30,15 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * PublishPriceList (23A section 7; doc 23 section 4.1). Guards: the owner in an entity-wide OWN
  * scope; the list is one of the caller's and a DRAFT; apply_from is today or later; it has lines;
- * every line is still valid (the validator runs again: a SKU may have been deactivated since);
- * TRADE: a fresh second factor (requiresMfa; only TRADE lists exist so far). Mutation: the lines
- * are dated apply_from, the draft becomes PUBLISHED and the previous published version
- * SUPERSEDED. Event: price_list.published.v1.
+ * every line is still valid on apply_from (the validator runs again: a SKU may have been
+ * deactivated, a control price entered or a lower-MRP batch received since; for RETAIL and ADVISORY
+ * the ceilings in force on apply_from bind); a fresh second factor (requiresMfa: 23A asks it for
+ * TRADE, and the permission carries it for every kind, M3-06, decided on the architect's
+ * delegation). Mutation: the lines are dated apply_from, the draft becomes PUBLISHED and the
+ * previous published version SUPERSEDED. Event: price_list.published.v1.
  *
- * <p>Deferred for the demo (M3-04): closing the previous version's lines at apply_from - 1 and
- * carrying unchanged lines forward. The trade price lookup reads the newest version in force on
+ * <p>Deferred for the demo (M3-04): closing the previous version's lines at apply_from - 1. The
+ * trade price lookup and the retail price resolution read the newest version in force on
  * the date (PriceListStore.versionInForce), so the previous version stops answering at the new
  * one's apply_from without its lines being closed. The previous version is marked SUPERSEDED at
  * publication rather than at apply_from; it still answers for dates before apply_from.
@@ -79,7 +81,8 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
             throw new ProblemException("request.invalid");
         }
         PriceListRules.requireOwnerScope(scope);
-        PriceListView list = store.find(command.priceListId())
+        // Locked, so DRAFT is re-checked after any concurrent publish has committed (M3-05).
+        PriceListView list = store.findForUpdate(command.priceListId())
                 .filter(found -> found.ownerEntityId().equals(scope.entityId()))
                 .orElseThrow(() -> new ProblemException("m3.price_list.not_found"));
         if (!PriceListStore.DRAFT.equals(list.status())) {
@@ -96,7 +99,8 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         List<SetLines.Line> asAuthored = lines.stream()
                 .map(line -> new SetLines.Line(line.skuId(), line.uomCode(), line.tierFromQty(), line.price()))
                 .toList();
-        if (validator.check(asAuthored, scope).stream().anyMatch(outcome -> !outcome.ok())) {
+        if (validator.check(list.kind(), asAuthored, command.applyFrom(), scope).stream()
+                .anyMatch(outcome -> !outcome.ok())) {
             throw new ProblemException("m3.price_list.lines_invalid");
         }
 

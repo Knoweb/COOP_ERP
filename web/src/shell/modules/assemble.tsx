@@ -48,7 +48,10 @@ function guarded(route: RouteObject, module: ModuleDefinition): RouteObject {
 export function navItemsFor(modules: ModuleDefinition[], permissions: PermissionSet): NavItem[] {
   return modules
     .filter((module) => hasAnyPermission(permissions, module.requiredPermissions))
-    .flatMap((module) => module.navItems);
+    .flatMap((module) => module.navItems)
+    // An entry that names its own permissions is shown only to a user who holds one of them:
+    // hidden, never shown and left to lead to the "not allowed" page (docs/demo/08).
+    .filter((item) => item.requiredPermissions === undefined || hasAnyPermission(permissions, item.requiredPermissions));
 }
 
 /** Two modules with one id is a copy-and-paste mistake; say so at start-up, loudly. */

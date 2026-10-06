@@ -91,7 +91,10 @@ export function SocietyCardPage() {
     return (
       <main className="shell-page">
         <p>
-          <Link to="/party/societies">{t("party.back_to_register").text}</Link>
+          <Link className="back-link" to="/party/societies">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("party.back_to_register").text}
+      </Link>
         </p>
         <p role="alert">{errorText(society.error, t("party.error.generic").text)}</p>
       </main>
@@ -121,7 +124,10 @@ export function SocietyCardPage() {
   return (
     <main className="shell-page">
       <p>
-        <Link to="/party/societies">{t("party.back_to_register").text}</Link>
+        <Link className="back-link" to="/party/societies">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("party.back_to_register").text}
+      </Link>
       </p>
 
       <DocumentHeader
@@ -135,7 +141,7 @@ export function SocietyCardPage() {
           { label: t("party.field.district").text, value: data.district },
           { label: t("party.field.language").text, value: data.defaultLanguage ? t(`party.language.${data.defaultLanguage}`).text : undefined },
           { label: t("party.field.fy_start").text, value: data.financialYearStartMonth ? t(`party.month.${data.financialYearStartMonth}`).text : undefined },
-          { label: t("party.card.officer").text, value: data.responsibleOfficerUserId },
+          { label: t("party.card.officer").text, value: data.responsibleOfficerName },
           { label: t("party.card.governance_signed").text, value: data.dataGovernanceSignedOn ? formatDate(data.dataGovernanceSignedOn) : undefined }
         ]}
       >

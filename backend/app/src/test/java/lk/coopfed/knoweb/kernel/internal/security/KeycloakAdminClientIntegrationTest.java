@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -24,9 +23,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.MountableFile;
 
 /**
  * {@link IdentityProviderClient} against the provider the local stack runs, started here with
@@ -38,24 +34,10 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID ENTITY = UUID.fromString("0190a700-0000-7000-8000-000000000001");
     private static final UUID OTHER_ENTITY = UUID.fromString("0190a700-0000-7000-8000-000000000002");
-    private static final String REALM_FILE = "../../infra/compose/realm-dev.json";
-
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> KEYCLOAK = new GenericContainer<>("quay.io/keycloak/keycloak:26.7.4")
-            .withCommand("start-dev", "--import-realm")
-            .withEnv("KEYCLOAK_ADMIN", "admin")
-            .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
-            .withEnv("KC_HEALTH_ENABLED", "true")
-            .withCopyFileToContainer(MountableFile.forHostPath(REALM_FILE), "/opt/keycloak/data/import/realm-dev.json")
-            .withExposedPorts(8080, 9000)
-            .waitingFor(Wait.forHttp("/health/ready").forPort(9000).withStartupTimeout(Duration.ofMinutes(4)));
 
     @DynamicPropertySource
     static void theProviderOfTheStack(DynamicPropertyRegistry registry) {
-        KEYCLOAK.start();
-        registry.add(
-                "coop-erp.security.oidc.admin.base-url",
-                () -> "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080));
+        registry.add("coop-erp.security.oidc.admin.base-url", lk.coopfed.knoweb.testsupport.SharedKeycloak::baseUrl);
     }
 
     @Autowired
@@ -142,7 +124,7 @@ class KeycloakAdminClientIntegrationTest extends PostgresIntegrationTest {
     // ---- what the administrator would see: the provider's own API, as the realm administrator ----
 
     private JsonNode userAtTheProvider(String subject) {
-        String base = "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080);
+        String base = lk.coopfed.knoweb.testsupport.SharedKeycloak.baseUrl();
         RestClient rest = RestClient.create(base);
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "password");

@@ -11,10 +11,17 @@ import lk.coopfed.knoweb.engine.TradePriceResolver;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
+import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
+import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
+import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
+import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
+import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +37,72 @@ class PricingQueriesImpl implements PricingQueries {
 
     private final PriceListStore store;
     private final RelationshipQueries relationships;
+    private final RuleStore rules;
+    private final ControlPriceStore controlPrices;
+    private final EffectivePolicy policies;
+    private final RetailPriceResolution retail;
 
-    PricingQueriesImpl(PriceListStore store, RelationshipQueries relationships) {
+    PricingQueriesImpl(
+            PriceListStore store,
+            RelationshipQueries relationships,
+            RuleStore rules,
+            ControlPriceStore controlPrices,
+            EffectivePolicy policies,
+            RetailPriceResolution retail) {
         this.store = store;
         this.relationships = relationships;
+        this.rules = rules;
+        this.controlPrices = controlPrices;
+        this.policies = policies;
+        this.retail = retail;
+    }
+
+    @Override
+    public List<ControlPriceView> controlPrices(UUID skuId, ScopeContext scope) {
+        return controlPrices.list(skuId);
+    }
+
+    @Override
+    public List<ControlPriceView> controlPricesInForce(LocalDate date, ScopeContext scope) {
+        return controlPrices.inForce(date);
+    }
+
+    @Override
+    public Optional<ControlPriceView> controlPriceFor(UUID skuId, String uomCode, LocalDate date, ScopeContext scope) {
+        return controlPrices.ceilingFor(skuId, uomCode, date);
+    }
+
+    @Override
+    public MrpPolicyView effectiveMrpPolicy(UUID skuId, ScopeContext scope) {
+        return policies.of(skuId, scope.entityId(), scope);
+    }
+
+    @Override
+    public List<MrpPolicyView> listMrpPolicies(ScopeContext scope) {
+        return policies.rows(scope);
+    }
+
+    @Override
+    public Optional<RetailPrice> resolveRetailPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
+        return retail.resolve(locationId, skuId, uomCode, quantity, date, scope);
+    }
+
+    @Override
+    public List<PriceListLineView> advisoryLines(LocalDate date, ScopeContext scope) {
+        return store.advisoryInForce(date).stream()
+                .flatMap(list -> store.lines(list.priceListId()).stream())
+                .toList();
+    }
+
+    @Override
+    public Optional<RuleView> getRule(UUID ruleId, ScopeContext scope) {
+        return rules.find(ruleId);
+    }
+
+    @Override
+    public List<RuleView> listRules(String status, String kind, ScopeContext scope) {
+        return rules.list(status, kind);
     }
 
     @Override

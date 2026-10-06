@@ -1,0 +1,139 @@
+# M8's report definitions as data (28A section 3.1, report_definition; section 7, the
+# DefinitionValidator). Read once at start by ReportCatalogue and checked by DefinitionValidator:
+# a definition that fails refuses the start, and ReportCatalogueTest runs the same checks in the
+# build. A new report is a new entry here plus, if no existing source fits, a named query in
+# ReportSources (the allow-list: a definition never carries SQL).
+#
+#   id          the id in the URL: lower case, digits and dashes, at most 40
+#   title       the message id of the report's name (en, si, ta in i18n/m8reporting)
+#   decision    the message id of the decision the report supports (28A: every report names one)
+#   source      a named projection query of ReportSources, reading reporting.* only
+#   parameters  any of: period (from and to, required), location (optional)
+#   columns     key (a key the source fills), label (a message id), kind: TEXT, DATE, QTY, COUNT,
+#               MONEY or PERCENT; cost: true for a cost column, left out of an answer to anybody
+#               but the owner's users and the Federation view (28A section 6, "Cost columns")
+#
+# Rows are decided by row-level security on the projections, never by the definition: the
+# audience check per definition of 28A waits for the definition editor (module README).
+reports:
+  - id: stock-position
+    title: m8.report.stock_position.title
+    decision: m8.report.stock_position.decision
+    source: stock-position
+    parameters: [location]
+    columns:
+      - { key: entity, label: m8.col.entity, kind: TEXT }
+      - { key: location, label: m8.col.location, kind: TEXT }
+      - { key: skuCode, label: m8.col.sku_code, kind: TEXT }
+      - { key: skuName, label: m8.col.sku_name, kind: TEXT }
+      - { key: qty, label: m8.col.qty, kind: QTY }
+      - { key: value, label: m8.col.stock_value, kind: MONEY, cost: true }
+
+  - id: trade-by-distributor
+    title: m8.report.trade_by_distributor.title
+    decision: m8.report.trade_by_distributor.decision
+    source: trade-received
+    parameters: [period]
+    columns:
+      - { key: date, label: m8.col.date, kind: DATE }
+      - { key: seller, label: m8.col.seller, kind: TEXT }
+      - { key: buyer, label: m8.col.buyer, kind: TEXT }
+      - { key: skuCode, label: m8.col.sku_code, kind: TEXT }
+      - { key: skuName, label: m8.col.sku_name, kind: TEXT }
+      - { key: qty, label: m8.col.qty, kind: QTY }
+      - { key: value, label: m8.col.trade_value, kind: MONEY }
+
+  - id: invoices-issued
+    title: m8.report.invoices_issued.title
+    decision: m8.report.invoices_issued.decision
+    source: invoices-issued
+    parameters: [period]
+    columns:
+      - { key: date, label: m8.col.tax_point, kind: DATE }
+      - { key: number, label: m8.col.invoice_no, kind: TEXT }
+      - { key: seller, label: m8.col.seller, kind: TEXT }
+      - { key: buyer, label: m8.col.buyer, kind: TEXT }
+      - { key: net, label: m8.col.net, kind: MONEY }
+      - { key: tax, label: m8.col.tax, kind: MONEY }
+      - { key: gross, label: m8.col.gross, kind: MONEY }
+
+  # 28A's exposure-statements, demo part: every invoice of the period with what was paid and
+  # credited against it and what is still due. The seller reads its buyers', the buyer its own.
+  - id: statement-of-account
+    title: m8.report.statement_of_account.title
+    decision: m8.report.statement_of_account.decision
+    source: statement-of-account
+    parameters: [period]
+    columns:
+      - { key: date, label: m8.col.tax_point, kind: DATE }
+      - { key: number, label: m8.col.invoice_no, kind: TEXT }
+      - { key: seller, label: m8.col.seller, kind: TEXT }
+      - { key: buyer, label: m8.col.buyer, kind: TEXT }
+      - { key: dueDate, label: m8.col.due_date, kind: DATE }
+      - { key: gross, label: m8.col.gross, kind: MONEY }
+      - { key: credited, label: m8.col.credited, kind: MONEY }
+      - { key: paid, label: m8.col.paid, kind: MONEY }
+      - { key: outstanding, label: m8.col.outstanding, kind: MONEY }
+      - { key: daysOverdue, label: m8.col.days_overdue, kind: COUNT }
+
+  # 28A's receivables-ageing, for trade: what is still due today by counterparty, by how long it
+  # is past its due date.
+  - id: receivables-ageing
+    title: m8.report.receivables_ageing.title
+    decision: m8.report.receivables_ageing.decision
+    source: receivables-ageing
+    parameters: []
+    columns:
+      - { key: seller, label: m8.col.seller, kind: TEXT }
+      - { key: buyer, label: m8.col.buyer, kind: TEXT }
+      - { key: invoices, label: m8.col.invoices, kind: COUNT }
+      - { key: notDue, label: m8.col.not_due, kind: MONEY }
+      - { key: d1to30, label: m8.col.overdue_1_30, kind: MONEY }
+      - { key: d31to60, label: m8.col.overdue_31_60, kind: MONEY }
+      - { key: d61to90, label: m8.col.overdue_61_90, kind: MONEY }
+      - { key: d90plus, label: m8.col.overdue_90_plus, kind: MONEY }
+      - { key: outstanding, label: m8.col.outstanding, kind: MONEY }
+
+  # 28A's fill-rate-delivery: per seller and buyer, what the delivery notes expected against what
+  # was received, and how many GRNs came on or before the date the seller committed to.
+  - id: fill-rate-delivery
+    title: m8.report.fill_rate_delivery.title
+    decision: m8.report.fill_rate_delivery.decision
+    source: fill-rate
+    parameters: [period]
+    columns:
+      - { key: seller, label: m8.col.seller, kind: TEXT }
+      - { key: buyer, label: m8.col.buyer, kind: TEXT }
+      - { key: grns, label: m8.col.grns, kind: COUNT }
+      - { key: expected, label: m8.col.expected_qty, kind: QTY }
+      - { key: received, label: m8.col.received_qty, kind: QTY }
+      - { key: fillRate, label: m8.col.fill_rate, kind: PERCENT }
+      - { key: withEta, label: m8.col.grns_with_eta, kind: COUNT }
+      - { key: onTime, label: m8.col.on_time, kind: COUNT }
+      - { key: onTimeRate, label: m8.col.on_time_rate, kind: PERCENT }
+
+  # 28A's daily-sales-by-shop, demo part: the till's receipts by day and shop.
+  - id: shop-sales-by-shop
+    title: m8.report.shop_sales_by_shop.title
+    decision: m8.report.shop_sales_by_shop.decision
+    source: shop-sales-by-shop
+    parameters: [period, location]
+    columns:
+      - { key: date, label: m8.col.date, kind: DATE }
+      - { key: location, label: m8.col.location, kind: TEXT }
+      - { key: receipts, label: m8.col.receipts, kind: COUNT }
+      - { key: net, label: m8.col.net, kind: MONEY }
+      - { key: tax, label: m8.col.tax, kind: MONEY }
+      - { key: gross, label: m8.col.gross, kind: MONEY }
+
+  # 28A's sales-by-sku-tag, demo part: what the shops sold of each item in the period.
+  - id: shop-sales-by-item
+    title: m8.report.shop_sales_by_item.title
+    decision: m8.report.shop_sales_by_item.decision
+    source: shop-sales-by-item
+    parameters: [period, location]
+    columns:
+      - { key: skuCode, label: m8.col.sku_code, kind: TEXT }
+      - { key: skuName, label: m8.col.sku_name, kind: TEXT }
+      - { key: qty, label: m8.col.qty, kind: QTY }
+      - { key: value, label: m8.col.sales_value, kind: MONEY }

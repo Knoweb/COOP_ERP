@@ -34,4 +34,13 @@ regexes = [
   # The pipeline fetches every branch, so the commit on the K-02 branch failed the scan of
   # main. The constant was rewritten; the commit stays in the history.
   '''ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789''',
+  # The DEVELOPMENT till snapshot signing key pair of infra/compose/compose.yml (28 September
+  # 2026): shared by the two local instances of make up-2 so a till verifies either one's
+  # snapshot. Public on purpose; a real environment sets SYNC_SIGNING_* to its own secret.
+  '''MC4CAQAwBQYDK2VwBCIEIEXGbZPMAOjGn3GfnQFq4dleT1FllP7DFrU3iZfoYwn3''',
+  '''MCowBQYDK2VwAyEAhHqEJHTMyMDprN89bJna8XrGfjtkJkpvX7Bw9CWW4Jk=''',
+  # A made-up temporary password in a mocked API answer of UserCardPage.test.tsx (M1 admin
+  # screens, 28 September 2026); no system ever issued it. The value was replaced by a plainly
+  # fake one; the commit stays in the history.
+  '''Kp7wQ2xZr9Ta''',
 ]

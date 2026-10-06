@@ -1,0 +1,154 @@
+# M7's audit codes (27A section 6), loaded by the kernel's AuditEventTypeSeedLoader. No record of
+# these holds a name, a phone number or a NIC (27A, "Read this first").
+audit_event_types:
+  - code: CUSTOMER_REGISTERED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer was registered at a society
+
+  - code: CUSTOMER_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's names, language, attributes or tags were amended
+
+  - code: CUSTOMER_PHONE_CHANGED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's primary phone was changed
+
+  - code: CUSTOMER_DEACTIVATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer was deactivated
+
+  - code: ACCOUNT_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: A society opened a credit account for a customer
+
+  - code: ACCOUNT_CHARGED
+    severity: INFO
+    offline_capturable: true
+    description_en: A till's account tender was charged to a customer's account
+
+  - code: ACCOUNT_CREDITED
+    severity: INFO
+    offline_capturable: true
+    description_en: A till's refund was credited to a customer's account
+
+  - code: ACCOUNT_LIMIT_BREACH
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A charge took a customer's account beyond its credit limit
+
+  - code: HARD_BLOCK_BYPASSED_OFFLINE
+    severity: ALERT
+    offline_capturable: true
+    description_en: An offline till charged a hard-blocked account beyond its limit
+
+  - code: ACCOUNT_TENDER_UNKNOWN
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till receipt charged an account the society does not have; nothing was posted
+
+  - code: CUSTOMER_PAYMENT_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's repayment was recorded
+
+  # The account remainders, the till's repayments and the privacy workflow (29 September 2026).
+  - code: ACCOUNT_LIMIT_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer account's limit, hard block or offline cap was changed
+
+  - code: ACCOUNT_SUSPENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer account was suspended
+
+  - code: ACCOUNT_REINSTATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A suspended customer account was opened again
+
+  - code: ACCOUNT_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer account was closed
+
+  - code: ACCOUNT_CHARGED_NOT_OPEN
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till charged a suspended or closed customer account; the charge was posted
+
+  - code: ACCOUNT_OFFLINE_CAP_EXCEEDED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: An offline till charged a customer account beyond its offline cap; the charge was posted
+
+  - code: ADJUSTMENT_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: An adjustment of a customer's balance was asked for
+
+  - code: ACCOUNT_ADJUSTED
+    severity: INFO
+    offline_capturable: false
+    description_en: An approved adjustment was posted to a customer's account
+
+  - code: CUSTOMER_PAYMENT_REVERSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's repayment was reversed
+
+  - code: TILL_PAYMENT_FLAGGED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A repayment a till took was applied and flagged
+
+  - code: DSAR_RECEIVED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's request for their data, a correction or erasure was received
+
+  - code: DSAR_FULFILLED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's data request was fulfilled by the responsible officer
+
+  - code: DSAR_REFUSED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's data request was refused on a legal ground
+
+  - code: CUSTOMER_ANONYMISED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's identity was erased; the account postings were kept
+
+  # Wave 2 of the code review (6 October 2026; CR-27A-1, 2026-10-06-wave2-keyed-hashes.md).
+  - code: NIC_RECAPTURED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's NIC was recorded again from the card presented; the record says only that it was
+
+  - code: ACCOUNT_REOPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: A closed customer account was reopened as suspended, to settle what a till posted on it
+
+  - code: ACCOUNT_CHARGED_CUSTOMER_INACTIVE
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till charged the account of a customer who is inactive or erased; the charge was posted
+
+  - code: ACCOUNT_TENDER_MALFORMED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till receipt carried an account tender central could not post (a field missing or an amount it cannot record); nothing was posted
+
+  - code: DSAR_EXPORT_DOWNLOADED
+    severity: INFO
+    offline_capturable: false
+    description_en: The export of a customer's fulfilled access request was handed over by the responsible officer

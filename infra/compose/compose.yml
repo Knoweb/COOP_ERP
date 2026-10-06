@@ -149,6 +149,7 @@ services:
       # state inside the container, so `make down` followed by `make up` imports the file again
       # and an edit to it takes effect. Changes made in the admin console are not kept.
       - ./realm-dev.json:/opt/keycloak/data/import/realm-dev.json:ro
+      - ../keycloak/theme/coop:/opt/keycloak/themes/coop:ro
     healthcheck:
       # The image has no curl or wget; bash can open the management port (9000) itself.
       # /dev/tcp is a bash feature, so bash is named: the default shell of an image may be dash.
@@ -188,6 +189,9 @@ services:
     environment:
       COOP_ERP_ROLE: web,worker
       COOP_ERP_SYSTEM_ENTITY_ID: 0190f000-0000-7000-8000-000000000001
+      # M9's e-mail adapter: every notification mail lands in Mailpit (http://localhost:8025).
+      COOP_ERP_SMTP_HOST: mailpit
+      COOP_ERP_SMTP_PORT: "1025"
       OBJECT_STORE_ENDPOINT: http://minio:9000
       OBJECT_STORE_PUBLIC_ENDPOINT: http://localhost:9000
       OBJECT_STORE_ACCESS_KEY: ${MINIO_ROOT_USER:-coopminio}
@@ -212,6 +216,12 @@ services:
       COOP_ERP_ENFORCE_PERMISSIONS: ${COOP_ERP_ENFORCE_PERMISSIONS:-true}
       # The dev realm has no OTP: a fresh password sign-in is the step-up here (never outside).
       COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS: "true"
+      # The till snapshot signing key pair (TillSigner), the same on every instance: without it
+      # each instance makes its own, and with make up-2 a till enrolled through one instance
+      # rejects a snapshot signed by the other ("not signed by central"). A DEVELOPMENT key,
+      # public in this repository; a real environment configures its own secret.
+      SYNC_SIGNING_PRIVATE_KEY: ${SYNC_SIGNING_PRIVATE_KEY:-MC4CAQAwBQYDK2VwBCIEIEXGbZPMAOjGn3GfnQFq4dleT1FllP7DFrU3iZfoYwn3}
+      SYNC_SIGNING_PUBLIC_KEY: ${SYNC_SIGNING_PUBLIC_KEY:-MCowBQYDK2VwAyEAhHqEJHTMyMDprN89bJna8XrGfjtkJkpvX7Bw9CWW4Jk=}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: ${RABBITMQ_USER:-coop}

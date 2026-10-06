@@ -6,9 +6,17 @@
  * section 4 names the kernel, "m1party::api", "m1party::query", "m2catalogue::api" and
  * "m2catalogue::query"; the list holds the ones the code uses: locations are read through M1's
  * query package and batches through M2's, and M5 answers M2's {@code InventoryLotQuery}, an
- * interface of M2's api package.
+ * interface of M2's api package. It answers M3's {@code InStockBatchQuery} the same way (M3-06:
+ * the RETAIL authoring check and the retail price at central), hence "m3pricing::api".
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "M5 Inventory, Costing, Repack & Loss",
-        allowedDependencies = {"kernel", "kernel::api", "m1party::query", "m2catalogue::api", "m2catalogue::query"})
+        allowedDependencies = {
+            "kernel",
+            "kernel::api",
+            "m1party::query",
+            "m2catalogue::api",
+            "m2catalogue::query",
+            "m3pricing::api"
+        })
 package lk.coopfed.knoweb.m5inventory;

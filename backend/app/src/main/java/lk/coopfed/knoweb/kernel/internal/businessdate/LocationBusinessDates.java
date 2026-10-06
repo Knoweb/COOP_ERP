@@ -18,6 +18,7 @@ import lk.coopfed.knoweb.kernel.api.LocationDayClosed;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import lk.coopfed.knoweb.kernel.internal.HistoricalClock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -70,6 +71,9 @@ public class LocationBusinessDates implements BusinessDate, DayClose {
     @Override
     public LocalDate current(UUID locationId) {
         Objects.requireNonNull(locationId, "a business date belongs to a location");
+        if (HistoricalClock.isHistorical()) {
+            return today(); // the demo loader's past moment (DEMO-02, HistoricalClock)
+        }
         return find(locationId, false).map(State::businessDate).orElseGet(this::today);
     }
 
@@ -79,6 +83,10 @@ public class LocationBusinessDates implements BusinessDate, DayClose {
 
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("BusinessDate.currentHeld was called outside a transaction");
+        }
+
+        if (HistoricalClock.isHistorical()) {
+            return today(); // the demo loader's past moment (DEMO-02, HistoricalClock)
         }
 
         // FOR SHARE: a day close (FOR UPDATE) waits until this transaction ends, so a document

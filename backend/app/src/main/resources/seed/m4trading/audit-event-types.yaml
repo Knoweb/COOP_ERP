@@ -119,3 +119,104 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The A4 copy of an issued tax invoice stored for printing
+
+  - code: INVOICE_DISPUTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The buyer disputed a tax invoice it received
+
+  - code: INVOICE_DISPUTE_RESOLVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The open dispute of a tax invoice closed by the seller or the buyer
+
+  - code: DISCREPANCY_SETTLED
+    severity: INFO
+    offline_capturable: false
+    description_en: The seller accepted the buyer's count; a credit note only for billed damaged quantity
+
+  - code: CREDIT_NOTE_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Credit note issued against a tax invoice, settling a discrepancy or chosen lines
+
+  - code: CREDIT_NOTE_PRINTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The A4 copy of an issued credit note stored for printing
+
+  - code: CREDIT_NOTE_APPLIED
+    severity: INFO
+    offline_capturable: false
+    description_en: Money a credit note held unapplied applied to an open invoice of the same buyer
+
+  - code: PAYMENT_RECEIPT_RECORDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A payment received from a buyer, recorded and applied to its open invoices
+
+  - code: CHEQUE_CLEARED
+    severity: INFO
+    offline_capturable: false
+    description_en: The cheque of a payment receipt cleared
+
+  - code: CHEQUE_BOUNCED
+    severity: ALERT
+    offline_capturable: false
+    description_en: The cheque of a payment receipt bounced; the receipt is reversed and its invoices reopen
+
+  - code: ORDER_AMENDED
+    severity: INFO
+    offline_capturable: false
+    description_en: The buyer amended its order before the seller decided it; the next version replaces it
+
+  - code: PAYMENT_RECEIPT_APPLIED
+    severity: INFO
+    offline_capturable: false
+    description_en: Money a payment receipt held on the buyer's account applied to later invoices
+
+  - code: PAYMENT_RECEIPT_PRINTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The A4 copy of a recorded payment receipt stored for printing
+
+  # M4-06 claims and M4-10 transfer requests (29 Sep). A raised claim waits for the seller: REVIEW.
+  - code: CLAIM_RAISED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: The buyer raised a claim against the seller for goods found damaged, expired, wrong or of poor quality
+
+  - code: CLAIM_PHOTO_ADDED
+    severity: INFO
+    offline_capturable: false
+    description_en: A photograph authorised for upload on a raised claim
+
+  - code: CLAIM_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The seller approved a claim in whole or in part and credited its invoice
+
+  - code: CLAIM_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The seller rejected a claim, with a reason
+
+  - code: CLAIM_RETURN_DISPATCHED
+    severity: INFO
+    offline_capturable: false
+    description_en: The buyer sent the goods of an approved claim back to the seller
+
+  - code: TRANSFER_REQUESTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A shop asked for stock from another location of its society
+
+  - code: TRANSFER_APPROVED
+    severity: INFO
+    offline_capturable: false
+    description_en: The society approved a transfer request; the stores issue the transfer
+
+  - code: TRANSFER_REJECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The society rejected a transfer request, with a reason

@@ -16,6 +16,26 @@ import { Navigation } from "./shell/nav/Navigation";
 import { ScopeBanner } from "./shell/scope/ScopeBanner";
 import { ScopeProvider } from "./shell/scope/ScopeContext";
 
+import coopLogo from "./shell/logo.jpg";
+
+import { useSession } from "./shell/auth/session";
+
+function SignOutSidebar() {
+  const session = useSession();
+  const t = useT();
+  if (!session) return null;
+  return (
+    <button type="button" className="btn-signout" onClick={session.signOut}>
+      <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <polyline points="16 17 21 12 16 7"></polyline>
+        <line x1="21" y1="12" x2="9" y2="12"></line>
+      </svg>
+      {t("shell.auth.sign_out").text}
+    </button>
+  );
+}
+
 /**
  * The frame around every page: the scope banner and the user on top, then the navigation, then
  * the page. In training mode the frame is loud (doc 30 section 2.3): a band above everything and
@@ -28,14 +48,36 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
     <ScopeProvider>
       <div className={training ? "shell shell--training" : "shell"}>
         <TrainingBadge active={training} />
-        <header className="shell-header">
-          <ScopeBanner />
-          <UserMenu />
-        </header>
-        {/* What became of the command a step-up interrupted; nothing, nearly always. */}
-        <StepUpReplay />
-        <Navigation modules={modules} />
-        <Outlet />
+        <div className="shell-layout">
+          <aside className="shell-sidebar">
+            <div className="shell-sidebar-brand">
+              <span className="brand-logo">
+                <img src={coopLogo} alt="COOPFED Logo" style={{ height: "44px", width: "auto", borderRadius: "6px", display: "block" }} />
+              </span>
+              <span className="brand-text">COOPFED ERP</span>
+            </div>
+            <div className="shell-sidebar-nav">
+              <Navigation modules={modules} />
+            </div>
+            <div className="shell-sidebar-footer">
+              <SignOutSidebar />
+            </div>
+          </aside>
+          <div className="shell-main">
+            <header className="shell-topbar">
+              <div className="shell-topbar-left">
+                <ScopeBanner />
+              </div>
+              <div className="shell-topbar-right">
+                <UserMenu />
+              </div>
+            </header>
+            <StepUpReplay />
+            <div className="shell-content-container">
+              <Outlet />
+            </div>
+          </div>
+        </div>
       </div>
     </ScopeProvider>
   );

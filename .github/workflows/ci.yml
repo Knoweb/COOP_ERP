@@ -12,18 +12,22 @@
 #                     schema, i18n and permission checks, web lint)
 #   test              job build-verify (unit, web) and job integration-test (integration with
 #                     Testcontainers)
-#                     job till (the till JVM tests and the debug APK)
+#                     job till (the till JVM tests, the debug APK and the Linux desktop till)
 #                     job scaffolder (a module copied from hello still builds and passes)
 #   e2e               job stack-smoke (the composed stack with two backend instances: first
 #                     tools/smoke.mjs from outside, then the Playwright run in a browser)
 #   package           jobs package (pull request) and package-main (main, after the tests) (Jib image, web bundle, shared engine, SBOM; the till APK
 #                     comes from job till)
+#   publish           job package-main, on a push to main only: the backend images, the web image
+#                     and the demo-tools image to GHCR, tagged main and the commit SHA, for the
+#                     demo server of infra/deploy
 #   nightly           job nightly-fresh-clone (the fifteen-minute start of 17A section 13)
 #
 # Not here yet, on purpose:
 #   - Android emulator smoke (e2e): needs the till hello screen (S0-08). stack-smoke covers
 #     what exists today.
-#   - publish: no registry has been chosen (doc 35 is unwritten). Add the job with the registry.
+#   - publish of a production release: doc 35 (deployment) is unwritten. What is published today
+#     (GHCR, by package-main) serves the demo server of infra/deploy only.
 #   - coverage floors: set per module by its implementation guide; hello has none. The report
 #     exists (job integration-test, artefact coverage-report), the gate does not.
 #
@@ -31,6 +35,10 @@
 # issue that mentions the team when main or the nightly run fails, closed again when green).
 # Vulnerable dependencies are reported by security-scan.yml, pull request titles are checked
 # by pr-title.yml, and dependency updates come from dependabot.yml.
+#
+# Every action is pinned to a commit SHA, its version in the comment after it (wave 2,
+# DEPLOY-15): a tag can be moved to other code, a SHA cannot. Dependabot's github-actions entry
+# proposes the next SHA with its version. The same holds in pr-title.yml and security-scan.yml.
 #
 # How the jobs are ordered, and why. On a pull request the small job `changes` looks first at
 # which files changed (a few seconds) and the jobs with nothing to do are skipped; see the rules
@@ -97,7 +105,7 @@ jobs:
       backend: ${{ steps.decide.outputs.backend }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -143,10 +151,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -163,25 +171,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0          # the format check compares with origin/main
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -207,7 +215,7 @@ jobs:
 
       - name: Upload test reports when something failed
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-reports-unit
           path: |
@@ -217,37 +225,62 @@ jobs:
 
   # The integration half of "test": row-level security, grants, the command pipeline and the
   # time rule against a real PostgreSQL (Testcontainers; the runner has Docker). Its own job,
-  # because it took as long as everything else in the old build-verify-test together. One
-  # fork on the two-core runner: two forks were slower there (run 36201575675), so the count
-  # comes from COOP_ERP_INTEGRATION_FORKS and a laptop keeps its default of two.
+  # because it took as long as everything else in the old build-verify-test together. Sharded by
+  # package (29 September 2026): each matrix leg runs a disjoint set of the 108 integration test
+  # classes (IntegrationTestShardCoverageTest, in make test, fails the build when a class matches
+  # none of the three prefix lists below or more than one, so a new module lands in a shard
+  # automatically as long as its prefix is added there). A pull request also excludes the tests
+  # tagged slow (DemoDataLoaderIntegrationTest; stack-smoke already loads the demo) and runs the
+  # randomised property tests at a smaller count (COOP_ERP_PROPERTY_TRIES); a push to main and
+  # the nightly run do neither, so main is still exercised at full strength. One fork per shard
+  # on the two-core runner: two forks were slower there (run 36201575675), so the count comes
+  # from COOP_ERP_INTEGRATION_FORKS and a laptop keeps its default of two.
   integration-test:
-    name: Integration tests
+    name: Integration tests (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.backend == 'true') }}
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: kernel+m1party
+            packages: "lk.coopfed.knoweb.kernel.,lk.coopfed.knoweb.m1party."
+          - name: m2catalogue+m3pricing+m4trading
+            packages: "lk.coopfed.knoweb.m2catalogue.,lk.coopfed.knoweb.m3pricing.,lk.coopfed.knoweb.m4trading."
+          - name: m5inventory+m6pos+m7customers+m8reporting+demo+others
+            packages: >-
+              lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,lk.coopfed.knoweb.m9integration.,
+              lk.coopfed.knoweb.demo.,lk.coopfed.knoweb.hello.,lk.coopfed.knoweb.config.,
+              lk.coopfed.knoweb.testsupport.,lk.coopfed.knoweb.SchemaRulesIntegrationTest,
+              lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest,lk.coopfed.knoweb.RuntimeRolesIntegrationTest,
+              lk.coopfed.knoweb.ModuleMigrationsFromThePreviousNumberIntegrationTest
     env:
       COOP_ERP_INTEGRATION_FORKS: "1"
+      COOP_ERP_TEST_SHARD_PACKAGES: ${{ matrix.shard.packages }}
+      COOP_ERP_EXCLUDE_SLOW: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+      COOP_ERP_PROPERTY_TRIES: ${{ github.event_name == 'pull_request' && '100' || '' }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -262,34 +295,82 @@ jobs:
       - name: Worker base image (Chromium for the A4 renderer test)
         run: docker build --quiet --tag coop-erp/worker-base:dev infra/worker-image
 
-      - name: make test-int
+      - name: make test-int (this shard only)
         env:
           CHROMIUM_PATH: ${{ github.workspace }}/tools/chromium-in-docker.sh
         run: make test-int
 
-      # One coverage report over the integration tests. A report, not a gate: floors are set per
-      # module by its implementation guide. The totals go to the run summary.
-      - name: Coverage report
+      # Each shard's own JaCoCo exec data, renamed so three shards' files never collide when
+      # jacoco-merge downloads them side by side, and merged into one report there. Not a report
+      # here: a shard's own coverage over a third of the classes would read as a drop.
+      - name: Rename this shard's coverage data
+        run: mv backend/app/build/jacoco/integrationTest.exec "backend/app/build/jacoco/integrationTest-${{ strategy.job-index }}.exec"
+
+      - name: Upload this shard's coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jacoco-exec-${{ strategy.job-index }}
+          path: backend/app/build/jacoco/integrationTest-${{ strategy.job-index }}.exec
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload test reports when something failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-reports-integration-${{ strategy.job-index }}
+          path: backend/app/build/reports/tests
+          retention-days: 7
+
+  # One coverage report over all three shards' JaCoCo data, merged (29 September 2026: sharding
+  # integration-test split one exec file into three). A report, not a gate: floors are set per
+  # module by its implementation guide. The totals go to the run summary, same as before the
+  # shards existed.
+  jacoco-merge:
+    name: Merge coverage
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: ${{ !cancelled() && needs.integration-test.result == 'success' }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Java 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # Landed directly under app/build/jacoco/, where jacocoTestReport's own fileTree
+      # (build.gradle.kts: `include("jacoco/*.exec")`) already looks for exec data — the same
+      # task a laptop runs after `make test-int` picks up three files here instead of one,
+      # with no task change needed.
+      - name: Download every shard's coverage data
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: jacoco-exec-*
+          path: backend/app/build/jacoco
+          merge-multiple: true
+
+      # jacocoTestReport depends on :app:test by Gradle's own jacoco plugin convention (it needs
+      # test's class files, not a fresh run of test itself); -x test -x integrationTest skips
+      # both so this job only compiles and reports, never re-running any test.
+      - name: gradlew jacocoTestReport (merged)
         run: |
-          cd backend && ./gradlew :app:jacocoTestReport --console=plain
+          cd backend && ./gradlew :app:jacocoTestReport -x test -x integrationTest --console=plain
           node ../tools/coverage-summary.mjs app/build/reports/jacoco/test/jacocoTestReport.csv >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-report
           path: backend/app/build/reports/jacoco/test
           retention-days: 7
 
-      - name: Upload test reports when something failed
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-reports-integration
-          path: backend/app/build/reports/tests
-          retention-days: 7
-
-  # The till (Android) part of "test" and "package": its JVM tests and the debug APK. Its own
+  # The till part of "test" and "package": its JVM tests, the debug APK and the Linux desktop
+  # distributable (CR-30-1: one Kotlin Multiplatform codebase). Its own
   # job, because it shares nothing with the backend build and took fifty seconds of the
   # critical path when it ran after it.
   # On a pull request that touches neither till/ nor the shared engine the steps are skipped
@@ -306,11 +387,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Did the till change?
         id: changes
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             till:
@@ -320,7 +401,7 @@ jobs:
 
       - name: Set up Java 21
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -331,12 +412,35 @@ jobs:
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
+      # The shared code's tests on the JVM (commonTest runs as jvmTest), the encrypted database,
+      # the printers, the receipt golden images (Sinhala, Tamil) and the desktop screens driven
+      # under a virtual display (xvfb). The desktop's stack test skips itself unless -Ptill.stack=true.
       - name: Till JVM tests
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
         working-directory: till
-        run: ./gradlew :core:test :peripherals:test :sync:test
+        run: >
+          xvfb-run -a ./gradlew :core:jvmTest :sync:jvmTest :db:jvmTest :peripherals:jvmTest
+          :peripherals-jvm:test :render:jvmTest :ui:jvmTest :desktop:test
+
+      # CR-30-1: the desktop till for Linux, as a folder with its own Java runtime. The Windows
+      # MSI needs a Windows runner (jpackage cannot cross-build); none is added yet.
+      - name: Till desktop distributable (Linux)
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
+        working-directory: till
+        run: |
+          ./gradlew :desktop:createDistributable
+          tar -czf coop-till-linux-x64.tar.gz -C desktop/build/compose/binaries/main/app coop-till
+
+      - name: Upload the Linux desktop till
+        if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: till-desktop-linux
+          path: till/coop-till-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Till APK (signed with the debug key)
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
@@ -345,7 +449,7 @@ jobs:
 
       - name: Upload the till APK
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: till-debug-apk
           path: till/app/build/outputs/apk/debug/app-debug.apk
@@ -354,10 +458,12 @@ jobs:
 
       - name: Upload test reports when something failed
         if: failure() && (github.event_name != 'pull_request' || steps.changes.outputs.till == 'true')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: till-test-reports
-          path: till/*/build/reports/tests
+          path: |
+            till/*/build/reports/tests
+            till/render/build/golden-actual
           retention-days: 7
 
   # S0-13 done criterion: a module scaffolded from hello compiles, keeps the architecture rules
@@ -372,23 +478,23 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -417,10 +523,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -428,13 +534,13 @@ jobs:
 
       # make e2e installs the web dependencies with pnpm, so the runner needs it.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -451,7 +557,7 @@ jobs:
       # (half a minute); it changes only with the Playwright version in the lockfile, so it is
       # kept between runs under that key. The system libraries it needs are installed anyway.
       - name: Cache the Playwright browser
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
@@ -478,7 +584,7 @@ jobs:
 
       - name: Upload the Playwright report and traces when something failed
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
           path: |
@@ -508,24 +614,29 @@ jobs:
     timeout-minutes: 30
 
     steps: &package-steps
+      # persist-credentials false (wave 2, DEPLOY-15): in package-main this job's token can write
+      # packages, and the checkout would otherwise leave it in .git/config for every later step
+      # (pnpm install scripts, Gradle plugins). Nothing here pushes to git.
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -548,7 +659,7 @@ jobs:
           pnpm build
 
       - name: Upload the shared engine
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: shared-engine
           path: backend/shared-engine/build/libs/*.jar
@@ -556,7 +667,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the software bill of materials (CycloneDX)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-sbom
           path: backend/app/build/reports/cyclonedx/bom.json
@@ -564,7 +675,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the web bundle
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-bundle
           path: web/dist
@@ -579,12 +690,37 @@ jobs:
 
       - name: Upload the backend image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-image
           path: backend-image.tar.gz
           if-no-files-found: error
           retention-days: 3
+
+      # The demo server (infra/deploy) pulls its images from GHCR: the two backend images
+      # `make image` built above, the web image (Caddy with the bundle just built,
+      # infra/web-image) and the demo-tools image (the till simulator for the demo's till history,
+      # infra/demo-tools). On a push to main only, after every test job; a pull request and the
+      # nightly run build and keep nothing here. Tagged main (what deploy.sh pulls) and the commit
+      # SHA (to pin or roll back). The source label links each package to this repository.
+      - name: Publish the demo server images to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          (cd backend && ./gradlew :app:demoToolsDist --console=plain)
+          docker build --quiet -f infra/demo-tools/Dockerfile -t coop-erp/demo-tools:dev backend/app
+          docker build --quiet -f infra/web-image/Dockerfile -t coop-erp/web:dev web
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
+          source="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          for name in backend backend-worker demo-tools web; do
+            echo "FROM coop-erp/$name:dev" | docker build --quiet --label "org.opencontainers.image.source=$source"               --label "org.opencontainers.image.revision=$GITHUB_SHA" -t "$registry/$name:main" -
+            docker tag "$registry/$name:main" "$registry/$name:$GITHUB_SHA"
+            docker push --quiet "$registry/$name:main"
+            docker push --quiet "$registry/$name:$GITHUB_SHA"
+          done
 
   # Every test job of the run, not only the two of the backend: the till tests, the scaffolder
   # proof and the two-instance smoke all run on main, and an artefact of main must not come from
@@ -596,6 +732,10 @@ jobs:
     needs: [build-verify, integration-test, till, scaffolder, stack-smoke]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
+    # packages: write for the publish steps (a push to main only); the anchor's other steps read.
+    permissions:
+      contents: read
+      packages: write
     steps: *package-steps
 
   # 17A section 13: from a fresh clone to a working stack with one command. Runs every night,
@@ -608,25 +748,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0          # the format check compares with origin/main
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
 
       # make test also runs the web client's lint and tests, which need pnpm on the host.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -671,7 +811,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -688,7 +828,7 @@ jobs:
   notify:
     name: Notify the team
     runs-on: ubuntu-latest
-    needs: [build-verify, integration-test, till, scaffolder, stack-smoke, package-main, secret-scan, nightly-fresh-clone]
+    needs: [build-verify, integration-test, jacoco-merge, till, scaffolder, stack-smoke, package-main, secret-scan, nightly-fresh-clone]
     if: always() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     timeout-minutes: 5
     permissions:
@@ -727,8 +867,14 @@ jobs:
               gh issue create --title "main is red: the pipeline failed" --label ci-failure --body-file body.md
             fi
           elif [ -n "$open" ]; then
-            gh issue close "$open" --comment "Green again: $RUN_URL"
-            echo "recovered=true" >> "$GITHUB_ENV"
+            # Two main runs can finish within a second of each other; the first closes the issue
+            # and the second must not fail on an issue that is already closed.
+            # Only the run that closes it reports the recovery.
+            if gh issue close "$open" --comment "Green again: $RUN_URL"; then
+              echo "recovered=true" >> "$GITHUB_ENV"
+            else
+              echo "already closed by another run"
+            fi
           fi
 
       # Mail as well, straight from here, so that it does not depend on how each person has set

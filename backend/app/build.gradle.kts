@@ -196,6 +196,8 @@ dependencies {
     // turns a violation into a problem document with message ids (RequestValidationHandler),
     // so no module handles validation itself. Business rules stay guards in the handler.
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // M9: the SMTP e-mail adapter (29A section 6.3), JavaMail to the configured relay (compose: Mailpit).
+    implementation("org.springframework.boot:spring-boot-starter-mail")
 
     runtimeOnly("org.postgresql:postgresql")
     // /actuator/prometheus (17A S0-02: health and metrics). The version is managed by Spring Boot.
@@ -314,6 +316,31 @@ tasks.register<JavaExec>("demoTillSale") {
     mainClass.set("lk.coopfed.knoweb.demo.DemoTillSale")
 }
 
+// The last step of make demo-data (DEMO-02b, docs/DEMO.md): eight weeks of till sales at the four
+// demo shops through the sync contract, with the same till simulator. Idempotent.
+tasks.register<JavaExec>("demoTillHistory") {
+    description = "Loads the demo's history of till sales through the sync contract (local stack)."
+    group = "demo"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("lk.coopfed.knoweb.demo.DemoTillHistory")
+}
+
+// The demo-tools image (infra/demo-tools/Dockerfile): the till simulator of the test sources and
+// everything it runs on, as plain jars and class folders, so that a demo server loads the till
+// history (infra/deploy/demo-data.sh) without a JDK or Gradle of its own. The Dockerfile copies
+// build/demo-tools; nothing here runs on a developer machine unless asked.
+tasks.register<Sync>("demoToolsDist") {
+    description = "Collects the till simulator and its class path for the demo-tools image."
+    group = "demo"
+    val classpath = sourceSets["test"].runtimeClasspath
+    into(layout.buildDirectory.dir("demo-tools"))
+    into("lib") { from(classpath.filter { it.isFile }) }
+    into("classes") {
+        from(classpath.filter { it.isDirectory })
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+}
+
 val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs the tests tagged integration against PostgreSQL in Docker."
     group = "verification"
@@ -321,11 +348,36 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     classpath = sourceSets["test"].runtimeClasspath
     useJUnitPlatform {
         includeTags("integration")
+        // DemoDataLoaderIntegrationTest (about 67s) is tagged slow and runs on main and the
+        // nightly schedule only; a pull request's stack-smoke job already loads the demo
+        // through the real HTTP API. Set by ci.yml's integration-test job via
+        // COOP_ERP_EXCLUDE_SLOW; unset (a laptop, main, nightly) runs everything tagged
+        // integration, slow included.
+        if ((System.getenv("COOP_ERP_EXCLUDE_SLOW") ?: "false").toBoolean()) {
+            excludeTags("slow")
+        }
     }
     // Run as if the server clock were in Colombo, on every machine and in CI (which is UTC).
     // A time bug that depends on the default zone then shows up here, not in production:
     // the first hello migration stored instants five and a half hours off only under this zone.
     systemProperty("user.timezone", "Asia/Colombo")
+    // How many times a randomised property test (RoleGuardrailsPropertyPostgresIntegrationTest)
+    // repeats itself: read by testsupport.PropertyTestTuning. A pull request sets a smaller
+    // count (COOP_ERP_PROPERTY_TRIES in ci.yml); unset, each test runs its own full count, as
+    // main and the nightly run do.
+    System.getenv("COOP_ERP_PROPERTY_TRIES")?.let { systemProperty("coop-erp.test.property-tries", it) }
+    // Which package(s) of test classes this run covers, for the sharded pull request job
+    // (ci.yml's integration-test-shard-*): a comma-separated list of fully-qualified prefixes,
+    // e.g. "lk.coopfed.knoweb.kernel.,lk.coopfed.knoweb.m1party.". Unset (a laptop, main,
+    // nightly, and the plain `make test-int`) runs every package. IntegrationTestShardCoverageTest
+    // fails the build when a test class matches no shard's prefix or more than one.
+    System.getenv("COOP_ERP_TEST_SHARD_PACKAGES")?.let { shards ->
+        val prefixes = shards.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        filter {
+            prefixes.forEach { includeTestsMatching("$it*") }
+            isFailOnNoMatchingTests = false
+        }
+    }
     // The forks share the classes. Each starts its own PostgreSQL container (the static one of
     // PostgresIntegrationTest is per JVM), and every other container maps a random port, so
     // the forks share no state. Two on a laptop; the pipeline sets one, because two forks on

@@ -4,15 +4,18 @@
 
 import { ApiProblem } from "../../shell/api/client";
 import type { ChipState } from "../../shell/components/StateChip";
-import { BUSINESS_TIME_ZONE } from "../../shell/i18n/formats";
 import type {
+  AmendOrderRequest,
   CaptureGrnRequest,
   CreateDeliveryNoteRequest,
   CreateOrderRequest,
   DeliveryNote,
+  Exposure,
   Order,
   OrderLine,
-  OrderStatus
+  OrderStatus,
+  PaymentReceipt,
+  RecordPaymentReceiptRequest
 } from "./tradingApi";
 
 // A batch-less SKU still needs a batch row (M2-05, doc 22 section 3.7), so M2 registers a
@@ -31,20 +34,6 @@ export function isSyntheticBatchNo(batchNo: string | undefined): boolean {
 /** The problem's title, which the server has already translated; the fallback otherwise. */
 export function errorText(error: unknown, fallback: string): string {
   return error instanceof ApiProblem && error.problem.title ? error.problem.title : fallback;
-}
-
-/** Today's business date (Asia/Colombo), as the server's guards read it: yyyy-mm-dd. */
-export function businessToday(now: Date = new Date()): string {
-  // Built from the parts, not from a locale's date format ("en-CA" writes yyyy-mm-dd): where the
-  // date formatter is the FormatJS polyfill (shell/i18n/localeData.ts) only en, si and ta exist.
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(now);
-  const part = (type: string) => parts.find((each) => each.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 /**
@@ -78,6 +67,113 @@ export function grnChip(status: "DRAFT" | "CONFIRMED"): ChipState {
   return status === "DRAFT" ? "draft" : "issued";
 }
 
+/** An open discrepancy is a disagreement still to settle; a settled one is closed and in force. */
+export function discrepancyChip(status: "RAISED" | "SETTLED"): ChipState {
+  return status === "RAISED" ? "disputed" : "issued";
+}
+
+/** A claim waits for the seller (disputed), is approved (issued) or rejected (void). */
+export function claimChip(status: "RAISED" | "APPROVED" | "REJECTED"): ChipState {
+  return status === "RAISED" ? "disputed" : status === "APPROVED" ? "issued" : "void";
+}
+
+/**
+ * The accepted quantity of each claimed line as the approval sends it: the seller's figure where it
+ * typed one (0 accepted), the claimed quantity where it left the field alone; null when a figure is
+ * not a number from 0 to the claimed quantity.
+ */
+export function acceptedLines(
+  lines: { claimLineId: string; claimedQty: number }[],
+  typed: Record<string, string>
+): { claimLineId: string; qty: number }[] | null {
+  const accepted: { claimLineId: string; qty: number }[] = [];
+  for (const line of lines) {
+    const text = typed[line.claimLineId];
+    const qty = text === undefined || text.trim() === "" ? line.claimedQty : Number(text);
+    if (!Number.isFinite(qty) || qty < 0 || qty > line.claimedQty) {
+      return null;
+    }
+    accepted.push({ claimLineId: line.claimLineId, qty });
+  }
+  return accepted;
+}
+
+/** An invoice is in force whatever its payments; one still owing is shown as a document still to close. */
+export function paymentStateChip(state: "OPEN" | "PART_PAID" | "SETTLED" | undefined): ChipState {
+  return state === "SETTLED" ? "issued" : "draft";
+}
+
+/** A receipt in force is issued; a bounced one and its reversal are kept for the record, void. */
+export function receiptChip(status: PaymentReceipt["status"]): ChipState {
+  return status === "RECORDED" ? "issued" : "void";
+}
+
+/** The exposure as a share of the credit limit, in whole percent; null when the relationship sets no limit. */
+export function percentOfLimit(amount: number, creditLimit: number | undefined | null): number | null {
+  if (creditLimit === undefined || creditLimit === null || creditLimit <= 0) {
+    return null;
+  }
+  return Math.round((amount / creditLimit) * 100);
+}
+
+/**
+ * What accepting an order would leave the exposure at: the order's value at its tier prices (what
+ * the acceptance adds, as the server's formula counts it) on top of today's exposure, and whether
+ * that passes the credit limit. It warns only: the server accepts it all the same (ADR-12).
+ */
+export function exposureAfter(
+  exposure: Pick<Exposure, "amount" | "creditLimit">,
+  orderValue: number
+): { amount: number; percent: number | null; overLimit: boolean } {
+  const amount = Math.round((exposure.amount + orderValue) * 100) / 100;
+  const limit = exposure.creditLimit;
+  return {
+    amount,
+    percent: percentOfLimit(amount, limit),
+    overLimit: limit !== undefined && limit !== null && limit > 0 && amount > limit
+  };
+}
+
+/** A payment as the seller's accounts type it; the amounts stay text until it is sent. */
+export type PaymentForm = {
+  method: "CASH" | "CHEQUE" | "TRANSFER" | "DEPOSIT";
+  amount: string;
+  reference: string;
+  receivedOn: string;
+  bank: string;
+  chequeNo: string;
+  chequeDated: string;
+};
+
+/** Ready to send: an amount above zero, and a cheque's bank, number and date when paid by cheque. */
+export function paymentReady(form: PaymentForm): boolean {
+  const amount = Number(form.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || form.receivedOn === "") {
+    return false;
+  }
+  return form.method !== "CHEQUE" || (form.bank.trim() !== "" && form.chequeNo.trim() !== "" && form.chequeDated !== "");
+}
+
+/**
+ * The request: against one invoice when `invoiceId` is given (the amount settles it, up to what is
+ * due), otherwise with no settlements, so the server settles the buyer's open invoices oldest first.
+ */
+export function paymentRequest(buyerEntityId: string, form: PaymentForm, invoiceId?: string): RecordPaymentReceiptRequest {
+  const amount = Number(form.amount);
+  return {
+    buyerEntityId,
+    method: form.method,
+    amount,
+    reference: form.reference.trim() === "" ? undefined : form.reference.trim(),
+    receivedOn: form.receivedOn,
+    cheque:
+      form.method === "CHEQUE"
+        ? { bank: form.bank.trim(), chequeNo: form.chequeNo.trim(), dated: form.chequeDated }
+        : undefined,
+    settlements: invoiceId ? [{ invoiceId, amount }] : undefined
+  };
+}
+
 /** A line of the requisition book as the buyer types it; the quantity stays text until it is sent. */
 export type RequisitionRow = {
   skuId: string;
@@ -95,6 +191,31 @@ export function orderRequest(sellerEntityId: string, deliverToLocationId: string
     sellerEntityId,
     deliverToLocationId: deliverToLocationId || undefined,
     lines: rows.map((row) => ({ skuId: row.skuId, uomCode: row.uomCode, qty: Number(row.qty) }))
+  };
+}
+
+/** A relationship row ACTIVE and in force on `today` (yyyy-mm-dd): M1 keeps one row per term of a pair. */
+export function inForce(row: { status: string; effectiveFrom: string; effectiveTo?: string | null }, today: string): boolean {
+  return row.status === "ACTIVE" && row.effectiveFrom <= today && (!row.effectiveTo || row.effectiveTo >= today);
+}
+
+/** A line of an order being amended: its item and unit stay, the quantity is typed (0 drops the line). */
+export type AmendRow = { skuId: string; uomCode: string; qty: string };
+
+/** The amended order has at least one line, and every quantity is a number, none negative. */
+export function amendReady(rows: AmendRow[]): boolean {
+  const numbers = rows.map((row) => (row.qty.trim() === "" ? Number.NaN : Number(row.qty)));
+  return numbers.every((n) => Number.isFinite(n) && n >= 0) && numbers.some((n) => n > 0);
+}
+
+/** AmendOrder's body: the whole set of lines, those at zero left out, and the requested delivery date. */
+export function amendRequest(rows: AmendRow[], requestedEta: string, notes?: string): AmendOrderRequest {
+  return {
+    requestedEta: requestedEta || undefined,
+    notes: notes || undefined,
+    lines: rows
+      .filter((row) => Number(row.qty) > 0)
+      .map((row) => ({ skuId: row.skuId, uomCode: row.uomCode, qty: Number(row.qty) }))
   };
 }
 

@@ -60,6 +60,7 @@ class A4RenderService implements A4Renderer {
     static final String TIMEOUT = "report.render.timeout_seconds";
     static final String MAX_BYTES = "report.render.max_bytes";
     static final String MAX_HTML_BYTES = "report.render.max_html_bytes";
+    static final String MAX_CONCURRENT = "render.max_concurrent";
 
     private static final Pattern TEMPLATE_ID = Pattern.compile("[a-z0-9]+(-[a-z0-9]+)*");
     private static final String TEMPLATES = "reports/templates/";
@@ -81,6 +82,7 @@ class A4RenderService implements A4Renderer {
 
     private final boolean enabled;
     private final ChromiumPdf chromium;
+    private final RenderSlots slots = new RenderSlots();
     private final ObjectStore store;
     private final ConfigRegistry config;
     private final AuditFacade audit;
@@ -141,7 +143,10 @@ class A4RenderService implements A4Renderer {
         long maxBytes = config.getInt(MAX_BYTES, ctx, 10 * 1024 * 1024);
 
         long started = System.nanoTime();
-        byte[] pdf = chromium.print(html, timeout, maxBytes);
+        // At most render.max_concurrent browsers at once on this instance; a render that cannot
+        // start within one render's timeout is answered render.busy (wave 2, TWK-28).
+        byte[] pdf = slots.run(
+                config.getInt(MAX_CONCURRENT, ctx, 2), timeout, () -> chromium.print(html, timeout, maxBytes));
         log.info(
                 "Rendered {} ({}) in {} ms, {} bytes",
                 templateId,
@@ -177,15 +182,31 @@ class A4RenderService implements A4Renderer {
 
     @Override
     public URI presignGet(String objectKey, ScopeContext ctx) {
-        if (ctx == null
-                || ctx.entityId() == null
-                || objectKey == null
-                || !objectKey.startsWith("reports/" + ctx.entityId() + "/")
-                || !objectKey.endsWith(".pdf")
-                || objectKey.contains("..")) {
+        if (ctx == null || ctx.entityId() == null || !isReportOf(objectKey, ctx.entityId())) {
             throw new ProblemException("report.scope_mismatch", Map.of("objectKey", String.valueOf(objectKey)));
         }
         return store.presignGet(objectKey, CONTENT_TYPE, presignValidity);
+    }
+
+    @Override
+    public URI presignGetOfParty(String objectKey, UUID ownerEntityId, ScopeContext ctx) {
+        // The module read the document naming this key under its own row-level security; here
+        // only an active scope and the key's owner are checked.
+        if (ctx == null
+                || !ctx.hasActiveScope()
+                || ctx.policyClass() == PolicyClass.NONE
+                || ownerEntityId == null
+                || !isReportOf(objectKey, ownerEntityId)) {
+            throw new ProblemException("report.scope_mismatch", Map.of("objectKey", String.valueOf(objectKey)));
+        }
+        return store.presignGet(objectKey, CONTENT_TYPE, presignValidity);
+    }
+
+    private static boolean isReportOf(String objectKey, UUID entityId) {
+        return objectKey != null
+                && objectKey.startsWith("reports/" + entityId + "/")
+                && objectKey.endsWith(".pdf")
+                && !objectKey.contains("..");
     }
 
     /** The template filled, with the kernel's head put first: charset, policy, page size, fonts. */

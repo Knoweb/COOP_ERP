@@ -3,7 +3,6 @@ package lk.coopfed.knoweb.m1party.internal.user;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.m1party.api.UserActivated;
@@ -30,9 +29,6 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.MountableFile;
 
 /**
  * M1-07's done criterion: create, reset and deactivate against the development realm. The
@@ -45,21 +41,9 @@ class UsersAgainstTheProviderIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID ENTITY = UUID.fromString("0190a707-0000-7000-8000-000000000071");
     private static final UUID ADMIN = UUID.fromString("0190a707-0000-7000-8000-0000000000a7");
-    private static final String REALM_FILE = "../../infra/compose/realm-dev.json";
-
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> KEYCLOAK = new GenericContainer<>("quay.io/keycloak/keycloak:26.7.4")
-            .withCommand("start-dev", "--import-realm")
-            .withEnv("KEYCLOAK_ADMIN", "admin")
-            .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
-            .withEnv("KC_HEALTH_ENABLED", "true")
-            .withCopyFileToContainer(MountableFile.forHostPath(REALM_FILE), "/opt/keycloak/data/import/realm-dev.json")
-            .withExposedPorts(8080, 9000)
-            .waitingFor(Wait.forHttp("/health/ready").forPort(9000).withStartupTimeout(Duration.ofMinutes(4)));
 
     @DynamicPropertySource
     static void theProviderOfTheStack(DynamicPropertyRegistry registry) {
-        KEYCLOAK.start();
         registry.add("coop-erp.security.oidc.admin.base-url", UsersAgainstTheProviderIntegrationTest::providerUrl);
     }
 
@@ -146,7 +130,7 @@ class UsersAgainstTheProviderIntegrationTest extends PostgresIntegrationTest {
     // ---- the provider, as its administrator and as the user ----
 
     private static String providerUrl() {
-        return "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080);
+        return lk.coopfed.knoweb.testsupport.SharedKeycloak.baseUrl();
     }
 
     private static JsonNode userAtTheProvider(String subject) {

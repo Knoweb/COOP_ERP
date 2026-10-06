@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DeviceCredentials;
@@ -18,9 +17,6 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.MountableFile;
 
 /**
  * {@link DeviceCredentials} against the provider the local stack runs, started with the same
@@ -32,21 +28,9 @@ import org.testcontainers.utility.MountableFile;
 class KeycloakDeviceCredentialsIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID ENTITY = UUID.fromString("0190a700-0000-7000-8000-000000000001");
-    private static final String REALM_FILE = "../../infra/compose/realm-dev.json";
-
-    @SuppressWarnings("resource")
-    private static final GenericContainer<?> KEYCLOAK = new GenericContainer<>("quay.io/keycloak/keycloak:26.7.4")
-            .withCommand("start-dev", "--import-realm")
-            .withEnv("KEYCLOAK_ADMIN", "admin")
-            .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
-            .withEnv("KC_HEALTH_ENABLED", "true")
-            .withCopyFileToContainer(MountableFile.forHostPath(REALM_FILE), "/opt/keycloak/data/import/realm-dev.json")
-            .withExposedPorts(8080, 9000)
-            .waitingFor(Wait.forHttp("/health/ready").forPort(9000).withStartupTimeout(Duration.ofMinutes(4)));
 
     @DynamicPropertySource
     static void theProviderOfTheStack(DynamicPropertyRegistry registry) {
-        KEYCLOAK.start();
         registry.add("coop-erp.security.oidc.admin.base-url", KeycloakDeviceCredentialsIntegrationTest::base);
         registry.add(
                 "coop-erp.security.oidc.token-endpoint", () -> base() + "/realms/coop/protocol/openid-connect/token");
@@ -90,7 +74,7 @@ class KeycloakDeviceCredentialsIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static String base() {
-        return "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080);
+        return lk.coopfed.knoweb.testsupport.SharedKeycloak.baseUrl();
     }
 
     private static String token(String endpoint, String clientId, String secret) {

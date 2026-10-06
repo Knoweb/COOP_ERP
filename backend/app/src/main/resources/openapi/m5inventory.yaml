@@ -44,6 +44,36 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/LotBalanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/inventory/locations/{locationId}/movements:
+    get:
+      tags: [Inventory]
+      operationId: listMovements
+      summary: The stock card of one SKU at a location, oldest first, with the running quantity
+      description: >
+        Every ledger movement of the SKU at the location (opening balance, receipt, transfer in
+        and out, sale, dispatch, reversal), in ledger order, each with the quantity of the SKU at
+        the location after it, summed by the server (25A section 8, "Stock card"). The unit cost
+        at the movement is shown to the owner's user only, like the balances. A location the
+        caller's scope does not read answers an empty list.
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The movements with the running quantity
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockCardLineResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
   /v1/inventory/availability:
     get:
       tags: [Inventory]
@@ -306,7 +336,543 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TransferResponse' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  # ---- stock control (M5-11, M5-13, repack): counts, write-offs, recipes, repacks ----------
+  /v1/inventory/counts:
+    get:
+      tags: [StockControl]
+      operationId: listCounts
+      summary: The counts of a location, newest first
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CountResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+    post:
+      tags: [StockControl]
+      operationId: scheduleCount
+      summary: Schedule a count of a location, of everything or of some items
+      description: >
+        Nothing is frozen: the location keeps selling and receiving while it is counted. Codes this
+        operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope,
+        m5.count.scope_invalid, m5.count.already_open.
+      x-permission: inv.count.schedule
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleCountRequest' }
+      responses:
+        '201':
+          description: Scheduled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/counts/{taskId}:
+    get:
+      tags: [StockControl]
+      operationId: getCount
+      summary: One count with its expectation, its lines and its adjustment
+      x-permission: inv.stock.view
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: The count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResponse' }
+        '404':
+          description: No such count, or the caller's scope may not see it
+  /v1/inventory/counts/{taskId}/start:
+    post:
+      tags: [StockControl]
+      operationId: startCount
+      summary: Start the count; what the book holds of every lot in scope is noted
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found,
+        m5.count.not_scheduled.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Counting
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/counts/{taskId}/submit:
+    post:
+      tags: [StockControl]
+      operationId: submitCount
+      summary: Submit what was counted; variances within tolerance post at once
+      description: >
+        Each lot is measured against the book as it stands at submit (what was noted at the start,
+        moved by the sales and receipts since). Variances within tolerance post as COUNT_ADJUST;
+        the others wait for approval (VARIANCE_REVIEW). Codes this operation can answer with 422:
+        m5.scope.own_required, m5.count.not_found, m5.count.not_counting, m5.count.line_invalid,
+        m5.batch.not_found, m5.count.line_out_of_scope, m5.count.line_missing.
+      x-permission: shop.count.record
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitCountRequest' }
+      responses:
+        '200':
+          description: Submitted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/counts/{taskId}/approve:
+    post:
+      tags: [StockControl]
+      operationId: approveAdjustment
+      summary: Approve the count's variances beyond tolerance and post them
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found,
+        m5.adjustment.not_in_review, m5.adjustment.approver_is_requester, sod.same_person,
+        m5.approval.limit_exceeded; mfa.required when the second factor is not fresh.
+      x-permission: inv.adjust.approve
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Approved and posted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/counts/{taskId}/reject:
+    post:
+      tags: [StockControl]
+      operationId: rejectAdjustment
+      summary: Reject the count's variances beyond tolerance; nothing more is posted
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.count.not_found,
+        m5.adjustment.not_in_review, m5.reason_required; mfa.required when the second factor is not fresh.
+      x-permission: inv.adjust.approve
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CountResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/locations/{locationId}/negative-lots:
+    get:
+      tags: [StockControl]
+      operationId: listNegativeLots
+      summary: The lots of a location below zero, oversold at the till, oldest first
+      x-permission: inv.stock.view
+      parameters:
+        - in: path
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The negative lots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/NegativeLotResponse' }
+  /v1/inventory/lots/{stockLotId}/acknowledge-negative:
+    post:
+      tags: [StockControl]
+      operationId: acknowledgeNegativeLot
+      summary: Acknowledge a lot below zero with a note; the next count corrects it
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.lot.not_found,
+        m5.lot.not_negative, m5.lot.already_acknowledged, m5.reason_required.
+      x-permission: inv.count.schedule
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: stockLotId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Acknowledged
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NegativeLotResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs:
+    get:
+      tags: [StockControl]
+      operationId: listWriteOffs
+      summary: The write-offs of a location, newest first
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The write-offs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WriteOffResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+    post:
+      tags: [StockControl]
+      operationId: requestWriteOff
+      summary: Draft a write-off of lost stock at a location
+      description: >
+        No stock moves until approval. Codes this operation can answer with 422:
+        m5.scope.own_required, m5.location.not_in_scope, m5.writeoff.category_required,
+        m5.writeoff.lines_required, m5.writeoff.line_invalid, m5.batch.not_found,
+        m5.writeoff.insufficient_stock.
+      x-permission: inv.writeoff.request
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestWriteOffRequest' }
+      responses:
+        '201':
+          description: Drafted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WriteOffResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}:
+    get:
+      tags: [StockControl]
+      operationId: getWriteOff
+      summary: One write-off with its lines, photographs and approval state
+      x-permission: inv.stock.view
+      parameters:
+        - $ref: '#/components/parameters/WriteOffId'
+      responses:
+        '200':
+          description: The write-off
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WriteOffResponse' }
+        '404':
+          description: No such write-off, or the caller's scope may not see it
+  /v1/inventory/write-offs/{writeOffId}/photos:
+    post:
+      tags: [StockControl]
+      operationId: addWriteOffPhoto
+      summary: Authorise the upload of one photograph for a draft write-off
+      description: >
+        Answers a URL the client PUTs the bytes to, with the content type given here. Codes this
+        operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found,
+        m5.writeoff.not_draft, attachment.content_type_not_allowed, attachment.too_large.
+      x-permission: inv.writeoff.request
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WriteOffId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PhotoUploadRequest' }
+      responses:
+        '200':
+          description: Authorised
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PhotoUploadResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}/submit:
+    post:
+      tags: [StockControl]
+      operationId: submitWriteOff
+      summary: Issue the write-off as a WOF document; it waits for its witness
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found,
+        m5.writeoff.not_draft, m5.location.not_in_scope, m5.writeoff.photos_required,
+        m5.writeoff.insufficient_stock, m5.writeoff.entity_unknown.
+      x-permission: inv.writeoff.request
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WriteOffId'
+      responses:
+        '200':
+          description: Submitted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WriteOffResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}/witness:
+    post:
+      tags: [StockControl]
+      operationId: witnessWriteOff
+      summary: Witness the loss; remotely from the photographs at a single-staff location
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found,
+        m5.writeoff.not_requested, m5.writeoff.witness_is_requester, m5.writeoff.photos_incomplete,
+        m5.location.not_in_scope, m5.writeoff.remote_witness_not_allowed.
+      x-permission: inv.writeoff.witness
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WriteOffId'
+      responses:
+        '200':
+          description: Witnessed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WriteOffResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}/approve:
+    post:
+      tags: [StockControl]
+      operationId: approveWriteOff
+      summary: Approve the write-off within your band; the stock is written off
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found,
+        m5.writeoff.not_witnessed, m5.writeoff.approver_is_requester, sod.same_person,
+        m5.writeoff.insufficient_stock, m5.approval.limit_exceeded; mfa.required when the second
+        factor is not fresh.
+      x-permission: inv.writeoff.approve
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WriteOffId'
+      responses:
+        '200':
+          description: Approved and posted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WriteOffResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/write-offs/{writeOffId}/reject:
+    post:
+      tags: [StockControl]
+      operationId: rejectWriteOff
+      summary: Reject the write-off with a reason; no stock moves
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.writeoff.not_found,
+        m5.writeoff.not_open, m5.reason_required; mfa.required when the second factor is not fresh.
+      x-permission: inv.writeoff.approve
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WriteOffId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WriteOffResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/recipes:
+    get:
+      tags: [StockControl]
+      operationId: listRecipes
+      summary: The entity's repack recipes, active first
+      x-permission: inv.stock.view
+      responses:
+        '200':
+          description: The recipes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RecipeResponse' }
+    post:
+      tags: [StockControl]
+      operationId: defineRecipe
+      summary: Define a repack recipe
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.recipe.name_required,
+        m5.recipe.invalid, m5.recipe.same_sku, m5.recipe.sku_inactive, m5.recipe.output_not_repack,
+        m5.recipe.name_taken.
+      x-permission: inv.recipe.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DefineRecipeRequest' }
+      responses:
+        '201':
+          description: Defined
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecipeResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/recipes/{recipeId}/retire:
+    post:
+      tags: [StockControl]
+      operationId: retireRecipe
+      summary: Retire a recipe; repacks done with it stay
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.recipe.not_found,
+        m5.recipe.retired.
+      x-permission: inv.recipe.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: recipeId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Retired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecipeResponse' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/repacks:
+    get:
+      tags: [StockControl]
+      operationId: listRepacks
+      summary: The repacks done at a location, newest first
+      x-permission: inv.stock.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The repacks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RepackResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+    post:
+      tags: [StockControl]
+      operationId: executeRepack
+      summary: Repack part of a bulk lot into packs by a recipe
+      description: >
+        The input leaves as REPACK_CONSUME at the entity average; the packs made come in as a new
+        batch at the consumed value divided by their number. Codes this operation can answer with
+        422: m5.scope.own_required, m5.location.not_in_scope, m5.recipe.not_found,
+        m5.recipe.retired, m5.repack.qty_invalid, m5.batch.not_found, m5.repack.input_mismatch,
+        m5.repack.insufficient_stock, and M2's batch guards for the output.
+      x-permission: inv.repack.execute
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExecuteRepackRequest' }
+      responses:
+        '201':
+          description: Executed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RepackResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/inventory/repacks/{repackId}:
+    get:
+      tags: [StockControl]
+      operationId: getRepack
+      summary: One repack
+      x-permission: inv.stock.view
+      parameters:
+        - $ref: '#/components/parameters/RepackId'
+      responses:
+        '200':
+          description: The repack
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RepackResponse' }
+        '404':
+          description: No such repack, or the caller's scope may not see it
+  /v1/inventory/repacks/{repackId}/reverse:
+    post:
+      tags: [StockControl]
+      operationId: reverseRepack
+      summary: Reverse a repack while its packs are untouched; the input lot is restored
+      description: >
+        Codes this operation can answer with 422: m5.scope.own_required, m5.repack.not_found,
+        m5.repack.already_reversed, m5.reason_required, m5.repack.output_touched.
+      x-permission: inv.repack.reverse
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RepackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Reversed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RepackResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
+  parameters:
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema: { type: string, format: uuid }
+    WriteOffId:
+      in: path
+      name: writeOffId
+      required: true
+      schema: { type: string, format: uuid }
+    RepackId:
+      in: path
+      name: repackId
+      required: true
+      schema: { type: string, format: uuid }
   schemas:
     IssueTransferRequest:
       type: object
@@ -364,6 +930,12 @@ components:
         documentLineId: { type: string, format: uuid }
         movementSeq: { type: integer, format: int64 }
         occurredAt: { type: string, format: date-time }
+    StockCardLineResponse:
+      type: object
+      required: [movement, balanceAfter]
+      properties:
+        movement: { $ref: '#/components/schemas/MovementResponse' }
+        balanceAfter: { type: number }
     PickListResponse:
       type: object
       required: [pickListId, deliveryNoteId, status, lines]
@@ -457,3 +1029,237 @@ components:
         locationId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         available: { type: number }
+    ScheduleCountRequest:
+      type: object
+      required: [locationId, scopeKind]
+      properties:
+        locationId: { type: string, format: uuid }
+        scopeKind: { type: string, enum: [FULL, SKUS] }
+        skuIds:
+          type: array
+          maxItems: 500
+          items: { type: string, format: uuid }
+        scheduledFor: { type: string, format: date }
+    SubmitCountRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          maxItems: 2000
+          items: { $ref: '#/components/schemas/CountLineRequest' }
+    CountLineRequest:
+      type: object
+      description: A counted quantity, or a reason to skip the lot; never both.
+      required: [batchId]
+      properties:
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        countedQty: { type: number, minimum: 0 }
+        skipReason: { type: string, maxLength: 200 }
+    ReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    CountResponse:
+      type: object
+      required: [taskId, locationId, scopeKind, skuIds, scheduledFor, status, expectation, lines]
+      properties:
+        taskId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        scopeKind: { type: string, enum: [FULL, SKUS] }
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+        scheduledFor: { type: string, format: date }
+        status: { type: string, enum: [SCHEDULED, COUNTING, VARIANCE_REVIEW, CLOSED] }
+        outcome: { type: string, enum: [POSTED, APPROVED, REJECTED] }
+        scheduledBy: { type: string, format: uuid }
+        startedBy: { type: string, format: uuid }
+        startedAt: { type: string, format: date-time }
+        submittedBy: { type: string, format: uuid }
+        submittedAt: { type: string, format: date-time }
+        reviewValue: { type: number, description: 'the value of the variances beyond tolerance, at the entity average' }
+        reviewBand: { type: integer }
+        reviewedBy: { type: string, format: uuid }
+        reviewedAt: { type: string, format: date-time }
+        reviewReason: { type: string }
+        expectation:
+          type: array
+          items: { $ref: '#/components/schemas/CountExpectedResponse' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/CountLineResponse' }
+    CountExpectedResponse:
+      type: object
+      required: [batchId, skuId, condition, expectedQty]
+      properties:
+        batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        expectedQty: { type: number }
+    CountLineResponse:
+      type: object
+      required: [lineNo, batchId, skuId, condition, expectedQty, varianceQty, varianceValue, withinTolerance]
+      properties:
+        lineNo: { type: integer }
+        batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        expectedQty: { type: number }
+        countedQty: { type: number }
+        skipReason: { type: string }
+        varianceQty: { type: number }
+        varianceValue: { type: number }
+        withinTolerance: { type: boolean }
+    NegativeLotResponse:
+      type: object
+      required: [stockLotId, locationId, skuId, batchId, condition, qtyOnHand]
+      properties:
+        stockLotId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qtyOnHand: { type: number }
+        negativeSince: { type: string, format: date-time }
+        acknowledgedAt: { type: string, format: date-time }
+    RequestWriteOffRequest:
+      type: object
+      required: [locationId, category, lines]
+      properties:
+        locationId: { type: string, format: uuid }
+        category:
+          type: string
+          enum: [DAMAGED_IN_TRANSIT, DAMAGED_IN_STORE, EXPIRED, THEFT, SHRINKAGE_UNEXPLAINED, STAFF_CONSUMPTION,
+                 SAMPLES, DONATION, OTHER]
+        note: { type: string, maxLength: 500 }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/WriteOffLineRequest' }
+    WriteOffLineRequest:
+      type: object
+      required: [batchId, qty]
+      properties:
+        batchId: { type: string, format: uuid }
+        condition: { type: string, enum: [GOOD, DAMAGED], default: GOOD }
+        qty: { type: number, exclusiveMinimum: 0 }
+    PhotoUploadRequest:
+      type: object
+      required: [contentType]
+      properties:
+        contentType: { type: string, maxLength: 100 }
+        contentLength: { type: integer, format: int64, minimum: 1 }
+    PhotoUploadResponse:
+      type: object
+      required: [attachmentId, url, expiresAt]
+      properties:
+        attachmentId: { type: string, format: uuid }
+        url: { type: string }
+        expiresAt: { type: string, format: date-time }
+    WriteOffResponse:
+      type: object
+      required: [writeOffId, locationId, category, status, remoteWitness, photosRequired, lines, photos]
+      properties:
+        writeOffId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        category: { type: string }
+        note: { type: string }
+        status: { type: string, enum: [DRAFT, REQUESTED, WITNESSED, POSTED, REJECTED] }
+        requestedBy: { type: string, format: uuid }
+        requestedAt: { type: string, format: date-time }
+        submittedAt: { type: string, format: date-time }
+        documentNo: { type: string }
+        value: { type: number, description: 'the loss at the entity average, from the submit on' }
+        band: { type: integer }
+        witnessUserId: { type: string, format: uuid }
+        witnessedAt: { type: string, format: date-time }
+        remoteWitness: { type: boolean }
+        approverUserId: { type: string, format: uuid }
+        decidedAt: { type: string, format: date-time }
+        rejectReason: { type: string }
+        photosRequired: { type: boolean }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/WriteOffLineResponse' }
+        photos:
+          type: array
+          items: { $ref: '#/components/schemas/WriteOffPhotoResponse' }
+    WriteOffLineResponse:
+      type: object
+      required: [lineNo, batchId, skuId, condition, qty]
+      properties:
+        lineNo: { type: integer }
+        batchId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        batchNo: { type: string }
+        condition: { type: string, enum: [GOOD, DAMAGED] }
+        qty: { type: number }
+    WriteOffPhotoResponse:
+      type: object
+      required: [attachmentId, status]
+      properties:
+        attachmentId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, COMPLETE, FAILED] }
+    DefineRecipeRequest:
+      type: object
+      required: [name, inputSkuId, inputQty, outputSkuId, outputQty]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        inputSkuId: { type: string, format: uuid }
+        inputQty: { type: number, exclusiveMinimum: 0 }
+        outputSkuId: { type: string, format: uuid }
+        outputQty: { type: number, exclusiveMinimum: 0 }
+        expectedLossPct: { type: number, minimum: 0, exclusiveMaximum: 100 }
+    RecipeResponse:
+      type: object
+      required: [recipeId, name, inputSkuId, inputQty, outputSkuId, outputQty, expectedLossPct, status]
+      properties:
+        recipeId: { type: string, format: uuid }
+        name: { type: string }
+        inputSkuId: { type: string, format: uuid }
+        inputQty: { type: number }
+        outputSkuId: { type: string, format: uuid }
+        outputQty: { type: number }
+        expectedLossPct: { type: number }
+        status: { type: string, enum: [ACTIVE, RETIRED] }
+    ExecuteRepackRequest:
+      type: object
+      required: [recipeId, locationId, inputBatchId, inputQty, actualOutputQty]
+      properties:
+        recipeId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        inputBatchId: { type: string, format: uuid }
+        inputQty: { type: number, exclusiveMinimum: 0 }
+        actualOutputQty: { type: number, exclusiveMinimum: 0 }
+        printedMrp: { type: number, exclusiveMinimum: 0 }
+    RepackResponse:
+      type: object
+      required: [repackId, locationId, recipeId, inputBatchId, inputSkuId, inputQty, outputSkuId, outputBatchId,
+                 expectedOutputQty, actualOutputQty, varianceQty, status]
+      properties:
+        repackId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        recipeId: { type: string, format: uuid }
+        inputBatchId: { type: string, format: uuid }
+        inputSkuId: { type: string, format: uuid }
+        inputQty: { type: number }
+        inputUnitCost: { type: number }
+        outputSkuId: { type: string, format: uuid }
+        outputBatchId: { type: string, format: uuid }
+        outputBatchNo: { type: string }
+        expectedOutputQty: { type: number }
+        actualOutputQty: { type: number }
+        varianceQty: { type: number, description: 'expected minus actual output: the yield loss beyond the recipe' }
+        outputUnitCost: { type: number }
+        status: { type: string, enum: [EXECUTED, REVERSED] }
+        executedBy: { type: string, format: uuid }
+        executedAt: { type: string, format: date-time }
+        reversalReason: { type: string }
+        reversedAt: { type: string, format: date-time }

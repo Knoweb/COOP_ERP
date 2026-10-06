@@ -88,3 +88,12 @@ VALUES
      '[{"day":"MON","opens":"07:30","closes":"19:30"},{"day":"TUE","opens":"07:30","closes":"19:30"},{"day":"WED","opens":"07:30","closes":"19:30"},{"day":"THU","opens":"07:30","closes":"19:30"},{"day":"FRI","opens":"07:30","closes":"19:30"},{"day":"SAT","opens":"07:30","closes":"13:00"}]',
      'S', true, 'ACTIVE')
 ON CONFLICT (location_id) DO NOTHING;
+
+-- M7, the privacy requests (29 September 2026, branch feat/m7-limits-privacy-snapshot): the
+-- manager of Kuliyapitiya MPCS (m101-manager in seed/m1security/demo-users.demo.sql) is its
+-- responsible officer (doc 21 CR-21-1; doc 27 section 3.2), who answers members' data requests.
+-- Only where none is appointed, so an officer appointed through the screens is kept.
+UPDATE party.entity
+   SET responsible_officer_user_id = '0190f0de-0000-7000-8000-000000000232'
+ WHERE entity_id = '0190f0de-0000-7000-8000-0000000000e3'
+   AND responsible_officer_user_id IS NULL;

@@ -3,6 +3,14 @@ package lk.coopfed.knoweb.kernel.internal.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -14,6 +22,7 @@ import java.util.function.Supplier;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry.ConfigScope;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.NotificationAudience;
 import lk.coopfed.knoweb.kernel.api.NotificationChannel;
 import lk.coopfed.knoweb.kernel.api.NotificationRuleQueries;
 import lk.coopfed.knoweb.kernel.api.Notifications;
@@ -37,10 +46,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Delivery against PostgreSQL with a test channel and a test rule store standing in for M9
- * (19A section 10, "Tests"): a replayed event sends once; quiet-hours suppression; the kill
+ * (19A section 10, "Tests", as CR-19A-12 corrects them): a replayed event sends once;
+ * quiet-hours deferral to the window's end, the recipient's entity's window; the kill
  * switch; fallback language; a failing provider is retried by the sweep and given up with
  * an ALERT; the dispatcher matches an event against a rule and its explicit audience; the
- * log holds a hash and a length, never the number or the body.
+ * log holds a keyed hash and a length, never the number or the body, and never a provider's
+ * error text (wave 2).
  *
  * <p>The review of 26 September added: the send runs after the commit and the retry is served
  * from what is held in {@code notification_pending}, so any instance can retry; a retry checks
@@ -55,9 +66,17 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID USER = UUID.fromString("0190c100-0000-7000-8000-000000000010");
     private static final UUID RULE = UUID.fromString("0190c100-0000-7000-8000-0000000000a1");
 
+    /** Another entity: the counterparty whose contact a rule reaches. */
+    private static final UUID OTHER = UUID.fromString("0190c100-0000-7000-8000-000000000002");
+
+    private static final ZoneId COLOMBO = ZoneId.of("Asia/Colombo");
+
     @DynamicPropertySource
     static void systemEntity(DynamicPropertyRegistry registry) {
         registry.add("coop-erp.system.entity-id", FEDERATION::toString);
+        // The test channels and the test rule store stand in for M9's, which would be a second
+        // adapter per channel and a second rule store (M9's NotifyConfiguration).
+        registry.add("coop-erp.integration.notify.enabled", () -> "false");
     }
 
     @Autowired
@@ -107,6 +126,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         sms.sent.clear();
         sms.failNext = 0;
         sms.refs = 0;
+        sms.failMessage = "gateway down";
         for (TestBeans.TestChannel channel : List.of(email, emailSecondary)) {
             channel.sent.clear();
             channel.failNext = 0;
@@ -121,10 +141,8 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         ((lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry) config)
                 .invalidate(NotificationDispatcher.CACHE_SECONDS);
         // No quiet hours in this test unless a case sets them: the clock is whatever it is.
-        inScope(ENTITY, () -> {
-            config.set("notification.sms.quiet_hours", ConfigScope.entity(ENTITY), "", scope(ENTITY), "test");
-            return null;
-        });
+        quietHours(ENTITY, "");
+        quietHours(OTHER, "");
     }
 
     @Test
@@ -145,11 +163,15 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
 
         Map<String, Object> row = superuserJdbc()
                 .queryForMap(
-                        "select status, recipient_hash, rendered_length, language, provider_ref from kernel.notification_log"
-                                + " where notification_id = ?",
+                        "select status, recipient_hash, recipient_hash_key_id, rendered_length, language, provider_ref"
+                                + " from kernel.notification_log where notification_id = ?",
                         id);
         assertThat(row.get("status")).isEqualTo("SENT");
         assertThat(String.valueOf(row.get("recipient_hash"))).hasSize(64).doesNotContain("0771234567");
+        // Keyed (TWK-20, M9-07): not the plain SHA-256 anybody can recompute for every number,
+        // and the key that made it is named beside it.
+        assertThat(String.valueOf(row.get("recipient_hash"))).isNotEqualTo(plainSha256("SMS:0771234567"));
+        assertThat(row.get("recipient_hash_key_id")).isNotNull();
         assertThat(row.get("rendered_length")).isEqualTo(sms.sent.get(0).body().length());
         assertThat(row.get("provider_ref")).isEqualTo("ref-1");
     }
@@ -187,7 +209,13 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
         // The same thing under another rule (so the unique key does not catch it): de-duplicated
         // inside the hour, logged as such.
         UUID other = inScope(ENTITY, () -> ((NotificationService) notifications)
-                .deliver(RULE, event, "SMS", "0771234567", "en", "hello.greeting.duplicate", Map.of(), scope(ENTITY)));
+                .deliver(
+                        RULE,
+                        event,
+                        new NotificationAudience.Recipient("SMS", "0771234567", "en"),
+                        "hello.greeting.duplicate",
+                        Map.of(),
+                        scope(ENTITY)));
         assertThat(sms.sent).hasSize(2);
         assertThat(superuserJdbc()
                         .queryForMap(
@@ -198,7 +226,7 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void theKillSwitchAndTheQuietHoursSuppress() {
+    void theKillSwitchSuppresses() {
         inScope(ENTITY, () -> {
             config.set("notification.sms.enabled", ConfigScope.entity(ENTITY), "false", scope(ENTITY), "test");
             return null;
@@ -213,24 +241,155 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                                 String.class,
                                 off))
                 .isEqualTo("KILL_SWITCH");
+    }
 
-        inScope(ENTITY, () -> {
-            config.set("notification.sms.enabled", ConfigScope.entity(ENTITY), "true", scope(ENTITY), "test");
-            // The whole day is quiet: whatever the clock says, it is inside the window.
-            config.set(
-                    "notification.sms.quiet_hours", ConfigScope.entity(ENTITY), "00:00-23:59", scope(ENTITY), "test");
-            return null;
-        });
-        UUID quiet = inScope(ENTITY, () -> notifications
-                .send("SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY))
-                .notificationId());
+    @Test
+    void quietHoursDeferToTheEndOfTheWindowAndTheSweepSendsThen() {
+        // CR-19A-12: a notification due inside quiet hours is held, not dropped.
+        quietHours(ENTITY, windowAroundNow());
+        Notifications.Delivery delivery = inScope(
+                ENTITY,
+                () -> notifications.send(
+                        "SMS", "0777654321", "en", "hello.greeting.duplicate", Map.of(), Ids.next(), scope(ENTITY)));
+        UUID id = delivery.notificationId();
+        assertThat(delivery.outcome()).isEqualTo(Notifications.Outcome.QUEUED);
         assertThat(sms.sent).isEmpty();
+        assertThat(status(id)).isEqualTo("QUEUED");
+        // A deferral is not an attempt; what the send needs stays held; due at the window's end.
+        assertThat(attempts(id)).isZero();
+        assertThat(held(id)).isNotNull();
+        assertDueAtTheWindowsEnd(id);
+        assertThat(sweep.retryDue()).isZero();
+
+        // The window ends (here: the entity clears it; the clock is whatever it is) and the row
+        // comes due: the sweep sends it, as its first attempt.
+        quietHours(ENTITY, "");
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(id)).isEqualTo("SENT");
+        assertThat(attempts(id)).isEqualTo(1);
+        assertThat(sms.sent).extracting(NotificationChannel.Outgoing::recipient).containsExactly("0777654321");
+        assertThat(held(id)).isNull();
+    }
+
+    @Test
+    void aRetryInsideQuietHoursIsDeferredWithItsAttemptGivenBack() {
+        sms.failNext = 1;
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "0771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        assertThat(attempts(id)).isEqualTo(1);
+
+        // Quiet hours begin between the first attempt and the retry: the retry waits, it is
+        // neither sent nor suppressed, and the hold is kept for it.
+        quietHours(ENTITY, windowAroundNow());
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(id)).isEqualTo("QUEUED");
+        assertThat(attempts(id)).isEqualTo(1);
+        assertThat(held(id)).isNotNull();
+        assertThat(sms.sent).isEmpty();
+        assertDueAtTheWindowsEnd(id);
+
+        quietHours(ENTITY, "");
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(id)).isEqualTo("SENT");
+        assertThat(attempts(id)).isEqualTo(2);
+    }
+
+    @Test
+    void theRecipientsEntitysQuietHoursHoldNotTheSenders() {
+        // The counterparty's ACCOUNTS desk, named by the audience (ROLE_AT_COUNTERPARTY): its
+        // entity's window decides, and the row says whose contact it reached and as what.
+        quietHours(ENTITY, "");
+        quietHours(OTHER, windowAroundNow());
+        UUID deferred = inScope(ENTITY, () -> ((NotificationService) notifications)
+                .deliver(
+                        RULE,
+                        Ids.next(),
+                        new NotificationAudience.Recipient("SMS", "0771234567", "en", OTHER, "ACCOUNTS"),
+                        "hello.greeting.duplicate",
+                        Map.of(),
+                        scope(ENTITY)));
+        assertThat(sms.sent).isEmpty();
+        assertThat(status(deferred)).isEqualTo("QUEUED");
+        assertDueAtTheWindowsEnd(deferred);
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select recipient_entity_id, audience_role, owner_entity_id from kernel.notification_log"
+                                        + " where notification_id = ?",
+                                deferred))
+                .containsEntry("recipient_entity_id", OTHER)
+                .containsEntry("audience_role", "ACCOUNTS")
+                .containsEntry("owner_entity_id", ENTITY);
+
+        // The sender's own window does not stop a message to an entity that has none.
+        quietHours(ENTITY, windowAroundNow());
+        quietHours(OTHER, "");
+        UUID sent = inScope(ENTITY, () -> ((NotificationService) notifications)
+                .deliver(
+                        RULE,
+                        Ids.next(),
+                        new NotificationAudience.Recipient("SMS", "0772222222", "en", OTHER, "ACCOUNTS"),
+                        "hello.greeting.duplicate",
+                        Map.of(),
+                        scope(ENTITY)));
+        assertThat(status(sent)).isEqualTo("SENT");
+        assertThat(sms.sent).extracting(NotificationChannel.Outgoing::recipient).containsExactly("0772222222");
+    }
+
+    @Test
+    void theRegisterRefusesQuietHoursLongerThanFifteenHours() {
+        // A deferral must never reach the 24-hour age at which a notification is given up.
+        assertThatThrownBy(() -> quietHours(ENTITY, "00:00-23:59"))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.value_invalid");
+        quietHours(ENTITY, "22:00-07:00");
+    }
+
+    @Test
+    void aProvidersErrorTextReachesNeitherTheLogNorTheAudit() {
+        // TWK-21, M9-10: a provider that quotes the number in its error; the log row and the
+        // insert-only audit row keep the class and a category, never the text.
+        sms.failNext = 3;
+        sms.failMessage = "Invalid destination +94771234567 for 'Hello'";
+        UUID id = inScope(
+                        ENTITY,
+                        () -> notifications.send(
+                                "SMS",
+                                "+94771234567",
+                                "en",
+                                "hello.greeting.duplicate",
+                                Map.of(),
+                                Ids.next(),
+                                scope(ENTITY)))
+                .notificationId();
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        makeDue(id);
+        assertThat(sweep.retryDue()).isEqualTo(1);
+        assertThat(status(id)).isEqualTo("FAILED");
+
+        String lastError = superuserJdbc()
+                .queryForObject(
+                        "select last_error from kernel.notification_log where notification_id = ?", String.class, id);
+        assertThat(lastError).isEqualTo("IllegalStateException: UNKNOWN").doesNotContain("771234567");
         assertThat(superuserJdbc()
                         .queryForObject(
-                                "select suppressed_reason from kernel.notification_log where notification_id = ?",
-                                String.class,
-                                quiet))
-                .isEqualTo("QUIET_HOURS");
+                                "select to_jsonb(a)::text from kernel.audit_event a where event_type_code = 'NOTIFICATION_FAILED'",
+                                String.class))
+                .contains("IllegalStateException: UNKNOWN")
+                .doesNotContain("771234567")
+                .doesNotContain("Invalid destination");
     }
 
     @Test
@@ -704,6 +863,45 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                         "select attempts from kernel.notification_log where notification_id = ?", Integer.class, id);
     }
 
+    private static String plainSha256(String text) {
+        try {
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** The entity's SMS quiet hours, set as its own administrator would. */
+    private void quietHours(UUID entity, String window) {
+        inScope(entity, () -> {
+            config.set("notification.sms.quiet_hours", ConfigScope.entity(entity), window, scope(entity), "test");
+            return null;
+        });
+    }
+
+    /**
+     * A window that holds now, whatever the clock says: from an hour ago to two hours ahead, in
+     * the business zone (it wraps midnight when the test runs late; the deferral handles both).
+     */
+    private static String windowAroundNow() {
+        LocalTime now = LocalTime.now(COLOMBO);
+        DateTimeFormatter hhmm = DateTimeFormatter.ofPattern("HH:mm");
+        return now.minusHours(1).format(hhmm) + "-" + now.plusHours(2).format(hhmm);
+    }
+
+    /** Deferred to the end of {@link #windowAroundNow}: between one and two hours from now. */
+    private void assertDueAtTheWindowsEnd(UUID id) {
+        Instant due = superuserJdbc()
+                .queryForObject(
+                        "select next_attempt_at from kernel.notification_log where notification_id = ?",
+                        java.sql.Timestamp.class,
+                        id)
+                .toInstant();
+        Instant now = Instant.now();
+        assertThat(due).isAfter(now.plus(Duration.ofMinutes(59))).isBefore(now.plus(Duration.ofMinutes(121)));
+    }
+
     private void makeDue(UUID id) {
         superuserJdbc()
                 .update(
@@ -765,11 +963,13 @@ class NotificationsPostgresIntegrationTest extends PostgresIntegrationTest {
                 return role;
             }
 
+            volatile String failMessage = "gateway down";
+
             @Override
             public String send(Outgoing outgoing) {
                 if (failNext > 0) {
                     failNext--;
-                    throw new IllegalStateException("gateway down");
+                    throw new IllegalStateException(failMessage);
                 }
                 sent.add(outgoing);
                 return (role == Role.SECONDARY ? "secondary-ref-" : "ref-") + (++refs);

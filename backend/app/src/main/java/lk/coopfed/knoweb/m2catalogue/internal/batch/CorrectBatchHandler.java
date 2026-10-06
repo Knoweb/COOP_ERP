@@ -28,8 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
  * replacement is the one to correct); the caller is the Federation or holds a lot of the batch
  * (M5's answer through {@link InventoryLotQuery}, from its lots); MFA (the permission cat.batch.correct asks for it); a reason; a new
  * value that differs. Mutation: a replacement batch citing the old one, owned by the caller; the
- * trigger batch_correction (V0004) marks the old batch SUPERSEDED and re-points its identity, as
- * the database's owner, because the old row belongs to the registering entity.
+ * trigger batch_correction (V0004, V0008) marks the old batch SUPERSEDED and re-points its identity, as
+ * the database's owner, because the old row belongs to the registering entity. The trigger holds the
+ * same "owner, Federation or lot holder" rule for every path (wave 2, RLS-07), so a write that skips
+ * this guard is refused by the database.
  */
 @Service
 @CommandHandler(permission = "cat.batch.correct", requiresMfa = true)
@@ -76,7 +78,7 @@ public class CorrectBatchHandler implements Handles<CorrectBatch, UUID> {
             throw new ProblemException("m2.batch.superseded", Map.of("batchId", command.batchId()));
         }
 
-        if (!federation.isFederation(scope) && !lots.holdsLotOf(before.batchId(), scope.entityId())) {
+        if (!federation.isFederation(scope) && !lots.holdsLotOf(before.batchId(), scope)) {
             throw new ProblemException("m2.batch.not_holder", Map.of("batchId", command.batchId()));
         }
 

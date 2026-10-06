@@ -4,11 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.EntityUpdated;
+import lk.coopfed.knoweb.m1party.query.UserQueries;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,8 +49,15 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
 
     private static final String URL = "/v1/party/entities/" + ENTITY_ID + "/responsible-officer";
 
+    private static final UUID FEDERATION_ID = UUID.fromString("00000000-0000-0000-0000-000000009304");
+
+    private static final UUID OTHER_ENTITY_ID = UUID.fromString("00000000-0000-0000-0000-000000009305");
+
     @Autowired
     private TestRestTemplate http;
+
+    @Autowired
+    private UserQueries users;
 
     @MockBean
     private CurrentScope currentScope;
@@ -52,7 +65,14 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
     @BeforeEach
     void seedEntity() {
 
-        superuserJdbc().update("delete from party.entity where entity_id = ?", ENTITY_ID);
+        superuserJdbc().update("delete from security.app_user where user_id = ?", OFFICER_ID);
+        // The entity is kept between tests (the party directory refers to it once an event has
+        // been projected); only its officer is reset.
+        superuserJdbc()
+                .update(
+                        "update party.entity set responsible_officer_user_id = null, data_governance_signed_on = null"
+                                + " where entity_id = ?",
+                        ENTITY_ID);
 
         superuserJdbc()
                 .update(
@@ -64,6 +84,7 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
                     legal_name_en
                 )
                 values (?, ?, 'MPCS', ?)
+                on conflict (entity_id) do nothing
                 """,
                         ENTITY_ID,
                         ENTITY_CODE,
@@ -143,6 +164,119 @@ class AppointResponsibleOfficerPostgresIntegrationTest extends PostgresIntegrati
 
         assertThat(kernel.committedEvents())
                 .containsExactly(new EntityUpdated(ENTITY_ID, ENTITY_CODE, "MPCS", "ONBOARDING"));
+    }
+
+    @Test
+    void theEntityCardNamesTheOfficerInsteadOfShowingTheId() {
+
+        superuserJdbc().update("delete from security.app_user where user_id = ?", OFFICER_ID);
+        superuserJdbc()
+                .update(
+                        "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
+                                + " values (?, ?, 'officer-9303', 'Nimal Perera', 'BACK_OFFICE', 'ACTIVE')",
+                        OFFICER_ID,
+                        ENTITY_ID);
+        superuserJdbc()
+                .update(
+                        "update party.entity set responsible_officer_user_id = ? where entity_id = ?",
+                        OFFICER_ID,
+                        ENTITY_ID);
+
+        when(currentScope.get()).thenReturn(ScopeContext.dev(CALLER_USER_ID, ENTITY_ID, null));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(TestIdentityProvider.token(CALLER_USER_ID, ENTITY_ID));
+        headers.set("X-Scope-Entity", ENTITY_ID.toString());
+
+        ResponseEntity<Map> response =
+                http.exchange("/v1/party/entities/" + ENTITY_ID, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody())
+                .containsEntry("responsibleOfficerUserId", OFFICER_ID.toString())
+                .containsEntry("responsibleOfficerName", "Nimal Perera");
+    }
+
+    @Test
+    void aFederationSessionReadsTheOfficersNameButNotTheUserRecord() {
+
+        appointNimalPerera();
+        // fed-accounts and fed-pricing in the demo: the Federation's own entity-wide scope, which
+        // reads the society's entity row (federation_admin_read) but none of its users.
+        UUID federation = superuserJdbc()
+                .queryForObject("select entity_id from kernel.system_identity where singleton", UUID.class);
+        ScopeContext federationOwn = ScopeContext.dev(CALLER_USER_ID, federation, null);
+
+        ResponseEntity<Map> own = readEntityAs(federationOwn, federation);
+
+        assertThat(own.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(own.getBody()).containsEntry("responsibleOfficerName", "Nimal Perera");
+        // The name is part of the register; the user record stays the society's (m1security V0017).
+        assertThat(users.getUser(OFFICER_ID, federationOwn)).isEmpty();
+        // A pair that is not the entity's appointment answers nothing.
+        assertThat(users.appointedOfficerName(ENTITY_ID, CALLER_USER_ID, federationOwn))
+                .isEmpty();
+    }
+
+    @Test
+    void aFederationViewSessionReadsTheOfficersName() {
+
+        appointNimalPerera();
+        ScopeContext federationView = new ScopeContext(
+                CALLER_USER_ID,
+                null,
+                FEDERATION_ID,
+                List.of(new Scope(FEDERATION_ID, null)),
+                null,
+                PolicyClass.FEDERATION_VIEW,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                null);
+
+        ResponseEntity<Map> response = readEntityAs(federationView, FEDERATION_ID);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsEntry("responsibleOfficerName", "Nimal Perera");
+    }
+
+    @Test
+    void aSessionThatCannotReadTheEntityCannotReadTheOfficersName() {
+
+        appointNimalPerera();
+        ScopeContext anotherSociety = ScopeContext.dev(CALLER_USER_ID, OTHER_ENTITY_ID, null);
+
+        ResponseEntity<Map> response = readEntityAs(anotherSociety, OTHER_ENTITY_ID);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(String.valueOf(response.getBody())).doesNotContain("Nimal Perera");
+        ScopeContext none = new ScopeContext(
+                CALLER_USER_ID, null, null, List.of(), null, PolicyClass.NONE, Set.of(), null, Locale.ENGLISH, null);
+        assertThat(users.appointedOfficerName(ENTITY_ID, OFFICER_ID, none)).isEmpty();
+    }
+
+    private void appointNimalPerera() {
+
+        superuserJdbc().update("delete from security.app_user where user_id = ?", OFFICER_ID);
+        superuserJdbc()
+                .update(
+                        "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
+                                + " values (?, ?, 'officer-9303', 'Nimal Perera', 'BACK_OFFICE', 'ACTIVE')",
+                        OFFICER_ID,
+                        ENTITY_ID);
+        superuserJdbc()
+                .update(
+                        "update party.entity set responsible_officer_user_id = ? where entity_id = ?",
+                        OFFICER_ID,
+                        ENTITY_ID);
+    }
+
+    private ResponseEntity<Map> readEntityAs(ScopeContext scope, UUID scopeEntity) {
+
+        when(currentScope.get()).thenReturn(scope);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(TestIdentityProvider.token(CALLER_USER_ID, scopeEntity));
+        headers.set("X-Scope-Entity", scopeEntity.toString());
+        return http.exchange("/v1/party/entities/" + ENTITY_ID, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
     }
 
     @TestConfiguration(proxyBeanMethods = false)

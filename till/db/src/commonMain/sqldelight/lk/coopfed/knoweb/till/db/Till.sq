@@ -1,0 +1,137 @@
+-- The till's own database (26A section 3; CR-30-1: SQLDelight over encrypted SQLite).
+-- Receipts are inserted once and never changed. An outbox row is marked acknowledged when central
+-- has it and kept for the retention window (doc 32 section 3.4; S8, DR-3), so central can ask for
+-- it again (RESEND_FROM). No .sqm migration before a pilot: the trial databases are re-created.
+
+CREATE TABLE setting (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- The snapshot at one version, applied whole: live rows (held = 0) and rows held for a later
+-- business date (held = 1). data is NULL for a held tombstone.
+CREATE TABLE snapshot_row (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tbl TEXT NOT NULL,
+    row_id TEXT NOT NULL,
+    apply_from TEXT,
+    data TEXT,
+    held INTEGER NOT NULL
+);
+
+-- acked_at: epoch ms on the till's clock when central acknowledged the row; NULL while pending.
+CREATE TABLE outbox (
+    device_seq INTEGER NOT NULL PRIMARY KEY,
+    event_id TEXT NOT NULL UNIQUE,
+    event_type TEXT NOT NULL,
+    json TEXT NOT NULL,
+    acked_at INTEGER
+);
+
+CREATE INDEX outbox_pending ON outbox(acked_at, device_seq);
+
+CREATE TABLE till_session (
+    session_id TEXT NOT NULL PRIMARY KEY,
+    is_open INTEGER NOT NULL,
+    json TEXT NOT NULL
+);
+
+CREATE TABLE receipt (
+    document_id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    number INTEGER NOT NULL UNIQUE,
+    json TEXT NOT NULL
+);
+
+CREATE INDEX receipt_session ON receipt(session_id);
+
+-- What the office must know (TWK-05, TWK-06, TWK-07): a fact central refused, a resend the till
+-- cannot serve, a counter repaired, a clock set by hand. One row per kind and fact (a NULL
+-- device_seq never collides, SQLite treats NULLs as distinct).
+CREATE TABLE anomaly (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    device_seq INTEGER,
+    event_id TEXT,
+    reason TEXT,
+    detail TEXT NOT NULL,
+    noted_at INTEGER NOT NULL,
+    seen INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX anomaly_fact ON anomaly(kind, device_seq);
+
+selectSetting:
+SELECT value FROM setting WHERE key = ?;
+
+upsertSetting:
+INSERT OR REPLACE INTO setting(key, value) VALUES (?, ?);
+
+deleteSetting:
+DELETE FROM setting WHERE key = ?;
+
+selectSnapshotRows:
+SELECT tbl, row_id, apply_from, data, held FROM snapshot_row ORDER BY id;
+
+deleteSnapshotRows:
+DELETE FROM snapshot_row;
+
+insertSnapshotRow:
+INSERT INTO snapshot_row(tbl, row_id, apply_from, data, held) VALUES (?, ?, ?, ?, ?);
+
+insertOutbox:
+INSERT INTO outbox(device_seq, event_id, event_type, json) VALUES (?, ?, ?, ?);
+
+selectPendingOutbox:
+SELECT device_seq, event_id, event_type, json FROM outbox WHERE acked_at IS NULL ORDER BY device_seq LIMIT ?;
+
+countPendingOutbox:
+SELECT count(*) FROM outbox WHERE acked_at IS NULL;
+
+acknowledgeOutboxUpTo:
+UPDATE outbox SET acked_at = ? WHERE device_seq <= ? AND acked_at IS NULL;
+
+purgeAcknowledged:
+DELETE FROM outbox WHERE acked_at IS NOT NULL AND acked_at < ?;
+
+countOutboxSeq:
+SELECT count(*) FROM outbox WHERE device_seq = ?;
+
+unacknowledgeFrom:
+UPDATE outbox SET acked_at = NULL WHERE device_seq >= ?;
+
+maxOutboxSeq:
+SELECT max(device_seq) AS seq FROM outbox;
+
+upsertSession:
+INSERT OR REPLACE INTO till_session(session_id, is_open, json) VALUES (?, ?, ?);
+
+selectOpenSession:
+SELECT json FROM till_session WHERE is_open = 1 LIMIT 1;
+
+selectSession:
+SELECT json FROM till_session WHERE session_id = ?;
+
+insertReceipt:
+INSERT INTO receipt(document_id, session_id, number, json) VALUES (?, ?, ?, ?);
+
+selectReceiptsOfSession:
+SELECT json FROM receipt WHERE session_id = ? ORDER BY number;
+
+maxReceiptNumber:
+SELECT max(number) AS number FROM receipt;
+
+insertAnomaly:
+INSERT OR IGNORE INTO anomaly(kind, device_seq, event_id, reason, detail, noted_at, seen) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectAnomalies:
+SELECT kind, device_seq, event_id, reason, detail, noted_at, seen FROM anomaly ORDER BY id DESC LIMIT ?;
+
+countUnseenAnomalies:
+SELECT count(*) FROM anomaly WHERE seen = 0;
+
+markAnomaliesSeen:
+UPDATE anomaly SET seen = 1 WHERE seen = 0;
+
+countQuarantinedAmong:
+SELECT count(*) FROM anomaly WHERE kind = 'QUARANTINED' AND device_seq IN ?;

@@ -1,0 +1,20 @@
+.reporting-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-end;
+  margin-bottom: var(--space-4);
+}
+
+.reporting-filter-label {
+  display: block;
+  margin-bottom: var(--space-half);
+}
+
+/* The eight-week trend on a tile: one series, the accent colour, a text for every bar. */
+.reporting-trend {
+  display: block;
+  width: 100%;
+  height: var(--space-6);
+  fill: var(--color-accent);
+}

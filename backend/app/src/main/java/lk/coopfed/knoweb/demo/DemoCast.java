@@ -37,6 +37,7 @@ final class DemoCast {
     static final Actor FED_STEWARD = actor("fed-steward", "000000000201", FEDERATION, null);
     static final Actor FED_PRICING = actor("fed-pricing", "000000000202", FEDERATION, null);
     static final Actor FED_STORES = actor("fed-stores", "000000000203", FEDERATION, FEDERATION_WAREHOUSE);
+    static final Actor FED_SALES = actor("fed-sales", "000000000204", FEDERATION, null);
     static final Actor FED_ACCOUNTS = actor("fed-accounts", "000000000205", FEDERATION, null);
     static final Actor D101_BUYER = actor("d101-buyer", "000000000211", D101, null);
     static final Actor D101_STORES = actor("d101-stores", "000000000212", D101, D101_WAREHOUSE);
@@ -49,6 +50,10 @@ final class DemoCast {
     static final Actor M101_SHOP_STAFF = actor("m101-shop", "000000000233", M101, M101_TOWN_SHOP);
     static final Actor M102_MANAGER = actor("m102-manager", "000000000242", M102, null);
     static final Actor M103_MANAGER = actor("m103-manager", "000000000252", M103, null);
+    /** The shop staff at Pannala and Point Pedro: each counts and signs the shop's opening stock. */
+    static final Actor M102_SHOP_STAFF = actor("m102-shop", "000000000243", M102, M102_SHOP);
+
+    static final Actor M103_SHOP_STAFF = actor("m103-shop", "000000000253", M103, M103_SHOP);
 
     /** A shop, the society manager who sets it up, and how many till positions it has. */
     record Shop(UUID locationId, Actor manager, int tills) {}

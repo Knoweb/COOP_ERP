@@ -36,14 +36,16 @@ class SyncRateLimiter {
     private static final Duration MINUTE = Duration.ofMinutes(1);
     private static final Duration HOUR = Duration.ofHours(1);
 
-    /** What a device has left: its batches this minute and its bytes this hour. */
+    /** What a device has left: its batches this minute, its bytes this hour, its other requests this minute. */
     private static final class DeviceBuckets {
         final TokenBucket batches;
         final TokenBucket bytes;
+        final TokenBucket requests;
 
         DeviceBuckets(Instant now) {
             this.batches = new TokenBucket(now);
             this.bytes = new TokenBucket(now);
+            this.requests = new TokenBucket(now);
         }
     }
 
@@ -107,6 +109,50 @@ class SyncRateLimiter {
             buckets.bytes.take(bytesNeeded);
         }
         return new Permit();
+    }
+
+    /**
+     * Lets one of the device's other calls in (a snapshot, a change page, a heartbeat, a presign:
+     * wave 2, TWK-25, decided 6 October 2026, docs/progress/deviations/2026-10-06-wave2-kernel-defaults-and-limits.md
+     * (4)), or refuses it with 429 {@code sync.rate_limited}: one token of the per-minute request
+     * bucket ({@code sync.rate.requests_per_minute}). A download also waits while the device's
+     * hourly byte bucket is spent, since what it answers is charged there afterwards
+     * ({@link #chargeBytes}): a till that loops on the full snapshot is told to wait like one that
+     * uploads too much.
+     */
+    void admitRequest(ScopeContext scope, UUID deviceId, boolean download) {
+        Instant now = clock.instant();
+        int perMinute = settings.requestsPerMinute(scope);
+        long perHour = settings.bytesPerHour(scope);
+        DeviceBuckets buckets = devices.get(deviceId, id -> new DeviceBuckets(now));
+        synchronized (buckets) {
+            buckets.requests.refill(now, perMinute, MINUTE);
+            buckets.bytes.refill(now, perHour, HOUR);
+            Duration wait = buckets.requests.waitFor(1, perMinute, MINUTE);
+            if (download) {
+                // Any byte left lets a download start; it is charged in full when it is answered.
+                Duration bytesWait = buckets.bytes.waitFor(1, perHour, HOUR);
+                wait = wait.compareTo(bytesWait) >= 0 ? wait : bytesWait;
+            }
+            if (!wait.isZero()) {
+                throw refused(wait);
+            }
+            buckets.requests.take(1);
+        }
+    }
+
+    /**
+     * Charges what was sent to the device against its hourly byte bucket; the bucket may go below
+     * zero, and the device then waits until it has refilled.
+     */
+    void chargeBytes(ScopeContext scope, UUID deviceId, long bytes) {
+        Instant now = clock.instant();
+        long perHour = settings.bytesPerHour(scope);
+        DeviceBuckets buckets = devices.get(deviceId, id -> new DeviceBuckets(now));
+        synchronized (buckets) {
+            buckets.bytes.refill(now, perHour, HOUR);
+            buckets.bytes.take(Math.max(0, bytes));
+        }
     }
 
     /** How many batches this instance is ingesting now (for tests and the health view). */

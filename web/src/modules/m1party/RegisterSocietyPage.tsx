@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
+import "./m1party.css";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { usePartyApi } from "./partyApi";
@@ -79,11 +80,14 @@ export function RegisterSocietyPage() {
   return (
     <main className="shell-page">
       <p>
-        <Link to="/party/societies">{t("party.back_to_register").text}</Link>
+        <Link className="back-link" to="/party/societies">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
+        {t("party.back_to_register").text}
+      </Link>
       </p>
       <h1>{t("party.new.title").text}</h1>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: "var(--target-gap)" }}>
+      <form onSubmit={submit} className="party-form-row">
         <TextField label={t("party.field.code").text} value={form.entityCode} onChange={(v) => set("entityCode", v)} error={fieldErrors.entityCode} required maxLength={12} />
 
         <label style={field}>
@@ -182,7 +186,7 @@ export function TextField(props: {
 
 function FieldError({ text }: { text: string }) {
   return (
-    <span role="alert" style={{ color: "var(--color-alert-text)", fontSize: "var(--font-size-sm)" }}>
+    <span role="alert" className="party-alert-text">
       {text}
     </span>
   );

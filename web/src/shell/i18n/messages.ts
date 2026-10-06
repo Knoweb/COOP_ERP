@@ -11,7 +11,10 @@ import partyMessages from "../../modules/m1party/party.messages.json" with { typ
 import catalogueMessages from "../../modules/m2catalogue/catalogue.messages.json" with { type: "json" };
 import inventoryMessages from "../../modules/m5inventory/inventory.messages.json" with { type: "json" };
 import tradingMessages from "../../modules/m4trading/trading.messages.json" with { type: "json" };
+import posMessages from "../../modules/m6pos/pos.messages.json" with { type: "json" };
 import reportingMessages from "../../modules/m8reporting/reporting.messages.json" with { type: "json" };
+import customersMessages from "../../modules/m7customers/customers.messages.json" with { type: "json" };
+import integrationMessages from "../../modules/m9integration/integration.messages.json" with { type: "json" };
 // new-module:import (make new-module adds a line above this one; keep the comment)
 
 export type Locale = "en" | "si" | "ta";
@@ -30,6 +33,8 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.scope.entity_unnamed": "Entity …{shortId}",
     "shell.scope.location_all": "All locations",
     "shell.scope.access": "Access:",
+    "shell.user.notifications": "Notifications",
+    "shell.user.label": "User",
     "shell.scope.class.OWN": "Own entity",
     "shell.scope.class.PARTY": "Trading partner (documents shared with you)",
     "shell.scope.class.FEDERATION_VIEW": "Federation view (sees every entity)",
@@ -62,6 +67,7 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.stepup.replaying": "Finishing the action you confirmed before signing in again …",
     "shell.stepup.done": "The action you confirmed before signing in again is done.",
     "shell.stepup.failed": "The action you confirmed before signing in again did not go through. Please try it again.",
+    "shell.stepup.reenter": "Your sign-in was refreshed. Enter the details again.",
     "shell.reason.confirm": "Confirm",
     "shell.reason.cancel": "Cancel",
     "shell.fact.empty": "Not set",
@@ -96,6 +102,8 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.scope.entity_unnamed": "ආයතනය …{shortId}",
     "shell.scope.location_all": "සියලු ස්ථාන",
     "shell.scope.access": "ප්‍රවේශය:",
+    "shell.user.notifications": "දැනුම්දීම්",
+    "shell.user.label": "පරිශීලක",
     "shell.scope.class.OWN": "තමන්ගේ ආයතනය",
     "shell.scope.class.PARTY": "වෙළඳ හවුල්කරු (ඔබ සමඟ බෙදාගත් ලේඛන)",
     "shell.scope.class.FEDERATION_VIEW": "සම්මේලන දර්ශනය (සියලු ආයතන පෙනේ)",
@@ -128,6 +136,7 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.stepup.replaying": "නැවත පුරනය වීමට පෙර ඔබ තහවුරු කළ ක්‍රියාව අවසන් කරමින් …",
     "shell.stepup.done": "නැවත පුරනය වීමට පෙර ඔබ තහවුරු කළ ක්‍රියාව සිදු කර ඇත.",
     "shell.stepup.failed": "නැවත පුරනය වීමට පෙර ඔබ තහවුරු කළ ක්‍රියාව සිදු නොවීය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "shell.stepup.reenter": "ඔබේ පුරනය නැවුම් කරන ලදී. විස්තර නැවත ඇතුළත් කරන්න.",
     "shell.reason.confirm": "තහවුරු කරන්න",
     "shell.reason.cancel": "අවලංගු කරන්න",
     "shell.fact.empty": "සකසා නැත",
@@ -162,6 +171,8 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.scope.entity_unnamed": "நிறுவனம் …{shortId}",
     "shell.scope.location_all": "அனைத்து இடங்கள்",
     "shell.scope.access": "அணுகல்:",
+    "shell.user.notifications": "அறிவிப்புகள்",
+    "shell.user.label": "பயனர்",
     "shell.scope.class.OWN": "சொந்த நிறுவனம்",
     "shell.scope.class.PARTY": "வர்த்தகப் பங்காளர் (உங்களுடன் பகிரப்பட்ட ஆவணங்கள்)",
     "shell.scope.class.FEDERATION_VIEW": "சம்மேளனப் பார்வை (அனைத்து நிறுவனங்களும் தெரியும்)",
@@ -194,6 +205,7 @@ export const SHELL_MESSAGES: Catalogue = {
     "shell.stepup.replaying": "மீண்டும் உள்நுழைவதற்கு முன் நீங்கள் உறுதிப்படுத்திய செயலை முடிக்கிறது …",
     "shell.stepup.done": "மீண்டும் உள்நுழைவதற்கு முன் நீங்கள் உறுதிப்படுத்திய செயல் முடிந்தது.",
     "shell.stepup.failed": "மீண்டும் உள்நுழைவதற்கு முன் நீங்கள் உறுதிப்படுத்திய செயல் நிறைவேறவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "shell.stepup.reenter": "உங்கள் உள்நுழைவு புதுப்பிக்கப்பட்டது. விவரங்களை மீண்டும் உள்ளிடவும்.",
     "shell.reason.confirm": "உறுதிப்படுத்து",
     "shell.reason.cancel": "ரத்துசெய்",
     "shell.fact.empty": "அமைக்கப்படவில்லை",
@@ -226,7 +238,10 @@ export const MODULE_CATALOGUES: Catalogue[] = [
   catalogueMessages,
   inventoryMessages,
   tradingMessages,
+  posMessages,
   reportingMessages,
+  customersMessages,
+  integrationMessages,
   // new-module:entry (make new-module adds a line above this one; keep the comment)
 ];
 

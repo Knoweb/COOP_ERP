@@ -1,0 +1,23 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`lk.coopfed.knoweb.m7customers`
+|Spring components
+|_Services_
+
+* `l.c.k.m.query.AccountQueries` (via `l.c.k.m.internal.queries.AccountQueriesImpl`)
+* `l.c.k.m.query.CustomerQueries` (via `l.c.k.m.internal.queries.CustomerQueriesImpl`)
+* `l.c.k.m.query.PrivacyQueries` (via `l.c.k.m.internal.queries.PrivacyQueriesImpl`)
+|Bean references
+|* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
+* `l.c.k.k.api.AuditFacade` (in Platform Kernel)
+* `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.DocumentBaseRepository` (in Platform Kernel)
+* `l.c.k.k.api.DocumentIssuance` (in Platform Kernel)
+* `l.c.k.k.api.NumberingService` (in Platform Kernel)
+* `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
+* `l.c.k.k.api.DocumentLinks` (in Platform Kernel)
+* `l.c.k.k.api.ChangeLog` (in Platform Kernel)
+* `l.c.k.k.api.CurrentScope` (in Platform Kernel)
+|===

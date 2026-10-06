@@ -1,0 +1,685 @@
+/*
+ * The fonts are served by this server (wave 2, DEPLOY-18): nothing is fetched from Google or any
+ * other third party, so a shop with restricted egress gets the same page and no sign-in is
+ * logged elsewhere. They are the web client's own (web/src/design/fonts.css, @fontsource, SIL
+ * Open Font Licence 1.1, fonts/OFL.txt): Noto Sans for Latin letters and digits, Noto Sans
+ * Sinhala and Noto Sans Tamil for the other two languages of the page, weights 400 and 600.
+ */
+@font-face {
+  font-family: 'Noto Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../fonts/noto-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 800;
+  src: url('../fonts/noto-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Sinhala';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../fonts/noto-sans-sinhala-sinhala-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Sinhala';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 800;
+  src: url('../fonts/noto-sans-sinhala-sinhala-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Tamil';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../fonts/noto-sans-tamil-tamil-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Tamil';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 800;
+  src: url('../fonts/noto-sans-tamil-tamil-600-normal.woff2') format('woff2');
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+body.login-pf-page {
+  margin: 0;
+  width: 100%;
+  min-height: 100vh;
+  font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', Arial, sans-serif;
+  
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+
+  padding: 50px 7%;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(142, 14, 91, 0.25) 0%,
+      rgba(20, 37, 76, 0.5) 100%
+    ),
+    url('../img/login.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (max-width: 900px) {
+  body.login-pf-page {
+    justify-content: center;
+    padding: 30px 15px;
+  }
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px; /* Reduced from 570px */
+  
+  /* Glassmorphism Effect - Reduced whiteness */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+
+  border-radius: 24px; /* Reduced from 28px */
+
+  padding: 40px 40px; /* Reduced from 48px 50px */
+
+  position: relative;
+  overflow: hidden;
+
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* ========================
+   BRAND
+======================== */
+
+.brand {
+  text-align: center;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 28px; /* Reduced from 32px */
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.coopfed {
+  color: #8E0E5B; /* Primary */
+}
+
+.erp {
+  color: #2E3192; /* Secondary Brand */
+}
+
+.brand p {
+  color: #64748B;
+  font-size: 13px; /* Reduced from 14px */
+  margin: 6px 0 0;
+}
+
+/* ========================
+   LOGO IMAGE
+======================== */
+
+.coopfed-logo {
+  height: 90px; /* Made larger to stand alone */
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 12px; /* Space between logo and text */
+}
+
+/* ========================
+   WELCOME
+======================== */
+
+.welcome {
+  margin-top: 35px; /* Reduced from 48px */
+  margin-bottom: 25px; /* Reduced from 38px */
+  text-align: left;
+}
+
+.welcome h2 {
+  margin: 0 0 6px;
+  color: #1F2937; /* Dark Text */
+
+  font-size: 26px; /* Reduced from 31px */
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.welcome p {
+  margin: 0;
+  color: #64748B;
+  font-size: 15px; /* Reduced from 17px */
+}
+
+/* ========================
+   INPUTS
+======================== */
+
+.input-group {
+  height: 57px;
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+
+  margin-bottom: 16px;
+
+  padding: 0 17px;
+
+  background: rgba(255, 255, 255, 0.9);
+
+  transition: all 0.2s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.input-group:focus-within {
+  border-color: #8E0E5B;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 3px rgba(142, 14, 91, 0.1),
+    inset 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.input-icon {
+  width: 23px;
+  height: 23px;
+
+  color: #64748B;
+
+  flex-shrink: 0;
+}
+
+.input-group input {
+  width: 100%;
+  height: 100%;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  padding: 0 15px;
+
+  font-size: 16px;
+  color: #1F2937;
+}
+
+.input-group input::placeholder {
+  color: #9aa5b8;
+}
+
+/* ========================
+   PASSWORD EYE
+======================== */
+
+.eye-button {
+  width: 35px;
+  height: 35px;
+
+  border: none;
+  background: transparent;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #64748B;
+}
+
+.eye-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ========================
+   REMEMBER / FORGOT
+======================== */
+
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin: 22px 0 28px;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  cursor: pointer;
+
+  color: #1F2937;
+  font-size: 15px;
+}
+
+.remember input {
+  width: 22px;
+  height: 22px;
+
+  accent-color: #8E0E5B;
+  cursor: pointer;
+}
+
+.login-options a {
+  color: #00AEEF; /* Info */
+  font-size: 15px;
+  font-weight: 500;
+
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ========================
+   SIGN IN BUTTON
+======================== */
+
+.sign-in-button {
+  width: 100%;
+  height: 62px;
+
+  border: none;
+  border-radius: 11px;
+
+  background: linear-gradient(
+    90deg,
+    #8E0E5B 0%,
+    #A31068 100%
+  );
+
+  color: white;
+
+  font-size: 19px;
+  font-weight: 700;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 18px;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 8px 20px rgba(142, 14, 91, 0.25);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sign-in-button:hover {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 12px 25px rgba(142, 14, 91, 0.35);
+}
+
+.sign-in-button:active {
+  transform: translateY(0);
+}
+
+.arrow {
+  font-size: 28px;
+  font-weight: 300;
+}
+
+/* ========================
+   DIVIDER
+======================== */
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+
+  margin: 25px 0 20px;
+}
+
+.divider span {
+  flex: 1;
+  height: 1px;
+  background: #E8E8EB;
+}
+
+.divider p {
+  margin: 0;
+  color: #64748B;
+  font-size: 15px;
+}
+
+/* ========================
+   MICROSOFT BUTTON
+======================== */
+
+.microsoft-button {
+  width: 100%;
+  height: 55px;
+
+  border: none;
+  border-radius: 11px;
+
+  background: #F8F9FB;
+  border: 1px solid #E8E8EB;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 14px;
+
+  color: #1F2937;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition: background 0.2s ease;
+}
+
+.microsoft-button:hover {
+  background: #F3E6F6; /* Soft Purple Tint */
+  border-color: #8E0E5B;
+}
+
+/* Microsoft Logo */
+
+.microsoft-logo {
+  width: 21px;
+  height: 21px;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+
+  gap: 2px;
+}
+
+.microsoft-logo i:nth-child(1) {
+  background: #f25022;
+}
+
+.microsoft-logo i:nth-child(2) {
+  background: #7fba00;
+}
+
+.microsoft-logo i:nth-child(3) {
+  background: #00a4ef;
+}
+
+.microsoft-logo i:nth-child(4) {
+  background: #ffb900;
+}
+
+/* ========================
+   DECORATIVE LEAF
+======================== */
+
+.decorative-leaf {
+  position: absolute;
+
+  width: 180px;
+  height: 180px;
+
+  right: -65px;
+  bottom: -55px;
+
+  opacity: 0.1;
+
+  transform: rotate(-25deg);
+
+  pointer-events: none;
+}
+
+.decorative-leaf span {
+  position: absolute;
+
+  width: 70px;
+  height: 130px;
+
+  border-radius: 100% 0 100% 0;
+
+  background: #8E0E5B;
+}
+
+.decorative-leaf span:nth-child(1) {
+  left: 20px;
+  top: 20px;
+
+  transform: rotate(-30deg);
+}
+
+.decorative-leaf span:nth-child(2) {
+  left: 70px;
+  top: 0;
+
+  background: #F18A00;
+}
+
+.decorative-leaf span:nth-child(3) {
+  left: 95px;
+  top: 55px;
+
+  transform: rotate(35deg);
+}
+
+/* ========================
+   ALERTS / ERROR MESSAGES
+======================== */
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.alert-error {
+  background-color: #ffebee;
+  color: #E30613;
+  border: 1px solid #ffcdd2;
+}
+
+.alert-warning {
+  background-color: #fff8e1;
+  color: #F18A00;
+  border: 1px solid #ffecb3;
+}
+
+.alert-success {
+  background-color: #e8f5e9;
+  color: #00A651;
+  border: 1px solid #c8e6c9;
+}
+
+/* ========================
+   LOCALE DROPDOWN (React Component)
+======================== */
+
+.language-position {
+  position: absolute;
+  top: 25px;
+  right: 30px;
+  z-index: 1000;
+}
+
+.language-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* The picker is a <details>: it opens and closes without script (no inline handlers). */
+summary.language-selector {
+  list-style: none;
+}
+
+summary.language-selector::-webkit-details-marker {
+  display: none;
+}
+
+.language-wrapper[open] .arrow-icon {
+  transform: rotate(180deg);
+}
+
+.language-selector {
+  height: 48px;
+  padding: 0 15px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 14px;
+
+  color: #14254c;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  box-shadow: 0 4px 15px rgba(24, 73, 130, 0.08);
+
+  transition: all 0.2s ease;
+}
+
+.language-selector:hover {
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 6px 18px rgba(24, 73, 130, 0.14);
+}
+
+.globe-icon {
+  width: 20px;
+  height: 20px;
+  color: #14254c;
+}
+
+.arrow-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.25s ease;
+}
+
+.arrow-icon.rotate {
+  transform: rotate(180deg);
+}
+
+/* Dropdown */
+
+.language-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 140px;
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #e5e8ef;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(20, 37, 76, 0.14);
+  z-index: 100;
+}
+
+.language-dropdown a {
+  display: block;
+  text-decoration: none;
+}
+
+.language-dropdown button,
+.language-dropdown a {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #14254c;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.language-dropdown button:hover,
+.language-dropdown a:hover {
+  background: #F3E6F6; /* Adapted to new soft purple tint */
+  color: #8E0E5B; /* Adapted to new primary brand color */
+}
+
+.language-dropdown .active-language {
+  background: #F3E6F6; /* Adapted to soft purple tint */
+  color: #8E0E5B;
+  font-weight: 600;
+}
+
+/* ========================
+   RESPONSIVE
+======================== */
+
+@media (max-width: 650px) {
+  .login-card {
+    max-width: 94%;
+    padding: 35px 25px 40px;
+    border-radius: 22px;
+  }
+
+  .brand h1 {
+    font-size: 26px;
+  }
+
+  .brand p {
+    font-size: 12px;
+  }
+
+  .welcome {
+    margin-top: 38px;
+  }
+
+  .welcome h2 {
+    font-size: 27px;
+  }
+
+  .login-options {
+    gap: 10px;
+  }
+
+  .login-options a,
+  .remember {
+    font-size: 13px;
+  }
+}
