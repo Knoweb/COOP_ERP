@@ -18,8 +18,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * The demo server's situation (wave 2 fix plan, "a Flyway test start on a database at the previous
  * migration"): a database whose every stream stands at the number before this pull request's
  * migrations (kernel {@code V0085}, m1party {@code V0014}, m1security {@code V0018} since PR 11, m2catalogue
- * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09)
- * migrates to the new numbers
+ * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09,
+ * m8reporting {@code V0006} since PR 08) migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
  * FlywayConfig} runs the streams. The streams depend on each other at run time only (a policy
  * naming a kernel function, M2's trigger calling an M5 function), so each later number must apply
@@ -47,7 +47,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m5inventory", "7");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
-        streams.put("m8reporting", null);
+        // Wave 2, PR 08: m8reporting V0007 (projections by location, event and line) from V0006.
+        streams.put("m8reporting", "6");
         // Wave 2, PR 14: m9integration V0006 (the stored file, the owner in the posting key, the
         // contact door) on a database at V0005.
         streams.put("m9integration", "5");
@@ -120,6 +121,20 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                     '0190e9f0-0000-7000-8000-000000000004', '2026-09-01T04:00:00Z')
                 """,
                 TEST_FEDERATION_ID);
+
+        // Two lines of a till receipt projected before V0007: keyed by line_id, no number.
+        String receipt = "0190e8aa-0000-7000-8000-000000000001";
+        for (String line : List.of("0190e8aa-0000-7000-8000-0000000000a2", "0190e8aa-0000-7000-8000-0000000000a1")) {
+            admin.update(
+                    """
+                    insert into reporting.shop_sale_line_fact
+                           (line_id, receipt_id, owner_entity_id, location_id, business_date, sku_id, qty, line_total)
+                    values (?::uuid, ?::uuid, ?::uuid, gen_random_uuid(), date '2026-09-26', gen_random_uuid(), 1, 10.00)
+                    """,
+                    line,
+                    receipt,
+                    TEST_FEDERATION_ID);
+        }
 
         Map<String, Integer> after = new LinkedHashMap<>();
         for (String stream : PREVIOUS.keySet()) {
@@ -196,6 +211,26 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                                 + " and table_name = 'count_line' and column_name = 'counted_at'",
                         Integer.class))
                 .isEqualTo(1);
+
+        // Wave 2, PR 08: m8reporting V0007 over a database at V0006 with rows in it. The old lines
+        // are numbered in their line_id order under the new key, as the migrator (not a superuser)
+        // could only do with the table's FORCE lifted for that statement, and FORCE is back.
+        assertThat(after).containsEntry("m8reporting", 7);
+        assertThat(admin.queryForList(
+                        "select line_id::text || ':' || line_no from reporting.shop_sale_line_fact order by line_no",
+                        String.class))
+                .containsExactly("0190e8aa-0000-7000-8000-0000000000a1:1", "0190e8aa-0000-7000-8000-0000000000a2:2");
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'reporting.shop_sale_line_fact'::regclass",
+                        Boolean.class))
+                .isTrue();
+        assertThat(admin.queryForObject(
+                        "select qual from pg_policies where schemaname = 'reporting'"
+                                + " and tablename = 'trade_document_event' and policyname = 'own_read'",
+                        String.class))
+                .contains("kernel.scope_location()");
+        assertThat(admin.queryForObject("select to_regclass('reporting.credit_limit_fact')::text", String.class))
+                .isEqualTo("reporting.credit_limit_fact");
     }
 
     /** One stream as FlywayConfig runs it, strict. */

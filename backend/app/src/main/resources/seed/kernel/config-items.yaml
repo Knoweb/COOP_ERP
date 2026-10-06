@@ -943,3 +943,25 @@ config_items:
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory
+  # wave 2, PR 08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-trading-projections.md
+  # (7), CR-28A-2): the longest period and the most rows one report answers, the row cap applied in SQL.
+  - key: reporting.max_period_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 3660 }
+    description_en: The longest period one report may cover, in days, the first and the last day included
+    description_si: එක් වාර්තාවකට ආවරණය කළ හැකි දීර්ඝතම කාලය, පළමු හා අවසාන දින ඇතුළුව දින වලින්
+    description_ta: ஒரு அறிக்கை உள்ளடக்கக்கூடிய மிக நீண்ட காலம், முதல் மற்றும் கடைசி நாள் உட்பட நாட்களில்
+    default: 366
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m8reporting
+  - key: reporting.max_rows
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 1000000 }
+    description_en: The most rows one report shows or exports; a report with more is refused, to be narrowed
+    description_si: එක් වාර්තාවක් පෙන්වන හෝ අපනයනය කරන උපරිම පේළි ගණන; වැඩි පේළි ඇති වාර්තාවක් පටු කිරීමට ප්‍රතික්ෂේප වේ
+    description_ta: ஒரு அறிக்கை காட்டும் அல்லது ஏற்றுமதி செய்யும் அதிகபட்ச வரிசைகள்; அதிகமுள்ள அறிக்கை சுருக்கும்படி மறுக்கப்படும்
+    default: 10000
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m8reporting

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteDispatched;
 import lk.coopfed.knoweb.m4trading.api.GrnConfirmed;
 import lk.coopfed.knoweb.m4trading.api.GrnLineConfirmed;
@@ -23,6 +24,7 @@ import lk.coopfed.knoweb.m4trading.api.OrderLineSummary;
 import lk.coopfed.knoweb.m4trading.api.OrderSubmitted;
 import lk.coopfed.knoweb.m5inventory.api.StockMoved;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness.Delivery;
+import lk.coopfed.knoweb.m8reporting.api.ReportExported;
 import lk.coopfed.knoweb.m8reporting.api.ReportRunRequested;
 import lk.coopfed.knoweb.m8reporting.internal.projection.StockPositionProjection;
 import lk.coopfed.knoweb.m8reporting.internal.projection.TradeProjection;
@@ -77,6 +79,9 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Clock clock;
+
+    @Autowired
+    JdbcConfigRegistry config;
 
     private ProjectionHarness harness;
     private UUID warehouse;
@@ -314,6 +319,79 @@ class ReportingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(lines).hasSize(2);
         assertThat(lines[0]).isEqualTo("Date,Seller,Buyer,Item code,Item,Quantity,Value");
         assertThat(lines[1]).startsWith(today + ",").endsWith(",10.000,902.50");
+
+        // Wave 2, M8-11: the export is audited with the report, its parameters and the row count,
+        // and announced; no row content travels.
+        assertThat(kernel.committedAudit()).singleElement().satisfies(audit -> {
+            assertThat(audit.eventType()).isEqualTo("REPORT_EXPORTED");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> after = (Map<String, Object>) audit.after();
+            assertThat(after)
+                    .containsEntry("reportId", "trade-by-distributor")
+                    .containsEntry("from", today.toString())
+                    .containsEntry("to", today.toString())
+                    .containsEntry("rowCount", 1)
+                    .doesNotContainKey("rows");
+        });
+        assertThat(kernel.committedEvents()).singleElement().satisfies(event -> {
+            assertThat(event).isInstanceOf(ReportExported.class);
+            ReportExported exported = (ReportExported) event;
+            assertThat(exported.reportId()).isEqualTo("trade-by-distributor");
+            assertThat(exported.rowCount()).isEqualTo(1);
+        });
+
+        // A screen read of the same rows is not audited.
+        kernel.reset();
+        get("/v1/reporting/reports/trade-by-distributor/data?from=" + today + "&to=" + today, as(SELLER));
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aReportRefusesAPeriodLongerThanTheConfiguredMaximumAndAnExportCommitsNothing() {
+        // reporting.max_period_days is 366 by default: a year and two days is refused.
+        String tooLong = "?from=" + today.minusDays(366) + "&to=" + today;
+        ResponseEntity<JsonNode> refused = get("/v1/reporting/reports/invoices-issued/data" + tooLong, as(SELLER));
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getBody().get("code").asText()).isEqualTo("m8.report.period_too_long");
+        assertThat(get(
+                                "/v1/reporting/reports/invoices-issued/data?from=" + today.minusDays(365) + "&to="
+                                        + today,
+                                as(SELLER))
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<String> export = http.exchange(
+                "/v1/reporting/reports/invoices-issued/csv" + tooLong,
+                HttpMethod.GET,
+                new HttpEntity<>(as(SELLER)),
+                String.class);
+        assertThat(export.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aReportWithMoreRowsThanTheConfiguredCapIsRefusedToBeNarrowed() {
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, value, reason) values (?, '1'::jsonb, 'test')",
+                        "reporting.max_rows");
+        config.invalidate("reporting.max_rows");
+        try {
+            // The buyer holds stock at two locations: two rows, one more than the cap.
+            ResponseEntity<JsonNode> refused = get("/v1/reporting/reports/stock-position/data", as(BUYER));
+            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(refused.getBody().get("code").asText()).isEqualTo("m8.report.too_many_rows");
+            // One location is one row: answered.
+            assertThat(get("/v1/reporting/reports/stock-position/data?locationId=" + shop, as(BUYER))
+                            .getBody()
+                            .get("rows"))
+                    .hasSize(1);
+        } finally {
+            superuserJdbc().update("delete from kernel.config_value where key = ?", "reporting.max_rows");
+            config.invalidate("reporting.max_rows");
+        }
     }
 
     @Test
