@@ -839,6 +839,42 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(forAnotherEntity).isFalse();
         }
 
+        /**
+         * m1security V0020 (wave 2, PR 17): the helper of app_user's own_read answers only the OWN
+         * class; any other class, or a transaction with no scope, learns nothing about a user's
+         * assignments. In OWN (where the policies call it) it answers as before.
+         */
+        @Test
+        void theAssignmentHelperAnswersOnlyTheOwnClass() {
+            for (String policyClass : List.of("FEDERATION_VIEW", "EXTERNAL_TIMEBOXED", "PARTY", "NONE", "")) {
+                Boolean answer = new TransactionTemplate(transactions).execute(status -> {
+                    jdbc.queryForObject(
+                            "select set_config('app.scope_entity_id', ?, true)", String.class, ENTITY.toString());
+                    jdbc.queryForObject("select set_config('app.scope_location_id', '', true)", String.class);
+                    jdbc.queryForObject("select set_config('app.scope_class', ?, true)", String.class, policyClass);
+                    jdbc.queryForObject(
+                            "select set_config('app.granted_entities', ?, true)", String.class, "{" + ENTITY + "}");
+                    try {
+                        return jdbc.queryForObject(
+                                "select security.user_has_any_assignment(?)", Boolean.class, atShopB);
+                    } finally {
+                        status.setRollbackOnly();
+                    }
+                });
+                assertThat(answer).as("class '" + policyClass + "'").isFalse();
+            }
+            Boolean own = inScope(
+                    ENTITY,
+                    null,
+                    () -> jdbc.queryForObject("select security.user_has_any_assignment(?)", Boolean.class, atShopB));
+            Boolean ownUnassigned = inScope(
+                    ENTITY,
+                    null,
+                    () -> jdbc.queryForObject("select security.user_has_any_assignment(?)", Boolean.class, unassigned));
+            assertThat(own).isTrue();
+            assertThat(ownUnassigned).isFalse();
+        }
+
         private List<UUID> visible(ScopeContext scope) {
             return queries.listUsers(new UserFilter(null, null, null, 100), scope).items().stream()
                     .map(UserView::userId)
