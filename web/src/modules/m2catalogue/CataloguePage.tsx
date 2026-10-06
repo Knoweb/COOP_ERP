@@ -30,7 +30,7 @@ function SkuThumbnail({ skuId }: { skuId: string }) {
       sessionStorage.removeItem(`sku_preview_${skuId}`);
       localPreviewUrl = null;
     }
-  } catch (_) {
+  } catch {
     // Ignore storage errors
   }
 

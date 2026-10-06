@@ -402,7 +402,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
       setLocalPreviewUrl(dataUrl);
       try {
         sessionStorage.setItem(`sku_preview_${skuId}`, dataUrl);
-      } catch (_) {
+      } catch {
         // Ignore quota exceeded errors
       }
     };
@@ -583,7 +583,6 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
                 ))}
               </select>
             </label>
-          </div>
         </div>
       )}
       
