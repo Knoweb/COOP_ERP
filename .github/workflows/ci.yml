@@ -36,6 +36,10 @@
 # Vulnerable dependencies are reported by security-scan.yml, pull request titles are checked
 # by pr-title.yml, and dependency updates come from dependabot.yml.
 #
+# Every action is pinned to a commit SHA, its version in the comment after it (wave 2,
+# DEPLOY-15): a tag can be moved to other code, a SHA cannot. Dependabot's github-actions entry
+# proposes the next SHA with its version. The same holds in pr-title.yml and security-scan.yml.
+#
 # How the jobs are ordered, and why. On a pull request the small job `changes` looks first at
 # which files changed (a few seconds) and the jobs with nothing to do are skipped; see the rules
 # above that job. Then build-verify, integration-test, till, scaffolder,
@@ -101,7 +105,7 @@ jobs:
       backend: ${{ steps.decide.outputs.backend }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -147,10 +151,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -167,25 +171,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0          # the format check compares with origin/main
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -211,7 +215,7 @@ jobs:
 
       - name: Upload test reports when something failed
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-reports-unit
           path: |
@@ -259,23 +263,23 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -302,7 +306,7 @@ jobs:
         run: mv backend/app/build/jacoco/integrationTest.exec "backend/app/build/jacoco/integrationTest-${{ strategy.job-index }}.exec"
 
       - name: Upload this shard's coverage data
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: jacoco-exec-${{ strategy.job-index }}
           path: backend/app/build/jacoco/integrationTest-${{ strategy.job-index }}.exec
@@ -311,7 +315,7 @@ jobs:
 
       - name: Upload test reports when something failed
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-reports-integration-${{ strategy.job-index }}
           path: backend/app/build/reports/tests
@@ -329,10 +333,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -343,7 +347,7 @@ jobs:
       # task a laptop runs after `make test-int` picks up three files here instead of one,
       # with no task change needed.
       - name: Download every shard's coverage data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           pattern: jacoco-exec-*
           path: backend/app/build/jacoco
@@ -358,7 +362,7 @@ jobs:
           node ../tools/coverage-summary.mjs app/build/reports/jacoco/test/jacocoTestReport.csv >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-report
           path: backend/app/build/reports/jacoco/test
@@ -382,11 +386,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Did the till change?
         id: changes
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             till:
@@ -396,7 +400,7 @@ jobs:
 
       - name: Set up Java 21
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -430,7 +434,7 @@ jobs:
 
       - name: Upload the Linux desktop till
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: till-desktop-linux
           path: till/coop-till-linux-x64.tar.gz
@@ -444,7 +448,7 @@ jobs:
 
       - name: Upload the till APK
         if: github.event_name != 'pull_request' || steps.changes.outputs.till == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: till-debug-apk
           path: till/app/build/outputs/apk/debug/app-debug.apk
@@ -453,7 +457,7 @@ jobs:
 
       - name: Upload test reports when something failed
         if: failure() && (github.event_name != 'pull_request' || steps.changes.outputs.till == 'true')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: till-test-reports
           path: |
@@ -473,23 +477,23 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -518,10 +522,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -529,13 +533,13 @@ jobs:
 
       # make e2e installs the web dependencies with pnpm, so the runner needs it.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -552,7 +556,7 @@ jobs:
       # (half a minute); it changes only with the Playwright version in the lockfile, so it is
       # kept between runs under that key. The system libraries it needs are installed anyway.
       - name: Cache the Playwright browser
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
@@ -579,7 +583,7 @@ jobs:
 
       - name: Upload the Playwright report and traces when something failed
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
           path: |
@@ -609,24 +613,29 @@ jobs:
     timeout-minutes: 30
 
     steps: &package-steps
+      # persist-credentials false (wave 2, DEPLOY-15): in package-main this job's token can write
+      # packages, and the checkout would otherwise leave it in .git/config for every later step
+      # (pnpm install scripts, Gradle plugins). Nothing here pushes to git.
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -649,7 +658,7 @@ jobs:
           pnpm build
 
       - name: Upload the shared engine
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: shared-engine
           path: backend/shared-engine/build/libs/*.jar
@@ -657,7 +666,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the software bill of materials (CycloneDX)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-sbom
           path: backend/app/build/reports/cyclonedx/bom.json
@@ -665,7 +674,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the web bundle
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-bundle
           path: web/dist
@@ -680,7 +689,7 @@ jobs:
 
       - name: Upload the backend image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-image
           path: backend-image.tar.gz
@@ -738,25 +747,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0          # the format check compares with origin/main
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
 
       # make test also runs the web client's lint and tests, which need pnpm on the host.
       - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: ${{ env.PNPM_VERSION }}
 
       # After pnpm, so that setup-node finds it and keeps the pnpm store between runs.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -801,7 +810,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 

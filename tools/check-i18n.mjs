@@ -19,6 +19,9 @@
 //   - no text contains the ASCII apostrophe ('). In a message format the apostrophe is the
 //     quote character: "Don't use {0}" prints "Dont use {0}" and the value never appears.
 //     Write the typographic apostrophe (’) instead; it is also the correct character.
+//   - the sign-in page (infra/keycloak/theme/coop/login): its three messages_*.properties hold
+//     the same ids, each with a text and no ASCII apostrophe, and every msg("...") of login.ftl
+//     is among them (wave 2, DEPLOY-16)
 //
 // tools/checks.test.mjs proves each of these with a catalogue that breaks it.
 // The web client's own catalogue is checked by web/src/shell/i18n/messages.test.ts.
@@ -244,6 +247,63 @@ export function messageIdsUsedIn(javaSource) {
   return ids;
 }
 
+/**
+ * The sign-in page's catalogue (wave 2, DEPLOY-16): the Keycloak theme's
+ * messages/messages_{en,si,ta}.properties, KEY=text per line, # for a comment. Keycloak ships no
+ * Sinhala bundle, so the theme must hold every id its page shows in all three languages.
+ */
+export function readThemeMessages(themeLoginDir) {
+  return Object.fromEntries(LANGUAGES.map((language) => {
+    const file = path.join(themeLoginDir, "messages", `messages_${language}.properties`);
+    const entries = {};
+    if (fs.existsSync(file)) {
+      for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith("!")) {
+          continue;
+        }
+        const at = trimmed.search(/[=:]/);
+        const key = (at < 0 ? trimmed : trimmed.slice(0, at)).trim();
+        entries[key] = at < 0 ? "" : trimmed.slice(at + 1).trim();
+      }
+    }
+    return [language, entries];
+  }));
+}
+
+/** The ids a FreeMarker template asks for: msg("id") and msg("id", ...). */
+export function themeIdsUsedIn(template) {
+  const source = template.replace(/<#--[\s\S]*?-->/g, " ");
+  return [...new Set([...source.matchAll(/\bmsg\(\s*"([^"]+)"/g)].map((match) => match[1]))].sort();
+}
+
+/**
+ * The theme's problems: an id missing from a language or with no text, an ASCII apostrophe
+ * (Keycloak formats these texts with MessageFormat, where it is the quote character), and an id
+ * the page's template asks for that the theme does not hold.
+ */
+export function problemsOfTheme(messages, templateIds = [], where = "theme") {
+  const problems = [];
+  const ids = new Set(LANGUAGES.flatMap((language) => Object.keys(messages[language])));
+  for (const id of [...ids].sort()) {
+    for (const language of LANGUAGES) {
+      if (!(id in messages[language])) {
+        problems.push(`${where}/messages_${language}.properties: ${id} is missing (it is in another language)`);
+      } else if (messages[language][id] === "") {
+        problems.push(`${where}/messages_${language}.properties: no text for ${id}`);
+      } else if (messages[language][id].includes("'")) {
+        problems.push(`${where}/messages_${language}.properties: ${id} contains an ASCII apostrophe; write ’`);
+      }
+    }
+  }
+  for (const id of templateIds) {
+    if (!ids.has(id)) {
+      problems.push(`${where}/login.ftl: msg("${id}") is in no messages_*.properties of the theme; add it to all three`);
+    }
+  }
+  return problems;
+}
+
 /** Ids the code answers with that the catalogue does not have. */
 export function problemsOfJavaSources(javaRoot, catalogues) {
   const known = new Set(Object.keys(catalogues.en));
@@ -266,9 +326,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const modules = readModuleCatalogues(i18nDir);
   const strayFiles = fs.readdirSync(i18nDir).filter((name) => name.endsWith(".json"));
   const catalogues = mergedCatalogues(modules);
+  const themeDir = path.resolve("infra/keycloak/theme/coop/login");
   const problems = [
     ...problemsOfModules(modules, strayFiles),
-    ...problemsOfJavaSources(path.resolve("backend/app/src/main/java"), catalogues)
+    ...problemsOfJavaSources(path.resolve("backend/app/src/main/java"), catalogues),
+    ...problemsOfTheme(
+      readThemeMessages(themeDir),
+      themeIdsUsedIn(fs.readFileSync(path.join(themeDir, "login.ftl"), "utf8")),
+      "infra/keycloak/theme/coop/login"
+    )
   ];
   if (problems.length > 0) {
     problems.forEach((problem) => console.error(problem));
