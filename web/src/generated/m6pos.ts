@@ -12,10 +12,27 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The receipts the tills of a location issued, newest first
-         * @description Each receipt as the till issued it (its number from the till's series, its till position), its lines, its tenders and what central flagged about it. A location the caller's scope does not read answers an empty list.
+         * The receipts the tills of a location issued on one business day, newest first, a page at a time
+         * @description Each receipt as the till issued it (its number from the till's series, its till position), its lines, its tenders and what central flagged about it. The day is the business day in the business time zone (today when not given); `flagged=true` keeps the receipts central flagged. A page holds `limit` receipts (50 when not given, at most the configured `pos.list.max_page`); `nextCursor` asks for the next one. A location the caller's scope does not read answers an empty page; a cursor that cannot be read is 400 request.malformed.
          */
         get: operations["listReceipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pos/receipts/{documentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One receipt a till issued, with its lines, tenders and flags */
+        get: operations["getPosReceipt"];
         put?: never;
         post?: never;
         delete?: never;
@@ -31,8 +48,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The till sessions of a location, newest first */
+        /**
+         * The till sessions of a location on one business day, newest first, a page at a time
+         * @description Every session opened, and every close whose open never arrived (its open fields empty), on the business day in the business time zone (today when not given), paged as the receipts are.
+         */
         get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pos/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One till session, with its close when it arrived */
+        get: operations["getTillSession"];
         put?: never;
         post?: never;
         delete?: never;
@@ -45,6 +82,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReceiptPage: {
+            items: components["schemas"]["ReceiptResponse"][];
+            /** @description The next page's cursor; absent on the last page */
+            nextCursor?: string | null;
+        };
+        SessionPage: {
+            items: components["schemas"]["SessionResponse"][];
+            /** @description The next page's cursor; absent on the last page */
+            nextCursor?: string | null;
+        };
         ReceiptResponse: {
             /** Format: uuid */
             documentId: string;
@@ -64,6 +111,7 @@ export interface components {
             netAmount?: number;
             taxAmount?: number;
             grossAmount?: number;
+            /** @description What central found odd (never a refusal): LOCATION_MISMATCH, SESSION_UNKNOWN, NO_SESSION, SESSION_CLOSED, NO_LINES, TOTALS_MISSING, TOTAL_MISMATCH, TENDER_MISMATCH, SERIES_FOREIGN, NUMBER_JUMP, DUPLICATE_NUMBER; a client shows an unknown code as it is */
             flags: string[];
             lines: components["schemas"]["ReceiptLineResponse"][];
             tenders: components["schemas"]["ReceiptTenderResponse"][];
@@ -93,8 +141,11 @@ export interface components {
             tillPositionId?: string;
             /** Format: date */
             businessDate?: string;
-            /** Format: date-time */
-            openedAt: string;
+            /**
+             * Format: date-time
+             * @description Absent for a close whose open never arrived
+             */
+            openedAt?: string;
             floatAmount?: number;
             /** @enum {string} */
             status: "OPEN" | "CLOSED";
@@ -151,6 +202,10 @@ export interface operations {
         parameters: {
             query: {
                 locationId: string;
+                businessDate?: string;
+                flagged?: boolean;
+                cursor?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -158,22 +213,55 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The receipts */
+            /** @description One page of the receipts */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReceiptResponse"][];
+                    "application/json": components["schemas"]["ReceiptPage"];
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    getPosReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description No such receipt, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listSessions: {
         parameters: {
             query: {
                 locationId: string;
+                businessDate?: string;
+                cursor?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -181,16 +269,46 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The sessions */
+            /** @description One page of the sessions */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionResponse"][];
+                    "application/json": components["schemas"]["SessionPage"];
                 };
             };
             400: components["responses"]["RequestProblem"];
+        };
+    };
+    getTillSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description No such session, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
 }

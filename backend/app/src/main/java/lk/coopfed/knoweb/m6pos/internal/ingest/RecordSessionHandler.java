@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m6pos.internal.ingest;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
  * is updated. A close whose open never arrived is still recorded (a fact is not refused).
  *
  * <p>Guards: the device's OWN scope at its shop ({@code m6.scope.device_required}); a session id
- * and a time ({@code m6.session.malformed}). One already recorded is not recorded again. Audit
+ * and a time ({@code m6.session.malformed}). One already recorded is not recorded again; a second
+ * close with other amounts keeps the first and writes the ALERT
+ * {@code TILL_SESSION_CLOSE_REPLAY_DIFFERS} (wave 2, M6-03). Audit
  * {@code TILL_SESSION_OPENED} or {@code TILL_SESSION_CLOSED}; event
  * {@code till_session.recorded.v1}. The variance threshold and its REVIEW are deferred (README).
  */
@@ -33,6 +36,8 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
 
     static final String AUDIT_OPENED = "TILL_SESSION_OPENED";
     static final String AUDIT_CLOSED = "TILL_SESSION_CLOSED";
+    static final String AUDIT_CLOSE_REPLAY_DIFFERS = "TILL_SESSION_CLOSE_REPLAY_DIFFERS";
+    static final String MESSAGE_CLOSE_REPLAY_DIFFERS = "m6.session.close_replay_differs";
 
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
@@ -56,6 +61,9 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
                 "select exists (select 1 from " + table + " where session_id = ?)",
                 Boolean.class,
                 command.sessionId()))) {
+            if (command.closing()) {
+                closedAgain(command, scope);
+            }
             return command.sessionId();
         }
 
@@ -106,5 +114,46 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
                 scope);
         events.publish(new TillSessionRecorded(command.sessionId(), scope.entityId(), scope.locationId(), status));
         return command.sessionId();
+    }
+
+    /**
+     * A second close of a session already closed. With the same amounts it is a redelivery; with
+     * other counted or expected cash or another variance the first close stays and an ALERT names
+     * both (wave 2, M6-03, as for a receipt replayed with other content).
+     */
+    private void closedAgain(RecordSession command, ScopeContext scope) {
+        Map<String, Object> first = jdbc.queryForMap(
+                "select counted_cash, expected_cash, variance from pos.till_session_close where session_id = ?",
+                command.sessionId());
+        boolean same = sameAmount((BigDecimal) first.get("counted_cash"), command.countedCash())
+                && sameAmount((BigDecimal) first.get("expected_cash"), command.expectedCash())
+                && sameAmount((BigDecimal) first.get("variance"), command.variance());
+        if (same) {
+            return;
+        }
+        Map<String, Object> differs = new LinkedHashMap<>();
+        differs.put("messageId", MESSAGE_CLOSE_REPLAY_DIFFERS);
+        differs.put("first", amounts(first.get("counted_cash"), first.get("expected_cash"), first.get("variance")));
+        differs.put("later", amounts(command.countedCash(), command.expectedCash(), command.variance()));
+        differs.put("deviceId", scope.deviceId());
+        audit.record(
+                AUDIT_CLOSE_REPLAY_DIFFERS,
+                Subject.of("till_session", command.sessionId()),
+                null,
+                differs,
+                scope,
+                "The session's close arrived again with other amounts; the first close is kept");
+    }
+
+    private static boolean sameAmount(BigDecimal first, BigDecimal later) {
+        return first == null ? later == null : later != null && first.compareTo(later) == 0;
+    }
+
+    private static Map<String, Object> amounts(Object counted, Object expected, Object variance) {
+        Map<String, Object> amounts = new LinkedHashMap<>();
+        amounts.put("countedCash", counted);
+        amounts.put("expectedCash", expected);
+        amounts.put("variance", variance);
+        return amounts;
     }
 }
