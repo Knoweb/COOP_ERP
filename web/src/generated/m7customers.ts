@@ -92,6 +92,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customers/{customerId}/nic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the customer's NIC again from the card they present (a fresh second factor)
+         * @description The way out of a recorded NIC that no longer matches the card (captured before the number was brought to one form, or under a key since retired), and the ordinary path of a key rotation. A fresh second factor as for a higher limit (401 mfa.required). 422 codes: m7.customer.not_found, m7.customer.not_active, m7.field.required, m7.field.personal_data, m7.account.nic_required (not a NIC), m7.account.nic_held (another customer of this society holds it; parameter customerId), m7.account.nic_held_elsewhere.
+         */
+        post: operations["recaptureNic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customers/{customerId}/accounts": {
         parameters: {
             query?: never;
@@ -105,7 +127,7 @@ export interface paths {
         put?: never;
         /**
          * Open the caller's society's credit account for the customer
-         * @description 422 codes: m7.customer.not_active, m7.customer.consent_required, m7.account.exists, m7.account.amount_invalid, m7.account.terms_invalid, m7.account.nic_required (a limit above zero needs the NIC), m7.account.nic_mismatch, m7.account.nic_held.
+         * @description 422 codes: m7.customer.not_active, m7.customer.consent_required, m7.account.exists, m7.account.amount_invalid, m7.account.terms_invalid, m7.account.nic_required (a limit above customers.nic_required_above_limit needs the NIC), m7.account.nic_mismatch, m7.account.nic_held (parameter customerId), m7.account.nic_held_elsewhere.
          */
         post: operations["openAccount"];
         delete?: never;
@@ -187,7 +209,7 @@ export interface paths {
         put?: never;
         /**
          * Amend the credit limit, the hard block or the offline cap (a field left out stays as it is)
-         * @description A higher limit asks for a fresh second factor (401 mfa.required). 422 codes: m7.account.not_found, m7.account.closed, m7.account.amount_invalid, m7.account.limits_unchanged.
+         * @description A higher limit asks for a fresh second factor (401 mfa.required), and when it rises above customers.nic_required_above_limit for a customer with no NIC recorded, the NIC (m7.account.nic_required). 422 codes: m7.account.not_found, m7.account.closed, m7.account.amount_invalid, m7.account.limits_unchanged, m7.field.personal_data, m7.account.nic_required, m7.account.nic_mismatch, m7.account.nic_held, m7.account.nic_held_elsewhere.
          */
         post: operations["amendAccountLimits"];
         delete?: never;
@@ -256,6 +278,28 @@ export interface paths {
          * @description 422 codes: m7.account.not_found, m7.account.status_invalid, m7.account.balance_not_zero, m7.account.unallocated_held.
          */
         post: operations["closeAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a closed account as suspended, to settle what a till posted on it (CR-27A-1)
+         * @description A till may charge a closed account (its snapshot was stale); the office reopens it, records the repayment or reverses the receipt, and closes it again. The account comes back SUSPENDED, so the tills keep refusing its tenders until it is reinstated. 422 codes: m7.account.not_found, m7.account.status_invalid (not CLOSED), m7.field.personal_data.
+         */
+        post: operations["reopenAccount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -383,7 +427,7 @@ export interface paths {
         put?: never;
         /**
          * Fulfil a request (the responsible officer only); an erasure anonymises the customer
-         * @description 422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer, m7.privacy.officer_only, m7.privacy.open_balance, m7.customer.anonymised, m7.field.required.
+         * @description An erasure needs every account of the customer at every society closed at zero and closed more than customers.erasure_wait_days ago (CR-27A-1). 422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer, m7.privacy.officer_only, m7.privacy.open_balance, m7.privacy.account_open, m7.privacy.recently_closed, m7.customer.anonymised, m7.field.required, m7.field.personal_data.
          */
         post: operations["fulfilPrivacyRequest"];
         delete?: never;
@@ -423,10 +467,13 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** The export of a fulfilled access request, every row the society holds about the customer */
-        get: operations["getPrivacyExport"];
+        get?: never;
         put?: never;
-        post?: never;
+        /**
+         * Hand over the export of a fulfilled access request (the responsible officer only; audited)
+         * @description A command, not a read (doc 27 section 9.3: every read of a customer record outside the sales path is audited). The export is rebuilt from the rows as they are now; exportSha256 on the request is the hash at fulfilment, and the audit record says whether they still agree. It never carries the NIC's hash. 422 codes: m7.privacy.not_found, m7.privacy.not_access, m7.privacy.not_fulfilled, m7.customer.anonymised, m7.privacy.no_officer, m7.privacy.officer_only.
+         */
+        post: operations["downloadPrivacyExport"];
         delete?: never;
         options?: never;
         head?: never;
@@ -485,6 +532,12 @@ export interface components {
             hardBlock?: boolean | null;
             offlineCap?: number | null;
             reason: string;
+            /** @description The NIC */
+            nic?: string | null;
+        };
+        RecaptureNicRequest: {
+            nic: string;
+            reason: string;
         };
         AdjustmentRequest: {
             /** @description Above zero adds to what the customer owes */
@@ -495,7 +548,7 @@ export interface components {
             /** Format: uuid */
             historyId: string;
             /** @enum {string} */
-            action: "LIMITS_AMENDED" | "SUSPENDED" | "REINSTATED" | "CLOSED";
+            action: "LIMITS_AMENDED" | "SUSPENDED" | "REINSTATED" | "CLOSED" | "REOPENED";
             before: {
                 [key: string]: unknown;
             };
@@ -560,7 +613,7 @@ export interface components {
             /** Format: uuid */
             answeredBy?: string | null;
             outcome?: string | null;
-            /** @description The SHA-256 of the access export handed over */
+            /** @description The SHA-256 of the access export at fulfilment; the download's audit says whether the rows still give it */
             exportSha256?: string | null;
             refusalGround?: string | null;
         };
@@ -683,7 +736,7 @@ export interface components {
                 /** @enum {string} */
                 kind: "CHARGE" | "CREDIT" | "PAYMENT" | "ADJUSTMENT" | "REVERSAL";
                 amount: number;
-                /** @description CHARGE: what payments settled of it; PAYMENT: what it settled */
+                /** @description A charge (CHARGE, positive ADJUSTMENT): what credits settled of it; a credit (PAYMENT, CREDIT, negative ADJUSTMENT): what it settled */
                 settled: number;
                 runningBalance: number;
                 /** Format: uuid */
@@ -926,6 +979,37 @@ export interface operations {
         };
         responses: {
             /** @description Deactivated; the card */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCard"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    recaptureNic: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecaptureNicRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded; the card (its nicLast4 from the card presented) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1185,6 +1269,37 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    reopenAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Reopened as SUSPENDED; the account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
     getAccountHistory: {
         parameters: {
             query?: never;
@@ -1431,10 +1546,13 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
-    getPrivacyExport: {
+    downloadPrivacyExport: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 requestId: string;
             };
@@ -1453,13 +1571,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No fulfilled access request with this id, or the customer was anonymised since */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            422: components["responses"]["RuleBroken"];
         };
     };
 }
