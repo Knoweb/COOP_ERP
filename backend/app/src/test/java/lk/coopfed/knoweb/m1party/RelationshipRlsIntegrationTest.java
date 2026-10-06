@@ -211,6 +211,50 @@ class RelationshipRlsIntegrationTest extends PostgresIntegrationTest {
         assertThat(asParty).isEmpty();
     }
 
+    // ---- party.caller_trades_with (m1party V0015; wave 2, RLS-06) ---------------------------
+
+    @Test
+    void theCallerTradesWithItsActiveAndSuspendedCounterpartiesOnlyInItsOwnScope() {
+        // Either direction: the distributor buys from the Federation and sells to the society.
+        assertThat(tradesWith(DISTRIBUTOR, "OWN", FEDERATION)).isTrue();
+        assertThat(tradesWith(DISTRIBUTOR, "OWN", SOCIETY)).isTrue();
+        assertThat(tradesWith(SOCIETY, "OWN", DISTRIBUTOR)).isTrue();
+        assertThat(tradesWith(DISTRIBUTOR, "OWN", STRANGER)).isFalse();
+        assertThat(tradesWith(SOCIETY, "OWN", FEDERATION))
+                .as("no relationship between them")
+                .isFalse();
+        assertThat(tradesWith(DISTRIBUTOR, "OWN", null)).isFalse();
+
+        // A suspended buyer still owes and must still be told; a replaced relationship is none.
+        superuserJdbc()
+                .update(
+                        "update party.entity_relationship set status = 'SUSPENDED' where relationship_id = ?",
+                        DISTRIBUTOR_TO_SOCIETY);
+        assertThat(tradesWith(DISTRIBUTOR, "OWN", SOCIETY)).isTrue();
+        assertThat(tradesWith(SOCIETY, "OWN", DISTRIBUTOR)).isTrue();
+        superuserJdbc()
+                .update(
+                        "update party.entity_relationship set status = 'REPLACED' where relationship_id = ?",
+                        DISTRIBUTOR_TO_SOCIETY);
+        assertThat(tradesWith(DISTRIBUTOR, "OWN", SOCIETY)).isFalse();
+        assertThat(tradesWith(SOCIETY, "OWN", DISTRIBUTOR)).isFalse();
+
+        // Only an OWN caller is answered: the view-all classes and a missing scope learn nothing.
+        assertThat(tradesWith(DISTRIBUTOR, "FEDERATION_VIEW", FEDERATION)).isFalse();
+        assertThat(tradesWith(DISTRIBUTOR, "PARTY", FEDERATION)).isFalse();
+        assertThat(tradesWith(DISTRIBUTOR, "EXTERNAL_TIMEBOXED", FEDERATION)).isFalse();
+        assertThat(tradesWith(null, "OWN", FEDERATION)).isFalse();
+        assertThat(tradesWith(null, "NONE", FEDERATION)).isFalse();
+    }
+
+    private boolean tradesWith(UUID caller, String policyClass, UUID other) {
+        return Boolean.TRUE.equals(inScope(
+                caller,
+                policyClass,
+                null,
+                () -> jdbc.queryForObject("select party.caller_trades_with(?)", Boolean.class, other)));
+    }
+
     // ---- helpers ----------------------------------------------------------------------------
 
     private List<UUID> visible(UUID entity, String policyClass, String grantedEntities) {

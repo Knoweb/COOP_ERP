@@ -259,9 +259,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             // is read by everyone once a batch cites it (cited_read), which no made-up row is.
             new Departure(
                     "pricing.control_price",
-                    "everyone_reads (m3pricing V0005): a gazetted ceiling is law every society and till checks"
-                            + " its prices against (23A section 3); only the Federation writes it",
-                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+                    "the Federation's rows only (m3pricing V0006; wave 2, RLS-04): a gazetted ceiling is law"
+                            + " every class but NONE reads (23A section 3), and only the Federation writes one;"
+                            + " the matrix's made-up rows belong to A, B and C, so nobody reads them and nobody"
+                            + " inserts one (RetailPricingPostgresIntegrationTest reads the Federation's row)",
+                    RlsMatrixIntegrationTest::federationRowsOnly),
             new Departure(
                     "pricing.mrp_policy",
                     "everyone_reads (m3pricing V0005): a society's effective policy falls back to the"
@@ -342,6 +344,20 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                         && !check.scope().is("NONE")
                 ? VISIBLE
                 : null;
+    }
+
+    /**
+     * Rows the Federation alone writes and everyone reads (the fed_admin form of CR-21A-1 item 2 on
+     * {@code kernel.system_entity()}): a made-up row owned by another entity is hidden to every
+     * class and an insert of one is refused. UPDATE, DELETE and MOVE keep the template's answer
+     * (the table grants UPDATE on one column and no DELETE, so both are refused before any policy).
+     */
+    private static String federationRowsOnly(Check check) {
+        return switch (check.op()) {
+            case SELECT -> HIDDEN;
+            case INSERT -> REFUSED;
+            default -> null;
+        };
     }
 
     /** Reference data read by every session, scope or none (the notification templates and rules). */
