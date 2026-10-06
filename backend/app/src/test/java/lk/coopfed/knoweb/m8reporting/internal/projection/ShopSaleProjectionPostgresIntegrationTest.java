@@ -105,6 +105,66 @@ class ShopSaleProjectionPostgresIntegrationTest extends PostgresIntegrationTest 
         assertThat(total).isEqualByComparingTo((BigDecimal) receipts.get(0).get("gross"));
     }
 
+    /**
+     * Wave 2, M8-04: the shipping till sends no line_id. Its lines are kept, keyed by their number,
+     * and the receipt is the device's shop's (the scope the dispatcher gives a till's event), not
+     * the location the till's payload names, as M6 files it.
+     */
+    @Test
+    void aTillReceiptWithoutLineIdsKeepsItsLinesByNumberAtTheDevicesShop() {
+        UUID owner = Ids.next();
+        UUID deviceShop = Ids.next();
+        UUID namedShop = Ids.next();
+        UUID sku = Ids.next();
+        Instant t = Instant.parse("2026-09-26T05:00:00Z");
+        Map<String, Object> bundle = receipt(namedShop, new UUID[] {sku}, new Random(11), t, "2026-09-26");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) bundle.get("lines");
+        lines.forEach(line -> line.remove("line_id"));
+        ProjectionHarness.Delivery event = harness.event(ShopSaleProjection.RECEIPT_ISSUED, owner, t, bundle);
+        ProjectionHarness.Delivery fromTheDevice =
+                new ProjectionHarness.Delivery(event.envelope(), ProjectionHarness.system(owner, deviceShop));
+        harness.deliver(fromTheDevice, projection::on);
+        harness.deliver(fromTheDevice, projection::on);
+
+        Map<String, Object> receipt = admin.queryForMap("select * from reporting.shop_sale_fact");
+        assertThat(receipt.get("location_id")).isEqualTo(deviceShop);
+        assertThat(receipt.get("lines")).isEqualTo(lines.size());
+        List<Map<String, Object>> rows =
+                admin.queryForList("select * from reporting.shop_sale_line_fact order by line_no");
+        assertThat(rows).hasSize(lines.size());
+        assertThat(rows)
+                .extracting(r -> r.get("line_no"))
+                .containsExactlyElementsOf(
+                        lines.stream().map(l -> l.get("line_no")).toList());
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.get("line_id")).isNull();
+            assertThat(r.get("location_id")).isEqualTo(deviceShop);
+            assertThat(r.get("sku_id")).isEqualTo(sku);
+        });
+    }
+
+    /** Wave 2, M8-02: a till clock a day ahead does not hold the projection's freshness in the future. */
+    @Test
+    void theLastEventTimeIsNeverAheadOfCentralsClock() {
+        UUID owner = Ids.next();
+        Instant ahead = Instant.now().plusSeconds(86_400);
+        harness.deliver(
+                harness.event(
+                        ShopSaleProjection.RECEIPT_ISSUED,
+                        owner,
+                        ahead,
+                        receipt(Ids.next(), new UUID[] {Ids.next()}, new Random(3), ahead, "2026-09-26")),
+                projection::on);
+
+        java.sql.Timestamp stored = admin.queryForObject(
+                "select last_event_at from reporting.projection_state where name = ? and owner_entity_id = ?",
+                java.sql.Timestamp.class,
+                ShopSaleProjection.NAME,
+                owner);
+        assertThat(stored.toInstant()).isBefore(ahead).isBeforeOrEqualTo(Instant.now());
+    }
+
     /** A till's bundle (doc 32 section 3.1), doc 18's column names, one to three lines. */
     private static Map<String, Object> receipt(UUID shop, UUID[] skus, Random random, Instant at, String day) {
         List<Map<String, Object>> lines = new ArrayList<>();

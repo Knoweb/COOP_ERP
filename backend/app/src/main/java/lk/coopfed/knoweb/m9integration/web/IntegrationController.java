@@ -23,6 +23,7 @@ import lk.coopfed.knoweb.m9integration.web.generated.NotificationTemplateRespons
 import lk.coopfed.knoweb.m9integration.web.generated.PendingPostingsResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.ReconciliationResponse;
 import lk.coopfed.knoweb.m9integration.web.generated.RequestJournalExportRequest;
+import lk.coopfed.knoweb.m9integration.web.generated.SupplementDueResponse;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -68,8 +69,10 @@ class IntegrationController implements IntegrationApi {
     public ResponseEntity<JournalExportResponse> requestJournalExport(
             String idempotencyKey, RequestJournalExportRequest request) {
         ScopeContext scope = currentScope.get();
-        UUID exportId =
-                requestExport.handle(new RequestJournalExport(request.getPeriodFrom(), request.getPeriodTo()), scope);
+        UUID exportId = requestExport.handle(
+                new RequestJournalExport(
+                        request.getPeriodFrom(), request.getPeriodTo(), Boolean.TRUE.equals(request.getProvisional())),
+                scope);
         JournalExportView export = queries.export(exportId, scope).orElseThrow();
         return ResponseEntity.created(URI.create(IntegrationApi.PATH_LIST_JOURNAL_EXPORTS + "/" + exportId))
                 .body(toResponse(export));
@@ -145,6 +148,15 @@ class IntegrationController implements IntegrationApi {
         return ResponseEntity.ok(new PendingPostingsResponse(pending.postings(), pending.amount())
                 .earliest(pending.earliest())
                 .latest(pending.latest()));
+    }
+
+    @Override
+    public ResponseEntity<SupplementDueResponse> getSupplementDue() {
+        IntegrationQueries.SupplementDue due = queries.supplementDue(currentScope.get());
+        return ResponseEntity.ok(new SupplementDueResponse(due.postings(), due.amount())
+                .earliest(due.earliest())
+                .latest(due.latest())
+                .upTo(due.upTo()));
     }
 
     @Override
@@ -234,6 +246,7 @@ class IntegrationController implements IntegrationApi {
                 export.periodTo(),
                 JournalExportResponse.FormatEnum.fromValue(export.format()),
                 JournalExportResponse.StatusEnum.fromValue(export.status()),
+                export.provisional(),
                 export.lineCount(),
                 export.totalDebit(),
                 export.totalCredit(),
@@ -241,9 +254,13 @@ class IntegrationController implements IntegrationApi {
                 export.generatedAt());
     }
 
-    /** journal_2026-09-01_2026-09-30_8000000000a1.csv: the period and the end of the export id (its random part). */
+    /**
+     * journal_2026-09-01_2026-09-30_8000000000a1.csv: the period and the end of the export id (its
+     * random part); journal_2026-09-01_2026-09-30_PROVISIONAL_8000000000a1.csv for a provisional
+     * export (wave 2, CR-29-1 item 1), so the accountant sees the mark in the folder too.
+     */
     static String fileName(JournalExportView export) {
-        return "journal_" + export.periodFrom() + "_" + export.periodTo() + "_"
-                + export.exportId().toString().substring(24) + ".csv";
+        return "journal_" + export.periodFrom() + "_" + export.periodTo() + (export.provisional() ? "_PROVISIONAL" : "")
+                + "_" + export.exportId().toString().substring(24) + ".csv";
     }
 }

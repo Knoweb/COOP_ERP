@@ -73,6 +73,22 @@ export function InvoicePage() {
       }
     }
   });
+  // The seller's accounts apply what a credit note of the same buyer still holds to this invoice
+  // (CR-24A-3 item 2): as much as fits, the server works it out.
+  const canIssueCredit = useHasPermission("bil.creditnote.issue");
+  const applyKey = useIdempotencyKey();
+  const applyCredit = useMutation({
+    mutationFn: (creditNoteId: string) => api.applyCreditNote(creditNoteId, invoiceId, applyKey.current()),
+    onSuccess: () => {
+      applyKey.next();
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        applyKey.next();
+      }
+    }
+  });
   // The tab is opened in the click itself, so a popup blocker lets it through, and is sent to
   // the PDF once the link arrives (openServerFile).
   const openPrint = () => print.mutate();
@@ -270,9 +286,33 @@ export function InvoicePage() {
               <li key={note.creditNoteId}>
                 <Link to={`/trading/credit-notes/${note.creditNoteId}`}>{note.docNumber ?? t("trading.creditnote.title").text}</Link>{" "}
                 <MoneyDisplay amount={note.grossAmount} />
+                {(note.unappliedAmount ?? 0) > 0 && (
+                  <>
+                    {" "}
+                    {t("trading.creditnote.unapplied").text} <MoneyDisplay amount={note.unappliedAmount ?? 0} />
+                  </>
+                )}
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {canIssueCredit && !isBuyer && amountDue > 0 && (inv.availableCredits ?? []).length > 0 && (
+        <section className="trading-section">
+          <h2>{t("trading.invoice.available_credits").text}</h2>
+          <ul>
+            {(inv.availableCredits ?? []).map((note) => (
+              <li key={note.creditNoteId}>
+                <Link to={`/trading/credit-notes/${note.creditNoteId}`}>{note.docNumber ?? t("trading.creditnote.title").text}</Link>{" "}
+                {t("trading.creditnote.unapplied").text} <MoneyDisplay amount={note.unappliedAmount ?? 0} />{" "}
+                <button type="button" disabled={applyCredit.isPending} onClick={() => applyCredit.mutate(note.creditNoteId)}>
+                  {t("trading.invoice.apply_credit").text}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {applyCredit.isError && <p role="alert">{errorText(applyCredit.error, t("trading.error.generic").text)}</p>}
         </section>
       )}
 

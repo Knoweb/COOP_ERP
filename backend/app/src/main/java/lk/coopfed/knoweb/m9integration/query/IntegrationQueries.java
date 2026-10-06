@@ -24,7 +24,11 @@ public interface IntegrationQueries {
     /** The lines of an export in their order; empty when the caller may not see the export. */
     List<JournalLineView> lines(UUID exportId, ScopeContext scope);
 
-    /** The journal file of an export for the accounting package (CSV), the bytes its content hash names. */
+    /**
+     * The journal file of an export for the accounting package (CSV): the bytes stored at
+     * generation, the ones its content hash names (wave 2, CR-29-1 item 2); for an export made
+     * before the file was stored, the version-1 writer's file of its lines.
+     */
     Optional<String> file(UUID exportId, ScopeContext scope);
 
     /**
@@ -35,6 +39,14 @@ public interface IntegrationQueries {
 
     /** What the next export over the period would take: postings no export has taken yet. */
     Pending pending(LocalDate periodFrom, LocalDate periodTo, ScopeContext scope);
+
+    /**
+     * The supplement due (wave 2, CR-29-1 item 1): the postings no export took that are dated on or
+     * before the latest {@code periodTo} this entity has exported, so they belong to a period the
+     * accountant already has a file for. Zero, with no dates, when nothing is due or nothing was
+     * ever exported.
+     */
+    SupplementDue supplementDue(ScopeContext scope);
 
     List<TemplateView> templates(ScopeContext scope);
 
@@ -48,12 +60,17 @@ public interface IntegrationQueries {
      */
     List<LogEntry> log(String status, int limit, ScopeContext scope);
 
+    /**
+     * @param provisional the period was open when the export was made (wave 2, CR-29-1 item 1):
+     *     marked in the list, the file name and the file
+     */
     record JournalExportView(
             UUID exportId,
             LocalDate periodFrom,
             LocalDate periodTo,
             String format,
             String status,
+            boolean provisional,
             int lineCount,
             BigDecimal totalDebit,
             BigDecimal totalCredit,
@@ -88,6 +105,11 @@ public interface IntegrationQueries {
     record AccountTotal(String role, BigDecimal debit, BigDecimal credit) {}
 
     record Pending(int postings, BigDecimal amount, LocalDate earliest, LocalDate latest) {}
+
+    /**
+     * @param upTo the latest {@code periodTo} the entity has exported; null when it never exported
+     */
+    record SupplementDue(int postings, BigDecimal amount, LocalDate earliest, LocalDate latest, LocalDate upTo) {}
 
     record TemplateView(
             String templateId,

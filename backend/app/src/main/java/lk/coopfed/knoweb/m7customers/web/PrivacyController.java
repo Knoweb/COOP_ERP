@@ -7,6 +7,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m7customers.api.DownloadAccessExport;
 import lk.coopfed.knoweb.m7customers.api.FulfilDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.RecordDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.RefuseDataSubjectRequest;
@@ -26,6 +27,7 @@ class PrivacyController implements PrivacyApi {
     private final Handles<RecordDataSubjectRequest, UUID> record;
     private final Handles<FulfilDataSubjectRequest, UUID> fulfil;
     private final Handles<RefuseDataSubjectRequest, UUID> refuse;
+    private final Handles<DownloadAccessExport, Map<String, Object>> download;
     private final PrivacyQueries privacy;
     private final CurrentScope currentScope;
 
@@ -33,11 +35,13 @@ class PrivacyController implements PrivacyApi {
             Handles<RecordDataSubjectRequest, UUID> record,
             Handles<FulfilDataSubjectRequest, UUID> fulfil,
             Handles<RefuseDataSubjectRequest, UUID> refuse,
+            Handles<DownloadAccessExport, Map<String, Object>> download,
             PrivacyQueries privacy,
             CurrentScope currentScope) {
         this.record = record;
         this.fulfil = fulfil;
         this.refuse = refuse;
+        this.download = download;
         this.privacy = privacy;
         this.currentScope = currentScope;
     }
@@ -76,11 +80,10 @@ class PrivacyController implements PrivacyApi {
         return ResponseEntity.ok(view(requestId, scope));
     }
 
+    /** A command, not a read (wave 2, M7CR-11): the hand-over is the officer's and audited. */
     @Override
-    public ResponseEntity<Map<String, Object>> getPrivacyExport(UUID requestId) {
-        return privacy.accessExport(requestId, currentScope.get())
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<Map<String, Object>> downloadPrivacyExport(String idempotencyKey, UUID requestId) {
+        return ResponseEntity.ok(download.handle(new DownloadAccessExport(requestId), currentScope.get()));
     }
 
     private PrivacyRequest view(UUID requestId, ScopeContext scope) {

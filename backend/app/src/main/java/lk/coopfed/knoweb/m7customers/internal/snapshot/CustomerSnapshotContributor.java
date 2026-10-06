@@ -20,18 +20,18 @@ import org.springframework.stereotype.Component;
  * ACCOUNT tender or a repayment on its own rules (27A section 7.3, "Till contract"), and nothing
  * more ("Read this first": name, phone, balance, limit).
  *
- * <p>Snapshot table {@code customer}, row id = customer id. A row is a customer holding an account
- * OPEN or SUSPENDED at the shop's society (a SUSPENDED one travels so the till can say why it
- * refuses); an anonymised customer, a CLOSED account and a customer of another society are not
- * in it, and the kernel sends the till a tombstone for a row that leaves. The row: the three names
- * (the till shows the shop's language and falls back to English), the language, the current
- * primary phone, the account, its limit, balance and offline cap as decimal text, the hard block,
- * the status and the society's tags. Never the NIC's hash or last four, the attributes or the
- * consents (27A section 7.3: "never: nic_hash, nic_last4, attributes, consent details").
+ * <p>Snapshot table {@code customer}, row id = customer id. A row is an ACTIVE customer holding an
+ * account OPEN or SUSPENDED at the shop's society (a SUSPENDED one travels so the till can say why
+ * it refuses); an INACTIVE or anonymised customer (wave 2, M7CR-05), a CLOSED account and a
+ * customer of another society are not in it, and the kernel sends the till a tombstone for a row
+ * that leaves. The row: the three names (the till shows the shop's language and falls back to
+ * English), the language, the current primary phone, the account, its limit, balance and offline
+ * cap as decimal text, the hard block, the status and the society's tags. Never the NIC's hash or
+ * last four, the attributes or the consents (27A section 7.3: "never: nic_hash, nic_last4,
+ * attributes, consent details").
  *
  * <p>The change log (27A: "customer.*, account.* ... -> UPSERT; account.suspended -> urgent") is
- * not fed yet, as M1's and M2's contributors do not feed it: a till gets these rows in its full
- * snapshot (module README, "Deviations").
+ * fed by {@link CustomerChangeLogFanOut} from the module's own events (wave 2, M7CR-14).
  */
 @Component
 class CustomerSnapshotContributor implements SnapshotContributor {
@@ -83,7 +83,7 @@ class CustomerSnapshotContributor implements SnapshotContributor {
                   join customers.customer c on c.customer_id = a.customer_id
                  where a.owner_entity_id = :entity
                    and a.status in ('OPEN', 'SUSPENDED')
-                   and c.status <> 'ANONYMISED'
+                   and c.status = 'ACTIVE'
                 """
                         + onlyIds
                         + " order by c.customer_id",

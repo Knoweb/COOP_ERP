@@ -37,15 +37,17 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@code m5.transfer.not_destination}: a session at the source reads the transfer but does not
  * receive it); not received before ({@code m5.transfer.already_received}).
  *
- * <p>Mutation: the receipt row; TRANSFER_IN per line at the cost the TRANSFER_OUT carried (the
- * entity average does not move: the stock never left the entity). Audit {@code TRANSFER_RECEIVED};
- * event {@code transfer.received.v1}.
+ * <p>Mutation: the receipt row; TRANSFER_IN per line at the cost the TRANSFER_OUT carried, so the
+ * value that left comes back. Audit {@code TRANSFER_RECEIVED}, and {@code TRANSFER_SELF_RECEIVED}
+ * (REVIEW) when the receiver issued it too (wave 2, M5-16: allowed, flagged); event
+ * {@code transfer.received.v1}.
  */
 @Service
 @CommandHandler(permission = "shop.transfer.receive")
 class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
 
     static final String AUDIT_RECEIVED = "TRANSFER_RECEIVED";
+    static final String AUDIT_SELF_RECEIVED = "TRANSFER_SELF_RECEIVED";
 
     private final TransferStore store;
     private final StockLedger ledger;
@@ -106,6 +108,17 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
                 Map.of("status", "IN_TRANSIT"),
                 Map.of("status", "RECEIVED", "toLocationId", transfer.toLocationId(), "lines", lines.size()),
                 scope);
+        if (scope.userId() != null && scope.userId().equals(transfer.issuedBy())) {
+            // wave 2, M5-16: allowed (a society with one manager sends and receives; the demo does) but
+            // flagged, since one person moved stock between locations with nobody else looking.
+            audit.record(
+                    AUDIT_SELF_RECEIVED,
+                    Subject.of("transfer", transfer.transferId()),
+                    null,
+                    Map.of("fromLocationId", transfer.fromLocationId(), "toLocationId", transfer.toLocationId()),
+                    scope,
+                    "The transfer was received by the person who issued it");
+        }
         events.publish(new TransferReceived(
                 transfer.transferId(),
                 transfer.ownerEntityId(),

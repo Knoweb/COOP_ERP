@@ -30,6 +30,19 @@ final class RelationshipRules {
     /** The allocation rules M4 knows (24A section 6.2); the V0007 check constraint says the same. */
     static final Set<String> ALLOCATION_RULES = Set.of("FCFS", "PRO_RATA", "QUOTA");
 
+    /**
+     * The pair's credit limit has been published as {@code credit_limit.changed.v1} (m1security
+     * V0019): written, in the same transaction, by the handlers that publish the event (Activate,
+     * an amendment of the limit, the backfill's announcement), so {@code CreditLimitBackfillJob}
+     * never announces a pair twice. A handler runs it; this class only names it.
+     */
+    static final String MARK_LIMIT_ANNOUNCED =
+            """
+            insert into security.credit_limit_announcement (owner_entity_id, buyer_entity_id, relationship_id)
+            values (?, ?, ?)
+            on conflict (owner_entity_id, buyer_entity_id) do nothing
+            """;
+
     /** SQLSTATE exclusion_violation: the A-I3 constraint refused a second ACTIVE row. */
     private static final String EXCLUSION_VIOLATION = "23P01";
 

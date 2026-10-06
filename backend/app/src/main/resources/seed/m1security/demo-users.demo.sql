@@ -292,3 +292,46 @@ FROM job
 CROSS JOIN LATERAL unnest(job.codes) AS code
 JOIN security.permission p ON p.permission_code = code
 ON CONFLICT DO NOTHING;
+
+-- wave 2, PR 11 (CR-21A-7; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (1) and
+-- 2026-10-06-wave2-m1-administration.md (4)). A block of its own, so the other lanes' additions
+-- above merge without a conflict.
+--
+-- 1. The approval limit of the society managers (M101, M102, M103), who approve their societies'
+--    write-offs and stock adjustments: the grant's max_value, Rs 250,000, band 2 of doc 25 section
+--    7 (a society's general manager). A grant without one approves up to
+--    inventory.approval_band1_limit only (M5). Set only where none is set yet, so a limit changed
+--    on the screen survives a second `make demo-data`.
+UPDATE security.role_permission
+   SET limits = '{"max_value": 250000}'::jsonb
+ WHERE role_id IN ('0190f0de-0000-7000-8000-000000000332',
+                   '0190f0de-0000-7000-8000-000000000342',
+                   '0190f0de-0000-7000-8000-000000000352')
+   AND permission_code IN ('inv.writeoff.approve', 'inv.adjust.approve')
+   AND limits IS NULL;
+
+-- 2. Opening a relationship with a credit limit, and activating a draft that carries one, now need
+--    bil.creditlimit.change and a fresh second factor, as amending the limit always did (doc 21
+--    flow 6.4). The roles that open and activate the demo's relationships (Federation pricing and
+--    each distributor's commercial role) set the opening limit too, so they hold it.
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT grant_row.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000302'::uuid, 'bil.creditlimit.change'),
+        ('0190f0de-0000-7000-8000-000000000311'::uuid, 'bil.creditlimit.change'),
+        ('0190f0de-0000-7000-8000-000000000321'::uuid, 'bil.creditlimit.change')
+     ) AS grant_row (role_id, permission_code)
+JOIN security.permission p ON p.permission_code = grant_row.permission_code
+ON CONFLICT DO NOTHING;
+
+-- wave 2, PR 10 (CR-25A-1 item 3; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (3)).
+-- A block of its own, so the other lanes' additions above merge without a conflict. The approver of
+-- a write-off may no longer be its in-person witness (M5-10): the society office (m101-office)
+-- witnesses the demo's damaged flour at the stores and the manager approves it (DemoStockOperations).
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT grant_row.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'inv.writeoff.witness')
+     ) AS grant_row (role_id, permission_code)
+JOIN security.permission p ON p.permission_code = grant_row.permission_code
+ON CONFLICT DO NOTHING;

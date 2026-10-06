@@ -73,6 +73,9 @@ public class CancelOrderHandler implements Handles<CancelOrder, Void> {
         if (!OrderStatus.DRAFT.equals(status) && !OrderStatus.SUBMITTED.equals(status)) {
             throw new ProblemException("m4.order.not_cancellable", Map.of("status", status));
         }
+        // The seller's decision and its delivery note take the same lock: read the allocation and
+        // what was dispatched only once it is held (wave 2, M4MONEY-06 and -07).
+        OrderLocks.lock(jdbc, orderId);
         List<String> decision = jdbc.queryForList(
                 "select status from trading.order_allocation where order_id = ?", String.class, orderId);
         if (decision.contains(OrderStatus.REJECTED)) {

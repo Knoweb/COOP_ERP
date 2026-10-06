@@ -1,6 +1,8 @@
 package lk.coopfed.knoweb.m5inventory.internal.consumers;
 
 import java.math.BigDecimal;
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +21,9 @@ class ConsumerStore {
 
     record PickList(UUID pickListId, String status) {}
 
+    /** A short row of a pick list: the delivery line, its item, the batch it named (or null), the quantity not found. */
+    record ShortPick(UUID deliveryLineId, UUID skuId, UUID batchId, BigDecimal qty) {}
+
     private final JdbcTemplate jdbc;
 
     ConsumerStore(JdbcTemplate jdbc) {
@@ -35,9 +40,11 @@ class ConsumerStore {
      * The GOOD lots of the SKU with stock, of every location the scope reads, in FEFO order
      * (expiry, none last, then received), each with its quantity less what open pick lists hold of
      * it; locked for the rest of the transaction so two delivery notes cannot reserve the same
-     * units. Only the named batch when the delivery line names one.
+     * units. Only the named batch when the delivery line names one. Only lots that expire on or
+     * after {@code expiresFrom} (wave 2, M5-01): the business date plus the seller's minimum shelf
+     * life for a delivery note, so an expired lot never leaves on one.
      */
-    List<Candidate> lockCandidates(UUID skuId, UUID batchId) {
+    List<Candidate> lockCandidates(UUID skuId, UUID batchId, LocalDate expiresFrom) {
         return jdbc.query(
                 """
                 select l.stock_lot_id, l.location_id, l.batch_id,
@@ -48,6 +55,7 @@ class ConsumerStore {
                   from inventory.stock_lot l
                  where l.sku_id = ? and l.condition = 'GOOD' and l.qty_on_hand > 0
                    and (?::uuid is null or l.batch_id = ?)
+                   and (l.expiry_date is null or l.expiry_date >= ?)
                  order by l.expiry_date nulls last, l.received_at, l.stock_lot_id
                    for update of l
                 """,
@@ -58,7 +66,8 @@ class ConsumerStore {
                         rs.getBigDecimal("free")),
                 skuId,
                 batchId,
-                batchId);
+                batchId,
+                Date.valueOf(expiresFrom));
     }
 
     Optional<PickList> pickListOf(UUID deliveryDocumentId) {
@@ -69,6 +78,23 @@ class ConsumerStore {
                         deliveryDocumentId)
                 .stream()
                 .findFirst();
+    }
+
+    /** The short parts of a list: a row per delivery line with no lot, what was not found at the reservation. */
+    List<ShortPick> shortPicks(UUID pickListId) {
+        return jdbc.query(
+                """
+                select delivery_line_id, sku_id, batch_id, qty
+                  from inventory.pick_list_line
+                 where pick_list_id = ? and stock_lot_id is null
+                 order by delivery_line_id
+                """,
+                (rs, n) -> new ShortPick(
+                        rs.getObject("delivery_line_id", UUID.class),
+                        rs.getObject("sku_id", UUID.class),
+                        rs.getObject("batch_id", UUID.class),
+                        rs.getBigDecimal("qty")),
+                pickListId);
     }
 
     /** The picks of a list that name a lot (the short parts move nothing). */

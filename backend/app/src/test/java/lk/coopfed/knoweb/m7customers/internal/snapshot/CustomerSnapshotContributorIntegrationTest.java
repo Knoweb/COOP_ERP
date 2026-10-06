@@ -19,6 +19,7 @@ import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.m7customers.CustomersFixture;
 import lk.coopfed.knoweb.m7customers.api.AmendAccountLimits;
 import lk.coopfed.knoweb.m7customers.api.ChangeAccountStatus;
+import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
@@ -57,6 +58,9 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
 
     @Autowired
     Handles<ChangeAccountStatus, UUID> changeStatus;
+
+    @Autowired
+    Handles<DeactivateCustomer, UUID> deactivate;
 
     private final Shop shop = new Shop(SOCIETY, SHOP);
 
@@ -102,6 +106,10 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
         UUID noAccount = member("Anoma Herath", null, "0700000604", List.of(), SOCIETY);
         UUID elsewhere = member("S. Sivakumar", null, "0700000605", List.of(), OTHER);
         open.handle(new OpenAccount(elsewhere, BigDecimal.ZERO, null, null, null), other());
+        // An INACTIVE customer with an OPEN account leaves the snapshot (wave 2, M7CR-05).
+        UUID inactive = member("P. Gunasekara", null, "0700000606", List.of(), SOCIETY);
+        open.handle(new OpenAccount(inactive, BigDecimal.ZERO, null, null, null), office());
+        deactivate.handle(new DeactivateCustomer(inactive, "Moved away"), office());
 
         Map<UUID, Map<String, Object>> rows =
                 transactions.inScope(SystemScope.own(SOCIETY, SHOP), () -> contributor.allRows("customer", shop));
@@ -127,7 +135,7 @@ class CustomerSnapshotContributorIntegrationTest extends PostgresIntegrationTest
         // The rows asked for by id: a row that left (closed, no account) is simply not answered.
         Map<UUID, Map<String, Object>> some = transactions.inScope(
                 SystemScope.own(SOCIETY, SHOP),
-                () -> contributor.rows("customer", shop, List.of(open1, closed, noAccount, elsewhere)));
+                () -> contributor.rows("customer", shop, List.of(open1, closed, noAccount, elsewhere, inactive)));
         assertThat(some).containsOnlyKeys(open1);
         assertThat(contributor.tables()).containsExactly("customer");
     }

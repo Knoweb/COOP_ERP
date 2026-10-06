@@ -124,11 +124,15 @@ public class M1SeedLoader {
         for (SeedRecords.PermissionData p : seed.permissions()) {
             boolean offline = p.offline_allowed() != null ? p.offline_allowed() : false;
             boolean mfa = p.requires_mfa() != null ? p.requires_mfa() : false;
+            // Written with a new row only, like every column here: an existing row's schema is a
+            // migration's to change (m1security V0019 for the two approval codes).
+            String limitsSchema = p.limits_schema() == null ? null : mapper.writeValueAsString(p.limits_schema());
 
             inserted(jdbc.sql(
                             """
-                INSERT INTO security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope)
-                VALUES (:code, :module, :desc, :offline, :mfa, :scope)
+                INSERT INTO security.permission (permission_code, module, description_en, offline_allowed, requires_mfa, scope,
+                                                 limits_schema)
+                VALUES (:code, :module, :desc, :offline, :mfa, :scope, CAST(:limitsSchema AS jsonb))
                 ON CONFLICT (permission_code) DO NOTHING
             """)
                     .param("code", p.code())
@@ -137,6 +141,7 @@ public class M1SeedLoader {
                     .param("offline", offline)
                     .param("mfa", mfa)
                     .param("scope", p.scope())
+                    .param("limitsSchema", limitsSchema, java.sql.Types.VARCHAR)
                     .update());
         }
         log.info("Loaded {} permissions", seed.permissions().size());

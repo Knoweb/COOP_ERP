@@ -22,11 +22,42 @@ public final class Allocator {
 
     private Allocator() {}
 
-    /** A charge with something still open: its amount less what earlier payments settled. */
-    public record OpenCharge(UUID postingId, LocalDate businessDate, Instant receivedAt, BigDecimal open) {}
+    /**
+     * A charge with something still open: its amount less what earlier credits settled.
+     *
+     * @param documentId the till receipt the charge came from (or the adjustment), so a void's
+     *                   CREDIT finds the charge it undoes
+     */
+    public record OpenCharge(
+            UUID postingId, UUID documentId, LocalDate businessDate, Instant receivedAt, BigDecimal open) {}
 
-    /** What the payment puts against one charge. */
+    /** What the payment (or the credit) puts against one charge. */
     public record Allocation(UUID chargePostingId, BigDecimal amount) {}
+
+    /**
+     * How a CREDIT settles charges (wave 2, CR-27A-1 item 2): first the open charge of the same
+     * document (a void's {@code receipt.voided.v1} carries the receipt's own id, so the voided
+     * charge is found; a refund's document is the refund receipt and usually matches nothing),
+     * then oldest first for what remains.
+     */
+    public static List<Allocation> sameDocumentFirst(List<OpenCharge> open, UUID documentId, BigDecimal amount) {
+        List<Allocation> allocations = new ArrayList<>();
+        BigDecimal remaining = amount;
+        List<OpenCharge> rest = new ArrayList<>();
+        for (OpenCharge charge : open) {
+            if (documentId != null && documentId.equals(charge.documentId()) && remaining.signum() > 0) {
+                BigDecimal take = charge.open().min(remaining);
+                if (take.signum() > 0) {
+                    allocations.add(new Allocation(charge.postingId(), take));
+                    remaining = remaining.subtract(take);
+                }
+            } else {
+                rest.add(charge);
+            }
+        }
+        allocations.addAll(oldestFirst(rest, remaining));
+        return allocations;
+    }
 
     /** Oldest first: each charge in turn, as far as the amount goes. */
     public static List<Allocation> oldestFirst(List<OpenCharge> open, BigDecimal amount) {

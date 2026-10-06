@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m4trading.internal.queries;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -8,6 +9,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceSettlements;
 import lk.coopfed.knoweb.m4trading.query.CreditNoteQueries;
 import lk.coopfed.knoweb.m4trading.query.CreditNoteView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
@@ -25,10 +27,12 @@ class CreditNoteQueriesImpl implements CreditNoteQueries {
 
     private final JdbcTemplate jdbc;
     private final DocumentBaseRepository documents;
+    private final InvoiceSettlements settlements;
 
-    CreditNoteQueriesImpl(JdbcTemplate jdbc, DocumentBaseRepository documents) {
+    CreditNoteQueriesImpl(JdbcTemplate jdbc, DocumentBaseRepository documents, InvoiceSettlements settlements) {
         this.jdbc = jdbc;
         this.documents = documents;
+        this.settlements = settlements;
     }
 
     @Override
@@ -68,6 +72,30 @@ class CreditNoteQueriesImpl implements CreditNoteQueries {
 
     @Override
     @Transactional(readOnly = true)
+    public List<CreditNoteView> unappliedCreditNotes(UUID sellerEntityId, UUID buyerEntityId, ScopeContext scope) {
+        if (sellerEntityId == null || buyerEntityId == null) {
+            return List.of();
+        }
+        List<CreditNoteView> views = new ArrayList<>();
+        for (UUID id : jdbc.queryForList(
+                """
+                select c.document_id from trading.doc_credit_note c
+                  join trading.doc_invoice i on i.document_id = c.invoice_document_id
+                 where i.seller_entity_id = ? and i.buyer_entity_id = ?
+                 order by c.document_id
+                """,
+                UUID.class,
+                sellerEntityId,
+                buyerEntityId)) {
+            getCreditNote(id, scope)
+                    .filter(note -> note.unappliedAmount().signum() > 0)
+                    .ifPresent(views::add);
+        }
+        return views;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<String> printObjectKey(UUID creditNoteId, ScopeContext scope) {
         if (creditNoteId == null) {
             return Optional.empty();
@@ -84,6 +112,8 @@ class CreditNoteQueriesImpl implements CreditNoteQueries {
 
     private CreditNoteView view(DocumentRecord header, Map<String, Object> row) {
         UUID invoiceId = (UUID) row.get("invoice_document_id");
+        BigDecimal gross = header.grossAmount() == null ? BigDecimal.ZERO : header.grossAmount();
+        BigDecimal applied = settlements.appliedOf(header.id());
         return new CreditNoteView(
                 header.id(),
                 header.docNumberDisplay(),
@@ -114,6 +144,8 @@ class CreditNoteQueriesImpl implements CreditNoteQueries {
                                 line.taxAmount(),
                                 line.lineTotal(),
                                 line.referenceLineId()))
-                        .toList());
+                        .toList(),
+                applied,
+                gross.subtract(applied));
     }
 }

@@ -19,11 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * DeactivateCustomer (27A section 6). Guards, in order: the society's OWN scope; the customer
- * registered by the caller's society and ACTIVE; a reason; no OPEN account of the caller's
- * society with a balance other than zero ({@code m7.customer.open_balance}).
+ * registered by the caller's society and ACTIVE; a reason free of a phone number or NIC; no OPEN
+ * or SUSPENDED account of the caller's society with a balance other than zero ({@code
+ * m7.customer.open_balance}).
  *
- * <p>Mutation: status INACTIVE. The account and its postings are untouched. Audit
- * CUSTOMER_DEACTIVATED with the reason; event customer.deactivated.v1.
+ * <p>Mutation: status INACTIVE. The account and its postings are untouched (27A); the customer
+ * leaves the tills' snapshot, which holds ACTIVE customers only, and a till charge that still
+ * arrives is posted and flagged (PostAccountTender, ACCOUNT_CHARGED_CUSTOMER_INACTIVE).
+ * Reactivation is not built (README, "Deferred"). Audit CUSTOMER_DEACTIVATED with the reason;
+ * event customer.deactivated.v1.
  */
 @Service
 @CommandHandler(permission = "cus.customer.manage")
@@ -52,11 +56,12 @@ class DeactivateCustomerHandler implements Handles<DeactivateCustomer, UUID> {
         if (!"ACTIVE".equals(CustomerGuards.customerStatus(jdbc, customerId))) {
             throw new ProblemException("m7.customer.not_active");
         }
-        String reason = CustomerGuards.requiredText(command.reason(), "reason");
+        String reason = PersonalDataText.require(CustomerGuards.requiredText(command.reason(), "reason"), "reason");
+        // Wave 2 (M7CR-05): a SUSPENDED debtor is a debtor too.
         List<BigDecimal> balances = jdbc.queryForList(
                 """
                 select balance from customers.customer_account
-                 where customer_id = ? and status = 'OPEN' and balance <> 0 for update
+                 where customer_id = ? and status in ('OPEN', 'SUSPENDED') and balance <> 0 for update
                 """,
                 BigDecimal.class,
                 customerId);
@@ -68,12 +73,14 @@ class DeactivateCustomerHandler implements Handles<DeactivateCustomer, UUID> {
 
         jdbc.update("update customers.customer set status = 'INACTIVE' where customer_id = ?", customerId);
 
+        // The reason travels as the audit's reason, never in after (wave 2, M7CR-10).
         audit.record(
                 AUDIT_DEACTIVATED,
                 Subject.of("customer", customerId),
                 Map.of("status", "ACTIVE"),
-                Map.of("status", "INACTIVE", "reason", reason),
-                scope);
+                Map.of("status", "INACTIVE"),
+                scope,
+                reason);
         events.publish(new CustomerDeactivated(customerId, scope.entityId()));
         return customerId;
     }
