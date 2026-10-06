@@ -13,6 +13,11 @@ interface SmsGateway {
     /** The name the configuration chooses it by. */
     String name();
 
-    /** @return the provider's reference, or throws for the kernel to retry */
+    /**
+     * @return the provider's reference, or throws for the kernel to retry. An exception's message
+     *     must not carry the recipient or the body: the notification id is the idempotency key and
+     *     all a failure needs to name (wave 2, M9-10). {@link SmsChannel} rethrows without the
+     *     message anyway; this is the second line.
+     */
     String send(UUID notificationId, String phone, String body);
 }

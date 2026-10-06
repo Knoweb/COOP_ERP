@@ -25,11 +25,6 @@
   color: var(--color-text-muted);
 }
 
-.integration-hash {
-  font-variant-numeric: tabular-nums;
-  font-size: var(--font-size-sm);
-}
-
 .integration-templates {
   list-style: none;
   padding: 0;

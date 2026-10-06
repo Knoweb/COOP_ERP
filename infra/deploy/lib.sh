@@ -182,3 +182,13 @@ smoke() {
   done
   [ "$fails" -eq 0 ] || fail "$fails smoke check(s) failed; see 'Troubleshooting' in the SETUP document"
 }
+
+# Adds a generated key (base64 of 32 random bytes) to .env when the key is missing: a server
+# bootstrapped before the key existed gets one at its next deploy, and a key that is there is
+# never rewritten (a new one would change what it protects). The value is never printed.
+env_ensure_key() {
+  local key="$1"
+  [ -n "$(env_get "$key")" ] && return 0
+  env_set "$key" "$(openssl rand -base64 32)"
+  echo "  $key generated (it was missing from $APP_DIR/.env)"
+}

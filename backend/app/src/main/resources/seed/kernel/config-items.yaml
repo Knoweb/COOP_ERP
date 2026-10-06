@@ -177,7 +177,7 @@ config_items:
     till_visible: true
   - key: notification.sms.quiet_hours
     value_type: STRING
-    schema: { pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$|^$" }
+    schema: { pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$|^$", window_max_hours: 15 }
     description_en: The hours during which no SMS is sent, as HH:mm-HH:mm; empty for none
     description_si: SMS නොයවන පැය, HH:mm-HH:mm ලෙස; නොමැති නම් හිස්
     description_ta: SMS அனுப்பப்படாத நேரங்கள், HH:mm-HH:mm என; இல்லையெனில் வெற்று

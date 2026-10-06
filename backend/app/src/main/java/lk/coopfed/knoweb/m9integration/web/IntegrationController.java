@@ -189,14 +189,17 @@ class IntegrationController implements IntegrationApi {
                                 e.createdAt(),
                                 NotificationLogResponse.ChannelEnum.fromValue(e.channel()),
                                 NotificationLogResponse.StatusEnum.fromValue(e.status()),
-                                e.attempts(),
-                                e.recipientHash())
+                                e.attempts())
                         .ruleId(e.ruleId())
                         .eventId(e.eventId())
                         .templateId(e.templateId())
                         .language(e.language())
                         .suppressedReason(e.suppressedReason())
-                        .lastError(e.lastError()))
+                        .lastError(e.lastError())
+                        .recipientEntityId(e.recipientEntityId())
+                        .audienceRole(e.audienceRole())
+                        .recipientTag(e.recipientTag())
+                        .nextAttemptAt(e.nextAttemptAt()))
                 .toList());
     }
 
