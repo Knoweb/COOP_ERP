@@ -174,13 +174,15 @@ class AccountQueriesImpl implements AccountQueries {
                 """
                 select p.posting_id, p.business_date, p.kind, p.amount, p.document_id, p.receipt_number,
                        p.limit_breached, p.offline,
-                       case when p.kind in ('CHARGE', 'ADJUSTMENT')
+                       case when"""
+                        + Ledger.CHARGE_SIDE
+                        + """
                             then (select coalesce(sum(a.amount), 0) from customers.allocation a
                                    where a.charge_posting_id = p.posting_id and"""
                         + Ledger.LIVE_ALLOCATION
                         + """
                                   )
-                            when p.kind = 'PAYMENT'
+                            when p.kind in ('PAYMENT', 'CREDIT') or (p.kind = 'ADJUSTMENT' and p.amount < 0)
                             then (select coalesce(sum(a.amount), 0) from customers.allocation a
                                    where a.payment_posting_id = p.posting_id and"""
                         + Ledger.LIVE_ALLOCATION

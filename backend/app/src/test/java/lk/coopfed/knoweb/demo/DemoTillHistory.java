@@ -191,7 +191,7 @@ public final class DemoTillHistory {
         List<LocalDate> plan = saleDays(today, FIRST_DAY_AGO.get(location));
 
         JsonNode device = findDevice(location, serial, manager);
-        List<LocalDate> todo = stillToSell(plan, device == null ? Set.of() : soldDays(location, device, manager));
+        List<LocalDate> todo = stillToSell(plan, device == null ? Set.of() : soldDays(location, device, plan, manager));
         if (todo.isEmpty()) {
             System.out.println("Till history at " + location + ": all " + plan.size() + " sale days already there");
             return;
@@ -308,7 +308,7 @@ public final class DemoTillHistory {
         // Wait for the relay to hand the receipts to M6, so a second run sees them.
         Set<LocalDate> sold = Set.of();
         for (int attempt = 0; attempt < 60; attempt++) {
-            sold = soldDays(location, device, manager);
+            sold = soldDays(location, device, plan, manager);
             if (sold.containsAll(todo)) {
                 break;
             }
@@ -343,14 +343,29 @@ public final class DemoTillHistory {
         return null;
     }
 
-    /** The business dates on which the demo till already has a receipt at central. */
-    private Set<LocalDate> soldDays(UUID location, JsonNode device, HttpHeaders manager) {
+    /**
+     * The business dates of the plan on which the demo till already has a receipt at central: the
+     * receipts list is one business day a page at a time (wave 2, M6-08), so each planned day is
+     * asked for until a receipt of this till is found or the day's pages run out.
+     */
+    private Set<LocalDate> soldDays(UUID location, JsonNode device, List<LocalDate> plan, HttpHeaders manager) {
         String deviceId = device.path("deviceId").asText();
         Set<LocalDate> days = new HashSet<>();
-        for (JsonNode r : call(HttpMethod.GET, "/v1/pos/receipts?locationId=" + location, null, manager)) {
-            if (deviceId.equals(r.path("deviceId").asText()) && r.hasNonNull("businessDate")) {
-                days.add(LocalDate.parse(r.path("businessDate").asText()));
-            }
+        for (LocalDate day : plan) {
+            String cursor = null;
+            do {
+                String path = "/v1/pos/receipts?locationId=" + location + "&businessDate=" + day + "&limit=200"
+                        + (cursor == null ? "" : "&cursor=" + cursor);
+                JsonNode page = call(HttpMethod.GET, path, null, manager);
+                for (JsonNode r : page.path("items")) {
+                    if (deviceId.equals(r.path("deviceId").asText())) {
+                        days.add(day);
+                    }
+                }
+                cursor = days.contains(day) || page.path("nextCursor").isNull()
+                        ? null
+                        : page.path("nextCursor").asText(null);
+            } while (cursor != null);
         }
         return days;
     }

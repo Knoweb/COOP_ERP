@@ -18,10 +18,13 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.m7customers.api.AccessExportDownloaded;
+import lk.coopfed.knoweb.m7customers.api.ChangeAccountStatus;
 import lk.coopfed.knoweb.m7customers.api.CustomerAnonymised;
 import lk.coopfed.knoweb.m7customers.api.DataSubjectRequestFulfilled;
 import lk.coopfed.knoweb.m7customers.api.DataSubjectRequestReceived;
 import lk.coopfed.knoweb.m7customers.api.DataSubjectRequestRefused;
+import lk.coopfed.knoweb.m7customers.api.DownloadAccessExport;
 import lk.coopfed.knoweb.m7customers.api.FulfilDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
@@ -29,6 +32,7 @@ import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
 import lk.coopfed.knoweb.m7customers.api.RecordDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.RefuseDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
+import lk.coopfed.knoweb.m7customers.internal.privacy.PrivacyExporter;
 import lk.coopfed.knoweb.m7customers.query.AccountQueries;
 import lk.coopfed.knoweb.m7customers.query.CustomerCard;
 import lk.coopfed.knoweb.m7customers.query.CustomerQueries;
@@ -43,9 +47,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * The data-subject requests (27A section 6; doc 27 flow 6.7): received by the society that
  * registered the customer, answered only by its responsible officer; the access export holds every
- * row about the customer; an erasure waits while a balance is open, then the Anonymiser leaves no
- * identity and the ledger exactly as it was (the balance still the sum of the postings); a refusal
- * records its legal ground. Nothing about the person reaches an event or an audit record.
+ * row about the customer (not the NIC's hash) and is handed over by an audited command; an erasure
+ * waits while an account is open, has a balance or was closed within the offline window, then the
+ * Anonymiser leaves no identity and no free text about the person, and the ledger exactly as it was
+ * (the balance still the sum of the postings); a refusal records its legal ground. Nothing about
+ * the person reaches an event or an audit record. Every number here is plainly made up.
  */
 class PrivacyRequestsIntegrationTest extends PostgresIntegrationTest {
 
@@ -69,6 +75,15 @@ class PrivacyRequestsIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Handles<RefuseDataSubjectRequest, UUID> refuse;
+
+    @Autowired
+    Handles<DownloadAccessExport, Map<String, Object>> download;
+
+    @Autowired
+    Handles<ChangeAccountStatus, UUID> changeStatus;
+
+    @Autowired
+    PrivacyExporter exporter;
 
     @Autowired
     CustomerQueries customers;
@@ -148,8 +163,14 @@ class PrivacyRequestsIntegrationTest extends PostgresIntegrationTest {
         UUID requestId = record.handle(
                 new RecordDataSubjectRequest(customerId, RecordDataSubjectRequest.ACCESS, null), office());
         fulfil.handle(new FulfilDataSubjectRequest(requestId, null), officer());
+        String atFulfilment = privacy.request(requestId, office()).orElseThrow().exportSha256();
 
-        Map<String, Object> export = privacy.accessExport(requestId, office()).orElseThrow();
+        // The hand-over is a command of the responsible officer (wave 2, M7CR-11), audited.
+        assertThatThrownBy(() -> download.handle(new DownloadAccessExport(requestId), officeWithMfa()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.privacy.officer_only"));
+        kernel.reset();
+        Map<String, Object> export = download.handle(new DownloadAccessExport(requestId), officer());
         assertThat(export)
                 .containsOnlyKeys(
                         "customer", "phones", "consents", "tags", "accounts", "postings", "allocations", "payments");
@@ -157,22 +178,66 @@ class PrivacyRequestsIntegrationTest extends PostgresIntegrationTest {
         assertThat(text).contains("Nimal Rathnayake", "+94700000502", "0502", "CREDIT_ACCOUNT", "700.00", "-200.00");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) export.get("customer");
-        // Every column of the customer's row, as the table has them.
+        // Every column of the customer's row, as the table has them, but the NIC's hash and key id:
+        // a derived secret of the system, not the customer's data (M7CR-11, RLS-01).
         List<String> columns = superuserJdbc()
                 .queryForList(
                         """
                         select column_name from information_schema.columns
                          where table_schema = 'customers' and table_name = 'customer'
+                           and column_name not in ('nic_hash', 'nic_key_id')
                         """,
                         String.class);
         assertThat(rows.get(0).keySet()).containsExactlyInAnyOrderElementsOf(columns);
+        String nicHash = superuserJdbc()
+                .queryForObject(
+                        "select nic_hash from customers.customer where customer_id = ?", String.class, customerId);
+        assertThat(new String(exporter.bytes(export), java.nio.charset.StandardCharsets.UTF_8))
+                .doesNotContain(nicHash, "nic_hash", "190000000502");
+        AuditRecord downloaded = single("DSAR_EXPORT_DOWNLOADED");
+        assertThat(downloaded.subject().id()).isEqualTo(requestId);
+        assertThat(downloaded.after()).isEqualTo(Map.of("customerId", customerId, "matchesFulfilment", true));
+        assertThat(exporter.sha256(export)).isEqualTo(atFulfilment);
+        assertThat(kernel.committedEvents())
+                .containsExactly(new AccessExportDownloaded(requestId, customerId, SOCIETY));
         // Nothing of the person in the audit or the events.
         for (AuditRecord audit : kernel.committedAudit()) {
-            assertThat(String.valueOf(audit.after())).doesNotContain("700000502", "Nimal");
+            assertThat(String.valueOf(audit.after())).doesNotContain("700000502", "Nimal", "0502");
         }
         for (DomainEvent event : kernel.committedEvents()) {
             assertThat(String.valueOf(event)).doesNotContain("700000502", "Nimal");
         }
+        // Not an ACCESS request, or not fulfilled: no export.
+        UUID erasure = record.handle(
+                new RecordDataSubjectRequest(customerId, RecordDataSubjectRequest.ERASURE, null), office());
+        assertThatThrownBy(() -> download.handle(new DownloadAccessExport(erasure), officer()))
+                .hasMessageContaining("m7.privacy.not_access");
+        UUID access = record.handle(
+                new RecordDataSubjectRequest(customerId, RecordDataSubjectRequest.ACCESS, null), office());
+        assertThatThrownBy(() -> download.handle(new DownloadAccessExport(access), officer()))
+                .hasMessageContaining("m7.privacy.not_fulfilled");
+    }
+
+    /** Wave 2, M7CR-10: what an officer types stays on the record, so no phone number or NIC goes in. */
+    @Test
+    void officerFreeTextWithAPhoneNumberOrANicIsRefused() {
+        CustomersFixture.appointOfficer(superuserJdbc());
+        UUID customerId = member("Chandra Perera", "0700000505");
+        kernel.reset();
+        assertThatThrownBy(() -> record.handle(
+                        new RecordDataSubjectRequest(
+                                customerId, RecordDataSubjectRequest.ACCESS, "Asked by phone, call 0771234567"),
+                        office()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.field.personal_data"));
+        UUID requestId = record.handle(
+                new RecordDataSubjectRequest(customerId, RecordDataSubjectRequest.CORRECTION, "Name misspelt"),
+                office());
+        assertThatThrownBy(() -> fulfil.handle(
+                        new FulfilDataSubjectRequest(requestId, "Card 199000000505 corrected"), officer()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.field.personal_data"));
+        assertThat(kernel.committedAudit()).extracting(AuditRecord::eventType).containsExactly("DSAR_RECEIVED");
     }
 
     @Test
@@ -192,10 +257,24 @@ class PrivacyRequestsIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit()).isEmpty();
 
         pay.handle(payment(accountId, "900.00"), office());
+        // Settled, but OPEN: every account must be CLOSED (wave 2, M7CR-09; CR-27A-1 item 3).
+        assertThatThrownBy(() -> fulfil.handle(new FulfilDataSubjectRequest(requestId, null), officer()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.privacy.account_open"));
+        changeStatus.handle(new ChangeAccountStatus(accountId, ChangeAccountStatus.CLOSE, "Left the area"), office());
+        // Closed just now: the shops' offline sales may still arrive (customers.erasure_wait_days).
+        assertThatThrownBy(() -> fulfil.handle(new FulfilDataSubjectRequest(requestId, null), officer()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.privacy.recently_closed"));
+        // The clock moves: the close was ten days ago.
+        superuserJdbc()
+                .update(
+                        "update customers.account_history set changed_at = changed_at - interval '10 days' where account_id = ?",
+                        accountId);
         List<Map<String, Object>> ledgerBefore = ledger(accountId);
         kernel.reset();
 
-        fulfil.handle(new FulfilDataSubjectRequest(requestId, null), officer());
+        fulfil.handle(new FulfilDataSubjectRequest(requestId, "the officer's note is ignored"), officer());
 
         CustomerCard card = customers.card(customerId, office()).orElseThrow();
         assertThat(card.displayName()).isEqualTo("Customer");
@@ -208,10 +287,31 @@ class PrivacyRequestsIntegrationTest extends PostgresIntegrationTest {
         assertThat(card.consents()).allSatisfy(c -> assertThat(c.withdrawnAt()).isNotNull());
         Map<String, Object> row = superuserJdbc()
                 .queryForMap(
-                        "select nic_hash, nic_last4, attributes::text as attributes from customers.customer where customer_id = ?",
+                        "select nic_hash, nic_key_id, nic_last4, attributes::text as attributes from customers.customer where customer_id = ?",
                         customerId);
         assertThat(row.get("nic_hash")).isNull();
+        assertThat(row.get("nic_key_id")).isNull();
         assertThat(row.get("attributes")).isEqualTo("{}");
+        // The module's own free text about the person went with the identity (M7CR-10).
+        PrivacyQueries.RequestView fulfilled =
+                privacy.request(requestId, office()).orElseThrow();
+        assertThat(fulfilled.outcome()).isEqualTo("ANONYMISED");
+        assertThat(fulfilled.notes()).isNull();
+        // The privacy scan: no phone number, NIC or the fixture's name across the module's text columns.
+        for (String column : List.of(
+                "notes from customers.data_subject_request",
+                "outcome from customers.data_subject_request",
+                "reason from customers.account_history",
+                "reason from customers.account_adjustment",
+                "reference from customers.doc_customer_payment",
+                "phone from customers.customer_phone",
+                "display_name from customers.customer")) {
+            for (String text : superuserJdbc().queryForList("select " + column, String.class)) {
+                if (text != null) {
+                    assertThat(text).as(column).doesNotContain("Upali", "Wickramasinghe", "700000503", "190000000503");
+                }
+            }
+        }
         assertThat(superuserJdbc()
                         .queryForList(
                                 "select phone from customers.customer_phone where customer_id = ?",

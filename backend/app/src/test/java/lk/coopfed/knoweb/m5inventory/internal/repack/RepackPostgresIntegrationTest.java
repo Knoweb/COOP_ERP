@@ -153,6 +153,32 @@ class RepackPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aReversalTakesThePacksOutAtTheRepacksOwnCostSoThePackAverageComesBack() {
+        // The packs item already holds 20 packs at 150 from elsewhere (wave 2, M5-17): the reversal
+        // must remove the repack's 49 × 193.8776, not 49 at the mixed average of the moment.
+        UUID earlierPacks = fixture.batch(pack, MPCS, "P-EARLIER", LocalDate.of(2027, 6, 30));
+        post(MovementType.RECEIPT, earlierPacks, "20", "150");
+        UUID recipe = define.handle(recipe("R-012 rice 1 kg"), own(MPCS));
+        UUID id = execute.handle(
+                new ExecuteRepack(recipe, stores, looseBatch, new BigDecimal("50"), new BigDecimal("49"), null),
+                own(MPCS));
+        assertThat(inventory.entityAverageCost(pack, own(MPCS)).orElseThrow().avgCost())
+                .isEqualByComparingTo("181.1595");
+
+        reverse.handle(new ReverseRepack(id, "Wrong pack size"), own(MPCS));
+
+        assertThat(inventory.movementsOf(id, own(MPCS)))
+                .filteredOn(m -> m.movementType().equals("REPACK_CONSUME")
+                        && m.qtyDelta().compareTo(new BigDecimal("-49")) == 0)
+                .singleElement()
+                .satisfies(m -> assertThat(m.unitCostAtMovement()).isEqualByComparingTo("193.8776"));
+        assertThat(inventory.entityAverageCost(pack, own(MPCS)).orElseThrow().avgCost())
+                .isBetween(new BigDecimal("149.9998"), new BigDecimal("150.0002"));
+        assertThat(inventory.entityAverageCost(loose, own(MPCS)).orElseThrow().avgCost())
+                .isEqualByComparingTo("190");
+    }
+
+    @Test
     void aRepackIsNotReversedAfterItsPacksWereSold() {
         UUID recipe = define.handle(recipe("R-012 rice 1 kg"), own(MPCS));
         UUID id = execute.handle(

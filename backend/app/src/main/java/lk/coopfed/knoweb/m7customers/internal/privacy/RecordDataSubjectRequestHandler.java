@@ -17,6 +17,7 @@ import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.DataSubjectRequestReceived;
 import lk.coopfed.knoweb.m7customers.api.RecordDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
  * m7.privacy.kind_invalid}); the customer, registered by this society ({@code
  * m7.privacy.not_registering_society}: the registering society's officer is the addressee, doc 27
  * section 3.2); not already anonymised ({@code m7.customer.anonymised}); no request of the same
- * kind still open for the customer ({@code m7.privacy.request_open}).
+ * kind still open for the customer ({@code m7.privacy.request_open}); the notes free of a phone
+ * number or NIC ({@code m7.field.personal_data}).
  *
  * <p>Mutation: the request, RECEIVED. Audit DSAR_RECEIVED with the kind (never the notes, which may
  * name the person); event dsar.received.v1.
@@ -93,6 +95,10 @@ class RecordDataSubjectRequestHandler implements Handles<RecordDataSubjectReques
             throw new ProblemException("m7.privacy.request_open");
         }
 
+        // The notes are redacted at an erasure but shown on the list until then: no phone number
+        // or NIC in them (wave 2, M7CR-10).
+        String notes = PersonalDataText.require(CustomerGuards.blankToNull(command.notes()), "notes");
+
         UUID requestId = Ids.next();
         jdbc.update(
                 """
@@ -103,7 +109,7 @@ class RecordDataSubjectRequestHandler implements Handles<RecordDataSubjectReques
                 requestId,
                 command.customerId(),
                 command.kind(),
-                CustomerGuards.blankToNull(command.notes()),
+                notes,
                 Timestamp.from(clock.now()),
                 scope.userId(),
                 scope.entityId());

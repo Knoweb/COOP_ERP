@@ -6,12 +6,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
@@ -34,12 +39,14 @@ import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
+import lk.coopfed.knoweb.testsupport.PinnedClock;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -50,6 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * price lookup M4 uses (tiers, versions by date, the buyer's view), and M3's answer to M1's
  * price-list check.
  */
+@Import(PinnedClock.class)
 class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = TEST_FEDERATION;
@@ -83,10 +91,13 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    java.time.Clock clock;
+
     private final UUID rice = Ids.next();
     private final UUID sugar = Ids.next();
     private final UUID draftSku = Ids.next();
-    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Colombo"));
+    private final LocalDate today = PinnedClock.TODAY;
 
     @BeforeEach
     void arrange() {
@@ -325,6 +336,59 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 "m3.price_list.lines_invalid");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    /**
+     * M3-09: the handlers read the same pinned clock as this class, at 23:59:59.9 in Colombo, so a
+     * list published "from today" is accepted however long the run takes.
+     */
+    @Test
+    void theHandlersReadThePinnedClockAtTheLastTenthOfTheColomboDay() {
+        assertThat(clock.instant()).isEqualTo(PinnedClock.INSTANT);
+        assertThat(PinnedClock.INSTANT.atZone(PinnedClock.COLOMBO).toLocalTime())
+                .isEqualTo(java.time.LocalTime.of(23, 59, 59, 900_000_000));
+        UUID list = published(List.of(line(rice, "0", "100")), today);
+        assertThat(queries.getPriceList(list, own(FEDERATION))).get().satisfies(v -> assertThat(v.applyFrom())
+                .isEqualTo(today));
+    }
+
+    /**
+     * M3-05: publication locks the list row and checks DRAFT again, so two publishes of one draft
+     * started together publish it once: one audit, one event, the other refused as not a draft.
+     */
+    @Test
+    void twoPublishesOfOneDraftAtOnceArePublishedOnce() throws Exception {
+        UUID draft = create.handle(new CreatePriceList("TRADE", "Raced"), own(FEDERATION));
+        setLines.handle(new SetLines(draft, List.of(line(rice, "0", "100"))), own(FEDERATION));
+        kernel.reset();
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<String> outcomes = new ArrayList<>();
+        try {
+            List<Future<String>> running = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                running.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        publish.handle(new PublishPriceList(draft, today), own(FEDERATION));
+                        return "published";
+                    } catch (ProblemException refused) {
+                        return refused.messageId();
+                    }
+                }));
+            }
+            start.countDown();
+            for (Future<String> result : running) {
+                outcomes.add(result.get(60, TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(outcomes).containsExactlyInAnyOrder("published", "m3.price_list.not_draft");
+        assertThat(audit("PRICELIST_PUBLISHED")).hasSize(1);
+        assertThat(events(PriceListPublished.class)).hasSize(1);
     }
 
     @Test

@@ -26,12 +26,14 @@ import lk.coopfed.knoweb.m7customers.api.AccountAdjusted;
 import lk.coopfed.knoweb.m7customers.api.AccountClosed;
 import lk.coopfed.knoweb.m7customers.api.AccountLimitsAmended;
 import lk.coopfed.knoweb.m7customers.api.AccountReinstated;
+import lk.coopfed.knoweb.m7customers.api.AccountReopened;
 import lk.coopfed.knoweb.m7customers.api.AccountSuspended;
 import lk.coopfed.knoweb.m7customers.api.AdjustmentRequested;
 import lk.coopfed.knoweb.m7customers.api.AmendAccountLimits;
 import lk.coopfed.knoweb.m7customers.api.ApproveAdjustment;
 import lk.coopfed.knoweb.m7customers.api.ChangeAccountStatus;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentReversed;
+import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
@@ -51,8 +53,10 @@ import org.springframework.beans.factory.annotation.Autowired;
  * The account's remainders (27A section 6): limits, hard block and offline cap with the step-up on
  * a higher limit; suspend, reinstate and close with their history; a till's charge on a suspended
  * account or over the offline cap posted and flagged, never refused; the reversal of a repayment
- * (its allocations undone); adjustments with separation of duties; and the ledger's property with
- * reversals and adjustments in the mix. Business dates are fixed dates, never today's.
+ * (its allocations undone, the account's other credits re-applied); adjustments with separation of
+ * duties; a closed account reopened to settle a till's charge (wave 2); credits that settle charges
+ * (wave 2); and the ledger's invariants with charges, credits, payments, reversals and adjustments
+ * in the mix. Business dates are fixed dates, never today's; every number is plainly made up.
  */
 class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
 
@@ -84,6 +88,9 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     Handles<ApproveAdjustment, UUID> approveAdjustment;
+
+    @Autowired
+    Handles<DeactivateCustomer, UUID> deactivate;
 
     @Autowired
     AccountQueries accounts;
@@ -235,6 +242,143 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
                         ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.account.closed"));
     }
 
+    /** Wave 2 (M7CR-04; CR-27A-1 item 1): close, a till charge, reopen, an office payment, close. */
+    @Test
+    void aClosedAccountReopensAsSuspendedToSettleWhatATillPostedOnIt() {
+        UUID accountId = account("0700000408", null, "0");
+        // REOPEN starts from CLOSED only.
+        assertThatThrownBy(() -> changeStatus.handle(
+                        new ChangeAccountStatus(accountId, ChangeAccountStatus.REOPEN, "Not closed"), office()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.account.status_invalid"));
+        changeStatus.handle(new ChangeAccountStatus(accountId, ChangeAccountStatus.SUSPEND, "Overdue"), office());
+        assertThatThrownBy(() -> changeStatus.handle(
+                        new ChangeAccountStatus(accountId, ChangeAccountStatus.REOPEN, "Not closed"), office()))
+                .hasMessageContaining("m7.account.status_invalid");
+        changeStatus.handle(new ChangeAccountStatus(accountId, ChangeAccountStatus.CLOSE, "Left"), office());
+        kernel.reset();
+
+        // A till with a stale snapshot sells on the closed account: posted and flagged, never refused.
+        charge(accountId, "800.00");
+        assertThat(kernel.committedAudit())
+                .extracting(AuditRecord::eventType)
+                .contains("ACCOUNT_CHARGED", "ACCOUNT_CHARGED_NOT_OPEN");
+        assertThat(accounts.account(accountId, office()).orElseThrow().balance())
+                .isEqualByComparingTo("800");
+        assertThatThrownBy(() -> pay.handle(payment(accountId, "800.00"), office()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.account.not_open"));
+        assertThatThrownBy(() -> changeStatus.handle(
+                        new ChangeAccountStatus(accountId, ChangeAccountStatus.REOPEN, "see 0771234567"), office()))
+                .hasMessageContaining("m7.field.personal_data");
+        kernel.reset();
+
+        changeStatus.handle(
+                new ChangeAccountStatus(accountId, ChangeAccountStatus.REOPEN, "Till charge to settle"), office());
+        AccountView reopened = accounts.account(accountId, office()).orElseThrow();
+        assertThat(reopened.status()).isEqualTo("SUSPENDED");
+        AuditRecord audit = single("ACCOUNT_REOPENED");
+        assertThat(audit.reason()).isEqualTo("Till charge to settle");
+        assertThat(String.valueOf(audit.before())).contains("CLOSED");
+        assertThat(String.valueOf(audit.after())).contains("SUSPENDED");
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOf(AccountReopened.class);
+        kernel.reset();
+
+        pay.handle(payment(accountId, "800.00"), office());
+        changeStatus.handle(new ChangeAccountStatus(accountId, ChangeAccountStatus.CLOSE, "Settled"), office());
+        assertThat(accounts.account(accountId, office()).orElseThrow().status()).isEqualTo("CLOSED");
+        assertThat(accounts.history(accountId, office()))
+                .extracting(AccountQueries.HistoryEntry::action)
+                .containsExactly("CLOSED", "REOPENED", "CLOSED", "SUSPENDED");
+    }
+
+    /** Wave 2 (M7CR-05): a SUSPENDED debtor is a debtor too. */
+    @Test
+    void aCustomerWithABalanceOnASuspendedAccountIsNotDeactivated() {
+        UUID accountId = account("0700000409", "190000000409", "5000");
+        charge(accountId, "4000.00");
+        changeStatus.handle(new ChangeAccountStatus(accountId, ChangeAccountStatus.SUSPEND, "Arrears"), office());
+        UUID customerId = accounts.account(accountId, office()).orElseThrow().customerId();
+        kernel.reset();
+
+        assertThatThrownBy(() -> deactivate.handle(new DeactivateCustomer(customerId, "Moved away"), office()))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m7.customer.open_balance"));
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        pay.handle(payment(accountId, "4000.00"), office());
+        kernel.reset();
+        deactivate.handle(new DeactivateCustomer(customerId, "Moved away"), office());
+        // The reason travels as the audit's reason, never in after (M7CR-10).
+        AuditRecord deactivated = single("CUSTOMER_DEACTIVATED");
+        assertThat(deactivated.reason()).isEqualTo("Moved away");
+        assertThat(String.valueOf(deactivated.after())).doesNotContain("Moved away");
+        // The till still charges the INACTIVE customer's account: posted and flagged.
+        kernel.reset();
+        charge(accountId, "100.00");
+        assertThat(kernel.committedAudit())
+                .extracting(AuditRecord::eventType)
+                .contains("ACCOUNT_CHARGED", "ACCOUNT_CHARGED_CUSTOMER_INACTIVE");
+    }
+
+    // ---- credits settle charges (wave 2, M7CR-08; CR-27A-1 item 2) ------------------------------
+
+    @Test
+    void aVoidedChargeIsSettledByItsOwnCreditAndAgesNoMore() {
+        UUID accountId = account("0700000410", "190000000410", "10000");
+        UUID receipt = UUID.randomUUID();
+        UUID older = charge(accountId, "400.00");
+        UUID voided = tender(accountId, "1000.00", PostAccountTender.CHARGE, receipt, DAY.plusDays(5));
+        kernel.reset();
+
+        tender(accountId, "1000.00", PostAccountTender.CREDIT, receipt, DAY.plusDays(6));
+
+        AccountView view = accounts.account(accountId, office()).orElseThrow();
+        assertThat(view.balance()).isEqualByComparingTo("400");
+        assertThat(view.unallocated()).isEqualByComparingTo("0");
+        assertThat(view.oldestUnpaid()).isEqualTo(DAY.plusDays(1));
+        assertThat(openTotal(view)).as("only the older charge is open").isEqualByComparingTo("400");
+        AccountQueries.Statement statement = statement(accountId);
+        assertThat(settled(statement, voided)).isEqualByComparingTo("1000");
+        assertThat(statement.lines())
+                .filteredOn(line -> "CREDIT".equals(line.kind()))
+                .singleElement()
+                .satisfies(line -> assertThat(line.settled()).isEqualByComparingTo("1000"));
+        assertThat(String.valueOf(single("ACCOUNT_CREDITED").after())).contains("charges=1");
+
+        // A refund whose receipt matches no charge settles oldest first, like a payment.
+        tender(accountId, "150.00", PostAccountTender.CREDIT, UUID.randomUUID(), DAY.plusDays(7));
+        assertThat(settled(statement(accountId), older)).isEqualByComparingTo("150");
+        // A negative adjustment does the same.
+        UUID adjustment = requestAdjustment.handle(
+                new RequestAdjustment(accountId, new BigDecimal("-50.00"), "Damaged goods"), office());
+        approveAdjustment.handle(new ApproveAdjustment(adjustment), clerk());
+        assertThat(settled(statement(accountId), older)).isEqualByComparingTo("200");
+        assertThat(accounts.account(accountId, office()).orElseThrow().unallocated())
+                .isEqualByComparingTo("0");
+    }
+
+    @Test
+    void aReversalReappliesTheAccountsOtherCreditsToTheChargesItOpened() {
+        UUID accountId = account("0700000411", "190000000411", "10000");
+        UUID charged = charge(accountId, "1000.00");
+        UUID first = pay.handle(payment(accountId, "1000.00"), office());
+        // The second payment finds nothing open and waits on the account.
+        pay.handle(payment(accountId, "300.00"), office());
+        assertThat(accounts.account(accountId, office()).orElseThrow().unallocated())
+                .isEqualByComparingTo("300");
+        kernel.reset();
+
+        reverse.handle(new ReverseCustomerPayment(first, "Bounced deposit"), office());
+
+        AccountView after = accounts.account(accountId, office()).orElseThrow();
+        assertThat(after.balance()).isEqualByComparingTo("700");
+        assertThat(after.unallocated()).isEqualByComparingTo("0");
+        assertThat(settled(statement(accountId), charged)).isEqualByComparingTo("300");
+        assertThat(openTotal(after)).isEqualByComparingTo("700");
+        assertThat(String.valueOf(single("CUSTOMER_PAYMENT_REVERSED").after())).contains("allocationsReapplied=1");
+    }
+
     @Test
     void anAccountHoldingAnAdvancePaymentDoesNotClose() {
         UUID accountId = account("0700000404", "190000000404", "10000");
@@ -374,22 +518,34 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
 
     /**
      * 27A section 9: "Balance = Σ postings under random sequences incl. reversals; Σ allocations per
-     * charge ≤ charge; unallocated payment amount consistent".
+     * charge ≤ charge; unallocated payment amount consistent". Wave 2 (CR-27A-1 item 2) adds the
+     * credit side's own rules: credits (voids of earlier receipts and refunds) and negative
+     * adjustments allocate like payments, so "Σ open charges − unallocated = balance" holds at every
+     * step, no credit settles more than its amount, and nothing is ever allocated twice.
      */
     @Test
-    void theBalanceIsTheSumOfThePostingsWithReversalsAndAdjustments() {
+    void theLedgerInvariantsHoldUnderRandomChargesCreditsPaymentsReversalsAndAdjustments() {
         UUID accountId = account("0700000407", "190000000407", "100000");
         Random random = new Random(29);
         List<UUID> payments = new ArrayList<>();
-        for (int step = 0; step < 40; step++) {
-            int move = random.nextInt(10);
+        List<UUID> receiptsCharged = new ArrayList<>();
+        for (int step = 0; step < 60; step++) {
+            int move = random.nextInt(12);
             if (move < 5) {
-                charge(accountId, (100 + random.nextInt(2000)) + ".00");
+                UUID receipt = UUID.randomUUID();
+                receiptsCharged.add(receipt);
+                tender(accountId, (100 + random.nextInt(2000)) + ".00", PostAccountTender.CHARGE, receipt, day(step));
             } else if (move < 8) {
                 payments.add(pay.handle(payment(accountId, (50 + random.nextInt(1500)) + ".50"), office()));
             } else if (move == 8 && !payments.isEmpty()) {
                 UUID paymentId = payments.remove(random.nextInt(payments.size()));
                 reverse.handle(new ReverseCustomerPayment(paymentId, "Random reversal"), office());
+            } else if (move == 9 && !receiptsCharged.isEmpty()) {
+                // A void of an earlier receipt (its own charge first) or a refund (a new receipt).
+                UUID receipt = random.nextBoolean()
+                        ? receiptsCharged.remove(random.nextInt(receiptsCharged.size()))
+                        : UUID.randomUUID();
+                tender(accountId, (10 + random.nextInt(900)) + ".00", PostAccountTender.CREDIT, receipt, day(step));
             } else {
                 UUID adjustment = requestAdjustment.handle(
                         new RequestAdjustment(accountId, new BigDecimal((random.nextInt(600) - 300) + ".25"), "Random"),
@@ -403,6 +559,13 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
                             accountId);
             AccountView view = accounts.account(accountId, office()).orElseThrow();
             assertThat(view.balance()).as("step " + step).isEqualByComparingTo(sum);
+            // Σ open charges − unallocated = balance (the ageing buckets are the open charges, read
+            // in the office's scope).
+            assertThat(openTotal(view).subtract(view.unallocated()))
+                    .as("step " + step)
+                    .isEqualByComparingTo(sum);
+            assertThat(view.unallocated().signum()).as("step " + step).isGreaterThanOrEqualTo(0);
+            // No charge settled beyond its amount; no credit settling beyond its amount.
             Integer overAllocated = superuserJdbc()
                     .queryForObject(
                             """
@@ -416,8 +579,33 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
                             Integer.class,
                             accountId);
             assertThat(overAllocated).as("step " + step).isZero();
-            assertThat(view.unallocated().signum()).as("step " + step).isGreaterThanOrEqualTo(0);
+            Integer overSettling = superuserJdbc()
+                    .queryForObject(
+                            """
+                            select count(*) from customers.account_posting p
+                             where p.account_id = ? and p.amount < 0
+                               and -p.amount < (select coalesce(sum(a.amount), 0) from customers.allocation a
+                                                 where a.payment_posting_id = p.posting_id
+                                                   and not exists (select 1 from customers.allocation_reversal r
+                                                                    where r.allocation_id = a.allocation_id))
+                            """,
+                            Integer.class,
+                            accountId);
+            assertThat(overSettling).as("step " + step).isZero();
         }
+    }
+
+    private static LocalDate day(int step) {
+        return DAY.plusDays(step % 20);
+    }
+
+    /** What is open of the account's charges: the four ageing buckets together. */
+    private static BigDecimal openTotal(AccountView view) {
+        return view.ageing()
+                .days0To30()
+                .add(view.ageing().days31To60())
+                .add(view.ageing().days61To90())
+                .add(view.ageing().over90());
     }
 
     // ---- helpers ---------------------------------------------------------------------------------
@@ -426,6 +614,7 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
         return withMfa(ScopeContext.dev(SECOND_CLERK, SOCIETY, null), Instant.now());
     }
 
+    /** An account for a new member; {@code nic} null opens with no NIC (a limit of zero asks for none). */
     private UUID account(String phone, String nic, String limit) {
         UUID id = register.handle(
                 new RegisterCustomer(
@@ -449,18 +638,15 @@ class AccountRemaindersIntegrationTest extends PostgresIntegrationTest {
 
     private UUID charge(UUID accountId, String amount) {
         receipts++;
+        return tender(accountId, amount, PostAccountTender.CHARGE, UUID.randomUUID(), DAY.plusDays(receipts % 20));
+    }
+
+    /** A till's ACCOUNT tender (a CHARGE on a sale, a CREDIT on a void or a refund) of the receipt on that day. */
+    private UUID tender(UUID accountId, String amount, String kind, UUID receipt, LocalDate day) {
+        receipts++;
         return tender.handle(
                 new PostAccountTender(
-                        PostAccountTender.CHARGE,
-                        accountId,
-                        new BigDecimal(amount),
-                        UUID.randomUUID(),
-                        "RCT-" + receipts,
-                        1,
-                        SHOP,
-                        DAY.plusDays(receipts % 20),
-                        null,
-                        false),
+                        kind, accountId, new BigDecimal(amount), receipt, "RCT-" + receipts, 1, SHOP, day, null, false),
                 till());
     }
 
