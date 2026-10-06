@@ -11,3 +11,9 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A requested report was printed, or could not be
+
+  # Wave 2, M8-11 (decision D7): a report taken away as CSV; screen reads are not audited.
+  - code: REPORT_EXPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: A report was exported as CSV (the report, its parameters and the row count)

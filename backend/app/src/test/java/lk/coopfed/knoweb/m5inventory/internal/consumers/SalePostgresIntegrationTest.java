@@ -4,11 +4,14 @@ import static lk.coopfed.knoweb.m5inventory.InventoryFixture.own;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -22,6 +25,7 @@ import lk.coopfed.knoweb.m5inventory.api.Movement;
 import lk.coopfed.knoweb.m5inventory.api.MovementType;
 import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
+import lk.coopfed.knoweb.m5inventory.api.TillFactNotApplied;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
@@ -52,6 +56,12 @@ class SalePostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     InventoryQueries queries;
+
+    @Autowired
+    TillFactNotAppliedConsumer tillFacts;
+
+    @Autowired
+    ObjectMapper mapper;
 
     private InventoryFixture fixture;
     private UUID shop;
@@ -159,6 +169,115 @@ class SalePostgresIntegrationTest extends PostgresIntegrationTest {
                 .singleElement()
                 .satisfies(a -> assertThat(String.valueOf(a.after())).contains("[2]"));
         assertThat(kernel.committedEvents()).isNotEmpty();
+    }
+
+    /** Wave 2, M5-01: a sale is a fact, so an expired lot sells; past its date on the receipt's day it is flagged. */
+    @Test
+    void aSaleFromABatchPastItsExpiryOnTheReceiptsDateIsPostedAndFlagged() {
+        UUID old = fixture.batch(sku, MPCS, "OLD", LocalDate.of(2026, 1, 31));
+        outer.run(
+                own(MPCS),
+                () -> ledger.post(
+                        new PostMovements(
+                                Ids.next(),
+                                null,
+                                null,
+                                List.of(new Movement(
+                                        shop,
+                                        old,
+                                        LotCondition.GOOD,
+                                        MovementType.RECEIPT,
+                                        new BigDecimal("4"),
+                                        new BigDecimal("250"),
+                                        null))),
+                        own(MPCS)));
+        kernel.reset();
+
+        // Sold on its last day: no flag. Sold on 1 February: flagged, and posted all the same.
+        sale.handle(
+                new ApplySale(
+                        Ids.next(),
+                        shop,
+                        Instant.parse("2026-01-31T10:00:00Z"),
+                        List.of(new ApplySale.Line(null, 1, sku, old, BigDecimal.ONE))),
+                at(shop));
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .doesNotContain("SALE_OF_EXPIRED");
+
+        kernel.reset();
+        UUID receipt = Ids.next();
+        int posted = sale.handle(
+                new ApplySale(
+                        receipt,
+                        shop,
+                        Instant.parse("2026-02-01T03:00:00Z"),
+                        List.of(new ApplySale.Line(null, 1, sku, old, BigDecimal.ONE))),
+                at(shop));
+
+        assertThat(posted).isEqualTo(1);
+        assertThat(queries.movementsOf(receipt, own(MPCS))).singleElement().satisfies(m -> assertThat(m.batchId())
+                .isEqualTo(old));
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("SALE_OF_EXPIRED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("[1]", "2026-02-01"));
+    }
+
+    /** Wave 2, M5-05: an item the shop never held is sold from its newest batch, the lot going below zero. */
+    @Test
+    void aSaleOfAnItemTheShopNeverHeldPostsAgainstItsNewestBatchAndGoesNegative() {
+        UUID item = fixture.sku(MPCS, "NEVERHELD");
+        fixture.batch(item, MPCS, "N-OLD", LocalDate.of(2027, 1, 31));
+        UUID newest = fixture.batch(item, MPCS, "N-NEW", LocalDate.of(2027, 6, 30));
+        UUID receipt = Ids.next();
+
+        int posted = sale.handle(
+                new ApplySale(
+                        receipt,
+                        shop,
+                        Instant.now(),
+                        List.of(new ApplySale.Line(null, 1, item, null, new BigDecimal("2")))),
+                at(shop));
+
+        assertThat(posted).isEqualTo(1);
+        assertThat(queries.balances(shop, item, true, own(MPCS)))
+                .singleElement()
+                .satisfies(l -> {
+                    assertThat(l.batchId()).isEqualTo(newest);
+                    assertThat(l.qtyOnHand()).isEqualByComparingTo("-2");
+                    assertThat(l.negative()).isTrue();
+                });
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("STOCK_POSTED", "STOCK_LOT_NEGATIVE", "STOCK_SOLD", "SALE_WITHOUT_LOT")
+                .doesNotContain("SALE_LINE_UNRESOLVED");
+    }
+
+    /** Wave 2, M5-04: a till's stock fact M5 has no hook for yet is flagged, never dropped; central's own event is not. */
+    @Test
+    void aTillsStockFactWithNoHookYetIsFlaggedAndCentralsOwnEventIsNot() {
+        UUID count = Ids.next();
+        JsonNode bundle = mapper.valueToTree(Map.of("document", Map.of("document_id", count.toString())));
+
+        tillFacts.onCountRecorded(bundle, at(shop));
+
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("TILL_FACT_NOT_APPLIED");
+            assertThat(String.valueOf(a.after())).contains("count.recorded.v1", count.toString());
+        });
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOfSatisfying(TillFactNotApplied.class, e -> {
+            assertThat(e.factType()).isEqualTo("count.recorded.v1");
+            assertThat(e.documentId()).isEqualTo(count);
+            assertThat(e.locationId()).isEqualTo(shop);
+        });
+
+        // transfer.issued.v1 is also central's own event: delivered with no device, it is not a till fact.
+        kernel.reset();
+        tillFacts.onTransferIssued(
+                mapper.valueToTree(Map.of("transferId", Ids.next().toString())), own(MPCS));
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test

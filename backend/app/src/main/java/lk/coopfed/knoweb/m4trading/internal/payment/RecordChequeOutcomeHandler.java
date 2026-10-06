@@ -225,7 +225,8 @@ public class RecordChequeOutcomeHandler implements Handles<RecordChequeOutcome, 
                 reversal.docNumberDisplay(),
                 seller,
                 journal,
-                reversal.businessDate()));
+                reversal.businessDate(),
+                null));
         return reversalId;
     }
 

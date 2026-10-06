@@ -35,8 +35,9 @@ import org.springframework.stereotype.Component;
  * the lines of the owner's own side are recorded. The owner is the document's issuer, so its side
  * is the issuer role of the document type in the kernel's registry (SELLER for INV, CN and PRC;
  * BUYER for a GRN). A line of the other side is the counterparty's, whose books are not this
- * scope's: it is logged at WARN and left out, until a consumer of the counterparty records it in
- * the counterparty's own scope (CR-19A-13). A type whose issuer is neither (HOLDER) keeps every line.
+ * scope's: it is left out here and recorded by {@link BuyerJournalPostingsConsumer}, which the
+ * kernel runs in the counterparty's own scope (CR-19A-13). A type whose issuer is neither (HOLDER)
+ * keeps every line.
  */
 @Component
 class JournalPostingsConsumer {
@@ -83,9 +84,11 @@ class JournalPostingsConsumer {
                     decimal(posting, "amount")));
         }
         if (otherSide > 0) {
-            log.warn(
+            // Expected on every invoice and credit note since wave 2: the other side travels on
+            // the same event and the counterparty consumer files it.
+            log.debug(
                     "journal.postings_ready.v1 of {} {} carries {} posting(s) of the counterparty's side;"
-                            + " left out of the {} side's books",
+                            + " left to the counterparty's books, not the {} side's",
                     docTypeCode,
                     text(payload, "documentId"),
                     otherSide,

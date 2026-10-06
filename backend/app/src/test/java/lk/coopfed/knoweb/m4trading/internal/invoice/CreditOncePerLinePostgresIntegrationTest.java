@@ -389,8 +389,10 @@ class CreditOncePerLinePostgresIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(audit -> assertThat(((Map<?, ?>) audit.after()).get("unappliedAmount"))
                         .isEqualTo(new BigDecimal("283.20")));
         assertThat(events(CreditNoteIssued.class)).hasSize(1);
-        // The seller's books are the same either way: revenue and VAT reversed, receivable credited.
+        // The seller's books are the same either way: revenue and VAT reversed, receivable credited
+        // (the buyer's side travels on the same event, for the buyer's books; CR-24A-3 item 5).
         assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> assertThat(event.postings())
+                .filteredOn(posting -> "SELLER".equals(posting.side()))
                 .extracting(posting -> posting.debitRole() + "/" + posting.creditRole() + "="
                         + posting.amount().toPlainString())
                 .containsExactlyInAnyOrder("REVENUE/RECEIVABLE=240.00", "VAT_OUTPUT/RECEIVABLE=43.20"));

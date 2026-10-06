@@ -149,7 +149,8 @@ class StockControlController implements StockControlApi {
                                 ? LotCondition.GOOD
                                 : LotCondition.valueOf(l.getCondition().getValue()),
                         l.getCountedQty(),
-                        l.getSkipReason()))
+                        l.getSkipReason(),
+                        l.getCountedAt()))
                 .toList();
         handlers.submitCount().handle(new SubmitCount(taskId, lines), scope);
         return ResponseEntity.ok(count(taskId, scope));
@@ -453,7 +454,8 @@ class StockControlController implements StockControlApi {
                                 request.getInputBatchId(),
                                 request.getInputQty(),
                                 request.getActualOutputQty(),
-                                request.getPrintedMrp()),
+                                request.getPrintedMrp(),
+                                request.getVarianceReason()),
                         scope);
         return ResponseEntity.created(URI.create("/v1/inventory/repacks/" + id))
                 .body(toResponse(queries.repack(id, scope).orElseThrow(), new HashMap<>(), scope));

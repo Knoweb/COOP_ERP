@@ -173,7 +173,11 @@ export function StockPage() {
                     </td>
 
                     <td className="numeric-cell">
-                      {lot.fefoRank ?? ""}
+                      {lot.expired ? (
+                        <span className="condition-chip">{t("inventory.lot.expired").text}</span>
+                      ) : (
+                        (lot.fefoRank ?? "")
+                      )}
                     </td>
 
                     <td className="numeric-cell numeric-cell--strong">

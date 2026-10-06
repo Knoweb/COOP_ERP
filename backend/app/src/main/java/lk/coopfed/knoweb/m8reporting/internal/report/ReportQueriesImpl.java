@@ -6,11 +6,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
@@ -53,6 +55,12 @@ class ReportQueriesImpl implements ReportingQueries {
 
     static final String CACHE_SECONDS = "reporting.dashboard_cache_seconds";
 
+    /** The longest period a report may cover, in days, first and last included (wave 2, M8-09). */
+    static final String MAX_PERIOD_DAYS = "reporting.max_period_days";
+
+    /** The most rows a report answers; more is refused, to be narrowed (wave 2, M8-09). */
+    static final String MAX_ROWS = "reporting.max_rows";
+
     /** How many runs the run history lists. */
     static final int RUN_HISTORY = 20;
 
@@ -68,8 +76,24 @@ class ReportQueriesImpl implements ReportingQueries {
     private final Clock clock;
     private final ZoneId zone;
 
+    /**
+     * What a dashboard depends on: the caller's whole visibility, as the policies of M8 read it
+     * (wave 2, M8-06): the class, the entity, the location, the granted entities of an external
+     * grant (two auditors of one home entity with different grants see different rows, and a
+     * revoked grant changes the key), whether a device asks, the language and the cost flag;
+     * then the business day and this instance's applied-event count. No user: no M8 policy is per
+     * user, so the user would only lower the hit rate.
+     */
     private record CacheKey(
-            UUID entity, UUID location, PolicyClass policy, boolean cost, String lang, LocalDate day, long applied) {}
+            PolicyClass policy,
+            UUID entity,
+            UUID location,
+            Set<UUID> granted,
+            boolean device,
+            String lang,
+            boolean cost,
+            LocalDate day,
+            long applied) {}
 
     private record Cached(Dashboard dashboard, Instant madeAt) {}
 
@@ -108,14 +132,15 @@ class ReportQueriesImpl implements ReportingQueries {
     @Override
     public ReportTable report(String reportId, ReportParameters parameters, ScopeContext scope) {
         Definition definition = definition(reports, reportId);
-        checkPeriod(definition, parameters);
+        checkPeriod(definition, parameters, config.getInt(MAX_PERIOD_DAYS, scope, 366));
         Names names = new Names(party, catalogue, scope);
         boolean cost = seesCost(scope);
         List<Column> columns = new ArrayList<>(definition.columns());
         if (!cost) {
             columns.removeIf(c -> definition.costColumns().contains(c.key()));
         }
-        List<Map<String, String>> rows = sources.rows(definition.source(), parameters, names, cost, today());
+        List<Map<String, String>> rows = sources.rows(
+                definition.source(), parameters, names, cost, today(), config.getInt(MAX_ROWS, scope, 10_000));
         return new ReportTable(
                 definition.reportId(),
                 definition.titleId(),
@@ -133,7 +158,7 @@ class ReportQueriesImpl implements ReportingQueries {
                         () -> new ProblemException("m8.report.unknown", Map.of("reportId", String.valueOf(reportId))));
     }
 
-    static void checkPeriod(Definition definition, ReportParameters parameters) {
+    static void checkPeriod(Definition definition, ReportParameters parameters, int maxDays) {
         if (!definition.period()) {
             return;
         }
@@ -142,6 +167,9 @@ class ReportQueriesImpl implements ReportingQueries {
         }
         if (parameters.from().isAfter(parameters.to())) {
             throw new ProblemException("m8.report.period_invalid");
+        }
+        if (ChronoUnit.DAYS.between(parameters.from(), parameters.to()) + 1 > maxDays) {
+            throw new ProblemException("m8.report.period_too_long", Map.of("days", maxDays));
         }
     }
 
@@ -191,11 +219,13 @@ class ReportQueriesImpl implements ReportingQueries {
         LocalDate today = today();
         boolean cost = seesCost(scope);
         CacheKey key = new CacheKey(
+                scope.policyClass(),
                 scope.entityId(),
                 scope.locationId(),
-                scope.policyClass(),
-                cost,
+                scope.grantedEntities(),
+                scope.deviceId() != null,
                 scope.lang(),
+                cost,
                 today,
                 Projection.applied());
         int seconds = config.getInt(CACHE_SECONDS, scope, 60);
