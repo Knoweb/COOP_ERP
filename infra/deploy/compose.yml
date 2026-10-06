@@ -257,7 +257,7 @@ services:
   # Catches every mail of the demo; nothing leaves the server. Behind Caddy at /mail, with its
   # own sign-in.
   mailpit:
-    image: axllent/mailpit:v1.31.1
+    image: axllent/mailpit:v1.31.4
     restart: unless-stopped
     logging: *logging
     <<: *hardened
