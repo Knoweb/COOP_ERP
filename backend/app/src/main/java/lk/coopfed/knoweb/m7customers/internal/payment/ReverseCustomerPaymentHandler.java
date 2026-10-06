@@ -26,6 +26,8 @@ import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentReversed;
 import lk.coopfed.knoweb.m7customers.api.ReverseCustomerPayment;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
+import lk.coopfed.knoweb.m7customers.internal.ledger.Allocator;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger.LockedAccount;
@@ -47,7 +49,8 @@ import org.springframework.transaction.annotation.Transactional;
  * CPR; a till's CPR is kept by M7 alone, so the link is {@code reversal_of} only); its
  * {@code doc_customer_payment} row naming the original; a REVERSAL posting of the payment's amount
  * (positive: the customer owes it again); one {@code allocation_reversal} row per allocation the
- * payment made, so the charges it settled are open again; the balance recomputed. Audit
+ * payment made, so the charges it settled are open again; the account's other unallocated credits
+ * re-applied to them oldest first (CR-27A-1 item 2); the balance recomputed. Audit
  * CUSTOMER_PAYMENT_REVERSED with the reason; event customer_payment.reversed.v1.
  */
 @Service
@@ -133,7 +136,9 @@ class ReverseCustomerPaymentHandler implements Handles<ReverseCustomerPayment, U
         if (reversed != null && reversed > 0) {
             throw new ProblemException("m7.payment.reversed_already");
         }
-        String reason = CustomerGuards.requiredText(command.reason(), "reason");
+        // The reason goes onto the reversing CPR (an issued document) and into the audit: no phone
+        // number or NIC in it (wave 2, M7CR-10).
+        String reason = PersonalDataText.require(CustomerGuards.requiredText(command.reason(), "reason"), "reason");
         if ("CLOSED".equals(account.status())) {
             throw new ProblemException("m7.account.closed");
         }
@@ -194,6 +199,24 @@ class ReverseCustomerPaymentHandler implements Handles<ReverseCustomerPayment, U
                         + Ledger.LIVE_ALLOCATION,
                 reversalPostingId,
                 original.documentId());
+        // The charges the payment settled are open again; what the account's other credits still
+        // hold (a later payment left unallocated, a refund) settles them oldest first, so the
+        // ageing shows what is really owed (wave 2, CR-27A-1 item 2).
+        int reapplied = 0;
+        for (Ledger.OpenCredit credit : ledger.unallocatedCredits(account.accountId())) {
+            List<Allocator.Allocation> allocations =
+                    Allocator.oldestFirst(ledger.openCharges(account.accountId()), credit.open());
+            for (Allocator.Allocation allocation : allocations) {
+                jdbc.update(
+                        Ledger.ALLOCATION_INSERT,
+                        Ids.next(),
+                        credit.postingId(),
+                        allocation.chargePostingId(),
+                        allocation.amount(),
+                        account.ownerEntityId());
+            }
+            reapplied += allocations.size();
+        }
         BigDecimal balance = ledger.sum(account.accountId());
         jdbc.update(
                 "update customers.customer_account set balance = ? where account_id = ?", balance, account.accountId());
@@ -204,6 +227,7 @@ class ReverseCustomerPaymentHandler implements Handles<ReverseCustomerPayment, U
         after.put("accountId", account.accountId());
         after.put("amount", original.amount());
         after.put("allocationsUndone", undone);
+        after.put("allocationsReapplied", reapplied);
         after.put("balance", balance);
         audit.record(
                 AUDIT_REVERSED,

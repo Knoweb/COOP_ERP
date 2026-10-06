@@ -140,7 +140,8 @@ class AccountController implements AccountsApi {
                         request.getCreditLimit(),
                         request.getHardBlock(),
                         request.getOfflineCap(),
-                        request.getReason()),
+                        request.getReason(),
+                        request.getNic()),
                 scope);
         return ResponseEntity.ok(
                 CustomerResponses.account(accounts.account(accountId, scope).orElseThrow()));
@@ -159,6 +160,11 @@ class AccountController implements AccountsApi {
     @Override
     public ResponseEntity<Account> closeAccount(String idempotencyKey, UUID accountId, ReasonRequest request) {
         return status(accountId, ChangeAccountStatus.CLOSE, request);
+    }
+
+    @Override
+    public ResponseEntity<Account> reopenAccount(String idempotencyKey, UUID accountId, ReasonRequest request) {
+        return status(accountId, ChangeAccountStatus.REOPEN, request);
     }
 
     private ResponseEntity<Account> status(UUID accountId, String action, ReasonRequest request) {

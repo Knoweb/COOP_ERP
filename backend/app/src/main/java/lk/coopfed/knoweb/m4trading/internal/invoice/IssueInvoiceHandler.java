@@ -263,7 +263,8 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 issued.taxAmount(),
                 issued.grossAmount(),
                 issued.contentHash()));
-        events.publish(new JournalPostingsReady(invoiceId, INV, issued.docNumberDisplay(), seller, journal));
+        events.publish(new JournalPostingsReady(
+                invoiceId, INV, issued.docNumberDisplay(), seller, journal, issued.businessDate()));
         return invoiceId;
     }
 }

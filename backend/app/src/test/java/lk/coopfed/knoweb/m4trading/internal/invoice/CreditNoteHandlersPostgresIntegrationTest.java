@@ -242,10 +242,16 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
             assertThat(event.discrepancyId()).isEqualTo(discrepancyId);
             assertThat(event.contentHash()).hasSize(64);
         });
-        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> assertThat(event.postings())
-                .extracting(posting -> posting.debitRole() + "/" + posting.creditRole() + "="
-                        + posting.amount().toPlainString())
-                .containsExactlyInAnyOrder("REVENUE/RECEIVABLE=240.00", "VAT_OUTPUT/RECEIVABLE=43.20"));
+        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
+            assertThat(event.postings())
+                    .extracting(posting -> posting.debitRole() + "/" + posting.creditRole() + "="
+                            + posting.amount().toPlainString())
+                    .containsExactlyInAnyOrder("REVENUE/RECEIVABLE=240.00", "VAT_OUTPUT/RECEIVABLE=43.20");
+            // SettleDiscrepancy's credit note dates its postings by its own business date (CR-29-1 item 4).
+            assertThat(event.businessDate())
+                    .isNotNull()
+                    .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), creditNoteId));
+        });
     }
 
     @Test
@@ -344,6 +350,10 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
                 .contains("CREDIT_NOTE_ISSUED");
         assertThat(events(CreditNoteIssued.class)).singleElement().satisfies(event -> assertThat(event.discrepancyId())
                 .isNull());
+        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> assertThat(
+                        event.businessDate())
+                .isNotNull()
+                .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), creditNoteId)));
     }
 
     @Test

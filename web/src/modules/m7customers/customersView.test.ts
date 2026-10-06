@@ -44,7 +44,9 @@ describe("the customer view helpers", () => {
   it("offers the actions an account's state allows", () => {
     expect(accountActions("OPEN")).toEqual(["suspend", "close"]);
     expect(accountActions("SUSPENDED")).toEqual(["reinstate", "close"]);
-    expect(accountActions("CLOSED")).toEqual([]);
+    // CR-27A-1: a closed account reopens as suspended, to settle what a till posted on it.
+    expect(accountActions("CLOSED")).toEqual(["reopen"]);
+    expect(accountActions("UNKNOWN")).toEqual([]);
   });
 
   it("reverses only a repayment that stands", () => {

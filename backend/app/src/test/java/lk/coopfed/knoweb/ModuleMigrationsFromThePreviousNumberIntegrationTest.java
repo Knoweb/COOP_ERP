@@ -18,7 +18,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * The demo server's situation (wave 2 fix plan, "a Flyway test start on a database at the previous
  * migration"): a database whose every stream stands at the number before this pull request's
  * migrations (kernel {@code V0085}, m1party {@code V0014}, m1security {@code V0018} since PR 11, m2catalogue
- * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0006}) migrates to the new numbers
+ * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0006}, m7customers {@code V0002} since PR 09)
+ * migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
  * FlywayConfig} runs the streams. The streams depend on each other at run time only (a policy
  * naming a kernel function, M2's trigger calling an M5 function), so each later number must apply
@@ -40,10 +41,11 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m1security", "18");
         streams.put("m2catalogue", "7");
         streams.put("m3pricing", "5");
-        streams.put("m4trading", null);
+        // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
+        streams.put("m4trading", "9");
         streams.put("m5inventory", "6");
         streams.put("m6pos", null);
-        streams.put("m7customers", null);
+        streams.put("m7customers", "2");
         streams.put("m8reporting", null);
         streams.put("m9integration", null);
         return streams;
@@ -135,6 +137,14 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                                 + " and tablename = 'control_price' and policyname = 'own_write'",
                         String.class))
                 .contains("kernel.system_entity()");
+
+        // Wave 2, PR 07: m4trading V0010 over a database at V0009.
+        assertThat(after).containsEntry("m4trading", 10);
+        assertThat(admin.queryForObject(
+                        "select with_check from pg_policies where schemaname = 'trading'"
+                                + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
+                        String.class))
+                .contains("kernel.document_open_for_write(document_id)");
     }
 
     /** One stream as FlywayConfig runs it, strict. */

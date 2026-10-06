@@ -269,7 +269,12 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
         if (issued != null) {
             events.publish(IssueCreditNoteHandler.issuedEvent(issued, invoiceId, discrepancyId, seller, buyer));
             events.publish(new JournalPostingsReady(
-                    creditNoteId, IssueCreditNoteHandler.CN, issued.docNumberDisplay(), seller, journal));
+                    creditNoteId,
+                    IssueCreditNoteHandler.CN,
+                    issued.docNumberDisplay(),
+                    seller,
+                    journal,
+                    issued.businessDate()));
         }
         return creditNoteId;
     }

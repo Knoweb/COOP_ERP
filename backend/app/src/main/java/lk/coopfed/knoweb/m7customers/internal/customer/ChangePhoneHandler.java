@@ -23,12 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * ChangePhone (27A section 6). Guards, in order: the society's OWN scope; the customer registered
  * by the caller's society and ACTIVE; the new phone a Sri Lankan number, and not the current one;
- * a reason; the reuse detection of section 6.1 for the new number passed or confirmed.
+ * a reason free of a phone number or NIC; the reuse detection of section 6.1 for the new number
+ * passed or confirmed.
  *
  * <p>Mutation: the current primary row closed (valid_to), a new primary row. The old number stays
  * in the history, which is what reuse detection reads. Audit CUSTOMER_PHONE_CHANGED with the
- * reason and the previous holders' ids when confirmed (never a number); event
- * customer.phone_changed.v1.
+ * reason as its reason and, when confirmed, the previous holders the caller's society registered
+ * by id plus a count of the others (never a number); event customer.phone_changed.v1.
  */
 @Service
 @CommandHandler(permission = "cus.customer.manage")
@@ -74,8 +75,8 @@ class ChangePhoneHandler implements Handles<ChangePhone, UUID> {
         if (current.contains(phone)) {
             throw new ProblemException("m7.customer.phone_unchanged");
         }
-        String reason = CustomerGuards.requiredText(command.reason(), "reason");
-        List<UUID> previousHolders = reuse.guard(phone, customerId, command.confirmedIdentity(), scope);
+        String reason = PersonalDataText.require(CustomerGuards.requiredText(command.reason(), "reason"), "reason");
+        ReuseDetector.Confirmed previousHolders = reuse.guard(phone, customerId, command.confirmedIdentity(), scope);
 
         Timestamp now = Timestamp.from(clock.now());
         jdbc.update(
@@ -99,12 +100,11 @@ class ChangePhoneHandler implements Handles<ChangePhone, UUID> {
                 reason,
                 scope.entityId());
 
+        // The reason travels as the audit's reason, never in after (wave 2, M7CR-10); the
+        // previous holders as the caller's own ids plus a count of the others (RLS-03).
         Map<String, Object> after = new LinkedHashMap<>();
-        after.put("reason", reason);
-        if (!previousHolders.isEmpty()) {
-            after.put("previousHolders", previousHolders);
-        }
-        audit.record(AUDIT_CHANGED, Subject.of("customer", customerId), null, after, scope);
+        previousHolders.describe(after);
+        audit.record(AUDIT_CHANGED, Subject.of("customer", customerId), null, after, scope, reason);
         events.publish(new CustomerPhoneChanged(customerId, scope.entityId()));
         return customerId;
     }

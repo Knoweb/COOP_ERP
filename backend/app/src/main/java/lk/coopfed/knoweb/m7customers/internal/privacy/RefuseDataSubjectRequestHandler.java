@@ -15,6 +15,7 @@ import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m7customers.api.DataSubjectRequestRefused;
 import lk.coopfed.knoweb.m7customers.api.RefuseDataSubjectRequest;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,7 @@ class RefuseDataSubjectRequestHandler implements Handles<RefuseDataSubjectReques
             throw new ProblemException("m7.privacy.not_received", Map.of("status", request.status()));
         }
         PrivacyGuards.requireResponsibleOfficer(parties, scope);
-        String ground = CustomerGuards.requiredText(command.ground(), "ground");
+        String ground = PersonalDataText.require(CustomerGuards.requiredText(command.ground(), "ground"), "ground");
 
         jdbc.update(
                 """

@@ -195,14 +195,17 @@ class ReadPermissionsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(HttpStatus.OK);
         assertThat(owners(locations)).contains(societyA, societyB);
 
+        // CR-18-2 (wave 2, TWK-30): staff administration is the entity's; the users read is marked
+        // x-federation-view: false in the slice, so the Federation's set leaves its code out.
         ResponseEntity<JsonNode> users = get(USERS, viewer);
-        assertThat(users.getStatusCode()).as(String.valueOf(users.getBody())).isEqualTo(HttpStatus.OK);
+        assertThat(users.getStatusCode()).as(String.valueOf(users.getBody())).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(users.getBody().get("params").get("permission").asText()).isEqualTo("gov.user.view");
 
         ResponseEntity<JsonNode> session = get(SESSION, viewer);
         assertThat(session.getBody().get("policyClass").asText()).isEqualTo("FEDERATION_VIEW");
         assertThat(texts(session.getBody().get("permissions")))
-                .contains("prt.location.view", "gov.user.view", "cat.sku.view")
-                .doesNotContain("prt.location.register", "gov.entity.register");
+                .contains("prt.location.view", "cat.sku.view")
+                .doesNotContain("prt.location.register", "gov.entity.register", "gov.user.view", "cus.customer.view");
 
         // A command is refused by the class rule, although the read set carries the same code.
         ResponseEntity<JsonNode> command =

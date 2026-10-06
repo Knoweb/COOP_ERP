@@ -275,17 +275,27 @@ class CustomerHttpIntegrationTest extends PostgresIntegrationTest {
                 .as(String.valueOf(fulfilled.getBody()))
                 .isEqualTo(HttpStatus.OK);
         assertThat(fulfilled.getBody().get("status").asText()).isEqualTo("FULFILLED");
-        JsonNode export = get("/v1/privacy/requests/" + requestId + "/export", CustomersFixture.OFFICER_USER, SOCIETY)
-                .getBody();
+        // The export is handed over by a command (wave 2, M7CR-11): the officer's, audited, and
+        // without the NIC's hash.
+        ResponseEntity<JsonNode> handedOver =
+                post("/v1/privacy/requests/" + requestId + "/export", Map.of(), CustomersFixture.OFFICER_USER, SOCIETY);
+        assertThat(handedOver.getStatusCode())
+                .as(String.valueOf(handedOver.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        JsonNode export = handedOver.getBody();
         assertThat(export.get("customer").get(0).get("display_name").asText()).isEqualTo("Gamini Ekanayake");
+        assertThat(export.get("customer").get(0).has("nic_hash")).isFalse();
         assertThat(export.get("postings")).hasSize(3);
+        assertThat(String.valueOf(post("/v1/privacy/requests/" + requestId + "/export", Map.of(), OFFICE_USER, SOCIETY)
+                        .getBody()))
+                .contains("m7.privacy.officer_only");
         assertThat(get("/v1/privacy/requests?status=FULFILLED", OFFICE_USER, SOCIETY)
                         .getBody())
                 .hasSize(1);
         assertThat(get("/v1/privacy/requests", OTHER_USER, OTHER).getBody()).isEmpty();
-        assertThat(get("/v1/privacy/requests/" + requestId + "/export", OTHER_USER, OTHER)
-                        .getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(String.valueOf(post("/v1/privacy/requests/" + requestId + "/export", Map.of(), OTHER_USER, OTHER)
+                        .getBody()))
+                .contains("m7.privacy.not_found");
     }
 
     @Test
