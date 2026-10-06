@@ -76,6 +76,32 @@ export function useFormatDate() {
   };
 }
 
+/**
+ * Today's business date (Asia/Colombo) as the API writes a calendar date: yyyy-mm-dd. The one
+ * place a screen asks "what is today": a manager abroad, or a computer set to another zone,
+ * still reads the shop's day. `now` is a parameter so that a test names the instant and never
+ * depends on the clock. Built from the parts, not from a locale's date format ("en-CA" writes
+ * yyyy-mm-dd): where the date formatter is the FormatJS polyfill (localeData.ts) only en, si
+ * and ta exist.
+ */
+export function businessToday(now: Date = new Date()): string {
+  const parts = partsOf(now, { ...DATE_PARTS, timeZone: BUSINESS_TIME_ZONE });
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/**
+ * The first day of the month `months` before the month of `day` (yyyy-mm-dd), as yyyy-mm-dd.
+ * Text arithmetic on the calendar date, so no zone can move it: with 0 it is the first of the
+ * month of `day`.
+ */
+export function startOfMonthBefore(day: string, months: number): string {
+  const [year, month] = day.split("-").map(Number);
+  const index = year * 12 + (month - 1) - months;
+  const y = Math.floor(index / 12);
+  const m = (index % 12) + 1;
+  return `${y}-${String(m).padStart(2, "0")}-01`;
+}
+
 /** An amount ready to be shown: the digits without a sign ("1,234.00"), and whether it is below zero. */
 export type MoneyDigits = { digits: string; negative: boolean };
 

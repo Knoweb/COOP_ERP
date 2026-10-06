@@ -49,7 +49,7 @@ describe("the search for raw dates and money", () => {
 });
 
 describe("the web modules", () => {
-  const sources = import.meta.glob(["../modules/**/*.tsx", "!../modules/**/*.test.tsx"], {
+  const sources = import.meta.glob(["../modules/**/*.{ts,tsx}", "../shell/**/*.{ts,tsx}", "!../modules/**/*.test.{ts,tsx}", "!../shell/**/*.test.{ts,tsx}"], {
     query: "?raw",
     import: "default",
     eager: true
@@ -64,5 +64,40 @@ describe("the web modules", () => {
       rawValuesIn(source).map((line) => `${file.replace("../", "web/src/")}:${line}`)
     );
     expect(found, "a date goes through useFormatDate (dd/MM/yyyy), an amount through MoneyDisplay").toEqual([]);
+  });
+
+  it("take today's date from businessToday(), never from the browser's calendar (Asia/Colombo, TWK-12)", () => {
+    const found = Object.entries(sources)
+      .filter(([, source]) => browserLocalDayIn(source))
+      .map(([file]) => file.replace("../", "web/src/"));
+    expect(found, "use businessToday() of shell/i18n/formats.ts; the browser's zone is not the shop's").toEqual([]);
+  });
+});
+
+// "Today" read from the clock of the browser and cut into a calendar day with the browser's own
+// zone: new Date() together with getFullYear / getMonth / getDate / toISOString().slice. A date
+// built from a calendar day in UTC (new Date(`${day}T00:00:00Z`)) is fine and has no empty
+// new Date().
+const CLOCK_NOW = /new Date\(\)|Date\.now\(\)/;
+const LOCAL_DAY_PARTS = /\.(?:getFullYear|getMonth|getDate)\(\)|toISOString\(\)\.slice/;
+
+function browserLocalDayIn(source: string): boolean {
+  const code = source
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+    .join("\n");
+  return CLOCK_NOW.test(code) && LOCAL_DAY_PARTS.test(code);
+}
+
+describe("the search for the browser's calendar day", () => {
+  it("finds the clock cut into a local day", () => {
+    expect(browserLocalDayIn(`const d = new Date(); return d.getFullYear() + "-" + d.getMonth();`)).toBe(true);
+    expect(browserLocalDayIn(`return new Date().toISOString().slice(0, 10);`)).toBe(true);
+  });
+
+  it("accepts a clock default with no day arithmetic, a UTC calendar day, and comments", () => {
+    expect(browserLocalDayIn(`export function f(now: Date = new Date()) { return format(now); }`)).toBe(false);
+    expect(browserLocalDayIn(`const d = new Date(\`\${day}T00:00:00Z\`); return d.toISOString().slice(0, 10);`)).toBe(false);
+    expect(browserLocalDayIn(`// new Date().getFullYear() was here`)).toBe(false);
   });
 });

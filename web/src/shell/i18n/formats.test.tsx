@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { IntlProvider } from "react-intl";
 import { describe, expect, it } from "vitest";
-import { formatMoneyDigits, useFormatDate, useFormatInstant } from "./formats";
+import { businessToday, formatMoneyDigits, useFormatDate, useFormatInstant } from "./formats";
 import { messages } from "./messages";
 
 const inEnglish = ({ children }: { children: ReactNode }) => (
@@ -119,5 +119,19 @@ describe("formatting an amount of money", () => {
   it("does not crash on a value the types did not promise, as JSON can always deliver one", () => {
     expect(formatMoneyDigits({} as unknown as string)).toBeNull();
     expect(formatMoneyDigits(true as unknown as number)).toBeNull();
+  });
+});
+
+describe("the business day", () => {
+  it("is the day in Colombo (UTC+5:30), whatever the zone of the computer", () => {
+    // 18:29 UTC is 23:59 in Colombo; one minute later it is the next day. Fixed instants: this
+    // never depends on the clock, so a run across midnight cannot break it.
+    expect(businessToday(new Date("2026-09-27T18:29:00Z"))).toBe("2026-09-27");
+    expect(businessToday(new Date("2026-09-27T18:30:00Z"))).toBe("2026-09-28");
+    expect(businessToday(new Date("2026-12-31T20:00:00Z"))).toBe("2027-01-01");
+  });
+
+  it("writes a month and a day with two digits", () => {
+    expect(businessToday(new Date("2026-01-05T06:00:00Z"))).toBe("2026-01-05");
   });
 });

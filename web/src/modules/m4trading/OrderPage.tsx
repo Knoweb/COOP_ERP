@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatDate } from "../../shell/i18n/formats";
+import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -13,7 +13,7 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { ExposurePanel } from "./ExposurePanel";
 import { EntityName, LocationName, SkuLabel } from "./labels";
 import { useTradingApi } from "./tradingApi";
-import { amendReady, amendRequest, businessToday, canDeliver, errorText, firstOpenEta, orderChip } from "./tradingView";
+import { amendReady, amendRequest, canDeliver, errorText, firstOpenEta, orderChip } from "./tradingView";
 import type { AmendRow } from "./tradingView";
 
 const CANCEL_REASONS = ["NOT_NEEDED", "WRONG_ITEMS", "OTHER"];
