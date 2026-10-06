@@ -203,7 +203,7 @@ services:
   # options (kc.sh build). The plain start does that build itself, which costs about half a
   # minute at each start and nothing afterwards.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.4
+    image: quay.io/keycloak/keycloak:26.8.0
     restart: unless-stopped
     logging: *logging
     <<: *hardened
