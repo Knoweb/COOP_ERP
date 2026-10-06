@@ -9,6 +9,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m7customers.api.AmendCustomer;
 import lk.coopfed.knoweb.m7customers.api.ChangePhone;
 import lk.coopfed.knoweb.m7customers.api.DeactivateCustomer;
+import lk.coopfed.knoweb.m7customers.api.RecaptureNic;
 import lk.coopfed.knoweb.m7customers.api.RegisterCustomer;
 import lk.coopfed.knoweb.m7customers.query.CustomerQueries;
 import lk.coopfed.knoweb.m7customers.web.generated.AmendCustomerRequest;
@@ -17,6 +18,7 @@ import lk.coopfed.knoweb.m7customers.web.generated.CustomerCard;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomerSummary;
 import lk.coopfed.knoweb.m7customers.web.generated.CustomersApi;
 import lk.coopfed.knoweb.m7customers.web.generated.ReasonRequest;
+import lk.coopfed.knoweb.m7customers.web.generated.RecaptureNicRequest;
 import lk.coopfed.knoweb.m7customers.web.generated.RegisterCustomerRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +33,7 @@ class CustomerController implements CustomersApi {
     private final Handles<AmendCustomer, UUID> amend;
     private final Handles<ChangePhone, UUID> changePhone;
     private final Handles<DeactivateCustomer, UUID> deactivate;
+    private final Handles<RecaptureNic, UUID> recapture;
     private final CustomerQueries queries;
     private final CurrentScope currentScope;
 
@@ -39,12 +42,14 @@ class CustomerController implements CustomersApi {
             Handles<AmendCustomer, UUID> amend,
             Handles<ChangePhone, UUID> changePhone,
             Handles<DeactivateCustomer, UUID> deactivate,
+            Handles<RecaptureNic, UUID> recapture,
             CustomerQueries queries,
             CurrentScope currentScope) {
         this.register = register;
         this.amend = amend;
         this.changePhone = changePhone;
         this.deactivate = deactivate;
+        this.recapture = recapture;
         this.queries = queries;
         this.currentScope = currentScope;
     }
@@ -126,6 +131,14 @@ class CustomerController implements CustomersApi {
             String idempotencyKey, UUID customerId, ReasonRequest request) {
         ScopeContext scope = currentScope.get();
         deactivate.handle(new DeactivateCustomer(customerId, request.getReason()), scope);
+        return ResponseEntity.ok(card(customerId, scope));
+    }
+
+    @Override
+    public ResponseEntity<CustomerCard> recaptureNic(
+            String idempotencyKey, UUID customerId, RecaptureNicRequest request) {
+        ScopeContext scope = currentScope.get();
+        recapture.handle(new RecaptureNic(customerId, request.getNic(), request.getReason()), scope);
         return ResponseEntity.ok(card(customerId, scope));
     }
 

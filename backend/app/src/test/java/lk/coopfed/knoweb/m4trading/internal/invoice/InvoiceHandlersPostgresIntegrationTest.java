@@ -130,6 +130,9 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         });
         assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
             assertThat(event.ownerEntityId()).isEqualTo(SELLER);
+            assertThat(event.businessDate())
+                    .isNotNull()
+                    .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), event.documentId()));
             assertThat(event.postings())
                     .extracting(posting ->
                             posting.creditRole() + "=" + posting.amount().toPlainString())

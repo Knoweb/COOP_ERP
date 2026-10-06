@@ -115,6 +115,56 @@ class RoleRulesTest {
         assertThat(RoleRules.limitsProblem(Map.of("max_value", 1), null)).contains("limits");
     }
 
+    // ---- a granted limit never exceeds the grantor's (wave 2, M1A-04; CR-21A-7) ----
+
+    private static final String APPROVAL_SCHEMA =
+            "{\"properties\":{\"max_value\":{\"type\":\"number\",\"minimum\":0},\"note\":{\"type\":\"string\"}},"
+                    + "\"required\":[\"max_value\"]}";
+
+    @Test
+    void aLimitAtOrBelowTheGrantorsIsGrantedAndAboveItIsNot() throws Exception {
+        JsonNode schema = new ObjectMapper().readTree(APPROVAL_SCHEMA);
+        List<Map<String, Object>> grantor = List.of(Map.of("max_value", 25000));
+
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 25000), schema, grantor))
+                .isEmpty();
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 24999.5), schema, grantor))
+                .isEmpty();
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 250000), schema, grantor))
+                .hasValueSatisfying(excess -> {
+                    assertThat(excess.permission()).isEqualTo("c");
+                    assertThat(excess.field()).isEqualTo("max_value");
+                    assertThat(excess.requested()).isEqualByComparingTo("250000");
+                    assertThat(excess.grantorLimit()).isEqualByComparingTo("25000");
+                });
+        // A grant that sets no value is unlimited, which is above any limit.
+        assertThat(RoleRules.aboveGrantor("c", null, schema, grantor))
+                .hasValueSatisfying(excess -> assertThat(excess.requested()).isNull());
+    }
+
+    @Test
+    void theGrantorsHighestHoldingCountsAndAHoldingWithoutALimitIsUnlimited() throws Exception {
+        JsonNode schema = new ObjectMapper().readTree(APPROVAL_SCHEMA);
+        List<Map<String, Object>> two = List.of(Map.of("max_value", 25000), Map.of("max_value", 100000));
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100000), schema, two))
+                .isEmpty();
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100001), schema, two))
+                .isPresent();
+
+        java.util.ArrayList<Map<String, Object>> withAnUnlimited = new java.util.ArrayList<>(two);
+        withAnUnlimited.add(null);
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 9_999_999), schema, withAnUnlimited))
+                .isEmpty();
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 9_999_999), schema, List.of(Map.of("note", "x"))))
+                .as("a holding without the property is unlimited in it")
+                .isEmpty();
+        // Only numbers compare; a permission without a schema has no limits to compare.
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 1, "note", "y"), schema, two))
+                .isEmpty();
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 1), null, two))
+                .isEmpty();
+    }
+
     @Test
     void theDiffOfTwoSetsIsWhatWasAddedAndWhatWasRemoved() {
         Map<String, List<String>> diff = RoleRules.diff(List.of("a", "b"), List.of("b", "c"));

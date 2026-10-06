@@ -10,9 +10,9 @@
 |* `l.c.k.m.query.CatalogueQueries` (in M2 Catalogue & Batch)
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
+* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.m.query.BatchQueries` (in M2 Catalogue & Batch)
 * `l.c.k.m.query.PartyQueries` (in M1 Party, Tenancy & Security)
-* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.m.query.RelationshipQueries` (in M1 Party, Tenancy & Security)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===

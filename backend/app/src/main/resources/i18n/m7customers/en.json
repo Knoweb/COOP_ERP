@@ -34,7 +34,7 @@
   "m7.statement.period_invalid": "Choose a period of at most a year, the start before the end",
   "m7.account.closed": "This account is closed",
   "m7.account.limits_unchanged": "Nothing changes: the limit, hard block and offline cap are already these",
-  "m7.account.action_invalid": "Choose suspend, reinstate or close",
+  "m7.account.action_invalid": "Choose suspend, reinstate, reopen or close",
   "m7.account.status_invalid": "The account cannot do this in its present state",
   "m7.account.balance_not_zero": "The account still has a balance; it closes only at zero",
   "m7.account.unallocated_held": "The account holds money paid in advance; settle or reverse it before closing",
@@ -57,5 +57,11 @@
   "m7.privacy.not_received": "This request was already answered",
   "m7.privacy.no_officer": "The society has no responsible officer; appoint one first",
   "m7.privacy.officer_only": "Only the society’s responsible officer answers data requests",
-  "m7.privacy.open_balance": "The customer has a balance with a society; erasure waits until it is settled"
+  "m7.privacy.open_balance": "The customer has a balance with a society; erasure waits until it is settled",
+  "m7.account.nic_held_elsewhere": "A customer of another society has this NIC number: one person holds credit at one society",
+  "m7.privacy.account_open": "The customer still has an account that is not closed; close every account before erasing",
+  "m7.privacy.recently_closed": "An account of the customer was closed only recently; erasure waits until the shops’ offline sales have arrived",
+  "m7.privacy.not_access": "This request is not a request for the customer’s data",
+  "m7.privacy.not_fulfilled": "This request has not been fulfilled, so there is no export to hand over",
+  "m7.field.personal_data": "Do not type a phone number or NIC number here; it would stay on the record after an erasure"
 }

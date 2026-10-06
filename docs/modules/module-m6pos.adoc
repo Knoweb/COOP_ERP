@@ -11,5 +11,6 @@
 * `l.c.k.k.api.AuditFacade` (in Platform Kernel)
 * `l.c.k.k.api.EventPublisher` (in Platform Kernel)
 * `l.c.k.k.api.NumberingService` (in Platform Kernel)
+* `l.c.k.k.api.ConfigRegistry` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |===

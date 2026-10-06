@@ -6,54 +6,149 @@
 openapi: 3.1.0
 info:
   title: COOP ERP M6 Point of Sale API
-  version: 0.1.0
+  version: 0.2.0
 paths:
+  # Wave 2, M6-08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
+  # (4)): one business day a page at a time, newest first, with an opaque cursor; a single read
+  # each, so that one receipt is never found by loading the shop's whole list.
   /v1/pos/receipts:
     get:
       tags: [Pos]
       operationId: listReceipts
-      summary: The receipts the tills of a location issued, newest first
+      summary: The receipts the tills of a location issued on one business day, newest first, a page at a time
       description: >
         Each receipt as the till issued it (its number from the till's series, its till
-        position), its lines, its tenders and what central flagged about it. A location the caller's scope does not read answers an
-        empty list.
+        position), its lines, its tenders and what central flagged about it. The day is the
+        business day in the business time zone (today when not given); `flagged=true` keeps the
+        receipts central flagged. A page holds `limit` receipts (50 when not given, at most the
+        configured `pos.list.max_page`); `nextCursor` asks for the next one. A location the
+        caller's scope does not read answers an empty page; a cursor that cannot be read is
+        400 request.malformed.
       x-permission: pos.receipt.view
       parameters:
         - in: query
           name: locationId
           required: true
           schema: { type: string, format: uuid }
+        - in: query
+          name: businessDate
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: flagged
+          required: false
+          schema: { type: boolean }
+        - in: query
+          name: cursor
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, default: 50 }
       responses:
         '200':
-          description: The receipts
+          description: One page of the receipts
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/ReceiptResponse' }
+              schema: { $ref: '#/components/schemas/ReceiptPage' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/pos/receipts/{documentId}:
+    get:
+      tags: [Pos]
+      operationId: getPosReceipt
+      summary: One receipt a till issued, with its lines, tenders and flags
+      x-permission: pos.receipt.view
+      parameters:
+        - in: path
+          name: documentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReceiptResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: No such receipt, or the caller's scope may not see it
   /v1/pos/sessions:
     get:
       tags: [Pos]
       operationId: listSessions
-      summary: The till sessions of a location, newest first
+      summary: The till sessions of a location on one business day, newest first, a page at a time
+      description: >
+        Every session opened, and every close whose open never arrived (its open fields empty),
+        on the business day in the business time zone (today when not given), paged as the
+        receipts are.
       x-permission: pos.receipt.view
       parameters:
         - in: query
           name: locationId
           required: true
           schema: { type: string, format: uuid }
+        - in: query
+          name: businessDate
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: cursor
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, default: 50 }
       responses:
         '200':
-          description: The sessions
+          description: One page of the sessions
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/SessionResponse' }
+              schema: { $ref: '#/components/schemas/SessionPage' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+  /v1/pos/sessions/{sessionId}:
+    get:
+      tags: [Pos]
+      operationId: getTillSession
+      summary: One till session, with its close when it arrived
+      x-permission: pos.receipt.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: No such session, or the caller's scope may not see it
 components:
   schemas:
+    ReceiptPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReceiptResponse' }
+        nextCursor:
+          type: [string, 'null']
+          description: The next page's cursor; absent on the last page
+    SessionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SessionResponse' }
+        nextCursor:
+          type: [string, 'null']
+          description: The next page's cursor; absent on the last page
     ReceiptResponse:
       type: object
       required: [documentId, locationId, issuedAt, flags, lines, tenders]
@@ -71,6 +166,11 @@ components:
         grossAmount: { type: number }
         flags:
           type: array
+          description: >
+            What central found odd (never a refusal): LOCATION_MISMATCH, SESSION_UNKNOWN,
+            NO_SESSION, SESSION_CLOSED, NO_LINES, TOTALS_MISSING, TOTAL_MISMATCH,
+            TENDER_MISMATCH, SERIES_FOREIGN, NUMBER_JUMP, DUPLICATE_NUMBER; a client shows an
+            unknown code as it is
           items: { type: string }
         lines:
           type: array
@@ -97,13 +197,16 @@ components:
         lineTotal: { type: number }
     SessionResponse:
       type: object
-      required: [sessionId, locationId, openedAt, status]
+      required: [sessionId, locationId, status]
       properties:
         sessionId: { type: string, format: uuid }
         locationId: { type: string, format: uuid }
         tillPositionId: { type: string, format: uuid }
         businessDate: { type: string, format: date }
-        openedAt: { type: string, format: date-time }
+        openedAt:
+          type: string
+          format: date-time
+          description: Absent for a close whose open never arrived
         floatAmount: { type: number }
         status: { type: string, enum: [OPEN, CLOSED] }
         closedAt: { type: string, format: date-time }

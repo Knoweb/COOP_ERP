@@ -158,3 +158,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: The goods of an approved claim left the buyer's stock back to the seller
+
+  # wave 2, PR 13 (M6-06, decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md (2)).
+  - code: SALE_BATCH_SUBSTITUTED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till named a batch the catalogue does not know for the item; the sale was deducted from the shop's first lot of it
+
+  - code: SALE_LINE_SKIPPED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till receipt line with no quantity, or one of zero or less, was not deducted

@@ -15,9 +15,11 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.AccountClosed;
 import lk.coopfed.knoweb.m7customers.api.AccountReinstated;
+import lk.coopfed.knoweb.m7customers.api.AccountReopened;
 import lk.coopfed.knoweb.m7customers.api.AccountSuspended;
 import lk.coopfed.knoweb.m7customers.api.ChangeAccountStatus;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger.LockedAccount;
@@ -26,18 +28,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * SuspendAccount / ReinstateAccount / CloseAccount (27A section 6; doc 27 section 4.2). Guards, in
- * order: the society's OWN scope; the account of this society; a known action ({@code
- * m7.account.action_invalid}); a reason; the transition: SUSPEND from OPEN, REINSTATE from
- * SUSPENDED, CLOSE from OPEN or SUSPENDED ({@code m7.account.status_invalid}); to close, a balance of
- * zero ({@code m7.account.balance_not_zero}) and nothing held from payments ({@code
- * m7.account.unallocated_held}).
+ * SuspendAccount / ReinstateAccount / CloseAccount / ReopenAccount (27A section 6; doc 27 section
+ * 4.2; REOPEN from wave 2, CR-27A-1 item 1). Guards, in order: the society's OWN scope; the account
+ * of this society; a known action ({@code m7.account.action_invalid}); a reason free of a phone
+ * number or NIC ({@code m7.field.personal_data}); the transition: SUSPEND from OPEN, REINSTATE from
+ * SUSPENDED, CLOSE from OPEN or SUSPENDED, REOPEN from CLOSED ({@code m7.account.status_invalid}); to
+ * close, a balance of zero ({@code m7.account.balance_not_zero}) and nothing held from payments
+ * ({@code m7.account.unallocated_held}).
  *
  * <p>Suspending changes what the till accepts (27A section 7.3: ACCOUNT tender only when OPEN)
  * but never what central posts: a till's charge on a suspended or closed account is posted and
- * flagged like any other (AGENTS.md). Mutation: the status; a row in the account's history. Audit
- * ACCOUNT_SUSPENDED, ACCOUNT_REINSTATED or ACCOUNT_CLOSED with the reason; events
- * account.suspended.v1, account.reinstated.v1 or account.closed.v1.
+ * flagged like any other (AGENTS.md). Reopening is the officer's path after such a flag on a
+ * CLOSED account: reopen (to SUSPENDED, so the tills still refuse it), settle or reverse, close
+ * again. Mutation: the status; a row in the account's history. Audit ACCOUNT_SUSPENDED,
+ * ACCOUNT_REINSTATED, ACCOUNT_CLOSED or ACCOUNT_REOPENED with the reason; events
+ * account.suspended.v1, account.reinstated.v1, account.closed.v1 or account.reopened.v1.
  */
 @Service
 @CommandHandler(permission = "cus.account.manage")
@@ -72,7 +77,11 @@ class ChangeAccountStatusHandler implements Handles<ChangeAccountStatus, UUID> {
             ChangeAccountStatus.REINSTATE,
             new Transition("SUSPENDED", "SUSPENDED", "OPEN", "REINSTATED", "ACCOUNT_REINSTATED"),
             ChangeAccountStatus.CLOSE,
-            new Transition("OPEN", "SUSPENDED", "CLOSED", "CLOSED", "ACCOUNT_CLOSED"));
+            new Transition("OPEN", "SUSPENDED", "CLOSED", "CLOSED", "ACCOUNT_CLOSED"),
+            // Wave 2 (M7CR-04, CR-27A-1 item 1): to SUSPENDED, not OPEN, so the tills keep refusing
+            // tenders until the officer decides to REINSTATE.
+            ChangeAccountStatus.REOPEN,
+            new Transition("CLOSED", "CLOSED", "SUSPENDED", "REOPENED", "ACCOUNT_REOPENED"));
 
     @Override
     @Transactional
@@ -87,7 +96,7 @@ class ChangeAccountStatusHandler implements Handles<ChangeAccountStatus, UUID> {
         if (transition == null) {
             throw new ProblemException("m7.account.action_invalid", Map.of("action", String.valueOf(command.action())));
         }
-        String reason = CustomerGuards.requiredText(command.reason(), "reason");
+        String reason = PersonalDataText.require(CustomerGuards.requiredText(command.reason(), "reason"), "reason");
         if (!transition.startsFrom(account.status())) {
             throw new ProblemException(
                     "m7.account.status_invalid", Map.of("status", account.status(), "action", command.action()));
@@ -135,6 +144,8 @@ class ChangeAccountStatusHandler implements Handles<ChangeAccountStatus, UUID> {
                         new AccountSuspended(account.accountId(), account.customerId(), account.ownerEntityId());
                     case ChangeAccountStatus.REINSTATE ->
                         new AccountReinstated(account.accountId(), account.customerId(), account.ownerEntityId());
+                    case ChangeAccountStatus.REOPEN ->
+                        new AccountReopened(account.accountId(), account.customerId(), account.ownerEntityId());
                     default -> new AccountClosed(account.accountId(), account.customerId(), account.ownerEntityId());
                 };
         events.publish(event);
