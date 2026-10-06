@@ -206,6 +206,7 @@ class PaymentController implements PaymentApi {
                 view.amount(),
                 view.asOf());
         response.setCreditLimit(view.creditLimit());
+        response.setUnappliedCredits(view.unappliedCredits());
         response.setWarnThresholdPercent(view.warnThresholdPercent());
         return response;
     }

@@ -76,7 +76,7 @@ What it does, each step safe to repeat:
 4. copies the deployment files to `/opt/coop-erp`;
 5. writes `/opt/coop-erp/.env` with strong random passwords and a new till signing key pair, **only if there is no `.env` yet** (it never overwrites one);
 6. renders the Keycloak realm for this address, with the demo users' password from `.env`;
-7. pulls the images and starts everything, and waits until every service is healthy (the first start takes a few minutes: Keycloak builds itself and imports the realm, the backend creates the database);
+7. pins the images to the clone's commit (`IMAGE_TAG` in `.env`, once CI has published that commit; see step 7), pulls them and starts everything, and waits until every service is healthy (the first start takes a few minutes: Keycloak builds itself and imports the realm, the backend creates the database);
 8. checks the address from outside and prints it.
 
 If it stops at "pull access denied", do the GHCR sign-in of step 3 and run the same command again.
@@ -99,9 +99,18 @@ Other addresses on the same server:
 |---|---|---|
 | Back office | `https://203-0-113-5.sslip.io` | a demo user, `DEMO_PASSWORD` |
 | Mail catcher (every mail the demo sends) | `https://203-0-113-5.sslip.io/mail/` | `MAIL_USER` / `MAIL_PASSWORD` from `.env` |
-| Keycloak admin console | `https://203-0-113-5.sslip.io/auth/admin/` | `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` from `.env` |
+| Keycloak admin console | `http://localhost:8081/auth/admin/`, through an SSH tunnel (below) | `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` from `.env` |
 
 The users exist from the start; the business data (societies, orders, stock, sales) comes in the next step.
+
+**The Keycloak admin console is not on the internet.** Through the public address Keycloak answers only the sign-in pages of the `coop` realm and its theme files; the admin console, the admin API, the `master` realm and the account console answer 404. Keycloak listens on the server's own loopback address (`127.0.0.1:8081`), so the console is reached through an SSH tunnel from your computer:
+
+```bash
+ssh -L 8081:127.0.0.1:8081 root@203.0.113.5
+# leave it open, and browse to http://localhost:8081/auth/admin/
+```
+
+**The demo users are shared** (several testers sign in as the same user), so the demo has no self-service: no account console, no changing a password or adding a one-time code from the sign-in page. Thirty wrong passwords in a row lock a user for at most 15 minutes, never for good, and a correct sign-in clears the count. Someone can still change a demo user's password through the application itself (an administrator of the demo may, in phase 4); then put every demo user back with `demo-data.sh --repair-users` (step 8), which touches no data.
 
 ## 6. Load the demo
 
@@ -113,20 +122,40 @@ It loads, in this order: the seed rows, then the demo through the application it
 
 Give the testers the address and `DEMO_PASSWORD`, and point them to the storyline in `docs/DEMO.md`.
 
-**Step-up without a second factor (demo only).** Some actions ask the user to sign in again before they go through. The demo realm has no one-time codes, so typing the password again counts; this is switched on for the demo only (`COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS` in `compose.yml`).
+**Step-up without a second factor (demo only).** Some actions ask the user to sign in again before they go through. The demo realm has no one-time codes, so typing the password again counts; this is switched on for the demo only (`COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS` in `compose.yml`, with its acknowledgement `COOP_ERP_MFA_PASSWORD_REAUTH_PUBLIC_ACK=demo-data-only`, without which the backend refuses to start on a public address). Never copy those two lines to a server with real data: there the flag is off and the realm has a second factor.
 
-## 7. Update to the newest version
+## 7. Update to a newer version
 
-CI publishes new images on every merge to `main`. To take them:
+The server runs the commit the clone is at: the deployment files (compose, Caddy, the realm, the seeds) and the images are always of the same commit. CI publishes the images of every commit of `main` whose tests pass, tagged with the commit's SHA, when the pipeline of that commit has finished. To update:
 
 ```bash
-cd ~/COOP_ERP && git pull
-/opt/coop-erp/deploy.sh
+cd ~/COOP_ERP && git pull --ff-only && ./infra/deploy/deploy.sh
 ```
 
-`deploy.sh` copies the newest deployment files, pulls the images, restarts what changed, waits until healthy and checks the address from outside (it prints `ok` per check, or `FAIL` and stops). The data stays; the backend brings the database up to date as it starts.
+`deploy.sh` runs from the clone only (it is not in `/opt/coop-erp`). In order, it:
 
-To stay on one version, set `IMAGE_TAG` in `/opt/coop-erp/.env` to a commit SHA from `main` (CI publishes that tag too), then run `deploy.sh`.
+1. refuses a clone with local changes under `infra/` or the seeds ("the clone has local changes"): the server would run them with images built without them;
+2. checks that CI has published every image of the clone's commit. If not, it stops with "CI has not published this commit yet": wait until the pipeline of that commit is green (job *Package (main)*), or, when main's tests failed on it, `git checkout` an earlier commit of main and run it again;
+3. writes the commit into `/opt/coop-erp/.env` as `IMAGE_TAG`, and the commit it replaces as `PREVIOUS_IMAGE_TAG`;
+4. backs up both databases and the uploaded files (step 9) and prints the backup's stamp: the way back (`--no-backup` skips it);
+5. copies the deployment files, pulls the images, restarts what changed, waits until healthy, applies the sign-in policy to the running Keycloak, and checks the address from outside (`ok` per check, or `FAIL` and stops), printing the last good backup;
+6. removes the images of every version but these two.
+
+The data stays; the backend brings the database up to date as it starts. To stay on a version, leave the clone where it is; to run a particular commit of main, `git checkout <sha>` in the clone, then `deploy.sh`.
+
+**The tills' version floor.** Do not raise the tills' minimum version above a version already handed out to a till until the till updater (CR-30-1) exists: below the floor, central still takes the till's sales, but the till gets no new prices or catalogue (CR-32-1).
+
+### Going back
+
+A migration cannot be undone: once the backend has started, the database has the new version's shape, and an older backend would start on it without a word (Flyway ignores migrations it does not know). So going back is always a restore of the backup `deploy.sh` took, then the previous commit:
+
+```bash
+sudo /opt/coop-erp/restore.sh <stamp>        # the stamp deploy.sh printed (ls /opt/coop-erp/backups)
+cd ~/COOP_ERP && git checkout <previous>      # PREVIOUS_IMAGE_TAG in /opt/coop-erp/.env
+./infra/deploy/deploy.sh
+```
+
+`restore.sh` puts back the databases and the uploaded files of that moment and starts the version that made the backup; `deploy.sh` then brings the deployment files to the same commit. Everything testers did after the backup is lost. Never go back by changing `IMAGE_TAG` alone. When the fix is on main: `git checkout main && git pull --ff-only && ./infra/deploy/deploy.sh`.
 
 ## 8. Start the demo again from nothing
 
@@ -136,32 +165,42 @@ To stay on one version, set `IMAGE_TAG` in `/opt/coop-erp/.env` to a commit SHA 
 
 It asks you to type `reset`, then deletes every record, user, mail and file the testers made, starts again (Keycloak imports the realm afresh) and loads the demo. The certificate and `.env` stay.
 
+When only the demo users are broken (a tester changed a password, a user is locked out), do not reset; repair them, in about a minute, without touching any record:
+
+```bash
+/opt/coop-erp/demo-data.sh --repair-users
+```
+
+Every user of the storyline gets `DEMO_PASSWORD` back, with no pending action and no one-time code, every lockout is cleared, and the password grant is switched off. Users made in the back office are left as they are.
+
 ## 9. Backups
 
 ```bash
 /opt/coop-erp/backup.sh
 ```
 
-dumps the application's database and Keycloak's to `/opt/coop-erp/backups` (timestamped, the newest 14 kept). Every night at 02:00:
+backs up to `/opt/coop-erp/backups`, under one stamp (UTC, such as `20261006-020000`): the application's database and Keycloak's (`coop_erp-<stamp>.dump`, `keycloak-<stamp>.dump`, the newest 14 of each kept), the version that made them (`<stamp>.tag`), and the files testers uploaded (GRN and claim photos, SKU images) into `backups/objects`, one current copy. `deploy.sh` runs it before every update. Every night at 02:00:
 
 ```bash
 echo '0 2 * * * root /opt/coop-erp/backup.sh' > /etc/cron.d/coop-erp-backup
 ```
 
-To keep copies off the server too, create a DigitalOcean Spaces bucket and an access key, and fill in `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT` (for example `https://sgp1.digitaloceanspaces.com`), `BACKUP_S3_ACCESS_KEY` and `BACKUP_S3_SECRET_KEY` in `/opt/coop-erp/.env`.
+The server sends no mail, so a failing night shows up elsewhere: `backups/LAST_OK` holds the stamp of the last good backup and `backups/LAST_FAILED` that of a failed one, and every `deploy.sh` prints both.
+
+To keep copies off the server too, create a DigitalOcean Spaces bucket and an access key, and fill in `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT` (for example `https://sgp1.digitaloceanspaces.com`), `BACKUP_S3_ACCESS_KEY` and `BACKUP_S3_SECRET_KEY` in `/opt/coop-erp/.env`. The dumps, the tag files and the uploaded files are then copied there after every backup.
+
+For the demo the dumps are not encrypted and a night's work is the most that can be lost (one backup a day). Before any real data: encrypted dumps, the `audit-anchors` bucket copied to a write-once bucket off the server, and point-in-time recovery of the database (doc 35, not written yet).
 
 For a copy of the whole machine, turn on **Backups** for the Droplet in DigitalOcean (weekly, a paid option), or take a **Snapshot** before a risky change.
 
-To restore a dump (the demo stops for a minute):
+To restore a backup (the demo stops for a few minutes):
 
 ```bash
-cd /opt/coop-erp
-C="docker compose -p coop-erp-demo --env-file .env -f compose.yml -f resources-medium.yml"
-$C stop backend keycloak
-$C exec -T postgres pg_restore -U postgres -d coop_erp --clean --if-exists < backups/coop_erp-<stamp>.dump
-$C exec -T postgres pg_restore -U postgres -d keycloak --clean --if-exists < backups/keycloak-<stamp>.dump
-$C up -d --wait
+ls /opt/coop-erp/backups                     # the stamps: coop_erp-<stamp>.dump
+sudo /opt/coop-erp/restore.sh <stamp>
 ```
+
+It asks you to type `restore`, backs up the present state first (the undo), stops the backend, Keycloak and PgBouncer, drops both databases and restores each dump into a fresh one in a single transaction (a table a later version made cannot survive, and a restore that fails half way stops with an error, never with a half-restored database), puts the uploaded files back, starts the version that made the backup and checks the address from outside. Then run `deploy.sh` from the clone at the version you want (step 7). A restore needs the `.env` the backup was made with.
 
 ## 10. When sslip.io or Let's Encrypt cannot be reached
 
@@ -211,12 +250,18 @@ cd /opt/coop-erp && C="docker compose -p coop-erp-demo --env-file .env -f compos
 
 | What you see | What to do |
 |---|---|
-| `bootstrap.sh` stops at "pull access denied" | the server is not signed in to GHCR: step 3 |
+| `bootstrap.sh` stops at "pull access denied", or "CI has not published this commit yet" although the pipeline is green | the server is not signed in to GHCR: step 3 |
+| `deploy.sh` says "run deploy.sh from the clone" | `cd ~/COOP_ERP && git pull --ff-only && ./infra/deploy/deploy.sh` (step 7) |
+| `deploy.sh` says "CI has not published this commit yet" | the pipeline of that commit is still running, or main's tests failed on it: wait, or `git checkout` an earlier commit of main (step 7) |
+| `deploy.sh` says "the clone has local changes" | `git status` in the clone; discard them (`git checkout -- infra`) or bring them to main by a pull request |
+| a demo user's password no longer works, or the user is locked | `/opt/coop-erp/demo-data.sh --repair-users` (step 8) |
+| the smoke check says the password grant is on | `demo-data.sh` was interrupted: `/opt/coop-erp/demo-data.sh --repair-users` switches it off |
+| `deploy.sh` prints `WARN LAST_FAILED backup` | run `/opt/coop-erp/backup.sh` by hand and read its error (often a full disk: `df -h`) |
 | the browser says the site cannot be reached | `$C ps`: is every service `healthy`? `ufw status` must list 80 and 443 |
 | a certificate warning on the sslip.io name | Caddy could not get the certificate yet: `$C logs caddy`. Port 80 must be reachable from the internet. If it keeps failing, step 10 |
 | the sign-in page says "HTTPS required" | the address is not HTTPS; open the `https://` address `bootstrap.sh` printed |
 | "Invalid parameter: redirect_uri" after sign-in | the realm has another address: run `bootstrap.sh` again with the address you use (`--ip` or `--domain`) |
-| a service keeps restarting | `$C logs --tail 200 <service>`; `docker inspect --format '{{.State.OOMKilled}}' coop-erp-demo-<service>-1` says `true` if it ran out of memory: raise its `mem_limit` in `resources-medium.yml` (in the clone, then `deploy.sh`) |
+| a service keeps restarting | `$C logs --tail 200 <service>`; `docker inspect --format '{{.State.OOMKilled}}' coop-erp-demo-<service>-1` says `true` if it ran out of memory: raise its `mem_limit` in `infra/deploy/resources-medium.yml` through a pull request to main, then update (step 7) |
 | slow when many testers act at once | `docker stats` shows who is busy; on a provider with slower shared CPUs (see Other providers) some slowness at peaks is expected |
 | everything is slow, `free -h` shows swap nearly full | restart once (`$C restart backend keycloak`) and look at `docker stats` for the service that grew |
 | no mails in the mail catcher | `$C logs backend | grep -i mail`; the catcher keeps the newest 5000 |
