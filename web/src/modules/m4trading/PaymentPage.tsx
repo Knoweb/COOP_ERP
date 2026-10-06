@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
+import { openServerFile } from "../../shell/api/openServerFile";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
@@ -46,21 +47,9 @@ export function PaymentPage() {
       }
     }
   });
-  const print = useMutation({ mutationFn: () => api.paymentPrint(receiptId) });
+  const print = useMutation({ mutationFn: () => openServerFile(() => api.paymentPrint(receiptId)) });
   // The tab is opened in the click itself, so a popup blocker lets it through (as InvoicePage).
-  const openPrint = () => {
-    const tab = window.open("about:blank", "_blank");
-    print.mutate(undefined, {
-      onSuccess: (url) => {
-        if (tab) {
-          tab.location.href = url;
-        } else {
-          window.location.assign(url);
-        }
-      },
-      onError: () => tab?.close()
-    });
-  };
+  const openPrint = () => print.mutate();
   const outcome = useMutation({
     mutationFn: (value: "CLEARED" | "BOUNCED") => api.chequeOutcome(receiptId, value, reason, key.current()),
     onSuccess: () => {

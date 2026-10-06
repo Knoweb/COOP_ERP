@@ -2,6 +2,32 @@ import { useState, useRef, useEffect } from "react";
 import { useT } from "../i18n/useT";
 import { useSession } from "./session";
 import { useScope } from "../scope/useScope";
+import { initialsOf } from "../i18n/initials";
+
+/** The signed-in person's initials in a circle; made in the browser, no name leaves it. */
+export function Avatar({ name, size, className }: { name: string; size: number; className?: string }) {
+  return (
+    <span
+      className={className}
+      aria-hidden="true"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: "50%",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        fontSize: `${Math.round(size * 0.4)}px`,
+        fontWeight: 600,
+        background: "var(--color-accent-light)",
+        color: "var(--color-accent)"
+      }}
+    >
+      {initialsOf(name)}
+    </span>
+  );
+}
 
 /** Who is signed in, and the way out. Part of the shell's header on every page. */
 export function UserMenu() {
@@ -44,8 +70,8 @@ export function UserMenu() {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div style={{ position: 'relative', display: 'flex' }}>
-          <div className="user-menu__avatar" aria-hidden="true" style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'url("https://ui-avatars.com/api/?name=' + session.displayName.replace(' ', '+') + '&background=F6D7E9&color=8E0E5B") center/cover' }}></div>
-          <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '12px', height: '12px', backgroundColor: '#00A651', border: '2px solid #F3E6F6', borderRadius: '50%' }}></div>
+          <Avatar name={session.displayName} size={36} className="user-menu__avatar" />
+          <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '12px', height: '12px', backgroundColor: 'var(--color-brand-success)', border: '2px solid var(--color-surface-card)', borderRadius: '50%' }}></div>
         </div>
         <div className="user-menu__info" style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: '1.2' }}>User</span>
@@ -71,7 +97,7 @@ export function UserMenu() {
           border: '1px solid rgba(142, 14, 91, 0.05)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px', marginBottom: '16px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'url("https://ui-avatars.com/api/?name=' + session.displayName.replace(' ', '+') + '&background=F6D7E9&color=8E0E5B") center/cover' }}></div>
+            <Avatar name={session.displayName} size={40} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <strong style={{ fontSize: '15px', color: 'var(--color-text)' }}>{session.displayName}</strong>
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{t(`shell.scope.class.${scope.policyClass}`).text}</span>

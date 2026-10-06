@@ -18,6 +18,8 @@ export type RuntimeConfig = {
   oidcAuthority?: string;
   oidcClientId?: string;
   stepUpAcrValues?: string;
+  /** Where pre-signed file links point when that is not the app's own origin (openServerFile). */
+  objectStoreOrigin?: string;
 };
 
 declare global {
@@ -46,7 +48,7 @@ function text(value: unknown): string | undefined {
 export function resolveConfig(
   page: RuntimeConfig = pageConfig(),
   env: BuildEnv = import.meta.env
-): Required<RuntimeConfig> {
+): Required<Omit<RuntimeConfig, "objectStoreOrigin">> {
   return {
     apiBase: text(page.apiBase) ?? text(env.VITE_API_BASE) ?? "http://localhost:8080",
     oidcAuthority: text(page.oidcAuthority) ?? text(env.VITE_OIDC_AUTHORITY) ?? "http://localhost:8085/realms/coop",

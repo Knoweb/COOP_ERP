@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
+import { openServerFile } from "../../shell/api/openServerFile";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
@@ -38,7 +39,7 @@ export function InvoicePage() {
     enabled: firstGrn !== undefined,
     retry: false
   });
-  const print = useMutation({ mutationFn: () => api.invoicePrint(invoiceId) });
+  const print = useMutation({ mutationFn: () => openServerFile(() => api.invoicePrint(invoiceId)) });
   // The buyer disputes the invoice with a reason; either party holding the permission closes it.
   const scope = useScope();
   const queryClient = useQueryClient();
@@ -73,20 +74,8 @@ export function InvoicePage() {
     }
   });
   // The tab is opened in the click itself, so a popup blocker lets it through, and is sent to
-  // the PDF once the link arrives.
-  const openPrint = () => {
-    const tab = window.open("about:blank", "_blank");
-    print.mutate(undefined, {
-      onSuccess: (url) => {
-        if (tab) {
-          tab.location.href = url;
-        } else {
-          window.location.assign(url);
-        }
-      },
-      onError: () => tab?.close()
-    });
-  };
+  // the PDF once the link arrives (openServerFile).
+  const openPrint = () => print.mutate();
 
   if (invoice.isLoading) {
     return <main className="shell-page">{t("trading.loading").text}</main>;

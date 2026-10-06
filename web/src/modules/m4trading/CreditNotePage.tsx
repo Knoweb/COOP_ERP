@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { openServerFile } from "../../shell/api/openServerFile";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
@@ -23,21 +24,9 @@ export function CreditNotePage() {
     queryKey: ["trading", "credit-note", creditNoteId],
     queryFn: () => api.creditNote(creditNoteId)
   });
-  const print = useMutation({ mutationFn: () => api.creditNotePrint(creditNoteId) });
+  const print = useMutation({ mutationFn: () => openServerFile(() => api.creditNotePrint(creditNoteId)) });
   // The tab is opened in the click itself, so a popup blocker lets it through (as InvoicePage).
-  const openPrint = () => {
-    const tab = window.open("about:blank", "_blank");
-    print.mutate(undefined, {
-      onSuccess: (url) => {
-        if (tab) {
-          tab.location.href = url;
-        } else {
-          window.location.assign(url);
-        }
-      },
-      onError: () => tab?.close()
-    });
-  };
+  const openPrint = () => print.mutate();
 
   if (note.isLoading) {
     return <main className="shell-page">{t("trading.loading").text}</main>;
