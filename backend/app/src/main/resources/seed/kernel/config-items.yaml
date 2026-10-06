@@ -852,3 +852,15 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m6pos
+  # wave 2, PR 12 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-pricing-rules.md
+  # (3), CR-23A-1): how far back a control price may take effect, to the gazette's own date.
+  - key: pricing.control_price_backdate_days
+    value_type: INTEGER
+    schema: { minimum: 0, maximum: 31 }
+    description_en: How many days before today a control price may take effect, to match the gazette's own date; an older date is refused
+    description_si: ගැසට් පත්‍රයේම දිනයට ගැළපෙන පරිදි පාලන මිලක් බලපැවැත්විය හැක්කේ අද දිනට පෙර දින කීයක සිටද; ඊට පැරණි දිනයක් ප්‍රතික්ෂේප වේ
+    description_ta: வர்த்தமானியின் சொந்தத் திகதிக்கு ஏற்ப, இன்றைக்கு எத்தனை நாட்கள் முன்பிருந்து கட்டுப்பாட்டு விலை நடைமுறைக்கு வரலாம்; அதைவிடப் பழைய திகதி மறுக்கப்படும்
+    default: 7
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m3pricing

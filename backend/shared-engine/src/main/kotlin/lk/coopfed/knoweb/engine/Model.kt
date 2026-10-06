@@ -135,7 +135,13 @@ data class LineResult(
     val taxRatePercent: BigDecimal = BigDecimal.ZERO,
     val taxAmount: Money = Money.ZERO,
     val lineTotal: Money = Money.ZERO,
-    val candidates: List<BatchCandidate> = emptyList()
+    val candidates: List<BatchCandidate> = emptyList(),
+    /**
+     * The batch an expiry markdown is judged on: the scanned or picked batch, else the FEFO-first
+     * in-date candidate (CR-23A-1). When a markdown applies, it becomes [batch], so the sale
+     * depletes the units that were marked down.
+     */
+    val markdownBatch: BatchCandidate? = null
 ) {
     val skuId: UUID get() = input.skuId
 
