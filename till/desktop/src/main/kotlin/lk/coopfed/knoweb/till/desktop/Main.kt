@@ -29,7 +29,13 @@ fun main() {
     val jvmStart = ManagementFactory.getRuntimeMXBean().startTime
     fun since() = System.currentTimeMillis() - jvmStart
     val atMain = since()
-    val till = DesktopTill()
+    val till = try {
+        DesktopTill()
+    } catch (e: KeyVaultRefusal) {
+        // The database cannot be opened and must not be replaced silently (TWK-08): say so and stop.
+        javax.swing.JOptionPane.showMessageDialog(null, e.message, "COOP ERP till", javax.swing.JOptionPane.ERROR_MESSAGE)
+        exitProcess(2)
+    }
     val config = till.config
     val atDatabase = since()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

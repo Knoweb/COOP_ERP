@@ -81,7 +81,7 @@ export interface paths {
         get?: never;
         /**
          * Replace the lines of a draft
-         * @description Answers one outcome per line, in the order given. The lines are stored only when every line is accepted (saved true); a refused line carries its reason (a message id: m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing, .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete; and for RETAIL and ADVISORY .above_control_price, .above_shelf_mrp (RETAIL: the lowest printed MRP in stock at the society's locations), .retail_precision, .tier_not_allowed), with the binding ceiling in ceilingKind, ceilingValue and ceilingRef. An accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
+         * @description Answers one outcome per line, in the order given. The lines are stored only when every line is accepted (saved true); a refused line carries its reason (a message id: m3.price_list.line.sku_not_active, .uom_invalid, .duplicate, .tier_base_missing, .tiers_not_ascending, .price_negative, .price_precision, .tier_invalid, .incomplete; and for RETAIL and ADVISORY .above_control_price, .above_shelf_mrp (RETAIL: the lowest printed MRP in stock at the society's locations), .retail_precision, .tier_not_allowed; and for RETAIL .price_zero: a shelf price is above zero, CR-23A-1), with the binding ceiling in ceilingKind, ceilingValue and ceilingRef. An accepted line may carry a review (m3.price_list.review.above_mrp: a trade price above the SKU's lowest printed MRP; a review, not a block). Codes this operation can answer with 422: m3.price_list.not_found, m3.price_list.not_draft, scope.invalid.
          */
         put: operations["setLines"];
         post?: never;
@@ -185,7 +185,7 @@ export interface paths {
         put?: never;
         /**
          * Enter a gazetted control price for a SKU from a date (the Federation, with a second factor)
-         * @description The ceiling of the same SKU in force on effectiveFrom is closed at effectiveFrom - 1. Codes this operation can answer with 422: m3.control_price.federation_only, m3.control_price.sku_not_active, m3.control_price.uom_invalid, m3.control_price.ceiling_invalid, m3.control_price.dates_invalid, m3.control_price.overlap, request.field.required, scope.invalid.
+         * @description The ceiling of the same SKU in force on effectiveFrom is closed at effectiveFrom - 1. effectiveFrom may be up to pricing.control_price_backdate_days (default 7) before today, to the gazette's own date; such an entry is audited for review. Codes this operation can answer with 422: m3.control_price.federation_only, m3.control_price.sku_not_active, m3.control_price.uom_invalid, m3.control_price.ceiling_invalid, m3.control_price.dates_invalid, m3.control_price.effective_from_past, m3.control_price.overlap, request.field.required, scope.invalid.
          */
         post: operations["enterControlPrice"];
         delete?: never;
@@ -417,7 +417,7 @@ export interface components {
             uomCode: string;
             /** @description The quantity from which the price applies; 0 is the base price */
             tierFromQty: number;
-            /** @description Unit price (tax-exclusive for TRADE) with at most four decimals */
+            /** @description Unit price (tax-exclusive for TRADE) with at most four decimals. A RETAIL price is above zero (m3.price_list.line.price_zero); the request does not name the list's kind, so that bound is the handler's guard, not this schema's. */
             price: number;
         };
         SetLinesResponse: {

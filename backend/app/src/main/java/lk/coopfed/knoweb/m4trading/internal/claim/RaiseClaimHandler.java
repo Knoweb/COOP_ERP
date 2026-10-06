@@ -50,9 +50,10 @@ import org.springframework.transaction.annotation.Transactional;
  * has no counterparty in M4); within {@code trading.claim_window_days} of the confirmation ({@code
  * m4.claim.window_closed}); lines ({@code m4.claim.lines_required}), each a line of the GRN ({@code
  * m4.claim.line_unknown}) once ({@code m4.claim.line_duplicate}), a quantity above zero with at
- * most three decimals ({@code m4.claim.qty_invalid}) and at most what was received less what
- * earlier claims not rejected hold ({@code m4.claim.exceeds_received}, under an advisory lock per
- * GRN).
+ * most three decimals ({@code m4.claim.qty_invalid}) and at most what was received less what the
+ * GRN recorded as damaged (the discrepancy credits that; decision A-1) less what earlier claims
+ * hold ({@link ClaimReads#claimedBefore}) ({@code m4.claim.exceeds_received}, under an advisory
+ * lock per GRN).
  *
  * <p>Mutation: the CLM document from the buyer's ENTITY series (24B) at the GRN's location, ISSUED
  * then RAISED; a DISPUTES link to the GRN; {@code doc_claim} and {@code doc_claim_line}. Audit
@@ -155,8 +156,11 @@ public class RaiseClaimHandler implements Handles<RaiseClaim, UUID> {
             if (qty == null || qty.signum() <= 0 || qty.stripTrailingZeros().scale() > 3) {
                 throw new ProblemException("m4.claim.qty_invalid", Map.of("skuId", line.skuId()));
             }
+            // The GRN's damaged quantity is the discrepancy's to credit (SettleDiscrepancy), not a
+            // claim's, whatever the claim's kind (decision A-1, wave 2 M4MONEY-01).
             BigDecimal received = line.receivedQty() == null ? BigDecimal.ZERO : line.receivedQty();
-            BigDecimal open = received.subtract(claims.claimedBefore(line.lineId()));
+            BigDecimal damaged = line.damagedQty() == null ? BigDecimal.ZERO : line.damagedQty();
+            BigDecimal open = received.subtract(damaged).subtract(claims.claimedBefore(line.lineId()));
             if (qty.compareTo(open) > 0) {
                 throw new ProblemException(
                         "m4.claim.exceeds_received", Map.of("skuId", line.skuId(), "open", open.toPlainString()));

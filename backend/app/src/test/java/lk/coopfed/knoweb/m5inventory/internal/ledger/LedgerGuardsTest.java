@@ -146,6 +146,32 @@ class LedgerGuardsTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
+    void aSaleReversalCarriesItsSalesCostAndAnOutAtAGivenCostIsNeverNegative() {
+        // wave 2, D10: a sale reversal comes back at the original sale's cost, so it must carry one.
+        assertProblem(
+                () -> LedgerGuards.requireMovement(issue(MovementType.SALE_REVERSAL, "1")), "m5.ledger.cost_required");
+        assertProblem(
+                () -> LedgerGuards.requireMovement(new Movement(
+                        LOCATION,
+                        BATCH,
+                        LotCondition.GOOD,
+                        MovementType.REPACK_CONSUME,
+                        BigDecimal.ONE.negate(),
+                        new BigDecimal("-1"),
+                        null)),
+                "m5.ledger.cost_invalid");
+        assertThatCode(() -> LedgerGuards.requireMovement(new Movement(
+                        LOCATION,
+                        BATCH,
+                        LotCondition.GOOD,
+                        MovementType.REPACK_CONSUME,
+                        BigDecimal.ONE.negate(),
+                        new BigDecimal("193.8776"),
+                        null)))
+                .doesNotThrowAnyException();
+    }
+
     private static Movement receipt(String qty) {
         return new Movement(
                 LOCATION,

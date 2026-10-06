@@ -9,7 +9,7 @@
 
 import { InMemoryWebStorage, WebStorageStateStore } from "oidc-client-ts";
 import type { AuthProviderProps } from "react-oidc-context";
-import type { PendingCommand } from "../api/pendingCommand";
+import { mayKeep, type PendingCommand } from "../api/pendingCommand";
 import { resolveConfig } from "../runtimeConfig";
 
 // From the server's /config.js, else the VITE_* values of the build (runtimeConfig.ts).
@@ -34,18 +34,31 @@ export const STEP_UP_ACR_VALUES: string = CONFIG.stepUpAcrValues;
  * state of the login request; the library keeps it in session storage until the browser is
  * back, so a page unload does not lose it.
  */
-export type LoginState = { returnTo?: string; pendingCommand?: PendingCommand };
+export type LoginState = {
+  returnTo?: string;
+  pendingCommand?: PendingCommand;
+  /** A command was refused for a fresh sign-in but must not be kept (personal data in its body, a file, a foreign URL). */
+  commandNotKept?: boolean;
+};
 
 // The command the sign-in brought back, until the shell takes it: set by the callback below,
 // read once by takePendingCommand(). A module variable, because the callback runs before any
 // component of the shell exists.
 let broughtBack: PendingCommand | null = null;
+let notKept = false;
 
 /** The command to replay after this sign-in, once; null when there is none (or it was taken). */
 export function takePendingCommand(): PendingCommand | null {
   const pending = broughtBack;
   broughtBack = null;
   return pending;
+}
+
+/** True once after a sign-in that interrupted a command which was not kept: the person enters it again. */
+export function takeCommandNotKept(): boolean {
+  const flag = notKept;
+  notKept = false;
+  return flag;
 }
 
 export const oidcConfig: AuthProviderProps = {
@@ -63,7 +76,10 @@ export const oidcConfig: AuthProviderProps = {
   // command a step-up interrupted, if there was one.
   onSigninCallback: (user) => {
     const state = (user?.state as LoginState | undefined) ?? {};
-    broughtBack = state.pendingCommand ?? null;
+    // Checked again here: the state sat in session storage, where a crafted one could name any URL.
+    const kept = state.pendingCommand && mayKeep(state.pendingCommand, CONFIG.apiBase) ? state.pendingCommand : null;
+    broughtBack = kept;
+    notKept = kept === null && (state.commandNotKept === true || state.pendingCommand !== undefined);
     window.history.replaceState({}, document.title, state.returnTo || window.location.pathname);
   }
 };

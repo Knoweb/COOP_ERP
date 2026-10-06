@@ -28,7 +28,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * The authoring checks of a list's lines (23A section 7, SetLines and PublishPriceList: "per line:
- * sku active, uom valid (M2), tiers ascending, price >= 0; AuthoringValidator.ceilings (RETAIL: min
+ * sku active, uom valid (M2), tiers ascending, price >= 0 (a RETAIL price > 0, CR-23A-1);
+ * AuthoringValidator.ceilings (RETAIL: min
  * in-stock batch MRP at owner's locations via M5 query, control price; TRADE: review-only above
  * lowest MRP)"). One outcome per line, in the order given.
  *
@@ -87,7 +88,8 @@ class AuthoringValidator {
 
         List<Outcome> outcomes = new ArrayList<>();
         for (SetLines.Line line : lines) {
-            String reason = refusal(line, shelfList, skus, tierFaults, occurrences, scope);
+            String reason =
+                    refusal(line, shelfList, PriceListStore.RETAIL.equals(kind), skus, tierFaults, occurrences, scope);
             if (reason != null) {
                 outcomes.add(new Outcome(line.skuId(), line.uomCode(), line.tierFromQty(), false, reason, null));
                 continue;
@@ -164,6 +166,7 @@ class AuthoringValidator {
     private String refusal(
             SetLines.Line line,
             boolean shelfList,
+            boolean retail,
             Map<UUID, Optional<SkuView>> skus,
             Map<String, String> tierFaults,
             Map<String, Long> occurrences,
@@ -173,6 +176,12 @@ class AuthoringValidator {
         }
         if (line.price().signum() < 0) {
             return "m3.price_list.line.price_negative";
+        }
+        // No free goods through a price (CR-23A-1, TWK D-5): a shelf price of 0.00 sells the item
+        // for nothing outside the write-off controls. The slice refuses it too, but a job or a
+        // till sets lines without HTTP, so the guard stays.
+        if (retail && line.price().signum() == 0) {
+            return "m3.price_list.line.price_zero";
         }
         if (line.price().stripTrailingZeros().scale() > (shelfList ? 2 : 4)) {
             return shelfList ? "m3.price_list.line.retail_precision" : "m3.price_list.line.price_precision";

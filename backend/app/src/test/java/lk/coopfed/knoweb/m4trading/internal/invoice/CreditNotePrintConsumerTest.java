@@ -67,7 +67,9 @@ class CreditNotePrintConsumerTest {
                         new BigDecimal("18"),
                         new BigDecimal("43.20"),
                         new BigDecimal("240.00"),
-                        null)));
+                        null)),
+                new BigDecimal("283.20"),
+                BigDecimal.ZERO);
         ScopeContext scope = ScopeContext.dev(UUID.randomUUID(), seller, null);
         CreditNoteQueries queries = mock(CreditNoteQueries.class);
         when(queries.getCreditNote(creditNoteId, scope)).thenReturn(Optional.of(note));

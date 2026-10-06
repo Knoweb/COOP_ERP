@@ -11,10 +11,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import lk.coopfed.knoweb.till.core.TillPolicy
 import lk.coopfed.knoweb.till.core.TillRefusal
 import lk.coopfed.knoweb.till.core.TillService
 import lk.coopfed.knoweb.till.core.TillStatus
+import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
@@ -72,6 +75,14 @@ class TillController(
     /** An item scanned with no price in the snapshot or the price book: the cashier keys it. */
     var needsPrice by mutableStateOf<Item?>(null)
         private set
+    /** The problems list while the supervisor looks at it; closing it marks them seen. */
+    var problemsShown by mutableStateOf<List<Anomaly>?>(null)
+        private set
+    /** The business date the till last opened, and today's by its clock, for the open-session screen. */
+    var businessDate by mutableStateOf<LocalDate?>(null)
+        private set
+    var clockDate by mutableStateOf<LocalDate?>(null)
+        private set
 
     private val basket = Basket()
     val lines = mutableStateListOf<BasketLine>()
@@ -79,17 +90,24 @@ class TillController(
         private set
 
     val operators: List<Operator> get() = service.catalogue.operators
+    /** Operators who may sign a correction of the business date. */
+    val supervisors: List<Operator> get() = operators.filter { TillPolicy.SUPERVISOR_PERMISSION in it.permissions }
+    /** Whether the sign-in screen offers the trial's stand-in cashier (the PC opted in and no operator was ever sent). */
+    val trialCashierOffered: Boolean get() = service.trialCashierOffered
     val operatorName: String? get() = service.operator?.displayName
     val shopName: String get() = service.catalogue.shop?.name?.get(service.shopLanguage) ?: service.device?.let { "Shop ${it.locationId.takeLast(4)}" } ?: "COOP till"
     val tillLabel: String get() = service.device?.let { "${it.receiptPrefix} · ${it.hardwareSerial}" } ?: "not enrolled"
     val printerDescription: String get() = printer.description
+    /** The shop's time zone, for times shown on screen. */
+    val zoneForScreens: TimeZone get() = zone
 
     private var syncJob: Job? = null
 
     fun start() = act {
         service.start()
         session = service.currentSession()
-        screen = if (service.isEnrolled) Screen.SIGN_IN else Screen.ENROL
+        screen = if (service.isEnrolled && !service.isRevoked) Screen.SIGN_IN else Screen.ENROL
+        refreshDates()
         watchStatus()
         if (service.isEnrolled) startSyncLoop()
     }
@@ -118,6 +136,7 @@ class TillController(
 
     private suspend fun afterSignIn() {
         session = service.currentSession()
+        refreshDates()
         screen = if (session == null) Screen.OPEN_SESSION else Screen.SELL
         say("Signed in as ${service.operator?.displayName}")
     }
@@ -133,7 +152,40 @@ class TillController(
         session = service.openSession(parseMoney(float))
         screen = Screen.SELL
         say("Session open with a float of LKR ${session!!.floatAmount.display()}")
+        refreshDates()
         syncSoon()
+    }
+
+    /**
+     * A supervisor moves the till's business date back (decision D-4): [supervisor] null only on a
+     * trial till with no operators.
+     */
+    fun correctBusinessDate(date: String, supervisor: Operator?, pin: String, onDone: () -> Unit = {}) = act {
+        val parsed = try {
+            LocalDate.parse(date.trim())
+        } catch (e: IllegalArgumentException) {
+            throw TillRefusal("\"$date\" is not a date (yyyy-mm-dd)")
+        }
+        withContext(Dispatchers.Default) { service.correctBusinessDate(parsed, supervisor, pin) }
+        refreshDates()
+        onDone()
+        say("The business date is now $parsed")
+    }
+
+    private suspend fun refreshDates() {
+        businessDate = service.currentBusinessDate()
+        clockDate = service.clockDate()
+    }
+
+    // ---- problems for the office ----
+
+    fun showProblems() = act {
+        problemsShown = service.problems()
+    }
+
+    fun closeProblems() {
+        problemsShown = null
+        scope.launch { runCatching { service.markProblemsSeen() } }
     }
 
     fun toCloseSession() {
@@ -157,6 +209,7 @@ class TillController(
 
     fun afterZReport() {
         screen = Screen.OPEN_SESSION
+        scope.launch { runCatching { refreshDates() } }
     }
 
     fun reprintZReport() = act {
@@ -261,7 +314,20 @@ class TillController(
     }
 
     private fun watchStatus() {
-        scope.launch { service.status.collect { status = it } }
+        scope.launch {
+            service.status.collect {
+                val wasRevoked = status.revoked
+                status = it
+                // Central revoked the till: back to enrolment (a new code ends the revoke, D-3).
+                if (it.revoked && !wasRevoked && screen != Screen.ENROL) {
+                    screen = Screen.ENROL
+                    lines.clear()
+                    basket.clear()
+                } else if (!it.revoked && wasRevoked && screen == Screen.ENROL && service.isEnrolled) {
+                    screen = Screen.SIGN_IN
+                }
+            }
+        }
     }
 
     // ---- helpers ----

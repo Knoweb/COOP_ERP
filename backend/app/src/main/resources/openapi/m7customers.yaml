@@ -19,6 +19,8 @@ paths:
       operationId: searchCustomers
       summary: The society's customers matching a name or a phone number, by name
       x-permission: cus.customer.view
+      # Member identity is the society's (CR-18-2): a FEDERATION_VIEW session does not resolve this read.
+      x-federation-view: false
       parameters:
         - { in: query, name: q, required: false, schema: { type: string, maxLength: 100 } }
         - { in: query, name: phone, required: false, schema: { type: string, maxLength: 20 } }
@@ -66,6 +68,7 @@ paths:
       operationId: getCustomer
       summary: The customer card, with the account at the caller's society
       x-permission: cus.customer.view
+      x-federation-view: false
       responses:
         '200':
           description: The card
@@ -143,6 +146,36 @@ paths:
               schema: { $ref: '#/components/schemas/CustomerCard' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/customers/{customerId}/nic:
+    parameters:
+      - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Customers]
+      operationId: recaptureNic
+      summary: Record the customer's NIC again from the card they present (a fresh second factor)
+      description: >
+        The way out of a recorded NIC that no longer matches the card (captured before the number
+        was brought to one form, or under a key since retired), and the ordinary path of a key
+        rotation. A fresh second factor as for a higher limit (401 mfa.required). 422 codes:
+        m7.customer.not_found, m7.customer.not_active, m7.field.required, m7.field.personal_data,
+        m7.account.nic_required (not a NIC), m7.account.nic_held (another customer of this society
+        holds it; parameter customerId), m7.account.nic_held_elsewhere.
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecaptureNicRequest' }
+      responses:
+        '200':
+          description: Recorded; the card (its nicLast4 from the card presented)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerCard' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   /v1/customers/{customerId}/accounts:
     parameters:
       - { in: path, name: customerId, required: true, schema: { type: string, format: uuid } }
@@ -153,7 +186,8 @@ paths:
       description: >
         422 codes: m7.customer.not_active, m7.customer.consent_required, m7.account.exists,
         m7.account.amount_invalid, m7.account.terms_invalid, m7.account.nic_required (a limit
-        above zero needs the NIC), m7.account.nic_mismatch, m7.account.nic_held.
+        above customers.nic_required_above_limit needs the NIC), m7.account.nic_mismatch,
+        m7.account.nic_held (parameter customerId), m7.account.nic_held_elsewhere.
       x-permission: cus.account.manage
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -240,9 +274,12 @@ paths:
       operationId: amendAccountLimits
       summary: Amend the credit limit, the hard block or the offline cap (a field left out stays as it is)
       description: >
-        A higher limit asks for a fresh second factor (401 mfa.required). 422 codes:
-        m7.account.not_found, m7.account.closed, m7.account.amount_invalid,
-        m7.account.limits_unchanged.
+        A higher limit asks for a fresh second factor (401 mfa.required), and when it rises above
+        customers.nic_required_above_limit for a customer with no NIC recorded, the NIC
+        (m7.account.nic_required). 422 codes: m7.account.not_found, m7.account.closed,
+        m7.account.amount_invalid, m7.account.limits_unchanged, m7.field.personal_data,
+        m7.account.nic_required, m7.account.nic_mismatch, m7.account.nic_held,
+        m7.account.nic_held_elsewhere.
       x-permission: cus.account.manage
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -326,6 +363,34 @@ paths:
       responses:
         '200':
           description: Closed; the account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/accounts/{accountId}/reopen:
+    parameters:
+      - { in: path, name: accountId, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Accounts]
+      operationId: reopenAccount
+      summary: Reopen a closed account as suspended, to settle what a till posted on it (CR-27A-1)
+      description: >
+        A till may charge a closed account (its snapshot was stale); the office reopens it, records
+        the repayment or reverses the receipt, and closes it again. The account comes back SUSPENDED,
+        so the tills keep refusing its tenders until it is reinstated. 422 codes:
+        m7.account.not_found, m7.account.status_invalid (not CLOSED), m7.field.personal_data.
+      x-permission: cus.account.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Reopened as SUSPENDED; the account
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Account' }
@@ -435,6 +500,7 @@ paths:
       operationId: listPrivacyRequests
       summary: The society's data-subject requests, newest first
       x-permission: cus.privacy.record
+      x-federation-view: false
       parameters:
         - { in: query, name: status, required: false, schema: { type: string, enum: [RECEIVED, FULFILLED, REFUSED] } }
       responses:
@@ -476,8 +542,11 @@ paths:
       operationId: fulfilPrivacyRequest
       summary: Fulfil a request (the responsible officer only); an erasure anonymises the customer
       description: >
-        422 codes: m7.privacy.not_found, m7.privacy.not_received, m7.privacy.no_officer,
-        m7.privacy.officer_only, m7.privacy.open_balance, m7.customer.anonymised, m7.field.required.
+        An erasure needs every account of the customer at every society closed at zero and closed
+        more than customers.erasure_wait_days ago (CR-27A-1). 422 codes: m7.privacy.not_found,
+        m7.privacy.not_received, m7.privacy.no_officer, m7.privacy.officer_only,
+        m7.privacy.open_balance, m7.privacy.account_open, m7.privacy.recently_closed,
+        m7.customer.anonymised, m7.field.required, m7.field.personal_data.
       x-permission: cus.privacy.fulfil
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -521,11 +590,20 @@ paths:
   /v1/privacy/requests/{requestId}/export:
     parameters:
       - { in: path, name: requestId, required: true, schema: { type: string, format: uuid } }
-    get:
+    post:
       tags: [Privacy]
-      operationId: getPrivacyExport
-      summary: The export of a fulfilled access request, every row the society holds about the customer
+      operationId: downloadPrivacyExport
+      summary: Hand over the export of a fulfilled access request (the responsible officer only; audited)
+      description: >
+        A command, not a read (doc 27 section 9.3: every read of a customer record outside the sales
+        path is audited). The export is rebuilt from the rows as they are now; exportSha256 on the
+        request is the hash at fulfilment, and the audit record says whether they still agree. It
+        never carries the NIC's hash. 422 codes: m7.privacy.not_found, m7.privacy.not_access,
+        m7.privacy.not_fulfilled, m7.customer.anonymised, m7.privacy.no_officer,
+        m7.privacy.officer_only.
       x-permission: cus.privacy.fulfil
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: The export, as JSON (tables by name, rows as column to text)
@@ -534,8 +612,7 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        '404':
-          description: No fulfilled access request with this id, or the customer was anonymised since
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   schemas:
     Language: { type: string, enum: [en, si, ta] }
@@ -606,6 +683,16 @@ components:
         hardBlock: { type: [boolean, 'null'] }
         offlineCap: { type: [number, 'null'], minimum: 0, maximum: 999999999.99 }
         reason: { type: string, minLength: 1, maxLength: 200 }
+        nic:
+          type: [string, 'null']
+          maxLength: 20
+          description: The NIC, when the limit rises above the threshold and none is recorded; only its hash and last four are kept
+    RecaptureNicRequest:
+      type: object
+      required: [nic, reason]
+      properties:
+        nic: { type: string, minLength: 10, maxLength: 20 }
+        reason: { type: string, minLength: 1, maxLength: 200 }
     AdjustmentRequest:
       type: object
       required: [amount, reason]
@@ -617,7 +704,7 @@ components:
       required: [historyId, action, before, after, reason, changedAt]
       properties:
         historyId: { type: string, format: uuid }
-        action: { type: string, enum: [LIMITS_AMENDED, SUSPENDED, REINSTATED, CLOSED] }
+        action: { type: string, enum: [LIMITS_AMENDED, SUSPENDED, REINSTATED, CLOSED, REOPENED] }
         before: { type: object, additionalProperties: true }
         after: { type: object, additionalProperties: true }
         reason: { type: string }
@@ -666,7 +753,7 @@ components:
         answeredAt: { type: [string, 'null'], format: date-time }
         answeredBy: { type: [string, 'null'], format: uuid }
         outcome: { type: [string, 'null'] }
-        exportSha256: { type: [string, 'null'], description: The SHA-256 of the access export handed over }
+        exportSha256: { type: [string, 'null'], description: The SHA-256 of the access export at fulfilment; the download's audit says whether the rows still give it }
         refusalGround: { type: [string, 'null'] }
     RecordPaymentRequest:
       type: object
@@ -786,7 +873,7 @@ components:
               businessDate: { type: string, format: date }
               kind: { type: string, enum: [CHARGE, CREDIT, PAYMENT, ADJUSTMENT, REVERSAL] }
               amount: { type: number }
-              settled: { type: number, description: "CHARGE: what payments settled of it; PAYMENT: what it settled" }
+              settled: { type: number, description: "A charge (CHARGE, positive ADJUSTMENT): what credits settled of it; a credit (PAYMENT, CREDIT, negative ADJUSTMENT): what it settled" }
               runningBalance: { type: number }
               documentId: { type: string, format: uuid }
               documentNumber: { type: [string, 'null'], description: The receipt's or the CPR's number }

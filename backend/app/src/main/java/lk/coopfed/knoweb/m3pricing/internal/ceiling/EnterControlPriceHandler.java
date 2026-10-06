@@ -2,6 +2,9 @@ package lk.coopfed.knoweb.m3pricing.internal.ceiling;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -23,6 +27,7 @@ import lk.coopfed.knoweb.m3pricing.api.EnterControlPrice;
 import lk.coopfed.knoweb.m3pricing.internal.list.Federation;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListRules;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Federation in an entity-wide OWN scope (the second factor is the permission's, checked by the
  * kernel before the handler runs); the SKU is active and the unit is its base unit (unit conversion
  * of a ceiling is deferred, 23A section 11); the ceiling is above zero with at most two decimals; a
- * gazette reference; the dates in order; no overlap with a ceiling of the same SKU other than the
+ * gazette reference; the dates in order; the first day not more than
+ * {@code pricing.control_price_backdate_days} (default 7) before today, an earlier first day than
+ * today being a REVIEW audit {@code CONTROL_PRICE_RETROSPECTIVE} (CR-23A-1); no overlap with a
+ * ceiling of the same SKU other than the
  * one in force on the first day, which is closed (the exclusion constraint is the backstop).
  * Mutation: the ceiling in force on effective_from, if any, ends at effective_from - 1; the new row
  * is inserted. Nothing is ever edited otherwise, so the table is the history.
@@ -47,6 +55,12 @@ public class EnterControlPriceHandler implements Handles<EnterControlPrice, UUID
 
     static final String AUDIT_ENTERED = "CONTROL_PRICE_ENTERED";
 
+    /** A REVIEW audit: the ceiling takes effect before the day it was entered (CR-23A-1). */
+    static final String AUDIT_RETROSPECTIVE = "CONTROL_PRICE_RETROSPECTIVE";
+
+    static final String BACKDATE_DAYS_KEY = "pricing.control_price_backdate_days";
+    private static final int DEFAULT_BACKDATE_DAYS = 7;
+
     /** The SKU states in which it can be sold (doc 22 section 4). */
     private static final Set<String> ACTIVE = Set.of("LOCAL", "SHARED");
 
@@ -56,6 +70,9 @@ public class EnterControlPriceHandler implements Handles<EnterControlPrice, UUID
     private final Federation federation;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final ConfigRegistry config;
+    private final Clock clock;
+    private final ZoneId businessZone;
 
     EnterControlPriceHandler(
             JdbcTemplate jdbc,
@@ -63,13 +80,19 @@ public class EnterControlPriceHandler implements Handles<EnterControlPrice, UUID
             CatalogueQueries catalogue,
             Federation federation,
             AuditFacade audit,
-            EventPublisher events) {
+            EventPublisher events,
+            ConfigRegistry config,
+            Clock clock,
+            @Value("${coop-erp.business-timezone}") String businessZone) {
         this.jdbc = jdbc;
         this.store = store;
         this.catalogue = catalogue;
         this.federation = federation;
         this.audit = audit;
         this.events = events;
+        this.config = config;
+        this.clock = clock;
+        this.businessZone = ZoneId.of(businessZone);
     }
 
     @Override
@@ -105,6 +128,14 @@ public class EnterControlPriceHandler implements Handles<EnterControlPrice, UUID
         if (command.effectiveTo() != null && command.effectiveTo().isBefore(command.effectiveFrom())) {
             throw new ProblemException("m3.control_price.dates_invalid");
         }
+        // A gazette price order takes effect from its own date, usually before the steward can
+        // enter it: a short backdate is allowed and reviewed; older is refused (CR-23A-1, D3).
+        LocalDate today = PriceListRules.today(clock, businessZone);
+        int backdateDays = Math.max(0, config.getInt(BACKDATE_DAYS_KEY, scope, DEFAULT_BACKDATE_DAYS));
+        if (command.effectiveFrom().isBefore(today.minusDays(backdateDays))) {
+            throw new ProblemException("m3.control_price.effective_from_past", Map.of("days", backdateDays));
+        }
+        boolean retrospective = command.effectiveFrom().isBefore(today);
 
         // The ceiling in force on the first day is superseded; any other overlap is a mistake.
         List<ControlPriceView> overlapping =
@@ -149,7 +180,20 @@ public class EnterControlPriceHandler implements Handles<EnterControlPrice, UUID
         after.put("effectiveTo", command.effectiveTo());
         after.put("gazetteReference", gazette);
         after.put("closes", closed);
-        audit.record(AUDIT_ENTERED, Subject.of("control_price", id), null, after, scope);
+        // The table is the legal (effective-time) history; this row is the knowledge time, so it
+        // keeps the superseded ceiling's end date as it was before this entry closed it.
+        Map<String, Object> before = null;
+        if (superseded != null) {
+            before = new LinkedHashMap<>();
+            before.put("controlPriceId", superseded.controlPriceId());
+            before.put("effectiveTo", superseded.effectiveTo());
+        }
+        audit.record(
+                retrospective ? AUDIT_RETROSPECTIVE : AUDIT_ENTERED,
+                Subject.of("control_price", id),
+                before,
+                after,
+                scope);
 
         events.publish(new ControlPriceEntered(
                 id,

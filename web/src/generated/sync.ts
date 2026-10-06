@@ -55,7 +55,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a contiguous run of till events in device sequence order (doc 32 section 3)
-         * @description One batch in flight per device. The answer is the acknowledgement: last_applied_seq is authoritative, everything at or below it is durably at central. A batch that starts at or below the cursor is a replay and is answered from state (DUPLICATE) without applying anything twice; resending the same batch_id returns the same acknowledgement. An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap (params.expected_seq: resend from there), 409 sync.batch_in_flight (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent (the events are not first_seq..last_seq), 426 sync.app_below_floor (the application is below sync.app_version_floor and its grace, sync.app_version_floor.grace, is over; params.floor and params.grace_ended_at; within the grace the batch is taken and the acknowledgement carries a FLOOR_NOTICE, doc 31 section 6), 429 sync.rate_limited (params.retry_after in seconds: the device's batches per minute or bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403 for the device (see the Refused response).
+         * @description One batch in flight per device. The answer is the acknowledgement: last_applied_seq is authoritative, everything at or below it is durably at central. A batch that starts at or below the cursor is a replay and is answered from state (DUPLICATE) without applying anything twice; resending the same batch_id returns the same acknowledgement. An event that cannot be accepted is QUARANTINED with a reason, the cursor moves past it and the events after it are applied (doc 32 S4). Codes: 409 sync.sequence_gap (params.expected_seq: resend from there), 409 sync.batch_in_flight (params.in_flight_batch_id), 413 sync.batch_too_large, 400 sync.batch_inconsistent (the events are not first_seq..last_seq), 429 sync.rate_limited (params.retry_after in seconds: the device's batches per minute or bytes per hour are spent, or central is at its ingest capacity; doc 32 section 9), 403 for the device (see the Refused response). A device below the application floor (sync.app_version_floor) is never refused here: facts are always accepted (CR-30-1 point 4, CR-32-1 item 1), and the acknowledgement carries a FLOOR_NOTICE, within the grace (sync.app_version_floor.grace) and after it. A plain body is accepted and counted like a gzip one (at most coop-erp.sync.max-uncompressed-bytes read; 413 beyond).
          */
         post: operations["uploadBatch"];
         delete?: never;
@@ -78,6 +78,26 @@ export interface paths {
          * @description The recovery procedure of doc 32 sections 7 and 8 for a till whose outbox was lost or corrupted: it keeps being answered 409 sync.sequence_gap because the rows central asks for no longer exist on it. An administrator of the device's entity, with a user token, names the first sequence the device will send from now on and a reason code; the numbers from the cursor's expected_seq up to new_start_seq - 1 are recorded as a documented gap (never received), the cursor moves to new_start_seq - 1, and an ALERT audit record and sync.sequence_reset.v1 are raised. Forward only: a device whose sequence restarted below the cursor is enrolled again instead. A retry with the same Idempotency-Key is answered with the gap it recorded. Codes: 403 permission.denied, 401 mfa.required, 409 sync.batch_in_flight (a batch of the device is being ingested), 422 sync.sequence_reset.device_not_enrolled, 422 sync.sequence_reset.not_forward (params.expected_seq).
          */
         post: operations["resetDeviceSequence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/quarantine/{quarantine_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a quarantined till event repaired or discarded (an administrator, CR-32-1 item 2)
+         * @description A quarantined event (doc 32 sections 3.3 step 6 and 7) is a fact the till sent that central could not accept; it is never purged by time (S4). An administrator of the device's entity, with a user token, resolves it once: REPAIRED when the till resent a correct copy (doc 32 section 8), DISCARDED when nothing will; with a reason code and, when needed, a text. The row stays as the record that a fact was refused and why; its raw event is removed sync.quarantine.raw_retention_days after the resolution. Audited (SYNC_QUARANTINE_RESOLVED) and published (sync.quarantine.resolved.v1). Codes: 403 permission.denied, 401 mfa.required, 404 sync.quarantine.not_found (none the caller can see), 422 sync.quarantine.already_resolved.
+         */
+        post: operations["resolveQuarantine"];
         delete?: never;
         options?: never;
         head?: never;
@@ -113,7 +133,7 @@ export interface paths {
         };
         /**
          * The change log of the device's location after a version (what changed, not the rows)
-         * @description The per-location change log the snapshot delta is built from (doc 32 section 5.2): every publication that changes the shop's snapshot recorded one row and bumped the location's version. Read in version order, a page at a time. full_snapshot_required is true when since is 0 or older than the change-log retention (sync.change_log.retention, doc 32 DR-4): the device then takes a full snapshot. The location must be the device's own (403 sync.location_mismatch).
+         * @description The per-location change log the snapshot delta is built from (doc 32 section 5.2): every publication that changes the shop's snapshot recorded one row and bumped the location's version. Read in version order, a page at a time. full_snapshot_required is true when since is 0 or older than the change-log retention (sync.change_log.retention, doc 32 DR-4): the device then takes a full snapshot. The location must be the device's own (403 sync.location_mismatch). 426 sync.app_below_floor (params.floor, params.grace_ended_at): the application the device last reported is below sync.app_version_floor and its grace is over; central withholds reference data, never facts (CR-32-1 item 1). 429 sync.rate_limited: the device's requests per minute (sync.rate.requests_per_minute) are spent.
          */
         get: operations["listChanges"];
         put?: never;
@@ -133,7 +153,7 @@ export interface paths {
         };
         /**
          * The snapshot delta since a version, or the pointer to the full snapshot (doc 32 section 5.2)
-         * @description Per table, the upserted rows and the tombstones from since+1 to the current version, with the rows as the owning modules' snapshot contributors give them. When since is 0 or absent, ahead of central, or older than the change-log retention (sync.change_log.retention, doc 32 DR-4), the answer is the full snapshot instead: full_snapshot_required is true and tables holds every row of every snapshot table, to replace what the device holds. Either answer is one version, read at one point in time, and is applied whole (doc 32 S5): the device stages it, checks the signed manifest and each table's hash, and swaps it in with the version in one local transaction. A row with apply_from later than the shop's business date is held until that day's open. The change log itself is readable at /changes. The location must be the device's own (403 sync.location_mismatch).
+         * @description Per table, the upserted rows and the tombstones from since+1 to the current version, with the rows as the owning modules' snapshot contributors give them. When since is 0 or absent, ahead of central, or older than the change-log retention (sync.change_log.retention, doc 32 DR-4), the answer is the full snapshot instead: full_snapshot_required is true and tables holds every row of every snapshot table, to replace what the device holds. Either answer is one version, read at one point in time, and is applied whole (doc 32 S5): the device stages it, checks the signed manifest and each table's hash, and swaps it in with the version in one local transaction. A row with apply_from later than the shop's business date is held until that day's open. The change log itself is readable at /changes. The location must be the device's own (403 sync.location_mismatch). 426 sync.app_below_floor (params.floor, params.grace_ended_at): the application the device last reported is below sync.app_version_floor and its grace is over; the till keeps selling on the snapshot it holds and its staleness warning tells the supervisor (CR-32-1 item 1). 429 sync.rate_limited: the device's requests per minute are spent, or the bytes it was sent this hour (sync.rate.bytes_per_hour, which an answer is charged against).
          */
         get: operations["getSnapshot"];
         put?: never;
@@ -190,6 +210,30 @@ export interface components {
             /** @description Why the device cannot produce expected_seq, e.g. OUTBOX_LOST, DATABASE_CORRUPTED */
             reason_code: string;
             reason_text?: string | null;
+        };
+        QuarantineResolution: {
+            /**
+             * @description REPAIRED, the till resent a correct copy; DISCARDED, nothing will be
+             * @enum {string}
+             */
+            resolution: "REPAIRED" | "DISCARDED";
+            /** @description Why, e.g. RESENT_CORRECTED, TEST_EVENT, DUPLICATE_OF_APPLIED */
+            reason_code: string;
+            reason_text?: string | null;
+        };
+        ResolvedQuarantine: {
+            /** Format: uuid */
+            quarantine_id: string;
+            /** Format: uuid */
+            device_id: string;
+            /** Format: int64 */
+            device_seq: number;
+            /** @description Why it was quarantined, SCHEMA, DUPLICATE_ID, HASH, TOO_LARGE or FORBIDDEN_FIELD */
+            reason: string;
+            /** @enum {string} */
+            resolution: "REPAIRED" | "DISCARDED";
+            /** Format: date-time */
+            resolved_at: string;
         };
         SequenceGap: {
             /** Format: uuid */
@@ -694,7 +738,6 @@ export interface operations {
             403: components["responses"]["Refused"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["Refused"];
-            426: components["responses"]["Refused"];
             429: components["responses"]["Refused"];
         };
     };
@@ -732,6 +775,39 @@ export interface operations {
             422: components["responses"]["RuleBroken"];
         };
     };
+    resolveQuarantine: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                quarantine_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuarantineResolution"];
+            };
+        };
+        responses: {
+            /** @description The row as resolved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedQuarantine"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            403: components["responses"]["Refused"];
+            404: components["responses"]["Refused"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
     heartbeat: {
         parameters: {
             query?: never;
@@ -762,6 +838,7 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             403: components["responses"]["Refused"];
+            429: components["responses"]["Refused"];
         };
     };
     listChanges: {
@@ -790,6 +867,8 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             403: components["responses"]["Refused"];
+            426: components["responses"]["Refused"];
+            429: components["responses"]["Refused"];
         };
     };
     getSnapshot: {
@@ -817,6 +896,8 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             403: components["responses"]["Refused"];
+            426: components["responses"]["Refused"];
+            429: components["responses"]["Refused"];
         };
     };
     presignAttachment: {
@@ -847,6 +928,7 @@ export interface operations {
             400: components["responses"]["RequestProblem"];
             403: components["responses"]["Refused"];
             422: components["responses"]["RuleBroken"];
+            429: components["responses"]["Refused"];
         };
     };
 }

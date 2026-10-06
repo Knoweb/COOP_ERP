@@ -124,5 +124,12 @@ public interface IntegrationQueries {
             int attempts,
             String suppressedReason,
             String lastError,
-            String recipientHash) {}
+            // Who it was for, never a hash a reader could reverse (wave 2, M9-07): the
+            // recipient's entity and role when the audience named them, and eight characters
+            // of the keyed hash so two numbers of one role can be told apart.
+            UUID recipientEntityId,
+            String audienceRole,
+            String recipientTag,
+            // A QUEUED row due later; with no attempt made, deferred by quiet hours (CR-19A-12).
+            Instant nextAttemptAt) {}
 }

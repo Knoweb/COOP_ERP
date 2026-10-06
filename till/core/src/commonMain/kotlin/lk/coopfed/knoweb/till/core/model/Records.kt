@@ -42,6 +42,9 @@ data class SessionRecord(
     val closedAt: Long? = null,
     val countedCash: Money? = null,
     val expectedCash: Money? = null,
+    /** The device sequence of till_session.opened.v1 and .closed.v1, for the Z-report's refused facts. */
+    val openedSeq: Long? = null,
+    val closedSeq: Long? = null,
 ) {
     val isOpen: Boolean get() = closedAt == null
     val variance: Money? get() = if (countedCash != null && expectedCash != null) countedCash - expectedCash else null
@@ -87,4 +90,31 @@ data class OutboxEntry(
     /** The TillEvent as JSON text, exactly as it is uploaded. */
     val json: String,
 )
+
+/**
+ * Something the office must know about this till (TWK-05, TWK-06, TWK-07): a fact central refused,
+ * a sequence central asked for that the till no longer holds, a counter repaired at start, a clock
+ * that was set by hand. Kept locally, counted on the status bar and on the Z-report.
+ */
+data class Anomaly(
+    val kind: String,
+    val deviceSeq: Long?,
+    val eventId: String?,
+    val reason: String?,
+    val detail: String,
+    /** Epoch ms on the till's clock. */
+    val notedAt: Long,
+    val seen: Boolean = false,
+) {
+    companion object {
+        /** central answered QUARANTINED for the fact with this device sequence. */
+        const val QUARANTINED = "QUARANTINED"
+        /** central asked for a sequence (RESEND_FROM, 409 sync.sequence_gap) the till has purged. */
+        const val RESEND_IMPOSSIBLE = "RESEND_IMPOSSIBLE"
+        /** A counter was at or below a number already used and was moved on at start. */
+        const val COUNTER_REPAIRED = "COUNTER_REPAIRED"
+        /** The PC's clock was set by hand, or central's offset was too large: the offset is not used. */
+        const val CLOCK = "CLOCK"
+    }
+}
 

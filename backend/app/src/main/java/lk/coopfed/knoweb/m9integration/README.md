@@ -27,10 +27,17 @@ screens of those, the Playwright flows.
 ## The accounting export
 
 1. M4 publishes `journal.postings_ready.v1` with every invoice, credit note, payment receipt and
-   reversal (its posting map names the roles and the amount). `JournalPostingsConsumer` (a
-   consumer of every type, for the envelope's time) hands the postings to
+   reversal, and (wave 2) every GRN the receiver confirms (its posting map names the roles and
+   the amount). `JournalPostingsConsumer` (a consumer of every type) hands the postings to
    `RecordJournalPostings`, which holds them in `journal_posting` in the owner's scope, dated by
-   the event's day in Asia/Colombo. A redelivery finds the document and adds nothing.
+   the document's business date as issued (the payload's `businessDate`, CR-29-1 item 4; an
+   event published before wave 2 has none and falls back to the event's day in Asia/Colombo).
+   Only the lines of the owner's own side are recorded: the issuer role of the document type in
+   the kernel's registry (SELLER for INV, CN, PRC; BUYER for GRN); a line of the other side is
+   the counterparty's books, logged at WARN and left out until the counterparty consumer of plan
+   PR 14 (CR-19A-13) records it in the counterparty's scope. A redelivery finds the document
+   held by this entity (`owner_entity_id` and `document_id`, named explicitly: the seller's and
+   the buyer's postings of one invoice share the id) and adds nothing.
 2. `RequestJournalExport(periodFrom, periodTo)` (`int.journal.export`, a user of the whole entity)
    takes, under a per-entity advisory lock, every posting of the period that no export took,
    writes `journal_export` (GENERATED, CSV, totals, SHA-256 of the file) and `journal_line` (one
@@ -44,7 +51,13 @@ screens of those, the Playwright flows.
    compares them, and the file's hash, with what was recorded at generation.
 
 M5 and M7 publish no `journal.postings_ready.v1` yet (a write-off's and a customer account's
-posting maps are theirs to seed); when they do, the consumer takes them unchanged.
+posting maps are theirs to seed); when they do, the consumer takes them unchanged (a HOLDER
+document keeps every line).
+
+Next (plan PR 14, wave 2): `journal_posting`'s unique key `(document_id, seq)` must become
+`(owner_entity_id, document_id, seq)` in m9integration `V0006` before the buyer's INV and CN
+lines arrive by counterparty delivery: the handler's dedupe already names the owner, but the
+seller's and the buyer's first posting of one invoice would both be seq 1.
 
 ## Notifications
 
@@ -60,12 +73,19 @@ The kernel (K-10) dispatches, renders, suppresses, retries and logs. M9 gives it
   party of seller and buyer that is not the owner (the kernel's dispatcher, 29 September 2026).
 - **Adapters**: `SmtpEmailChannel` (JavaMail to `coop-erp.integration.smtp.*`; Mailpit in
   compose) and `SmsChannel` over the provider `coop-erp.integration.sms.provider` (only `log`,
-  which sends nothing and logs the id and length). A failure is thrown without the relay's text;
-  the kernel retries (1, 5, 15 minutes).
+  which sends nothing and logs the id and length). A failure is thrown without the relay's or the
+  gateway's text (`SmsChannel` throws the kernel's `NotificationChannel.SendFailed` with a
+  category; wave 2, M9-10); the kernel retries (1, 5, 15 minutes) and keeps the class and the
+  category only.
 - **Rule toggle**: `SetNotificationRuleStatus` (`int.notify.manage`, the Federation only)
   activates or retires a federation-wide rule and publishes `notification_rule.changed.v1`,
   which empties the dispatcher's cache.
 - **Delivery log**: the kernel's `kernel.notification_log`, read select-only under its policies.
+  The screen names the recipient's entity (this entity, or another by the end of its id: M9
+  reads no party names), the role, and eight characters of the keyed hash, never the hash
+  itself (wave 2, M9-07); a QUEUED row with no attempt and a future `nextAttemptAt` reads
+  "deferred (quiet hours) until" (CR-19A-12). `ContactAudience` gives the kernel the entity and
+  the role, so the recipient's entity's quiet hours hold.
 
 `coop-erp.integration.notify.enabled=false` removes all of M9's notification beans (the kernel's
 own delivery test stands in its test channels).

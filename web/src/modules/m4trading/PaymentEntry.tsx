@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
+import { businessToday } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { useTradingApi, type PaymentReceipt } from "./tradingApi";
-import { businessToday, errorText, paymentReady, paymentRequest, type PaymentForm } from "./tradingView";
+import { errorText, paymentReady, paymentRequest, type PaymentForm } from "./tradingView";
 
 const METHODS: PaymentForm["method"][] = ["TRANSFER", "CASH", "CHEQUE", "DEPOSIT"];
 

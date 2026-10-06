@@ -7,7 +7,6 @@ import {
   amendReady,
   amendRequest,
   inForce,
-  businessToday,
   canDeliver,
   countReady,
   exposureAfter,
@@ -88,10 +87,6 @@ describe("the requisition book", () => {
     expect(lineAmount("3", 0.3333)).toBe(1);
     expect(lineAmount("", 10)).toBeNull();
     expect(lineAmount("5", undefined)).toBeNull();
-  });
-
-  it("dates in Colombo, whatever the browser's zone", () => {
-    expect(businessToday(new Date("2026-09-27T20:00:00Z"))).toBe("2026-09-28");
   });
 });
 

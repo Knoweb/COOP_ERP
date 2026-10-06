@@ -17,10 +17,11 @@ import org.springframework.stereotype.Component;
 /**
  * The access export (27A section 6: "ACCESS: export"; section 9: "access export contains every
  * field the customer's rows hold"): every row the caller's society holds about the customer, as
- * the columns are named, read under the caller's policies. The customer's identity, phone history,
+ * the columns are named, read under the caller's policies. The customer's identity (without the
+ * NIC's hash and key id, which are the system's secret, not the customer's data), phone history,
  * consents and tags; the society's account, its postings, the allocations and the repayment
- * receipts. Values are text (a date as ISO text, an amount as its
- * decimal text), so the export's hash is stable. It only reads.
+ * receipts. Values are text (a date as ISO text, an amount as its decimal text), so the export's
+ * hash is stable. It only reads; {@code DownloadAccessExportHandler} audits the hand-over.
  */
 @Component
 public class PrivacyExporter {
@@ -33,9 +34,18 @@ public class PrivacyExporter {
         this.json = json.copy().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
     }
 
+    /**
+     * The customer's row by column name: never {@code nic_hash} or {@code nic_key_id} (a derived
+     * secret, M7CR-11 and RLS-01); {@code nic_last4} stays, it is the customer's own.
+     */
+    static final String CUSTOMER_COLUMNS = "customer_id, display_name, display_name_si, display_name_ta, language,"
+            + " nic_last4, attributes, status, registered_by_entity_id, registered_at, owner_entity_id";
+
     public Map<String, Object> export(UUID customerId) {
         Map<String, Object> export = new LinkedHashMap<>();
-        export.put("customer", rows("select * from customers.customer where customer_id = ?", customerId));
+        export.put(
+                "customer",
+                rows("select " + CUSTOMER_COLUMNS + " from customers.customer where customer_id = ?", customerId));
         export.put(
                 "phones",
                 rows("select * from customers.customer_phone where customer_id = ? order by valid_from", customerId));

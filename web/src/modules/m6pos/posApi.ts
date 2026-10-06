@@ -11,6 +11,12 @@ import type { components as catalogueComponents, paths as cataloguePaths } from 
 
 export type Receipt = components["schemas"]["ReceiptResponse"];
 export type TillSession = components["schemas"]["SessionResponse"];
+export type ReceiptPage = components["schemas"]["ReceiptPage"];
+export type SessionPage = components["schemas"]["SessionPage"];
+
+/** The receipts of one shop on one business day (yyyy-mm-dd), all or the flagged ones only. */
+export type ReceiptFilter = { locationId: string; businessDate: string; flaggedOnly: boolean };
+export type SessionFilter = { locationId: string; businessDate: string };
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type TillPosition = partyComponents["schemas"]["TillPositionResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
@@ -34,14 +40,37 @@ export function usePosApi() {
         return data ?? [];
       },
 
-      async receipts(locationId: string): Promise<Receipt[]> {
-        const { data } = await api.GET("/v1/pos/receipts", { params: { query: { locationId } } });
-        return data ?? [];
+      /** One page of a shop's receipts on one business day; `cursor` is the previous page's nextCursor. */
+      async receipts(filter: ReceiptFilter, cursor?: string): Promise<ReceiptPage> {
+        const { data } = await api.GET("/v1/pos/receipts", {
+          params: {
+            query: {
+              locationId: filter.locationId,
+              businessDate: filter.businessDate,
+              flagged: filter.flaggedOnly ? true : undefined,
+              cursor
+            }
+          }
+        });
+        return data ?? { items: [] };
       },
 
-      async sessions(locationId: string): Promise<TillSession[]> {
-        const { data } = await api.GET("/v1/pos/sessions", { params: { query: { locationId } } });
-        return data ?? [];
+      /** One receipt; the server answers 404 (an ApiProblem) when there is none the caller may see. */
+      async receipt(documentId: string): Promise<Receipt> {
+        const { data } = await api.GET("/v1/pos/receipts/{documentId}", { params: { path: { documentId } } });
+        return data!;
+      },
+
+      async sessions(filter: SessionFilter, cursor?: string): Promise<SessionPage> {
+        const { data } = await api.GET("/v1/pos/sessions", {
+          params: { query: { locationId: filter.locationId, businessDate: filter.businessDate, cursor } }
+        });
+        return data ?? { items: [] };
+      },
+
+      async session(sessionId: string): Promise<TillSession> {
+        const { data } = await api.GET("/v1/pos/sessions/{sessionId}", { params: { path: { sessionId } } });
+        return data!;
       },
 
       async getSku(skuId: string): Promise<Sku | null> {

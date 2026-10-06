@@ -6,14 +6,14 @@ import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { usePosApi } from "./posApi";
 import { useShop } from "./ShopPicker";
-import { SkuLabel, TillLabel, useTenderText } from "./labels";
+import { FlagList, SkuLabel, TillLabel, useTenderText } from "./labels";
 import { errorText, receiptLook, tillNumber } from "./posView";
 import "./pos.css";
 
 /**
- * One receipt as the till issued it (26A section 8, demo scope): its lines, its totals, how it
- * was paid, the session it was sold in, and what central flagged. M6 has no read of a single
- * receipt yet, so the screen finds it in its shop's list (the shop is in the address).
+ * One receipt as the till issued it (26A section 8): its lines, its totals, how it was paid, the
+ * session it was sold in, and what central flagged, in the reader's language. Read on its own
+ * (wave 2, M6-08), never found in the shop's whole list; the shop in the address is for Back.
  */
 export function ReceiptPage() {
   const { documentId = "" } = useParams();
@@ -24,15 +24,18 @@ export function ReceiptPage() {
   const tenderText = useTenderText();
   const api = usePosApi();
 
-  const receipts = useQuery({
-    queryKey: ["pos", "receipts", locationId],
-    queryFn: () => api.receipts(locationId),
-    enabled: locationId !== ""
+  const found = useQuery({
+    queryKey: ["pos", "receipt", documentId],
+    queryFn: () => api.receipt(documentId),
+    enabled: documentId !== "",
+    retry: false
   });
-  const sessions = useQuery({
-    queryKey: ["pos", "sessions", locationId],
-    queryFn: () => api.sessions(locationId),
-    enabled: locationId !== ""
+  const sessionId = found.data?.sessionId;
+  const sessionRead = useQuery({
+    queryKey: ["pos", "session", sessionId],
+    queryFn: () => api.session(sessionId!),
+    enabled: sessionId !== undefined,
+    retry: false
   });
   const positions = useQuery({
     queryKey: ["pos", "positions", locationId],
@@ -47,20 +50,21 @@ export function ReceiptPage() {
     </Link>
   );
 
-  if (receipts.isLoading) {
+  if (found.isLoading) {
     return <main className="shell-page">{t("pos.loading").text}</main>;
   }
-  const receipt = receipts.data?.find((r) => r.documentId === documentId);
-  if (receipts.isError || !receipt) {
+  const receipt = found.data;
+  if (found.isError || !receipt) {
     return (
       <main className="shell-page">
-        <p role="alert">{errorText(receipts.error, t("pos.error.not_found").text)}</p>
+        <p role="alert">{errorText(found.error, t("pos.error.not_found").text)}</p>
         {back}
       </main>
     );
   }
 
-  const session = sessions.data?.find((s) => s.sessionId === receipt.sessionId);
+  const session = sessionRead.data;
+  const sessionDay = receipt.businessDate ? `&day=${receipt.businessDate}` : "";
   const look = receiptLook(receipt);
 
   return (
@@ -77,9 +81,10 @@ export function ReceiptPage() {
           {
             label: t("pos.field.session").text,
             value: session ? (
-              <Link className="entity-link" to={`/pos/sessions?location=${locationId}`}>
+              <Link className="entity-link" to={`/pos/sessions?location=${locationId}${sessionDay}`}>
+                {/* An open session has its open; a closed one its close (an orphan close has no open). */}
                 {t(session.status === "OPEN" ? "pos.session.opened_at" : "pos.session.closed_at", undefined, {
-                  time: formatInstant(session.status === "OPEN" ? session.openedAt : (session.closedAt ?? session.openedAt))
+                  time: formatInstant((session.status === "OPEN" ? session.openedAt : session.closedAt)!)
                 }).text}
               </Link>
             ) : undefined
@@ -88,9 +93,10 @@ export function ReceiptPage() {
       />
 
       {receipt.flags.length > 0 && (
-        <p role="status" className="pos-flags">
-          {t("pos.receipt.flags", undefined, { flags: receipt.flags.join(", ") }).text}
-        </p>
+        <section role="status" className="pos-flags">
+          <p>{t("pos.receipt.flags.heading").text}</p>
+          <FlagList flags={receipt.flags} />
+        </section>
       )}
 
       <section className="modern-table-card pos-section">

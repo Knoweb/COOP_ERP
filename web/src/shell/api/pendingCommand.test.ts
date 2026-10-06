@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { pendingCommandOf, replayPendingCommand, type PendingCommand } from "./pendingCommand";
+import { isUnderApiBase, mayKeep, pendingCommandOf, replayPendingCommand, type PendingCommand } from "./pendingCommand";
 
 const pending: PendingCommand = {
   method: "POST",
@@ -26,7 +26,7 @@ describe("the command a step-up interrupted", () => {
       body: "{}"
     });
 
-    const copy = await pendingCommandOf(request);
+    const copy = await pendingCommandOf(request, "http://api.test");
 
     expect(copy).toEqual({ method: "POST", url: "http://api.test/v1/x", headers: { "Idempotency-Key": "key-1", "Content-Type": "application/json" }, body: "{}" });
     // The request itself can still be sent: the copy read a clone.
@@ -42,7 +42,34 @@ describe("the command a step-up interrupted", () => {
       body: '------b\r\nContent-Disposition: form-data; name="file"; filename="societies.csv"\r\n\r\na,b\r\n------b--\r\n'
     });
 
-    expect(await pendingCommandOf(request)).toBeNull();
+    expect(await pendingCommandOf(request, "http://api.test")).toBeNull();
+  });
+
+  const post = (url: string, body: unknown) =>
+    new Request(url, { method: "POST", headers: { "Idempotency-Key": "key-3", "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+  it("is not kept when its body holds a NIC or a phone: session storage is no place for them", async () => {
+    expect(await pendingCommandOf(post("http://api.test/v1/customers", { nic: "000000000V", name: "Test" }), "http://api.test")).toBeNull();
+    expect(await pendingCommandOf(post("http://api.test/v1/customers/c-1", { contact: { phone: "0000000000" } }), "http://api.test")).toBeNull();
+  });
+
+  it("is kept when its body has plain keys, an adjustment with a reason text included", async () => {
+    const copy = await pendingCommandOf(post("http://api.test/v1/stock/adjust", { reasonCode: "DAMAGED", reasonText: "box dropped", quantity: "2" }), "http://api.test");
+    expect(copy?.url).toBe("http://api.test/v1/stock/adjust");
+  });
+
+  it("is not kept when its URL is not under the API base, and 'under' means a path, not a longer host name", async () => {
+    expect(await pendingCommandOf(post("http://elsewhere.test/v1/x", {}), "http://api.test")).toBeNull();
+    expect(await pendingCommandOf(post("http://api.test.evil.example/v1/x", {}), "http://api.test")).toBeNull();
+    expect(isUnderApiBase("http://api.test/v1/x", "http://api.test/")).toBe(true);
+    expect(isUnderApiBase("http://api.test", "http://api.test")).toBe(true);
+  });
+
+  it("is checked again when it comes back from session storage, where the state could have been made up", () => {
+    expect(mayKeep({ ...pending, url: "http://elsewhere.test/v1/x" }, "http://api.test")).toBe(false);
+    expect(mayKeep({ ...pending, url: "http://api.test/v1/x", body: '{"password":"x"}' }, "http://api.test")).toBe(false);
+    expect(mayKeep({ ...pending, url: "http://api.test/v1/x", body: "not json" }, "http://api.test")).toBe(false);
+    expect(mayKeep({ ...pending, url: "http://api.test/v1/x", body: null }, "http://api.test")).toBe(true);
   });
 
   it("is sent again with the fresh token, the language and the scope, and the same key", async () => {

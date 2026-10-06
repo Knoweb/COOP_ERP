@@ -1,12 +1,67 @@
+/*
+ * The fonts are served by this server (wave 2, DEPLOY-18): nothing is fetched from Google or any
+ * other third party, so a shop with restricted egress gets the same page and no sign-in is
+ * logged elsewhere. They are the web client's own (web/src/design/fonts.css, @fontsource, SIL
+ * Open Font Licence 1.1, fonts/OFL.txt): Noto Sans for Latin letters and digits, Noto Sans
+ * Sinhala and Noto Sans Tamil for the other two languages of the page, weights 400 and 600.
+ */
+@font-face {
+  font-family: 'Noto Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../fonts/noto-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 800;
+  src: url('../fonts/noto-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Sinhala';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../fonts/noto-sans-sinhala-sinhala-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Sinhala';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 800;
+  src: url('../fonts/noto-sans-sinhala-sinhala-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Tamil';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../fonts/noto-sans-tamil-tamil-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Tamil';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 800;
+  src: url('../fonts/noto-sans-tamil-tamil-600-normal.woff2') format('woff2');
+}
+
 * {
   box-sizing: border-box;
+}
+
+button,
+input {
+  font-family: inherit;
 }
 
 body.login-pf-page {
   margin: 0;
   width: 100%;
   min-height: 100vh;
-  font-family: Inter, Arial, sans-serif;
+  font-family: 'Noto Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', Arial, sans-serif;
   
   display: flex;
   justify-content: flex-end;
@@ -484,6 +539,19 @@ body.login-pf-page {
   display: inline-block;
 }
 
+/* The picker is a <details>: it opens and closes without script (no inline handlers). */
+summary.language-selector {
+  list-style: none;
+}
+
+summary.language-selector::-webkit-details-marker {
+  display: none;
+}
+
+.language-wrapper[open] .arrow-icon {
+  transform: rotate(180deg);
+}
+
 .language-selector {
   height: 48px;
   padding: 0 15px;
@@ -548,7 +616,13 @@ body.login-pf-page {
   z-index: 100;
 }
 
-.language-dropdown button {
+.language-dropdown a {
+  display: block;
+  text-decoration: none;
+}
+
+.language-dropdown button,
+.language-dropdown a {
   width: 100%;
   padding: 10px 12px;
   border: none;
@@ -561,7 +635,8 @@ body.login-pf-page {
   transition: 0.2s;
 }
 
-.language-dropdown button:hover {
+.language-dropdown button:hover,
+.language-dropdown a:hover {
   background: #F3E6F6; /* Adapted to new soft purple tint */
   color: #8E0E5B; /* Adapted to new primary brand color */
 }

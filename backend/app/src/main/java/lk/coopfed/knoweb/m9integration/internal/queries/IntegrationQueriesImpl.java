@@ -218,7 +218,9 @@ class IntegrationQueriesImpl implements IntegrationQueries {
         return jdbc.query(
                 """
                 select notification_id, created_at, rule_id, event_id, channel, template_id, language, status,
-                       attempts, suppressed_reason, last_error, recipient_hash
+                       attempts, suppressed_reason, last_error, recipient_entity_id, audience_role,
+                       next_attempt_at,
+                       case when recipient_hash_key_id is not null then left(recipient_hash, 8) end as recipient_tag
                   from kernel.notification_log
                  where (?::text is null or status = ?::text)
                  order by created_at desc, notification_id desc
@@ -238,8 +240,12 @@ class IntegrationQueriesImpl implements IntegrationQueries {
                         rs.getInt("attempts"),
                         rs.getString("suppressed_reason"),
                         rs.getString("last_error"),
-                        // The first twelve characters are enough to tell recipients apart on the screen.
-                        rs.getString("recipient_hash").substring(0, 12)),
+                        rs.getObject("recipient_entity_id", UUID.class),
+                        rs.getString("audience_role"),
+                        // Eight characters of the keyed hash tell two numbers of one role apart and
+                        // give nothing back without the key; a row whose hash V0085 replaced has none.
+                        rs.getString("recipient_tag"),
+                        instant(rs.getTimestamp("next_attempt_at"))),
                 status,
                 status,
                 rows);

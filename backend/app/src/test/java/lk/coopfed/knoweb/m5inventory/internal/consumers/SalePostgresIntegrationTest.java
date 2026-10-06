@@ -110,7 +110,8 @@ class SalePostgresIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(q -> assertThat(q).isEqualByComparingTo("3"));
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
-                .contains("STOCK_POSTED", "STOCK_SOLD", "SALE_LINE_UNRESOLVED");
+                .contains("STOCK_POSTED", "STOCK_SOLD", "SALE_LINE_UNRESOLVED")
+                .doesNotContain("SALE_BATCH_SUBSTITUTED", "SALE_LINE_SKIPPED");
 
         // The same receipt again moves nothing.
         kernel.reset();
@@ -122,6 +123,42 @@ class SalePostgresIntegrationTest extends PostgresIntegrationTest {
                                 List.of(new ApplySale.Line(null, 1, sku, null, new BigDecimal("2")))),
                         at(shop)))
                 .isZero();
+    }
+
+    /**
+     * Wave 2, M6-06: a batch the till named that the catalogue does not know is deducted from the
+     * shop's first lot and leaves a REVIEW trace; a line of no quantity is not deducted and leaves
+     * one too; a line with no batch at all (the till's normal case) stays silent.
+     */
+    @Test
+    void anUnknownNamedBatchAndANonPositiveLineLeaveATrace() {
+        UUID receipt = Ids.next();
+
+        int posted = sale.handle(
+                new ApplySale(
+                        receipt,
+                        shop,
+                        Instant.now(),
+                        List.of(
+                                new ApplySale.Line(null, 1, sku, Ids.next(), BigDecimal.ONE),
+                                new ApplySale.Line(null, 2, sku, null, BigDecimal.ZERO),
+                                new ApplySale.Line(null, 3, sku, null, BigDecimal.ONE))),
+                at(shop));
+
+        assertThat(posted).isEqualTo(2);
+        assertThat(queries.balances(shop, sku, true, own(MPCS)))
+                .extracting(LotBalance::qtyOnHand)
+                .singleElement()
+                .satisfies(q -> assertThat(q).isEqualByComparingTo("3"));
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("SALE_BATCH_SUBSTITUTED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("[1]"));
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("SALE_LINE_SKIPPED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("[2]"));
+        assertThat(kernel.committedEvents()).isNotEmpty();
     }
 
     @Test

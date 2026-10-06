@@ -39,6 +39,45 @@ public interface NotificationChannel {
         return Role.PRIMARY;
     }
 
-    /** @return the provider's reference for the message, or null when the channel has none */
+    /**
+     * @return the provider's reference for the message, or null when the channel has none
+     * @throws SendFailed (preferred) or any runtime exception when the provider did not take it
+     */
     String send(Outgoing outgoing);
+
+    /**
+     * Why a provider did not take a message, in words the kernel may keep (wave 2, TWK-21 and
+     * M9-10). The kernel stores the exception's class name and, for this one, the category, on
+     * the delivery log and in the audit row; never an exception's message, which a provider can
+     * fill with the recipient or the body. The adapter knows its provider's codes and maps them.
+     */
+    enum FailureCategory {
+        /** The provider refused the message or the recipient. */
+        REJECTED,
+        /** The provider did not answer in time. */
+        TIMEOUT,
+        /** The provider refused our credentials. */
+        AUTH,
+        /** Anything else. */
+        UNKNOWN
+    }
+
+    /**
+     * The failure an adapter throws. Its message must carry neither the recipient nor the body
+     * (the notification id is enough to find the message again): it goes to the application log
+     * at DEBUG only.
+     */
+    class SendFailed extends RuntimeException {
+
+        private final FailureCategory category;
+
+        public SendFailed(FailureCategory category, String message) {
+            super(message);
+            this.category = category == null ? FailureCategory.UNKNOWN : category;
+        }
+
+        public FailureCategory category() {
+            return category;
+        }
+    }
 }

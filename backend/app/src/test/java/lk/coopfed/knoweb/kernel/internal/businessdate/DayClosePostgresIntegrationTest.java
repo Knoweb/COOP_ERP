@@ -317,32 +317,54 @@ class DayClosePostgresIntegrationTest extends PostgresIntegrationTest {
 
         // One session still open: nothing moves.
         inScope(ENTITY, () -> {
-            trigger.onSessionClosed(
-                    mapper.createObjectNode().put("locationId", SHOP.toString()).put("openSessionsRemaining", 1),
-                    scope(ENTITY));
+            trigger.onSessionClosed(mapper.createObjectNode().put("openSessionsRemaining", 1), scope(ENTITY, SHOP));
             return null;
         });
         assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
 
         // A payload without the field: the cut-off's business, not the trigger's.
         inScope(ENTITY, () -> {
-            trigger.onSessionClosed(mapper.createObjectNode().put("locationId", SHOP.toString()), scope(ENTITY));
+            trigger.onSessionClosed(mapper.createObjectNode(), scope(ENTITY, SHOP));
             return null;
         });
         assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
 
-        // The last one: the day closes.
+        // An envelope that names no location: nothing, whatever the payload says (wave 2, TWK-23).
         inScope(ENTITY, () -> {
             trigger.onSessionClosed(
                     mapper.createObjectNode().put("locationId", SHOP.toString()).put("openSessionsRemaining", 0),
-                    scope(ENTITY));
+                    scope(ENTITY, null));
+            return null;
+        });
+        assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today);
+
+        // The last one: the day of the envelope's shop closes; a payload naming another shop of the
+        // society (or nothing readable) is ignored, never closed (wave 2, TWK-23).
+        UUID elsewhere = UUID.randomUUID();
+        inScope(ENTITY, () -> {
+            trigger.onSessionClosed(
+                    mapper.createObjectNode()
+                            .put("locationId", elsewhere.toString())
+                            .put("openSessionsRemaining", 0),
+                    scope(ENTITY, SHOP));
             return null;
         });
         assertThat(inScope(ENTITY, () -> businessDate.current(SHOP))).isEqualTo(today.plusDays(1));
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.location_business_date where location_id = ?",
+                                Long.class,
+                                elsewhere))
+                .isZero();
     }
 
     private static ScopeContext scope(UUID entity) {
-        Scope active = new Scope(entity, null);
+        return scope(entity, null);
+    }
+
+    /** The scope the consumer framework delivers a till's event in: OWN at the envelope's location. */
+    private static ScopeContext scope(UUID entity, UUID location) {
+        Scope active = new Scope(entity, location);
         return new ScopeContext(
                 USER,
                 null,

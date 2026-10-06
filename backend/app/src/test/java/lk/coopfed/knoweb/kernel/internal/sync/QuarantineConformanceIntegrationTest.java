@@ -100,7 +100,7 @@ class QuarantineConformanceIntegrationTest extends SyncIntegrationTest {
     @Test
     void aBundleWhoseHashDoesNotMatchOrIsMissingIsQuarantined() {
         ObjectNode tampered = bundle(1, Ids.next());
-        ((ObjectNode) tampered.path("payload").path("lines").get(0)).put("qty", 5);
+        ((ObjectNode) tampered.path("payload").path("lines").get(0)).put("qty", "5");
         ObjectNode unsigned = bundle(2, Ids.next());
         unsigned.remove("content_hash");
         ObjectNode unreadable = bundle(3, Ids.next());
@@ -133,8 +133,167 @@ class QuarantineConformanceIntegrationTest extends SyncIntegrationTest {
                 .contains("SYNC_EVENT_QUARANTINED");
     }
 
+    /**
+     * Wave 2, CR-32-1 item 2: the one value a quarantine must not keep is the one that put the
+     * event there. The key stays, so a person sees what the till sent and where; the value, at any
+     * depth, is "[removed]"; every other field is kept as it arrived.
+     */
+    @Test
+    void aForbiddenFieldIsStoredWithItsValueRemovedAndTheRestAsItArrived() {
+        ObjectNode leaky = event(1);
+        ObjectNode payload = (ObjectNode) leaky.path("payload");
+        payload.put("customerPhone", "0771234567");
+        payload.putObject("customer").put("nic", "199012345678").put("account_ref", "A-7");
+
+        upload(Ids.next(), 1, List.of(leaky));
+
+        String raw = superuserJdbc()
+                .queryForObject(
+                        "select raw_event from kernel.sync_quarantine where device_id = ? and device_seq = 1",
+                        String.class,
+                        DEVICE);
+        assertThat(raw).doesNotContain("0771234567").doesNotContain("199012345678");
+        JsonNode stored = readTree(raw);
+        assertThat(stored.path("payload").path("customerPhone").asText()).isEqualTo("[removed]");
+        assertThat(stored.path("payload").path("customer").path("nic").asText()).isEqualTo("[removed]");
+        assertThat(stored.path("payload").path("customer").path("account_ref").asText())
+                .isEqualTo("A-7");
+        assertThat(stored.path("payload").path("kind").asText()).isEqualTo("conformance");
+        assertThat(stored.path("event_id").asText())
+                .isEqualTo(leaky.path("event_id").asText());
+    }
+
+    /**
+     * Wave 2, M6-01: a bundle whose hash matches but whose shape is not doc 32 section 3.1's is
+     * quarantined as SCHEMA at the gateway, before the outbox, so none of the modules that consume
+     * the same event (M5, M6, M7, M8) applies it. One case per shape; the events after each are
+     * applied, and a bundle exactly as the till writes it (Facts.kt) is applied.
+     */
+    @Test
+    void aBundleOfTheWrongShapeIsQuarantinedAsSchemaOnePerShape() {
+        List<java.util.function.Consumer<ObjectNode>> shapes = List.of(
+                // document.document_id is not a UUID
+                p -> document(p).put("document_id", "R-0001"),
+                // document.issued_at is missing
+                p -> document(p).remove("issued_at"),
+                // money written as a JSON number, not text
+                p -> document(p).put("gross_amount", 250.00),
+                // a quantity that is not a decimal
+                p -> line(p).put("qty", "two"),
+                // a UUID field that is not a UUID
+                p -> line(p).put("sku_id", "RICE5"),
+                // lines is not a list
+                p -> p.putObject("lines"),
+                // a line without line_no
+                p -> line(p).remove("line_no"),
+                // line_no 0
+                p -> line(p).put("line_no", 0),
+                // line_no written as text
+                p -> line(p).put("line_no", "1"),
+                // two lines with the same line_no
+                p -> ((ArrayNode) p.path("lines")).add(line(p).deepCopy()),
+                // a tender without kind
+                p -> tender(p).remove("kind"),
+                // a tender amount that is not a decimal
+                p -> tender(p).put("amount", 250),
+                // two tenders with the same seq
+                p -> ((ArrayNode) p.path("tenders")).add(tender(p).deepCopy()),
+                // a tender seq below 1
+                p -> tender(p).put("seq", 0),
+                // the session id is not a UUID
+                p -> p.put("session_id", "SESSION-1"));
+        List<ObjectNode> events = new java.util.ArrayList<>();
+        long seq = 1;
+        for (java.util.function.Consumer<ObjectNode> shape : shapes) {
+            events.add(bundle(seq++, Ids.next(), shape));
+        }
+        events.add(bundle(seq, Ids.next()));
+
+        JsonNode ack = upload(Ids.next(), 1, events).getBody();
+
+        List<String> outcomes = outcomes(ack);
+        assertThat(outcomes.subList(0, shapes.size())).containsOnly("QUARANTINED");
+        assertThat(outcomes.getLast()).isEqualTo("APPLIED");
+        for (int i = 0; i < shapes.size(); i++) {
+            assertThat(ack.path("outcomes").get(i).path("reason").asText())
+                    .as("shape case %d", i + 1)
+                    .isEqualTo("SCHEMA");
+        }
+        assertThat(outboxSequences()).containsExactly(seq);
+        assertThat(cursor()).isEqualTo(seq);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("SYNC_EVENT_QUARANTINED"))
+                .hasSize(shapes.size());
+    }
+
+    /**
+     * Wave 2, M6-01: a session event M6 could not read is quarantined at the gateway through M6's
+     * own check ({@code DevicePayloadCheck}); one the till writes is applied.
+     */
+    @Test
+    void aSessionEventM6CannotReadIsQuarantinedAndAGoodOneApplied() {
+        ObjectNode good = sessionOpened(1);
+        ObjectNode noSession = sessionOpened(2);
+        ((ObjectNode) noSession.path("payload")).remove("session_id");
+        ObjectNode badTime = sessionOpened(3);
+        ((ObjectNode) badTime.path("payload")).put("opened_at", "this morning");
+        ObjectNode badFloat = sessionOpened(4);
+        ((ObjectNode) badFloat.path("payload")).put("float_amount", 1000);
+        ObjectNode closeWithoutTime = event(5, "till_session.closed.v1");
+        ((ObjectNode) closeWithoutTime.path("payload"))
+                .put("session_id", Ids.next().toString());
+
+        JsonNode ack = upload(Ids.next(), 1, List.of(good, noSession, badTime, badFloat, closeWithoutTime))
+                .getBody();
+
+        assertThat(outcomes(ack))
+                .containsExactly("APPLIED", "QUARANTINED", "QUARANTINED", "QUARANTINED", "QUARANTINED");
+        assertThat(ack.path("outcomes").get(1).path("reason").asText()).isEqualTo("SCHEMA");
+        assertThat(outboxSequences()).containsExactly(1L);
+    }
+
+    private ObjectNode sessionOpened(long seq) {
+        ObjectNode event = event(seq, "till_session.opened.v1");
+        ObjectNode payload = event.putObject("payload");
+        payload.put("session_id", Ids.next().toString());
+        payload.put("till_position_id", POSITION.toString());
+        payload.put("operator_user_id", OPERATOR.toString());
+        payload.put("business_date", "2026-09-25");
+        payload.put("opened_at", "2026-09-25T04:30:00Z");
+        payload.put("float_amount", "1000.00");
+        return event;
+    }
+
+    private static ObjectNode document(ObjectNode payload) {
+        return (ObjectNode) payload.path("document");
+    }
+
+    private static ObjectNode line(ObjectNode payload) {
+        return (ObjectNode) payload.path("lines").get(0);
+    }
+
+    private static ObjectNode tender(ObjectNode payload) {
+        return (ObjectNode) payload.path("tenders").get(0);
+    }
+
+    private JsonNode readTree(String text) {
+        try {
+            return json.readTree(text);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** A receipt bundle of doc 32 section 3.1 with its content hash, as the till computes it. */
     ObjectNode bundle(long seq, UUID documentId) {
+        return bundle(seq, documentId, payload -> {});
+    }
+
+    /**
+     * The same bundle with its payload changed by {@code shape} before the hash is taken, so that
+     * the hash matches and only the shape is wrong.
+     */
+    ObjectNode bundle(long seq, UUID documentId, java.util.function.Consumer<ObjectNode> shape) {
         ObjectNode event = event(seq, "receipt.issued.v1");
         ObjectNode payload = json.createObjectNode();
         ObjectNode document = payload.putObject("document");
@@ -150,9 +309,10 @@ class QuarantineConformanceIntegrationTest extends SyncIntegrationTest {
         document.put("business_date", "2026-09-25");
         document.put("operator_user_id", OPERATOR.toString());
         document.put("currency", "LKR");
-        document.put("net_amount", 250.00);
-        document.put("tax_amount", 0);
-        document.put("gross_amount", 250.00);
+        // Decimals as text, as the till writes them (till/core Facts.kt, Money.plain()).
+        document.put("net_amount", "250.00");
+        document.put("tax_amount", "0.00");
+        document.put("gross_amount", "250.00");
         document.put("origin", "OFFLINE");
         document.put("device_seq", seq);
         ArrayNode lines = payload.putArray("lines");
@@ -160,11 +320,25 @@ class QuarantineConformanceIntegrationTest extends SyncIntegrationTest {
         line.put("line_no", 1);
         line.put("sku_id", Ids.next().toString());
         line.put("uom_code", "EA");
-        line.put("qty", 2);
-        line.put("unit_price", 125.0);
-        line.put("line_total", 250.00);
+        line.put("qty", "2");
+        line.put("unit_price", "125.00");
+        line.put("tax_amount", "0.00");
+        line.put("line_total", "250.00");
+        ObjectNode tender = payload.putArray("tenders").addObject();
+        tender.put("seq", 1);
+        tender.put("kind", "CASH");
+        tender.put("amount", "250.00");
+        payload.put("session_id", Ids.next().toString());
+        shape.accept(payload);
         event.set("payload", payload);
-        event.put("content_hash", BundleHash.of(document, lines));
+        String hash;
+        try {
+            hash = BundleHash.of(payload.get("document"), payload.get("lines"));
+        } catch (RuntimeException unreadable) {
+            // A shape the hash rule cannot read either: the gateway finds that first (SCHEMA).
+            hash = "0".repeat(64);
+        }
+        event.put("content_hash", hash);
         return event;
     }
 }

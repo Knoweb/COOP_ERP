@@ -2,5 +2,8 @@
   "m6.scope.device_required": "A till’s facts are applied at the shop of the till that sent them",
   "m6.receipt.malformed": "The receipt from the till has no document id or issue time",
   "m6.session.malformed": "The till session has no id or time",
-  "m6.receipt.duplicate_number": "Another receipt of the same till series already has this number; both receipts are kept for review"
+  "m6.receipt.duplicate_number": "Another receipt of the same till series already has this number; both receipts are kept for review",
+  "m6.receipt.replay_differs": "The receipt arrived again under the same document id with other content; the first copy is kept",
+  "m6.receipt.number_jump": "The receipt’s number is far past its series’ next number; the series was moved only as far as the configured limit",
+  "m6.session.close_replay_differs": "The till session’s close arrived again with other amounts; the first close is kept"
 }

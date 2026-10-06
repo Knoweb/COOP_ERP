@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,13 +40,18 @@ import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
+import lk.coopfed.knoweb.testsupport.PinnedClock;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * M3-06 and M3-07 (23A section 7; doc 23 flows 6.1, 6.4, 6.6): control prices (enter, supersede,
@@ -60,6 +64,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * and prices are resolved for tomorrow, so a run that crosses midnight in Colombo reads the same
  * answers (the handlers take "today" from the clock when they run).
  */
+@Import(PinnedClock.class)
 class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = TEST_FEDERATION;
@@ -93,10 +98,16 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     PricingQueries queries;
 
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
     private final UUID rice = Ids.next();
     private final UUID sugar = Ids.next();
     private final UUID milk = Ids.next();
-    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Colombo"));
+    private final LocalDate today = PinnedClock.TODAY;
     private final LocalDate yesterday = today.minusDays(1);
     private final LocalDate tomorrow = today.plusDays(1);
 
@@ -145,8 +156,7 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theFederationEntersAControlPriceAndALaterGazetteClosesIt() {
         UUID first = enterControlPrice.handle(
-                new EnterControlPrice(rice, new BigDecimal("220.00"), "EA", yesterday, null, " 2492/29 "),
-                own(FEDERATION));
+                new EnterControlPrice(rice, new BigDecimal("220.00"), "EA", today, null, " 2492/29 "), own(FEDERATION));
 
         assertThat(queries.controlPriceFor(rice, "EA", tomorrow, own(SOCIETY)))
                 .as("every scope reads the ceilings")
@@ -160,7 +170,7 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(r -> assertThat(r.subject().id()).isEqualTo(first));
         assertThat(events(ControlPriceEntered.class))
                 .containsExactly(new ControlPriceEntered(
-                        first, rice, new BigDecimal("220.00"), "EA", yesterday, null, "2492/29", null));
+                        first, rice, new BigDecimal("220.00"), "EA", today, null, "2492/29", null));
         kernel.reset();
 
         UUID second = enterControlPrice.handle(
@@ -179,9 +189,76 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(events(ControlPriceEntered.class))
                 .singleElement()
                 .satisfies(e -> assertThat(e.closedControlPriceId()).isEqualTo(first));
+        // The superseded ceiling's end date as it was before, so the knowledge time is kept.
+        assertThat(audit("CONTROL_PRICE_ENTERED")).singleElement().satisfies(r -> {
+            assertThat(((Map<?, ?>) r.before()).get("controlPriceId")).isEqualTo(first);
+            assertThat(((Map<?, ?>) r.before()).get("effectiveTo")).isNull();
+        });
         assertThat(queries.controlPricesInForce(tomorrow, own(SOCIETY)))
                 .extracting(ControlPriceView::controlPriceId)
                 .containsExactly(first);
+    }
+
+    /**
+     * CR-23A-1 (M3-03): a gazette takes effect from its own date, usually before the steward enters
+     * it. Up to {@code pricing.control_price_backdate_days} (7) back is accepted as a REVIEW audit
+     * that keeps the superseded ceiling's previous end date; eight days back is refused.
+     */
+    @Test
+    void aControlPriceMayTakeEffectAWeekBackAndIsReviewedButNotEightDays() {
+        UUID old = Ids.next();
+        superuserJdbc()
+                .update(
+                        """
+                        insert into pricing.control_price (control_price_id, sku_id, ceiling_price, ceiling_uom_code,
+                            effective_from, effective_to, gazette_reference, entered_by, owner_entity_id)
+                        values (?, ?, 230.00, 'EA', ?, ?, '2490/01', ?, ?)
+                        """,
+                        old,
+                        rice,
+                        today.minusDays(30),
+                        today.plusDays(30),
+                        USER,
+                        FEDERATION);
+
+        refused(
+                () -> enterControlPrice.handle(
+                        new EnterControlPrice(
+                                rice, new BigDecimal("220.00"), "EA", today.minusDays(8), null, "2492/29"),
+                        own(FEDERATION)),
+                "m3.control_price.effective_from_past");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(queries.controlPrices(rice, own(SOCIETY))).singleElement().satisfies(c -> assertThat(c.effectiveTo())
+                .isEqualTo(today.plusDays(30)));
+
+        UUID entered = enterControlPrice.handle(
+                new EnterControlPrice(rice, new BigDecimal("220.00"), "EA", today.minusDays(7), null, "2492/29"),
+                own(FEDERATION));
+
+        assertThat(audit("CONTROL_PRICE_ENTERED")).isEmpty();
+        assertThat(audit("CONTROL_PRICE_RETROSPECTIVE")).singleElement().satisfies(r -> {
+            assertThat(r.subject().id()).isEqualTo(entered);
+            assertThat(((Map<?, ?>) r.before()).get("controlPriceId")).isEqualTo(old);
+            assertThat(((Map<?, ?>) r.before()).get("effectiveTo")).isEqualTo(today.plusDays(30));
+            assertThat(((Map<?, ?>) r.after()).get("effectiveFrom")).isEqualTo(today.minusDays(7));
+        });
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select severity from kernel.audit_event_type where event_type_code = ?",
+                                String.class,
+                                "CONTROL_PRICE_RETROSPECTIVE"))
+                .isEqualTo("REVIEW");
+        assertThat(events(ControlPriceEntered.class))
+                .containsExactly(new ControlPriceEntered(
+                        entered, rice, new BigDecimal("220.00"), "EA", today.minusDays(7), null, "2492/29", old));
+        // The table is the effective-time history: the old ceiling held until the gazette's date.
+        assertThat(queries.controlPriceFor(rice, "EA", today.minusDays(8), own(SOCIETY)))
+                .get()
+                .satisfies(c -> assertThat(c.controlPriceId()).isEqualTo(old));
+        assertThat(queries.controlPriceFor(rice, "EA", today.minusDays(7), own(SOCIETY)))
+                .get()
+                .satisfies(c -> assertThat(c.controlPriceId()).isEqualTo(entered));
     }
 
     @Test
@@ -263,6 +340,97 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
                         new EnterControlPrice(rice, new BigDecimal("215"), "EA", yesterday, null, "2492/40"),
                         own(FEDERATION)),
                 "m3.control_price.overlap");
+    }
+
+    /**
+     * m3pricing V0006 (wave 2, RLS-04; CR-23A-1): the Federation's ceiling is read by every class but
+     * NONE, and only the Federation writes one. A society's row, written past the handler guard, is
+     * refused by the policy; were one to exist, it would be a ceiling for nobody.
+     */
+    @Test
+    void onlyTheFederationWritesACeilingAndEveryClassButNoneReadsIt() {
+        UUID ceiling = enterControlPrice.handle(
+                new EnterControlPrice(rice, new BigDecimal("220.00"), "EA", yesterday, null, "2492/29"),
+                own(FEDERATION));
+
+        assertThat(ceilingsVisible(SOCIETY, "OWN", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(SOCIETY, "PARTY", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "FEDERATION_VIEW", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "EXTERNAL_TIMEBOXED", "{" + SOCIETY + "}"))
+                .containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "EXTERNAL_TIMEBOXED", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(SOCIETY, "NONE", "{}")).isEmpty();
+
+        // The society's own row, with the Java guard bypassed: the database refuses it.
+        assertThatThrownBy(() -> inScope(
+                        SOCIETY,
+                        "OWN",
+                        "{}",
+                        () -> jdbc.update(
+                                """
+                        insert into pricing.control_price (control_price_id, sku_id, ceiling_price, ceiling_uom_code,
+                            effective_from, gazette_reference, entered_by, owner_entity_id)
+                        values (?, ?, 1.00, 'EA', ?, '0000/01', ?, ?)
+                        """,
+                                Ids.next(),
+                                sugar,
+                                tomorrow,
+                                USER,
+                                SOCIETY)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        // Nor may the society end the Federation's ceiling.
+        assertThat(inScope(
+                        SOCIETY,
+                        "OWN",
+                        "{}",
+                        () -> jdbc.update(
+                                "update pricing.control_price set effective_to = ? where control_price_id = ?",
+                                tomorrow,
+                                ceiling)))
+                .isZero();
+        // A row that is somehow not the Federation's is a ceiling for nobody.
+        superuserJdbc()
+                .update(
+                        """
+                        insert into pricing.control_price (control_price_id, sku_id, ceiling_price, ceiling_uom_code,
+                            effective_from, gazette_reference, entered_by, owner_entity_id)
+                        values (?, ?, 1.00, 'EA', ?, '0000/01', ?, ?)
+                        """,
+                        Ids.next(),
+                        sugar,
+                        tomorrow,
+                        USER,
+                        SOCIETY);
+        assertThat(ceilingsVisible(SOCIETY, "OWN", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "FEDERATION_VIEW", "{}")).containsExactly(ceiling);
+        assertThat(queries.controlPriceFor(sugar, "EA", tomorrow, own(SOCIETY))).isEmpty();
+    }
+
+    private List<UUID> ceilingsVisible(UUID entity, String policyClass, String granted) {
+        return inScope(
+                entity,
+                policyClass,
+                granted,
+                () -> jdbc.queryForList("select control_price_id from pricing.control_price", UUID.class));
+    }
+
+    /** One transaction as the application user with the scope set directly, as the customizer would. */
+    private <T> T inScope(UUID entity, String policyClass, String granted, java.util.function.Supplier<T> work) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.queryForList(
+                    "select set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                            + " set_config('app.scope_class', ?, true), set_config('app.granted_entities', ?, true)",
+                    entity.toString(),
+                    policyClass,
+                    granted);
+            try {
+                return work.get();
+            } finally {
+                status.setRollbackOnly();
+            }
+        });
     }
 
     // ---- MRP policy (M3-07) --------------------------------------------------------------------------
@@ -382,6 +550,45 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
                 "m3.price_list.retail_exists");
         UUID v2 = draftNewVersion.handle(new DraftNewVersion(list), own(SOCIETY));
         assertThat(queries.lines(v2, own(SOCIETY))).hasSize(3);
+    }
+
+    /**
+     * CR-23A-1 (TWK D-5, M3-07): a shelf price of 0.00 would sell the item for nothing outside the
+     * write-off controls. Refused when the lines are set, and again at publication for a zero line
+     * that reached the draft without the handler (a job or a till writes no HTTP request).
+     */
+    @Test
+    void aShelfPriceOfZeroIsRefusedWhenSetAndWhenPublished() {
+        UUID list = create.handle(new CreatePriceList("RETAIL", "Society shelf prices"), own(SOCIETY));
+        kernel.reset();
+
+        SetLinesResult refused = setLines.handle(
+                new SetLines(list, List.of(line(rice, "0.00"), line(sugar, "0"), line(milk, "0.01"))), own(SOCIETY));
+
+        assertThat(refused.saved()).isFalse();
+        assertThat(refused.outcomes())
+                .extracting(SetLinesResult.Outcome::reason)
+                .containsExactly("m3.price_list.line.price_zero", "m3.price_list.line.price_zero", null);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        setLines.handle(new SetLines(list, List.of(line(milk, "1050.00"))), own(SOCIETY));
+        superuserJdbc()
+                .update(
+                        "insert into pricing.price_list_line (line_id, price_list_id, sku_id, uom_code,"
+                                + " tier_from_qty, price, effective_from, owner_entity_id)"
+                                + " values (?, ?, ?, 'EA', 0, 0.00, ?, ?)",
+                        Ids.next(),
+                        list,
+                        rice,
+                        today,
+                        SOCIETY);
+        kernel.reset();
+        refused(
+                () -> publish.handle(new PublishPriceList(list, tomorrow), own(SOCIETY)),
+                "m3.price_list.lines_invalid");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test

@@ -1,6 +1,8 @@
 package lk.coopfed.knoweb.m5inventory.internal.availability;
 
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.InventoryLotQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -12,7 +14,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Both questions are asked inside M2's command, in its caller's scope, about lots that scope
  * need not read (a Federation edit of a shared SKU a society holds), so each is answered by a
- * function of m5inventory V0002 that returns yes or no and shows no lot.
+ * SECURITY DEFINER function (m5inventory V0002, V0007) that returns yes or no and shows no lot.
+ * The functions answer an OWN caller only and take the caller from {@code kernel.scope_entity()},
+ * never from a parameter (wave 2, RLS-12): the scope handed in here is the same scope the
+ * connection carries, and a class other than OWN is answered "no" before the database is asked.
  */
 @Component
 class LotQuestionsForCatalogue implements InventoryLotQuery {
@@ -23,16 +28,19 @@ class LotQuestionsForCatalogue implements InventoryLotQuery {
         this.jdbc = jdbc;
     }
 
-    /** UpdateSku: a lot of the SKU exists anywhere, at any quantity. */
+    /** UpdateSku: a lot of the SKU exists anywhere, at any quantity (asked in an OWN scope). */
     @Override
     public boolean hasAnyLot(UUID skuId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select inventory.sku_has_lot(?)", Boolean.class, skuId));
     }
 
-    /** CorrectBatch: the entity holds (or held) a lot of the batch. */
+    /** CorrectBatch: the caller's entity holds (or held) a lot of the batch. */
     @Override
-    public boolean holdsLotOf(UUID batchId, UUID entityId) {
+    public boolean holdsLotOf(UUID batchId, ScopeContext scope) {
+        if (scope == null || scope.policyClass() != PolicyClass.OWN || scope.entityId() == null) {
+            return false;
+        }
         return Boolean.TRUE.equals(
-                jdbc.queryForObject("select inventory.entity_holds_lot_of(?, ?)", Boolean.class, batchId, entityId));
+                jdbc.queryForObject("select inventory.caller_holds_lot_of(?)", Boolean.class, batchId));
     }
 }

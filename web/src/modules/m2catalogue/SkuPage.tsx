@@ -382,12 +382,8 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
       sessionStorage.removeItem(`sku_preview_${skuId}`);
     },
     onError: (err) => {
+      // The failure is shown inline under the image (role="alert"), not in a browser dialog.
       forgetKeyOnProblem(key)(err);
-      if (err instanceof ApiProblem) {
-        alert(errorText(err, "Failed to remove image"));
-      } else {
-        alert("Failed to remove image");
-      }
     }
   });
 
@@ -449,6 +445,9 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
         setUploadStatus("IDLE");
       }, 3000);
     } catch (err) {
+      // The server answered: that action is finished, the next file is a new one. A failed
+      // storage PUT is not an answer; its retry carries the same key and renews the PENDING row.
+      forgetKeyOnProblem(key)(err);
       setUploadStatus("ERROR");
       setLocalPreviewUrl(null); // Clear preview on error
       sessionStorage.removeItem(`sku_preview_${skuId}`);
@@ -474,14 +473,14 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   return (
     <section className="catalogue-section">
       <h2 className="catalogue-section-title">
-        Item Details
+        {t("catalogue.item_details").text}
       </h2>
       
       <div className="catalogue-image-layout">
         {/* Left Card: The Image itself */}
         <div className="catalogue-image-card">
         <h3 className="catalogue-image-title">
-          Item Image
+          {t("catalogue.images.card_title").text}
         </h3>
         
         <div className="catalogue-image-box">
@@ -489,7 +488,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
             displayUrl ? (
               <img 
                 src={displayUrl} 
-                alt="SKU" 
+                alt={t("catalogue.images.alt").text} 
                 className="catalogue-image-img" 
               />
             ) : (
@@ -498,12 +497,12 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <div className="catalogue-image-processing-text">Processing image...</div>
-                <div className="catalogue-image-processing-subtext">Please wait up to 15 minutes.</div>
+                <div className="catalogue-image-processing-text">{t("catalogue.images.processing").text}</div>
+                <div className="catalogue-image-processing-subtext">{t("catalogue.images.processing_wait").text}</div>
               </div>
             )
           ) : (
-            <div className="catalogue-image-no-image">No image uploaded</div>
+            <div className="catalogue-image-no-image">{t("catalogue.images.none").text}</div>
           )}
         </div>
         
@@ -515,7 +514,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <polyline points="21 15 16 10 5 21"/>
               </svg>
-              {activeImage ? "Change Image" : "Upload Image"}
+              {(activeImage ? t("catalogue.images.change") : t("catalogue.images.upload")).text}
               <input 
                 type="file" 
                 accept="image/jpeg, image/png" 
@@ -538,7 +537,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
                   <line x1="10" y1="11" x2="10" y2="17"/>
                   <line x1="14" y1="11" x2="14" y2="17"/>
                 </svg>
-                Remove
+                {t("catalogue.images.remove").text}
               </button>
             )}
           </div>
@@ -553,8 +552,10 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
           </div>
         )}
         
+        {retire.isError && <p role="alert">{errorText(retire.error, t("catalogue.images.remove_failed").text)}</p>}
+
         <div className="catalogue-image-formats">
-          Supported formats: JPG, PNG (Max 2MB)
+          {t("catalogue.images.formats").text}
         </div>
       </div>
       
@@ -562,10 +563,10 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
       {canEdit && (
         <div className="catalogue-image-settings-panel">
             <h3 className="catalogue-image-settings-title">
-              Upload Settings
+              {t("catalogue.images.settings_title").text}
             </h3>
             <p className="catalogue-image-settings-desc">
-              Select a barcode before uploading an image if the image is specific to a variant.
+              {t("catalogue.images.settings_hint").text}
             </p>
             
             <label className="catalogue-form-field">

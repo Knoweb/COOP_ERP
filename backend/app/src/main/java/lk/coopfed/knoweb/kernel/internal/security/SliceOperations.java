@@ -41,8 +41,17 @@ public class SliceOperations {
     private static final String SLICES = "classpath*:openapi/*.yaml";
     private static final String SHARED = "common.yaml";
 
+    /**
+     * The slice mark that keeps a read from a FEDERATION_VIEW session (CR-18-2; wave 2, TWK-30):
+     * {@code x-federation-view: false} on an operation. The Federation reads its members' trading,
+     * stock, finance and reporting data; it does not read their staff administration or their
+     * customers' personal data.
+     */
+    public static final String FEDERATION_VIEW_MARK = "x-federation-view";
+
     private final Map<String, String> permissionByOperation;
     private final Set<String> readPermissions;
+    private final Set<String> federationViewReadPermissions;
 
     public SliceOperations() {
         this(loadSlices());
@@ -52,6 +61,7 @@ public class SliceOperations {
     SliceOperations(Map<String, Map<String, Object>> slices) {
         Map<String, String> permissions = new LinkedHashMap<>();
         Set<String> reads = new TreeSet<>();
+        Set<String> withheldFromTheFederation = new TreeSet<>();
         slices.forEach((name, document) -> map(document.get("paths"))
                 .forEach((path, item) -> map(item).forEach((method, value) -> {
                     Object permission = map(value).get("x-permission");
@@ -64,10 +74,19 @@ public class SliceOperations {
                             && !AUTHENTICATED.equals(code)
                             && !ScopeFilter.isDeviceOperation(path)) {
                         reads.add(code);
+                        if (Boolean.FALSE.equals(map(value).get(FEDERATION_VIEW_MARK))) {
+                            withheldFromTheFederation.add(code);
+                        }
                     }
                 })));
         this.permissionByOperation = Map.copyOf(permissions);
         this.readPermissions = Set.copyOf(reads);
+        // A permission is a code, not an operation: when one GET under a code is marked, the code
+        // leaves the Federation's set (fail closed), and a module that wants the Federation to keep
+        // reading its other views under that code gives them a code of their own.
+        Set<String> federation = new TreeSet<>(reads);
+        federation.removeAll(withheldFromTheFederation);
+        this.federationViewReadPermissions = Set.copyOf(federation);
     }
 
     /** The x-permission of the operation, or null when no slice describes it. */
@@ -78,13 +97,19 @@ public class SliceOperations {
         return permissionByOperation.get(key(method, pathTemplate));
     }
 
-    /**
-     * Every permission a GET of any slice asks for: what a FEDERATION_VIEW caller holds, since
-     * that class reads everything and writes nothing (doc 18 section 3.7; 21A section 3's
-     * federation-view template carries no permission of its own).
-     */
+    /** Every permission a GET of any slice asks for (the user-held reads). */
     public Set<String> readPermissions() {
         return readPermissions;
+    }
+
+    /**
+     * What a FEDERATION_VIEW caller holds: every read of every slice (doc 18 section 3.7; 21A
+     * section 3's federation-view template carries no permission of its own) except the codes of
+     * the operations marked {@code x-federation-view: false} (CR-18-2: staff administration and
+     * customers' personal data are the entity's).
+     */
+    public Set<String> federationViewReadPermissions() {
+        return federationViewReadPermissions;
     }
 
     private static String key(String method, String path) {

@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -25,6 +26,8 @@ import lk.coopfed.knoweb.kernel.sync.web.generated.HeartbeatResponse;
 import lk.coopfed.knoweb.kernel.sync.web.generated.Instruction;
 import lk.coopfed.knoweb.kernel.sync.web.generated.PresignRequest;
 import lk.coopfed.knoweb.kernel.sync.web.generated.PresignResponse;
+import lk.coopfed.knoweb.kernel.sync.web.generated.QuarantineResolution;
+import lk.coopfed.knoweb.kernel.sync.web.generated.ResolvedQuarantine;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SequenceGap;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SequenceResetRequest;
 import lk.coopfed.knoweb.kernel.sync.web.generated.SeriesAssignment;
@@ -64,6 +67,8 @@ class SyncController implements SyncApi {
     private final SystemScope transactions;
     private final ObjectMapper json;
     private final HttpServletRequest request;
+    private final AppVersionFloors floors;
+    private final ResolveQuarantineHandler quarantine;
 
     SyncController(
             CurrentScope currentScope,
@@ -80,7 +85,11 @@ class SyncController implements SyncApi {
             Attachments attachments,
             SystemScope transactions,
             ObjectMapper json,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            AppVersionFloors floors,
+            ResolveQuarantineHandler quarantine) {
+        this.floors = floors;
+        this.quarantine = quarantine;
         this.currentScope = currentScope;
         this.directory = directory;
         this.enrolment = enrolment;
@@ -162,6 +171,24 @@ class SyncController implements SyncApi {
     }
 
     @Override
+    public ResponseEntity<ResolvedQuarantine> resolveQuarantine(
+            UUID quarantineId, String idempotencyKey, QuarantineResolution resolution) {
+        ResolveQuarantineHandler.Resolved resolved = quarantine.resolve(
+                currentScope.get(),
+                quarantineId,
+                resolution.getResolution().getValue(),
+                resolution.getReasonCode(),
+                resolution.getReasonText());
+        return ResponseEntity.ok(new ResolvedQuarantine(
+                resolved.quarantineId(),
+                resolved.deviceId(),
+                resolved.deviceSeq(),
+                resolved.reason(),
+                ResolvedQuarantine.ResolutionEnum.fromValue(resolved.resolution()),
+                resolved.resolvedAt()));
+    }
+
+    @Override
     public ResponseEntity<SyncAck> uploadBatch(UUID deviceId, String idempotencyKey, SyncBatch syncBatch) {
         ScopeContext device = deviceScope(deviceId);
         DeviceRecord record = directory.find(deviceId).orElseThrow(() -> new ProblemException("sync.device_unknown"));
@@ -199,6 +226,7 @@ class SyncController implements SyncApi {
     @Override
     public ResponseEntity<HeartbeatResponse> heartbeat(UUID deviceId, String idempotencyKey, Heartbeat heartbeat) {
         ScopeContext device = deviceScope(deviceId);
+        rateLimiter.admitRequest(device, deviceId, false);
         HeartbeatService.Answer answer = heartbeats.record(
                 device,
                 new HeartbeatService.Report(
@@ -226,6 +254,8 @@ class SyncController implements SyncApi {
     @Override
     public ResponseEntity<ChangePage> listChanges(UUID locationId, Long since, Integer limit) {
         ScopeContext device = locationScope(locationId);
+        rateLimiter.admitRequest(device, device.deviceId(), false);
+        withheldBelowTheFloor(device);
         ChangeLogReader.Page page =
                 changeLog.read(device, since, limit == null ? 500 : limit, settings.changeLogRetention(device));
         List<ChangeEntry> entries = page.entries().stream()
@@ -251,6 +281,8 @@ class SyncController implements SyncApi {
     @Override
     public ResponseEntity<SnapshotDelta> getSnapshot(UUID locationId, Long since) {
         ScopeContext device = locationScope(locationId);
+        rateLimiter.admitRequest(device, device.deviceId(), true);
+        withheldBelowTheFloor(device);
         SnapshotBuilder.Snapshot snapshot =
                 snapshots.build(device, since == null ? 0 : since, settings.changeLogRetention(device));
         Map<String, SnapshotTable> tables = new LinkedHashMap<>();
@@ -265,7 +297,37 @@ class SyncController implements SyncApi {
                         snapshot.signature(),
                         snapshot.keyId())
                 .since(snapshot.since());
+        // Downloads are the heavy direction (a full snapshot of a shop's catalogue): what is sent
+        // costs the device's hourly byte bucket as an upload does (wave 2, TWK-25).
+        rateLimiter.chargeBytes(device, device.deviceId(), answerBytes(body));
         return ResponseEntity.ok(body);
+    }
+
+    /** The size of the answer as JSON, before any compression on the way. */
+    private long answerBytes(Object body) {
+        try {
+            return json.writeValueAsBytes(body).length;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("The snapshot answer cannot be written as JSON", e);
+        }
+    }
+
+    /**
+     * After the grace of the application floor, central withholds its reference data and keeps
+     * taking the device's facts (CR-30-1 point 4; CR-32-1 item 1; wave 2, TWK-09): the till sells
+     * on its last snapshot, and its staleness warning tells the supervisor (doc 32 section 5.2).
+     */
+    private void withheldBelowTheFloor(ScopeContext device) {
+        AppVersionFloor.Standing floor = floors.standingOfDevice(device);
+        if (floor.afterGrace()) {
+            throw new ProblemException(
+                    "sync.app_below_floor",
+                    Map.of(
+                            "floor",
+                            floor.floor(),
+                            "grace_ended_at",
+                            floor.graceEndsAt().toString()));
+        }
     }
 
     private static SnapshotTable snapshotTable(SnapshotManifest.Table table) {
@@ -281,6 +343,7 @@ class SyncController implements SyncApi {
     @Override
     public ResponseEntity<PresignResponse> presignAttachment(String idempotencyKey, PresignRequest presignRequest) {
         ScopeContext device = currentScope.get();
+        rateLimiter.admitRequest(device, device.deviceId(), false);
         // The attachment service writes its pending row in a transaction under the caller's scope
         // (K-09); the device's scope is applied to that transaction as to any handler's.
         Attachments.PresignedUpload upload = transactions.inScope(
@@ -314,10 +377,13 @@ class SyncController implements SyncApi {
         return scope;
     }
 
-    /** The batch's size as the device sent it: compressed when it was (GzipRequestFilter). */
+    /**
+     * The batch's size as the device sent it, compressed when it was, as {@link SyncBodyFilter}
+     * counted the bytes it read (wave 2, TWK-24: a plain or chunked body is counted too).
+     */
     private long wireBytes() {
-        if (request.getAttribute(GzipRequestFilter.WIRE_BYTES) instanceof Long compressed) {
-            return compressed;
+        if (request.getAttribute(SyncBodyFilter.WIRE_BYTES) instanceof Long read) {
+            return read;
         }
         return Math.max(0, request.getContentLengthLong());
     }

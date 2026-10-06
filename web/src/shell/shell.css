@@ -2247,3 +2247,121 @@ textarea {
   text-align: center;
   margin-top: 24px;
 }
+
+/* ---- The user menu: what UserMenu.tsx used to say inline, so that the style scan covers it ---- */
+
+.user-menu {
+  position: relative;
+  gap: var(--space-3);
+}
+
+.user-menu .user-menu__bell {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.user-menu .user-menu__profile {
+  display: flex;
+  align-items: center;
+  gap: var(--target-gap);
+  cursor: pointer;
+}
+
+.user-menu__avatar-wrap {
+  position: relative;
+  display: flex;
+}
+
+.user-menu__status {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background-color: var(--color-brand-success);
+  border: var(--border-width-strong) solid var(--color-surface-card);
+  border-radius: 50%;
+}
+
+.user-menu__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-menu__role {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+
+.user-menu .user-menu__name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-strong);
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.user-menu__chevron {
+  color: var(--color-text-muted);
+  margin-left: var(--space-half);
+}
+
+.user-menu__panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-2);
+  background: var(--color-surface);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px var(--color-polish-13);
+  padding: 20px;
+  min-width: 260px;
+  z-index: 100;
+  border: var(--border-width) solid var(--color-polish-14);
+}
+
+.user-menu__panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--target-gap);
+  border-bottom: var(--border-width) solid var(--color-border);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.user-menu__panel-head strong {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.user-menu__panel-head span {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.user-menu__panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--target-gap);
+}
+
+.user-menu__chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 10px var(--target-gap);
+  background: var(--color-surface-card);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.user-menu__chip--access {
+  color: var(--color-text);
+}
+
+.user-menu__chip--access svg {
+  color: var(--color-accent);
+}

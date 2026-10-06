@@ -10,7 +10,16 @@
 # pull from GHCR). Tear down with:
 #   docker compose -p coop-erp-deploytest down -v
 
+#
+# Keycloak's console port moves to 18081 (the development stack may hold 8081); its console is
+# then http://localhost:18081/auth/admin/.
+
 services:
   caddy:
     ports: !override
       - "8443:8443"
+  keycloak:
+    ports: !override
+      - "127.0.0.1:18081:8080"
+    environment:
+      KC_HOSTNAME_ADMIN: http://localhost:18081/auth
