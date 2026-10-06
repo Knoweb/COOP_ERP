@@ -40,13 +40,19 @@ export function statusChip(status: string): ChipState {
   return status === "OPEN" || status === "ACTIVE" ? "issued" : status === "SUSPENDED" ? "disputed" : "void";
 }
 
-/** What the office may do with an account in its state (doc 27 section 4.2). */
-export function accountActions(status: string): ("suspend" | "reinstate" | "close")[] {
+/**
+ * What the office may do with an account in its state (doc 27 section 4.2; CR-27A-1: a CLOSED
+ * account reopens as SUSPENDED, to settle what a till posted on it).
+ */
+export function accountActions(status: string): ("suspend" | "reinstate" | "close" | "reopen")[] {
   if (status === "OPEN") {
     return ["suspend", "close"];
   }
   if (status === "SUSPENDED") {
     return ["reinstate", "close"];
+  }
+  if (status === "CLOSED") {
+    return ["reopen"];
   }
   return [];
 }

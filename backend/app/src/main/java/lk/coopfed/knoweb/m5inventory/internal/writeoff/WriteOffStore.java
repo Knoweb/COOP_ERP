@@ -8,8 +8,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.api.LossCategory;
-import lk.coopfed.knoweb.m5inventory.query.EntityCost;
-import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.internal.control.StockOnHand;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -31,12 +30,15 @@ class WriteOffStore {
 
     record Line(UUID lineId, int lineNo, UUID batchId, UUID skuId, String condition, BigDecimal qty) {}
 
-    private final JdbcTemplate jdbc;
-    private final InventoryQueries inventory;
+    /** The value of a write-off and whether a line of it has no cost at all (it routes to band 2). */
+    record Valuation(BigDecimal value, boolean zeroCostLine) {}
 
-    WriteOffStore(JdbcTemplate jdbc, InventoryQueries inventory) {
+    private final JdbcTemplate jdbc;
+    private final StockOnHand stock;
+
+    WriteOffStore(JdbcTemplate jdbc, StockOnHand stock) {
         this.jdbc = jdbc;
-        this.inventory = inventory;
+        this.stock = stock;
     }
 
     /** The write-off, locked for the rest of the transaction, or {@code m5.writeoff.not_found}. */
@@ -93,7 +95,7 @@ class WriteOffStore {
                 writeOffId);
     }
 
-    /** What the lot holds at the location; zero when there is none. */
+    /** What the lot holds at the location, unlocked (a draft's check; nothing posts); zero when there is none. */
     BigDecimal onHand(UUID locationId, UUID batchId, String condition) {
         List<BigDecimal> found = jdbc.queryForList(
                 "select qty_on_hand from inventory.stock_lot where location_id = ? and batch_id = ? and condition = ?",
@@ -104,16 +106,32 @@ class WriteOffStore {
         return found.isEmpty() ? BigDecimal.ZERO : found.get(0);
     }
 
-    /** The loss at the entity average (doc 25 DR-3: the value basis for the bands is the average, not retail). */
-    BigDecimal value(List<Line> lines, ScopeContext scope) {
+    /**
+     * What each line's lot holds at the location, the lots locked in the ledger's order (wave 2,
+     * M5-12): the guard and the posting see the same quantity, and two approvals over several
+     * lines cannot deadlock.
+     */
+    Map<StockOnHand.LotRef, BigDecimal> lockLots(UUID locationId, List<Line> lines) {
+        return stock.lockLots(
+                locationId,
+                lines.stream()
+                        .map(line -> new StockOnHand.LotRef(line.batchId(), line.condition()))
+                        .toList());
+    }
+
+    /**
+     * The loss at the entity average (doc 25 DR-3: the value basis for the bands is the average, not
+     * retail), a line of an item with no average at its lot's cost; a line with neither is of no
+     * cost and routes the write-off to band 2 (wave 2, M5-09).
+     */
+    Valuation value(List<Line> lines, UUID locationId, ScopeContext scope) {
         BigDecimal total = BigDecimal.ZERO;
+        boolean zeroCostLine = false;
         for (Line line : lines) {
-            BigDecimal average = inventory
-                    .entityAverageCost(line.skuId(), scope)
-                    .map(EntityCost::avgCost)
-                    .orElse(BigDecimal.ZERO);
-            total = total.add(line.qty().multiply(average));
+            BigDecimal unit = stock.unitValue(line.skuId(), locationId, line.batchId(), line.condition(), scope);
+            zeroCostLine |= unit.signum() == 0;
+            total = total.add(line.qty().multiply(unit));
         }
-        return total.setScale(2, RoundingMode.HALF_UP);
+        return new Valuation(total.setScale(2, RoundingMode.HALF_UP), zeroCostLine);
     }
 }

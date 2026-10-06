@@ -169,3 +169,41 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A till receipt line with no quantity, or one of zero or less, was not deducted
+
+  # wave 2, PR 10 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-expired-stock.md,
+  # 2026-10-06-wave2-stock-approvals.md and 2026-10-06-wave2-stock-movements.md; CR-25A-1): the flags
+  # of stock control, each for a person to look at on the exception report.
+  - code: SALE_OF_EXPIRED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till sold from a batch past its expiry date on the receipt's date
+
+  - code: PICK_SHORT_DISPATCHED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A delivery note was dispatched with lines the seller's stock could not cover
+
+  - code: TRANSFER_REQUEST_SHORT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: An approved transfer request was sent short; the shop raises a new request for the rest
+
+  - code: TRANSFER_SELF_RECEIVED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A transfer was received by the person who issued it
+
+  - code: COUNT_TOLERANCE_CLEARED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Count variances were posted within tolerance, without a second person
+
+  - code: REPACK_YIELD_EXCEPTION
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A repack made fewer packs than its recipe allows, with a reason
+
+  - code: TILL_FACT_NOT_APPLIED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till uploaded a stock fact central does not apply yet

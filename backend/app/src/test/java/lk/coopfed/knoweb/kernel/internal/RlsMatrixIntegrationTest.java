@@ -316,6 +316,28 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "everyone_reads (m9integration V0001): no personal data; the kernel's dispatcher reads the"
                             + " rules in the scope of whichever entity's event it matches",
                     RlsMatrixIntegrationTest::everySessionReadsEverything),
+            // Member identity is the society's (CR-18-2, m7customers V0003; wave 2, RLS-01, RLS-02):
+            // FEDERATION_VIEW and EXTERNAL_TIMEBOXED read no personal data of a natural person by
+            // policy. The credit book (customer_account, the postings, allocations, history,
+            // adjustments, the CPRs) keeps the template: money, no name.
+            new Departure(
+                    "customers.customer",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): a member's name, NIC hash and status are the"
+                            + " society's; identity reaches the Federation only through an audited query or export",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.customer_phone",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): a member's phone numbers are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.customer_consent",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): a member's consents are the society's",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "customers.data_subject_request",
+                    "no fed_view or ext_view (m7customers V0003, CR-18-2): its notes and outcome are free text about"
+                            + " the person, redacted at an erasure and read by the society alone until then",
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
             new Departure(
                     "integration.notification_contact",
                     "own_* only (m9integration V0003, fed_view dropped by V0006; wave 2, M9-06 and"

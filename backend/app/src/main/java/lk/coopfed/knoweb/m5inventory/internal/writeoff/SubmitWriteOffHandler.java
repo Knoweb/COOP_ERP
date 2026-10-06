@@ -124,8 +124,9 @@ class SubmitWriteOffHandler implements Handles<SubmitWriteOff, UUID> {
                 .findById(writeOff.writeOffId())
                 .orElseThrow(() -> new ProblemException("m5.writeoff.not_found"));
         DocumentRecord issued = documents.issue(draft, List.of(), scope);
-        BigDecimal value = store.value(lines, scope);
-        int band = policy.band(value, scope);
+        WriteOffStore.Valuation valuation = store.value(lines, writeOff.locationId(), scope);
+        BigDecimal value = valuation.value();
+        int band = policy.band(value, valuation.zeroCostLine(), scope);
         jdbc.update(
                 """
                 update inventory.write_off

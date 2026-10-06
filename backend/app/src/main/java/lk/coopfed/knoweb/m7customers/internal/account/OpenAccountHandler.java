@@ -3,7 +3,6 @@ package lk.coopfed.knoweb.m7customers.internal.account;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
@@ -18,7 +17,7 @@ import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.AccountOpened;
 import lk.coopfed.knoweb.m7customers.api.OpenAccount;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
-import lk.coopfed.knoweb.m7customers.internal.customer.NicNumbers;
+import lk.coopfed.knoweb.m7customers.internal.customer.NicCapture;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -28,9 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
  * OpenAccount (27A section 6). Guards, in order: the society's OWN scope; the customer registered
  * by the caller's society and ACTIVE; the CREDIT_ACCOUNT consent in force; no account of this
  * society for the customer yet; a limit of zero or more, terms above zero, a cap of zero or more
- * (money in cents); when the limit is above zero, the NIC: well formed, the same as the one the
- * customer already has, and not held by another of the society's customers ({@code
- * m7.account.nic_held}: one person, one identity).
+ * (money in cents); when the limit is above {@code customers.nic_required_above_limit}, the NIC
+ * ({@link NicCapture}): well formed, the same card as the one the customer already has, and held by
+ * nobody else at any society ({@code m7.account.nic_held}, {@code m7.account.nic_held_elsewhere}:
+ * one person, one identity).
  *
  * <p>Mutation: the account (OPEN, balance zero, the next account number of the society), the NIC's
  * hash and last four on the customer. Audit ACCOUNT_OPENED with the limit, terms and cap and
@@ -49,14 +49,21 @@ class OpenAccountHandler implements Handles<OpenAccount, UUID> {
 
     private final JdbcTemplate jdbc;
     private final ConfigRegistry config;
+    private final NicCapture nicCapture;
     private final CustomersClock clock;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     OpenAccountHandler(
-            JdbcTemplate jdbc, ConfigRegistry config, CustomersClock clock, AuditFacade audit, EventPublisher events) {
+            JdbcTemplate jdbc,
+            ConfigRegistry config,
+            NicCapture nicCapture,
+            CustomersClock clock,
+            AuditFacade audit,
+            EventPublisher events) {
         this.jdbc = jdbc;
         this.config = config;
+        this.nicCapture = nicCapture;
         this.clock = clock;
         this.audit = audit;
         this.events = events;
@@ -104,26 +111,13 @@ class OpenAccountHandler implements Handles<OpenAccount, UUID> {
                         : command.offlineCap(),
                 "offlineCap");
 
-        String nic = null;
-        if (limit.signum() > 0 || (command.nic() != null && !command.nic().isBlank())) {
-            nic = NicNumbers.normalise(command.nic())
-                    .orElseThrow(() -> new ProblemException("m7.account.nic_required"));
-            String hash = NicNumbers.hash(nic);
-            String held = jdbc.queryForObject(
-                    "select nic_hash from customers.customer where customer_id = ?", String.class, customerId);
-            if (held != null && !held.equals(hash)) {
-                throw new ProblemException("m7.account.nic_mismatch");
-            }
-            List<UUID> others = jdbc.queryForList(
-                    "select customer_id from customers.customer where nic_hash = ? and customer_id <> ?",
-                    UUID.class,
-                    hash,
-                    customerId);
-            if (!others.isEmpty()) {
-                throw new ProblemException(
-                        "m7.account.nic_held",
-                        Map.of("customerId", others.get(0).toString()));
-            }
+        // The NIC when the limit is above customers.nic_required_above_limit (doc 27 section 7;
+        // wave 2, M7CR-03), or whenever one is offered: canonical form, the same card as the one
+        // recorded, held by nobody else at any society (NicCapture).
+        NicCapture.Captured nic = null;
+        if (limit.compareTo(CustomerGuards.nicRequiredAboveLimit(config, scope)) > 0
+                || (command.nic() != null && !command.nic().isBlank())) {
+            nic = nicCapture.capture(command.nic(), customerId);
         }
 
         // The society's next account number, one at a time (the unique constraint is the safety net).
@@ -154,11 +148,7 @@ class OpenAccountHandler implements Handles<OpenAccount, UUID> {
                 scope.userId() == null ? society : scope.userId(),
                 society);
         if (nic != null) {
-            jdbc.update(
-                    "update customers.customer set nic_hash = ?, nic_last4 = ? where customer_id = ?",
-                    NicNumbers.hash(nic),
-                    NicNumbers.last4(nic),
-                    customerId);
+            jdbc.update(NicCapture.WRITE_SQL, nic.hash(), nic.last4(), nic.keyId(), customerId);
         }
 
         Map<String, Object> after = new LinkedHashMap<>();

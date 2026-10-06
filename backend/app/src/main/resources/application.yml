@@ -188,6 +188,15 @@ coop-erp:
     pending-key-previous: ${COOP_ERP_NOTIFICATION_KEY_PREVIOUS:}
     recipient-hash-key: ${COOP_ERP_NOTIFICATION_RECIPIENT_KEY:}
 
+  # Wave 2 (6 Oct 2026, M7CR-01; docs/progress/deviations/2026-10-06-wave2-keyed-hashes.md): a
+  # customer's NIC is stored as an HMAC-SHA-256 under this pepper (base64 of 32 random bytes, the
+  # same on every instance), with the key id beside it, never as a plain hash. Its own key, for its
+  # own purpose. The same rule: no default outside development. Losing it makes every captured NIC
+  # unmatchable until each member presents the card again (RecaptureNic); back it up with the
+  # database. To rotate it, see m7customers/README.md ("The NIC").
+  customers:
+    nic-pepper: ${COOP_ERP_CUSTOMERS_NIC_PEPPER:}
+
   # The per-instance cache fan-out (doc 19 section 8, 19A section 3): every instance, in every
   # role, holds an exclusive queue on the domain exchange for the events that empty its
   # permission, configuration and device caches, beside the worker's consumer queues. Off only
