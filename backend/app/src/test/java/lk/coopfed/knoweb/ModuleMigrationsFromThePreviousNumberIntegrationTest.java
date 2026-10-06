@@ -17,7 +17,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 /**
  * The demo server's situation (wave 2 fix plan, "a Flyway test start on a database at the previous
  * migration"): a database whose every stream stands at the number before this pull request's
- * migrations (kernel {@code V0085}, m1party {@code V0014}, m1security {@code V0018} since PR 11, m2catalogue
+ * migrations (kernel {@code V0086} and m1security {@code V0019} since PR 17, m1party {@code V0014}, m2catalogue
  * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09,
  * m8reporting {@code V0006} since PR 08) migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
@@ -34,11 +34,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
     private static Map<String, String> previous() {
         Map<String, String> streams = new LinkedHashMap<>();
-        streams.put("kernel", "85");
+        // Wave 2, PR 17: kernel V0087 (change_log_append tests the class) from V0086.
+        streams.put("kernel", "86");
         streams.put("hello", null);
         streams.put("m1party", "14");
-        // Wave 2 PR 11 (m1security V0019): from V0018, where the demo server stands after PR 05.
-        streams.put("m1security", "18");
+        // Wave 2, PR 17 (m1security V0020, user_has_any_assignment tests the class): from V0019,
+        // where the demo server stands after PR 11.
+        streams.put("m1security", "19");
         streams.put("m2catalogue", "7");
         streams.put("m3pricing", "5");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
@@ -146,9 +148,9 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         }
 
         assertThat(after)
-                .containsEntry("kernel", 86)
+                .containsEntry("kernel", 87)
                 .containsEntry("m1party", 15)
-                .containsEntry("m1security", 19)
+                .containsEntry("m1security", 20)
                 .containsEntry("m2catalogue", 8)
                 .containsEntry("m3pricing", 6)
                 .containsEntry("m5inventory", 8);
@@ -166,6 +168,19 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         assertThat(functions)
                 .containsExactly(
                         "inventory.caller_holds_lot_of", "kernel.document_open_for_write", "party.caller_trades_with");
+        // Wave 2, PR 17: the last two definer functions test the class, and keep their grant.
+        for (String function : List.of(
+                "kernel.change_log_append(uuid, uuid, text[], uuid[], text[], date, boolean)",
+                "security.user_has_any_assignment(uuid)")) {
+            assertThat(admin.queryForObject(
+                            "select position('kernel.scope_class()' in prosrc) > 0"
+                                    + " and has_function_privilege('coop_app', oid, 'EXECUTE')"
+                                    + " from pg_proc where oid = ?::regprocedure",
+                            Boolean.class,
+                            function))
+                    .as(function + " tests the class and stays executable by the application")
+                    .isTrue();
+        }
         assertThat(admin.queryForObject(
                         "select has_function_privilege('coop_app', 'inventory.entity_holds_lot_of(uuid, uuid)', 'EXECUTE')",
                         Boolean.class))

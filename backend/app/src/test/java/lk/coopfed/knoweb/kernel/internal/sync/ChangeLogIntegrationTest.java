@@ -18,8 +18,10 @@ import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -38,8 +40,65 @@ class ChangeLogIntegrationTest extends SyncIntegrationTest {
     @Autowired
     PlatformTransactionManager transactions;
 
+    @Autowired
+    SystemScope systemScope;
+
+    @Autowired
+    JdbcTemplate appJdbc;
+
     /** A central publisher: the Federation's scope, writing into an MPCS's shops. */
     private final ScopeContext federation = SystemScope.own(OTHER_ENTITY, null);
+
+    /**
+     * kernel V0087 (wave 2, PR 17): a publication is a write, and only the OWN class writes. The
+     * definer function refuses every other class, and a transaction with no scope, before it touches
+     * a version; the OWN class publishes.
+     */
+    @Test
+    void onlyTheOwnClassPublishes() {
+        for (String policyClass : List.of("FEDERATION_VIEW", "EXTERNAL_TIMEBOXED", "PARTY", "NONE")) {
+            assertThatThrownBy(() -> appendAs(policyClass))
+                    .as(policyClass)
+                    .isInstanceOf(DataAccessException.class)
+                    .rootCause()
+                    .hasMessageContaining("OWN class");
+        }
+        assertThatThrownBy(() -> appendAs(null))
+                .as("no scope at all")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("OWN class");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.change_log where location_id = ?", Long.class, SHOP))
+                .as("nothing was written by a refused class")
+                .isZero();
+
+        assertThat(appendAs("OWN")).isEqualTo(1L);
+    }
+
+    /** The function as the application user calls it, in a class set directly on the transaction. */
+    private Long appendAs(String policyClass) {
+        return new TransactionTemplate(transactions).execute(status -> {
+            if (policyClass != null) {
+                appJdbc.queryForList(
+                        "select set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                                + " set_config('app.scope_class', ?, true), set_config('app.granted_entities', ?, true)",
+                        OTHER_ENTITY.toString(),
+                        policyClass,
+                        "EXTERNAL_TIMEBOXED".equals(policyClass) ? "{" + ENTITY + "}" : "{}");
+            }
+            return appJdbc.queryForObject(
+                    "select kernel.change_log_append(?, ?, cast(? as text[]), cast(? as uuid[]), cast(? as text[]),"
+                            + " null, false)",
+                    Long.class,
+                    ENTITY,
+                    SHOP,
+                    "{sku}",
+                    "{" + Ids.next() + "}",
+                    "{UPSERT}");
+        });
+    }
 
     @Test
     void aPublicationBumpsEachShopsVersionOnceAndTheTillReadsItAfterItsVersion() {
@@ -160,8 +219,8 @@ class ChangeLogIntegrationTest extends SyncIntegrationTest {
     }
 
     private Map<UUID, Long> publish(List<Target> targets, List<Change> changes, LocalDate applyFrom, boolean urgent) {
-        return new TransactionTemplate(transactions)
-                .execute(status -> changeLog.append(targets, changes, applyFrom, urgent, federation));
+        return systemScope.inOwnTransaction(
+                federation, () -> changeLog.append(targets, changes, applyFrom, urgent, federation));
     }
 
     private ResponseEntity<JsonNode> changes(long since, int limit) {
