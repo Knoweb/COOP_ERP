@@ -10,6 +10,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lk.coopfed.knoweb.kernel.api.Attachments;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -169,12 +173,16 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
 
         kernel.reset();
         assertProblem(() -> approve.handle(new ApproveWriteOff(id), own(MPCS)), "m5.writeoff.approver_is_requester");
-        // The witness may also approve (the MPCS accountant of flow 6.4); here another approver does.
-        approve.handle(new ApproveWriteOff(id), own(MPCS, APPROVER));
+        // wave 2, M5-10: the in-person witness may not approve; a third person does.
+        assertProblem(
+                () -> approve.handle(new ApproveWriteOff(id), own(MPCS, WITNESS)), "m5.writeoff.approver_is_witness");
+        assertThat(kernel.committedAudit()).isEmpty();
+        UUID approver = user("inv.writeoff.approve");
+        approve.handle(new ApproveWriteOff(id), own(MPCS, approver));
 
         WriteOffView posted = control.writeOff(id, own(MPCS)).orElseThrow();
         assertThat(posted.status()).isEqualTo("POSTED");
-        assertThat(posted.approverUserId()).isEqualTo(APPROVER);
+        assertThat(posted.approverUserId()).isEqualTo(approver);
         assertThat(qty(stores)).isEqualByComparingTo("48");
         assertThat(inventory.movementsOf(id, own(MPCS))).singleElement().satisfies(m -> {
             assertThat(m.movementType()).isEqualTo("WRITE_OFF");
@@ -269,6 +277,161 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(qty(stores)).isEqualByComparingTo("50");
     }
 
+    // ---- wave 2: approval limits fail closed (M5-09) ------------------------------------------
+
+    @Test
+    void theApprovalLimitFailsClosedNoGrantNoValueBelowAndAbove() {
+        receive(stores, "250");
+        // 260 units at the average of 100: Rs 26,000, above band 1 (Rs 25,000).
+        UUID id = witnessed(expired(stores, "260"));
+        assertThat(control.writeOff(id, own(MPCS)).orElseThrow().band()).isEqualTo(2);
+
+        kernel.reset();
+        // No grant of the permission at the entity: no authority at all.
+        UUID nobody = user(null);
+        assertProblem(() -> approve.handle(new ApproveWriteOff(id), own(MPCS, nobody)), "m5.approval.limit_exceeded");
+        // A grant without max_value (a seeded template, a role from before the limits schema): band 1 only.
+        UUID bandOne = user("inv.writeoff.approve");
+        assertProblem(() -> approve.handle(new ApproveWriteOff(id), own(MPCS, bandOne)), "m5.approval.limit_exceeded");
+        // A limit below the value.
+        UUID below = user("inv.writeoff.approve", "{\"max_value\": 25999}");
+        assertProblem(() -> approve.handle(new ApproveWriteOff(id), own(MPCS, below)), "m5.approval.limit_exceeded");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(qty(stores)).isEqualByComparingTo("300");
+
+        // A limit at or above it approves.
+        UUID above = user("inv.writeoff.approve", "{\"max_value\": 250000}");
+        approve.handle(new ApproveWriteOff(id), own(MPCS, above));
+        assertThat(control.writeOff(id, own(MPCS)).orElseThrow().status()).isEqualTo("POSTED");
+        assertThat(qty(stores)).isEqualByComparingTo("40");
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("WRITEOFF_POSTED");
+    }
+
+    @Test
+    void aGrantWithoutALimitStillApprovesASmallWriteOff() {
+        UUID id = witnessed(expired(stores, "2"));
+        approve.handle(new ApproveWriteOff(id), own(MPCS, user("inv.writeoff.approve")));
+        assertThat(control.writeOff(id, own(MPCS)).orElseThrow().status()).isEqualTo("POSTED");
+    }
+
+    @Test
+    void aLineOfNoCostRoutesTheWriteOffToBandTwo() {
+        UUID samples = fixture.sku(MPCS, "SAMPLE");
+        UUID free = fixture.batch(samples, MPCS, "S1", LocalDate.of(2028, 1, 31));
+        outer.run(
+                own(MPCS),
+                () -> ledger.post(
+                        new PostMovements(
+                                Ids.next(),
+                                null,
+                                null,
+                                List.of(new Movement(
+                                        stores,
+                                        free,
+                                        LotCondition.GOOD,
+                                        MovementType.RECEIPT,
+                                        new BigDecimal("500"),
+                                        BigDecimal.ZERO,
+                                        null))),
+                        own(MPCS)));
+        UUID id = witnessed(new RequestWriteOff(
+                stores,
+                LossCategory.SAMPLES,
+                "Given away at the fair",
+                List.of(new RequestWriteOff.Line(free, LotCondition.GOOD, new BigDecimal("500")))));
+        WriteOffView requested = control.writeOff(id, own(MPCS)).orElseThrow();
+        assertThat(requested.value()).isEqualByComparingTo("0.00");
+        assertThat(requested.band()).isEqualTo(2);
+
+        kernel.reset();
+        UUID bandOne = user("inv.writeoff.approve", "{\"max_value\": 25000}");
+        assertProblem(() -> approve.handle(new ApproveWriteOff(id), own(MPCS, bandOne)), "m5.approval.limit_exceeded");
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        approve.handle(new ApproveWriteOff(id), own(MPCS, user("inv.writeoff.approve", "{\"max_value\": 250000}")));
+        assertThat(control.writeOff(id, own(MPCS)).orElseThrow().band()).isEqualTo(2);
+    }
+
+    @Test
+    void aFailedUploadDoesNotHoldTheWitnessForEverWhileAnotherPhotographIsThere() {
+        UUID id = request.handle(
+                new RequestWriteOff(
+                        stores,
+                        LossCategory.THEFT,
+                        null,
+                        List.of(new RequestWriteOff.Line(batch, LotCondition.GOOD, BigDecimal.ONE))),
+                own(MPCS));
+        Attachments.PresignedUpload lost = photo.handle(new AddWriteOffPhoto(id, "image/jpeg", 2048L), own(MPCS));
+        Attachments.PresignedUpload kept = photo.handle(new AddWriteOffPhoto(id, "image/jpeg", 2048L), own(MPCS));
+        submit.handle(new SubmitWriteOff(id), own(MPCS));
+        setPhoto(lost, "FAILED");
+
+        kernel.reset();
+        // One still on its way: wait.
+        assertProblem(
+                () -> witness.handle(new WitnessWriteOff(id), own(MPCS, WITNESS)), "m5.writeoff.photos_incomplete");
+        // Another write-off whose only photograph FAILED, where one is required: refused, not held for ever.
+        UUID other = request.handle(
+                new RequestWriteOff(
+                        stores,
+                        LossCategory.THEFT,
+                        null,
+                        List.of(new RequestWriteOff.Line(batch, LotCondition.GOOD, BigDecimal.ONE))),
+                own(MPCS));
+        Attachments.PresignedUpload only = photo.handle(new AddWriteOffPhoto(other, "image/jpeg", 2048L), own(MPCS));
+        submit.handle(new SubmitWriteOff(other), own(MPCS));
+        setPhoto(only, "FAILED");
+        kernel.reset();
+        assertProblem(
+                () -> witness.handle(new WitnessWriteOff(other), own(MPCS, WITNESS)), "m5.writeoff.photos_required");
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        // One COMPLETE and one FAILED: witnessed, the failed one named in the audit.
+        setPhoto(kept, "COMPLETE");
+        witness.handle(new WitnessWriteOff(id), own(MPCS, WITNESS));
+        assertThat(control.writeOff(id, own(MPCS)).orElseThrow().status()).isEqualTo("WITNESSED");
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("WRITEOFF_WITNESSED");
+            assertThat(a.after().toString()).contains(lost.attachmentId().toString());
+        });
+    }
+
+    @Test
+    void twoApprovalsOverTheSameLotsInOppositeOrderDoNotDeadlock() throws Exception {
+        UUID batch2 = fixture.batch(
+                inventory.balances(stores, null, true, own(MPCS)).get(0).skuId(),
+                MPCS,
+                "F2",
+                LocalDate.of(2028, 3, 31));
+        receiveBatch(stores, batch2, "50");
+        UUID approver = user("inv.writeoff.approve", "{\"max_value\": 250000}");
+        List<UUID[]> pairs = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            UUID ab = witnessed(twoLines(batch, batch2));
+            UUID ba = witnessed(twoLines(batch2, batch));
+            pairs.add(new UUID[] {ab, ba});
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (UUID[] pair : pairs) {
+                Future<?> first = pool.submit(() -> approve.handle(new ApproveWriteOff(pair[0]), own(MPCS, approver)));
+                Future<?> second = pool.submit(() -> approve.handle(new ApproveWriteOff(pair[1]), own(MPCS, approver)));
+                first.get(30, TimeUnit.SECONDS);
+                second.get(30, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        for (UUID[] pair : pairs) {
+            assertThat(control.writeOff(pair[0], own(MPCS)).orElseThrow().status())
+                    .isEqualTo("POSTED");
+            assertThat(control.writeOff(pair[1], own(MPCS)).orElseThrow().status())
+                    .isEqualTo("POSTED");
+        }
+    }
+
     @Test
     void aRejectedWriteOffMovesNoStockAndKeepsItsNumber() {
         UUID id = request.handle(expired(stores, "2"), own(MPCS));
@@ -327,7 +490,37 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
                 List.of(new RequestWriteOff.Line(batch, LotCondition.GOOD, new BigDecimal(qty))));
     }
 
+    /** A write-off drafted at the stores, submitted and witnessed in person by another person. */
+    private UUID witnessed(RequestWriteOff draft) {
+        UUID id = request.handle(draft, own(MPCS));
+        submit.handle(new SubmitWriteOff(id), own(MPCS));
+        witness.handle(new WitnessWriteOff(id), own(MPCS, WITNESS));
+        return id;
+    }
+
+    private RequestWriteOff twoLines(UUID first, UUID second) {
+        return new RequestWriteOff(
+                stores,
+                LossCategory.DAMAGED_IN_STORE,
+                "Torn",
+                List.of(
+                        new RequestWriteOff.Line(first, LotCondition.GOOD, BigDecimal.ONE),
+                        new RequestWriteOff.Line(second, LotCondition.GOOD, BigDecimal.ONE)));
+    }
+
+    private void setPhoto(Attachments.PresignedUpload upload, String status) {
+        superuserJdbc()
+                .update(
+                        "update kernel.document_attachment set status = ? where attachment_id = ?",
+                        status,
+                        upload.attachmentId());
+    }
+
     private void receive(UUID location, String qty) {
+        receiveBatch(location, batch, qty);
+    }
+
+    private void receiveBatch(UUID location, UUID theBatch, String qty) {
         ScopeContext scope = own(MPCS);
         outer.run(
                 scope,
@@ -338,7 +531,7 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
                                 null,
                                 List.of(new Movement(
                                         location,
-                                        batch,
+                                        theBatch,
                                         LotCondition.GOOD,
                                         MovementType.RECEIPT,
                                         new BigDecimal(qty),

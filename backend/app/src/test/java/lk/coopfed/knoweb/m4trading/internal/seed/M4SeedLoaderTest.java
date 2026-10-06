@@ -16,7 +16,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class M4SeedLoaderTest extends PostgresIntegrationTest {
 
-    private static final int POSTING_MAP_ROWS = 11;
+    /** 24A section 3.1's eleven rows, plus the two CN GOODS BUYER rows of wave 2 (CR-24A-3 item 5). */
+    private static final int POSTING_MAP_ROWS = 13;
 
     @Autowired
     private M4SeedLoader loader;
@@ -45,5 +46,22 @@ class M4SeedLoaderTest extends PostgresIntegrationTest {
                 .extracting(
                         row -> row.get("debit_role") + "/" + row.get("credit_role") + "/" + row.get("amount_source"))
                 .containsExactly("RECEIVABLE/REVENUE/net", "RECEIVABLE/VAT_OUTPUT/tax");
+
+        // The buyer's credit note (wave 2, CR-24A-3 item 5): payable reduced against inventory and
+        // VAT input, two rows with one key each beside the seller's two.
+        List<Map<String, Object>> creditNote = db.queryForList(
+                """
+                select side, debit_role, credit_role, amount_source from trading.posting_map
+                 where doc_type_code = 'CN' and line_kind = 'GOODS'
+                 order by side, credit_role
+                """);
+        assertThat(creditNote)
+                .extracting(row -> row.get("side") + " " + row.get("debit_role") + "/" + row.get("credit_role") + "/"
+                        + row.get("amount_source"))
+                .containsExactly(
+                        "BUYER PAYABLE/INVENTORY/net",
+                        "BUYER PAYABLE/VAT_INPUT/tax",
+                        "SELLER REVENUE/RECEIVABLE/net",
+                        "SELLER VAT_OUTPUT/RECEIVABLE/tax");
     }
 }

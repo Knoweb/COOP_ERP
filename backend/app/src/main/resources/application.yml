@@ -88,6 +88,13 @@ coop-erp:
       port: ${COOP_ERP_SMTP_PORT:1025}
       from: ${COOP_ERP_SMTP_FROM:notifications@coop-erp.test}
       timeout-millis: 5000
+      # Wave 2 (M9-11): a real relay authenticates and encrypts. security is NONE (Mailpit, a relay
+      # on the deployment's own network), STARTTLS (required, identity checked) or SSL (SMTPS);
+      # NONE with a relay beyond this machine or network refuses the start outside development.
+      # The password comes from the environment only.
+      username: ${COOP_ERP_SMTP_USERNAME:}
+      password: ${COOP_ERP_SMTP_PASSWORD:}
+      security: ${COOP_ERP_SMTP_SECURITY:NONE}
     sms:
       provider: ${COOP_ERP_SMS_PROVIDER:log}
 

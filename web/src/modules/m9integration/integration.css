@@ -11,6 +11,25 @@
   margin-bottom: var(--space-half);
 }
 
+.integration-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.integration-check .integration-label {
+  margin-bottom: 0;
+}
+
+.integration-hint {
+  color: var(--color-text-muted);
+  margin-top: 0;
+}
+
+.integration-banner {
+  font-weight: var(--font-weight-strong);
+}
+
 .integration-number {
   text-align: right;
 }

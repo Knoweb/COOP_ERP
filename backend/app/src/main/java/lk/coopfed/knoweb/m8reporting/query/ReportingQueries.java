@@ -20,7 +20,9 @@ public interface ReportingQueries {
      * A report's rows for the parameters.
      *
      * @throws lk.coopfed.knoweb.kernel.api.ProblemException {@code m8.report.unknown},
-     *     {@code m8.report.period_required}, {@code m8.report.period_invalid}
+     *     {@code m8.report.period_required}, {@code m8.report.period_invalid},
+     *     {@code m8.report.period_too_long} ({@code reporting.max_period_days}),
+     *     {@code m8.report.too_many_rows} ({@code reporting.max_rows})
      */
     ReportTable report(String reportId, ReportParameters parameters, ScopeContext scope);
 

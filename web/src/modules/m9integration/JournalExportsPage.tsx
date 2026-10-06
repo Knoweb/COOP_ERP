@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
@@ -7,7 +7,7 @@ import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { useIntegrationApi, type JournalExport } from "./integrationApi";
-import { defaultExportPeriod, errorText, journalFileName } from "./integrationView";
+import { defaultExportPeriod, errorText, journalFileName, periodIsOpen } from "./integrationView";
 import "./integration.css";
 
 /**
@@ -15,6 +15,11 @@ import "./integration.css";
  * export, "Generate", and the run history with the totals, the file for the accounting package
  * and the reconciliation of each export. Every amount goes through MoneyDisplay; the page adds
  * nothing up itself, the server's reconciliation does.
+ *
+ * Wave 2 (CR-29-1): the default period ends yesterday; a period that ends today or later is still
+ * open, so the provisional box is ticked and required for it (the server refuses the export
+ * otherwise); a provisional export is marked in the history; and the banner says when postings
+ * for periods already exported are waiting, so the accountant exports the supplement.
  */
 export function JournalExportsPage() {
   const t = useT();
@@ -25,16 +30,30 @@ export function JournalExportsPage() {
   const canExport = useHasPermission("int.journal.export");
   const exportKey = useIdempotencyKey();
 
-  const [period, setPeriod] = useState(() => defaultExportPeriod(businessToday()));
+  const today = businessToday();
+  const [period, setPeriod] = useState(() => defaultExportPeriod(today));
+  const [provisional, setProvisional] = useState(false);
   const [message, setMessage] = useState<{ kind: "status" | "alert"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
 
   const periodValid = period.from !== "" && period.to !== "" && period.from <= period.to;
+  const periodOpen = periodIsOpen(period.to, today);
+  // An open period ticks the box; the box stays required, so unticking it stops the form, and the
+  // accountant chooses knowingly between a provisional file and an earlier end date.
+  useEffect(() => {
+    if (periodOpen) {
+      setProvisional(true);
+    }
+  }, [periodOpen]);
   const pending = useQuery({
     queryKey: ["integration", "pending", period.from, period.to],
     queryFn: () => api.pending(period.from, period.to),
     enabled: periodValid
+  });
+  const supplementDue = useQuery({
+    queryKey: ["integration", "supplement-due"],
+    queryFn: () => api.supplementDue()
   });
   const exports = useQuery({ queryKey: ["integration", "exports"], queryFn: () => api.exports() });
 
@@ -42,7 +61,7 @@ export function JournalExportsPage() {
     setMessage(null);
     setBusy(true);
     try {
-      const created = await api.requestExport(period.from, period.to, exportKey.current());
+      const created = await api.requestExport(period.from, period.to, provisional, exportKey.current());
       exportKey.next();
       setMessage({
         kind: "status",
@@ -64,7 +83,7 @@ export function JournalExportsPage() {
       const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = journalFileName(journal.periodFrom, journal.periodTo);
+      link.download = journalFileName(journal.periodFrom, journal.periodTo, journal.provisional);
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -102,6 +121,16 @@ export function JournalExportsPage() {
             onChange={(event) => setPeriod({ ...period, to: event.target.value })}
           />
         </label>
+        <label className="modern-field integration-check">
+          <input
+            type="checkbox"
+            checked={provisional}
+            required={periodOpen}
+            aria-describedby="integration-provisional-hint"
+            onChange={(event) => setProvisional(event.target.checked)}
+          />
+          <span className="modern-field__label integration-label">{t("integration.journal.provisional").text}</span>
+        </label>
         {canExport && (
           <button
             type="submit"
@@ -113,6 +142,22 @@ export function JournalExportsPage() {
         )}
       </form>
 
+      <p id="integration-provisional-hint" className="integration-hint">
+        {periodOpen
+          ? t("integration.journal.provisional.open", undefined, { to: formatDate(period.to) }).text
+          : t("integration.journal.provisional.hint").text}
+      </p>
+      {supplementDue.data && supplementDue.data.postings > 0 && supplementDue.data.upTo && (
+        <p role="status" className="integration-banner">
+          {
+            t("integration.journal.supplement_due", undefined, {
+              count: String(supplementDue.data.postings),
+              upTo: formatDate(supplementDue.data.upTo)
+            }).text
+          }{" "}
+          <MoneyDisplay amount={String(supplementDue.data.amount)} />
+        </p>
+      )}
       {pending.data && (
         <p role="status" aria-live="polite">
           {pending.data.postings === 0 ? (
@@ -156,6 +201,12 @@ export function JournalExportsPage() {
                       <td>{formatInstant(journal.generatedAt)}</td>
                       <td>
                         <StateChip state="issued" label={t(`integration.journal.status.${journal.status}`).text} />
+                        {journal.provisional && (
+                          <>
+                            {" "}
+                            <StateChip state="alert" label={t("integration.journal.mark.PROVISIONAL").text} />
+                          </>
+                        )}
                       </td>
                       <td className="integration-number">{journal.lineCount}</td>
                       <td className="integration-number">

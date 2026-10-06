@@ -26,6 +26,7 @@ import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.PostedMovement;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
 import lk.coopfed.knoweb.m5inventory.api.TransferIssued;
+import lk.coopfed.knoweb.m5inventory.internal.control.StockOnHand;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,10 +45,12 @@ import org.springframework.transaction.annotation.Transactional;
  * see the destination; at least one line ({@code m5.transfer.lines_required}); each line a batch
  * and a quantity above zero with at most three decimals ({@code m5.transfer.line_invalid}), the
  * batch known to M2 ({@code m5.batch.not_found}), and the source's GOOD lot of it holding the
- * quantity ({@code m5.transfer.insufficient_stock}: stock that is not there is not sent).
+ * quantity, less what open pick lists hold of it, the lots locked in the ledger's order (wave 2,
+ * M5-12; {@code m5.transfer.insufficient_stock}: stock that is not there is not sent).
  *
  * <p>Mutation: the transfer and its lines, all at the source location (the source's rows); the
- * ledger's TRANSFER_OUT movements there, citing the transfer. Audit {@code TRANSFER_ISSUED}; event
+ * ledger's TRANSFER_OUT movements there, citing the transfer. Audit {@code TRANSFER_ISSUED}, and
+ * {@code TRANSFER_REQUEST_SHORT} (REVIEW) for a request sent short (M5-03); event
  * {@code transfer.issued.v1}. The XFR document of 25A is deferred for the demo: the movements cite
  * the transfer's id (README, deviation 13).
  */
@@ -56,8 +59,10 @@ import org.springframework.transaction.annotation.Transactional;
 class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
 
     static final String AUDIT_ISSUED = "TRANSFER_ISSUED";
+    static final String AUDIT_REQUEST_SHORT = "TRANSFER_REQUEST_SHORT";
 
     private final TransferStore store;
+    private final StockOnHand stock;
     private final PartyQueries party;
     private final BatchQueries batches;
     private final StockLedger ledger;
@@ -67,6 +72,7 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
 
     IssueTransferHandler(
             TransferStore store,
+            StockOnHand stock,
             PartyQueries party,
             BatchQueries batches,
             StockLedger ledger,
@@ -74,6 +80,7 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
             AuditFacade audit,
             EventPublisher events) {
         this.store = store;
+        this.stock = stock;
         this.party = party;
         this.batches = batches;
         this.ledger = ledger;
@@ -123,8 +130,17 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
             skus.add(batch.skuId());
             perBatch.merge(line.batchId(), line.qty(), BigDecimal::add);
         }
+        // wave 2, M5-12: the lots locked in the ledger's order, so the check and the posting see the
+        // same quantity; what an open pick list holds for a delivery note is not free to send.
+        Map<StockOnHand.LotRef, BigDecimal> held = stock.lockLots(
+                from,
+                perBatch.keySet().stream()
+                        .map(batch -> new StockOnHand.LotRef(batch, LotCondition.GOOD.name()))
+                        .toList());
         perBatch.forEach((batch, qty) -> {
-            if (store.goodOnHand(from, batch).compareTo(qty) < 0) {
+            BigDecimal free = held.get(new StockOnHand.LotRef(batch, LotCondition.GOOD.name()))
+                    .subtract(store.reserved(from, batch));
+            if (free.compareTo(qty) < 0) {
                 throw new ProblemException("m5.transfer.insufficient_stock", Map.of("batchId", batch));
             }
         });
@@ -176,8 +192,33 @@ class IssueTransferHandler implements Handles<IssueTransfer, UUID> {
         }
 
         audit.record(AUDIT_ISSUED, Subject.of("transfer", id), null, auditAfter(from, to, command), scope);
+        if (!command.shortfalls().isEmpty()) {
+            // wave 2, M5-03: the request is filled once; what could not be sent is on the exception
+            // report and the shop raises a new request for it, as an indent book works.
+            List<Map<String, Object>> shortLines = new ArrayList<>();
+            for (IssueTransfer.Shortfall shortfall : command.shortfalls()) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("skuId", shortfall.skuId());
+                entry.put("wanted", shortfall.wanted().toPlainString());
+                entry.put("sent", shortfall.sent().toPlainString());
+                shortLines.add(entry);
+            }
+            audit.record(
+                    AUDIT_REQUEST_SHORT,
+                    Subject.of("transfer", id),
+                    null,
+                    Map.of("transferRequestId", String.valueOf(command.transferRequestId()), "lines", shortLines),
+                    scope,
+                    "The approved request could not be filled in full; the shop raises a new request for the rest");
+        }
         events.publish(new TransferIssued(
-                id, scope.entityId(), from, to, command.lines().size(), command.transferRequestId()));
+                id,
+                scope.entityId(),
+                from,
+                to,
+                command.lines().size(),
+                command.transferRequestId(),
+                command.shortfalls().size()));
         return id;
     }
 

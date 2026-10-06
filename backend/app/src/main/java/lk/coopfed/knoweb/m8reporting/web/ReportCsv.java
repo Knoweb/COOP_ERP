@@ -10,10 +10,18 @@ import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 /**
  * A report as CSV (RFC 4180): a header line of the column names in the caller's language, then
  * one line per row, values as the data operation gives them. A text cell that a spreadsheet
- * would take for a formula (it starts with =, +, - or @) is written with a leading apostrophe,
- * so opening the file never runs anything; numbers and dates are written as they are.
+ * would take for a formula (it starts with =, +, -, @, a tab, a carriage return or a line feed)
+ * is written with a leading apostrophe, so opening the file never runs anything; numbers and
+ * dates are written as they are.
  */
 final class ReportCsv {
+
+    /**
+     * The first characters a spreadsheet may read as the start of a formula: = + - @, and a tab,
+     * carriage return or line feed in front of one (wave 2, M8-10). Only TEXT cells are guarded: a
+     * MONEY or QTY cell starts with "-" when it is negative, and is a number.
+     */
+    static final String FORMULA_START = "=+-@\t\r\n";
 
     private ReportCsv() {}
 
@@ -42,7 +50,7 @@ final class ReportCsv {
     }
 
     private static String text(String value) {
-        if (!value.isEmpty() && "=+-@".indexOf(value.charAt(0)) >= 0) {
+        if (!value.isEmpty() && FORMULA_START.indexOf(value.charAt(0)) >= 0) {
             return "'" + value;
         }
         return value;

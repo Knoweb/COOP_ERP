@@ -52,9 +52,11 @@ public class ShopSaleProjection extends Projection {
     protected void apply(ProjectionEvent event, ScopeContext scope) {
         JsonNode document = event.payload().path("document");
         UUID receipt = ProjectionEvent.uuid(document, "document_id");
-        UUID location = ProjectionEvent.uuid(document, "location_id");
+        // The device's shop, as M6 files the receipt (wave 2, M8-04): the till's own location_id
+        // only when the scope has none.
+        UUID location = scope.locationId();
         if (location == null) {
-            location = scope.locationId();
+            location = ProjectionEvent.uuid(document, "location_id");
         }
         String day = ProjectionEvent.string(document, "business_date");
         String issued = ProjectionEvent.string(document, "issued_at");
@@ -67,20 +69,24 @@ public class ShopSaleProjection extends Projection {
         for (JsonNode line : event.payload().path("lines")) {
             BigDecimal qty = ProjectionEvent.decimal(line, "qty");
             UUID sku = ProjectionEvent.uuid(line, "sku_id");
-            UUID lineId = ProjectionEvent.uuid(line, "line_id");
-            if (qty == null || sku == null || lineId == null) {
+            // The line's number is its identity (doc 32's bundle, M6's receipt_line key); the till
+            // sends no line_id (wave 2, M8-04), which is kept only when a bundle carries one.
+            int lineNo = line.path("line_no").asInt(0);
+            if (qty == null || sku == null || lineNo < 1) {
                 continue;
             }
             lines++;
             jdbc.update(
                     """
                     insert into reporting.shop_sale_line_fact
-                           (line_id, receipt_id, owner_entity_id, location_id, business_date, sku_id, qty, line_total)
-                    values (?, ?, ?, ?, ?, ?, ?, ?)
-                    on conflict (line_id) do nothing
+                           (receipt_id, line_no, line_id, owner_entity_id, location_id, business_date, sku_id, qty,
+                            line_total)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    on conflict (receipt_id, line_no) do nothing
                     """,
-                    lineId,
                     receipt,
+                    lineNo,
+                    ProjectionEvent.uuid(line, "line_id"),
                     scope.entityId(),
                     location,
                     Date.valueOf(businessDate),

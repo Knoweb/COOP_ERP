@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The cases of doc 32 section 11 that the second part of K-08 makes passable, run by the
@@ -39,6 +38,9 @@ class TillSimulatorConformanceIntegrationTest extends SyncIntegrationTest {
 
     @Autowired
     PlatformTransactionManager transactions;
+
+    @Autowired
+    SystemScope systemScope;
 
     @Autowired
     TillSigner signer;
@@ -244,9 +246,9 @@ class TillSimulatorConformanceIntegrationTest extends SyncIntegrationTest {
     }
 
     private long publish(LocalDate applyFrom, boolean urgent, Change... changes) {
-        return new TransactionTemplate(transactions)
-                .execute(status ->
-                        changeLog.append(new Target(ENTITY, SHOP), List.of(changes), applyFrom, urgent, federation));
+        return systemScope.inOwnTransaction(
+                federation,
+                () -> changeLog.append(new Target(ENTITY, SHOP), List.of(changes), applyFrom, urgent, federation));
     }
 
     private UUID addPosition(int number) {

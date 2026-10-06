@@ -22,8 +22,12 @@ import org.springframework.stereotype.Component;
  * the issue handler, which audits, publishes and refuses a second transfer for the same request.
  *
  * <p>The approval checked the availability; stock sold between the approval and this delivery is
- * sent as far as it goes (the request's line is short), and a request with nothing left to send
- * fails ({@code m5.transfer.insufficient_stock}) and waits in the dead letter queue for a person.
+ * sent as far as it goes, and a request with nothing left to send fails ({@code
+ * m5.transfer.insufficient_stock}) and waits in the dead letter queue for a person. Since wave 2
+ * (M5-03; {@code 2026-10-06-wave2-stock-movements.md} (2)) a request is filled once: each item sent
+ * short or not at all is handed to the issue as a shortfall (wanted, sent), which the handler
+ * audits as {@code TRANSFER_REQUEST_SHORT} (REVIEW) and counts in {@code transfer.issued.v1}'s
+ * {@code shortLines}; the shop raises a new request for the rest. Expired lots are never sent.
  *
  * <p>The payload is M4's {@code TransferRequestApproved} record (requestId, ownerEntityId,
  * fromLocationId, toLocationId, lines of skuId and qty), read as JSON: M5 imports nothing of M4.
@@ -47,22 +51,28 @@ class TransferRequestConsumer {
     public void onApproved(JsonNode payload, ScopeContext scope) {
         UUID from = Payloads.uuid(payload, "fromLocationId");
         List<IssueTransfer.Line> lines = new ArrayList<>();
+        List<IssueTransfer.Shortfall> shortfalls = new ArrayList<>();
         for (JsonNode line : payload.path("lines")) {
             BigDecimal wanted = Payloads.decimal(line, "qty");
             UUID sku = Payloads.uuid(line, "skuId");
             if (wanted == null || sku == null) {
                 continue;
             }
+            BigDecimal remaining = wanted;
+            // In-date lots only, each with what no delivery note's pick list holds (wave 2, M5-01).
             for (LotBalance lot : inventory.pickBatches(from, sku, scope)) {
-                if (wanted.signum() <= 0) {
+                if (remaining.signum() <= 0) {
                     break;
                 }
                 if (!"GOOD".equals(lot.condition()) || lot.qtyOnHand().signum() <= 0) {
                     continue;
                 }
-                BigDecimal take = wanted.min(lot.qtyOnHand());
+                BigDecimal take = remaining.min(lot.qtyOnHand());
                 lines.add(new IssueTransfer.Line(lot.batchId(), take));
-                wanted = wanted.subtract(take);
+                remaining = remaining.subtract(take);
+            }
+            if (remaining.signum() > 0) {
+                shortfalls.add(new IssueTransfer.Shortfall(sku, wanted, wanted.subtract(remaining)));
             }
         }
         if (lines.isEmpty()) {
@@ -70,7 +80,11 @@ class TransferRequestConsumer {
         }
         issue.handle(
                 new IssueTransfer(
-                        from, Payloads.uuid(payload, "toLocationId"), lines, Payloads.uuid(payload, "requestId")),
+                        from,
+                        Payloads.uuid(payload, "toLocationId"),
+                        lines,
+                        Payloads.uuid(payload, "requestId"),
+                        shortfalls),
                 scope);
     }
 }

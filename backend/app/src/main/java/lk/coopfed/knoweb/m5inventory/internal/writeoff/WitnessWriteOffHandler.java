@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m5inventory.internal.writeoff;
 
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,8 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Guards, in order: an OWN scope; the write-off visible ({@code m5.writeoff.not_found});
  * REQUESTED ({@code m5.writeoff.not_requested}); the witness not the requester
- * ({@code m5.writeoff.witness_is_requester}); every photograph verified COMPLETE by the kernel
- * ({@code m5.writeoff.photos_incomplete}); for a remote witness, remote witnessing allowed and the
+ * ({@code m5.writeoff.witness_is_requester}); no photograph still PENDING, each COMPLETE or FAILED
+ * (an upload that never arrived) ({@code m5.writeoff.photos_incomplete}), and at least one COMPLETE
+ * where photographs are required ({@code m5.writeoff.photos_required}; wave 2, M5-11: the FAILED ones are named in the audit,
+ * and evidence stays fixed after issue); for a remote witness, remote witnessing allowed and the
  * witness holding inv.writeoff.approve ({@code m5.writeoff.remote_witness_not_allowed}).
  *
  * <p>Mutation: WITNESSED with the witness, the time and the remote flag. Audit
@@ -87,13 +90,25 @@ class WitnessWriteOffHandler implements Handles<WitnessWriteOff, UUID> {
         if (scope.userId() == null || scope.userId().equals(writeOff.requestedBy())) {
             throw new ProblemException("m5.writeoff.witness_is_requester");
         }
+        LocationView location = policy.requireEntityLocation(writeOff.locationId(), scope);
+        // wave 2, M5-11: an upload that never arrived (FAILED) does not hold the write-off for ever;
+        // one still on its way (PENDING) does, and where photographs are required one must be there.
         List<UUID> photos = store.photos(writeOff.writeOffId());
+        List<UUID> failed = new ArrayList<>();
+        int complete = 0;
         for (UUID photo : photos) {
-            if (!"COMPLETE".equals(attachments.status(photo).orElse(null))) {
+            String status = attachments.status(photo).orElse("PENDING");
+            if ("COMPLETE".equals(status)) {
+                complete++;
+            } else if ("FAILED".equals(status)) {
+                failed.add(photo);
+            } else {
                 throw new ProblemException("m5.writeoff.photos_incomplete", Map.of("attachmentId", photo));
             }
         }
-        LocationView location = policy.requireEntityLocation(writeOff.locationId(), scope);
+        if (complete == 0 && policy.photosRequired(writeOff.category(), location, scope)) {
+            throw new ProblemException("m5.writeoff.photos_required");
+        }
         boolean remote = policy.singleStaff(location, scope);
         if (remote && (!policy.remoteWitnessAllowed(scope) || !permissions.allows(scope, "inv.writeoff.approve"))) {
             throw new ProblemException("m5.writeoff.remote_witness_not_allowed");
@@ -114,7 +129,7 @@ class WitnessWriteOffHandler implements Handles<WitnessWriteOff, UUID> {
                 AUDIT_WITNESSED,
                 Subject.of("write_off", writeOff.writeOffId()),
                 Map.of("status", "REQUESTED"),
-                Map.of("status", "WITNESSED", "remoteWitness", remote, "photos", photos.size()),
+                Map.of("status", "WITNESSED", "remoteWitness", remote, "photos", photos.size(), "failedPhotos", failed),
                 scope,
                 null,
                 scope.userId());

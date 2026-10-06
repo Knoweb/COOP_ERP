@@ -9,6 +9,7 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m8reporting.api.ExportReportCsv;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
@@ -46,6 +47,7 @@ class ReportingController implements ReportingApi {
     private final ReportingQueries queries;
     private final CurrentScope currentScope;
     private final Handles<RequestReportRun, UUID> requestRun;
+    private final Handles<ExportReportCsv, ReportTable> exportCsv;
     private final Messages messages;
     private final ObjectProvider<A4Renderer> renderer;
 
@@ -53,11 +55,13 @@ class ReportingController implements ReportingApi {
             ReportingQueries queries,
             CurrentScope currentScope,
             Handles<RequestReportRun, UUID> requestRun,
+            Handles<ExportReportCsv, ReportTable> exportCsv,
             Messages messages,
             ObjectProvider<A4Renderer> renderer) {
         this.queries = queries;
         this.currentScope = currentScope;
         this.requestRun = requestRun;
+        this.exportCsv = exportCsv;
         this.messages = messages;
         this.renderer = renderer;
     }
@@ -152,7 +156,8 @@ class ReportingController implements ReportingApi {
     @Override
     public ResponseEntity<String> exportReportCsv(String reportId, LocalDate from, LocalDate to, UUID locationId) {
         ScopeContext scope = currentScope.get();
-        ReportTable table = queries.report(reportId, new ReportParameters(from, to, locationId), scope);
+        // Audited REPORT_EXPORTED (wave 2, M8-11); the screen's /data is not.
+        ReportTable table = exportCsv.handle(new ExportReportCsv(reportId, from, to, locationId), scope);
         String name = reportId + (from == null ? "" : "_" + from + "_" + to) + ".csv";
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
