@@ -236,8 +236,11 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 taxPoint,
                 dueDate);
 
-        List<Posting> journal =
-                postings.postings(INV, "GOODS", "SELLER", Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+        // Both sides of the invoice (wave 2, CR-24A-3 item 5): the seller's receivable and the
+        // buyer's payable travel on one event; M9 files each under its own party (CR-19A-13).
+        Map<String, BigDecimal> amounts = Map.of("net", issued.netAmount(), "tax", issued.taxAmount());
+        List<Posting> journal = new ArrayList<>(postings.postings(INV, "GOODS", "SELLER", amounts));
+        journal.addAll(postings.postings(INV, "GOODS", "BUYER", amounts));
 
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", issued.status());
@@ -264,7 +267,7 @@ public class IssueInvoiceHandler implements Handles<IssueInvoice, UUID> {
                 issued.grossAmount(),
                 issued.contentHash()));
         events.publish(new JournalPostingsReady(
-                invoiceId, INV, issued.docNumberDisplay(), seller, journal, issued.businessDate()));
+                invoiceId, INV, issued.docNumberDisplay(), seller, journal, issued.businessDate(), buyerId));
         return invoiceId;
     }
 }

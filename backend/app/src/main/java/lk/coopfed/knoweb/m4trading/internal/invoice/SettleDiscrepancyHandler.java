@@ -227,11 +227,7 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                         "update trading.doc_invoice set credited_amount = ? where document_id = ?",
                         credited,
                         invoiceId);
-                journal = postings.postings(
-                        IssueCreditNoteHandler.CN,
-                        "GOODS",
-                        "SELLER",
-                        Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+                journal = IssueCreditNoteHandler.bothSides(postings, issued);
             }
         }
 
@@ -274,7 +270,8 @@ public class SettleDiscrepancyHandler implements Handles<SettleDiscrepancy, UUID
                     issued.docNumberDisplay(),
                     seller,
                     journal,
-                    issued.businessDate()));
+                    issued.businessDate(),
+                    buyer));
         }
         return creditNoteId;
     }

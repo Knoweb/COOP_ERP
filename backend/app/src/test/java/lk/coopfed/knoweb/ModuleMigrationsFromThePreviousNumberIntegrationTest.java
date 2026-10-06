@@ -48,7 +48,9 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
         streams.put("m8reporting", null);
-        streams.put("m9integration", null);
+        // Wave 2, PR 14: m9integration V0006 (the stored file, the owner in the posting key, the
+        // contact door) on a database at V0005.
+        streams.put("m9integration", "5");
         return streams;
     }
 
@@ -97,6 +99,27 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 new JdbcTemplate(new DriverManagerDataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword()));
         admin.update(
                 "insert into kernel.system_identity (singleton, entity_id) values (true, ?::uuid)", TEST_FEDERATION_ID);
+        // An M9 posting and an export over it, as the demo server holds them before V0006.
+        admin.update(
+                """
+                insert into integration.journal_posting (posting_id, owner_entity_id, document_id, seq, doc_type_code,
+                    doc_number_display, line_kind, side, debit_role, credit_role, amount_source, amount, business_date,
+                    recorded_at)
+                values ('0190e9f0-0000-7000-8000-000000000001', ?::uuid, '0190e9f0-0000-7000-8000-000000000002', 1,
+                    'INV', 'D101-INV-000001', 'GOODS', 'SELLER', 'RECEIVABLE', 'REVENUE', 'net', 10.00, '2026-08-05',
+                    '2026-08-05T04:00:00Z')
+                """,
+                TEST_FEDERATION_ID);
+        admin.update(
+                """
+                insert into integration.journal_export (export_id, owner_entity_id, period_from, period_to, format,
+                    provisional, status, line_count, total_debit, total_credit, content_hash, generated_at,
+                    requested_by, requested_at)
+                values ('0190e9f0-0000-7000-8000-000000000003', ?::uuid, '2026-08-01', '2026-08-31', 'CSV', false,
+                    'GENERATED', 1, 10.00, 10.00, repeat('0', 64), '2026-09-01T04:00:00Z',
+                    '0190e9f0-0000-7000-8000-000000000004', '2026-09-01T04:00:00Z')
+                """,
+                TEST_FEDERATION_ID);
 
         Map<String, Integer> after = new LinkedHashMap<>();
         for (String stream : PREVIOUS.keySet()) {
@@ -138,6 +161,26 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                                 + " and tablename = 'control_price' and policyname = 'own_write'",
                         String.class))
                 .contains("kernel.system_entity()");
+
+        // Wave 2, PR 14: m9integration V0006 over a database at V0005, with a posting and an export
+        // of the demo's in place: the key changes under rows, and the export has no file row.
+        assertThat(after).containsEntry("m9integration", 6);
+        assertThat(admin.queryForList(
+                        "select conname from pg_constraint where conrelid = 'integration.journal_posting'::regclass"
+                                + " and contype = 'u'",
+                        String.class))
+                .containsExactly("journal_posting_owner_document_seq_uq");
+        assertThat(admin.queryForObject(
+                        "select count(*) from pg_policies where schemaname = 'integration'"
+                                + " and tablename = 'notification_contact' and policyname = 'fed_view'",
+                        Integer.class))
+                .isZero();
+        assertThat(admin.queryForObject(
+                        "select prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace"
+                                + " where n.nspname = 'integration' and p.proname = 'notification_recipients'",
+                        String.class))
+                .contains("kernel.scope_class() = 'OWN'")
+                .contains("party.caller_trades_with(p_entity)");
 
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
         assertThat(after).containsEntry("m4trading", 10);

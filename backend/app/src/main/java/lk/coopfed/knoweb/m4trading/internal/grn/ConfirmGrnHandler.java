@@ -273,8 +273,15 @@ public class ConfirmGrnHandler implements Handles<ConfirmGrn, String> {
             events.publish(raised);
         }
         if (!journal.isEmpty()) {
+            // The receiver's side only: no counterparty, so the kernel delivers it to nobody else.
             events.publish(new JournalPostingsReady(
-                    grnId, GrnReads.GRN, issued.docNumberDisplay(), scope.entityId(), journal, issued.businessDate()));
+                    grnId,
+                    GrnReads.GRN,
+                    issued.docNumberDisplay(),
+                    scope.entityId(),
+                    journal,
+                    issued.businessDate(),
+                    null));
         }
         return issued.docNumberDisplay();
     }
