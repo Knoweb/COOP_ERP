@@ -4,6 +4,7 @@ import static lk.coopfed.knoweb.m5inventory.InventoryFixture.at;
 import static lk.coopfed.knoweb.m5inventory.InventoryFixture.own;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ import lk.coopfed.knoweb.m5inventory.api.Movement;
 import lk.coopfed.knoweb.m5inventory.api.MovementType;
 import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
+import lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay;
 import lk.coopfed.knoweb.m5inventory.query.Availability;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
@@ -66,6 +68,9 @@ class InventoryQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    BusinessDay businessDay;
 
     private InventoryFixture fixture;
     private UUID warehouse;
@@ -125,6 +130,73 @@ class InventoryQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
                 .extracting(LotBalance::batchId)
                 .containsExactly(early, late, undated);
         assertThat(queries.skusWithLots(warehouse, own(MPCS))).containsExactly(sku);
+    }
+
+    @Test
+    void anExpiredLotIsShownFlaggedButNeverRankedAvailablePickedOrPricedWhileALotExpiringTodayStillIs() {
+        LocalDate today = businessDay.today();
+        UUID gone = fixture.batch(sku, MPCS, "GONE", today.minusDays(1));
+        UUID lastDay = fixture.batch(sku, MPCS, "LASTDAY", today);
+        post(
+                own(MPCS),
+                receipt(warehouse, gone, LotCondition.GOOD, "6"),
+                receipt(warehouse, lastDay, LotCondition.GOOD, "4"),
+                receipt(warehouse, late, LotCondition.GOOD, "5"));
+
+        List<LotBalance> lots = queries.balances(warehouse, sku, false, own(MPCS));
+        BigDecimal available =
+                available(queries.availability(List.of(warehouse), List.of(sku), own(MPCS)), warehouse, sku);
+        List<LotBalance> picks = queries.pickBatches(warehouse, sku, own(MPCS));
+        List<LotBalance> priced = queries.inStockBatches(List.of(warehouse), sku, own(MPCS));
+        // The business date is read again: a run across midnight in Colombo proves nothing, so it is skipped.
+        assumeTrue(today.equals(businessDay.today()), "the run crossed midnight in Colombo");
+
+        assertThat(lots)
+                .extracting(LotBalance::batchId, LotBalance::fefoRank, LotBalance::expired)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(lastDay, 1, false),
+                        org.assertj.core.groups.Tuple.tuple(late, 2, false),
+                        org.assertj.core.groups.Tuple.tuple(gone, null, true));
+        assertThat(available).isEqualByComparingTo("9");
+        assertThat(picks).extracting(LotBalance::batchId).containsExactly(lastDay, late);
+        assertThat(priced).extracting(LotBalance::batchId).containsExactly(lastDay, late);
+    }
+
+    @Test
+    void pickBatchesLeaveOutWhatAnOpenPickListHolds() {
+        post(
+                own(MPCS),
+                receipt(warehouse, early, LotCondition.GOOD, "10"),
+                receipt(warehouse, late, LotCondition.GOOD, "5"));
+        UUID earlyLot =
+                queries.balances(warehouse, sku, false, own(MPCS)).get(0).stockLotId();
+        UUID pickList = Ids.next();
+        JdbcTemplate admin = superuserJdbc();
+        admin.update(
+                "insert into inventory.pick_list (pick_list_id, owner_entity_id, delivery_document_id) values (?, ?, ?)",
+                pickList,
+                MPCS,
+                Ids.next());
+        admin.update(
+                """
+                insert into inventory.pick_list_line
+                    (pick_line_id, pick_list_id, owner_entity_id, delivery_line_id, sku_id, location_id, stock_lot_id,
+                     batch_id, qty)
+                values (?, ?, ?, ?, ?, ?, ?, ?, 7)
+                """,
+                Ids.next(),
+                pickList,
+                MPCS,
+                Ids.next(),
+                sku,
+                warehouse,
+                earlyLot,
+                early);
+
+        assertThat(queries.pickBatches(warehouse, sku, own(MPCS)))
+                .extracting(LotBalance::batchId, l -> l.qtyOnHand().intValue())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(early, 3), org.assertj.core.groups.Tuple.tuple(late, 5));
     }
 
     @Test
