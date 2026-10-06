@@ -315,6 +315,7 @@ permissions:
     module: "m4trading"
     description_en: "Issue debit notes"
     scope: "ENTITY"
+    requires_mfa: true
   - code: "bil.payment.record"
     module: "m4trading"
     description_en: "Record payment receipts, settlements and cheque outcomes"

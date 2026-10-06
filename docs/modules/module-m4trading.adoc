@@ -7,6 +7,7 @@
 
 * `l.c.k.m.query.ClaimQueries` (via `l.c.k.m.internal.queries.ClaimQueriesImpl`)
 * `l.c.k.m.query.CreditNoteQueries` (via `l.c.k.m.internal.queries.CreditNoteQueriesImpl`)
+* `l.c.k.m.query.DebitNoteQueries` (via `l.c.k.m.internal.queries.DebitNoteQueriesImpl`)
 * `l.c.k.m.query.DeliveryQueries` (via `l.c.k.m.internal.queries.DeliveryQueriesImpl`)
 * `l.c.k.m.query.DiscrepancyQueries` (via `l.c.k.m.internal.queries.DiscrepancyQueriesImpl`)
 * `l.c.k.m.query.ExposureQueries` (via `l.c.k.m.internal.queries.ExposureQueriesImpl`)

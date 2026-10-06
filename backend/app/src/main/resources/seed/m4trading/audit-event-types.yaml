@@ -150,6 +150,16 @@ audit_event_types:
     offline_capturable: false
     description_en: Money a credit note held unapplied applied to an open invoice of the same buyer
 
+  - code: DEBIT_NOTE_ISSUED
+    severity: INFO
+    offline_capturable: false
+    description_en: Debit note issued against a tax invoice, for additional charges or corrections
+
+  - code: DEBIT_NOTE_PRINTED
+    severity: INFO
+    offline_capturable: false
+    description_en: The A4 copy of an issued debit note stored for printing
+
   - code: PAYMENT_RECEIPT_RECORDED
     severity: INFO
     offline_capturable: false

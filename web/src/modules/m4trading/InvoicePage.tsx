@@ -111,6 +111,7 @@ export function InvoicePage() {
   const inv = invoice.data;
   const isBuyer = inv.buyerEntityId === scope.entityId;
   const credited = (inv.creditedAmount ?? 0) > 0;
+  const debited = (inv.debitedAmount ?? 0) > 0;
   const paid = (inv.payments ?? []).length > 0;
   const amountDue = inv.amountDue ?? inv.grossAmount;
   const paymentState = inv.paymentState ?? "OPEN";
@@ -236,6 +237,14 @@ export function InvoicePage() {
             </dd>
           </div>
         )}
+        {debited && (
+          <div className="document-header__fact">
+            <dt>{t("trading.invoice.debited").text}</dt>
+            <dd>
+              <MoneyDisplay amount={inv.debitedAmount ?? 0} />
+            </dd>
+          </div>
+        )}
         {paid && (
           <div className="document-header__fact">
             <dt>{t("trading.invoice.settled").text}</dt>
@@ -244,7 +253,7 @@ export function InvoicePage() {
             </dd>
           </div>
         )}
-        {(credited || paid) && (
+        {(credited || paid || debited) && (
           <div className="document-header__fact">
             <dt>{t("trading.invoice.amount_due").text}</dt>
             <dd>
@@ -313,6 +322,20 @@ export function InvoicePage() {
             ))}
           </ul>
           {applyCredit.isError && <p role="alert">{errorText(applyCredit.error, t("trading.error.generic").text)}</p>}
+        </section>
+      )}
+
+      {(inv.debitNotes ?? []).length > 0 && (
+        <section className="trading-section">
+          <h2>{t("trading.invoice.debit_notes").text}</h2>
+          <ul>
+            {(inv.debitNotes ?? []).map((note) => (
+              <li key={note.debitNoteId}>
+                <Link to={`/trading/debit-notes/${note.debitNoteId}`}>{note.docNumber ?? t("trading.debitnote.title").text}</Link>{" "}
+                <MoneyDisplay amount={note.grossAmount} />
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
