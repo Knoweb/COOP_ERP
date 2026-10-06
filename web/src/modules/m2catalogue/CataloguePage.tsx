@@ -8,6 +8,7 @@ import { PageHeader } from "../../shell/components/PageHeader";
 import { StateChip } from "../../shell/components/StateChip";
 import { useCatalogueApi, type SkuStatus } from "./catalogueApi";
 import { chipOf, errorText, languageOf, nameIn } from "./skuView";
+import css from "./catalogue.css";
 
 const STATUSES: SkuStatus[] = ["DRAFT", "LOCAL", "SHARED", "INACTIVE"];
 
@@ -29,26 +30,26 @@ function SkuThumbnail({ skuId }: { skuId: string }) {
       sessionStorage.removeItem(`sku_preview_${skuId}`);
       localPreviewUrl = null;
     }
-  } catch (e) {
+  } catch (_) {
     // Ignore storage errors
   }
 
   const displayUrl = localPreviewUrl || activeImage?.thumbUrl || activeImage?.imageUrl;
 
   if (images.isLoading && !displayUrl) {
-    return <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-1)' }} />;
+    return <div className={css.catalogueThumbnailPlaceholder} />;
   }
 
   if (displayUrl) {
     return (
-      <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-1)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-        <img src={displayUrl} alt="Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <div className={css.catalogueThumbnailContainer}>
+        <img src={displayUrl} alt="Thumbnail" className={css.catalogueThumbnailImage} />
       </div>
     );
   }
 
   return (
-    <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
+    <div className={css.catalogueThumbnailPlaceholder}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
         <circle cx="8.5" cy="8.5" r="1.5"></circle>
@@ -166,7 +167,7 @@ export function CataloguePage() {
             <table className="modern-table catalogue-table">
               <thead>
                 <tr>
-                  <th style={{ width: '60px' }}>Image</th>
+                  <th>Image</th>
                   <th>{t("catalogue.column.code").text}</th>
                   <th>{t("catalogue.column.name").text}</th>
                   <th>{t("catalogue.column.unit").text}</th>

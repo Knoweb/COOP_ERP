@@ -402,7 +402,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
       setLocalPreviewUrl(dataUrl);
       try {
         sessionStorage.setItem(`sku_preview_${skuId}`, dataUrl);
-      } catch (e) {
+      } catch (_) {
         // Ignore quota exceeded errors
       }
     };
@@ -473,75 +473,43 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   
   return (
     <section className="catalogue-section">
-      <h2 style={{ color: 'var(--color-primary, #b3005e)', marginBottom: 'var(--space-4)' }}>
+      <h2 className={css.catalogueSectionTitle}>
         Item Details
       </h2>
       
-      <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div className={css.catalogueImageLayout}>
         {/* Left Card: The Image itself */}
-        <div style={{ 
-          border: 'var(--border-width) solid var(--color-border)', 
-          borderRadius: 'var(--radius-3)', 
-          padding: 'var(--space-4)',
-          width: '400px',
-          maxWidth: '100%',
-          backgroundColor: 'var(--color-surface)'
-        }}>
-        <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-text)', marginBottom: 'var(--space-3)', marginTop: 0 }}>
+        <div className={css.catalogueImageCard}>
+        <h3 className={css.catalogueImageTitle}>
           Item Image
         </h3>
         
-        <div style={{
-          border: 'var(--border-width) solid var(--color-border)',
-          borderRadius: 'var(--radius-2)',
-          padding: 'var(--space-2)',
-          marginBottom: 'var(--space-3)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '250px',
-          backgroundColor: '#fff'
-        }}>
+        <div className={css.catalogueImageBox}>
           {activeImage || localPreviewUrl ? (
             displayUrl ? (
               <img 
                 src={displayUrl} 
                 alt="SKU" 
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                className={css.catalogueImageImg} 
               />
             ) : (
-              <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 'var(--space-2)', opacity: 0.7 }}>
+              <div className={css.catalogueImageProcessing}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={css.catalogueImageProcessingIcon}>
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <div style={{ fontWeight: 500 }}>Processing image...</div>
-                <div style={{ fontSize: '12px', marginTop: '4px' }}>Please wait up to 15 minutes.</div>
+                <div className={css.catalogueImageProcessingText}>Processing image...</div>
+                <div className={css.catalogueImageProcessingSubtext}>Please wait up to 15 minutes.</div>
               </div>
             )
           ) : (
-            <div style={{ color: 'var(--color-text-muted)' }}>No image uploaded</div>
+            <div className={css.catalogueImageNoImage}>No image uploaded</div>
           )}
         </div>
         
         {canEdit && (
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-            <label style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--space-2)',
-              padding: 'var(--space-2)',
-              border: 'var(--border-width) solid var(--color-primary, #b3005e)',
-              borderRadius: 'var(--radius-2)',
-              color: 'var(--color-primary, #b3005e)',
-              fontWeight: 600,
-              cursor: 'pointer',
-              backgroundColor: 'transparent',
-              fontSize: 'var(--text-sm)',
-              opacity: (uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR") ? 0.5 : 1
-            }}>
+          <div className={css.catalogueImageActions}>
+            <label className={`${css.catalogueImageBtn} ${css.catalogueImageBtnPrimary} ${(uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR") ? css.catalogueImageBtnPrimaryDisabled : ""}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -562,20 +530,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
                 type="button"
                 onClick={() => retire.mutate(activeImage.imageId)}
                 disabled={retire.isPending}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 'var(--space-2)',
-                  padding: 'var(--space-2)',
-                  border: 'var(--border-width) solid var(--color-error, #d32f2f)',
-                  borderRadius: 'var(--radius-2)',
-                  color: 'var(--color-error, #d32f2f)',
-                  fontWeight: 600,
-                  backgroundColor: 'transparent',
-                  fontSize: 'var(--text-sm)'
-                }}
+                className={`${css.catalogueImageBtn} ${css.catalogueImageBtnError}`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/>
@@ -590,51 +545,37 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
         )}
 
         {uploadStatus !== "IDLE" && uploadStatus !== "DONE" && (
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>
+          <div className={css.catalogueImageStatus}>
             {uploadStatus === "HASHING" && t("catalogue.images.status.hashing").text}
             {uploadStatus === "GETTING_URL" && t("catalogue.images.status.getting_url").text}
             {uploadStatus === "UPLOADING" && t("catalogue.images.status.uploading").text}
-            {uploadStatus === "ERROR" && <span style={{ color: "var(--color-error, #d32f2f)" }}>{errorMsg}</span>}
+            {uploadStatus === "ERROR" && <span className={css.catalogueImageStatusError}>{errorMsg}</span>}
           </div>
         )}
         
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+        <div className={css.catalogueImageFormats}>
           Supported formats: JPG, PNG (Max 2MB)
         </div>
       </div>
       
       {/* Right panel: Upload Settings (Barcode) */}
       {canEdit && (
-        <div style={{ flex: 1, minWidth: '300px' }}>
-          <div style={{
-            border: 'var(--border-width) solid var(--color-border)',
-            borderRadius: 'var(--radius-3)',
-            padding: 'var(--space-4)',
-            backgroundColor: 'var(--color-surface)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-3)'
-          }}>
-            <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>
+        <div className={css.catalogueImageSettingsPanel}>
+            <h3 className={css.catalogueImageSettingsTitle}>
               Upload Settings
             </h3>
-            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            <p className={css.catalogueImageSettingsDesc}>
               Select a barcode before uploading an image if the image is specific to a variant.
             </p>
             
-            <label className="catalogue-form-field">
-              <span style={{ fontWeight: 500, color: 'var(--color-primary, #b3005e)' }}>
+            <label className={css.catalogueFormField}>
+              <span className={css.catalogueImageSettingsLabel}>
                 {t("catalogue.field.barcode").text}
               </span>
               <select 
                 value={barcode} 
                 onChange={(e) => setBarcode(e.target.value)}
-                style={{ 
-                  padding: 'var(--space-2)', 
-                  borderRadius: 'var(--radius-2)', 
-                  border: '1px solid var(--color-border)',
-                  outline: 'none'
-                }}
+                className={css.catalogueImageSettingsSelect}
               >
                 <option value="">{t("catalogue.field.choose").text}</option>
                 {(barcodes.data ?? []).filter(b => b.status === "ACTIVE").map((b) => (
