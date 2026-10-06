@@ -21,6 +21,11 @@ data class ZReport(
     val grossSales: Money,
     val cashSales: Money,
     val items: List<ItemTotal>,
+    /**
+     * The session's facts central refused (QUARANTINED) as far as the till knows: they are still
+     * sales on paper and in the drawer, and the office must repair them at central (TWK-05).
+     */
+    val refusedFacts: Long = 0,
 ) {
     val floatAmount: Money get() = session.floatAmount
     val expectedCash: Money get() = session.expectedCash ?: SessionRules.expectedCash(session, cashSales)
@@ -28,7 +33,11 @@ data class ZReport(
     val variance: Money? get() = session.variance
 
     companion object {
-        fun of(session: SessionRecord, receipts: List<IssuedReceipt>): ZReport {
+        /** The device sequences of the session's own facts: its opening, its receipts, its close. */
+        fun factsOf(session: SessionRecord, receipts: List<IssuedReceipt>): List<Long> =
+            listOfNotNull(session.openedSeq, session.closedSeq) + receipts.map { it.deviceSeq }
+
+        fun of(session: SessionRecord, receipts: List<IssuedReceipt>, refusedFacts: Long = 0): ZReport {
             val ordered = receipts.sortedBy { it.number }
             val gross = ordered.fold(Money.ZERO) { sum, r -> sum + r.gross }
             val items = ordered.flatMap { it.lines }
@@ -52,6 +61,7 @@ data class ZReport(
                 // Cash is the only tender of the trial: every receipt was paid in cash.
                 cashSales = gross,
                 items = items,
+                refusedFacts = refusedFacts,
             )
         }
     }

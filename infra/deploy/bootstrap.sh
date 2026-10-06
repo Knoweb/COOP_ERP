@@ -24,18 +24,24 @@
 #   installs Docker Engine and the compose plugin (Docker's apt repository); makes a swap file
 #   (2 GB small, 1 GB medium) with swappiness 10; opens 22, 80 and 443 in ufw; copies the
 #   deployment files to /opt/coop-erp; writes /opt/coop-erp/.env with generated passwords and a
-#   new till signing key pair, ONLY when there is no .env yet; renders the Keycloak realm; pulls
-#   the images and starts everything; waits until healthy; prints the addresses.
+#   new till signing key pair, ONLY when there is no .env yet; renders the Keycloak realm; pins
+#   IMAGE_TAG to the clone's commit once CI has published it (as deploy.sh does); pulls the
+#   images and starts everything; waits until healthy; applies the realm's sign-in policy;
+#   prints the addresses.
 #
 # Run again with another --ip/--domain/--tls to move the demo to a new address: only the address
 # lines of .env change (every password stays), and the realm Keycloak already has is updated.
 #
 # For a test on a machine that already has Docker (never on a server): --no-system skips the
-# Docker install, swap and firewall and the root check; --no-pull uses images already present.
+# Docker install, swap and firewall and the root check; --no-pull uses images already present
+# and keeps IMAGE_TAG as it is in .env (COOP_ERP_IMAGE_TAG and COOP_ERP_REGISTRY set them for a
+# new .env).
 set -euo pipefail
 
 # shellcheck source=lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+require_clone
 
 usage() {
   sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
@@ -189,7 +195,8 @@ CADDY_TLS=$CADDY_TLS
 ACME_EMAIL=${EMAIL}
 REGISTRY=${COOP_ERP_REGISTRY:-ghcr.io/knoweb/coop_erp}
 IMAGE_TAG=${COOP_ERP_IMAGE_TAG:-main}
-DEMO_PASSWORD=Demo-$(rand 4)
+PREVIOUS_IMAGE_TAG=
+DEMO_PASSWORD=Demo-$(rand 6)
 KEYCLOAK_ADMIN=admin
 KEYCLOAK_ADMIN_PASSWORD=$(rand)
 KEYCLOAK_BACKEND_CLIENT_SECRET=$(rand)
@@ -203,6 +210,8 @@ RELAY_DB_PASSWORD=$(rand)
 KEYCLOAK_DB_PASSWORD=$(rand)
 RABBITMQ_PASSWORD=$(rand)
 MINIO_ROOT_PASSWORD=$(rand)
+MINIO_APP_USER=coop-erp-app
+MINIO_APP_PASSWORD=$(rand)
 COOP_ERP_IDEMPOTENCY_SECRET=$(rand 32)
 COOP_ERP_NOTIFICATION_KEY=$(openssl rand -base64 32)
 COOP_ERP_NOTIFICATION_RECIPIENT_KEY=$(openssl rand -base64 32)
@@ -235,10 +244,13 @@ if [ -f "$APP_DIR/.env" ]; then
 else
   new_env
 fi
+ensure_env_additions
 
 render_realm
 
 # ---- start ---------------------------------------------------------------------------------
+
+pin_image_tag "$PULL"
 
 if [ "$PULL" -eq 1 ]; then
   say "Pulling the images ($(env_get REGISTRY), tag $(env_get IMAGE_TAG))"
@@ -248,6 +260,7 @@ fi
 
 say "Starting the demo (the first start imports the realm and migrates the database: a few minutes)"
 start_stack
+apply_realm_policy
 
 if [ "$ADDRESS_CHANGED" -eq 1 ]; then
   say "Writing the new address into the running Keycloak realm"
@@ -263,8 +276,10 @@ cat <<EOF
 COOP ERP demo is up ($SIZE).
 
   Back office          $URL
-  Keycloak admin       $URL/auth/admin/      user: $(env_get KEYCLOAK_ADMIN)
   Mail catcher         $URL/mail/            user: $(env_get MAIL_USER)
+  Keycloak admin       not on the internet: from your computer, open a tunnel
+                         ssh -L 8081:127.0.0.1:8081 root@<this server>
+                       then http://localhost:8081/auth/admin/   user: $(env_get KEYCLOAK_ADMIN)
 
   The demo users' password, the admin and the mail passwords are in $APP_DIR/.env
   (DEMO_PASSWORD, KEYCLOAK_ADMIN_PASSWORD, MAIL_PASSWORD):  sudo grep PASSWORD $APP_DIR/.env

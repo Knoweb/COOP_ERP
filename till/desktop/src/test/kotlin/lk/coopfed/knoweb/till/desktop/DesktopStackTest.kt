@@ -12,7 +12,10 @@ import java.util.Properties
 import kotlin.io.path.listDirectoryEntries
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import lk.coopfed.knoweb.till.core.ServerAddress
+import lk.coopfed.knoweb.till.core.TillRefusal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -53,6 +56,9 @@ class DesktopStackTest {
             service.start()
             if (!service.isEnrolled) {
                 val prefill = Properties().apply { Files.newBufferedReader(till.config.home.resolve("enrol-prefill.properties")).use { load(it) } }
+                // The stack is reached over https or on this PC (localhost, *.localhost); a plain http host is refused (TWK-02).
+                ServerAddress.requireTrusted(prefill.getProperty("server"), "The stack's address")
+                assertFailsWith<TillRefusal> { service.enrol("http://central.example.lk", prefill.getProperty("device_id"), "unused", "unused") }
                 service.enrol(prefill.getProperty("server"), prefill.getProperty("device_id"), prefill.getProperty("code"), prefill.getProperty("hardware_serial"))
             }
             val version = service.refreshSnapshot()

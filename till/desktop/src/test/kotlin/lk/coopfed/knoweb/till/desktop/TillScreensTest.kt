@@ -86,6 +86,8 @@ class TillScreensTest {
                 override val zone = zone
             },
             ids, "0.1.0",
+            // The trial's explicit opt-in (TWK-04): the stand-in central sends no operator.
+            trialCashierAllowed = true,
         )
         val controller = TillController(
             service, PreviewFolderPrinter(home.resolve("print")), SkiaReceiptRasteriser(),

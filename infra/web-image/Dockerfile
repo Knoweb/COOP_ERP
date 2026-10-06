@@ -7,5 +7,8 @@
 #
 # Build context: web, after `pnpm build` (which fills dist).
 #   docker build -f infra/web-image/Dockerfile -t coop-erp/web:dev web
-FROM caddy:2.10-alpine
+#
+# The base is pinned by digest (wave 2, DEPLOY-15): a tag can be moved under us. Dependabot (the
+# docker entry for this folder in .github/dependabot.yml) proposes the next digest.
+FROM caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
 COPY dist /srv

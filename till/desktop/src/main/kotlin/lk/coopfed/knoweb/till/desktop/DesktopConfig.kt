@@ -21,6 +21,10 @@ import lk.coopfed.knoweb.till.ui.EnrolDefaults
  * - COOP_TILL_PRINTER: "tcp://192.168.1.50:9100" for a network printer; empty for the preview folder
  * - COOP_TILL_PAPER: 80 (default) or 58 mm
  * - COOP_TILL_TOKEN_ENDPOINT: the identity provider's token URL when the till reaches it by another address
+ * - COOP_TILL_CA_FILE: a PEM file of a certificate authority to trust besides the system's (a server
+ *   with a private certificate, such as Caddy's internal CA on a demo server); never a "trust all" switch
+ * - COOP_TILL_TRIAL_CASHIER: "true" lets the trial's stand-in cashier sign in while the shop has no
+ *   operator (TWK-04); off by default, and never once a snapshot has carried an operator
  */
 class DesktopConfig(private val env: Map<String, String> = System.getenv()) {
 
@@ -29,6 +33,18 @@ class DesktopConfig(private val env: Map<String, String> = System.getenv()) {
     val previewFolder: Path get() = home.resolve("print-preview")
     val paperDots: Int = if (env["COOP_TILL_PAPER"] == "58") MonoBitmap.DOTS_58MM else MonoBitmap.DOTS_80MM
     val tokenEndpointOverride: String? = env["COOP_TILL_TOKEN_ENDPOINT"]?.takeIf { it.isNotBlank() }
+    val caFile: Path? = env["COOP_TILL_CA_FILE"]?.takeIf { it.isNotBlank() }?.let { Paths.get(it) }
+
+    /** The explicit opt-in: the environment, else what devEnrolmentCode wrote into the prefill file. */
+    val trialCashier: Boolean
+        get() = (env["COOP_TILL_TRIAL_CASHIER"] ?: prefill().getProperty("trial_cashier")).equals("true", ignoreCase = true)
+
+    private fun prefill(): Properties {
+        val prefill = Properties()
+        val file = home.resolve("enrol-prefill.properties")
+        if (file.exists()) Files.newBufferedReader(file).use { prefill.load(it) }
+        return prefill
+    }
 
     fun printer(): PrinterPort {
         val setting = env["COOP_TILL_PRINTER"]?.trim().orEmpty()
@@ -54,9 +70,7 @@ class DesktopConfig(private val env: Map<String, String> = System.getenv()) {
 
     /** What the enrol form shows first: env settings, then the file the devEnrolmentCode task leaves. */
     fun enrolDefaults(): EnrolDefaults {
-        val prefill = Properties()
-        val file = home.resolve("enrol-prefill.properties")
-        if (file.exists()) Files.newBufferedReader(file).use { prefill.load(it) }
+        val prefill = prefill()
         fun pick(envName: String, key: String, default: String) = env[envName] ?: prefill.getProperty(key) ?: default
         return EnrolDefaults(
             serverUrl = pick("COOP_TILL_SERVER", "server", "http://localhost:8080"),

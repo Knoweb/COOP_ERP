@@ -47,7 +47,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * M3-06 and M3-07 (23A section 7; doc 23 flows 6.1, 6.4, 6.6): control prices (enter, supersede,
@@ -92,6 +95,12 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     PricingQueries queries;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private final UUID rice = Ids.next();
     private final UUID sugar = Ids.next();
@@ -263,6 +272,97 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
                         new EnterControlPrice(rice, new BigDecimal("215"), "EA", yesterday, null, "2492/40"),
                         own(FEDERATION)),
                 "m3.control_price.overlap");
+    }
+
+    /**
+     * m3pricing V0006 (wave 2, RLS-04; CR-23A-1): the Federation's ceiling is read by every class but
+     * NONE, and only the Federation writes one. A society's row, written past the handler guard, is
+     * refused by the policy; were one to exist, it would be a ceiling for nobody.
+     */
+    @Test
+    void onlyTheFederationWritesACeilingAndEveryClassButNoneReadsIt() {
+        UUID ceiling = enterControlPrice.handle(
+                new EnterControlPrice(rice, new BigDecimal("220.00"), "EA", yesterday, null, "2492/29"),
+                own(FEDERATION));
+
+        assertThat(ceilingsVisible(SOCIETY, "OWN", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(SOCIETY, "PARTY", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "FEDERATION_VIEW", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "EXTERNAL_TIMEBOXED", "{" + SOCIETY + "}"))
+                .containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "EXTERNAL_TIMEBOXED", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(SOCIETY, "NONE", "{}")).isEmpty();
+
+        // The society's own row, with the Java guard bypassed: the database refuses it.
+        assertThatThrownBy(() -> inScope(
+                        SOCIETY,
+                        "OWN",
+                        "{}",
+                        () -> jdbc.update(
+                                """
+                        insert into pricing.control_price (control_price_id, sku_id, ceiling_price, ceiling_uom_code,
+                            effective_from, gazette_reference, entered_by, owner_entity_id)
+                        values (?, ?, 1.00, 'EA', ?, '0000/01', ?, ?)
+                        """,
+                                Ids.next(),
+                                sugar,
+                                tomorrow,
+                                USER,
+                                SOCIETY)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("row-level security");
+        // Nor may the society end the Federation's ceiling.
+        assertThat(inScope(
+                        SOCIETY,
+                        "OWN",
+                        "{}",
+                        () -> jdbc.update(
+                                "update pricing.control_price set effective_to = ? where control_price_id = ?",
+                                tomorrow,
+                                ceiling)))
+                .isZero();
+        // A row that is somehow not the Federation's is a ceiling for nobody.
+        superuserJdbc()
+                .update(
+                        """
+                        insert into pricing.control_price (control_price_id, sku_id, ceiling_price, ceiling_uom_code,
+                            effective_from, gazette_reference, entered_by, owner_entity_id)
+                        values (?, ?, 1.00, 'EA', ?, '0000/01', ?, ?)
+                        """,
+                        Ids.next(),
+                        sugar,
+                        tomorrow,
+                        USER,
+                        SOCIETY);
+        assertThat(ceilingsVisible(SOCIETY, "OWN", "{}")).containsExactly(ceiling);
+        assertThat(ceilingsVisible(DISTRIBUTOR, "FEDERATION_VIEW", "{}")).containsExactly(ceiling);
+        assertThat(queries.controlPriceFor(sugar, "EA", tomorrow, own(SOCIETY))).isEmpty();
+    }
+
+    private List<UUID> ceilingsVisible(UUID entity, String policyClass, String granted) {
+        return inScope(
+                entity,
+                policyClass,
+                granted,
+                () -> jdbc.queryForList("select control_price_id from pricing.control_price", UUID.class));
+    }
+
+    /** One transaction as the application user with the scope set directly, as the customizer would. */
+    private <T> T inScope(UUID entity, String policyClass, String granted, java.util.function.Supplier<T> work) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.queryForList(
+                    "select set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                            + " set_config('app.scope_class', ?, true), set_config('app.granted_entities', ?, true)",
+                    entity.toString(),
+                    policyClass,
+                    granted);
+            try {
+                return work.get();
+            } finally {
+                status.setRollbackOnly();
+            }
+        });
     }
 
     // ---- MRP policy (M3-07) --------------------------------------------------------------------------

@@ -119,6 +119,7 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
         admin.execute(
                 "truncate catalogue.batch, catalogue.batch_key, catalogue.supplier, catalogue.sku_tag, catalogue.sku_barcode, catalogue.sku_image,"
                         + " catalogue.sku_uom_conversion, catalogue.sku");
+        admin.update("delete from inventory.stock_lot where owner_entity_id = ?", MPCS_B);
         admin.update("delete from catalogue.tag where tag_code like 't-%'");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
@@ -385,20 +386,67 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
     @Test
     void anotherEntitysCorrectionSupersedesTheBatchAndMovesItsIdentity() {
         // M2-05 (V0004): a lot holder or the Federation corrects a batch it did not register
-        // (22A section 6; who may is CorrectBatchHandler's guard). The trigger batch_correction
-        // marks the old row SUPERSEDED and re-points the identity, as the function's owner.
-        UUID replacement = Ids.next();
-        Map<String, Object> after = inScope(MPCS_B, "OWN", () -> {
-            insertBatch(replacement, sharedSku, "B2411A", batchOfA, MPCS_B);
-            return jdbc.queryForMap(
-                    "select (select status from catalogue.batch where batch_id = ?) as old_status,"
-                            + " (select batch_id from catalogue.batch_key where sku_id = ? and batch_no = 'B2411A')"
-                            + " as identity",
-                    batchOfA,
-                    sharedSku);
-        });
-        assertThat(after.get("old_status")).isEqualTo("SUPERSEDED");
-        assertThat(after.get("identity")).isEqualTo(replacement);
+        // (22A section 6). The trigger batch_correction marks the old row SUPERSEDED and re-points
+        // the identity, as the function's owner. Since V0008 (wave 2, RLS-07) the trigger holds the
+        // rule itself: the caller is the batch's owner, the Federation or a lot holder, whatever path
+        // wrote the correction row; CorrectBatchHandler's guard is no longer the only one.
+
+        // A society that holds no lot of the batch, with the Java guard bypassed (a direct insert):
+        // refused by the database, and nothing changed.
+        assertThatThrownBy(() ->
+                        inScope(MPCS_B, "OWN", () -> insertBatch(Ids.next(), sharedSku, "B2411A", batchOfA, MPCS_B)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("m2.batch.not_holder");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select status from catalogue.batch where batch_id = ?", String.class, batchOfA))
+                .isEqualTo("REGISTERED");
+
+        // The owner corrects its own batch; a lot holder corrects the replacement; the Federation
+        // corrects that one. Each old row SUPERSEDED, the identity on the newest.
+        UUID byOwner = Ids.next();
+        committedInScope(MPCS_A, () -> insertBatch(byOwner, sharedSku, "B2411A", batchOfA, MPCS_A));
+        superuserJdbc()
+                .update(
+                        "insert into inventory.stock_lot (stock_lot_id, owner_entity_id, location_id, batch_id, sku_id,"
+                                + " qty_on_hand, unit_cost, received_at) values (?, ?, ?, ?, ?, 4, 90, now())",
+                        Ids.next(),
+                        MPCS_B,
+                        Ids.next(),
+                        byOwner,
+                        sharedSku);
+        UUID byHolder = Ids.next();
+        committedInScope(MPCS_B, () -> insertBatch(byHolder, sharedSku, "B2411A", byOwner, MPCS_B));
+        UUID byFederation = Ids.next();
+        committedInScope(FEDERATION, () -> insertBatch(byFederation, sharedSku, "B2411A", byHolder, FEDERATION));
+
+        Map<String, Object> after = superuserJdbc()
+                .queryForMap(
+                        "select (select status from catalogue.batch where batch_id = ?) as first,"
+                                + " (select status from catalogue.batch where batch_id = ?) as second,"
+                                + " (select status from catalogue.batch where batch_id = ?) as third,"
+                                + " (select batch_id from catalogue.batch_key where sku_id = ? and batch_no = 'B2411A')"
+                                + " as identity",
+                        batchOfA,
+                        byOwner,
+                        byHolder,
+                        sharedSku);
+        assertThat(after.get("first")).isEqualTo("SUPERSEDED");
+        assertThat(after.get("second")).isEqualTo("SUPERSEDED");
+        assertThat(after.get("third")).isEqualTo("SUPERSEDED");
+        assertThat(after.get("identity")).isEqualTo(byFederation);
+
+        // Not in an OWN class, even for the Federation's entity.
+        assertThatThrownBy(() -> inScope(
+                        FEDERATION,
+                        "FEDERATION_VIEW",
+                        () -> insertBatch(Ids.next(), sharedSku, "B2411A", byFederation, FEDERATION)))
+                .isInstanceOf(DataAccessException.class);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select status from catalogue.batch where batch_id = ?", String.class, byFederation))
+                .isEqualTo("REGISTERED");
 
         // A superseded batch is not corrected again (its replacement is), nor a batch of another item.
         superuserJdbc().update("update catalogue.batch set status = 'SUPERSEDED' where batch_id = ?", batchOfA);
@@ -678,6 +726,19 @@ class CatalogueRlsIntegrationTest extends PostgresIntegrationTest {
             } finally {
                 status.setRollbackOnly();
             }
+        });
+    }
+
+    /**
+     * The same, committed: for a chain of writes by different entities that the next step must see
+     * (the correction chain). The {@code @AfterEach} truncation cleans up.
+     */
+    private <T> T committedInScope(UUID entityId, Supplier<T> work) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.queryForObject("select set_config('app.scope_entity_id', ?, true)", String.class, entityId.toString());
+            jdbc.queryForObject("select set_config('app.scope_location_id', '', true)", String.class);
+            jdbc.queryForObject("select set_config('app.scope_class', 'OWN', true)", String.class);
+            return work.get();
         });
     }
 }

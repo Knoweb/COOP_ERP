@@ -34,6 +34,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The queries of 25A section 7 against real lots (M5-04 "done when": dependants' tests pass
@@ -61,6 +63,9 @@ class InventoryQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     CorrectBatchHandler correct;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private InventoryFixture fixture;
     private UUID warehouse;
@@ -173,19 +178,42 @@ class InventoryQueriesPostgresIntegrationTest extends PostgresIntegrationTest {
     // ---- M2's questions, answered by M5 -----------------------------------------------------
 
     @Test
-    void catalogueQuestionsAreAnsweredFromTheLotsWhoeverAsks() {
-        assertThat(lotQuestions.hasAnyLot(sku)).isFalse();
-        assertThat(lotQuestions.holdsLotOf(early, MPCS)).isFalse();
+    void catalogueQuestionsAreAnsweredFromTheLotsToAnOwnCallerAboutItself() {
+        assertThat(outer.run(own(MPCS), () -> lotQuestions.hasAnyLot(sku))).isFalse();
+        assertThat(outer.run(own(MPCS), () -> lotQuestions.holdsLotOf(early, own(MPCS))))
+                .isFalse();
 
         post(own(MPCS), receipt(shop, early, LotCondition.GOOD, "1"));
 
         // Asked in another entity's scope (the Federation editing a shared item): the answer is
         // yes or no, without showing that entity the lot.
         assertThat(outer.run(own(OTHER), () -> lotQuestions.hasAnyLot(sku))).isTrue();
-        assertThat(outer.run(own(OTHER), () -> lotQuestions.holdsLotOf(early, MPCS)))
+        // The holder question is about the caller (m5inventory V0007; wave 2, RLS-12): MPCS holds
+        // a lot of the early batch, OTHER does not, and nobody holds one of the late batch.
+        assertThat(outer.run(own(MPCS), () -> lotQuestions.holdsLotOf(early, own(MPCS))))
                 .isTrue();
-        assertThat(lotQuestions.holdsLotOf(early, OTHER)).isFalse();
-        assertThat(lotQuestions.holdsLotOf(late, MPCS)).isFalse();
+        assertThat(outer.run(own(OTHER), () -> lotQuestions.holdsLotOf(early, own(OTHER))))
+                .isFalse();
+        assertThat(outer.run(own(MPCS), () -> lotQuestions.holdsLotOf(late, own(MPCS))))
+                .isFalse();
+
+        // A class that is not OWN is answered nothing, in Java and in the database alike.
+        assertThat(outer.run(federationView(), () -> lotQuestions.hasAnyLot(sku)))
+                .isFalse();
+        assertThat(outer.run(federationView(), () -> lotQuestions.holdsLotOf(early, federationView())))
+                .isFalse();
+        assertThat(outer.run(
+                        federationView(),
+                        () -> jdbc.queryForObject("select inventory.caller_holds_lot_of(?)", Boolean.class, early)))
+                .isFalse();
+        // The two-argument form of V0002 is the migrator's alone now (M2's correction trigger).
+        assertThatThrownBy(() -> outer.run(
+                        own(MPCS),
+                        () -> jdbc.queryForObject(
+                                "select inventory.entity_holds_lot_of(?, ?)", Boolean.class, early, MPCS)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("permission denied");
     }
 
     @Test

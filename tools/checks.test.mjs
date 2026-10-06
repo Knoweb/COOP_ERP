@@ -26,7 +26,10 @@ import {
   problemsOfCatalogues,
   problemsOfModules,
   readModuleCatalogues,
-  problemsOfJavaSources
+  problemsOfJavaSources,
+  problemsOfTheme,
+  readThemeMessages,
+  themeIdsUsedIn
 } from "./check-i18n.mjs";
 
 import {
@@ -576,6 +579,40 @@ test(
     // A module folder without a language file: every id of it is missing in that language.
     fs.rmSync(path.join(root, "kernel", "ta.json"));
     one(problemsOfModules(readModuleCatalogues(root)).filter((p) => p.startsWith("kernel/")), /^kernel\/ta\.json: no text for request\.invalid/);
+  }
+);
+
+test(
+  "sign-in theme: the three messages files hold the same ids, with a text, and every msg() of the page",
+  () => {
+    const root = tempDir();
+    write(root, "messages/messages_en.properties", "# a comment\nlocale_en=English\ncoopWelcome=Welcome Back\nloginTitle=Sign in to {0}\n");
+    write(root, "messages/messages_si.properties", "locale_en=English\ncoopWelcome=සාදරයෙන්\nloginTitle={0}\n");
+    write(root, "messages/messages_ta.properties", "locale_en=English\ncoopWelcome=\nloginTitle=Don't\n");
+    const messages = readThemeMessages(root);
+    assert.deepEqual(problemsOfTheme(messages, themeIdsUsedIn('<#-- msg("inComment") -->${msg("coopWelcome")} ${msg("loginTitle",(realm.displayName!\'\'))} ${msg("coopMissing")}')), [
+      "theme/messages_ta.properties: no text for coopWelcome",
+      "theme/messages_ta.properties: loginTitle contains an ASCII apostrophe; write ’",
+      'theme/login.ftl: msg("coopMissing") is in no messages_*.properties of the theme; add it to all three'
+    ]);
+    // A language file that is not there reads as empty: each id is missing in it.
+    fs.rmSync(path.join(root, "messages", "messages_si.properties"));
+    assert.deepEqual(problemsOfTheme(readThemeMessages(root)).filter((p) => p.includes("messages_si")), [
+      "theme/messages_si.properties: coopWelcome is missing (it is in another language)",
+      "theme/messages_si.properties: locale_en is missing (it is in another language)",
+      "theme/messages_si.properties: loginTitle is missing (it is in another language)"
+    ]);
+  }
+);
+
+test(
+  "sign-in theme: the committed theme passes",
+  () => {
+    const themeDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "infra", "keycloak", "theme", "coop", "login");
+    assert.deepEqual(
+      problemsOfTheme(readThemeMessages(themeDir), themeIdsUsedIn(fs.readFileSync(path.join(themeDir, "login.ftl"), "utf8"))),
+      []
+    );
   }
 );
 
