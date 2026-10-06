@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.testsupport.PinnedClock;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -31,6 +32,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * shop, and the Federation's advisory lines. Dates as in RetailPricingPostgresIntegrationTest:
  * ceilings from yesterday, lists and prices from tomorrow, so a run across midnight holds.
  */
+@Import(PinnedClock.class)
 class RetailPricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = TEST_FEDERATION;
@@ -42,7 +44,7 @@ class RetailPricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     TestRestTemplate http;
 
     private final UUID rice = Ids.next();
-    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Colombo"));
+    private final LocalDate today = PinnedClock.TODAY;
     private final LocalDate yesterday = today.minusDays(1);
     private final LocalDate tomorrow = today.plusDays(1);
 

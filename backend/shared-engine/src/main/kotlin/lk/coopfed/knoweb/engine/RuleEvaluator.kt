@@ -18,18 +18,23 @@ object RuleEvaluator {
         if (!r.sellable) {
             return r
         }
-        val applicable = ix.lineRulesFor(r.skuId, date).filter { matches(it, r, date) }
+        // A rule that gives this line nothing is dropped before precedence, as the bill path
+        // does, so it cannot take a real discount away from the customer (M3-01).
+        val applicable = ix.lineRulesFor(r.skuId, date)
+            .filter { matches(it, r, date) }
+            .filter { lineDiscount(it, r) > Money.ZERO }
         val chosen = choose(applicable, policy) { lineDiscount(it, r) } ?: return r
         val discount = lineDiscount(chosen, r)
-        if (discount <= Money.ZERO) {
-            return r
-        }
         val perUnit = perUnitDiscount(chosen, r.basePrice)
         val unit = r.basePrice - perUnit
+        val markdown = chosen.kind == RuleKind.EXPIRY_MARKDOWN
         return r.copy(
             unitPrice = unit,
             ruleId = chosen.ruleId,
-            markdown = chosen.kind == RuleKind.EXPIRY_MARKDOWN,
+            markdown = markdown,
+            // The marked-down units are the ones sold, so M5 depletes that batch; mrpApplied
+            // stays the policy's MRP, which already bounded the base price.
+            batch = if (markdown) r.markdownBatch else r.batch,
             discountAmount = discount,
             lineTotal = unit * r.input.qty
         )
@@ -66,10 +71,13 @@ object RuleEvaluator {
             RuleKind.TIME_LIMITED_PRICE -> rule.uom == null || rule.uom == r.input.uom
             RuleKind.QUANTITY_BREAK -> rule.minQty != null && r.input.qty >= rule.minQty
             RuleKind.EXPIRY_MARKDOWN -> {
-                val expiry = r.batch?.expiry
+                // 0 <= days <= D: an expired batch (days < 0) never takes a markdown (CR-23A-1).
+                val expiry = r.markdownBatch?.expiry
+                val days = expiry?.let { ChronoUnit.DAYS.between(date, it) }
                 rule.daysToExpiry != null &&
-                    expiry != null &&
-                    ChronoUnit.DAYS.between(date, expiry) <= rule.daysToExpiry
+                    days != null &&
+                    days >= 0 &&
+                    days <= rule.daysToExpiry
             }
             RuleKind.FREE_ITEM, RuleKind.BILL_THRESHOLD -> false
         }

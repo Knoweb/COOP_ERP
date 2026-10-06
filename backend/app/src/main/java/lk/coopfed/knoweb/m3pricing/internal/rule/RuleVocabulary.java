@@ -130,13 +130,13 @@ class RuleVocabulary {
         }
         BigDecimal value = benefit.value();
         boolean valid = value != null && scaleOf(value) <= 2;
+        // No free goods through a price (CR-23A-1, D11): 100 % off or a fixed price of 0 would give
+        // the item away outside the write-off controls; that is a DONATION or SAMPLES write-off.
         if (valid && PERCENT_OFF.equals(benefit.kind())) {
-            // 23A section 7, ActivateRule: "benefit within [0, 100%]"; 0 would change nothing.
-            valid = value.signum() > 0 && value.compareTo(HUNDRED) <= 0;
-        } else if (valid && AMOUNT_OFF.equals(benefit.kind())) {
-            valid = value.signum() > 0;
+            // 0 would change nothing; 100 would make the item free.
+            valid = value.signum() > 0 && value.compareTo(HUNDRED) < 0;
         } else if (valid) {
-            valid = value.signum() >= 0; // FIXED_PRICE: a price, possibly zero
+            valid = value.signum() > 0; // AMOUNT_OFF, and FIXED_PRICE: a price above zero
         }
         if (!valid) {
             throw new ProblemException("m3.rule.benefit_value_invalid");
