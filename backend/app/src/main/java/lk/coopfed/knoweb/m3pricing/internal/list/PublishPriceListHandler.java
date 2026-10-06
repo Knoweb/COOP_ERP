@@ -81,7 +81,8 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
             throw new ProblemException("request.invalid");
         }
         PriceListRules.requireOwnerScope(scope);
-        PriceListView list = store.find(command.priceListId())
+        // Locked, so DRAFT is re-checked after any concurrent publish has committed (M3-05).
+        PriceListView list = store.findForUpdate(command.priceListId())
                 .filter(found -> found.ownerEntityId().equals(scope.entityId()))
                 .orElseThrow(() -> new ProblemException("m3.price_list.not_found"));
         if (!PriceListStore.DRAFT.equals(list.status())) {

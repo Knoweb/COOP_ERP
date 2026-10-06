@@ -52,8 +52,10 @@ import org.springframework.transaction.annotation.Transactional;
  * drawn, a block per location, in location order (SequenceService of 25A: dense per location and
  * source, source 'central' or the device); then the entity's cost rows, in SKU order. The
  * movements are then applied in the order given: each is inserted with its number and its cost
- * ("costFor"), moves its lot, flips the lot's negative flag when it crosses zero, and moves the
- * entity average ({@link CostService}).
+ * ("costFor"), moves its lot and moves the entity average ({@link CostService}). Last, each lot's
+ * negative flag follows its sign at the end of the posting against its sign when it was locked:
+ * negative before and after keeps the flag and its date, so one posting never opens a second
+ * negative period on a lot that never stopped being negative (wave 2, M5-07).
  *
  * <p>Audit: {@code STOCK_POSTED} for the document; {@code STOCK_LOT_NEGATIVE} (REVIEW) and
  * {@code STOCK_LOT_NEGATIVE_CLEARED} for a lot that crosses zero. Events: {@code stock.moved.v1}
@@ -221,7 +223,7 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
             UUID sku = lot.skuId();
             BigDecimal qty = m.qtyDelta().setScale(CostService.QTY_SCALE, CostService.ROUNDING);
             CostRow cost = costs.get(sku);
-            BigDecimal costAtMovement = CostService.costAtMovement(cost, m.type(), m.unitCost());
+            BigDecimal costAtMovement = CostService.costAtMovement(cost, m.type(), qty, m.unitCost());
             costs.put(sku, CostService.apply(cost, m.type(), qty, m.unitCost()));
 
             long seq = nextSeq.merge(m.locationId(), 1L, Long::sum) - 1;
@@ -253,14 +255,6 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
                     scope.deviceId());
 
             BigDecimal after = lot.qtyOnHand().add(qty);
-            Instant negativeSince = lot.negativeSince();
-            if (after.signum() < 0 && negativeSince == null) {
-                negativeSince = now;
-                crossings.put(key, Crossing.WENT_NEGATIVE);
-            } else if (after.signum() >= 0 && negativeSince != null) {
-                negativeSince = null;
-                crossings.merge(key, Crossing.CLEARED, (was, is) -> was == Crossing.WENT_NEGATIVE ? null : is);
-            }
             LotRow updated = new LotRow(
                     lot.stockLotId(),
                     lot.ownerEntityId(),
@@ -270,7 +264,7 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
                     lot.condition(),
                     after,
                     lot.unitCost(),
-                    negativeSince,
+                    lot.negativeSince(),
                     seq);
             lots.put(key, updated);
 
@@ -290,6 +284,30 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
                     command.documentId(),
                     source,
                     seq));
+        }
+
+        // 5. the crossings: the lot as locked against the lot at the end of the posting, so a lot
+        //    that was negative before and after keeps its negative_since and records nothing
+        //    (wave 2, M5-07: -3, then +5 and -4, is one negative period, not a new one)
+        for (Map.Entry<LotKey, LotRow> entry : lots.entrySet()) {
+            LotRow lot = entry.getValue();
+            boolean negativeBefore = lot.negativeSince() != null;
+            boolean negativeAfter = lot.qtyOnHand().signum() < 0;
+            if (negativeBefore == negativeAfter) {
+                continue;
+            }
+            crossings.put(entry.getKey(), negativeAfter ? Crossing.WENT_NEGATIVE : Crossing.CLEARED);
+            entry.setValue(new LotRow(
+                    lot.stockLotId(),
+                    lot.ownerEntityId(),
+                    lot.locationId(),
+                    lot.batchId(),
+                    lot.skuId(),
+                    lot.condition(),
+                    lot.qtyOnHand(),
+                    lot.unitCost(),
+                    negativeAfter ? now : null,
+                    lot.lastMovementSeq()));
         }
 
         for (LotRow lot : lots.values()) {
@@ -326,9 +344,6 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
                 Map.of("documentId", command.documentId(), "movements", posted),
                 scope);
         crossings.forEach((key, crossing) -> {
-            if (crossing == null) {
-                return;
-            }
             LotRow lot = lots.get(key);
             audit.record(
                     crossing == Crossing.WENT_NEGATIVE ? AUDIT_NEGATIVE : AUDIT_NEGATIVE_CLEARED,
@@ -368,7 +383,7 @@ public class LedgerService implements Handles<PostMovements, List<PostedMovement
         return bySku;
     }
 
-    /** Whether a lot crossed zero during the posting; null when it crossed and came back. */
+    /** How a lot's sign differs between its lock and the end of the posting. */
     private enum Crossing {
         WENT_NEGATIVE,
         CLEARED

@@ -24,13 +24,15 @@ import lk.coopfed.knoweb.m4trading.internal.delivery.AllocatedLines.AllocatedLin
 import lk.coopfed.knoweb.m4trading.internal.document.TradingDocuments;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingGuards;
 import lk.coopfed.knoweb.m4trading.internal.document.TradingSeries;
+import lk.coopfed.knoweb.m4trading.internal.order.OrderLocks;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * IssueDeliveryNote (24A section 6). Guards: the seller's entity-wide OWN scope; its own DRAFT
- * note; per order line, re-checked under a lock of the seller's allocation line, the note's
+ * note; under the per-order lock of every order on the note ({@link OrderLocks}, sorted), each
+ * order still accepted and not cancelled; per order line, re-checked under a lock of the seller's allocation line, the note's
  * quantity no more than what is allocated and not yet dispatched (another note may have been
  * issued since this one was drafted). Mutation: the seller's ENTITY series of DN, the issuance,
  * the allocation lines' fulfilled quantity raised by what the note dispatches (the order's
@@ -85,6 +87,10 @@ public class IssueDeliveryNoteHandler implements Handles<IssueDeliveryNote, Stri
             throw new ProblemException("m4.delivery.not_draft");
         }
         List<DropSummary> drops = reads.drops(noteId);
+        // The buyer's CancelOrder takes the same per-order lock: once held, a cancelled order is
+        // seen as cancelled here and the cancel sees what this note dispatched (wave 2,
+        // M4MONEY-07). Several orders are locked in sorted order, so two notes never deadlock.
+        OrderLocks.lockAll(jdbc, reads.allOrderIds(drops));
         Map<UUID, BigDecimal> dispatched = new HashMap<>();
         for (DropSummary drop : drops) {
             for (DeliveryLineSummary line : drop.lines()) {

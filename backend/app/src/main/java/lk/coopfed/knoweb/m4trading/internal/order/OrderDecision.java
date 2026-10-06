@@ -12,17 +12,25 @@ final class OrderDecision {
 
     private OrderDecision() {}
 
-    static void requireUndecided(JdbcTemplate jdbc, DocumentRecord order) {
-        if (!OrderStatus.SUBMITTED.equals(order.status())) {
-            throw new ProblemException("m4.order.not_submitted", Map.of("status", order.status()));
+    /**
+     * The order is locked ({@link OrderLocks}), then its status is read again and must still be
+     * SUBMITTED, then no decision may exist. The status is read after the lock, not before: the
+     * buyer's AmendOrder or CancelOrder holds the same lock while it moves the order, so a
+     * decision that waited on it sees the order as the buyer left it (wave 2, M4MONEY-06).
+     *
+     * @return the order as read under the lock
+     */
+    static DocumentRecord requireUndecided(JdbcTemplate jdbc, OrderGuards guards, DocumentRecord order) {
+        OrderLocks.lock(jdbc, order.id());
+        DocumentRecord current = guards.visibleOrder(order.id());
+        if (!OrderStatus.SUBMITTED.equals(current.status())) {
+            throw new ProblemException("m4.order.not_submitted", Map.of("status", current.status()));
         }
-        // Locked: two decisions on one order serialise on the seller's allocation key.
-        jdbc.queryForList(
-                "select pg_advisory_xact_lock(hashtext(?::text))", order.id().toString());
         List<String> decided = jdbc.queryForList(
                 "select status from trading.order_allocation where order_id = ?", String.class, order.id());
         if (!decided.isEmpty()) {
             throw new ProblemException("m4.order.already_decided", Map.of("status", decided.get(0)));
         }
+        return current;
     }
 }

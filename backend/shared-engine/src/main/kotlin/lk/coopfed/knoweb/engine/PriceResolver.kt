@@ -16,7 +16,9 @@ object PriceResolver {
             ?: return LineResult.notSellable(input, LineResult.NO_LIST_LINE)
         val sku = ix.sku(input.skuId)
             ?: return LineResult.notSellable(input, LineResult.NO_LIST_LINE)
-        val candidates = ix.inStockBatches(input.skuId).filter { it.onHand > Quantity.ZERO }
+        // A pricing candidate has stock and is not past its expiry on the business date: an
+        // expired batch never sets the price or takes a markdown (CR-23A-1, wave 2 D1/D4).
+        val candidates = ix.inStockBatches(input.skuId).filter { isCandidate(it, date) }
         val policy = ix.policyFor(input.skuId)
 
         // 2. batch term
@@ -25,21 +27,26 @@ object PriceResolver {
         val batch: BatchCandidate?
         val batchTerm: Money?
         val reasonIfBound: CapReason
+        // The batch the cashier identified (scanned or picked), when there is one.
+        val identified: BatchCandidate?
         when {
             !sku.hasPrintedMrp -> {
                 batch = scanned
                 batchTerm = null
                 reasonIfBound = CapReason.NONE
+                identified = scanned
             }
             policy.kind == PolicyKind.BARCODE_RESOLVED && scanned != null -> {
                 batch = scanned
                 batchTerm = scanned.printedMrp
                 reasonIfBound = CapReason.MRP_BARCODE
+                identified = scanned
             }
             policy.kind == PolicyKind.PICKER && picked != null -> {
                 batch = picked
                 batchTerm = picked.printedMrp
                 reasonIfBound = CapReason.MRP_PICKED
+                identified = picked
             }
             policy.kind == PolicyKind.PICKER && gapExceeds(candidates, policy) ->
                 return LineResult.needsPick(input, candidates)
@@ -47,8 +54,13 @@ object PriceResolver {
                 batch = candidates.minByOrNull { it.printedMrp ?: Money.MAX }
                 batchTerm = batch?.printedMrp
                 reasonIfBound = CapReason.MRP_LOWEST
+                identified = null
             }
         }
+        // The batch an expiry markdown is judged on (doc 23 section 3.5: "applies only to the
+        // specific batch"): the identified one, else the FEFO-first candidate, which is the one
+        // at the front of the shelf. Not the lowest-MRP batch, which may be other units.
+        val markdownBatch = identified ?: fefoFirst(candidates)
 
         // 3. control term: the lowest of the SKU's and its tags' ceilings in force.
         val control = ix.ceilingFor(input.skuId, input.uom, date)
@@ -74,9 +86,20 @@ object PriceResolver {
             controlPriceApplied = control?.price,
             capReason = reason,
             taxRatePercent = sku.taxRatePercent,
-            lineTotal = unit * input.qty
+            lineTotal = unit * input.qty,
+            markdownBatch = markdownBatch
         )
     }
+
+    /** In stock and in date: `onHand > 0` and no expiry, or an expiry on or after the date. */
+    @JvmStatic
+    fun isCandidate(b: BatchCandidate, date: LocalDate): Boolean =
+        b.onHand > Quantity.ZERO && (b.expiry == null || !b.expiry.isBefore(date))
+
+    /** First expiry first out: the earliest expiry; a batch without one comes last. */
+    private fun fefoFirst(candidates: List<BatchCandidate>): BatchCandidate? =
+        candidates.sortedWith(compareBy<BatchCandidate, LocalDate?>(nullsLast()) { it.expiry }.thenBy { it.batchId })
+            .firstOrNull()
 
     /** The PICKER threshold (doc 23 DR-4, Rs 20 or 5 %): either one crossed shows the picker. */
     private fun gapExceeds(candidates: List<BatchCandidate>, policy: Policy): Boolean {

@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
@@ -84,6 +86,22 @@ public class DeliveryReads {
                 .flatMap(drop -> drop.orderIds().stream())
                 .distinct()
                 .toList();
+    }
+
+    /**
+     * Every order the note carries, from its drops and from its lines, each once: the orders
+     * IssueDeliveryNote locks (in sorted order, {@code OrderLocks.lockAll}) before it reads them.
+     */
+    public Set<UUID> allOrderIds(List<DropSummary> drops) {
+        Set<UUID> ids = new HashSet<>(orderIds(drops));
+        for (DropSummary drop : drops) {
+            for (DeliveryLineSummary line : drop.lines()) {
+                if (line.orderId() != null) {
+                    ids.add(line.orderId());
+                }
+            }
+        }
+        return ids;
     }
 
     static List<UUID> uuids(Object array) {

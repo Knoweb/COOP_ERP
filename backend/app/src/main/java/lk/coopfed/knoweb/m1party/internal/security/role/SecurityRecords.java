@@ -298,6 +298,43 @@ class SecurityRecords {
                 "select security.user_permissions_at(?, ?, ?)", String.class, userId, entityId, leavingOutRoleId));
     }
 
+    /**
+     * The limits of each holding through which the user holds these codes in the scope (the rows
+     * the permission resolver unions: ACTIVE roles of an ACTIVE user, assigned at the entity
+     * with no location or at this location), code to one entry per holding; an entry is null
+     * when that holding carries no limits. Read under the caller's row-level security, which
+     * shows a user their own assignments at the scope's entity.
+     */
+    Map<String, List<Map<String, Object>>> holdingLimits(
+            UUID userId, UUID entityId, UUID locationId, Collection<String> codes) {
+        Map<String, List<Map<String, Object>>> found = new HashMap<>();
+        if (userId == null || codes.isEmpty()) {
+            return found;
+        }
+        List<Object> args = new ArrayList<>(List.of(userId, entityId));
+        args.add(locationId);
+        args.addAll(codes);
+        String placeholders = String.join(",", codes.stream().map(c -> "?").toList());
+        jdbc.query(
+                """
+                select rp.permission_code, rp.limits::text as limits
+                  from security.user_role ur
+                  join security.role r on r.role_id = ur.role_id and r.status = 'ACTIVE'
+                  join security.role_permission rp on rp.role_id = r.role_id
+                  join security.app_user u on u.user_id = ur.user_id and u.status = 'ACTIVE'
+                 where ur.user_id = ?
+                   and ur.scope_entity_id = ?
+                   and (ur.scope_location_id is null or ur.scope_location_id = cast(? as uuid))
+                   and rp.permission_code in ("""
+                        + placeholders + ")",
+                rs -> {
+                    found.computeIfAbsent(rs.getString("permission_code"), code -> new ArrayList<>())
+                            .add(limits(rs.getString("limits")));
+                },
+                args.toArray());
+        return found;
+    }
+
     /** How many users of the entity still hold the role, counting across entities for a template. */
     long assignmentCount(UUID roleId) {
         Long count = jdbc.queryForObject("select security.role_assignment_count(?)", Long.class, roleId);
@@ -318,7 +355,8 @@ class SecurityRecords {
      * The entity-wide assignments at the entity through which an ACTIVE user holds
      * {@code gov.user.manage}. ACTIVE only: the permission resolver grants nothing to a PENDING
      * or LOCKED user, so such a holder is not a manager who can act, and counting one would let
-     * the last one who can be taken away.
+     * the last one who can be taken away. And only a kind that signs in to the back office
+     * (BACK_OFFICE, BOTH): a TILL-only user cannot manage users (wave 2, M1A-03; CR-21A-7).
      */
     List<Assignment> userManagerHoldings(UUID entityId) {
         return jdbc.query(
@@ -326,6 +364,7 @@ class SecurityRecords {
                 select ur.user_id, ur.role_id, ur.scope_entity_id, ur.scope_location_id
                   from security.user_role ur
                   join security.app_user u on u.user_id = ur.user_id and u.status = 'ACTIVE'
+                                          and u.user_kind in ('BACK_OFFICE', 'BOTH')
                   join security.role r on r.role_id = ur.role_id and r.status = 'ACTIVE'
                   join security.role_permission rp on rp.role_id = r.role_id and rp.permission_code = ?
                  where ur.scope_entity_id = ?

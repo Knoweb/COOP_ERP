@@ -1,30 +1,38 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
-import { usePosApi } from "./posApi";
-import { ShopPicker, useShop } from "./ShopPicker";
-import { TenderKinds, TillLabel } from "./labels";
+import { usePosApi, type Receipt, type ReceiptFilter } from "./posApi";
+import { DayPicker, ShopPicker, useBusinessDay, useFlaggedOnly, useShop } from "./ShopPicker";
+import { FlagList, TenderKinds, TillLabel } from "./labels";
 import { errorText, receiptLook, tenderKinds, tillNumber } from "./posView";
 import "./pos.css";
 
 /**
- * The receipts the tills of a shop issued (26A section 8, demo scope), newest first: number,
- * time, till, total and how it was paid. Read-only: a sale is made at the till and reaches
- * central through the sync contract; this screen shows what arrived.
+ * The receipts the tills of a shop issued on one business day (26A section 8), newest first, a
+ * page at a time: number, time, till, total, how it was paid, and what central flagged, in the
+ * reader's language. "Flagged only" is how a shop manager finds what central questioned (wave 2,
+ * M6-08 and M6-09). Read-only: a sale is made at the till and reaches central through the sync
+ * contract; this screen shows what arrived.
  */
 export function ReceiptsPage() {
   const t = useT();
   const formatInstant = useFormatInstant();
   const api = usePosApi();
   const [locationId, setLocationId] = useShop();
+  const [day, setDay] = useBusinessDay();
+  const [flaggedOnly, setFlaggedOnly] = useFlaggedOnly();
 
-  const receipts = useQuery({
-    queryKey: ["pos", "receipts", locationId],
-    queryFn: () => api.receipts(locationId),
+  const filter: ReceiptFilter = { locationId, businessDate: day, flaggedOnly };
+  const receipts = useInfiniteQuery({
+    queryKey: ["pos", "receipts", filter],
+    queryFn: ({ pageParam }) => api.receipts(filter, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: locationId !== ""
   });
   const positions = useQuery({
@@ -34,6 +42,9 @@ export function ReceiptsPage() {
     retry: false
   });
 
+  const shown: Receipt[] = useMemo(() => receipts.data?.pages.flatMap((page) => page.items) ?? [], [receipts.data]);
+  const empty = receipts.isSuccess && shown.length === 0 && !receipts.hasNextPage;
+
   return (
     <main className="shell-page">
       <PageHeader
@@ -41,22 +52,27 @@ export function ReceiptsPage() {
         title={t("pos.receipts.title").text}
         actions={
           locationId ? (
-            <Link className="action-link" to={`/pos/sessions?location=${locationId}`}>
+            <Link className="action-link" to={`/pos/sessions?location=${locationId}&day=${day}`}>
               <span>{t("pos.sessions.link").text}</span>
             </Link>
           ) : null
         }
       />
 
-      <section className="modern-filter-panel">
+      <section className="modern-filter-panel pos-filters">
         <ShopPicker value={locationId} onChange={setLocationId} />
+        <DayPicker value={day} onChange={setDay} />
+        <label className="pos-check">
+          <input type="checkbox" checked={flaggedOnly} onChange={(event) => setFlaggedOnly(event.target.checked)} />
+          {t("pos.field.flagged_only").text}
+        </label>
       </section>
 
       {receipts.isLoading && <p>{t("pos.loading").text}</p>}
       {receipts.isError && <p role="alert">{errorText(receipts.error, t("pos.error.generic").text)}</p>}
-      {receipts.data?.length === 0 && <p>{t("pos.receipts.empty").text}</p>}
+      {empty && <p>{t(flaggedOnly ? "pos.receipts.empty_flagged" : "pos.receipts.empty").text}</p>}
 
-      {receipts.data && receipts.data.length > 0 && (
+      {shown.length > 0 && (
         <section className="modern-table-card">
           <div className="modern-table-scroll">
             <table className="modern-table">
@@ -71,7 +87,7 @@ export function ReceiptsPage() {
                 </tr>
               </thead>
               <tbody>
-                {receipts.data.map((receipt) => (
+                {shown.map((receipt) => (
                   <tr key={receipt.documentId}>
                     <td>
                       <Link
@@ -96,6 +112,7 @@ export function ReceiptsPage() {
                         state={receiptLook(receipt)}
                         label={t(receiptLook(receipt) === "alert" ? "pos.receipt.flagged" : "pos.receipt.issued").text}
                       />
+                      {receipt.flags.length > 0 && <FlagList flags={receipt.flags} />}
                     </td>
                   </tr>
                 ))}
@@ -103,6 +120,17 @@ export function ReceiptsPage() {
             </table>
           </div>
         </section>
+      )}
+
+      {receipts.hasNextPage && (
+        <button
+          type="button"
+          className="modern-btn pos-more"
+          onClick={() => receipts.fetchNextPage()}
+          disabled={receipts.isFetchingNextPage}
+        >
+          {t("pos.more").text}
+        </button>
       )}
     </main>
   );

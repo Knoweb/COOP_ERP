@@ -24,12 +24,15 @@ public class InvoiceDisputes {
         this.jdbc = jdbc;
     }
 
-    /** The latest act on the invoice's dispute, if any. */
+    /**
+     * The latest act on the invoice's dispute, if any: the one with the highest sequence (V0009),
+     * never the latest {@code recorded_at}, which is the writing instance's clock.
+     */
     public Optional<Latest> latest(UUID invoiceId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 """
                 select action, reason from trading.invoice_dispute where invoice_document_id = ?
-                 order by recorded_at desc, dispute_event_id desc limit 1
+                 order by seq desc limit 1
                 """,
                 invoiceId);
         if (rows.isEmpty()) {

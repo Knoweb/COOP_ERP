@@ -30,9 +30,12 @@ import org.springframework.stereotype.Component;
  *       applies through {@code ext_view}); the role says what. Read as the federation-wide
  *       viewer in a transaction of its own, because the caller's own policies do not show the
  *       Federation's assignment rows to an external caller.
- *   <li><b>FEDERATION_VIEW</b>: every read of every slice ({@link SliceOperations#readPermissions}):
- *       the class is "SELECT on everything, no writes" (doc 18 section 3.7), and 21A section
- *       3's federation-view template carries no permission of its own.
+ *   <li><b>FEDERATION_VIEW</b>: every read of every slice ({@link
+ *       SliceOperations#federationViewReadPermissions}) but the operations the slices mark
+ *       {@code x-federation-view: false} (CR-18-2; wave 2, TWK-30: staff administration and
+ *       customers' personal data are the entity's): the class is "SELECT on everything, no
+ *       writes" (doc 18 section 3.7), and 21A section 3's federation-view template carries no
+ *       permission of its own.
  *   <li>anything else: nothing.
  * </ul>
  *
@@ -71,7 +74,7 @@ class JdbcPermissionResolver implements PermissionResolver {
                 cache.get(
                         new Key(ctx.userId(), ctx.entityId(), ctx.locationId()),
                         k -> loadOwn(k.userId(), k.entityId(), k.locationId()));
-            case FEDERATION_VIEW -> slices.readPermissions();
+            case FEDERATION_VIEW -> slices.federationViewReadPermissions();
             case EXTERNAL_TIMEBOXED ->
                 ctx.grantedEntities().isEmpty()
                         ? Set.of()

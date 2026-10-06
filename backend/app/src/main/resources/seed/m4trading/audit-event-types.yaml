@@ -145,6 +145,11 @@ audit_event_types:
     offline_capturable: false
     description_en: The A4 copy of an issued credit note stored for printing
 
+  - code: CREDIT_NOTE_APPLIED
+    severity: INFO
+    offline_capturable: false
+    description_en: Money a credit note held unapplied applied to an open invoice of the same buyer
+
   - code: PAYMENT_RECEIPT_RECORDED
     severity: INFO
     offline_capturable: false

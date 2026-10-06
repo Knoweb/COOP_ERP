@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,12 +30,14 @@ import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
+import lk.coopfed.knoweb.testsupport.PinnedClock;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -44,6 +45,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * each guard with its failing case and nothing committed, the vocabulary of every kind, what each
  * handler audits and publishes, and who sees a rule.
  */
+@Import(PinnedClock.class)
 class RuleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = TEST_FEDERATION;
@@ -67,7 +69,7 @@ class RuleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     private final UUID milk = Ids.next();
     private final UUID biscuits = Ids.next();
     private final UUID draftSku = Ids.next();
-    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Colombo"));
+    private final LocalDate today = PinnedClock.TODAY;
 
     @BeforeEach
     void arrange() {
@@ -236,6 +238,37 @@ class RuleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 "m3.rule.benefit_value_invalid");
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    /**
+     * CR-23A-1 (D11, M3-07): no free goods through a price. A fixed price of 0 or 100 % off is refused
+     * by every kind that takes it; giving goods away is a DONATION or SAMPLES write-off.
+     */
+    @Test
+    void aRuleThatMakesTheItemFreeIsRefused() {
+        RulePredicate quantity = new RulePredicate(milk, null, BigDecimal.TEN, null, null);
+        RulePredicate expiry = new RulePredicate(milk, null, null, 3, null);
+        for (AuthorRule free : List.of(
+                rule("TIME_LIMITED_PRICE", item(milk), benefit("FIXED_PRICE", "0")),
+                rule("TIME_LIMITED_PRICE", item(milk), benefit("FIXED_PRICE", "0.00")),
+                rule("TIME_LIMITED_PRICE", item(milk), benefit("PERCENT_OFF", "100")),
+                rule("QUANTITY_BREAK", quantity, benefit("FIXED_PRICE", "0")),
+                rule("QUANTITY_BREAK", quantity, benefit("PERCENT_OFF", "100.00")),
+                rule("EXPIRY_MARKDOWN", expiry, benefit("FIXED_PRICE", "0")),
+                rule("EXPIRY_MARKDOWN", expiry, benefit("PERCENT_OFF", "100")),
+                rule(
+                        "BILL_THRESHOLD",
+                        new RulePredicate(null, null, null, null, BigDecimal.TEN),
+                        benefit("PERCENT_OFF", "100")))) {
+            refused(free, "m3.rule.benefit_value_invalid");
+        }
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        // Just short of free is a discount, not a gift.
+        author.handle(rule("TIME_LIMITED_PRICE", item(milk), benefit("PERCENT_OFF", "99.99")), own(SOCIETY));
+        author.handle(rule("EXPIRY_MARKDOWN", expiry, benefit("FIXED_PRICE", "0.01")), own(SOCIETY));
+        assertThat(kernel.committedAudit()).hasSize(2);
     }
 
     @Test

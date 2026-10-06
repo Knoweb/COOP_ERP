@@ -47,6 +47,14 @@ export function ExposurePanel({ exposure, orderValue }: { exposure: Exposure; or
             <MoneyDisplay amount={exposure.unappliedReceipts} />
           </dd>
         </div>
+        {(exposure.unappliedCredits ?? 0) > 0 && (
+          <div className="document-header__fact">
+            <dt>{t("trading.exposure.unapplied_credits").text}</dt>
+            <dd>
+              <MoneyDisplay amount={exposure.unappliedCredits ?? 0} />
+            </dd>
+          </div>
+        )}
         <div className="document-header__fact">
           <dt>{t("trading.exposure.amount").text}</dt>
           <dd>

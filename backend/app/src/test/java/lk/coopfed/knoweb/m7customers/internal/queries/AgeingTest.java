@@ -35,6 +35,6 @@ class AgeingTest {
     }
 
     private static OpenCharge charge(LocalDate day, String open) {
-        return new OpenCharge(UUID.randomUUID(), day, Instant.EPOCH, new BigDecimal(open));
+        return new OpenCharge(UUID.randomUUID(), UUID.randomUUID(), day, Instant.EPOCH, new BigDecimal(open));
     }
 }
