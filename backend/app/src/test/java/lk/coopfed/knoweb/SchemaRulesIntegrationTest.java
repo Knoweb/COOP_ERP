@@ -148,11 +148,21 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
      * a SECURITY DEFINER function whose search_path does not end in {@code pg_temp} searches the
      * caller's temporary schema first, so a temporary table could shadow a catalogue relation it
      * reads. Every definer function of the schemas fixed so far ends its search_path in pg_temp; the
-     * schemas still to fix (reporting, integration) join this set with their wave 2 pull requests,
-     * and the test PR of the plan (17) makes it every schema.
+     * schema still to fix (reporting) joins this set with its wave 2 pull request, and the test PR of
+     * the plan (17) makes it every schema.
      */
     static final Set<String> DEFINER_SEARCH_PATH_FIXED = Set.of(
-            "kernel", "hello", "party", "security", "catalogue", "pricing", "inventory", "trading", "pos", "customers");
+            "kernel",
+            "hello",
+            "party",
+            "security",
+            "catalogue",
+            "pricing",
+            "inventory",
+            "trading",
+            "pos",
+            "customers",
+            "integration");
 
     @Test
     void everyDefinerFunctionOfTheFixedSchemasEndsItsSearchPathInPgTemp() {

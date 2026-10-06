@@ -21,19 +21,25 @@ public interface InventoryQueries {
     List<LotBalance> balances(UUID locationId, UUID skuId, boolean includeZero, ScopeContext scope);
 
     /**
-     * Availability(locations, skus): per requested location and SKU, the GOOD lots with stock
-     * less the undispatched reservations of issued delivery notes; zero where there is nothing.
+     * Availability(locations, skus): per requested location and SKU, the in-date GOOD lots with
+     * stock less the undispatched reservations of issued delivery notes; zero where there is nothing.
+     * An expired lot (expiry before the business date) is never available (wave 2, M5-01).
      * What M4 shows buyers and allocates from (doc 24 section 6.2).
      */
     List<Availability> availability(Collection<UUID> locationIds, Collection<UUID> skuIds, ScopeContext scope);
 
     /**
-     * PickBatches / FEFO order: the GOOD lots of the SKU with stock at the location, the one to
-     * pick first first (expiry, none last, then received). M4's delivery note and M5's pick list.
+     * PickBatches / FEFO order: the in-date GOOD lots of the SKU at the location with something
+     * free of them, the one to pick first first (expiry, none last, then received), each lot's
+     * quantity being what the open pick lists do not hold of it. M5's transfer request consumer.
      */
     List<LotBalance> pickBatches(UUID locationId, UUID skuId, ScopeContext scope);
 
-    /** InStockBatches: the GOOD lots of the SKU with stock at any of the locations, for M3's authoring checks. */
+    /**
+     * InStockBatches: the in-date GOOD lots of the SKU with stock at any of the locations, for M3's
+     * authoring checks and price candidates (an expired lot with a lower printed MRP must not hold
+     * the shelf price down).
+     */
     List<LotBalance> inStockBatches(Collection<UUID> locationIds, UUID skuId, ScopeContext scope);
 
     /** SkusWithLots: the SKUs with a lot other than zero at the location (M2's assortment). */

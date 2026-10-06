@@ -197,11 +197,7 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                 reason);
         BigDecimal credited = IssueCreditNoteHandler.creditedFromLinks(documents, invoiceId);
         jdbc.update("update trading.doc_invoice set credited_amount = ? where document_id = ?", credited, invoiceId);
-        List<Posting> journal = postings.postings(
-                IssueCreditNoteHandler.CN,
-                "GOODS",
-                "SELLER",
-                Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+        List<Posting> journal = IssueCreditNoteHandler.bothSides(postings, issued);
 
         Instant decidedAt = clock.now();
         String findings = command.findings() == null || command.findings().isBlank()
@@ -270,7 +266,8 @@ public class ApproveClaimHandler implements Handles<ApproveClaim, UUID> {
                 issued.docNumberDisplay(),
                 seller,
                 journal,
-                issued.businessDate()));
+                issued.businessDate(),
+                buyer));
         return creditNoteId;
     }
 

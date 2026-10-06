@@ -52,7 +52,12 @@ public class EventConsumerRegistry implements BeanPostProcessor {
                 Registration existing = registrations.putIfAbsent(
                         key,
                         new Registration(
-                                annotation.consumer(), eventType, bean, invocable, method.getParameterTypes()[0]));
+                                annotation.consumer(),
+                                eventType,
+                                annotation.party(),
+                                bean,
+                                invocable,
+                                method.getParameterTypes()[0]));
 
                 if (existing != null) {
                     throw new IllegalStateException(
@@ -93,6 +98,14 @@ public class EventConsumerRegistry implements BeanPostProcessor {
             throw new IllegalStateException("@EventConsumer needs at least one event type: " + method);
         }
 
+        // A counterparty consumer reads documentId and counterpartyEntityId from the payload; the
+        // envelope form of "*" is for consumers that match on type and id alone (CR-19A-13).
+        if (annotation.party() == EventConsumer.Party.COUNTERPARTY
+                && java.util.Arrays.asList(annotation.types()).contains("*")) {
+            throw new IllegalStateException(
+                    "@EventConsumer with party = COUNTERPARTY names its types, not \"*\": " + method);
+        }
+
         Class<?>[] parameters = method.getParameterTypes();
 
         if (parameters.length != 2 || !ScopeContext.class.equals(parameters[1])) {
@@ -110,7 +123,13 @@ public class EventConsumerRegistry implements BeanPostProcessor {
 
     private record Key(String consumer, String eventType) {}
 
-    record Registration(String consumer, String eventType, Object bean, Method method, Class<?> payloadType) {
+    record Registration(
+            String consumer,
+            String eventType,
+            EventConsumer.Party party,
+            Object bean,
+            Method method,
+            Class<?> payloadType) {
 
         void invoke(String payload, ScopeContext scope, ObjectMapper mapper) {
 
