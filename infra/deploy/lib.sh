@@ -168,11 +168,14 @@ prune_images() {
 #   - the web client's addresses become the server's (PUBLIC_URL) instead of localhost:5173
 #   - every user's password ("dev" and "demo" in the file) becomes DEMO_PASSWORD from .env
 #   - the backend client's secret becomes KEYCLOAK_BACKEND_CLIENT_SECRET from .env
-#   - HTTPS is required from outside the server's own network (sslRequired external)
+#   - HTTPS is required from outside the server's own network (sslRequired external), and
+#     brute-force protection is on, with a temporary lockout only (D-3). Not in realm-dev.json:
+#     on a laptop and in CI the end-to-end tests sign the same users in from four browsers at
+#     once, and Keycloak's quick-login check locked fed-admin out (PR #267's first CI run)
 #   - the password grant of the web client is off (a development shortcut); demo-data.sh
 #     switches it on for the few minutes the till history needs it
-# Brute-force protection, the default roles and the disabled OTP enrolment come with
-# realm-dev.json itself; apply_realm_policy writes them into a realm Keycloak already has.
+# The default roles and the disabled OTP enrolment are set by apply_realm_policy, which also
+# writes the brute-force settings into a realm Keycloak already has.
 # The result is checked: no development address or password may be left.
 render_realm() {
   local url pw secret src out
@@ -184,7 +187,7 @@ render_realm() {
       -e "s|\"value\": \"dev\"|\"value\": \"$pw\"|g" \
       -e "s|\"value\": \"demo\"|\"value\": \"$pw\"|g" \
       -e "s|\"secret\": \"coop-erp-backend-dev\"|\"secret\": \"$secret\"|" \
-      -e "s|\"sslRequired\": \"none\"|\"sslRequired\": \"external\"|" \
+      -e "s|\"sslRequired\": \"none\",|\"sslRequired\": \"external\", \"bruteForceProtected\": true, \"permanentLockout\": false, \"failureFactor\": 30, \"maxFailureWaitSeconds\": 900,|" \
       -e "s|\"directAccessGrantsEnabled\": true|\"directAccessGrantsEnabled\": false|g" \
       -e "s|COOP ERP (development)|COOP ERP (demo)|" \
       -e "s|(development)\"|(demo)\"|g" \
