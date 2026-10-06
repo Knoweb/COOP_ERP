@@ -322,8 +322,9 @@ class GrnHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
             kernel.reset();
             issueInvoice.handle(new IssueInvoice(List.of(grnId)), seller());
+            // The seller's net line: the invoice's event carries the buyer's side too (wave 2).
             BigDecimal billed = events(JournalPostingsReady.class).get(0).postings().stream()
-                    .filter(posting -> "net".equals(posting.amountSource()))
+                    .filter(posting -> "SELLER".equals(posting.side()) && "net".equals(posting.amountSource()))
                     .map(Posting::amount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             assertThat(accrued)

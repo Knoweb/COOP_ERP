@@ -222,8 +222,10 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
                 receivedOn,
                 applied,
                 unapplied));
+        // The seller's side only (doc 10 A-01: the buyer's cash book is its own record), so no
+        // counterparty on the event and nobody else receives it.
         events.publish(new JournalPostingsReady(
-                receiptId, PRC, issued.docNumberDisplay(), seller, journal, issued.businessDate()));
+                receiptId, PRC, issued.docNumberDisplay(), seller, journal, issued.businessDate(), null));
         return receiptId;
     }
 

@@ -144,8 +144,7 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
         BigDecimal credited = creditedFromLinks(documents, invoiceId);
         jdbc.update("update trading.doc_invoice set credited_amount = ? where document_id = ?", credited, invoiceId);
 
-        List<Posting> journal =
-                postings.postings(CN, "GOODS", "SELLER", Map.of("net", issued.netAmount(), "tax", issued.taxAmount()));
+        List<Posting> journal = bothSides(postings, issued);
 
         audit.record(
                 AUDIT_ISSUED,
@@ -155,8 +154,27 @@ public class IssueCreditNoteHandler implements Handles<IssueCreditNote, UUID> {
                 scope);
         events.publish(issuedEvent(issued, invoiceId, null, seller, invoice.counterpartyEntityId()));
         events.publish(new JournalPostingsReady(
-                creditNoteId, CN, issued.docNumberDisplay(), seller, journal, issued.businessDate()));
+                creditNoteId,
+                CN,
+                issued.docNumberDisplay(),
+                seller,
+                journal,
+                issued.businessDate(),
+                invoice.counterpartyEntityId()));
         return creditNoteId;
+    }
+
+    /**
+     * The credit note's lines of both sides (wave 2, CR-24A-3 item 5): the seller's revenue and
+     * VAT reversed against its receivable, and the buyer's payable reduced against its inventory
+     * and VAT input ({@code CN GOODS BUYER}). One event carries both; M9 files each side under
+     * its own party (CR-19A-13). Shared by the three handlers that issue a credit note.
+     */
+    public static List<Posting> bothSides(PostingMapper postings, DocumentRecord issued) {
+        Map<String, BigDecimal> amounts = Map.of("net", issued.netAmount(), "tax", issued.taxAmount());
+        List<Posting> journal = new ArrayList<>(postings.postings(CN, "GOODS", "SELLER", amounts));
+        journal.addAll(postings.postings(CN, "GOODS", "BUYER", amounts));
+        return journal;
     }
 
     /**
