@@ -55,4 +55,11 @@ GRANT app_rw    TO "$APP_DB_USER";
 GRANT app_relay TO "$RELAY_DB_USER";
 
 ALTER DATABASE "$POSTGRES_DB" OWNER TO "$MIGRATION_DB_USER";
+
+-- Nobody but the owner creates temporary tables (wave 2, RLS-13): a session's temporary schema is
+-- searched before pg_catalog by a function whose search_path does not end in pg_temp, so a temporary
+-- table named pg_policy could shadow the catalogue for a SECURITY DEFINER function. Every definer
+-- function now ends its search_path in pg_temp; this is the belt to those braces. Nothing under
+-- backend/app/src creates a temporary table.
+REVOKE TEMPORARY ON DATABASE "$POSTGRES_DB" FROM PUBLIC;
 EOSQL

@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.ChangeLog;
@@ -18,6 +19,8 @@ import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -37,6 +40,9 @@ class ChangeLogPurgeIntegrationTest extends SyncIntegrationTest {
 
     @Autowired
     PlatformTransactionManager transactions;
+
+    @Autowired
+    JdbcTemplate appJdbc;
 
     private final ScopeContext federation = SystemScope.own(OTHER_ENTITY, null);
 
@@ -86,6 +92,68 @@ class ChangeLogPurgeIntegrationTest extends SyncIntegrationTest {
     void theLastDayIsNeverPurged() {
         assertThatThrownBy(() -> purge.purgeOlderThan(Duration.ofHours(1)))
                 .hasMessageContaining("keeps at least the last 24 hours");
+    }
+
+    /** kernel V0086 (wave 2, RLS-14): the purge answers the class the job runs in, and no other. */
+    @Test
+    void onlyTheFederationViewClassPurges() {
+        for (String policyClass : List.of("OWN", "NONE", "PARTY", "EXTERNAL_TIMEBOXED")) {
+            assertThatThrownBy(() -> purgeAs(policyClass, LocalDate.now(ZoneOffset.UTC)))
+                    .as(policyClass)
+                    .isInstanceOf(DataAccessException.class)
+                    .rootCause()
+                    .hasMessageContaining("FEDERATION_VIEW");
+        }
+        assertThatThrownBy(() -> purgeAs(null, LocalDate.now(ZoneOffset.UTC)))
+                .as("no scope at all")
+                .isInstanceOf(DataAccessException.class)
+                .rootCause()
+                .hasMessageContaining("FEDERATION_VIEW");
+    }
+
+    /**
+     * kernel V0086 (wave 2, RLS-14): a keep-from date far ahead is clamped to today, so the latest
+     * entry of a row still to take effect is kept whatever a mis-wired caller passes.
+     */
+    @Test
+    void aKeepFromDateInTheFutureIsClampedToToday() {
+        LocalDate later = LocalDate.now().plusDays(60);
+        publish(null, Change.upsert("location", SHOP)); // version 1
+        publish(later, Change.upsert("till_position", POSITION)); // version 2: a day ahead
+        publish(null, Change.upsert("location", SHOP)); // version 3
+        recordedAgo(1, Duration.ofDays(40));
+        recordedAgo(2, Duration.ofDays(40));
+        recordedAgo(3, Duration.ofDays(1));
+
+        Long removed = purgeAs("FEDERATION_VIEW", LocalDate.of(9999, 12, 31));
+
+        assertThat(removed).isEqualTo(1);
+        List<Map<String, Object>> left = superuserJdbc()
+                .queryForList(
+                        "select version, table_name from kernel.change_log where location_id = ? order by version",
+                        SHOP);
+        assertThat(left)
+                .extracting(r -> r.get("version") + " " + r.get("table_name"))
+                .containsExactly("2 till_position", "3 location");
+    }
+
+    /** The function as the application user calls it, in a class set directly on the transaction. */
+    private Long purgeAs(String policyClass, LocalDate keepApplyFrom) {
+        return new TransactionTemplate(transactions).execute(status -> {
+            if (policyClass != null) {
+                appJdbc.queryForList(
+                        "select set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                                + " set_config('app.scope_class', ?, true), set_config('app.granted_entities', '{}', true)",
+                        OTHER_ENTITY.toString(),
+                        policyClass);
+            }
+            // A refusal rolls the transaction back by itself; an accepted purge commits, as the job's.
+            return appJdbc.queryForObject(
+                    "select kernel.change_log_purge(?, ?)",
+                    Long.class,
+                    Timestamp.from(Instant.now().minus(Duration.ofDays(30))),
+                    java.sql.Date.valueOf(keepApplyFrom));
+        });
     }
 
     @Test

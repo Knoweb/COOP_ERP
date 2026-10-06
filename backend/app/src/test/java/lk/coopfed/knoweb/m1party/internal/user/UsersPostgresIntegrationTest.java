@@ -647,6 +647,33 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(takenForNobody).isFalse();
         }
 
+        /**
+         * m1security V0018 (wave 2, RLS-16): an OWN scope with no entity (which the customizer never
+         * produces) is answered "no", not "yes for any entity" as V0016's NULL comparison did.
+         */
+        @Test
+        void theOfficerCheckAnswersNoToAScopeWithoutAnEntity() {
+            Boolean withoutEntity = new TransactionTemplate(transactions).execute(status -> {
+                jdbc.queryForObject("select set_config('app.scope_entity_id', '', true)", String.class);
+                jdbc.queryForObject("select set_config('app.scope_location_id', '', true)", String.class);
+                jdbc.queryForObject("select set_config('app.scope_class', 'OWN', true)", String.class);
+                try {
+                    return jdbc.queryForObject(
+                            "select security.user_belongs_to_entity(?, ?)", Boolean.class, atShopB, ENTITY);
+                } finally {
+                    status.setRollbackOnly();
+                }
+            });
+            Boolean forAnotherEntity = inScope(
+                    OTHER_ENTITY,
+                    null,
+                    () -> jdbc.queryForObject(
+                            "select security.user_belongs_to_entity(?, ?)", Boolean.class, atShopB, ENTITY));
+
+            assertThat(withoutEntity).isFalse();
+            assertThat(forAnotherEntity).isFalse();
+        }
+
         private List<UUID> visible(ScopeContext scope) {
             return queries.listUsers(new UserFilter(null, null, null, 100), scope).items().stream()
                     .map(UserView::userId)

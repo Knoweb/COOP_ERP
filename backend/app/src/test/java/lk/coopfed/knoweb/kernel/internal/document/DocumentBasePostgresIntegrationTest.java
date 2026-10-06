@@ -508,6 +508,44 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(inScope(BUYER, () -> documents.findLines(id))).hasSize(2);
     }
 
+    /**
+     * kernel V0086 (wave 2, RLS-09; the rule "written before issue or in the issuing transaction"):
+     * the helper the extension-table policies of M4 test. True for an unissued header, true in the
+     * transaction that issues it (after the issuing UPDATE), false in any later transaction. This
+     * is what proves the {@code pg_current_xact_id()::xid} cast on PostgreSQL 16: a refused cast
+     * would fail the migration itself, and a wrong comparison would answer false mid-issue.
+     */
+    @Test
+    void aDocumentIsOpenForWriteUntilTheTransactionThatIssuesItEnds() {
+        inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID id = Ids.next();
+        inScope(BUYER, () -> documents.save(draft(id, BUYER, SELLER)));
+
+        assertThat(inScope(BUYER, () -> openForWrite(id)))
+                .as("an unissued header, in a later transaction")
+                .isTrue();
+
+        Boolean duringIssue = inScope(BUYER, () -> {
+            issuance.issue(draft(id, BUYER, SELLER), twoLines(id), scope(BUYER));
+            return openForWrite(id);
+        });
+        assertThat(duringIssue).as("issued in this transaction").isTrue();
+
+        assertThat(inScope(BUYER, () -> openForWrite(id)))
+                .as("issued in an earlier transaction")
+                .isFalse();
+        assertThat(inScope(STRANGER, () -> openForWrite(id)))
+                .as("a header the caller cannot see is not open to it")
+                .isFalse();
+        assertThat(inScope(BUYER, () -> openForWrite(Ids.next())))
+                .as("no header, nothing to write under")
+                .isFalse();
+    }
+
+    private Boolean openForWrite(UUID documentId) {
+        return jdbc.queryForObject("select kernel.document_open_for_write(?)", Boolean.class, documentId);
+    }
+
     @Test
     void aStateTransitionIsCompareAndSetAndAudited() {
         inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
