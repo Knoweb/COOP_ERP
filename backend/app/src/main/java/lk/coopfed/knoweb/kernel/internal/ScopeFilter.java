@@ -172,7 +172,9 @@ public class ScopeFilter extends OncePerRequestFilter {
         return path.startsWith(SYNC)
                 && !isEnrolment(path)
                 && !path.endsWith("/enrolment-codes")
-                && !path.endsWith("/sequence-reset");
+                && !path.endsWith("/sequence-reset")
+                // An administrator resolves a quarantined event (wave 2, CR-32-1 item 2).
+                && !path.startsWith(SYNC + "quarantine/");
     }
 
     private static boolean isEnrolment(String path) {

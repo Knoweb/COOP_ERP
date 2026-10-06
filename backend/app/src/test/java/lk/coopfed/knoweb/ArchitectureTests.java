@@ -798,6 +798,33 @@ class ArchitectureTests {
     /** Same prefix as PLACEHOLDER_PERMISSION_PREFIX in tools/new-module.mjs. */
     static final String SCAFFOLD_PLACEHOLDER = "todo.";
 
+    /**
+     * Wave 2, TWK-28 (docs/progress/deviations/2026-10-06-wave2-kernel-defaults-and-limits.md (5)):
+     * {@code A4Renderer.presignGetOfParty} checks only the caller's scope and the key's owner, so
+     * every caller must read the document's row under its own row-level security first, as M4's
+     * invoice, credit-note and receipt reads and M8's report read do. The document-id predicate
+     * the review asked for waits for a third caller; until then only those two modules call it.
+     */
+    @Test
+    void onlyM4AndM8PresignAPartysPrintout() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackages(
+                        "lk.coopfed.knoweb.m4trading..",
+                        "lk.coopfed.knoweb.m8reporting..",
+                        "lk.coopfed.knoweb.kernel..")
+                .should()
+                .callMethodWhere(new DescribedPredicate<JavaMethodCall>("A4Renderer.presignGetOfParty") {
+                    @Override
+                    public boolean test(JavaMethodCall call) {
+                        return call.getName().equals("presignGetOfParty")
+                                && call.getTargetOwner().isAssignableTo(lk.coopfed.knoweb.kernel.api.A4Renderer.class);
+                    }
+                })
+                .allowEmptyShould(true)
+                .check(CLASSES);
+    }
+
     @Test
     void onlyScheduledJobsTakeAnEntitysScope() { // CR-19A-7, as revised on 27 September 2026
         ownScopeOfOnlyInScheduledJobsRule().check(CLASSES);

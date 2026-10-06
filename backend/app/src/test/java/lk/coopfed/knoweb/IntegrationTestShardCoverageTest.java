@@ -50,6 +50,7 @@ class IntegrationTestShardCoverageTest {
                             "lk.coopfed.knoweb.SchemaRulesIntegrationTest",
                             "lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest",
                             "lk.coopfed.knoweb.RuntimeRolesIntegrationTest",
+                            "lk.coopfed.knoweb.ModuleMigrationsFromThePreviousNumberIntegrationTest",
                             "lk.coopfed.knoweb.IntegrationTestShardCoverageTest"));
 
     @Test

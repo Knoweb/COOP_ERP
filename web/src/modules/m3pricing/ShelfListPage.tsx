@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIntl } from "react-intl";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatDate } from "../../shell/i18n/formats";
+import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { inLocale, skuText } from "../../shell/i18n/localName";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
@@ -14,7 +14,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { RetailPrice, SetLinesResponse } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
-import { bindingCeiling, chipOf, errorText, isoToday, reasonMessageId } from "./priceListState";
+import { bindingCeiling, chipOf, errorText, incompleteLines, reasonMessageId } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -44,7 +44,7 @@ export function ShelfListPage() {
   const versionKey = useIdempotencyKey();
 
   const detail = useQuery({ queryKey: ["pricing", "priceList", listId], queryFn: () => api.getPriceList(listId) });
-  const advisoryDate = detail.data?.list.applyFrom ?? isoToday();
+  const advisoryDate = detail.data?.list.applyFrom ?? businessToday();
   const advisory = useQuery({
     queryKey: ["pricing", "advisory", advisoryDate],
     queryFn: () => api.advisoryLines(advisoryDate),
@@ -59,6 +59,7 @@ export function ShelfListPage() {
   }, [advisory.data]);
 
   const [rows, setRows] = useState<Row[]>([]);
+  const incomplete = incompleteLines(rows);
   const [outcomes, setOutcomes] = useState<SetLinesResponse | null>(null);
   const [applyFrom, setApplyFrom] = useState("");
 
@@ -234,9 +235,10 @@ export function ShelfListPage() {
             }
           />
           <div>
-            <button type="button" disabled={save.isPending} onClick={() => save.mutate()}>
+            <button type="button" disabled={save.isPending || incomplete.length > 0} onClick={() => save.mutate()}>
               {t("pricing.save").text}
             </button>
+            {incomplete.length > 0 && <p role="alert">{t("pricing.shelf.incomplete", undefined, { rows: incomplete.join(", ") }).text}</p>}
             {outcomes?.saved && <p role="status">{t("pricing.saved").text}</p>}
             {outcomes && !outcomes.saved && (
               <p role="alert">{t("pricing.shelf.not_saved", undefined, { count: refusedLines }).text}</p>
@@ -298,7 +300,7 @@ function PriceCheck({ rows }: { rows: Row[] }) {
   });
   const [locationId, setLocationId] = useState("");
   const [skuId, setSkuId] = useState("");
-  const [date, setDate] = useState(isoToday());
+  const [date, setDate] = useState(businessToday());
   const [result, setResult] = useState<RetailPrice | null>(null);
 
   const check = useMutation({

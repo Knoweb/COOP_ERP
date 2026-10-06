@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { replayPendingCommand, type ReplayOutcome } from "../api/pendingCommand";
 import { useT } from "../i18n/useT";
 import { useScope } from "../scope/useScope";
-import { takePendingCommand } from "./oidc";
+import { takeCommandNotKept, takePendingCommand } from "./oidc";
 import { useSession } from "./session";
 
-type ReplayState = { phase: "none" } | { phase: "replaying" } | { phase: "finished"; outcome: ReplayOutcome };
+type ReplayState = { phase: "none" } | { phase: "reenter" } | { phase: "replaying" } | { phase: "finished"; outcome: ReplayOutcome };
 
 /**
  * Takes again, once, the command a step-up interrupted (shell/api/pendingCommand.ts). It sits
@@ -37,6 +37,11 @@ export function StepUpReplay() {
     // takePendingCommand() empties the hand-over, so a second run of this effect (React's
     // strict mode, a token renewal) finds nothing and replays nothing.
     const pending = takePendingCommand();
+    if (!pending && takeCommandNotKept()) {
+      // The command held personal data, a file or a foreign address: it was not kept (CR-30-2).
+      setState({ phase: "reenter" });
+      return;
+    }
     if (!pending) {
       return;
     }
@@ -56,6 +61,13 @@ export function StepUpReplay() {
 
   if (state.phase === "none") {
     return null;
+  }
+  if (state.phase === "reenter") {
+    return (
+      <p className="step-up-replay" role="status">
+        {t("shell.stepup.reenter").text}
+      </p>
+    );
   }
   if (state.phase === "replaying") {
     return (

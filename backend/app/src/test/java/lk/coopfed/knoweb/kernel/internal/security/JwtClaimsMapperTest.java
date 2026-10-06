@@ -190,9 +190,40 @@ class JwtClaimsMapperTest {
                 .isNull();
     }
 
+    /**
+     * Wave 2, D-5 (docs/progress/deviations/2026-10-06-wave2-deploy-kit.md (5)): the password
+     * shortcut on a public issuer needs a second opt-in that names the demo, or the start fails.
+     */
+    @Test
+    void thePasswordShortcutStartsOnADevelopmentIssuerAndOnAPublicOneOnlyWithTheDemoAck() {
+        List<String> acr = List.of("loa2");
+        // A development issuer and the flag: starts, as on a laptop.
+        assertThat(new JwtClaimsMapper(records, devices, acr, true, "http://localhost:8085/realms/coop", ""))
+                .isNotNull();
+        // A public issuer and the flag without the acknowledgement: refused, naming what to set.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new JwtClaimsMapper(
+                        records, devices, acr, true, "https://203.0.113.10.sslip.io/auth/realms/coop", ""))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("password-reauth-public-issuer-ack")
+                .hasMessageContaining("demo-data-only");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new JwtClaimsMapper(
+                        records, devices, acr, true, "https://203.0.113.10.sslip.io/auth/realms/coop", "yes"))
+                .isInstanceOf(IllegalStateException.class);
+        // With the acknowledgement: starts (and logs a WARN), and the shortcut counts.
+        JwtClaimsMapper demo = new JwtClaimsMapper(
+                records, devices, acr, true, "https://203.0.113.10.sslip.io/auth/realms/coop", "demo-data-only");
+        long at = Instant.now().minusSeconds(60).getEpochSecond();
+        assertThat(demo.map(jwt(Map.of("sub", USER.toString(), "auth_time", at)), null, null, null, null)
+                        .mfaAt())
+                .isEqualTo(Instant.ofEpochSecond(at));
+        // The flag off: a public issuer needs nothing.
+        assertThat(new JwtClaimsMapper(records, devices, acr, false, "https://id.coopfed.lk/realms/coop", ""))
+                .isNotNull();
+    }
+
     @Test
     void onlyALocalOrTestIssuerIsADevelopmentIssuer() {
-        // password-reauth-counts with any other issuer is logged at ERROR when the mapper starts.
+        // password-reauth-counts with any other issuer is refused at start without the demo ack.
         assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://localhost:8085/realms/coop"))
                 .isTrue();
         assertThat(JwtClaimsMapper.isDevelopmentIssuer("http://127.0.0.1:8085/realms/coop"))

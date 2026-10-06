@@ -112,7 +112,7 @@ public class AcceptOrderHandler implements Handles<AcceptOrder, UUID> {
         TradingGuards.requireEntityScope(scope);
         UUID orderId = TradingGuards.required(command.orderId(), "orderId");
         DocumentRecord order = guards.sellersOrder(orderId, scope);
-        OrderDecision.requireUndecided(jdbc, order);
+        order = OrderDecision.requireUndecided(jdbc, guards, order);
         Map<String, Object> request = jdbc.queryForMap(
                 "select relationship_id, buyer_entity_id from trading.doc_order where document_id = ?", orderId);
         UUID relationshipId = (UUID) request.get("relationship_id");

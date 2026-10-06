@@ -7,10 +7,12 @@ import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m4trading.api.ApplyCreditNote;
 import lk.coopfed.knoweb.m4trading.api.DisputeInvoice;
 import lk.coopfed.knoweb.m4trading.api.IssueCreditNote;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
 import lk.coopfed.knoweb.m4trading.api.ResolveInvoiceDispute;
+import lk.coopfed.knoweb.m4trading.internal.invoice.ApplyCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.DisputeInvoiceHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueInvoiceHandler;
@@ -22,6 +24,7 @@ import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
+import lk.coopfed.knoweb.m4trading.web.generated.ApplyCreditNoteRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.BillingApi;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNotePrintResponse;
@@ -49,6 +52,7 @@ class BillingController implements BillingApi {
     private final DisputeInvoiceHandler dispute;
     private final ResolveInvoiceDisputeHandler resolveDispute;
     private final IssueCreditNoteHandler issueCreditNote;
+    private final ApplyCreditNoteHandler applyCreditNote;
     private final InvoiceQueries queries;
     private final CreditNoteQueries creditNotes;
     private final PaymentQueries payments;
@@ -61,6 +65,7 @@ class BillingController implements BillingApi {
             DisputeInvoiceHandler dispute,
             ResolveInvoiceDisputeHandler resolveDispute,
             IssueCreditNoteHandler issueCreditNote,
+            ApplyCreditNoteHandler applyCreditNote,
             InvoiceQueries queries,
             CreditNoteQueries creditNotes,
             PaymentQueries payments,
@@ -71,6 +76,7 @@ class BillingController implements BillingApi {
         this.dispute = dispute;
         this.resolveDispute = resolveDispute;
         this.issueCreditNote = issueCreditNote;
+        this.applyCreditNote = applyCreditNote;
         this.queries = queries;
         this.creditNotes = creditNotes;
         this.currentScope = currentScope;
@@ -152,6 +158,14 @@ class BillingController implements BillingApi {
     }
 
     @Override
+    public ResponseEntity<CreditNoteResponse> applyCreditNote(
+            String idempotencyKey, UUID creditNoteId, ApplyCreditNoteRequest request) {
+        ScopeContext scope = currentScope.get();
+        applyCreditNote.handle(new ApplyCreditNote(creditNoteId, request.getInvoiceId(), request.getAmount()), scope);
+        return ResponseEntity.ok(readCreditNote(creditNoteId, scope));
+    }
+
+    @Override
     public ResponseEntity<CreditNotePrintResponse> getCreditNotePrint(UUID creditNoteId) {
         ScopeContext scope = currentScope.get();
         CreditNoteView note = creditNotes
@@ -223,13 +237,27 @@ class BillingController implements BillingApi {
                 })
                 .toList());
         response.setCreditNotes(creditNotes.creditNotesOf(invoice.invoiceId(), scope).stream()
-                .map(note -> {
-                    CreditNoteSummary summary = new CreditNoteSummary(note.creditNoteId(), note.grossAmount());
-                    summary.setDocNumber(note.docNumberDisplay());
-                    return summary;
-                })
+                .map(BillingController::toSummary)
                 .toList());
+        // The seller's credit notes to this buyer holding money unapplied, while this invoice owes
+        // something (CR-24A-3 item 2): what the screen offers to apply here.
+        boolean owes =
+                response.getAmountDue() != null && response.getAmountDue().signum() > 0;
+        if (owes && invoice.sellerEntityId().equals(scope.entityId())) {
+            response.setAvailableCredits(
+                    creditNotes.unappliedCreditNotes(invoice.sellerEntityId(), invoice.buyerEntityId(), scope).stream()
+                            .map(BillingController::toSummary)
+                            .toList());
+        }
         return response;
+    }
+
+    private static CreditNoteSummary toSummary(CreditNoteView note) {
+        CreditNoteSummary summary = new CreditNoteSummary(note.creditNoteId(), note.grossAmount());
+        summary.setDocNumber(note.docNumberDisplay());
+        summary.setAppliedAmount(note.appliedAmount());
+        summary.setUnappliedAmount(note.unappliedAmount());
+        return summary;
     }
 
     private static InvoiceLineResponse toLine(InvoiceView.InvoiceLineView line) {
@@ -280,6 +308,8 @@ class BillingController implements BillingApi {
         response.setInvoiceDocNumber(note.invoiceDocNumberDisplay());
         response.setDiscrepancyId(note.discrepancyId());
         response.setIssuedAt(note.issuedAt());
+        response.setAppliedAmount(note.appliedAmount());
+        response.setUnappliedAmount(note.unappliedAmount());
         return response;
     }
 }

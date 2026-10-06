@@ -765,9 +765,13 @@ paths:
       summary: The seller credits chosen quantities of lines of its invoice
       description: >
         At each line's price and VAT rate. A discrepancy is settled with settleDiscrepancy instead.
-        Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.creditnote.not_seller,
-        m4.invoice.not_issued, m4.creditnote.line_unknown, m4.creditnote.qty_invalid,
-        m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
+        Each invoice line at most once, and no more than the line has left uncredited by earlier
+        credit notes (a settlement or a claim may have credited it). The credit note's money applies
+        to the invoice as far as it is still due; the rest stays on the credit note, unapplied, and
+        applyCreditNote applies it later. Asks for a fresh second factor. Problems:
+        m4.invoice.not_found, m4.creditnote.not_seller, m4.invoice.not_issued,
+        m4.creditnote.line_unknown, m4.creditnote.line_duplicate, m4.creditnote.qty_invalid,
+        m4.creditnote.exceeds_billed, m4.creditnote.nothing_to_credit, document.link.exceeds_balance.
       x-permission: bil.creditnote.issue
       x-scope: ENTITY
       parameters:
@@ -843,6 +847,46 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/credit-notes/{creditNoteId}/apply:
+
+    parameters:
+      - $ref: '#/components/parameters/CreditNoteId'
+
+    post:
+      tags: [Billing]
+      operationId: applyCreditNote
+      summary: The seller applies money a credit note holds unapplied to an open invoice of the same buyer
+      description: >
+        A credit note's money applies to the invoice it credits only as far as that invoice was
+        still due; the rest is its unapplied amount (CR-24A-3 item 2). This applies it, with no
+        amount as much as fits, to an issued, undisputed invoice of the same seller and buyer. No
+        money moves and nothing is refunded. Asks for a fresh second factor. Problems:
+        m4.creditnote.not_found, m4.creditnote.not_seller, m4.invoice.not_found,
+        m4.invoice.not_issued, m4.creditnote.invoice_not_ours, m4.creditnote.invoice_disputed,
+        m4.creditnote.applied_already, m4.creditnote.amount_invalid,
+        m4.creditnote.exceeds_unapplied, m4.creditnote.exceeds_due.
+      x-permission: bil.creditnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyCreditNoteRequest'
+      responses:
+        '200':
+          description: The credit note, with what it applied and what it still holds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
   /v1/trading/discrepancies:
 
     get:
@@ -914,7 +958,9 @@ paths:
       summary: The seller accepts the buyer's count and settles the discrepancy
       description: >
         The invoice bills the received quantity, so a short quantity is settled with no money;
-        damaged quantity the invoice charged is credited by a credit note issued in the same act.
+        damaged quantity the invoice charged is credited by a credit note issued in the same act, no
+        more than the line has left uncredited; the money applies to the invoice as far as it is
+        still due and the rest stays on the credit note, unapplied.
         Asks for a fresh second factor. Problems: m4.discrepancy.not_found,
         m4.discrepancy.settled_already, m4.discrepancy.invoice_first, document.link.exceeds_balance.
       x-permission: bil.creditnote.issue
@@ -973,7 +1019,9 @@ paths:
         With no settlements the payment settles the buyer's open, undisputed invoices oldest
         first; what is left stays on the buyer's account (unapplied). Problems:
         m4.payment.method_invalid, m4.payment.amount_invalid, m4.payment.received_in_future,
-        m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.invoice_invalid,
+        m4.payment.cheque_required, m4.payment.no_relationship, m4.payment.cheque_recorded (the
+        same cheque, by bank and number, on an earlier receipt from this buyer that did not bounce),
+        m4.payment.invoice_invalid,
         m4.invoice.not_found, m4.payment.invoice_not_ours, m4.invoice.not_issued,
         m4.payment.exceeds_due, m4.payment.exceeds_receipt.
       x-permission: bil.payment.record
@@ -1275,7 +1323,9 @@ paths:
       description: >
         Problems: m4.claim.not_found, m4.claim.decided, m4.claim.evidence_pending,
         m4.claim.line_unknown, m4.claim.qty_invalid, m4.claim.nothing_approved,
-        m4.claim.invoice_first, m4.creditnote.exceeds_due.
+        m4.claim.invoice_first, m4.creditnote.exceeds_billed (an accepted quantity above what its
+        invoice line has left uncredited is refused, not capped). The credit note's money applies to
+        the invoice as far as it is still due; the rest stays on the credit note, unapplied.
       x-permission: del.claim.decide
       x-scope: ENTITY
       parameters:
@@ -2157,6 +2207,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CreditNoteSummary'
+        availableCredits:
+          type: array
+          description: >
+            For the seller, while something is due: its credit notes to this buyer that still hold
+            money unapplied, which applyCreditNote can apply to this invoice
+          items:
+            $ref: '#/components/schemas/CreditNoteSummary'
         lines:
           type: array
           items:
@@ -2173,6 +2230,25 @@ components:
           type: string
         grossAmount:
           type: number
+        appliedAmount:
+          type: number
+          description: What of it was applied to invoices
+        unappliedAmount:
+          type: number
+          description: What it still holds for the buyer, to apply to an open invoice
+
+    ApplyCreditNoteRequest:
+      type: object
+      required: [invoiceId]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 999999999999.99
+          description: What to apply; absent, as much as fits
 
     DisputeInvoiceRequest:
       type: object
@@ -2265,6 +2341,12 @@ components:
           type: number
         grossAmount:
           type: number
+        appliedAmount:
+          type: number
+          description: What of it was applied to invoices (to its own invoice as far as that was due, then by applyCreditNote)
+        unappliedAmount:
+          type: number
+          description: What it still holds for the buyer
         lines:
           type: array
           items:
@@ -2659,6 +2741,9 @@ components:
           type: number
         unappliedReceipts:
           type: number
+        unappliedCredits:
+          type: number
+          description: What the seller's credit notes to the buyer hold unapplied; subtracted
         amount:
           type: number
         warnThresholdPercent:

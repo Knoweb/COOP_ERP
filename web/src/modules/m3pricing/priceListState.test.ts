@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import messages from "./pricing.messages.json" with { type: "json" };
-import { bindingCeiling, chipOf, controlPriceChip, controlPriceState, isoToday, reasonMessageId } from "./priceListState";
+import { bindingCeiling, chipOf, controlPriceChip, controlPriceState, incompleteLines, reasonMessageId } from "./priceListState";
 import type { ControlPrice, LineOutcome } from "./pricingApi";
 
 // The reasons SetLines answers with (openapi/m3pricing.yaml, setLines): each must have a text on
@@ -20,7 +20,9 @@ const REASONS = [
   "m3.price_list.line.above_control_price",
   "m3.price_list.line.above_shelf_mrp",
   "m3.price_list.line.retail_precision",
-  "m3.price_list.line.tier_not_allowed"
+  "m3.price_list.line.tier_not_allowed",
+  // CR-23A-1: no free goods through a shelf price
+  "m3.price_list.line.price_zero"
 ];
 
 // The enums of the slice the screens turn into message ids: every value needs its text.
@@ -87,8 +89,8 @@ describe("price list state", () => {
     expect(controlPriceChip("ended")).toBe("void");
   });
 
-  it("writes a calendar day as ISO text", () => {
-    expect(isoToday(new Date(2026, 0, 5))).toBe("2026-01-05");
-    expect(isoToday(new Date(2026, 11, 31))).toBe("2026-12-31");
+  it("names the shelf lines whose price is blank or not a plain decimal as incomplete", () => {
+    expect(incompleteLines([{ price: "12.50" }, { price: "" }, { price: "  " }, { price: "1e3" }, { price: "0" }, { price: "7" }])).toEqual([2, 3, 4]);
+    expect(incompleteLines([])).toEqual([]);
   });
 });

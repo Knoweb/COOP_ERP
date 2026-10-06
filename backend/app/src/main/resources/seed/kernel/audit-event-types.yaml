@@ -106,6 +106,11 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: A till event could not be accepted and was quarantined
+  # Wave 2, PR 03 (CR-32-1 item 2): a quarantined event resolved by an administrator, once.
+  - code: SYNC_QUARANTINE_RESOLVED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: An administrator marked a quarantined till event repaired or discarded, with a reason
   - code: SYNC_ANOMALY
     severity: ALERT
     offline_capturable: false
@@ -123,3 +128,9 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: An administrator moved a device's sync cursor past numbers it lost; the gap is recorded
+  # wave 2, PR 16 (till trust and durability, TWK-03): the till records a PIN lock-out offline as
+  # an audit.* fact (26A section 8, "5 failures -> 15-min lockout (local + audit)").
+  - code: TILL_PIN_LOCKOUT
+    severity: REVIEW
+    offline_capturable: true
+    description_en: Wrong PINs in a row locked a till's sign-in for a while

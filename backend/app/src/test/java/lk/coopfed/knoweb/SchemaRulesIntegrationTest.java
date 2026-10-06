@@ -120,6 +120,62 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
                 .isFalse();
     }
 
+    /**
+     * The sync quarantine (kernel V0084; CR-32-1 item 2): app_rw may write the four resolution
+     * columns and nothing else, the raw event included (only kernel.sync_quarantine_drop_raw nulls
+     * it), and never delete a row: a quarantined fact is resolved, never purged.
+     */
+    @Test
+    void theQuarantineTakesOnlyItsResolutionColumns() {
+        JdbcTemplate db = superuserJdbc();
+        assertThat(problemsOf(db)).noneMatch(problem -> problem.startsWith("kernel.sync_quarantine:"));
+        List<String> updatable = db.queryForList(
+                """
+                select column_name from information_schema.column_privileges
+                 where table_schema = 'kernel' and table_name = 'sync_quarantine'
+                   and grantee = 'app_rw' and privilege_type = 'UPDATE'
+                 order by column_name
+                """,
+                String.class);
+        assertThat(updatable).containsExactly("resolution", "resolution_reason", "resolved_at", "resolved_by_user_id");
+        assertThat(db.queryForObject(
+                        "select has_table_privilege('app_rw', 'kernel.sync_quarantine', 'DELETE')", Boolean.class))
+                .isFalse();
+    }
+
+    /**
+     * Wave 2 (RLS-13; {@code docs/progress/deviations/2026-10-06-wave2-cross-tenant-functions.md} (1)):
+     * a SECURITY DEFINER function whose search_path does not end in {@code pg_temp} searches the
+     * caller's temporary schema first, so a temporary table could shadow a catalogue relation it
+     * reads. Every definer function of the schemas fixed so far ends its search_path in pg_temp; the
+     * schemas still to fix (reporting, integration) join this set with their wave 2 pull requests,
+     * and the test PR of the plan (17) makes it every schema.
+     */
+    static final Set<String> DEFINER_SEARCH_PATH_FIXED = Set.of(
+            "kernel", "hello", "party", "security", "catalogue", "pricing", "inventory", "trading", "pos", "customers");
+
+    @Test
+    void everyDefinerFunctionOfTheFixedSchemasEndsItsSearchPathInPgTemp() {
+        List<String> unguarded = superuserJdbc()
+                .queryForList(
+                        """
+                        select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+                               || ': search_path ' || coalesce((select c from unnest(p.proconfig) c
+                                                                 where c like 'search_path=%'), 'not set')
+                          from pg_proc p
+                          join pg_namespace n on n.oid = p.pronamespace
+                         where p.prosecdef
+                           and n.nspname = any (?)
+                           and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c
+                                            where c ~ '^search_path=.*[, ]pg_temp\\s*$')
+                         order by 1
+                        """,
+                        String.class, (Object) DEFINER_SEARCH_PATH_FIXED.toArray(String[]::new));
+        assertThat(unguarded)
+                .as("SECURITY DEFINER functions whose search_path does not end in pg_temp")
+                .isEmpty();
+    }
+
     /** Proof that the rules bite: tables that break each of them are reported, by name. */
     @Test
     void aTableThatBreaksTheRulesIsReported() {

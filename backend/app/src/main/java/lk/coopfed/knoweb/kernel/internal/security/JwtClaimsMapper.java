@@ -77,25 +77,40 @@ public class JwtClaimsMapper {
     private final Set<String> secondFactorAcr;
     private final boolean passwordReauthCounts;
 
+    /**
+     * The one value of {@code coop-erp.security.mfa.password-reauth-public-issuer-ack} that lets a
+     * public issuer count a password sign-in as the second factor (wave 2, D-5 of the deploy
+     * review, decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-deploy-kit.md (5)).
+     * Only the demo server's compose file sets it; staging gets a realm with OTP and the flag off.
+     */
+    static final String PUBLIC_ISSUER_ACK = "demo-data-only";
+
     @Autowired
     public JwtClaimsMapper(
             UserScopes userScopes,
             DeviceScopes deviceScopes,
             @Value("${coop-erp.security.mfa.acr-values:2,loa2,mfa,otp}") List<String> secondFactorAcr,
             @Value("${coop-erp.security.mfa.password-reauth-counts:false}") boolean passwordReauthCounts,
-            @Value("${coop-erp.security.oidc.issuer:}") String issuer) {
+            @Value("${coop-erp.security.oidc.issuer:}") String issuer,
+            @Value("${coop-erp.security.mfa.password-reauth-public-issuer-ack:}") String publicIssuerAck) {
         this.userScopes = userScopes;
         this.deviceScopes = deviceScopes;
         this.secondFactorAcr = Set.copyOf(secondFactorAcr);
         this.passwordReauthCounts = passwordReauthCounts;
         if (passwordReauthCounts && !isDevelopmentIssuer(issuer)) {
-            // A password sign-in counted as the second factor is for a development realm without
-            // OTP; with any other issuer it switches the step-up off. Loud, not fatal: an
-            // operator may be testing a staging realm on purpose.
-            LOG.error(
-                    "coop-erp.security.mfa.password-reauth-counts is true with the issuer {}, which is not a"
-                            + " development issuer: a password sign-in counts as the second factor. Set it to"
-                            + " false outside development.",
+            // A password sign-in counted as the second factor is for a realm without OTP; with a
+            // public issuer it switches the step-up off. Refused at start unless the second
+            // opt-in names the one case where that is meant (the demo server's data).
+            if (!PUBLIC_ISSUER_ACK.equals(publicIssuerAck == null ? null : publicIssuerAck.strip())) {
+                throw new IllegalStateException("coop-erp.security.mfa.password-reauth-counts is true with the issuer "
+                        + issuer + ", which is not a development issuer: a password sign-in would count as the"
+                        + " second factor. Set it false, or, for the demo server only, set"
+                        + " coop-erp.security.mfa.password-reauth-public-issuer-ack"
+                        + " (COOP_ERP_MFA_PASSWORD_REAUTH_PUBLIC_ACK) to \"" + PUBLIC_ISSUER_ACK + "\"");
+            }
+            LOG.warn(
+                    "coop-erp.security.mfa.password-reauth-counts is true with the public issuer {}, acknowledged as"
+                            + " demo data only: a password sign-in counts as the second factor. Never with real data.",
                     issuer);
         }
     }
@@ -105,7 +120,7 @@ public class JwtClaimsMapper {
             DeviceScopes deviceScopes,
             List<String> secondFactorAcr,
             boolean passwordReauthCounts) {
-        this(userScopes, deviceScopes, secondFactorAcr, passwordReauthCounts, "http://localhost:8085/realms/coop");
+        this(userScopes, deviceScopes, secondFactorAcr, passwordReauthCounts, "http://localhost:8085/realms/coop", "");
     }
 
     /** The production rule: only an acr or amr that names a second factor counts. */

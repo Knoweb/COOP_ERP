@@ -80,8 +80,11 @@ function RequestRow({ request, canAnswer }: { request: PrivacyRequest; canAnswer
     onSuccess: done,
     onError
   });
+  const downloadKey = useIdempotencyKey();
   const download = async () => {
-    const data = await api.privacyExport(request.requestId);
+    // Each hand-over is its own audited command: a fresh key per click.
+    const data = await api.privacyExport(request.requestId, downloadKey.current());
+    downloadKey.next();
     if (!data) {
       return;
     }

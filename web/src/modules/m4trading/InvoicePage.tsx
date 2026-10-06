@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
+import { openServerFile } from "../../shell/api/openServerFile";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useScope } from "../../shell/scope/useScope";
@@ -38,7 +39,7 @@ export function InvoicePage() {
     enabled: firstGrn !== undefined,
     retry: false
   });
-  const print = useMutation({ mutationFn: () => api.invoicePrint(invoiceId) });
+  const print = useMutation({ mutationFn: () => openServerFile(() => api.invoicePrint(invoiceId)) });
   // The buyer disputes the invoice with a reason; either party holding the permission closes it.
   const scope = useScope();
   const queryClient = useQueryClient();
@@ -72,21 +73,25 @@ export function InvoicePage() {
       }
     }
   });
+  // The seller's accounts apply what a credit note of the same buyer still holds to this invoice
+  // (CR-24A-3 item 2): as much as fits, the server works it out.
+  const canIssueCredit = useHasPermission("bil.creditnote.issue");
+  const applyKey = useIdempotencyKey();
+  const applyCredit = useMutation({
+    mutationFn: (creditNoteId: string) => api.applyCreditNote(creditNoteId, invoiceId, applyKey.current()),
+    onSuccess: () => {
+      applyKey.next();
+      queryClient.invalidateQueries({ queryKey: ["trading"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiProblem) {
+        applyKey.next();
+      }
+    }
+  });
   // The tab is opened in the click itself, so a popup blocker lets it through, and is sent to
-  // the PDF once the link arrives.
-  const openPrint = () => {
-    const tab = window.open("about:blank", "_blank");
-    print.mutate(undefined, {
-      onSuccess: (url) => {
-        if (tab) {
-          tab.location.href = url;
-        } else {
-          window.location.assign(url);
-        }
-      },
-      onError: () => tab?.close()
-    });
-  };
+  // the PDF once the link arrives (openServerFile).
+  const openPrint = () => print.mutate();
 
   if (invoice.isLoading) {
     return <main className="shell-page">{t("trading.loading").text}</main>;
@@ -281,9 +286,33 @@ export function InvoicePage() {
               <li key={note.creditNoteId}>
                 <Link to={`/trading/credit-notes/${note.creditNoteId}`}>{note.docNumber ?? t("trading.creditnote.title").text}</Link>{" "}
                 <MoneyDisplay amount={note.grossAmount} />
+                {(note.unappliedAmount ?? 0) > 0 && (
+                  <>
+                    {" "}
+                    {t("trading.creditnote.unapplied").text} <MoneyDisplay amount={note.unappliedAmount ?? 0} />
+                  </>
+                )}
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {canIssueCredit && !isBuyer && amountDue > 0 && (inv.availableCredits ?? []).length > 0 && (
+        <section className="trading-section">
+          <h2>{t("trading.invoice.available_credits").text}</h2>
+          <ul>
+            {(inv.availableCredits ?? []).map((note) => (
+              <li key={note.creditNoteId}>
+                <Link to={`/trading/credit-notes/${note.creditNoteId}`}>{note.docNumber ?? t("trading.creditnote.title").text}</Link>{" "}
+                {t("trading.creditnote.unapplied").text} <MoneyDisplay amount={note.unappliedAmount ?? 0} />{" "}
+                <button type="button" disabled={applyCredit.isPending} onClick={() => applyCredit.mutate(note.creditNoteId)}>
+                  {t("trading.invoice.apply_credit").text}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {applyCredit.isError && <p role="alert">{errorText(applyCredit.error, t("trading.error.generic").text)}</p>}
         </section>
       )}
 

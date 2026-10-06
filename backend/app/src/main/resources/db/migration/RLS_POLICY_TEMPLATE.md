@@ -128,3 +128,41 @@ A fourth case, from K-07:
   under the caller's own policies. So a row is visible under whichever class sees its document
   (OWN, PARTY through the counterparty, FEDERATION_VIEW, EXTERNAL through the grant) and
   writable only by the owner in an OWN scope, with nothing copied and nothing to keep in step.
+  **An extension row is written before the document is issued or in the transaction that issues
+  it, never later** (wave 2, RLS-09; `docs/progress/deviations/2026-10-06-wave2-extension-rows-after-issue.md`):
+  `document_write` adds `kernel.document_open_for_write(document_id)` (kernel `V0086`,
+  `SECURITY INVOKER`): the header is unissued, or its `xmin` is the current transaction's id,
+  which is how the database knows "issued in this transaction" without a session variable
+  (forbidden above) and without trusting a clock. The columns a handler specification writes
+  after issue (a cancelled quantity, dispatch and proof-of-delivery columns, the invoice's
+  settlement caches, a print key) are named per table in the `UPDATE` grant and keep their own
+  `document_update` policy; attachments and photographs may be added to an issued document.
+  A savepoint gives a row the subtransaction's id, so the issuing handler opens none (Spring's
+  default propagation; the kernel's `inOwnTransaction` opens a connection, not a savepoint).
+
+A fifth case, from wave 2 of the code review (RLS-03, -06, -12, -14, -16;
+`docs/progress/deviations/2026-10-06-wave2-cross-tenant-functions.md` (1)):
+
+- **A function that answers across tenants.** A guard sometimes needs one fact about rows its
+  caller may not read (does anyone hold this phone number; does the caller hold a lot of this
+  batch; does the caller trade with this entity; how many users of this entity hold a role). That
+  fact is answered by a `SECURITY DEFINER` function the migrator owns, executable by `app_rw`,
+  which reads through a policy `TO app_seed` and follows five rules: (1) it tests
+  `kernel.scope_class()` first and answers nothing (false, zero, no rows) to a class that has no
+  business asking, today `= 'OWN'`; a job's class is named explicitly when a job calls it
+  (`kernel.change_log_purge` takes `FEDERATION_VIEW`); (2) the caller is `kernel.scope_entity()`,
+  never a parameter: parameters name the thing asked about, never the entity answered for;
+  (3) it returns the smallest fact the guard needs, a boolean, a count, or ids the caller already
+  owns, so another tenant's ids never leave it; (4) `SET search_path = pg_catalog, <schema>, pg_temp`,
+  with `pg_temp` last, so a session cannot shadow a catalogue relation with a temporary table
+  (PostgreSQL's own guidance for definer functions; `01-roles.sh` revokes `TEMPORARY` from
+  `PUBLIC` besides); (5) `REVOKE ALL FROM PUBLIC; GRANT EXECUTE TO app_rw`: who may call is the
+  class test inside, not the grant, because one role serves every class. Examples:
+  `party.caller_trades_with(entity)`, `party.trading_standing(entity)` (m1party),
+  `inventory.caller_holds_lot_of(batch)`, `inventory.sku_has_lot(sku)` (m5inventory),
+  `security.user_belongs_to_entity(user, entity)` (m1security). `SchemaRulesIntegrationTest` pins
+  rule (4) on every definer function of the schemas fixed so far.
+  One recorded exception to the layering rule, for SQL only: a module's migration may call a
+  function another module created for it, read-only, never a table and never a write, and the
+  creating module lists the function in its README as part of its contract
+  (`catalogue.batch_apply_correction` asks `inventory.entity_holds_lot_of`, m2catalogue `V0008`).

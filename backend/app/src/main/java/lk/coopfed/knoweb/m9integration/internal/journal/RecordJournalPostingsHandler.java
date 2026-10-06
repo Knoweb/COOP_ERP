@@ -28,8 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Guards: the OWN scope of an entity ({@code m9.journal.own_required}); a document, its type
  * and number, a business date, and on every posting the side, both roles and an amount
- * ({@code m9.journal.postings_malformed}). A document whose postings are already held (the event
- * redelivered) is left alone and answers 0: nothing is recorded, audited or published twice.
+ * ({@code m9.journal.postings_malformed}). A document whose postings this entity already holds (the
+ * event redelivered) is left alone and answers 0: nothing is recorded, audited or published twice.
  *
  * <p>Mutation: one row per posting, numbered in the order of the event. The owning module
  * computed the amount and named the roles; a negative amount (a reversal written as a negated
@@ -71,9 +71,13 @@ class RecordJournalPostingsHandler implements Handles<RecordJournalPostings, Int
                 || command.postings().stream().anyMatch(RecordJournalPostingsHandler::malformed)) {
             throw new ProblemException("m9.journal.postings_malformed");
         }
+        // Held already by this entity, named explicitly: the seller's and the buyer's postings of
+        // one invoice share its document id and are two entities' books (wave 2, M9-02 (3)), so the
+        // owner is part of the key, not left to the read policy.
         Integer held = jdbc.queryForObject(
-                "select count(*) from integration.journal_posting where document_id = ?",
+                "select count(*) from integration.journal_posting where owner_entity_id = ? and document_id = ?",
                 Integer.class,
+                scope.entityId(),
                 command.documentId());
         if (held != null && held > 0) {
             return 0;

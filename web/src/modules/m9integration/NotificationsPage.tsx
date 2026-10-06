@@ -6,8 +6,10 @@ import { useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { StateChip, type ChipState } from "../../shell/components/StateChip";
-import { useIntegrationApi, type LogStatus, type NotificationRule } from "./integrationApi";
+import { useScope } from "../../shell/scope/useScope";
+import { useIntegrationApi, type LogStatus, type NotificationLogEntry, type NotificationRule } from "./integrationApi";
 import { errorText, templateText } from "./integrationView";
+import { deferredUntil, recipientParty } from "./notificationLogView";
 import "./integration.css";
 
 const LOG_STATUSES: LogStatus[] = ["QUEUED", "SENT", "FAILED", "SUPPRESSED"];
@@ -22,10 +24,12 @@ const LOG_LOOK: Record<LogStatus, ChipState> = {
 /**
  * Notifications (29A section 8, demo scope): the rules with their status (the Federation's
  * administration activates and retires them), the templates in the reader's language with the
- * English fallback tag, and the delivery log, whose recipients are hashes.
+ * English fallback tag, and the delivery log, which names the recipient's entity and role and
+ * never a number or a hash a reader could reverse (wave 2, M9-07).
  */
 export function NotificationsPage() {
   const t = useT();
+  const scope = useScope();
   const api = useIntegrationApi();
   const intl = useIntl();
   const queryClient = useQueryClient();
@@ -43,6 +47,31 @@ export function NotificationsPage() {
     queryKey: ["integration", "log", status],
     queryFn: () => api.log(status === "" ? undefined : status)
   });
+
+  /** "Entity …000000b2, the accounts desk · 3fa9c2e1": who was reached, never the number (M9-07). */
+  function recipientText(entry: NotificationLogEntry): string {
+    const party = recipientParty(entry, scope.entityId);
+    const parts: string[] = [];
+    if (party.kind === "own") {
+      parts.push(t("integration.log.recipient.own").text);
+    } else if (party.kind === "other") {
+      parts.push(t("integration.log.recipient.other", undefined, { id: party.shortId }).text);
+    }
+    if (entry.audienceRole) {
+      parts.push(t(`integration.role.${entry.audienceRole}`, entry.audienceRole).text);
+    }
+    const who = parts.join(", ");
+    return entry.recipientTag ? (who ? `${who} · ${entry.recipientTag}` : entry.recipientTag) : who;
+  }
+
+  /** The reason a row was not sent, or when quiet hours let it go (CR-19A-12). */
+  function noteText(entry: NotificationLogEntry): string {
+    const until = deferredUntil(entry, new Date());
+    if (until) {
+      return t("integration.log.deferred", undefined, { until: formatInstant(until) }).text;
+    }
+    return entry.suppressedReason ?? entry.lastError ?? "";
+  }
 
   async function toggle(rule: NotificationRule) {
     setMessage(null);
@@ -201,13 +230,13 @@ export function NotificationsPage() {
                       <td>{formatInstant(entry.createdAt)}</td>
                       <td title={entry.templateId ?? undefined}>{entry.templateId ? t(`integration.template.${entry.templateId}`, entry.templateId).text : ""}</td>
                       <td>{t(`integration.channel.${entry.channel}`, entry.channel).text}</td>
-                      <td className="integration-hash">{entry.recipientHash}</td>
+                      <td>{recipientText(entry)}</td>
                       <td>{entry.language ? t(`integration.language.${entry.language}`, entry.language).text : ""}</td>
                       <td>
                         <StateChip state={LOG_LOOK[entry.status]} label={t(`integration.log.status.${entry.status}`).text} />
                       </td>
                       <td className="integration-number">{entry.attempts}</td>
-                      <td>{entry.suppressedReason ?? entry.lastError ?? ""}</td>
+                      <td>{noteText(entry)}</td>
                     </tr>
                   ))}
                 </tbody>

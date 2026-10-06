@@ -27,6 +27,8 @@ data class ReceiptMessages(
     val expected: String,
     val counted: String,
     val variance: String,
+    /** "{n}" stands for the count. */
+    val refusedFacts: String,
 ) {
     companion object {
         private val EN = ReceiptMessages(
@@ -34,7 +36,7 @@ data class ReceiptMessages(
             cash = "Cash", change = "Change", thanks = "Thank you", reprint = "REPRINT", zReport = "Z REPORT",
             businessDate = "Business date", opened = "Opened", closed = "Closed", receipts = "Receipts",
             sales = "Sales", float = "Float", expected = "Expected cash", counted = "Counted cash",
-            variance = "Variance",
+            variance = "Variance", refusedFacts = "{n} facts refused by central, see the office",
         )
         private val SI = ReceiptMessages(
             receipt = "රිසිට්පත", date = "දිනය", cashier = "මුදල් අයකැමි", counter = "කවුන්ටරය",
@@ -42,7 +44,7 @@ data class ReceiptMessages(
             reprint = "නැවත මුද්‍රණය", zReport = "Z වාර්තාව", businessDate = "ව්‍යාපාර දිනය",
             opened = "ආරම්භය", closed = "අවසානය", receipts = "රිසිට්පත්", sales = "විකුණුම්",
             float = "ආරම්භක මුදල", expected = "අපේක්ෂිත මුදල", counted = "ගණන් කළ මුදල",
-            variance = "වෙනස",
+            variance = "වෙනස", refusedFacts = "මධ්‍යස්ථානය ප්‍රතික්ෂේප කළ වාර්තා {n}ක්, කාර්යාලය අමතන්න",
         )
         private val TA = ReceiptMessages(
             receipt = "ரசீது", date = "தேதி", cashier = "காசாளர்", counter = "கவுண்டர்",
@@ -50,7 +52,7 @@ data class ReceiptMessages(
             reprint = "மறுஅச்சு", zReport = "Z அறிக்கை", businessDate = "வணிக தேதி",
             opened = "தொடக்கம்", closed = "முடிவு", receipts = "ரசீதுகள்", sales = "விற்பனை",
             float = "தொடக்கப் பணம்", expected = "எதிர்பார்க்கும் பணம்", counted = "எண்ணிய பணம்",
-            variance = "வேறுபாடு",
+            variance = "வேறுபாடு", refusedFacts = "மையம் நிராகரித்த {n} பதிவுகள், அலுவலகத்தை அணுகவும்",
         )
 
         fun of(language: Language): ReceiptMessages = when (language) {

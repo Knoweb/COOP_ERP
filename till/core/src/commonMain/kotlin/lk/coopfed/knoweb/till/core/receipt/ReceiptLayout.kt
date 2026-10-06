@@ -85,6 +85,10 @@ object ReceiptLayouts {
         blocks += Block.Row(m.expected, z.expectedCash.display(), bold = true)
         z.countedCash?.let { blocks += Block.Row(m.counted, it.display()) }
         z.variance?.let { blocks += Block.Row(m.variance, it.display(), bold = true) }
+        if (z.refusedFacts > 0) {
+            blocks += Block.Rule
+            blocks += Block.Text(m.refusedFacts.replace("{n}", z.refusedFacts.toString()), bold = true)
+        }
         blocks += Block.Gap(24)
         return ReceiptLayout(language, blocks)
     }

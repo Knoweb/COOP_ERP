@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.AdjustmentRequested;
 import lk.coopfed.knoweb.m7customers.api.RequestAdjustment;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger.LockedAccount;
@@ -28,7 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
  * approval"). Guards, in order: the society's OWN scope with a user (the approver must be
  * another person, so the requester is named: {@code m7.adjustment.user_required}); the account of
  * this society, not CLOSED; an amount other than zero in cents ({@code m7.adjustment.amount_invalid});
- * a reason.
+ * a reason free of a phone number or NIC ({@code m7.field.personal_data}: the reason is retained
+ * after an erasure).
  *
  * <p>Mutation: the adjustment, REQUESTED; nothing is posted until another person approves it.
  * Audit ADJUSTMENT_REQUESTED; event account.adjusted.v1 comes with the approval. The request
@@ -77,7 +79,7 @@ class RequestAdjustmentHandler implements Handles<RequestAdjustment, UUID> {
             throw new ProblemException("m7.adjustment.amount_invalid");
         }
         amount = amount.setScale(2);
-        String reason = CustomerGuards.requiredText(command.reason(), "reason");
+        String reason = PersonalDataText.require(CustomerGuards.requiredText(command.reason(), "reason"), "reason");
 
         UUID adjustmentId = Ids.next();
         jdbc.update(

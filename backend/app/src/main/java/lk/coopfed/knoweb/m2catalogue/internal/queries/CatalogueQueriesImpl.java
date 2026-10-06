@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.ConversionView;
+import lk.coopfed.knoweb.m2catalogue.query.ImageView;
 import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
@@ -165,6 +166,27 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                         rs.getString("uom_code"),
                         rs.getObject("batch_id", UUID.class),
                         rs.getString("status")),
+                skuId);
+    }
+
+    @Override
+    public List<ImageView> images(UUID skuId, ScopeContext scope) {
+        if (skuId == null || scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        return jdbc.query(
+                """
+                select image_id, barcode, status, object_key_full, object_key_thumb
+                from catalogue.sku_image
+                where sku_id = ?
+                order by created_at desc
+                """,
+                (rs, row) -> new ImageView(
+                        rs.getObject("image_id", UUID.class),
+                        rs.getString("barcode"),
+                        rs.getString("status"),
+                        rs.getString("object_key_full"),
+                        rs.getString("object_key_thumb")),
                 skuId);
     }
 

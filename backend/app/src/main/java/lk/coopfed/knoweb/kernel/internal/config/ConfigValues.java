@@ -112,10 +112,42 @@ final class ConfigValues {
                         throw invalid(item, text);
                     }
                 }
+                if (schema.hasNonNull("window_max_hours")
+                        && !windowWithin(text, schema.get("window_max_hours").asInt())) {
+                    throw invalid(item, text);
+                }
             }
             case BOOLEAN, JSON -> {
                 // Nothing a schema constrains beyond the type.
             }
+        }
+    }
+
+    /**
+     * A daily window {@code HH:mm-HH:mm} (one that wraps midnight included) no longer than
+     * {@code maxHours}, or empty for none (the {@code window_max_hours} keyword). Quiet hours
+     * defer a notification to the window's end (CR-19A-12), and a notification is given up 24
+     * hours after it was queued: a window of at most 15 hours, plus the backoffs, never reaches
+     * that. A window whose two ends are equal is refused (none, or the whole day: say which).
+     */
+    static boolean windowWithin(String text, int maxHours) {
+        if (text.isBlank()) {
+            return true;
+        }
+        String[] parts = text.strip().split("-");
+        if (parts.length != 2) {
+            return false;
+        }
+        try {
+            int from = java.time.LocalTime.parse(parts[0].strip()).toSecondOfDay() / 60;
+            int to = java.time.LocalTime.parse(parts[1].strip()).toSecondOfDay() / 60;
+            if (from == to) {
+                return false;
+            }
+            int minutes = to > from ? to - from : 24 * 60 - from + to;
+            return minutes <= maxHours * 60;
+        } catch (java.time.format.DateTimeParseException e) {
+            return false;
         }
     }
 

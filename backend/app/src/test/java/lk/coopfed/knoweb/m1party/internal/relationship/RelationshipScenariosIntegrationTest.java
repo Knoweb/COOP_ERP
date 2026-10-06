@@ -154,6 +154,7 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         superuserJdbc().execute("delete from security.role_permission where role_id = '" + CREDIT_ROLE + "'");
         superuserJdbc().execute("delete from security.role where role_id = '" + CREDIT_ROLE + "'");
         superuserJdbc().execute("delete from security.app_user where user_id = '" + USER + "'");
+        superuserJdbc().execute("delete from security.credit_limit_announcement");
         superuserJdbc()
                 .execute("truncate table party.entity_relationship, party.entity_party_directory,"
                         + " party.entity cascade");
@@ -188,15 +189,40 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
 
         verify(priceLists).refusal(eq(PRICE_LIST), eq(DISTRIBUTOR), any());
         assertThat(status(id)).isEqualTo("ACTIVE");
-        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+        assertThat(kernel.committedAudit()).hasSize(2);
+        assertThat(kernel.committedAudit().get(0)).satisfies(a -> {
             assertThat(a.eventType()).isEqualTo("RELATIONSHIP_ACTIVATED");
             assertThat(((Map<?, ?>) a.before()).get("status")).isEqualTo("DRAFT");
             assertThat(((Map<?, ?>) a.after()).get("status")).isEqualTo("ACTIVE");
         });
-        assertThat(kernel.committedEvents())
-                .singleElement()
+        // The opening limit is an event (CR-21A-7; M8 D6): null to the limit, audited as a change.
+        assertThat(kernel.committedAudit().get(1)).satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("CREDIT_LIMIT_CHANGED");
+            assertThat(((Map<?, ?>) a.before()).get("creditLimit")).isNull();
+            assertThat(((Map<?, ?>) a.after()).get("creditLimit")).isNotNull();
+        });
+        assertThat(kernel.committedEvents()).hasSize(2);
+        assertThat(kernel.committedEvents().get(0))
                 .isInstanceOfSatisfying(RelationshipActivated.class, e -> assertThat(e.relationshipId())
                         .isEqualTo(id));
+        assertThat(kernel.committedEvents().get(1)).isInstanceOfSatisfying(CreditLimitChanged.class, e -> {
+            assertThat(e.relationshipId()).isEqualTo(id);
+            assertThat(e.previousRelationshipId()).isNull();
+            assertThat(e.previousCreditLimit()).isNull();
+            assertThat(e.creditLimit()).isEqualByComparingTo("3000000.00");
+            assertThat(e.effectiveFrom()).isEqualTo(APRIL);
+            assertThat(e.sellerEntityId()).isEqualTo(DISTRIBUTOR);
+            assertThat(e.buyerEntityId()).isEqualTo(SOCIETY);
+        });
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select relationship_id from security.credit_limit_announcement"
+                                        + " where owner_entity_id = ? and buyer_entity_id = ?",
+                                UUID.class,
+                                DISTRIBUTOR,
+                                SOCIETY))
+                .as("the pair is marked announced, so the backfill leaves it alone")
+                .isEqualTo(id);
 
         // M4 may now accept orders from the buyer: the buyer, in PARTY and in its own scope,
         // and the Federation view find the terms on any date of the range.
@@ -283,7 +309,10 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
                 .as("Federation to society needs the flag, off by default (doc 10 F-03)")
                 .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
                         .isEqualTo("m1.relationship.tier_not_allowed"));
-        assertThat(open.handle(openTo(DISTRIBUTOR, PRICE_LIST, APRIL, null), own(FEDERATION)))
+        // Without a credit limit: this test's user holds bil.creditlimit.change at the distributor only.
+        assertThat(open.handle(
+                        new OpenTradingRelationship(DISTRIBUTOR, PRICE_LIST, null, 45, null, null, null, APRIL, null),
+                        own(FEDERATION)))
                 .isNotNull();
     }
 
@@ -428,6 +457,119 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).isEmpty();
     }
 
+    // ---- CR-21A-7 (M1A-06): the limit is gated at opening and at activation ----------------------
+
+    @Test
+    void openingOrActivatingWithALimitNeedsTheLimitPermissionAndAFreshSecondFactor() {
+        assertThatThrownBy(() ->
+                        open.handle(openTo(SOCIETY, PRICE_LIST, APRIL, null), ownWithoutSecondFactor(DISTRIBUTOR)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("mfa.required"));
+        assertThat(count()).isZero();
+
+        UUID draft = open.handle(openTo(SOCIETY, PRICE_LIST, APRIL, null), own(DISTRIBUTOR));
+        // The role that held bil.creditlimit.change is withdrawn; a new user id keeps the
+        // kernel's permission cache out of it.
+        UUID clerk = UUID.fromString("00000000-0000-0000-0000-00000000e002");
+        superuserJdbc()
+                .update(
+                        "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
+                                + " values (?, ?, ?, 'Relationship clerk', 'BACK_OFFICE', 'ACTIVE')",
+                        clerk,
+                        DISTRIBUTOR,
+                        "u-" + clerk);
+        try {
+            Scope active = new Scope(DISTRIBUTOR, null);
+            ScopeContext clerkScope = new ScopeContext(
+                    clerk,
+                    null,
+                    DISTRIBUTOR,
+                    List.of(active),
+                    active,
+                    PolicyClass.OWN,
+                    Set.of(),
+                    clock.instant().minus(Duration.ofMinutes(1)),
+                    Locale.ENGLISH,
+                    null);
+            kernel.reset();
+            assertThatThrownBy(() -> activate.handle(new ActivateRelationship(draft), clerkScope))
+                    .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
+                            .isEqualTo("m1.relationship.credit_limit_permission_required"));
+            assertThat(status(draft)).isEqualTo("DRAFT");
+            assertThat(kernel.committedAudit()).isEmpty();
+            assertThat(kernel.committedEvents()).isEmpty();
+        } finally {
+            superuserJdbc().update("delete from security.app_user where user_id = ?", clerk);
+        }
+    }
+
+    // ---- CR-21A-7 and M8 D6: the opening limits of relationships activated before ------------------
+
+    @Autowired
+    private CreditLimitBackfillJob backfill;
+
+    @Test
+    void theBackfillAnnouncesEachPairOnceAndLeavesTheAnnouncedOnesAlone() {
+        // One relationship as an earlier release left it: ACTIVE with a limit, never announced.
+        UUID before = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                        insert into party.entity_relationship (relationship_id, seller_entity_id,
+                            buyer_entity_id, price_list_id, credit_limit, payment_terms_days, status, effective_from)
+                        values (?, ?, ?, ?, 2500000.00, 30, 'ACTIVE', ?)
+                        """,
+                        before,
+                        DISTRIBUTOR,
+                        SOCIETY,
+                        PRICE_LIST,
+                        APRIL);
+        // And one activated now, which announced itself.
+        UUID now = open.handle(openTo(OTHER_SOCIETY, PRICE_LIST, APRIL, null), own(DISTRIBUTOR));
+        activate.handle(new ActivateRelationship(now), own(DISTRIBUTOR));
+        kernel.reset();
+
+        assertThat(backfill.announceOpeningLimits(job())).isEqualTo(1);
+
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("CREDIT_LIMIT_CHANGED");
+            assertThat(a.reason()).isEqualTo("OPENING_LIMIT_ANNOUNCED");
+            assertThat(a.subject().id()).isEqualTo(before);
+            assertThat(a.scope().entityId()).isEqualTo(DISTRIBUTOR);
+        });
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOfSatisfying(CreditLimitChanged.class, e -> {
+            assertThat(e.relationshipId()).isEqualTo(before);
+            assertThat(e.previousCreditLimit()).isNull();
+            assertThat(e.creditLimit()).isEqualByComparingTo("2500000.00");
+            assertThat(e.sellerEntityId()).isEqualTo(DISTRIBUTOR);
+            assertThat(e.buyerEntityId()).isEqualTo(SOCIETY);
+        });
+
+        // A second run finds nothing: one-off by its data.
+        kernel.reset();
+        assertThat(backfill.announceOpeningLimits(job())).isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    /** A run of the job outside the scheduler: the two scopes are the interface's own defaults. */
+    private static lk.coopfed.knoweb.kernel.api.JobExecution job() {
+        return new lk.coopfed.knoweb.kernel.api.JobExecution() {
+            @Override
+            public UUID runId() {
+                return UUID.randomUUID();
+            }
+
+            @Override
+            public void itemsProcessed(int count) {}
+
+            @Override
+            public Optional<ScopeContext> systemScope() {
+                return Optional.empty();
+            }
+        };
+    }
+
     @Test
     void theSellerSuspendsAndTheBuyerCanNeitherAmendNorSuspend() {
         UUID id = activeRelationship(APRIL);
@@ -450,6 +592,24 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).singleElement().isInstanceOf(RelationshipSuspended.class);
         assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, JULY, own(SOCIETY)))
                 .as("a suspended relationship is not in force")
+                .isEmpty();
+
+        // But money is still settled under it (wave 2, CR-21A-7 section 6.1): the pair's row, of
+        // either party, on the day or (before it began) the latest; never a stranger's.
+        for (ScopeContext caller : List.of(own(DISTRIBUTOR), own(SOCIETY), party(SOCIETY), federationView())) {
+            assertThat(queries.settlementRelationship(DISTRIBUTOR, SOCIETY, JULY, caller))
+                    .hasValueSatisfying(row -> {
+                        assertThat(row.relationshipId()).isEqualTo(id);
+                        assertThat(row.status()).isEqualTo("SUSPENDED");
+                    });
+        }
+        assertThat(queries.settlementRelationship(DISTRIBUTOR, SOCIETY, APRIL.minusDays(1), own(DISTRIBUTOR)))
+                .map(RelationshipView::relationshipId)
+                .hasValue(id);
+        assertThat(queries.settlementRelationship(DISTRIBUTOR, SOCIETY, JULY, own(OTHER_SOCIETY)))
+                .isEmpty();
+        assertThat(queries.settlementRelationship(DISTRIBUTOR, OTHER_SOCIETY, JULY, own(DISTRIBUTOR)))
+                .as("a pair that never traded")
                 .isEmpty();
     }
 
@@ -545,8 +705,13 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
                                 "select count(*) from party.entity_relationship where status = 'ACTIVE'",
                                 Integer.class))
                 .isEqualTo(1);
-        assertThat(kernel.committedAudit()).hasSize(1);
-        assertThat(kernel.committedEvents()).singleElement().isInstanceOf(RelationshipActivated.class);
+        // One activation: its record and, the draft carrying a limit, the opening limit's (CR-21A-7).
+        assertThat(kernel.committedAudit())
+                .extracting(a -> a.eventType())
+                .containsExactly("RELATIONSHIP_ACTIVATED", "CREDIT_LIMIT_CHANGED");
+        assertThat(kernel.committedEvents()).hasSize(2);
+        assertThat(kernel.committedEvents().get(0)).isInstanceOf(RelationshipActivated.class);
+        assertThat(kernel.committedEvents().get(1)).isInstanceOf(CreditLimitChanged.class);
     }
 
     @Test
@@ -680,7 +845,8 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void theOperationsOfTheSliceOverHttp() {
-        ResponseEntity<Map> opened = http.exchange(
+        // CR-21A-7: terms with a credit limit need a second factor, which this request lacks.
+        ResponseEntity<Map> withLimit = http.exchange(
                 "/v1/party/relationships",
                 HttpMethod.POST,
                 new HttpEntity<>(
@@ -691,6 +857,24 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
                                 PRICE_LIST.toString(),
                                 "creditLimit",
                                 3000000.00,
+                                "paymentTermsDays",
+                                30,
+                                "effectiveFrom",
+                                "2026-04-01"),
+                        headers(DISTRIBUTOR, "OWN")),
+                Map.class);
+        assertThat(withLimit.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(withLimit.getBody()).containsEntry("code", "mfa.required");
+
+        ResponseEntity<Map> opened = http.exchange(
+                "/v1/party/relationships",
+                HttpMethod.POST,
+                new HttpEntity<>(
+                        Map.of(
+                                "buyerEntityId",
+                                SOCIETY.toString(),
+                                "priceListId",
+                                PRICE_LIST.toString(),
                                 "paymentTermsDays",
                                 30,
                                 "effectiveFrom",
@@ -819,7 +1003,15 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         return headers;
     }
 
-    private static ScopeContext own(UUID entity) {
+    /**
+     * The seller's own scope, with a second factor presented a minute ago: the relationships of
+     * these scenarios carry a credit limit, whose opening and activation need one (CR-21A-7).
+     */
+    private ScopeContext own(UUID entity) {
+        return withFreshMfa(entity);
+    }
+
+    private static ScopeContext ownWithoutSecondFactor(UUID entity) {
         return scope(entity, PolicyClass.OWN, null);
     }
 
