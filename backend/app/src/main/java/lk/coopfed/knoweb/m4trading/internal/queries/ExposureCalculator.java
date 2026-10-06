@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
+import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceSettlements;
 import lk.coopfed.knoweb.m4trading.query.ExposureView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,8 @@ import org.springframework.stereotype.Component;
  *   acceptedNotInvoiced = sum(allocated qty (less what the buyer cancelled) x tier price) of the
  *                         seller's ACCEPTED orders from the buyer that no invoice covers yet
  *   unappliedReceipts   = sum(amount - settled) of the seller's receipts from the buyer, not reversed
- *   amount              = openInvoices + acceptedNotInvoiced - unappliedReceipts
+ *   unappliedCredits    = sum(gross - Σ CREDITS links) of the seller's credit notes to the buyer
+ *   amount              = openInvoices + acceptedNotInvoiced - unappliedReceipts - unappliedCredits
  * </pre>
  *
  * <p>An order counts as invoiced once an invoice bills a GRN of a drop that carried it: the demo
@@ -46,18 +48,21 @@ public class ExposureCalculator {
     private final ConfigRegistry config;
     private final ObjectMapper json;
     private final Clock clock;
+    private final InvoiceSettlements settlements;
 
     ExposureCalculator(
             JdbcTemplate jdbc,
             DocumentBaseRepository documents,
             ConfigRegistry config,
             ObjectMapper json,
-            Clock clock) {
+            Clock clock,
+            InvoiceSettlements settlements) {
         this.jdbc = jdbc;
         this.documents = documents;
         this.config = config;
         this.json = json;
         this.clock = clock;
+        this.settlements = settlements;
     }
 
     /** The exposure of the relationship's pair now, with its limit and the highest threshold reached. */
@@ -67,7 +72,8 @@ public class ExposureCalculator {
         BigDecimal open = openInvoices(seller, buyer);
         BigDecimal accepted = acceptedNotInvoiced(seller, buyer);
         BigDecimal unapplied = unappliedReceipts(seller, buyer);
-        BigDecimal amount = open.add(accepted).subtract(unapplied);
+        BigDecimal credits = unappliedCredits(seller, buyer);
+        BigDecimal amount = open.add(accepted).subtract(unapplied).subtract(credits);
         return new ExposureView(
                 relationship.relationshipId(),
                 seller,
@@ -76,6 +82,7 @@ public class ExposureCalculator {
                 open,
                 accepted,
                 unapplied,
+                credits,
                 amount,
                 thresholdReached(amount, relationship.creditLimit(), scope),
                 clock.instant());
@@ -177,5 +184,29 @@ public class ExposureCalculator {
                 seller,
                 buyer);
         return sum == null ? BigDecimal.ZERO : sum;
+    }
+
+    /**
+     * 24A's {@code unappliedCredits}: what the seller's credit notes to the buyer hold beyond their
+     * CREDITS links (CR-24A-3 item 2), a sum, never stored. A credit note's origin invoice names
+     * the pair.
+     */
+    BigDecimal unappliedCredits(UUID seller, UUID buyer) {
+        BigDecimal sum = BigDecimal.ZERO;
+        for (UUID creditNoteId : jdbc.queryForList(
+                """
+                select c.document_id from trading.doc_credit_note c
+                  join trading.doc_invoice i on i.document_id = c.invoice_document_id
+                 where i.seller_entity_id = ? and i.buyer_entity_id = ?
+                """,
+                UUID.class,
+                seller,
+                buyer)) {
+            BigDecimal unapplied = settlements.unappliedOf(creditNoteId);
+            if (unapplied.signum() > 0) {
+                sum = sum.add(unapplied);
+            }
+        }
+        return sum;
     }
 }

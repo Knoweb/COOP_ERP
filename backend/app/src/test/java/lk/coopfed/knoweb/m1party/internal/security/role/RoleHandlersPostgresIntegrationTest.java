@@ -837,8 +837,114 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
     }
 
+    /** A granted limit never exceeds the grantor's (wave 2, M1A-04; CR-21A-7). */
+    @Nested
+    class LimitsWithinTheGrantor {
+
+        static final String CODE = "tst.m1a04.approve";
+        static final String SCHEMA =
+                "{\"properties\":{\"max_value\":{\"type\":\"number\",\"minimum\":0}},\"required\":[\"max_value\"]}";
+
+        UUID grantor;
+
+        @BeforeEach
+        void aGrantorWhoApprovesUpTo25000() {
+            fx.permission(CODE, "ENTITY", SCHEMA);
+            grantor = fx.user(mpcs);
+            fx.assign(grantor, fx.role(mpcs, "gov.role.manage", "gov.user.manage"), mpcs, null);
+            fx.assign(grantor, limitedRole(25000), mpcs, null);
+        }
+
+        private ScopeContext asGrantor() {
+            return ScopeContext.dev(grantor, mpcs, null);
+        }
+
+        /** A role of the society holding CODE with this max_value (null: no limits), written directly. */
+        private UUID limitedRole(Integer maxValue) {
+            UUID role = fx.role(mpcs);
+            superuserJdbc()
+                    .update(
+                            "insert into security.role_permission (role_id, permission_code, limits)"
+                                    + " values (?, ?, cast(? as jsonb))",
+                            role,
+                            CODE,
+                            maxValue == null ? null : "{\"max_value\": " + maxValue + "}");
+            return role;
+        }
+
+        private List<RolePermission> approveUpTo(int maxValue) {
+            return List.of(new RolePermission(CODE, Map.of("max_value", maxValue)));
+        }
+
+        @Test
+        void aLimitAboveTheGrantorsIsRefusedAtCreateAmendAndAssign() {
+            refused(
+                    () -> createRole.handle(named("above", approveUpTo(250000)), asGrantor()),
+                    "m1.role.limit_exceeds_grantor");
+
+            UUID equal = createRole.handle(named("equal", approveUpTo(25000)), asGrantor());
+            assertThat(kernel.committedEvents()).singleElement().isInstanceOf(RoleChanged.class);
+            createRole.handle(named("below", approveUpTo(10000)), asGrantor());
+
+            kernel.reset();
+            refused(
+                    () -> amendRole.handle(new AmendRole(equal, approveUpTo(25001), false), asGrantor()),
+                    "m1.role.limit_exceeds_grantor");
+            amendRole.handle(new AmendRole(equal, approveUpTo(20000), false), asGrantor());
+
+            // Assigning is granting: a role that approves Rs 250,000, written by somebody else,
+            // is not the grantor's to give.
+            UUID big = limitedRole(250000);
+            kernel.reset();
+            refused(
+                    () -> assignRole.handle(new AssignRole(clerk, big, null), asGrantor()),
+                    "m1.role.limit_exceeds_grantor");
+            UUID small = limitedRole(25000);
+            assignRole.handle(new AssignRole(clerk, small, null), asGrantor());
+            assertThat(kernel.committedEvents()).containsExactly(new RoleAssigned(small, clerk, mpcs, null));
+        }
+
+        @Test
+        void theHighestHoldingCountsAndAHoldingWithoutALimitIsUnlimited() {
+            fx.assign(grantor, limitedRole(100000), mpcs, null);
+
+            createRole.handle(named("hundred", approveUpTo(100000)), asGrantor());
+            kernel.reset();
+            refused(
+                    () -> createRole.handle(named("over", approveUpTo(100001)), asGrantor()),
+                    "m1.role.limit_exceeds_grantor");
+
+            // A grantor whose holding carries no limit (a legacy role) grants any.
+            fx.assign(grantor, limitedRole(null), mpcs, null);
+            UUID any = createRole.handle(named("any", approveUpTo(9_999_999)), asGrantor());
+            assertThat(superuserJdbc()
+                            .queryForObject(
+                                    "select limits ->> 'max_value' from security.role_permission where role_id = ?",
+                                    String.class,
+                                    any))
+                    .isEqualTo("9999999");
+        }
+    }
+
     @Nested
     class SeparationOfDutiesPairs {
+
+        @Test
+        void theRoleAndUserManagementPairIsGoneAndAnAdministratorRoleIsAuthorable() {
+            // CR-21A-7 (M1A-05): the pair was in neither doc 21 nor 21A; m1security V0019 and the
+            // seed removed it. The Entity Administrator's two codes in one role are authorable.
+            assertThat(superuserJdbc()
+                            .queryForObject(
+                                    "select count(*) from security.sod_pair where owner_entity_id is null"
+                                            + " and permission_a = 'gov.role.manage' and permission_b = 'gov.user.manage'",
+                                    Integer.class))
+                    .isZero();
+
+            UUID roleId = createRole.handle(
+                    named("entity administrator", perms("gov.role.manage", "gov.user.manage")), asAdmin());
+
+            assertThat(fx.permissionsOf(roleId)).containsExactly("gov.role.manage", "gov.user.manage");
+        }
 
         @Test
         void anEntityAddsAPairOfItsOwn() {
@@ -874,7 +980,9 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         @Test
         void raisingIsRefusedWhileSomebodyHoldsBoth() {
-            // The administrator's role holds both halves of the seeded default gov.role.manage/gov.user.manage.
+            // The administrator's role holds both codes. The federation default pair over them is
+            // gone (CR-21A-7, m1security V0019); an entity may still add one of its own, and
+            // raising it to ROLE is refused while somebody holds both.
             refused(
                     () -> setSodPair.handle(new SetSodPair("gov.role.manage", "gov.user.manage", "ROLE"), asAdmin()),
                     "m1.sod.existing_conflict");
@@ -907,7 +1015,8 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         void theRuleInForceAgainIsRefused() {
             refused(
                     () -> setSodPair.handle(
-                            new SetSodPair("gov.user.manage", "gov.role.manage", "INSTANCE"), asAdmin()),
+                            // the seeded default (gov.role.manage/gov.user.manage went in CR-21A-7)
+                            new SetSodPair("gov.user.manage", "gov.audit.review", "INSTANCE"), asAdmin()),
                     "m1.sod.unchanged");
         }
 

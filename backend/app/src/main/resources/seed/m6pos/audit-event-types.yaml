@@ -24,3 +24,19 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A till session's close was recorded at central
+
+  # wave 2, PR 13 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md (2))
+  - code: RECEIPT_REPLAY_DIFFERS
+    severity: ALERT
+    offline_capturable: false
+    description_en: A receipt arrived again under the same document id with other content; the first copy is kept
+
+  - code: RECEIPT_NUMBER_JUMPED
+    severity: ALERT
+    offline_capturable: false
+    description_en: A receipt's number was far past its series' next number; the series moved by the configured limit only
+
+  - code: TILL_SESSION_CLOSE_REPLAY_DIFFERS
+    severity: ALERT
+    offline_capturable: false
+    description_en: A till session's close arrived again with other amounts; the first close is kept

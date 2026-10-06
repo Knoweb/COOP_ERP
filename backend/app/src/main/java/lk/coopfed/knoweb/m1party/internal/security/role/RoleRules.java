@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m1party.internal.security.role;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -153,6 +154,74 @@ final class RoleRules {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * A granted limit above the grantor's own (wave 2, M1A-04; CR-21A-7).
+     *
+     * @param requested    what the grant asks, null when it sets no value (unlimited)
+     * @param grantorLimit the grantor's effective value
+     */
+    record LimitExcess(String permission, String field, BigDecimal requested, BigDecimal grantorLimit) {}
+
+    /**
+     * "A granted limit never exceeds the grantor's" (doc 19 section 3.2, applied to the limits of
+     * section 3.3; CR-21A-7): for each numeric property of the permission's {@code limits_schema},
+     * the value granted is at or below the grantor's effective value for that code. The grantor's
+     * effective value is the highest over their holdings of the code; a holding with no limits, or
+     * without that property, is unlimited, and so is a grant that sets no value. A permission
+     * without a schema has no limits to compare.
+     *
+     * @param requested       the limits of the grant; null for none
+     * @param schema          the permission's limits_schema; null for none
+     * @param grantorHoldings one entry per holding of the code by the grantor; an entry is null
+     *                        when that holding carries no limits
+     * @return the first property, in name order, whose granted value is above the grantor's
+     */
+    static Optional<LimitExcess> aboveGrantor(
+            String permission,
+            Map<String, Object> requested,
+            JsonNode schema,
+            Collection<Map<String, Object>> grantorHoldings) {
+        JsonNode properties = schema == null ? null : schema.path("properties");
+        if (properties == null || !properties.isObject()) {
+            return Optional.empty();
+        }
+        List<String> names = new ArrayList<>();
+        properties.fieldNames().forEachRemaining(names::add);
+        names.sort(null);
+        for (String name : names) {
+            String type = properties.path(name).path("type").asText("");
+            if (!"number".equals(type) && !"integer".equals(type)) {
+                continue;
+            }
+            Optional<BigDecimal> grantor = effectiveLimit(grantorHoldings, name);
+            if (grantor.isEmpty()) {
+                continue;
+            }
+            BigDecimal asked = requested == null ? null : decimal(requested.get(name));
+            if (asked == null || asked.compareTo(grantor.get()) > 0) {
+                return Optional.of(new LimitExcess(permission, name, asked, grantor.get()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The highest value of the property over the holdings; empty (unlimited) when any holding sets none. */
+    private static Optional<BigDecimal> effectiveLimit(Collection<Map<String, Object>> holdings, String name) {
+        BigDecimal highest = null;
+        for (Map<String, Object> holding : holdings) {
+            BigDecimal value = holding == null ? null : decimal(holding.get(name));
+            if (value == null) {
+                return Optional.empty();
+            }
+            highest = highest == null || value.compareTo(highest) > 0 ? value : highest;
+        }
+        return Optional.ofNullable(highest);
+    }
+
+    private static BigDecimal decimal(Object value) {
+        return value instanceof Number number ? new BigDecimal(number.toString()) : null;
     }
 
     private static boolean valueFits(Object value, JsonNode property) {

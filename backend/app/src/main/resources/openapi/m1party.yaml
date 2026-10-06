@@ -21,12 +21,16 @@
 # vatRegistrationNo; the schema's field already existed (an OWN caller's own entity always had
 # it), only the counterparty's read of it was withheld. No field, operation or permission was
 # removed or renamed; the version records a visibility change, not a shape change.
+#
+# CR-21A-7 (accepted 6 October 2026, wave 2): api only, the slice's shape unchanged.
+# CreditLimitChanged gains sellerEntityId and buyerEntityId, and the job-only command
+# AnnounceCreditLimit is added; both additive.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
   version: 1.4.1
-  x-change-request: CR-21A-6
+  x-change-request: CR-21A-7
 
 paths:
 

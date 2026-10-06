@@ -1,18 +1,21 @@
 package lk.coopfed.knoweb.m1party.internal.security.seed;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class SeedRecords {
     public record PermissionsSeed(List<PermissionData> permissions) {}
 
+    /** {@code limits_schema}: the JSON Schema of a grant's limits (doc 19 section 3.3); null for most codes. */
     public record PermissionData(
             String code,
             String module,
             String description_en,
             String scope,
             Boolean offline_allowed,
-            Boolean requires_mfa) {}
+            Boolean requires_mfa,
+            Map<String, Object> limits_schema) {}
 
     public record RoleTemplatesSeed(List<RoleTemplateData> templates) {}
 

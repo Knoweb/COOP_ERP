@@ -215,11 +215,12 @@ public final class DemoTillSale {
                             .toPlainString(),
                     i + 1);
         }
-        for (JsonNode r : call(HttpMethod.GET, "/v1/pos/receipts?locationId=" + shop, null, manager)) {
-            if (receipt.toString().equals(r.path("documentId").asText())) {
-                System.out.println("Receipt " + r.path("docNumberDisplay").asText() + ", LKR "
-                        + r.path("grossAmount").asText() + ", flags " + r.path("flags"));
-            }
+        try {
+            JsonNode r = call(HttpMethod.GET, "/v1/pos/receipts/" + receipt, null, manager);
+            System.out.println("Receipt " + r.path("docNumberDisplay").asText() + ", LKR "
+                    + r.path("grossAmount").asText() + ", flags " + r.path("flags"));
+        } catch (IllegalStateException notYet) {
+            // 404 until the relay has handed the receipt to M6; the stock check below says so.
         }
         if (after.equals(before)) {
             System.out.println("Central has not applied the sale yet: is the relay running (make up)?");
