@@ -73,9 +73,21 @@ class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = empty
     val items: List<Item>
     val operators: List<Operator>
     val shop: Shop?
+    /**
+     * The location's configuration items (doc 32 section 5.1, "configuration items for the
+     * location"), key to value, from a table `config` (row: key, value) when central sends one;
+     * the kernel's contributor for it is not built yet, so the till keeps its defaults until then.
+     */
+    val config: Map<String, String>
     private val byBarcode: Map<String, Item>
 
     init {
+        config = snapshot.table("config").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            val key = d.str("key") ?: return@mapNotNull null
+            val value = d.str("value") ?: return@mapNotNull null
+            key to value
+        }.toMap()
         val centralPrices = snapshot.table("price").mapNotNull { row ->
             val data = row.data ?: return@mapNotNull null
             val sku = data.str("sku_id") ?: return@mapNotNull null

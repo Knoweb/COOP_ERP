@@ -10,12 +10,15 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentType
 import io.ktor.http.parameters
 import kotlin.time.Instant
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -27,6 +30,8 @@ import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.port.Central
 import lk.coopfed.knoweb.till.core.port.CentralRefused
 import lk.coopfed.knoweb.till.core.port.CentralUnreachable
+import lk.coopfed.knoweb.till.core.port.EventOutcome
+import lk.coopfed.knoweb.till.core.port.Instruction
 import lk.coopfed.knoweb.till.core.port.UploadAnswer
 
 /**
@@ -35,11 +40,17 @@ import lk.coopfed.knoweb.till.core.port.UploadAnswer
  * of the enrolment answer), fetched again when it is about to expire or central says 401. Every
  * POST carries an Idempotency-Key. A network failure or a 5xx is [CentralUnreachable]: the till
  * carries on offline.
+ *
+ * A batch goes gzip-compressed (doc 32 section 3.2, "everything is gzip-compressed"; TWK-24's till
+ * half): central counts its size against the batch limit as it reads it. The heartbeat is small and
+ * stays plain.
  */
 class HttpCentral(
     private val http: HttpClient,
     private val ids: IdGenerator,
     private val now: () -> Instant,
+    /** GZIP of a body, from the platform (JvmGzip on the JVM and Android). */
+    private val gzip: (ByteArray) -> ByteArray,
     /** Replaces the token endpoint of the enrolment answer (a till that reaches the identity provider by another address). */
     private val tokenEndpointOverride: String? = null,
 ) : Central {
@@ -84,12 +95,13 @@ class HttpCentral(
 
     override suspend fun upload(batch: JsonObject): UploadAnswer {
         val d = requireDevice()
+        val body = gzip(batch.toString().encodeToByteArray())
         val answer = authorised { bearer ->
             http.post("${d.serverUrl}/v1/sync/devices/${d.deviceId}/batches") {
                 header(HttpHeaders.Authorization, "Bearer $bearer")
                 header("Idempotency-Key", ids.next())
-                contentType(ContentType.Application.Json)
-                setBody(batch.toString())
+                header(HttpHeaders.ContentEncoding, "gzip")
+                setBody(ByteArrayContent(body, ContentType.Application.Json))
             }
         }
         if (answer.status.value == 429) {
@@ -102,8 +114,22 @@ class HttpCentral(
             lastAppliedSeq = ack.getValue("last_applied_seq").jsonPrimitive.longOrNull!!,
             snapshotVersion = ack["snapshot_version"]?.jsonPrimitive?.longOrNull ?: 0,
             clockOffsetMs = ack["clock_offset_ms"]?.jsonPrimitive?.longOrNull,
+            outcomes = (ack["outcomes"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map {
+                EventOutcome(
+                    deviceSeq = it["device_seq"]?.jsonPrimitive?.longOrNull ?: 0,
+                    eventId = it.text("event_id"),
+                    outcome = it.text("outcome") ?: "",
+                    reason = it.text("reason"),
+                )
+            },
+            instructions = (ack["instructions"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map {
+                Instruction(it.text("type") ?: "", it["from_seq"]?.jsonPrimitive?.longOrNull, it.text("detail"))
+            },
+            serverTime = ack.text("server_time")?.let { runCatching { Instant.parse(it) }.getOrNull() },
         )
     }
+
+    private fun JsonObject.text(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull
 
     override suspend fun heartbeat(report: JsonObject): JsonObject {
         val d = requireDevice()
