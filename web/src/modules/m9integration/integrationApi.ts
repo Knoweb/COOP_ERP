@@ -10,6 +10,7 @@ export type JournalExport = components["schemas"]["JournalExportResponse"];
 export type JournalLine = components["schemas"]["JournalLineResponse"];
 export type Reconciliation = components["schemas"]["ReconciliationResponse"];
 export type PendingPostings = components["schemas"]["PendingPostingsResponse"];
+export type SupplementDue = components["schemas"]["SupplementDueResponse"];
 export type NotificationTemplate = components["schemas"]["NotificationTemplateResponse"];
 export type NotificationRule = components["schemas"]["NotificationRuleResponse"];
 export type NotificationLogEntry = components["schemas"]["NotificationLogResponse"];
@@ -25,11 +26,19 @@ export function useIntegrationApi() {
         return data ?? [];
       },
 
-      /** `idempotencyKey` comes from useIdempotencyKey(): one key per user action, reused on a retry. */
-      async requestExport(periodFrom: string, periodTo: string, idempotencyKey: string): Promise<JournalExport> {
+      /**
+       * `idempotencyKey` comes from useIdempotencyKey(): one key per user action, reused on a retry.
+       * `provisional` says the caller knows the period is still open and wants the file anyway.
+       */
+      async requestExport(
+        periodFrom: string,
+        periodTo: string,
+        provisional: boolean,
+        idempotencyKey: string
+      ): Promise<JournalExport> {
         const { data } = await api.POST("/v1/integration/journal-exports", {
           params: { header: { "Idempotency-Key": idempotencyKey } },
-          body: { periodFrom, periodTo }
+          body: { periodFrom, periodTo, provisional }
         });
         return data!;
       },
@@ -38,6 +47,12 @@ export function useIntegrationApi() {
         const { data } = await api.GET("/v1/integration/journal-postings/pending", {
           params: { query: { from, to } }
         });
+        return data!;
+      },
+
+      /** Postings for periods already exported that no export took: the supplement due. */
+      async supplementDue(): Promise<SupplementDue> {
+        const { data } = await api.GET("/v1/integration/journal-postings/supplement-due");
         return data!;
       },
 

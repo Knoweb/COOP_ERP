@@ -126,3 +126,29 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A customer's identity was erased; the account postings were kept
+
+  # Wave 2 of the code review (6 October 2026; CR-27A-1, 2026-10-06-wave2-keyed-hashes.md).
+  - code: NIC_RECAPTURED
+    severity: INFO
+    offline_capturable: false
+    description_en: A customer's NIC was recorded again from the card presented; the record says only that it was
+
+  - code: ACCOUNT_REOPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: A closed customer account was reopened as suspended, to settle what a till posted on it
+
+  - code: ACCOUNT_CHARGED_CUSTOMER_INACTIVE
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till charged the account of a customer who is inactive or erased; the charge was posted
+
+  - code: ACCOUNT_TENDER_MALFORMED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A till receipt carried an account tender central could not post (a field missing or an amount it cannot record); nothing was posted
+
+  - code: DSAR_EXPORT_DOWNLOADED
+    severity: INFO
+    offline_capturable: false
+    description_en: The export of a customer's fulfilled access request was handed over by the responsible officer

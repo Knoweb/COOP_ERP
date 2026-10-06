@@ -135,7 +135,48 @@ class TradingRlsIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void aShopScopedPartySessionReadsTheReturnsOfItsOwnShop() {
+        // Wave 2, RLS-11: party_read on trading.claim_return applies the location line on the
+        // owner's side, as the template and kernel.document do (CR-17A-3).
+        UUID fromShop1 = Ids.next();
+        UUID fromShop2 = Ids.next();
+        JdbcTemplate admin = superuserJdbc();
+        try {
+            for (UUID[] row : new UUID[][] {{fromShop1, SHOP_1}, {fromShop2, SHOP_2}}) {
+                admin.update(
+                        "insert into trading.claim_return (claim_document_id, location_id, dispatched_by, dispatched_at,"
+                                + " owner_entity_id, counterparty_entity_id) values (?, ?, ?, now(), ?, ?)",
+                        row[0],
+                        row[1],
+                        Ids.next(),
+                        BUYER,
+                        SELLER);
+            }
+            assertThat(inScopeAt(BUYER, SHOP_1, "PARTY", () -> returns(fromShop1, fromShop2)))
+                    .containsExactly(fromShop1);
+            assertThat(inScopeAt(BUYER, null, "PARTY", () -> returns(fromShop1, fromShop2)))
+                    .containsExactlyInAnyOrder(fromShop1, fromShop2);
+            // The seller, whatever its location, reads every return sent to it.
+            assertThat(inScopeAt(SELLER, SHOP_1, "PARTY", () -> returns(fromShop1, fromShop2)))
+                    .containsExactlyInAnyOrder(fromShop1, fromShop2);
+            assertThat(inScopeAt(BUYER, SHOP_1, "OWN", () -> returns(fromShop1, fromShop2)))
+                    .containsExactly(fromShop1);
+            assertThat(inScope(STRANGER, "PARTY", () -> returns(fromShop1, fromShop2)))
+                    .isEmpty();
+        } finally {
+            admin.update("delete from trading.claim_return where claim_document_id in (?, ?)", fromShop1, fromShop2);
+        }
+    }
+
     // ---- reads and writes under test -------------------------------------------------------
+
+    private List<UUID> returns(UUID... ids) {
+        return jdbc.queryForList(
+                "select claim_document_id from trading.claim_return where claim_document_id = any (?::uuid[])",
+                UUID.class,
+                (Object) ids);
+    }
 
     private int orderRows() {
         return jdbc.queryForObject(

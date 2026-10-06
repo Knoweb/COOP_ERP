@@ -38,9 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * RecordPaymentReceipt (24A section 6.3). Guards, in order: the seller's entity-wide OWN scope; a
  * buyer, a known method, an amount above zero, the date received not in the future; a cheque's
- * bank, number and date when the method is CHEQUE; an ACTIVE relationship in which the caller sells
- * to the buyer; each chosen settlement names an issued invoice of this seller to this buyer, once,
- * for more than zero and no more than its amount due ({@code m4.payment.exceeds_due}); the
+ * bank, number and date when the method is CHEQUE; a relationship in which the caller sells to the
+ * buyer, ACTIVE or SUSPENDED ({@link RelationshipQueries#settlementRelationship}; wave 2,
+ * M4MONEY-08); a cheque not recorded on an earlier receipt that did not bounce
+ * ({@code m4.payment.cheque_recorded}; M4MONEY-09); each chosen settlement names an issued invoice
+ * of this seller to this buyer, once, for more than zero and no more than its amount due ({@code m4.payment.exceeds_due}); the
  * settlements together no more than the receipt ({@code m4.payment.exceeds_receipt}).
  *
  * <p>With no settlements chosen, the receipt settles the buyer's open invoices oldest first (by tax
@@ -132,10 +134,15 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
                         || cheque.dated() == null)) {
             throw new ProblemException("m4.payment.cheque_required");
         }
+        // Any relationship the pair traded under, ACTIVE or SUSPENDED, in force on the day received
+        // or else the latest (CR-21A-7 section 6.1): money from a suspended buyer, the one that
+        // owes, is recorded; only new trading asks for an ACTIVE row (wave 2, M4MONEY-08).
         RelationshipView relationship = relationships
-                .lookupRelationship(seller, buyer, today, scope)
-                .filter(row -> "ACTIVE".equals(row.status()))
+                .settlementRelationship(seller, buyer, receivedOn, scope)
                 .orElseThrow(() -> new ProblemException("m4.payment.no_relationship"));
+        if (RecordPaymentReceipt.CHEQUE.equals(method)) {
+            requireChequeNotRecorded(seller, buyer, cheque);
+        }
 
         List<RecordPaymentReceipt.Settlement> applied = command.settlements().isEmpty()
                 ? planner.oldestFirst(seller, buyer, amount)
@@ -215,8 +222,62 @@ public class RecordPaymentReceiptHandler implements Handles<RecordPaymentReceipt
                 receivedOn,
                 applied,
                 unapplied));
-        events.publish(new JournalPostingsReady(receiptId, PRC, issued.docNumberDisplay(), seller, journal));
+        // The seller's side only (doc 10 A-01: the buyer's cash book is its own record), so no
+        // counterparty on the event and nobody else receives it.
+        events.publish(new JournalPostingsReady(
+                receiptId, PRC, issued.docNumberDisplay(), seller, journal, issued.businessDate(), null));
         return receiptId;
+    }
+
+    /**
+     * Each cheque once (wave 2, CR-24A-3 item 3, M4MONEY-09). A cheque is the seller, the payer,
+     * the bank ({@code upper(btrim(bank))}) and the number ({@code ltrim(btrim(cheque_no), '0')}),
+     * not its date: the same number from the same drawer with another date is a mistake or worse,
+     * and a replacement cheque has a new number. The payer is in the key because two drawers at
+     * one bank can hold one number. It is recorded again only when every earlier receipt of this
+     * seller from this payer carrying it bounced (a re-presented cheque); otherwise
+     * {@code m4.payment.cheque_recorded}, naming the earlier receipt. No unique index can say
+     * this (the outcome lives in another table, and a bounced cheque comes back with the same
+     * number), so the look-up runs under an advisory lock on the key, and two clerks recording one
+     * cheque at once are serialised: the second sees the first's receipt.
+     */
+    private void requireChequeNotRecorded(UUID seller, UUID payer, RecordPaymentReceipt.Cheque cheque) {
+        // Normalised in SQL, the same expression on both sides; the values are stripped as they are stored.
+        String bank = cheque.bank().strip();
+        String number = cheque.chequeNo().strip();
+        jdbc.queryForList(
+                """
+                select pg_advisory_xact_lock(hashtext('cheque-' || ?::text || '|' || ?::text || '|'
+                       || upper(btrim(?::text)) || '|' || ltrim(btrim(?::text), '0')))
+                """,
+                seller,
+                payer,
+                bank,
+                number);
+        List<UUID> earlier = jdbc.queryForList(
+                """
+                select c.receipt_document_id from trading.cheque c
+                  join trading.doc_payment_receipt r on r.document_id = c.receipt_document_id
+                 where r.seller_entity_id = ? and r.payer_entity_id = ?
+                   and upper(btrim(c.bank)) = upper(btrim(?::text))
+                   and ltrim(btrim(c.cheque_no), '0') = ltrim(btrim(?::text), '0')
+                   and not exists (select 1 from trading.cheque_outcome o
+                                    where o.receipt_document_id = c.receipt_document_id and o.outcome = 'BOUNCED')
+                 order by c.receipt_document_id
+                 limit 1
+                """,
+                UUID.class,
+                seller,
+                payer,
+                bank,
+                number);
+        if (!earlier.isEmpty()) {
+            UUID receiptId = earlier.get(0);
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("receiptId", receiptId);
+            documents.findById(receiptId).ifPresent(receipt -> detail.put("docNumber", receipt.docNumberDisplay()));
+            throw new ProblemException("m4.payment.cheque_recorded", detail);
+        }
     }
 
     /** The one line of a receipt: no item, quantity one, the amount as its total (a reversal's negated). */

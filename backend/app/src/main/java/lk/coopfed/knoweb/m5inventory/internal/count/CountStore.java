@@ -2,6 +2,9 @@ package lk.coopfed.knoweb.m5inventory.internal.count;
 
 import java.math.BigDecimal;
 import java.sql.Array;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -22,12 +25,19 @@ class CountStore {
             String status,
             UUID submittedBy,
             BigDecimal reviewValue,
-            Integer reviewBand) {}
+            Integer reviewBand,
+            Instant startedAt) {}
 
     /** A lot of the location as the ledger holds it now. */
     record Lot(UUID batchId, UUID skuId, String condition, BigDecimal qtyOnHand) {}
 
-    record Line(UUID lineId, UUID batchId, String condition, BigDecimal varianceQty, boolean withinTolerance) {}
+    record Line(
+            UUID lineId,
+            UUID batchId,
+            String condition,
+            BigDecimal varianceQty,
+            boolean withinTolerance,
+            BigDecimal unitCost) {}
 
     private final JdbcTemplate jdbc;
 
@@ -41,13 +51,14 @@ class CountStore {
                 .query(
                         """
                         select task_id, owner_entity_id, location_id, scope_kind, scope_sku_ids, status,
-                               submitted_by, review_value, review_band
+                               submitted_by, review_value, review_band, started_at
                           from inventory.count_task
                          where task_id = ?
                            for update
                         """,
                         (rs, n) -> {
                             Array skus = rs.getArray("scope_sku_ids");
+                            OffsetDateTime startedAt = rs.getObject("started_at", OffsetDateTime.class);
                             return new Task(
                                     rs.getObject("task_id", UUID.class),
                                     rs.getObject("owner_entity_id", UUID.class),
@@ -57,7 +68,8 @@ class CountStore {
                                     rs.getString("status"),
                                     rs.getObject("submitted_by", UUID.class),
                                     rs.getBigDecimal("review_value"),
-                                    (Integer) rs.getObject("review_band"));
+                                    (Integer) rs.getObject("review_band"),
+                                    startedAt == null ? null : startedAt.toInstant());
                         },
                         taskId)
                 .stream()
@@ -91,6 +103,26 @@ class CountStore {
                 task.skuIds().toArray(new UUID[0]));
     }
 
+    /**
+     * What the lot held at a moment (wave 2, M5-13): what it holds now less every movement of it
+     * that occurred after the moment (by {@code occurred_at}, so a till's sale uploaded late falls
+     * on the right side). Zero when there is no lot.
+     */
+    BigDecimal onHandAt(UUID locationId, UUID batchId, String condition, Instant moment) {
+        BigDecimal now = onHand(locationId, batchId, condition);
+        BigDecimal after = jdbc.queryForObject(
+                """
+                select coalesce(sum(qty_delta), 0) from inventory.stock_movement
+                 where location_id = ? and batch_id = ? and condition = ? and occurred_at > ?
+                """,
+                BigDecimal.class,
+                locationId,
+                batchId,
+                condition,
+                Timestamp.from(moment));
+        return now.subtract(after == null ? BigDecimal.ZERO : after);
+    }
+
     /** What the lot holds now; zero when there is none. */
     BigDecimal onHand(UUID locationId, UUID batchId, String condition) {
         List<BigDecimal> found = jdbc.queryForList(
@@ -120,7 +152,7 @@ class CountStore {
     List<Line> lines(UUID taskId) {
         return jdbc.query(
                 """
-                select line_id, batch_id, condition, variance_qty, within_tolerance
+                select line_id, batch_id, condition, variance_qty, within_tolerance, unit_cost
                   from inventory.count_line
                  where task_id = ?
                  order by line_no
@@ -130,7 +162,8 @@ class CountStore {
                         rs.getObject("batch_id", UUID.class),
                         rs.getString("condition"),
                         rs.getBigDecimal("variance_qty"),
-                        rs.getBoolean("within_tolerance")),
+                        rs.getBoolean("within_tolerance"),
+                        rs.getBigDecimal("unit_cost")),
                 taskId);
     }
 }

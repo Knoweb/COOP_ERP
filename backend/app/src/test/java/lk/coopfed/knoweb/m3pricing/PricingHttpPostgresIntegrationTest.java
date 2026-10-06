@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.testsupport.PinnedClock;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -30,6 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * new version, and the trade price of an order line; a refused rule is a 422 problem, a list
  * another entity cannot see a 404.
  */
+@Import(PinnedClock.class)
 class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = TEST_FEDERATION;
@@ -43,7 +45,7 @@ class PricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     private final UUID rice = Ids.next();
     // Tomorrow, not today: the test takes a while, and a list published "from today" is refused
     // as backdated once midnight in Colombo passes during the run (CI runs at any hour).
-    private final LocalDate applyFrom = LocalDate.now(ZoneId.of("Asia/Colombo")).plusDays(1);
+    private final LocalDate applyFrom = PinnedClock.TODAY.plusDays(1);
 
     @BeforeEach
     void arrange() {

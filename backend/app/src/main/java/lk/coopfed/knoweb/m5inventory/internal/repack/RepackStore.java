@@ -32,6 +32,7 @@ class RepackStore {
             BigDecimal inputUnitCost,
             UUID outputBatchId,
             BigDecimal actualOutputQty,
+            BigDecimal outputUnitCost,
             boolean reversed) {}
 
     private final JdbcTemplate jdbc;
@@ -81,7 +82,7 @@ class RepackStore {
                 .query(
                         """
                         select r.repack_id, r.owner_entity_id, r.location_id, r.input_batch_id, r.input_qty,
-                               r.input_unit_cost, r.output_batch_id, r.actual_output_qty,
+                               r.input_unit_cost, r.output_batch_id, r.actual_output_qty, r.output_unit_cost,
                                v.repack_id is not null as reversed
                           from inventory.repack r
                           left join inventory.repack_reversal v on v.repack_id = r.repack_id
@@ -96,6 +97,7 @@ class RepackStore {
                                 rs.getBigDecimal("input_unit_cost"),
                                 rs.getObject("output_batch_id", UUID.class),
                                 rs.getBigDecimal("actual_output_qty"),
+                                rs.getBigDecimal("output_unit_cost"),
                                 rs.getBoolean("reversed")),
                         repackId)
                 .stream()

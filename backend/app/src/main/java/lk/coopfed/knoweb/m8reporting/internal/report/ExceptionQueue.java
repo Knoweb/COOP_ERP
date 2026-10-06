@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m8reporting.internal.report;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -25,8 +26,9 @@ import org.springframework.stereotype.Component;
  *   <li>CLAIM_OPEN (REVIEW): a claim raised and not yet decided by the seller (M4-06).
  *   <li>INVOICE_DISPUTED (REVIEW): an invoice disputed and not resolved since.
  *   <li>CHEQUE_BOUNCED (ALERT): a payment whose cheque bounced.
- *   <li>EXPOSURE_WARNING (ALERT): a buyer whose exposure today is at or past the lowest threshold
- *       a warning of the relationship crossed.
+ *   <li>EXPOSURE_WARNING (ALERT): a buyer whose exposure today, against the pair's current credit
+ *       limit, is at or past the lowest step of {@code trading.exposure_warn_thresholds} (wave 2,
+ *       M8-08: whether or not M4 ever warned).
  *   <li>NEGATIVE_STOCK (ALERT): a lot below zero, a till sold more than central knew of.
  * </ul>
  *
@@ -40,14 +42,19 @@ class ExceptionQueue {
 
     static final String ESCALATE_AFTER = "reporting.exception_escalate_after";
 
+    /** M4's key (ExposureCalculator): the queue lists a buyer by the steps M4 warns by. */
+    static final String THRESHOLDS = "trading.exposure_warn_thresholds";
+
     private final JdbcTemplate jdbc;
     private final ConfigRegistry config;
     private final Clock clock;
+    private final ObjectMapper mapper;
 
-    ExceptionQueue(JdbcTemplate jdbc, ConfigRegistry config, Clock clock) {
+    ExceptionQueue(JdbcTemplate jdbc, ConfigRegistry config, Clock clock, ObjectMapper mapper) {
         this.jdbc = jdbc;
         this.config = config;
         this.clock = clock;
+        this.mapper = mapper;
     }
 
     List<ExceptionItem> items(ScopeContext scope, Names names) {
@@ -63,7 +70,7 @@ class ExceptionQueue {
                        r.window_ends_at, r.qty_at_issue
                   from (select distinct on (document_id) * from reporting.trade_document_event
                          where doc_type = 'DISCREPANCY' and event_kind = 'RAISED'
-                         order by document_id, owner_entity_id) r
+                         order by document_id, owner_entity_id, occurred_at desc, event_id desc) r
                  where not exists (select 1 from reporting.trade_document_event s
                                     where s.document_id = r.document_id and s.event_kind = 'SETTLED')
                 """,
@@ -96,7 +103,7 @@ class ExceptionQueue {
                        r.window_ends_at
                   from (select distinct on (document_id) * from reporting.trade_document_event
                          where doc_type = 'CLAIM' and event_kind = 'RAISED'
-                         order by document_id, owner_entity_id) r
+                         order by document_id, owner_entity_id, occurred_at desc, event_id desc) r
                  where not exists (select 1 from reporting.trade_document_event s
                                     where s.document_id = r.document_id
                                       and s.event_kind in ('APPROVED', 'REJECTED'))
@@ -126,7 +133,7 @@ class ExceptionQueue {
                 select d.document_id, i.doc_number, d.seller_entity_id, d.buyer_entity_id, d.occurred_at, i.gross
                   from (select distinct on (document_id) * from reporting.trade_document_event
                          where doc_type = 'INVOICE' and event_kind = 'DISPUTED'
-                         order by document_id, occurred_at desc) d
+                         order by document_id, occurred_at desc, event_id desc) d
                   left join (select distinct on (document_id) document_id, doc_number, gross
                                from reporting.trade_document_event
                               where doc_type = 'INVOICE' and event_kind = 'ISSUED'
@@ -157,7 +164,7 @@ class ExceptionQueue {
                 select b.document_id, p.doc_number, b.seller_entity_id, b.buyer_entity_id, b.occurred_at, b.gross
                   from (select distinct on (document_id) * from reporting.trade_document_event
                          where doc_type = 'PAYMENT' and event_kind = 'BOUNCED'
-                         order by document_id, owner_entity_id) b
+                         order by document_id, owner_entity_id, occurred_at desc, event_id desc) b
                   left join (select distinct on (document_id) document_id, doc_number
                                from reporting.trade_document_event
                               where doc_type = 'PAYMENT' and event_kind = 'RECORDED'
@@ -180,11 +187,13 @@ class ExceptionQueue {
                             names));
                 });
 
+        // Every pair with a current limit (wave 2, M8-08): listed once its exposure reaches the
+        // lowest step of trading.exposure_warn_thresholds, the key M4 warns by.
+        int lowest = thresholds(scope)[0];
         jdbc.query(
-                "select * from " + TradeSql.EXPOSURE + " e"
-                        + " where e.exposure * 100 >= e.credit_limit * e.threshold_percent",
+                "select * from " + TradeSql.EXPOSURE + " e where e.exposure * 100 >= e.credit_limit * ?",
                 rs -> {
-                    Instant since = rs.getTimestamp("warned_at").toInstant();
+                    Instant since = rs.getTimestamp("since").toInstant();
                     BigDecimal exposure = rs.getBigDecimal("exposure");
                     items.add(trading(
                             "EXPOSURE_WARNING",
@@ -199,7 +208,8 @@ class ExceptionQueue {
                             since.isBefore(escalateBefore),
                             me,
                             names));
-                });
+                },
+                lowest);
 
         jdbc.query(
                 """
@@ -229,6 +239,24 @@ class ExceptionQueue {
                 .thenComparing(item -> !"ALERT".equals(item.severity()))
                 .thenComparing(ExceptionItem::since));
         return items;
+    }
+
+    /**
+     * trading.exposure_warn_thresholds, ascending (default [80, 100], as M4 reads it): the
+     * percentages of the limit at which a buyer's exposure is worth a look. A value that is not a
+     * list of whole numbers falls back to the default rather than hiding every warning.
+     */
+    int[] thresholds(ScopeContext scope) {
+        String value = config.getOrDefault(THRESHOLDS, scope, "[80, 100]");
+        try {
+            int[] steps = mapper.readValue(value, int[].class);
+            if (steps.length > 0) {
+                return java.util.Arrays.stream(steps).sorted().toArray();
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // the default below
+        }
+        return new int[] {80, 100};
     }
 
     private static ExceptionItem trading(

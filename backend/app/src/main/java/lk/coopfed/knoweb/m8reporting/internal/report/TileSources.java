@@ -55,6 +55,15 @@ class TileSources {
             "grns-today",
             "stock-value");
 
+    /**
+     * The tiles with no meaning for a shop session (wave 2, decision D4): what the entity is owed
+     * and owes, and its exposure, are entity-wide figures; row-level security hides their rows
+     * from a shop, and a tile of zeros would read as a fact. Left out, as a tile with nothing for
+     * the scope is.
+     */
+    static final Set<String> ENTITY_ONLY =
+            Set.of("receivables", "overdue-receivables", "payables", "overdue-payables", "exposure");
+
     /** The sources that can answer a trend. */
     static final Set<String> TREND = Set.of("sales", "purchases", "shop-sales");
 
@@ -66,6 +75,11 @@ class TileSources {
 
         UUID me() {
             return scope.entityId();
+        }
+
+        /** A shop-scoped session (kernel.scope_location() set). */
+        boolean atLocation() {
+            return scope.locationId() != null;
         }
 
         boolean everyone() {
@@ -80,21 +94,26 @@ class TileSources {
     }
 
     Value value(String source, Context context) {
+        if (context.atLocation() && ENTITY_ONLY.contains(source)) {
+            return null;
+        }
         LocalDate today = context.today();
         return switch (source) {
             case "sales" ->
                 trend(
                         """
-                    select business_date as d, net as v from reporting.trade_document_event
+                    select business_date as d, net as v from %s e
                      where doc_type = 'INVOICE' and event_kind = 'ISSUED' and (? or seller_entity_id = ?)
-                    """,
+                    """
+                                .formatted(TradeSql.EVENTS),
                         context);
             case "purchases" ->
                 trend(
                         """
-                    select business_date as d, net as v from reporting.trade_document_event
+                    select business_date as d, net as v from %s e
                      where doc_type = 'INVOICE' and event_kind = 'ISSUED' and (? or buyer_entity_id = ?)
-                    """,
+                    """
+                                .formatted(TradeSql.EVENTS),
                         context);
             case "shop-sales" ->
                 trend(

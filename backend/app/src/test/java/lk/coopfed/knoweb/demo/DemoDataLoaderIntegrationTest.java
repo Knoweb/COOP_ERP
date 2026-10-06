@@ -423,7 +423,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         assertThat(writeOffs).singleElement().satisfies(w -> {
             assertThat(w.status()).isEqualTo("POSTED");
             assertThat(w.category()).isEqualTo("DAMAGED_IN_STORE");
-            assertThat(w.witnessUserId()).isEqualTo(DemoCast.M101_MANAGER.userId());
+            // wave 2, M5-10: the society office witnesses in person, the manager approves.
+            assertThat(w.witnessUserId()).isEqualTo(UUID.fromString("0190f0de-0000-7000-8000-000000000234"));
+            assertThat(w.approverUserId()).isEqualTo(DemoCast.M101_MANAGER.userId());
             assertThat(w.documentNo()).isNotBlank();
             assertThat(LocalDate.ofInstant(w.decidedAt(), colombo))
                     .isEqualTo(LocalDate.ofInstant(w.requestedAt(), colombo));

@@ -367,6 +367,7 @@ permissions:
     description_en: "Approve or reject stock adjustments"
     scope: "ENTITY"
     requires_mfa: true
+    limits_schema: { properties: { max_value: { type: "number", minimum: 0 } }, required: ["max_value"] }
   - code: "inv.writeoff.request"
     module: "m5inventory"
     description_en: "Request a write-off"
@@ -380,6 +381,7 @@ permissions:
     description_en: "Approve or reject a write-off"
     scope: "ENTITY"
     requires_mfa: true
+    limits_schema: { properties: { max_value: { type: "number", minimum: 0 } }, required: ["max_value"] }
   - code: "inv.recipe.manage"
     module: "m5inventory"
     description_en: "Define and retire repack recipes"
@@ -524,3 +526,8 @@ permissions:
     module: "kernel"
     description_en: "Resolve a till event the sync gateway quarantined, as repaired or discarded"
     scope: "ENTITY"
+  # wave 2, PR 11 (CR-21A-7; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (1)): no
+  # new code. inv.writeoff.approve and inv.adjust.approve above now carry a limits_schema with
+  # max_value required, so a role grants each up to a value (doc 25 section 7: "writeoff_bands as
+  # role limits (M1)"); M1SeedLoader writes it with a new catalogue row, and m1security V0019 sets
+  # it on an existing database, since the loader never updates a row.

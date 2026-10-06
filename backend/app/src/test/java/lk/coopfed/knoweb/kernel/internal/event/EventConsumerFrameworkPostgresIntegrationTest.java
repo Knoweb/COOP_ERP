@@ -46,6 +46,8 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
                     kernel.event_outbox
                 """);
 
+        superuserJdbc().update("DELETE FROM kernel.document WHERE owner_entity_id = ?", OWNER);
+
         superuserJdbc()
                 .execute(
                         """
@@ -194,6 +196,10 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
     }
 
     private int inboxRowsVisibleTo(UUID entity) {
+        return inboxRowsVisibleTo(entity, "test.projection");
+    }
+
+    private int inboxRowsVisibleTo(UUID entity, String consumer) {
 
         Integer count = new org.springframework.transaction.support.TransactionTemplate(transactionManager)
                 .execute(status -> {
@@ -202,11 +208,238 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
                                     + " set_config('app.scope_class', 'OWN', true)",
                             entity.toString());
                     return jdbc.queryForObject(
-                            "SELECT count(*) FROM kernel.event_inbox WHERE consumer = 'test.projection'",
-                            Integer.class);
+                            "SELECT count(*) FROM kernel.event_inbox WHERE consumer = ?", Integer.class, consumer);
                 });
 
         return count == null ? 0 : count;
+    }
+
+    // ---- counterparty delivery (wave 2, CR-19A-13) ------------------------------------------------
+
+    private static final UUID OWNER = UUID.fromString("0190c300-0000-7000-8000-000000000001");
+    private static final UUID COUNTERPARTY = UUID.fromString("0190c300-0000-7000-8000-000000000002");
+    private static final UUID STRANGER = UUID.fromString("0190c300-0000-7000-8000-000000000003");
+
+    /** A document of OWNER's with COUNTERPARTY as its other party, as M4 issues an invoice. */
+    private UUID twoPartyDocument() {
+        UUID documentId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                        INSERT INTO kernel.document (document_id, doc_type_code, owner_entity_id, counterparty_entity_id, status)
+                        VALUES (?, 'INV', ?, ?, 'DRAFT')
+                        """,
+                        documentId,
+                        OWNER,
+                        COUNTERPARTY);
+        return documentId;
+    }
+
+    private OutboxMessage twoPartyMessage(UUID documentId, UUID counterparty, String source) throws Exception {
+
+        com.fasterxml.jackson.databind.node.ObjectNode payload = mapper.createObjectNode();
+        payload.put("documentId", documentId.toString());
+        if (counterparty != null) {
+            payload.put("counterpartyEntityId", counterparty.toString());
+        }
+
+        return new OutboxMessage(
+                UUID.randomUUID(),
+                TestCounterpartyProjection.TYPE,
+                Instant.now(),
+                source,
+                1,
+                OWNER,
+                null,
+                "invoice",
+                documentId,
+                UUID.randomUUID(),
+                null,
+                null,
+                null,
+                mapper.writeValueAsString(payload));
+    }
+
+    private EventConsumerDispatcher counterpartyDispatcher(TestCounterpartyProjection projection) {
+
+        EventConsumerRegistry registry = new EventConsumerRegistry();
+
+        registry.register(projection);
+
+        return new EventConsumerDispatcher(
+                registry, inbox, new DeadLetter(new CapturingBroker()), audit, mapper, jdbc, transactionManager);
+    }
+
+    @Test
+    void aCounterpartyConsumerRunsInTheCounterpartysScopeWithItsOwnInboxRow() throws Exception {
+
+        TestCounterpartyProjection projection = new TestCounterpartyProjection();
+
+        EventConsumerDispatcher dispatcher = counterpartyDispatcher(projection);
+
+        OutboxMessage message = twoPartyMessage(twoPartyDocument(), COUNTERPARTY, "central");
+
+        assertThat(dispatcher.deliver(TestCounterpartyProjection.CONSUMER, message, 1))
+                .isEqualTo(EventConsumerDispatcher.DeliveryResult.APPLIED);
+
+        assertThat(projection.applied.get()).isEqualTo(1);
+        // The scope the consumer saw: OWN, entity-wide, the counterparty's, no device.
+        assertThat(projection.lastScope.entityId()).isEqualTo(COUNTERPARTY);
+        assertThat(projection.lastScope.locationId()).isNull();
+        assertThat(projection.lastScope.deviceId()).isNull();
+        assertThat(projection.lastScope.policyClass()).isEqualTo(lk.coopfed.knoweb.kernel.api.PolicyClass.OWN);
+        // The database session agreed with it.
+        assertThat(projection.lastSessionEntity).isEqualTo(COUNTERPARTY.toString());
+
+        // Its own inbox row, in the counterparty's scope: the owner's consumers see nothing of it.
+        assertThat(inboxRowsVisibleTo(COUNTERPARTY, TestCounterpartyProjection.CONSUMER))
+                .isEqualTo(1);
+        assertThat(inboxRowsVisibleTo(OWNER, TestCounterpartyProjection.CONSUMER))
+                .isZero();
+
+        // Redelivered: a duplicate, not applied twice.
+        assertThat(dispatcher.deliver(TestCounterpartyProjection.CONSUMER, message, 1))
+                .isEqualTo(EventConsumerDispatcher.DeliveryResult.DUPLICATE);
+        assertThat(projection.applied.get()).isEqualTo(1);
+    }
+
+    @Test
+    void aDeviceEventIsNeverDeliveredToACounterpartyConsumer() throws Exception {
+
+        TestCounterpartyProjection projection = new TestCounterpartyProjection();
+
+        EventConsumerDispatcher dispatcher = counterpartyDispatcher(projection);
+
+        OutboxMessage fromATill = twoPartyMessage(
+                twoPartyDocument(), COUNTERPARTY, UUID.randomUUID().toString());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, fromATill, 1))
+                .isInstanceOf(PoisonMessageException.class)
+                .hasMessageContaining("device");
+
+        assertThat(projection.applied.get()).isZero();
+        assertThat(inboxRowsVisibleTo(COUNTERPARTY, TestCounterpartyProjection.CONSUMER))
+                .isZero();
+    }
+
+    @Test
+    void aCounterpartyThatIsNotTheDocumentsIsRefusedAndNothingIsWritten() throws Exception {
+
+        TestCounterpartyProjection projection = new TestCounterpartyProjection();
+
+        EventConsumerDispatcher dispatcher = counterpartyDispatcher(projection);
+
+        UUID documentId = twoPartyDocument();
+
+        // A payload naming a stranger: the document says COUNTERPARTY, so the stranger's books
+        // are never entered. Poison, not a retry: the third attempt would say the same.
+        OutboxMessage stranger = twoPartyMessage(documentId, STRANGER, "central");
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, stranger, 3))
+                .isInstanceOf(PoisonMessageException.class)
+                .hasMessageContaining(STRANGER.toString());
+
+        // The owner naming itself.
+        OutboxMessage self = twoPartyMessage(documentId, OWNER, "central");
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, self, 1))
+                .isInstanceOf(PoisonMessageException.class);
+
+        // A document that does not exist, and a payload with no document at all.
+        OutboxMessage noSuchDocument = twoPartyMessage(UUID.randomUUID(), COUNTERPARTY, "central");
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, noSuchDocument, 1))
+                .isInstanceOf(PoisonMessageException.class);
+        com.fasterxml.jackson.databind.node.ObjectNode noDocument = mapper.createObjectNode();
+        noDocument.put("counterpartyEntityId", COUNTERPARTY.toString());
+        OutboxMessage withoutDocument = new OutboxMessage(
+                UUID.randomUUID(),
+                TestCounterpartyProjection.TYPE,
+                Instant.now(),
+                "central",
+                1,
+                OWNER,
+                null,
+                "invoice",
+                null,
+                UUID.randomUUID(),
+                null,
+                null,
+                null,
+                mapper.writeValueAsString(noDocument));
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, withoutDocument, 1))
+                .isInstanceOf(PoisonMessageException.class);
+
+        assertThat(projection.applied.get()).isZero();
+        for (UUID entity : java.util.List.of(OWNER, COUNTERPARTY, STRANGER)) {
+            assertThat(inboxRowsVisibleTo(entity, TestCounterpartyProjection.CONSUMER))
+                    .isZero();
+        }
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "SELECT count(*) FROM kernel.event_inbox WHERE consumer = ?",
+                                Integer.class,
+                                TestCounterpartyProjection.CONSUMER))
+                .isZero();
+    }
+
+    @Test
+    void anEventWithoutACounterpartyIsPassedOverByACounterpartyConsumer() throws Exception {
+
+        TestCounterpartyProjection projection = new TestCounterpartyProjection();
+
+        EventConsumerDispatcher dispatcher = counterpartyDispatcher(projection);
+
+        // Published before the field existed, or a document with one party: nothing to deliver,
+        // and not an error either (a replay of old events must not dead-letter them all).
+        OutboxMessage onePartyEvent = twoPartyMessage(twoPartyDocument(), null, "central");
+
+        assertThat(dispatcher.deliver(TestCounterpartyProjection.CONSUMER, onePartyEvent, 1))
+                .isEqualTo(EventConsumerDispatcher.DeliveryResult.APPLIED);
+
+        assertThat(projection.applied.get()).isZero();
+    }
+
+    @Test
+    void aCounterpartyConsumerOfEveryTypeIsRefusedAtRegistration() {
+
+        EventConsumerRegistry registry = new EventConsumerRegistry();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> registry.register(new Object() {
+                    @EventConsumer(
+                            types = "*",
+                            consumer = "test.counterparty.star",
+                            party = EventConsumer.Party.COUNTERPARTY)
+                    public void on(com.fasterxml.jackson.databind.JsonNode event, ScopeContext scope) {}
+                }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COUNTERPARTY");
+    }
+
+    /** A consumer registered for the counterparty of a two-party event, recording the scope it saw. */
+    final class TestCounterpartyProjection {
+
+        static final String TYPE = "test.two_party.v1";
+        static final String CONSUMER = "test.counterparty";
+
+        final AtomicInteger applied = new AtomicInteger();
+
+        volatile ScopeContext lastScope;
+        volatile String lastSessionEntity;
+
+        @EventConsumer(
+                types = {TYPE},
+                consumer = CONSUMER,
+                party = EventConsumer.Party.COUNTERPARTY)
+        public void onTwoParty(com.fasterxml.jackson.databind.JsonNode event, ScopeContext scope) {
+
+            lastScope = scope;
+            lastSessionEntity =
+                    jdbc.queryForObject("SELECT current_setting('app.scope_entity_id', true)", String.class);
+            applied.incrementAndGet();
+        }
     }
 
     @Test

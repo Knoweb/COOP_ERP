@@ -242,10 +242,23 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
             assertThat(event.discrepancyId()).isEqualTo(discrepancyId);
             assertThat(event.contentHash()).hasSize(64);
         });
-        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> assertThat(event.postings())
-                .extracting(posting -> posting.debitRole() + "/" + posting.creditRole() + "="
-                        + posting.amount().toPlainString())
-                .containsExactlyInAnyOrder("REVENUE/RECEIVABLE=240.00", "VAT_OUTPUT/RECEIVABLE=43.20"));
+        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
+            // Both sides (wave 2, CR-24A-3 item 5): the seller's reversal, and the buyer's payable
+            // reduced against its inventory and VAT input (CN GOODS BUYER), for the buyer's books.
+            assertThat(event.counterpartyEntityId()).isEqualTo(BUYER);
+            assertThat(event.postings())
+                    .extracting(posting -> posting.side() + " " + posting.debitRole() + "/" + posting.creditRole() + "="
+                            + posting.amount().toPlainString())
+                    .containsExactlyInAnyOrder(
+                            "SELLER REVENUE/RECEIVABLE=240.00",
+                            "SELLER VAT_OUTPUT/RECEIVABLE=43.20",
+                            "BUYER PAYABLE/INVENTORY=240.00",
+                            "BUYER PAYABLE/VAT_INPUT=43.20");
+            // SettleDiscrepancy's credit note dates its postings by its own business date (CR-29-1 item 4).
+            assertThat(event.businessDate())
+                    .isNotNull()
+                    .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), creditNoteId));
+        });
     }
 
     @Test
@@ -319,6 +332,11 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
                         new IssueCreditNote(
                                 invoiceId, List.of(new IssueCreditNote.Line(dhal, new BigDecimal("999"))), "x"),
                         seller()),
+                "m4.creditnote.exceeds_billed");
+        refused(
+                () -> issueCreditNote.handle(
+                        new IssueCreditNote(invoiceId, List.of(new IssueCreditNote.Line(dhal, BigDecimal.ZERO)), "x"),
+                        seller()),
                 "m4.creditnote.qty_invalid");
         assertThat(kernel.committedEvents()).isEmpty();
 
@@ -339,6 +357,10 @@ class CreditNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
                 .contains("CREDIT_NOTE_ISSUED");
         assertThat(events(CreditNoteIssued.class)).singleElement().satisfies(event -> assertThat(event.discrepancyId())
                 .isNull());
+        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> assertThat(
+                        event.businessDate())
+                .isNotNull()
+                .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), creditNoteId)));
     }
 
     @Test

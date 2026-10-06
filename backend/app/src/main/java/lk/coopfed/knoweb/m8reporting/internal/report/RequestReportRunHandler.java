@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -33,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Guards: a user acting in an OWN scope ({@code m8.run.own_required}: the PDF belongs to an
  * entity, the renderer stores it under the scope's entity); the report known
  * ({@code m8.report.unknown}); the period of a period report given and in order
- * ({@code m8.report.period_required}, {@code m8.report.period_invalid}); a language the
+ * ({@code m8.report.period_required}, {@code m8.report.period_invalid}) and no longer than
+ * {@code reporting.max_period_days} ({@code m8.report.period_too_long}); a language the
  * catalogue has ({@code m8.run.language_invalid}). Audit {@code REPORT_RUN_REQUESTED}; event
  * {@code report_run.requested.v1}.
  */
@@ -50,6 +52,7 @@ class RequestReportRunHandler implements Handles<RequestReportRun, UUID> {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final ReportCatalogue reports;
+    private final ConfigRegistry config;
 
     RequestReportRunHandler(
             JdbcTemplate jdbc,
@@ -57,8 +60,10 @@ class RequestReportRunHandler implements Handles<RequestReportRun, UUID> {
             EventPublisher events,
             ObjectMapper mapper,
             Clock clock,
-            ReportCatalogue reports) {
+            ReportCatalogue reports,
+            ConfigRegistry config) {
         this.reports = reports;
+        this.config = config;
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
@@ -74,7 +79,9 @@ class RequestReportRunHandler implements Handles<RequestReportRun, UUID> {
         }
         Definition definition = ReportQueriesImpl.definition(reports, command.reportId());
         ReportQueriesImpl.checkPeriod(
-                definition, new ReportParameters(command.from(), command.to(), command.locationId()));
+                definition,
+                new ReportParameters(command.from(), command.to(), command.locationId()),
+                config.getInt(ReportQueriesImpl.MAX_PERIOD_DAYS, scope, 366));
         String language = command.language() == null ? scope.lang() : command.language();
         if (!LANGUAGES.contains(language)) {
             throw new ProblemException("m8.run.language_invalid", Map.of("language", language));

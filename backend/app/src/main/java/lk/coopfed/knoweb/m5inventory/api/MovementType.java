@@ -5,12 +5,14 @@ package lk.coopfed.knoweb.m5inventory.api;
  * about each: which way it may move a lot, and whether it carries a cost of its own.
  *
  * <ul>
- *   <li>An <b>intake at cost</b> (RECEIPT, OPENING_BALANCE, REPACK_PRODUCE) brings stock at the
- *       cost the caller gives and re-averages the entity's cost (doc 25 section 3.3).
- *   <li>TRANSFER_IN brings stock at the cost the source lot had (the caller gives it) and leaves
- *       the entity average alone: the stock stayed inside the entity.
+ *   <li>An <b>intake at its own cost</b> brings stock at the cost the caller gives and re-averages
+ *       the entity's cost (doc 25 section 3.3): RECEIPT, OPENING_BALANCE, REPACK_PRODUCE;
+ *       TRANSFER_IN at the cost its TRANSFER_OUT left with, so the value that left comes back
+ *       exactly and an intake during transit is averaged against the right base (wave 2, M5-06);
+ *       SALE_REVERSAL at the original SALE's cost, so a void undoes the sale's cost exactly (D10).
  *   <li>Every other movement is costed at the entity average of that moment and changes the
- *       entity's quantity only.
+ *       entity's quantity only, unless the caller gives an out movement a cost of its own (the
+ *       repack reversal's REPACK_CONSUME at the repack's output cost): then that value leaves.
  * </ul>
  */
 public enum MovementType {
@@ -18,7 +20,7 @@ public enum MovementType {
     OPENING_BALANCE(Direction.IN, true),
     REPACK_PRODUCE(Direction.IN, true),
     TRANSFER_IN(Direction.IN, true),
-    SALE_REVERSAL(Direction.IN, false),
+    SALE_REVERSAL(Direction.IN, true),
     SALE(Direction.OUT, false),
     TRANSFER_OUT(Direction.OUT, false),
     REPACK_CONSUME(Direction.OUT, false),
@@ -46,13 +48,11 @@ public enum MovementType {
         return direction;
     }
 
-    /** The caller gives the unit cost (an intake, or a transfer in at the source lot's cost). */
+    /**
+     * The caller gives the unit cost and the intake re-averages the entity's cost with it: every
+     * intake at a cost, a transfer in and a sale reversal included.
+     */
     public boolean carriesItsOwnCost() {
         return carriesItsOwnCost;
-    }
-
-    /** An intake that re-averages the entity's cost: every intake at a cost but a transfer in. */
-    public boolean reaverages() {
-        return carriesItsOwnCost && this != TRANSFER_IN;
     }
 }
