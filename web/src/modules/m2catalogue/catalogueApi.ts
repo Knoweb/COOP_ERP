@@ -118,6 +118,16 @@ export function useCatalogueApi() {
           body
         });
         return data!;
+      },
+
+      async retireImage(
+        skuId: string,
+        imageId: string,
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.DELETE("/v1/catalogue/skus/{skuId}/images/{imageId}", {
+          params: { path: { skuId, imageId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
       }
     }),
     [api]

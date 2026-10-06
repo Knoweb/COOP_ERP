@@ -79,13 +79,23 @@ class ImageController implements ImageApi {
                     ImageResponse r =
                             new ImageResponse(view.imageId(), ImageResponse.StatusEnum.valueOf(view.status()));
                     r.setBarcode(view.barcode());
-                    if (view.objectKeyFull() != null) {
-                        r.setImageUrl(storage.presignGet(view.objectKeyFull(), "image/jpeg", currentScope.get())
-                                .toString());
+                    if (("ACTIVE".equals(view.status()) || "RETIRED".equals(view.status()))
+                            && view.objectKeyFull() != null) {
+                        try {
+                            r.setImageUrl(storage.presignGet(view.objectKeyFull(), "image/jpeg", currentScope.get())
+                                    .toString());
+                        } catch (lk.coopfed.knoweb.kernel.api.ProblemException e) {
+                            // Ignore if the kernel attachment is missing, unverified, or out of scope
+                        }
                     }
-                    if (view.objectKeyThumb() != null) {
-                        r.setThumbUrl(storage.presignGet(view.objectKeyThumb(), "image/webp", currentScope.get())
-                                .toString());
+                    if (("ACTIVE".equals(view.status()) || "RETIRED".equals(view.status()))
+                            && view.objectKeyThumb() != null) {
+                        try {
+                            r.setThumbUrl(storage.presignGet(view.objectKeyThumb(), "image/webp", currentScope.get())
+                                    .toString());
+                        } catch (lk.coopfed.knoweb.kernel.api.ProblemException e) {
+                            // Ignore if the kernel attachment is missing, unverified, or out of scope
+                        }
                     }
                     return r;
                 })

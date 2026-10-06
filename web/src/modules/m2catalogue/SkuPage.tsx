@@ -360,56 +360,82 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   const api = useCatalogueApi();
   const queryClient = useQueryClient();
   const key = useIdempotencyKey();
-  const [file, setFile] = useState<File | null>(null);
-  const [barcode, setBarcode] = useState("");
+  
   const [uploadStatus, setUploadStatus] = useState<"IDLE" | "HASHING" | "GETTING_URL" | "UPLOADING" | "DONE" | "ERROR">("IDLE");
   const [errorMsg, setErrorMsg] = useState("");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [lastUploadedUrl, setLastUploadedUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-
+  const [barcode, setBarcode] = useState("");
+  
+  // Initialize from sessionStorage if available to persist preview across refreshes
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(() => {
+    return sessionStorage.getItem(`sku_preview_${skuId}`);
+  });
+  
   const barcodes = useQuery({ queryKey: ["catalogue", "barcodes", skuId], queryFn: () => api.barcodes(skuId) });
   const images = useQuery({ queryKey: ["catalogue", "images", skuId], queryFn: () => api.images(skuId) });
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!file) return;
+  const retire = useMutation({
+    mutationFn: (imageId: string) => api.retireImage(skuId, imageId, key.current()),
+    onSuccess: () => {
+      key.next();
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "images", skuId] });
+      setLocalPreviewUrl(null);
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
+    },
+    onError: (err) => {
+      forgetKeyOnProblem(key)(err);
+      if (err instanceof ApiProblem) {
+        alert(errorText(err, "Failed to remove image"));
+      } else {
+        alert("Failed to remove image");
+      }
+    }
+  });
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    
+    // Set immediate local preview and save to sessionStorage as data URL
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setLocalPreviewUrl(dataUrl);
+      try {
+        sessionStorage.setItem(`sku_preview_${skuId}`, dataUrl);
+      } catch (e) {
+        // Ignore quota exceeded errors
+      }
+    };
+    reader.readAsDataURL(selectedFile);
+    
     try {
       setUploadStatus("HASHING");
       setErrorMsg("");
-      const buffer = await file.arrayBuffer();
+      const buffer = await selectedFile.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const sha256Hex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
       setUploadStatus("GETTING_URL");
       const req: AttachImageRequest = {
-        contentType: file.type,
-        contentLength: file.size,
+        contentType: selectedFile.type,
+        contentLength: selectedFile.size,
         sha256Hex
       };
+      
       if (barcode) {
         req.barcode = barcode;
       }
+      
       const response = await api.attachImage(skuId, req, key.current());
 
       setUploadStatus("UPLOADING");
       const putResp = await fetch(response.uploadUrl, {
         method: "PUT",
         headers: {
-          "Content-Type": file.type,
+          "Content-Type": selectedFile.type,
         },
-        body: file
+        body: selectedFile
       });
       if (!putResp.ok) {
         throw new Error("Upload to storage failed");
@@ -417,50 +443,199 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
 
       setUploadStatus("DONE");
       key.next();
-      setLastUploadedUrl(previewUrl);
-      setFile(null);
       queryClient.invalidateQueries({ queryKey: ["catalogue", "images", skuId] });
+      
+      setTimeout(() => {
+        setUploadStatus("IDLE");
+      }, 3000);
     } catch (err) {
       setUploadStatus("ERROR");
+      setLocalPreviewUrl(null); // Clear preview on error
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
       setErrorMsg(err instanceof ApiProblem ? errorText(err, t("catalogue.error.generic").text) : t("catalogue.error.generic").text);
+    } finally {
+      e.target.value = "";
     }
   };
 
+  const activeImage = images.data?.find(img => img.status === "ACTIVE" || img.status === "PENDING");
+  
+  // Clear sessionStorage if the image is actually active from the backend
+  if (activeImage?.imageUrl || activeImage?.thumbUrl) {
+    if (localPreviewUrl) {
+      setLocalPreviewUrl(null);
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
+    }
+  }
+  
+  // Decide which URL to show: either local preview (highest priority right after upload) or the backend URL
+  const displayUrl = localPreviewUrl || activeImage?.imageUrl || activeImage?.thumbUrl;
+  
   return (
     <section className="catalogue-section">
-      <h2>{t("catalogue.images.title").text}</h2>
+      <h2 style={{ color: 'var(--color-primary, #b3005e)', marginBottom: 'var(--space-4)' }}>
+        Item Details
+      </h2>
       
-      {images.data && images.data.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(calc(var(--space-8) * 2), 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
-          {images.data.map(img => (
-            <div key={img.imageId} style={{ border: 'var(--border-width) solid var(--color-border)', borderRadius: 'var(--radius-2)', padding: 'var(--space-2)', textAlign: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Left Card: The Image itself */}
+        <div style={{ 
+          border: 'var(--border-width) solid var(--color-border)', 
+          borderRadius: 'var(--radius-3)', 
+          padding: 'var(--space-4)',
+          width: '400px',
+          maxWidth: '100%',
+          backgroundColor: 'var(--color-surface)'
+        }}>
+        <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-text)', marginBottom: 'var(--space-3)', marginTop: 0 }}>
+          Item Image
+        </h3>
+        
+        <div style={{
+          border: 'var(--border-width) solid var(--color-border)',
+          borderRadius: 'var(--radius-2)',
+          padding: 'var(--space-2)',
+          marginBottom: 'var(--space-3)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '250px',
+          backgroundColor: '#fff'
+        }}>
+          {activeImage || localPreviewUrl ? (
+            displayUrl ? (
               <img 
-                src={img.imageUrl || img.thumbUrl} 
+                src={displayUrl} 
                 alt="SKU" 
-                style={{ width: '100%', height: 120, objectFit: 'contain', marginBottom: 'var(--space-2)' }} 
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
               />
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                {img.barcode || t("catalogue.images.no_barcode")?.text || "No barcode"}
+            ) : (
+              <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 'var(--space-2)', opacity: 0.7 }}>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <div style={{ fontWeight: 500 }}>Processing image...</div>
+                <div style={{ fontSize: '12px', marginTop: '4px' }}>Please wait up to 15 minutes.</div>
               </div>
-              <StateChip 
-                state={img.status === "ACTIVE" ? "issued" : img.status === "FAILED" || img.status === "RETIRED" ? "void" : "draft"} 
-                label={t(`catalogue.images.status.${img.status.toLowerCase()}`)?.text || img.status} 
-              />
-            </div>
-          ))}
+            )
+          ) : (
+            <div style={{ color: 'var(--color-text-muted)' }}>No image uploaded</div>
+          )}
         </div>
-      )}
-
-      {canEdit ? (
-        <form onSubmit={submit} className="catalogue-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-            <label className="catalogue-form-field">
-              {t("catalogue.images.file").text}
-              <input type="file" accept="image/jpeg, image/png" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        
+        {canEdit && (
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+            <label style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'var(--space-2)',
+              padding: 'var(--space-2)',
+              border: 'var(--border-width) solid var(--color-primary, #b3005e)',
+              borderRadius: 'var(--radius-2)',
+              color: 'var(--color-primary, #b3005e)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              backgroundColor: 'transparent',
+              fontSize: 'var(--text-sm)',
+              opacity: (uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR") ? 0.5 : 1
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              {activeImage ? "Change Image" : "Upload Image"}
+              <input 
+                type="file" 
+                accept="image/jpeg, image/png" 
+                style={{ display: 'none' }} 
+                onChange={handleFileChange}
+                disabled={uploadStatus !== "IDLE" && uploadStatus !== "DONE" && uploadStatus !== "ERROR"}
+              />
             </label>
+            
+            {activeImage && (
+              <button 
+                type="button"
+                onClick={() => retire.mutate(activeImage.imageId)}
+                disabled={retire.isPending}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2)',
+                  border: 'var(--border-width) solid var(--color-error, #d32f2f)',
+                  borderRadius: 'var(--radius-2)',
+                  color: 'var(--color-error, #d32f2f)',
+                  fontWeight: 600,
+                  backgroundColor: 'transparent',
+                  fontSize: 'var(--text-sm)'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+                Remove
+              </button>
+            )}
+          </div>
+        )}
+
+        {uploadStatus !== "IDLE" && uploadStatus !== "DONE" && (
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>
+            {uploadStatus === "HASHING" && t("catalogue.images.status.hashing").text}
+            {uploadStatus === "GETTING_URL" && t("catalogue.images.status.getting_url").text}
+            {uploadStatus === "UPLOADING" && t("catalogue.images.status.uploading").text}
+            {uploadStatus === "ERROR" && <span style={{ color: "var(--color-error, #d32f2f)" }}>{errorMsg}</span>}
+          </div>
+        )}
+        
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+          Supported formats: JPG, PNG (Max 2MB)
+        </div>
+      </div>
+      
+      {/* Right panel: Upload Settings (Barcode) */}
+      {canEdit && (
+        <div style={{ flex: 1, minWidth: '300px' }}>
+          <div style={{
+            border: 'var(--border-width) solid var(--color-border)',
+            borderRadius: 'var(--radius-3)',
+            padding: 'var(--space-4)',
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-3)'
+          }}>
+            <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>
+              Upload Settings
+            </h3>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              Select a barcode before uploading an image if the image is specific to a variant.
+            </p>
+            
             <label className="catalogue-form-field">
-              {t("catalogue.field.barcode").text}
-              <select value={barcode} onChange={(e) => setBarcode(e.target.value)}>
+              <span style={{ fontWeight: 500, color: 'var(--color-primary, #b3005e)' }}>
+                {t("catalogue.field.barcode").text}
+              </span>
+              <select 
+                value={barcode} 
+                onChange={(e) => setBarcode(e.target.value)}
+                style={{ 
+                  padding: 'var(--space-2)', 
+                  borderRadius: 'var(--radius-2)', 
+                  border: '1px solid var(--color-border)',
+                  outline: 'none'
+                }}
+              >
                 <option value="">{t("catalogue.field.choose").text}</option>
                 {(barcodes.data ?? []).filter(b => b.status === "ACTIVE").map((b) => (
                   <option key={b.barcode} value={b.barcode}>{b.barcode}</option>
@@ -468,31 +643,10 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
               </select>
             </label>
           </div>
-          <div>
-            <button type="submit" disabled={!file || uploadStatus === "HASHING" || uploadStatus === "GETTING_URL" || uploadStatus === "UPLOADING"}>
-              {t("catalogue.images.upload").text}
-            </button>
-            <span style={{ marginLeft: 'var(--space-3)' }}>
-              {uploadStatus === "HASHING" && t("catalogue.images.status.hashing").text}
-              {uploadStatus === "GETTING_URL" && t("catalogue.images.status.getting_url").text}
-              {uploadStatus === "UPLOADING" && t("catalogue.images.status.uploading").text}
-              {uploadStatus === "DONE" && <span style={{ color: "var(--color-success)" }}>{t("catalogue.images.status.done").text}</span>}
-              {uploadStatus === "ERROR" && <span style={{ color: "var(--color-error)" }}>{errorMsg}</span>}
-            </span>
-          </div>
-          {(previewUrl || lastUploadedUrl) && (
-            <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'center' }}>
-              <img 
-                src={(previewUrl || lastUploadedUrl)!} 
-                alt="Upload preview" 
-                style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 'var(--radius-3)', border: 'var(--border-width) solid var(--color-border)' }} 
-              />
-            </div>
-          )}
-        </form>
-      ) : (
-        <p>{t("catalogue.images.empty")?.text ?? "Images can be attached by the SKU owner."}</p>
+        </div>
       )}
+      
+      </div>
     </section>
   );
 }

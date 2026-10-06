@@ -11,6 +11,53 @@ import { chipOf, errorText, languageOf, nameIn } from "./skuView";
 
 const STATUSES: SkuStatus[] = ["DRAFT", "LOCAL", "SHARED", "INACTIVE"];
 
+function SkuThumbnail({ skuId }: { skuId: string }) {
+  const api = useCatalogueApi();
+  const images = useQuery({ 
+    queryKey: ["catalogue", "images", skuId], 
+    queryFn: () => api.images(skuId),
+    staleTime: 60000 // Cache for a minute to reduce network calls
+  });
+  
+  const activeImage = images.data?.find(img => img.status === "ACTIVE" || img.status === "PENDING");
+  
+  // Read local preview if available, but clear it if backend image is ready
+  let localPreviewUrl = null;
+  try {
+    localPreviewUrl = sessionStorage.getItem(`sku_preview_${skuId}`);
+    if (localPreviewUrl && (activeImage?.thumbUrl || activeImage?.imageUrl)) {
+      sessionStorage.removeItem(`sku_preview_${skuId}`);
+      localPreviewUrl = null;
+    }
+  } catch (e) {
+    // Ignore storage errors
+  }
+
+  const displayUrl = localPreviewUrl || activeImage?.thumbUrl || activeImage?.imageUrl;
+
+  if (images.isLoading && !displayUrl) {
+    return <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-1)' }} />;
+  }
+
+  if (displayUrl) {
+    return (
+      <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-1)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+        <img src={displayUrl} alt="Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-surface-hover)', borderRadius: 'var(--radius-1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+        <polyline points="21 15 16 10 5 21"></polyline>
+      </svg>
+    </div>
+  );
+}
+
 export function CataloguePage() {
   const t = useT();
   const intl = useIntl();
@@ -119,6 +166,7 @@ export function CataloguePage() {
             <table className="modern-table catalogue-table">
               <thead>
                 <tr>
+                  <th style={{ width: '60px' }}>Image</th>
                   <th>{t("catalogue.column.code").text}</th>
                   <th>{t("catalogue.column.name").text}</th>
                   <th>{t("catalogue.column.unit").text}</th>
@@ -128,7 +176,10 @@ export function CataloguePage() {
 
               <tbody>
                 {skus.data.map((sku) => (
-                  <tr key={sku.skuId}>
+                  <tr key={sku.skuId} style={{ verticalAlign: 'middle' }}>
+                    <td style={{ padding: 'var(--space-2)' }}>
+                      <SkuThumbnail skuId={sku.skuId} />
+                    </td>
                     <td>
                       <Link
                         className="entity-link"
