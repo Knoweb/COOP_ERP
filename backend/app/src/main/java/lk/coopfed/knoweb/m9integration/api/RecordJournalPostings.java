@@ -11,7 +11,8 @@ import java.util.UUID;
  * consumer of that event builds it; M9 places each amount between the two roles the owning
  * module's posting map named and never recomputes one.
  *
- * @param businessDate the day of the document in the business time zone (the event's time)
+ * @param businessDate the document's business date as issued (the payload's {@code businessDate};
+ *     for an event published before that field existed, the day of the event's time)
  */
 public record RecordJournalPostings(
         UUID documentId, String docTypeCode, String docNumberDisplay, LocalDate businessDate, List<Line> postings) {

@@ -82,7 +82,8 @@ class JournalExportPostgresIntegrationTest extends PostgresIntegrationTest {
                 posting("GOODS", "RECEIVABLE", "REVENUE", "net", "1000.00"),
                 posting("GOODS", "RECEIVABLE", "VAT_OUTPUT", "tax", "180.00"));
 
-        // 20:30 UTC on the 10th is the 11th in Colombo: the business day of the posting.
+        // The payload has no businessDate (an event published before wave 2, replayed): 20:30 UTC on
+        // the 10th is the 11th in Colombo, the business day of the posting.
         assertThat(superuserJdbc()
                         .queryForList(
                                 "select business_date::text as day, seq, amount from integration.journal_posting"
@@ -103,6 +104,70 @@ class JournalExportPostgresIntegrationTest extends PostgresIntegrationTest {
                 posting("GOODS", "RECEIVABLE", "REVENUE", "net", "1000.00"),
                 posting("GOODS", "RECEIVABLE", "VAT_OUTPUT", "tax", "180.00"));
         assertThat(count("integration.journal_posting")).isEqualTo(2);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aPostingTakesItsDocumentsBusinessDateAndOnlyTheOwnersSide() {
+        // Wave 2 (CR-29-1 item 4): the document's own date, not the event's day (the 11th in Colombo).
+        // And only the issuer's side: an invoice's BUYER lines are the buyer's books, not the
+        // seller's, and are left out here (buyer-postings decision (3)).
+        UUID invoice = Ids.next();
+        deliverAs(
+                SELLER,
+                invoice,
+                "INV",
+                "D101-INV-000002",
+                "2026-08-10T20:30:00Z",
+                LocalDate.of(2026, 8, 5),
+                posting("GOODS", "RECEIVABLE", "REVENUE", "net", "1000.00"),
+                posting("BUYER", "GOODS", "GRN_ACCRUAL", "PAYABLE", "net", "1000.00"));
+
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select business_date::text as day, side, debit_role from integration.journal_posting"
+                                        + " where document_id = ? order by seq",
+                                invoice))
+                .extracting(row -> row.get("day") + " " + row.get("side") + " " + row.get("debit_role"))
+                .containsExactly("2026-08-05 SELLER RECEIVABLE");
+        assertThat(kernel.committedEvents()).containsExactly(new JournalPostingsRecorded(invoice, "INV", 1));
+
+        // A GRN is the receiver's document (issuer BUYER): its BUYER lines are its owner's own books.
+        kernel.reset();
+        UUID grn = Ids.next();
+        deliverAs(
+                OTHER,
+                grn,
+                "GRN",
+                "M101-GRN-000001",
+                "2026-08-10T04:00:00Z",
+                LocalDate.of(2026, 8, 10),
+                posting("BUYER", "GOODS", "INVENTORY", "GRN_ACCRUAL", "cost", "1000.00"));
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select owner_entity_id, side, debit_role, credit_role, amount::text as amount"
+                                        + " from integration.journal_posting where document_id = ?",
+                                grn))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.get("owner_entity_id")).isEqualTo(OTHER);
+                    assertThat(row.get("side")).isEqualTo("BUYER");
+                    assertThat(row.get("debit_role")).isEqualTo("INVENTORY");
+                    assertThat(row.get("credit_role")).isEqualTo("GRN_ACCRUAL");
+                    assertThat(row.get("amount")).isEqualTo("1000.00");
+                });
+
+        // An event with nothing of its owner's side records nothing, audits nothing.
+        kernel.reset();
+        deliverAs(
+                SELLER,
+                Ids.next(),
+                "CN",
+                "D101-CN-000001",
+                "2026-08-10T04:00:00Z",
+                LocalDate.of(2026, 8, 10),
+                posting("BUYER", "GOODS", "PAYABLE", "INVENTORY", "net", "10.00"));
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
     }
@@ -268,9 +333,14 @@ class JournalExportPostgresIntegrationTest extends PostgresIntegrationTest {
     // ---------------------------------------------------------------------------------------
 
     private ObjectNode posting(String lineKind, String debit, String credit, String source, String amount) {
+        return posting("SELLER", lineKind, debit, credit, source, amount);
+    }
+
+    private ObjectNode posting(
+            String side, String lineKind, String debit, String credit, String source, String amount) {
         ObjectNode posting = json.createObjectNode();
         posting.put("lineKind", lineKind);
-        posting.put("side", "SELLER");
+        posting.put("side", side);
         posting.put("debitRole", debit);
         posting.put("creditRole", credit);
         posting.put("amountSource", source);
@@ -278,24 +348,42 @@ class JournalExportPostgresIntegrationTest extends PostgresIntegrationTest {
         return posting;
     }
 
-    /** journal.postings_ready.v1 as the kernel hands it to a consumer of every type, in the seller's scope. */
+    /**
+     * journal.postings_ready.v1 as the kernel hands it to a consumer of every type, in the seller's
+     * scope, as published before wave 2: no businessDate in the payload.
+     */
     private void deliver(UUID documentId, String type, String number, String occurredAt, ObjectNode... postings) {
+        deliverAs(SELLER, documentId, type, number, occurredAt, null, postings);
+    }
+
+    /** The same, in the owner's scope, with the document's business date when one is given. */
+    private void deliverAs(
+            UUID owner,
+            UUID documentId,
+            String type,
+            String number,
+            String occurredAt,
+            LocalDate businessDate,
+            ObjectNode... postings) {
         ObjectNode payload = json.createObjectNode();
         payload.put("documentId", documentId.toString());
         payload.put("docTypeCode", type);
         payload.put("docNumberDisplay", number);
-        payload.put("ownerEntityId", SELLER.toString());
+        payload.put("ownerEntityId", owner.toString());
         ArrayNode list = payload.putArray("postings");
         for (ObjectNode posting : postings) {
             list.add(posting);
         }
+        if (businessDate != null) {
+            payload.put("businessDate", businessDate.toString());
+        }
         ObjectNode envelope = json.createObjectNode();
         envelope.put("eventType", "journal.postings_ready.v1");
         envelope.put("eventId", Ids.next().toString());
-        envelope.put("ownerEntityId", SELLER.toString());
+        envelope.put("ownerEntityId", owner.toString());
         envelope.put("occurredAt", Instant.parse(occurredAt).toString());
         envelope.set("payload", payload);
-        consumer(envelope, system(SELLER));
+        consumer(envelope, system(owner));
     }
 
     /** The consumer's method, found by its annotation as the kernel finds it (the class is the module's own). */

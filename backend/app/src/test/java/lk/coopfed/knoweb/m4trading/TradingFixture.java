@@ -50,6 +50,15 @@ public final class TradingFixture {
         return LocalDate.now(ZoneId.of("Asia/Colombo"));
     }
 
+    /**
+     * The business date the kernel gave a document when it issued it: what its postings carry
+     * (CR-29-1 item 4), read back rather than compared with today, so a run across midnight holds.
+     */
+    public static LocalDate businessDateOf(JdbcTemplate admin, UUID documentId) {
+        return admin.queryForObject(
+                "select business_date from kernel.document where document_id = ?", LocalDate.class, documentId);
+    }
+
     public static ScopeContext seller() {
         return ScopeContext.dev(SELLER_USER, SELLER, null);
     }

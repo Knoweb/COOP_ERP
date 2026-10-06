@@ -24,8 +24,11 @@ import lk.coopfed.knoweb.m4trading.api.CaptureGrn;
 import lk.coopfed.knoweb.m4trading.api.ChequeBounced;
 import lk.coopfed.knoweb.m4trading.api.ChequeCleared;
 import lk.coopfed.knoweb.m4trading.api.ConfirmGrn;
+import lk.coopfed.knoweb.m4trading.api.CreateDeliveryNote;
+import lk.coopfed.knoweb.m4trading.api.DispatchDeliveryNote;
 import lk.coopfed.knoweb.m4trading.api.ExposureWarning;
 import lk.coopfed.knoweb.m4trading.api.IssueCreditNote;
+import lk.coopfed.knoweb.m4trading.api.IssueDeliveryNote;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
 import lk.coopfed.knoweb.m4trading.api.JournalPostingsReady;
 import lk.coopfed.knoweb.m4trading.api.OrderAccepted;
@@ -33,6 +36,9 @@ import lk.coopfed.knoweb.m4trading.api.PaymentReceiptRecorded;
 import lk.coopfed.knoweb.m4trading.api.PaymentReceiptReversed;
 import lk.coopfed.knoweb.m4trading.api.RecordChequeOutcome;
 import lk.coopfed.knoweb.m4trading.api.RecordPaymentReceipt;
+import lk.coopfed.knoweb.m4trading.internal.delivery.CreateDeliveryNoteHandler;
+import lk.coopfed.knoweb.m4trading.internal.delivery.DispatchDeliveryNoteHandler;
+import lk.coopfed.knoweb.m4trading.internal.delivery.IssueDeliveryNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.ConfirmGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueCreditNoteHandler;
@@ -44,6 +50,7 @@ import lk.coopfed.knoweb.m4trading.query.ExposureView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
+import lk.coopfed.knoweb.m4trading.query.OrderView;
 import lk.coopfed.knoweb.m4trading.query.PaymentQueries;
 import lk.coopfed.knoweb.m4trading.query.PaymentReceiptView;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
@@ -104,6 +111,15 @@ class PaymentHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     DeliveryQueries deliveries;
 
+    @Autowired
+    CreateDeliveryNoteHandler createNote;
+
+    @Autowired
+    IssueDeliveryNoteHandler issueNote;
+
+    @Autowired
+    DispatchDeliveryNoteHandler dispatchNote;
+
     @BeforeEach
     void arrange() {
         TradingFixture.arrange(superuserJdbc());
@@ -111,6 +127,12 @@ class PaymentHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void clean() {
+        // The second payer's relationship of aChequeIsRecordedOnceUnlessItBounced; the fixture clears the pair's own.
+        superuserJdbc()
+                .update(
+                        "delete from party.entity_relationship where seller_entity_id = ? and buyer_entity_id = ?",
+                        SELLER,
+                        STRANGER);
         TradingFixture.clean(superuserJdbc());
     }
 
@@ -365,6 +387,214 @@ class PaymentHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .extracting(audit -> audit.eventType())
                 .contains("CREDIT_NOTE_ISSUED");
         assertThat(kernel.committedEvents()).hasAtLeastOneElementOfType(JournalPostingsReady.class);
+    }
+
+    @Test
+    void aSuspendedBuyersMoneyIsRecordedAndADraftOrReplacedPairIsRefused() {
+        // Wave 2, M4MONEY-08 (CR-21A-7 section 6.1): the suspension exists because the buyer owes;
+        // settling its open invoices goes on (doc 21 section 4).
+        UUID invoiceId = invoiced();
+        relationshipStatus("SUSPENDED");
+        kernel.reset();
+
+        UUID receiptId = record.handle(payment("TRANSFER", "1736.00", null, settle(invoiceId, "1736.00")), seller());
+
+        assertThat(invoices.balance(invoiceId, seller()).orElseThrow().paymentState())
+                .isEqualTo(InvoiceBalance.SETTLED);
+        assertThat(kernel.committedAudit())
+                .extracting(audit -> audit.eventType())
+                .contains("PAYMENT_RECEIPT_RECORDED");
+        assertThat(events(PaymentReceiptRecorded.class))
+                .singleElement()
+                .satisfies(event -> assertThat(event.relationshipId()).isEqualTo(RELATIONSHIP));
+        // The document's business date as issued rides on its postings (CR-29-1 item 4).
+        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
+            assertThat(event.documentId()).isEqualTo(receiptId);
+            assertThat(event.businessDate()).isNotNull().isEqualTo(businessDateOf(receiptId));
+        });
+
+        // Money on account with no invoice open: held, under the same relationship.
+        kernel.reset();
+        UUID onAccount = record.handle(payment("CASH", "100.00", null, List.of()), seller());
+        assertThat(payments.getReceipt(onAccount, seller()).orElseThrow().unappliedAmount())
+                .isEqualByComparingTo("100.00");
+
+        // A relationship that ended with money still to come: the latest row of the pair.
+        superuserJdbc()
+                .update(
+                        "update party.entity_relationship set status = 'ACTIVE', effective_to = ?"
+                                + " where relationship_id = ?",
+                        today().minusDays(1),
+                        RELATIONSHIP);
+        record.handle(payment("CASH", "10.00", null, List.of()), seller());
+
+        // DRAFT and REPLACED rows never qualify: for the pair, it never traded.
+        for (String status : List.of("DRAFT", "REPLACED")) {
+            relationshipStatus(status);
+            kernel.reset();
+            refused(
+                    () -> record.handle(payment("CASH", "10.00", null, List.of()), seller()),
+                    "m4.payment.no_relationship");
+            assertThat(kernel.committedAudit()).isEmpty();
+            assertThat(kernel.committedEvents()).isEmpty();
+        }
+    }
+
+    @Test
+    void aChequeIsRecordedOnceUnlessItBounced() {
+        // Wave 2, M4MONEY-09 (CR-24A-3 item 3): the key is seller, payer, bank and number, compared
+        // without case, outer spaces or leading zeros; the date is not part of it.
+        UUID invoiceId = invoiced();
+        UUID first = record.handle(payment("CHEQUE", "500.00", cheque(), List.of()), seller());
+        kernel.reset();
+
+        assertThatThrownBy(() -> record.handle(
+                        payment(
+                                "CHEQUE",
+                                "500.00",
+                                new RecordPaymentReceipt.Cheque(" bank of ceylon ", "0400123", today().minusDays(1)),
+                                List.of()),
+                        seller()))
+                .isInstanceOf(ProblemException.class)
+                .satisfies(error -> {
+                    ProblemException problem = (ProblemException) error;
+                    assertThat(problem.messageId()).isEqualTo("m4.payment.cheque_recorded");
+                    assertThat(problem.parameters()).containsEntry("receiptId", first);
+                    assertThat(problem.parameters()).containsKey("docNumber");
+                });
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(invoices.balance(invoiceId, seller()).orElseThrow().settledAmount())
+                .isEqualByComparingTo("500.00");
+
+        // Another number from the same drawer is another cheque.
+        record.handle(
+                payment(
+                        "CHEQUE",
+                        "10.00",
+                        new RecordPaymentReceipt.Cheque("Bank of Ceylon", "400124", today()),
+                        List.of()),
+                seller());
+
+        // Bounced, the cheque is re-presented with the same number and recorded again; once.
+        UUID reversalId = outcome.handle(new RecordChequeOutcome(first, "BOUNCED", null), seller());
+        assertThat(events(JournalPostingsReady.class))
+                .filteredOn(event -> event.documentId().equals(reversalId))
+                .singleElement()
+                .satisfies(event -> assertThat(event.businessDate()).isNotNull().isEqualTo(businessDateOf(reversalId)));
+        UUID again = record.handle(payment("CHEQUE", "500.00", cheque(), List.of()), seller());
+        assertThat(again).isNotEqualTo(first);
+        refused(
+                () -> record.handle(payment("CHEQUE", "500.00", cheque(), List.of()), seller()),
+                "m4.payment.cheque_recorded");
+
+        // Another payer may hold the same number at the same bank (another drawer's account).
+        superuserJdbc()
+                .update(
+                        """
+                        insert into party.entity_relationship (relationship_id, seller_entity_id, buyer_entity_id,
+                            status, effective_from, price_list_id)
+                        values (?, ?, ?, 'ACTIVE', ?, ?)
+                        """,
+                        UUID.randomUUID(),
+                        SELLER,
+                        STRANGER,
+                        today().minusDays(30),
+                        TradingFixture.PRICE_LIST);
+        UUID otherPayer = record.handle(
+                new RecordPaymentReceipt(
+                        STRANGER, "CHEQUE", new BigDecimal("50.00"), null, today(), cheque(), List.of()),
+                seller());
+        assertThat(payments.getReceipt(otherPayer, seller()).orElseThrow().unappliedAmount())
+                .isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void theExposureCountsEachOrderLineUntilItIsInvoicedAndNeverAShortQuantity() {
+        // Wave 2, M4MONEY-14 (CR-24A-3 item 6): 10 rice at 120.00 and 4 dhal at 80.00, accepted
+        // (1520.00), delivered on two notes: 6 rice and the dhal, then the other 4 rice.
+        OrderView order = flow.acceptedOrder();
+        UUID riceLine = lineOf(order, RICE);
+        UUID dhalLine = lineOf(order, DHAL);
+        assertThat(accepted()).isEqualByComparingTo("1520.00");
+
+        UUID firstNote = note(riceLine, "6", dhalLine, "4");
+        // On its way: still to be billed.
+        assertThat(accepted()).isEqualByComparingTo("1520.00");
+
+        // Received 5 of the 6 rice: the short one is never owed (DR-2).
+        UUID firstGrn = received(firstNote, line(RICE, "5"), line(DHAL, "4"));
+        assertThat(accepted()).isEqualByComparingTo("1400.00");
+
+        // Invoiced, the first note leaves the accepted part (it is an open invoice now); the 4 rice
+        // not yet dispatched stay in it, where the whole order used to drop out.
+        issueInvoice.handle(new IssueInvoice(List.of(firstGrn)), seller());
+        assertThat(accepted()).isEqualByComparingTo("480.00");
+        assertThat(exposures.exposure(SELLER, BUYER, seller()).orElseThrow().openInvoices())
+                .isEqualByComparingTo("1028.00"); // 600.00 + 18 % and 320.00 exempt
+
+        UUID secondNote = note(riceLine, "4", null, null);
+        assertThat(accepted()).isEqualByComparingTo("480.00");
+        UUID secondGrn = received(secondNote, line(RICE, "4"));
+        assertThat(accepted()).isEqualByComparingTo("480.00");
+        issueInvoice.handle(new IssueInvoice(List.of(secondGrn)), seller());
+        assertThat(accepted()).isEqualByComparingTo("0");
+        // The buyer reads the same of itself.
+        assertThat(exposures.exposure(SELLER, BUYER, buyer()).orElseThrow().acceptedNotInvoiced())
+                .isEqualByComparingTo("0");
+    }
+
+    private BigDecimal accepted() {
+        return exposures.exposure(SELLER, BUYER, seller()).orElseThrow().acceptedNotInvoiced();
+    }
+
+    private static UUID lineOf(OrderView order, UUID sku) {
+        return order.lines().stream()
+                .filter(line -> sku.equals(line.skuId()))
+                .findFirst()
+                .orElseThrow()
+                .lineId();
+    }
+
+    /** A note to the shop carrying these quantities of the order's lines (a null line is left out), issued and dispatched. */
+    private UUID note(UUID firstLine, String firstQty, UUID secondLine, String secondQty) {
+        List<CreateDeliveryNote.Line> lines = secondLine == null
+                ? List.of(new CreateDeliveryNote.Line(firstLine, new BigDecimal(firstQty), null))
+                : List.of(
+                        new CreateDeliveryNote.Line(firstLine, new BigDecimal(firstQty), null),
+                        new CreateDeliveryNote.Line(secondLine, new BigDecimal(secondQty), null));
+        UUID noteId = createNote.handle(
+                new CreateDeliveryNote(
+                        "WP-1234", "Sunil", null, List.of(new CreateDeliveryNote.Drop(SHOP, BUYER, lines))),
+                seller());
+        issueNote.handle(new IssueDeliveryNote(noteId), seller());
+        dispatchNote.handle(new DispatchDeliveryNote(noteId, null, null, null), seller());
+        return noteId;
+    }
+
+    /** The note's one drop received at the shop with these counts, and confirmed. */
+    private UUID received(UUID noteId, CaptureGrn.Line... counted) {
+        UUID dropId = deliveries
+                .getDeliveryNote(noteId, buyer())
+                .orElseThrow()
+                .drops()
+                .get(0)
+                .dropId();
+        UUID grnId = capture.handle(new CaptureGrn(dropId, SHOP, null, List.of(counted)), buyer());
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        return grnId;
+    }
+
+    private static java.time.LocalDate businessDateOf(UUID documentId) {
+        return TradingFixture.businessDateOf(superuserJdbc(), documentId);
+    }
+
+    private void relationshipStatus(String status) {
+        superuserJdbc()
+                .update(
+                        "update party.entity_relationship set status = ? where relationship_id = ?",
+                        status,
+                        RELATIONSHIP);
     }
 
     @Test

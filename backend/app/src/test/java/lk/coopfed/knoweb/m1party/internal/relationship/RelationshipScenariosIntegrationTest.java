@@ -593,6 +593,24 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         assertThat(queries.lookupRelationship(DISTRIBUTOR, SOCIETY, JULY, own(SOCIETY)))
                 .as("a suspended relationship is not in force")
                 .isEmpty();
+
+        // But money is still settled under it (wave 2, CR-21A-7 section 6.1): the pair's row, of
+        // either party, on the day or (before it began) the latest; never a stranger's.
+        for (ScopeContext caller : List.of(own(DISTRIBUTOR), own(SOCIETY), party(SOCIETY), federationView())) {
+            assertThat(queries.settlementRelationship(DISTRIBUTOR, SOCIETY, JULY, caller))
+                    .hasValueSatisfying(row -> {
+                        assertThat(row.relationshipId()).isEqualTo(id);
+                        assertThat(row.status()).isEqualTo("SUSPENDED");
+                    });
+        }
+        assertThat(queries.settlementRelationship(DISTRIBUTOR, SOCIETY, APRIL.minusDays(1), own(DISTRIBUTOR)))
+                .map(RelationshipView::relationshipId)
+                .hasValue(id);
+        assertThat(queries.settlementRelationship(DISTRIBUTOR, SOCIETY, JULY, own(OTHER_SOCIETY)))
+                .isEmpty();
+        assertThat(queries.settlementRelationship(DISTRIBUTOR, OTHER_SOCIETY, JULY, own(DISTRIBUTOR)))
+                .as("a pair that never traded")
+                .isEmpty();
     }
 
     // ---- the review of M1-04: several rows, concurrency, a shop-scoped caller --------------------

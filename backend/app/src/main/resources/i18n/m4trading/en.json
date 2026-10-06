@@ -105,6 +105,7 @@
   "m4.payment.not_seller": "Only the seller who recorded the payment can record its cheque",
   "m4.payment.not_cheque": "This payment was not made by cheque",
   "m4.payment.outcome_recorded": "The outcome of this cheque is already recorded",
+  "m4.payment.cheque_recorded": "This cheque is already recorded on another receipt from this buyer",
   "m4.creditnote.print_not_ready": "The printed copy is not ready yet; try again in a moment",
   "m4.creditnote.print.title": "Credit note",
   "m4.creditnote.print.invoice": "Tax invoice",

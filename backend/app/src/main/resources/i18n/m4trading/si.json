@@ -105,6 +105,7 @@
   "m4.payment.not_seller": "ගෙවීම වාර්තා කළ විකුණුම්කරුට පමණක් එහි චෙක්පත වාර්තා කළ හැක",
   "m4.payment.not_cheque": "මෙම ගෙවීම චෙක්පතකින් නොවේ",
   "m4.payment.outcome_recorded": "මෙම චෙක්පතේ ප්‍රතිඵලය දැනටමත් වාර්තා කර ඇත",
+  "m4.payment.cheque_recorded": "මෙම චෙක්පත මෙම ගැනුම්කරුගෙන් ලැබුණු වෙනත් රිසිට්පතක දැනටමත් වාර්තා කර ඇත",
   "m4.creditnote.print_not_ready": "මුද්‍රිත පිටපත තවම සූදානම් නැත; මොහොතකින් නැවත උත්සාහ කරන්න",
   "m4.creditnote.print.title": "බැර සටහන",
   "m4.creditnote.print.invoice": "බදු ඉන්වොයිසිය",
