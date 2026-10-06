@@ -68,6 +68,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     private static final UUID DEVICE = UUID.fromString("0190e6a0-0000-7000-8000-000000000301");
     private static final UUID SERIES = UUID.fromString("0190e6a0-0000-7000-8000-000000000401");
     private static final UUID REPLACEMENT = UUID.fromString("0190e6a0-0000-7000-8000-000000000302");
+    private static final java.time.ZoneId COLOMBO = java.time.ZoneId.of("Asia/Colombo");
 
     @Autowired
     TestRestTemplate http;
@@ -158,6 +159,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         rice = item(db, "RICE5", "4790001000011", "10");
         dhal = item(db, "DHAL1", "4790001000028", "10");
         soap = item(db, "SOAP1", "4790001000035", "10");
+        // The position's series held by the till, as M1 registers it at enrolment: a receipt of
+        // a series the device does not hold at its shop is flagged SERIES_FOREIGN (wave 2, M6-04).
+        registerTheSeries();
         kernel.reset();
     }
 
@@ -197,7 +201,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
 
         // The receipt shows centrally, as issued from the till's series, and the session closed.
         ScopeContext office = own(MPCS);
-        assertThat(pos.receipts(SHOP, office)).singleElement().satisfies(r -> {
+        assertThat(receiptsAt(office)).singleElement().satisfies(r -> {
             assertThat(r.documentId()).isEqualTo(receipt);
             assertThat(r.docNumberDisplay()).isEqualTo("M6S1-1-1");
             assertThat(r.grossAmount()).isEqualByComparingTo("3565.00");
@@ -216,7 +220,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .containsEntry("series_id", SERIES)
                 .containsEntry("doc_number", 1L)
                 .containsEntry("origin", "OFFLINE");
-        assertThat(pos.sessions(SHOP, office)).singleElement().satisfies(s -> {
+        assertThat(sessionsAt(office)).singleElement().satisfies(s -> {
             assertThat(s.closedAt()).isNotNull();
             assertThat(s.variance()).isEqualByComparingTo("0");
         });
@@ -236,28 +240,57 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .filteredOn(TillSessionRecorded.class::isInstance)
                 .hasSize(2);
 
-        // Over HTTP, the office reads the receipt; the shop's own session too.
+        // Over HTTP, the office reads the receipt on its business day, and on its own; the shop's
+        // own session too. The day is the one the receipt was issued on in the business time zone,
+        // never "today", so a run across midnight reads the same page.
+        LocalDate day = LocalDate.ofInstant(receiptsAt(office).getFirst().issuedAt(), COLOMBO);
         JsonNode receipts = http.exchange(
-                        "/v1/pos/receipts?locationId=" + SHOP,
+                        "/v1/pos/receipts?locationId=" + SHOP + "&businessDate=" + day,
                         HttpMethod.GET,
                         new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
                         JsonNode.class)
                 .getBody();
-        assertThat(receipts).hasSize(1);
-        assertThat(receipts.get(0).get("docNumberDisplay").asText()).isEqualTo("M6S1-1-1");
-        assertThat(receipts.get(0).get("tenders").get(0).get("kind").asText()).isEqualTo("CASH");
+        assertThat(receipts.get("items")).hasSize(1);
+        assertThat(receipts.has("nextCursor") && !receipts.get("nextCursor").isNull())
+                .isFalse();
+        assertThat(receipts.get("items").get(0).get("docNumberDisplay").asText())
+                .isEqualTo("M6S1-1-1");
+        assertThat(receipts.get("items")
+                        .get(0)
+                        .get("tenders")
+                        .get(0)
+                        .get("kind")
+                        .asText())
+                .isEqualTo("CASH");
+        JsonNode one = http.exchange(
+                        "/v1/pos/receipts/" + receipt,
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(one.get("lines")).hasSize(3);
         JsonNode sessions = http.exchange(
-                        "/v1/pos/sessions?locationId=" + SHOP,
+                        "/v1/pos/sessions?locationId=" + SHOP + "&businessDate="
+                                + LocalDate.ofInstant(
+                                        sessionsAt(office).getFirst().openedAt(), COLOMBO),
                         HttpMethod.GET,
                         new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
                         JsonNode.class)
                 .getBody();
-        assertThat(sessions.get(0).get("status").asText()).isEqualTo("CLOSED");
+        assertThat(sessions.get("items").get(0).get("status").asText()).isEqualTo("CLOSED");
+        assertThat(http.exchange(
+                                "/v1/pos/sessions/" + session,
+                                HttpMethod.GET,
+                                new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                                JsonNode.class)
+                        .getBody()
+                        .get("closedAt"))
+                .isNotNull();
 
         // A redelivery of every event changes nothing.
         deliverTheTillsEvents();
         assertThat(onHand(rice)).isEqualByComparingTo("8");
-        assertThat(pos.receipts(SHOP, office)).hasSize(1);
+        assertThat(receiptsAt(office)).hasSize(1);
     }
 
     @Test
@@ -301,7 +334,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(1L);
         deliverQueueByQueueReceiptsFirst(DEVICE);
 
-        assertThat(pos.receipts(SHOP, own(MPCS))).hasSize(3).allSatisfy(r -> {
+        assertThat(receiptsAt(own(MPCS))).hasSize(3).allSatisfy(r -> {
             assertThat(r.sessionId()).isEqualTo(session);
             assertThat(r.flags()).isEmpty();
         });
@@ -318,8 +351,6 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aReplacementTillOnThePositionContinuesTheNumbersCentralHasSeen() throws Exception {
-        registerTheSeries();
-
         TillSimulator first = till();
         first.refreshSnapshot();
         first.openSession(BigDecimal.ZERO);
@@ -347,7 +378,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(numberOf(two)).isEqualTo(2L);
         assertThat(numberOf(three)).isEqualTo(3L);
         assertThat(nextNumber()).isEqualTo(4L);
-        assertThat(pos.receipts(SHOP, own(MPCS))).hasSize(3).allSatisfy(r -> assertThat(r.flags())
+        assertThat(receiptsAt(own(MPCS))).hasSize(3).allSatisfy(r -> assertThat(r.flags())
                 .isEmpty());
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
@@ -356,8 +387,6 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDuplicateNumberIsStoredAndFlaggedNeverRefused() throws Exception {
-        registerTheSeries();
-
         TillSimulator first = till();
         first.refreshSnapshot();
         first.openSession(BigDecimal.ZERO);
@@ -378,11 +407,11 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         // Both receipts are kept; the second carries the flag, and an ALERT names the first.
         assertThat(numberOf(original)).isEqualTo(1L);
         assertThat(numberOf(duplicate)).isEqualTo(1L);
-        assertThat(pos.receipts(SHOP, own(MPCS)))
+        assertThat(receiptsAt(own(MPCS)))
                 .filteredOn(r -> r.documentId().equals(duplicate))
                 .singleElement()
                 .satisfies(r -> assertThat(r.flags()).containsExactly("DUPLICATE_NUMBER"));
-        assertThat(pos.receipts(SHOP, own(MPCS)))
+        assertThat(receiptsAt(own(MPCS)))
                 .filteredOn(r -> r.documentId().equals(original))
                 .singleElement()
                 .satisfies(r -> assertThat(r.flags()).isEmpty());
@@ -438,9 +467,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
 
         deliverTheTillsEvents();
 
-        assertThat(pos.receipts(SHOP, own(MPCS)))
-                .extracting(r -> r.documentId())
-                .containsExactly(good);
+        assertThat(receiptsAt(own(MPCS))).extracting(r -> r.documentId()).containsExactly(good);
         assertThat(onHand(rice))
                 .as("M5 deducted nothing for the quarantined receipt")
                 .isEqualByComparingTo("10");
@@ -472,10 +499,56 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .contains("SYNC_EVENT_QUARANTINED");
     }
 
+    /**
+     * Wave 2, M6-02: a bundle in the right shape whose gross disagrees with its lines and its
+     * tender passes the gateway, is applied by every module, and is flagged in M6 for a person,
+     * never refused; the receipts list's flagged filter finds it and only it.
+     */
+    @Test
+    void aReceiptWhoseTotalsDisagreeIsAppliedAndFlagged() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID odd = till.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))), payload -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> document = (Map<String, Object>) payload.get("document");
+            document.put("gross_amount", "1500.00");
+        });
+        UUID fine = till.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+        till.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents();
+
+        assertThat(onHand(rice)).as("M5 applied the sale").isEqualByComparingTo("9");
+        assertThat(receiptsAt(own(MPCS)))
+                .filteredOn(r -> r.documentId().equals(odd))
+                .singleElement()
+                .satisfies(r -> assertThat(r.flags()).containsExactly("TOTAL_MISMATCH", "TENDER_MISMATCH"));
+        assertThat(pos.receipts(new PosQueries.ReceiptFilter(SHOP, null, true, null, null), own(MPCS))
+                        .items())
+                .extracting(PosQueries.ReceiptView::documentId)
+                .containsExactly(odd)
+                .doesNotContain(fine);
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_FLAGGED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TOTAL_MISMATCH"));
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {
         return till(DEVICE);
+    }
+
+    /** The shop's receipts on every day, one long page (no day filter: a run across midnight stays right). */
+    private List<PosQueries.ReceiptView> receiptsAt(ScopeContext scope) {
+        return pos.receipts(new PosQueries.ReceiptFilter(SHOP, null, false, null, 200), scope)
+                .items();
+    }
+
+    private List<PosQueries.SessionView> sessionsAt(ScopeContext scope) {
+        return pos.sessions(new PosQueries.SessionFilter(SHOP, null, null, 200), scope)
+                .items();
     }
 
     private TillSimulator till(UUID device) {

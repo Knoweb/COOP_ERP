@@ -25,6 +25,18 @@ public interface RelationshipQueries {
     Optional<RelationshipView> lookupRelationship(
             UUID sellerEntityId, UUID buyerEntityId, LocalDate onDate, ScopeContext scope);
 
+    /**
+     * SettlementRelationship(seller, buyer, date) (CR-21A-7 section 6.1; wave 2, M4MONEY-08): the
+     * relationship a payment between the pair is recorded under. The pair's row of status ACTIVE or
+     * SUSPENDED whose effective range contains the date; else the pair's most recent ACTIVE or
+     * SUSPENDED row (a relationship that ended with invoices still open). DRAFT and REPLACED rows
+     * never qualify. Empty when the pair never traded, or when the caller may not see the row.
+     * Settling open documents goes on under a suspension (doc 21 section 4); new trading still
+     * asks {@link #lookupRelationship} for an ACTIVE row.
+     */
+    Optional<RelationshipView> settlementRelationship(
+            UUID sellerEntityId, UUID buyerEntityId, LocalDate onDate, ScopeContext scope);
+
     /** One row by its id; empty when it does not exist or the caller may not see it. */
     Optional<RelationshipView> getRelationship(UUID relationshipId, ScopeContext scope);
 

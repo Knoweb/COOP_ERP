@@ -23,6 +23,8 @@ public final class InventoryFixture {
     private final List<UUID> skus = new ArrayList<>();
     private final List<UUID> batches = new ArrayList<>();
     private final List<UUID> locations = new ArrayList<>();
+    private final List<UUID> users = new ArrayList<>();
+    private final List<UUID> roles = new ArrayList<>();
 
     public InventoryFixture(JdbcTemplate admin) {
         this.admin = admin;
@@ -121,7 +123,61 @@ public final class InventoryFixture {
         return id;
     }
 
+    /**
+     * A user of the entity holding, entity-wide, a role with the permission and its limits (null:
+     * a grant without limits). Since wave 2 an approval limit fails closed (M5-09): an approver needs
+     * a grant at the entity, and one without {@code max_value} approves band 1 only.
+     */
+    public UUID userWith(UUID entity, String permission, String limits) {
+        return userWithAll(entity, limits, permission);
+    }
+
+    /** A user of the entity holding, entity-wide, one role with every permission given, each with the limits. */
+    public UUID userWithAll(UUID entity, String limits, String... permissions) {
+        UUID user = Ids.next();
+        admin.update(
+                "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
+                        + " values (?, ?, ?, ?, 'BACK_OFFICE', 'ACTIVE')",
+                user,
+                entity,
+                "m5-" + user,
+                "M5 test user");
+        users.add(user);
+        UUID role = Ids.next();
+        admin.update(
+                "insert into security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)"
+                        + " values (?, ?, ?, false, 'OWN', 'ACTIVE')",
+                role,
+                entity,
+                "M5 test role " + role);
+        roles.add(role);
+        for (String permission : permissions) {
+            admin.update(
+                    "insert into security.role_permission (role_id, permission_code, limits) values (?, ?, ?::jsonb)",
+                    role,
+                    permission,
+                    limits);
+        }
+        admin.update(
+                "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id)"
+                        + " values (?, ?, ?, null)",
+                user,
+                role,
+                entity);
+        return user;
+    }
+
     public void clean() {
+        for (UUID user : users) {
+            admin.update("delete from security.user_role where user_id = ?", user);
+            admin.update("delete from security.app_user where user_id = ?", user);
+        }
+        for (UUID role : roles) {
+            admin.update("delete from security.role_permission where role_id = ?", role);
+            admin.update("delete from security.role where role_id = ?", role);
+        }
+        users.clear();
+        roles.clear();
         admin.execute("truncate table inventory.stock_lot, inventory.stock_movement, inventory.movement_sequence,"
                 + " inventory.entity_sku_cost, inventory.pick_list_line, inventory.pick_list,"
                 + " inventory.opening_balance_line, inventory.opening_balance, inventory.transfer_receipt,"

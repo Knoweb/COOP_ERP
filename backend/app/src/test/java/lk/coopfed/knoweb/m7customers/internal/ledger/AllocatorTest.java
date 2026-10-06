@@ -19,16 +19,42 @@ class AllocatorTest {
     private static final UUID SAME_DAY_LATER = UUID.randomUUID();
     private static final UUID NEW = UUID.randomUUID();
 
+    private static final UUID NEW_RECEIPT = UUID.randomUUID();
+
     private static final List<OpenCharge> OPEN = List.of(
-            new OpenCharge(NEW, LocalDate.of(2026, 9, 5), Instant.parse("2026-09-05T04:00:00Z"), money("700")),
             new OpenCharge(
-                    SAME_DAY_LATER, LocalDate.of(2026, 9, 1), Instant.parse("2026-09-01T09:00:00Z"), money("300")),
-            new OpenCharge(OLD, LocalDate.of(2026, 9, 1), Instant.parse("2026-09-01T03:00:00Z"), money("1000")));
+                    NEW, NEW_RECEIPT, LocalDate.of(2026, 9, 5), Instant.parse("2026-09-05T04:00:00Z"), money("700")),
+            new OpenCharge(
+                    SAME_DAY_LATER,
+                    UUID.randomUUID(),
+                    LocalDate.of(2026, 9, 1),
+                    Instant.parse("2026-09-01T09:00:00Z"),
+                    money("300")),
+            new OpenCharge(
+                    OLD,
+                    UUID.randomUUID(),
+                    LocalDate.of(2026, 9, 1),
+                    Instant.parse("2026-09-01T03:00:00Z"),
+                    money("1000")));
 
     @Test
     void oldestFirstByBusinessDateThenByArrival() {
         assertThat(Allocator.oldestFirst(OPEN, money("1200")))
                 .containsExactly(new Allocation(OLD, money("1000")), new Allocation(SAME_DAY_LATER, money("200")));
+    }
+
+    /** Wave 2 (CR-27A-1 item 2): a void's credit undoes its own receipt's charge before anything older. */
+    @Test
+    void aCreditSettlesTheChargeOfItsOwnDocumentFirstThenOldestFirst() {
+        assertThat(Allocator.sameDocumentFirst(OPEN, NEW_RECEIPT, money("700")))
+                .containsExactly(new Allocation(NEW, money("700")));
+        assertThat(Allocator.sameDocumentFirst(OPEN, NEW_RECEIPT, money("900")))
+                .containsExactly(new Allocation(NEW, money("700")), new Allocation(OLD, money("200")));
+        // A refund's document matches no charge: oldest first, as a payment.
+        assertThat(Allocator.sameDocumentFirst(OPEN, UUID.randomUUID(), money("1200")))
+                .containsExactly(new Allocation(OLD, money("1000")), new Allocation(SAME_DAY_LATER, money("200")));
+        assertThat(Allocator.sameDocumentFirst(OPEN, null, money("100")))
+                .containsExactly(new Allocation(OLD, money("100")));
     }
 
     @Test

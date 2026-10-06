@@ -214,7 +214,15 @@ class ClaimHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         });
         assertThat(events(CreditNoteIssued.class)).singleElement().satisfies(event -> assertThat(event.grossAmount())
                 .isEqualByComparingTo("283.20"));
-        assertThat(events(JournalPostingsReady.class)).hasSize(1);
+        assertThat(events(JournalPostingsReady.class)).singleElement().satisfies(event -> {
+            assertThat(event.documentId()).isEqualTo(creditNoteId);
+            assertThat(event.businessDate())
+                    .isNotNull()
+                    .isEqualTo(TradingFixture.businessDateOf(superuserJdbc(), creditNoteId));
+            // The buyer's side rides along for the buyer's books (wave 2, CR-24A-3 item 5).
+            assertThat(event.counterpartyEntityId()).isEqualTo(BUYER);
+            assertThat(event.postings()).extracting(posting -> posting.side()).contains("SELLER", "BUYER");
+        });
 
         kernel.reset();
         refused(() -> approve.handle(new ApproveClaim(claimId, null, false, List.of()), seller()), "m4.claim.decided");

@@ -4,6 +4,7 @@ import static lk.coopfed.knoweb.m5inventory.InventoryFixture.own;
 import static lk.coopfed.knoweb.m5inventory.InventoryFixture.system;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,6 +64,9 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
 
     @Autowired
     ObjectMapper mapper;
+
+    @Autowired
+    lk.coopfed.knoweb.m5inventory.internal.control.BusinessDay businessDay;
 
     private InventoryFixture fixture;
     private UUID stores;
@@ -124,6 +128,61 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
         requests.onApproved(approved(requestId, "6"), system(SOCIETY));
         assertThat(queries.transfers(stores, own(SOCIETY))).hasSize(1);
         assertThat(events(TransferIssued.class)).isEmpty();
+    }
+
+    /** Wave 2, M5-03: a request is filled once; what could not be sent is flagged and counted, never dropped silently. */
+    @Test
+    void aRequestThatCannotBeFilledInFullIsSentShortAndTheShortLinesAreFlagged() {
+        UUID requestId = Ids.next();
+        UUID salt = fixture.sku(SOCIETY, "SALT1");
+        JsonNode payload = mapper.valueToTree(Map.of(
+                "requestId", requestId,
+                "ownerEntityId", SOCIETY,
+                "fromLocationId", stores,
+                "toLocationId", shop,
+                "lines",
+                        List.of(
+                                Map.of("lineId", Ids.next(), "skuId", sku, "qty", new BigDecimal("20")),
+                                Map.of("lineId", Ids.next(), "skuId", salt, "qty", new BigDecimal("5")))));
+
+        requests.onApproved(payload, system(SOCIETY));
+
+        TransferView transfer =
+                queries.transferOfRequest(requestId, own(SOCIETY)).orElseThrow();
+        assertThat(transfer.lines())
+                .extracting(TransferView.Line::batchId, line -> line.qty().intValue())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(early, 4), org.assertj.core.groups.Tuple.tuple(late, 10));
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("TRANSFER_REQUEST_SHORT"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after()))
+                        .contains(sku.toString(), "wanted=20", "sent=14", salt.toString(), "wanted=5", "sent=0"));
+        assertThat(events(TransferIssued.class)).singleElement().satisfies(event -> {
+            assertThat(event.transferRequestId()).isEqualTo(requestId);
+            assertThat(event.shortLines()).isEqualTo(2);
+        });
+    }
+
+    @Test
+    void anApprovedRequestNeverSendsAnExpiredLot() {
+        LocalDate today = businessDay.today();
+        UUID gone = fixture.batch(sku, SOCIETY, "G1", today.minusDays(2));
+        outer.run(
+                own(SOCIETY),
+                () -> ledger.post(
+                        new PostMovements(Ids.next(), null, null, List.of(receipt(stores, gone, "30"))), own(SOCIETY)));
+        kernel.reset();
+        UUID requestId = Ids.next();
+
+        requests.onApproved(approved(requestId, "6"), system(SOCIETY));
+        assumeTrue(today.equals(businessDay.today()), "the run crossed midnight in Colombo");
+
+        assertThat(queries.transferOfRequest(requestId, own(SOCIETY))
+                        .orElseThrow()
+                        .lines())
+                .extracting(TransferView.Line::batchId)
+                .containsExactly(early, late);
     }
 
     @Test

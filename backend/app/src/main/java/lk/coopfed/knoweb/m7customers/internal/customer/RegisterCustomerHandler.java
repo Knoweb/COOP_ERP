@@ -82,7 +82,7 @@ class RegisterCustomerHandler implements Handles<RegisterCustomer, UUID> {
         }
         String phone = PhoneNumbers.normalise(command.phone())
                 .orElseThrow(() -> new ProblemException("m7.customer.phone_invalid"));
-        List<UUID> previousHolders = reuse.guard(phone, null, command.confirmedIdentity(), scope);
+        ReuseDetector.Confirmed previousHolders = reuse.guard(phone, null, command.confirmedIdentity(), scope);
         List<String> consents = command.consents().stream().distinct().toList();
         for (String purpose : consents) {
             if (!PURPOSES.contains(purpose)) {
@@ -155,9 +155,7 @@ class RegisterCustomerHandler implements Handles<RegisterCustomer, UUID> {
         after.put("consents", consents);
         after.put("tags", tags);
         after.put("status", "ACTIVE");
-        if (!previousHolders.isEmpty()) {
-            after.put("previousHolders", previousHolders);
-        }
+        previousHolders.describe(after);
         audit.record(AUDIT_REGISTERED, Subject.of("customer", customerId), null, after, scope);
         events.publish(new CustomerRegistered(customerId, society));
         for (String purpose : consents) {

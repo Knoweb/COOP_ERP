@@ -7,7 +7,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -268,12 +272,75 @@ class LedgerServicePostgresIntegrationTest extends PostgresIntegrationTest {
                 .hasMessageContaining("internal command");
     }
 
+    // ---- crossings within one posting (wave 2, M5-07) ------------------------------------------
+
+    @Test
+    void aLotNegativeBeforeAndAfterOnePostingKeepsItsNegativePeriodAndRecordsNoCrossing() {
+        post(own(MPCS), Ids.next(), move(shop, batch, LotCondition.GOOD, MovementType.RECEIPT, "1", "50"));
+        List<PostedMovement> sale =
+                post(at(MPCS, shop), Ids.next(), move(shop, batch, LotCondition.GOOD, MovementType.SALE, "-4", null));
+        UUID lot = sale.get(0).stockLotId();
+        Object since = negativeSince(lot);
+        assertThat(since).isNotNull();
+        kernel.reset();
+
+        // -3, then +5 and -4 in one posting: the lot never stopped being negative in a committed state.
+        post(
+                own(MPCS),
+                Ids.next(),
+                move(shop, batch, LotCondition.GOOD, MovementType.RECEIPT, "5", "50"),
+                move(shop, batch, LotCondition.GOOD, MovementType.WRITE_OFF, "-4", null));
+
+        assertThat(negativeSince(lot)).isEqualTo(since);
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("STOCK_POSTED");
+        assertThat(events(LotNegative.class)).isEmpty();
+    }
+
+    @Test
+    void aLotNegativeOnlyBeforeOnePostingClearsOnceAndOneNegativeOnlyAfterGoesNegativeOnce() {
+        post(own(MPCS), Ids.next(), move(shop, batch, LotCondition.GOOD, MovementType.RECEIPT, "1", "50"));
+        List<PostedMovement> sale =
+                post(at(MPCS, shop), Ids.next(), move(shop, batch, LotCondition.GOOD, MovementType.SALE, "-4", null));
+        UUID lot = sale.get(0).stockLotId();
+        kernel.reset();
+
+        // -3, then -1 and +6: cleared, once.
+        post(
+                own(MPCS),
+                Ids.next(),
+                move(shop, batch, LotCondition.GOOD, MovementType.WRITE_OFF, "-1", null),
+                move(shop, batch, LotCondition.GOOD, MovementType.RECEIPT, "6", "50"));
+        assertThat(negativeSince(lot)).isNull();
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("STOCK_POSTED", "STOCK_LOT_NEGATIVE_CLEARED");
+        assertThat(events(LotNegative.class)).isEmpty();
+
+        kernel.reset();
+        // 2, then -5 and +1: negative, once, at its final quantity.
+        post(
+                own(MPCS),
+                Ids.next(),
+                move(shop, batch, LotCondition.GOOD, MovementType.WRITE_OFF, "-5", null),
+                move(shop, batch, LotCondition.GOOD, MovementType.RECEIPT, "1", "50"));
+        assertThat(negativeSince(lot)).isNotNull();
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("STOCK_POSTED", "STOCK_LOT_NEGATIVE");
+        assertThat(events(LotNegative.class)).singleElement().satisfies(e -> assertThat(e.qtyOnHand())
+                .isEqualByComparingTo("-2"));
+    }
+
     // ---- the property: balance equals the sum of movements under random interleavings -------
 
     @Test
     void lotBalancesAndTheEntityAverageEqualTheLedgerUnderConcurrentRandomPostings() throws Exception {
         int workers = 4;
-        int postingsEach = 15;
+        int postingsEach = 20;
+        UUID packs = fixture.sku(MPCS, "RICE1KG");
+        UUID packBatch = fixture.batch(packs, MPCS, "P2410", LocalDate.of(2027, 3, 31));
         ExecutorService pool = Executors.newFixedThreadPool(workers);
         try {
             List<Future<Integer>> results = new ArrayList<>();
@@ -281,15 +348,12 @@ class LedgerServicePostgresIntegrationTest extends PostgresIntegrationTest {
                 long seed = 1000L + w;
                 Callable<Integer> worker = () -> {
                     Random random = new Random(seed);
+                    Deque<BigDecimal[]> inTransit = new ArrayDeque<>();
+                    Deque<BigDecimal[]> repacked = new ArrayDeque<>();
                     int failures = 0;
                     for (int p = 0; p < postingsEach; p++) {
-                        List<Movement> movements = new ArrayList<>();
-                        int size = 1 + random.nextInt(3);
-                        for (int m = 0; m < size; m++) {
-                            movements.add(randomMovement(random));
-                        }
                         try {
-                            post(own(MPCS), Ids.next(), movements.toArray(Movement[]::new));
+                            randomPosting(random, packBatch, inTransit, repacked);
                         } catch (RuntimeException deadlockOrSerialization) {
                             failures++;
                         }
@@ -323,34 +387,137 @@ class LedgerServicePostgresIntegrationTest extends PostgresIntegrationTest {
                         UUID.class))
                 .as("lots whose balance is not the sum of their movements")
                 .isEmpty();
-        // The entity's quantity is the sum of all its movements of the SKU.
-        BigDecimal total = db.queryForObject(
-                "select sum(qty_delta) from inventory.stock_movement where sku_id = ?", BigDecimal.class, sku);
-        CostRow stored = costRow(MPCS, sku);
-        assertThat(stored.qtyOnHand()).isEqualByComparingTo(total);
-        // The average equals the one recomputed from scratch, replaying the ledger in the order
-        // the postings committed: one location, one source, so the dense sequence is that order.
-        CostRow replayed = CostRow.empty();
-        for (Map<String, Object> m : db.queryForList(
-                "select movement_type, qty_delta, unit_cost_at_movement from inventory.stock_movement"
-                        + " where sku_id = ? order by movement_seq",
-                sku)) {
-            replayed = CostService.apply(
-                    replayed,
-                    MovementType.valueOf((String) m.get("movement_type")),
-                    (BigDecimal) m.get("qty_delta"),
-                    (BigDecimal) m.get("unit_cost_at_movement"));
+        // A lot is flagged negative exactly while it is below zero (M5-07).
+        assertThat(db.queryForList(
+                        "select stock_lot_id from inventory.stock_lot"
+                                + " where (negative_since is null) <> (qty_on_hand >= 0)",
+                        UUID.class))
+                .as("lots whose negative flag disagrees with their sign")
+                .isEmpty();
+        // The movements in the order the postings committed. Every posting starts at the
+        // warehouse, and a posting holds the warehouse's sequence row until it commits, so the
+        // warehouse numbers order the postings; inside one, the warehouse's movements come first
+        // and the shop's after, each in its own sequence.
+        List<Map<String, Object>> ledgerRows = db.queryForList(
+                "select document_id, location_id, sku_id, movement_type, qty_delta, unit_cost_at_movement,"
+                        + " movement_seq from inventory.stock_movement");
+        Map<Object, Long> postingOrder = new HashMap<>();
+        for (Map<String, Object> m : ledgerRows) {
+            if (warehouse.equals(m.get("location_id"))) {
+                postingOrder.merge(m.get("document_id"), (Long) m.get("movement_seq"), Math::min);
+            }
         }
-        assertThat(stored.avgCost()).isEqualByComparingTo(replayed.avgCost());
-        assertThat(stored.avgCost().signum()).isGreaterThanOrEqualTo(0);
-        // The sequence is dense: 1..n with no gap and no repeat.
-        List<Long> seqs = db.queryForList(
-                "select movement_seq from inventory.stock_movement where location_id = ? order by 1",
-                Long.class,
-                warehouse);
-        for (int i = 0; i < seqs.size(); i++) {
-            assertThat(seqs.get(i)).isEqualTo(i + 1L);
+        ledgerRows.sort(Comparator.<Map<String, Object>>comparingLong(m -> postingOrder.get(m.get("document_id")))
+                .thenComparing(m -> warehouse.equals(m.get("location_id")) ? 0 : 1)
+                .thenComparingLong(m -> (Long) m.get("movement_seq")));
+        for (UUID theSku : List.of(sku, packs)) {
+            // The entity's quantity is the sum of all its movements of the SKU.
+            BigDecimal total = db.queryForObject(
+                    "select sum(qty_delta) from inventory.stock_movement where sku_id = ?", BigDecimal.class, theSku);
+            CostRow stored = costRow(MPCS, theSku);
+            assertThat(stored.qtyOnHand()).isEqualByComparingTo(total);
+            // The average equals the one recomputed from scratch from each movement's own
+            // recorded cost, replayed in commit order: an out movement replayed "at its recorded
+            // cost" is the same rule whether it left at the average or at a given cost, so the
+            // recorded costs alone decide the average, across the transfer pairs and the repacks.
+            CostRow replayed = CostRow.empty();
+            for (Map<String, Object> m : ledgerRows) {
+                if (theSku.equals(m.get("sku_id"))) {
+                    replayed = CostService.apply(
+                            replayed,
+                            MovementType.valueOf((String) m.get("movement_type")),
+                            (BigDecimal) m.get("qty_delta"),
+                            (BigDecimal) m.get("unit_cost_at_movement"));
+                }
+            }
+            assertThat(stored.avgCost()).as("the average of %s", theSku).isEqualByComparingTo(replayed.avgCost());
+            assertThat(stored.avgCost().signum()).isGreaterThanOrEqualTo(0);
         }
+        // The sequence is dense at each location: 1..n with no gap and no repeat.
+        for (UUID location : List.of(warehouse, shop)) {
+            List<Long> seqs = db.queryForList(
+                    "select movement_seq from inventory.stock_movement where location_id = ? order by 1",
+                    Long.class,
+                    location);
+            for (int i = 0; i < seqs.size(); i++) {
+                assertThat(seqs.get(i)).isEqualTo(i + 1L);
+            }
+        }
+        assertThat(db.queryForObject(
+                        "select count(*) from inventory.stock_movement where movement_type = 'TRANSFER_IN'",
+                        Integer.class))
+                .as("the run received transfers")
+                .isPositive();
+    }
+
+    /**
+     * One random posting, always starting at the warehouse: plain movements there; a transfer
+     * out to the shop; the shop receiving one of this worker's transfers at the cost it left
+     * with; a repack of the rice into packs; or the reversal of one of this worker's repacks,
+     * the packs going out at the repack's own cost.
+     */
+    private void randomPosting(
+            Random random, UUID packBatch, Deque<BigDecimal[]> inTransit, Deque<BigDecimal[]> repacked) {
+        String qty = BigDecimal.valueOf(1 + random.nextInt(20_000), 3).toPlainString();
+        int kind = random.nextInt(8);
+        if (kind == 0) {
+            List<PostedMovement> out = post(
+                    own(MPCS),
+                    Ids.next(),
+                    move(warehouse, batch, LotCondition.GOOD, MovementType.TRANSFER_OUT, "-" + qty, null));
+            inTransit.add(new BigDecimal[] {new BigDecimal(qty), out.get(0).unitCostAtMovement()});
+            return;
+        }
+        if (kind == 1 && !inTransit.isEmpty()) {
+            BigDecimal[] transfer = inTransit.poll();
+            post(
+                    own(MPCS),
+                    Ids.next(),
+                    randomMovement(random),
+                    new Movement(
+                            shop, batch, LotCondition.GOOD, MovementType.TRANSFER_IN, transfer[0], transfer[1], null));
+            return;
+        }
+        if (kind == 2) {
+            String packsMade = BigDecimal.valueOf(1 + random.nextInt(20_000), 3).toPlainString();
+            String cost = BigDecimal.valueOf(1 + random.nextInt(2_000_000), 4).toPlainString();
+            post(
+                    own(MPCS),
+                    Ids.next(),
+                    move(warehouse, batch, LotCondition.GOOD, MovementType.REPACK_CONSUME, "-" + qty, null),
+                    move(warehouse, packBatch, LotCondition.GOOD, MovementType.REPACK_PRODUCE, packsMade, cost));
+            repacked.add(new BigDecimal[] {new BigDecimal(qty), new BigDecimal(packsMade), new BigDecimal(cost)});
+            return;
+        }
+        if (kind == 3 && !repacked.isEmpty()) {
+            BigDecimal[] repack = repacked.poll();
+            post(
+                    own(MPCS),
+                    Ids.next(),
+                    new Movement(
+                            warehouse,
+                            packBatch,
+                            LotCondition.GOOD,
+                            MovementType.REPACK_CONSUME,
+                            repack[1].negate(),
+                            repack[2],
+                            null),
+                    new Movement(
+                            warehouse,
+                            batch,
+                            LotCondition.GOOD,
+                            MovementType.REPACK_PRODUCE,
+                            repack[0],
+                            BigDecimal.valueOf(1 + random.nextInt(2_000_000), 4),
+                            null));
+            return;
+        }
+        List<Movement> movements = new ArrayList<>();
+        int size = 1 + random.nextInt(3);
+        for (int m = 0; m < size; m++) {
+            movements.add(randomMovement(random));
+        }
+        post(own(MPCS), Ids.next(), movements.toArray(Movement[]::new));
     }
 
     private Movement randomMovement(Random random) {
@@ -395,6 +562,12 @@ class LedgerServicePostgresIntegrationTest extends PostgresIntegrationTest {
                 new BigDecimal(qty),
                 cost == null ? null : new BigDecimal(cost),
                 null);
+    }
+
+    private Object negativeSince(UUID lot) {
+        return superuserJdbc()
+                .queryForObject(
+                        "select negative_since from inventory.stock_lot where stock_lot_id = ?", Object.class, lot);
     }
 
     private CostRow costRow(UUID entity, UUID sku) {

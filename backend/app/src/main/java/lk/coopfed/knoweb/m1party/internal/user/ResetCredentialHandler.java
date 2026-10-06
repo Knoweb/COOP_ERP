@@ -48,6 +48,7 @@ class ResetCredentialHandler implements Handles<ResetCredential, CredentialReset
 
     private final AppUserRepository users;
     private final PinPolicy pinPolicy;
+    private final UserRank rank;
     private final IdentityProviderClient provider;
     private final TemporaryPasswordDelivery delivery;
     private final AuditFacade audit;
@@ -57,6 +58,7 @@ class ResetCredentialHandler implements Handles<ResetCredential, CredentialReset
     ResetCredentialHandler(
             AppUserRepository users,
             PinPolicy pinPolicy,
+            UserRank rank,
             IdentityProviderClient provider,
             TemporaryPasswordDelivery delivery,
             AuditFacade audit,
@@ -64,6 +66,7 @@ class ResetCredentialHandler implements Handles<ResetCredential, CredentialReset
             Clock clock) {
         this.users = users;
         this.pinPolicy = pinPolicy;
+        this.rank = rank;
         this.provider = provider;
         this.delivery = delivery;
         this.audit = audit;
@@ -91,6 +94,13 @@ class ResetCredentialHandler implements Handles<ResetCredential, CredentialReset
         if (!password && !secondFactor && !pin) {
             throw new ProblemException("m1.user.credential_invalid");
         }
+        // Whose credentials (CR-21A-7): not one's own second factor, and not a user who holds a
+        // sensitive permission the caller does not. The temporary password may then be returned
+        // to the caller, who equals or outranks the user it opens.
+        if (secondFactor) {
+            UserRank.requireNotOwnSecondFactor(user, scope);
+        }
+        rank.requireCallerNotOutranked(user, scope);
         if ((password || secondFactor) && !user.hasLogin()) {
             throw new ProblemException("m1.user.password_not_applicable", Map.of("userKind", user.userKind()));
         }

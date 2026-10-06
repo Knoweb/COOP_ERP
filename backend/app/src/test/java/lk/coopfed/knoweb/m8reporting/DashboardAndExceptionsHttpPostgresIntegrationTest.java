@@ -13,9 +13,15 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
+import lk.coopfed.knoweb.kernel.api.Scope;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.api.CreditLimitChanged;
 import lk.coopfed.knoweb.m4trading.api.ChequeBounced;
 import lk.coopfed.knoweb.m4trading.api.CreditNoteIssued;
 import lk.coopfed.knoweb.m4trading.api.DeliveryNoteDispatched;
@@ -35,9 +41,12 @@ import lk.coopfed.knoweb.m4trading.api.PaymentReceiptReversed;
 import lk.coopfed.knoweb.m4trading.api.RecordPaymentReceipt.Settlement;
 import lk.coopfed.knoweb.m5inventory.api.StockMoved;
 import lk.coopfed.knoweb.m8reporting.ProjectionHarness.Delivery;
+import lk.coopfed.knoweb.m8reporting.internal.projection.CreditLimitProjection;
 import lk.coopfed.knoweb.m8reporting.internal.projection.ShopSaleProjection;
 import lk.coopfed.knoweb.m8reporting.internal.projection.StockPositionProjection;
 import lk.coopfed.knoweb.m8reporting.internal.projection.TradeProjection;
+import lk.coopfed.knoweb.m8reporting.query.Dashboard;
+import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import lk.coopfed.knoweb.testsupport.TestIdentityProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -79,6 +88,7 @@ class DashboardAndExceptionsHttpPostgresIntegrationTest extends PostgresIntegrat
             "reporting.trade_document_link",
             "reporting.trade_settlement_fact",
             "reporting.exposure_warning_event",
+            "reporting.credit_limit_fact",
             "reporting.shop_sale_fact",
             "reporting.shop_sale_line_fact",
             "reporting.report_run");
@@ -97,6 +107,12 @@ class DashboardAndExceptionsHttpPostgresIntegrationTest extends PostgresIntegrat
 
     @Autowired
     ShopSaleProjection shopSales;
+
+    @Autowired
+    CreditLimitProjection creditLimits;
+
+    @Autowired
+    ReportingQueries queries;
 
     @Autowired
     Clock clock;
@@ -314,6 +330,16 @@ class DashboardAndExceptionsHttpPostgresIntegrationTest extends PostgresIntegrat
         for (Delivery event : events) {
             harness.deliver(event, trade::on);
         }
+        // The pair's limit, opened at 1,000 before the story (wave 2: the exposure view reads the
+        // current limit from credit_limit.changed.v1, not from the warning).
+        harness.deliver(
+                harness.event(
+                        CreditLimitChanged.TYPE,
+                        SELLER,
+                        earlier.minus(1, ChronoUnit.DAYS),
+                        new CreditLimitChanged(
+                                relationship, null, null, new BigDecimal("1000.00"), today, SELLER, BUYER)),
+                creditLimits::on);
 
         harness.deliver(
                 harness.event(
@@ -510,6 +536,140 @@ class DashboardAndExceptionsHttpPostgresIntegrationTest extends PostgresIntegrat
                         .get("code")
                         .asText())
                 .isEqualTo("m8.report.unknown");
+    }
+
+    /**
+     * Wave 2, M8-08 (decision D6): a pair with a limit that M4 never warned about is listed once
+     * its exposure reaches the lowest configured step, against its current limit; a raised limit
+     * takes it off.
+     */
+    @Test
+    void aPairWithALimitAndNoWarningIsListedAndARaisedLimitTakesItOff() {
+        UUID pair = Ids.next();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        harness.deliver(
+                harness.event(
+                        CreditLimitChanged.TYPE,
+                        SELLER,
+                        now.minus(1, ChronoUnit.DAYS),
+                        new CreditLimitChanged(pair, null, null, new BigDecimal("100.00"), today, SELLER, OTHER)),
+                creditLimits::on);
+        // 9 accepted at 10.00: 90.00 against 100.00 is 90 %, past the first step (80).
+        harness.deliver(
+                harness.event(
+                        OrderAccepted.TYPE,
+                        SELLER,
+                        now,
+                        new OrderAccepted(
+                                Ids.next(),
+                                pair,
+                                OTHER,
+                                SELLER,
+                                Ids.next(),
+                                null,
+                                null,
+                                List.of(new OrderLineSummary(
+                                        Ids.next(),
+                                        1,
+                                        Ids.next(),
+                                        "EA",
+                                        new BigDecimal("9"),
+                                        new BigDecimal("9"),
+                                        new BigDecimal("10.0000"))))),
+                trade::on);
+
+        List<JsonNode> listed =
+                exposures(get("/v1/reporting/exceptions", as(SELLER)).getBody(), OTHER);
+        assertThat(listed).hasSize(1);
+        assertThat(listed.get(0).get("subjectId").asText()).isEqualTo(pair.toString());
+        assertThat(new BigDecimal(listed.get(0).get("amount").asText())).isEqualByComparingTo("90.00");
+        assertThat(new BigDecimal(listed.get(0).get("percent").asText())).isEqualByComparingTo("90.0");
+
+        // The limit amended to 1,000 (a new relationship row): 9 %, below every step.
+        harness.deliver(
+                harness.event(
+                        CreditLimitChanged.TYPE,
+                        SELLER,
+                        now.plusSeconds(1),
+                        new CreditLimitChanged(
+                                Ids.next(),
+                                pair,
+                                new BigDecimal("100.00"),
+                                new BigDecimal("1000.00"),
+                                today,
+                                SELLER,
+                                OTHER)),
+                creditLimits::on);
+        assertThat(exposures(get("/v1/reporting/exceptions", as(SELLER)).getBody(), OTHER))
+                .isEmpty();
+    }
+
+    /**
+     * Wave 2, M8-06: the dashboard's cache is keyed by the whole visibility. Two auditors of one
+     * home entity whose grants differ read different dashboards inside the cache's window.
+     */
+    @Test
+    void twoExternalScopesOfOneHomeEntityGetTheirOwnDashboards() {
+        Dashboard granted = queries.dashboard(external(Set.of(BUYER)));
+        Dashboard other = queries.dashboard(external(Set.of(OTHER)));
+
+        // The buyer's open discrepancy, its dispute and its lot below zero.
+        assertThat(tileValue(granted, "exceptions")).isEqualByComparingTo("3");
+        assertThat(tileValue(other, "exceptions")).isEqualByComparingTo("0");
+        // And asked again, inside the window, each keeps its own.
+        assertThat(tileValue(queries.dashboard(external(Set.of(BUYER))), "exceptions"))
+                .isEqualByComparingTo("3");
+    }
+
+    /**
+     * Wave 2, decision D4: a shop session's dashboard leaves out what the entity is owed and owes
+     * and its exposure, entity-wide figures, rather than showing zeros or the entity's figures as
+     * the shop's.
+     */
+    @Test
+    void aShopSessionsDashboardLeavesOutTheEntityWideTiles() {
+        Dashboard atTheShop = queries.dashboard(ScopeContext.dev(USER, BUYER, shop));
+        assertThat(atTheShop.tiles())
+                .extracting(Dashboard.Tile::tileId)
+                .doesNotContain("receivables", "overdue-receivables", "payables", "overdue-payables", "exposure")
+                .contains("shop-sales");
+        Dashboard entityWide = queries.dashboard(ScopeContext.dev(USER, BUYER, null));
+        assertThat(entityWide.tiles()).extracting(Dashboard.Tile::tileId).contains("payables", "exposure");
+    }
+
+    private static ScopeContext external(Set<UUID> granted) {
+        Scope home = new Scope(TEST_FEDERATION, null);
+        return new ScopeContext(
+                USER,
+                null,
+                TEST_FEDERATION,
+                List.of(home),
+                home,
+                PolicyClass.EXTERNAL_TIMEBOXED,
+                granted,
+                null,
+                Locale.ENGLISH,
+                Ids.next());
+    }
+
+    private static BigDecimal tileValue(Dashboard dashboard, String tileId) {
+        return dashboard.tiles().stream()
+                .filter(tile -> tile.tileId().equals(tileId))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no tile " + tileId))
+                .value();
+    }
+
+    /** The exposure items of the queue with one counterparty. */
+    private static List<JsonNode> exposures(JsonNode queue, UUID counterparty) {
+        List<JsonNode> found = new ArrayList<>();
+        for (JsonNode item : queue) {
+            if (item.get("kind").asText().equals("EXPOSURE_WARNING")
+                    && item.get("counterpartyEntityId").asText().equals(counterparty.toString())) {
+                found.add(item);
+            }
+        }
+        return found;
     }
 
     // ---- helpers -----------------------------------------------------------------------------

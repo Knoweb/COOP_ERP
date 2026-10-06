@@ -1,6 +1,8 @@
 package lk.coopfed.knoweb.m7customers.internal.ledger;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -9,8 +11,16 @@ import org.springframework.stereotype.Component;
 
 /**
  * Reads of the posting ledger the handlers share (27A: "PostingService (insert-only, balance
- * recache)"). It only reads; the handlers write the postings and the balance themselves, since
- * only a command handler writes (AGENTS.md, the architecture tests).
+ * recache)"). It only reads; the handlers write the postings, the allocations and the balance
+ * themselves, since only a command handler writes (AGENTS.md, the architecture tests).
+ *
+ * <p>The two sides of the ledger (wave 2, M7CR-08; CR-27A-1 item 2). The <b>charge side</b> is a
+ * CHARGE or a positive ADJUSTMENT; what is open of it is its amount less its live allocations. The
+ * <b>credit side</b> is a PAYMENT, a REVERSAL, a CREDIT (a refund or a void) or a negative
+ * ADJUSTMENT; every one of them but the REVERSAL settles charges through {@code allocation} rows,
+ * exactly as a payment does. So {@code Σ open charges − unallocated = Σ charge side + Σ credit
+ * side = balance} by construction, which {@code AccountRemaindersIntegrationTest} checks under
+ * random interleavings.
  */
 @Component
 public class Ledger {
@@ -21,6 +31,20 @@ public class Ledger {
      */
     public static final String LIVE_ALLOCATION =
             " not exists (select 1 from customers.allocation_reversal r where r.allocation_id = a.allocation_id) ";
+
+    /** The credit side of the ledger, on alias {@code p}. */
+    public static final String CREDIT_SIDE =
+            " (p.kind in ('PAYMENT', 'REVERSAL', 'CREDIT') or (p.kind = 'ADJUSTMENT' and p.amount < 0)) ";
+
+    /** The charge side of the ledger, on alias {@code p}. */
+    public static final String CHARGE_SIDE = " (p.kind = 'CHARGE' or (p.kind = 'ADJUSTMENT' and p.amount > 0)) ";
+
+    /** One allocation row, for the handlers: allocation id, the settling posting, the charge, the amount, the owner. */
+    public static final String ALLOCATION_INSERT =
+            """
+            insert into customers.allocation (allocation_id, payment_posting_id, charge_posting_id, amount, owner_entity_id)
+            values (?, ?, ?, ?, ?)
+            """;
 
     /** The account row a posting handler locks: its customer, limit, flags and status. */
     public record LockedAccount(
@@ -33,6 +57,13 @@ public class Ledger {
             String status,
             String accountNo,
             BigDecimal offlineCap) {}
+
+    /**
+     * A credit-side posting with something not yet allocated to a charge: a payment that was not
+     * reversed, a refund or void, a negative adjustment. {@code open} is what it still holds.
+     */
+    public record OpenCredit(
+            UUID postingId, UUID documentId, LocalDate businessDate, Instant receivedAt, BigDecimal open) {}
 
     private final JdbcTemplate jdbc;
 
@@ -74,15 +105,14 @@ public class Ledger {
     }
 
     /**
-     * What payments hold beyond the charges they settled: the payments less their reversals, less
-     * the allocations still in force.
+     * What the credit side holds beyond the charges it settled: minus the sum of the credit side
+     * (payments and their reversals, refunds and voids, negative adjustments), less the
+     * allocations still in force.
      */
     public BigDecimal unallocated(UUID accountId) {
-        BigDecimal paid = jdbc.queryForObject(
-                """
-                select coalesce(-sum(amount), 0) from customers.account_posting
-                 where account_id = ? and kind in ('PAYMENT', 'REVERSAL')
-                """,
+        BigDecimal credited = jdbc.queryForObject(
+                "select coalesce(-sum(p.amount), 0) from customers.account_posting p where p.account_id = ? and"
+                        + CREDIT_SIDE,
                 BigDecimal.class,
                 accountId);
         BigDecimal allocated = jdbc.queryForObject(
@@ -93,7 +123,8 @@ public class Ledger {
                         + LIVE_ALLOCATION,
                 BigDecimal.class,
                 accountId);
-        return (paid == null ? BigDecimal.ZERO : paid).subtract(allocated == null ? BigDecimal.ZERO : allocated);
+        return (credited == null ? BigDecimal.ZERO : credited)
+                .subtract(allocated == null ? BigDecimal.ZERO : allocated);
     }
 
     /**
@@ -104,24 +135,60 @@ public class Ledger {
         return jdbc
                 .query(
                         """
-                        select p.posting_id, p.business_date, p.received_at,
+                        select p.posting_id, p.document_id, p.business_date, p.received_at,
                                p.amount - coalesce((select sum(a.amount) from customers.allocation a
                                                      where a.charge_posting_id = p.posting_id and"""
                                 + LIVE_ALLOCATION
                                 + """
                                 ), 0) as open
                           from customers.account_posting p
-                         where p.account_id = ? and (p.kind = 'CHARGE' or (p.kind = 'ADJUSTMENT' and p.amount > 0))
-                         order by p.business_date, p.received_at
-                        """,
+                         where p.account_id = ? and"""
+                                + CHARGE_SIDE
+                                + " order by p.business_date, p.received_at",
                         (rs, n) -> new Allocator.OpenCharge(
                                 rs.getObject("posting_id", UUID.class),
-                                rs.getObject("business_date", java.time.LocalDate.class),
+                                rs.getObject("document_id", UUID.class),
+                                rs.getObject("business_date", LocalDate.class),
                                 rs.getTimestamp("received_at").toInstant(),
                                 rs.getBigDecimal("open")),
                         accountId)
                 .stream()
                 .filter(charge -> charge.open().signum() > 0)
+                .toList();
+    }
+
+    /**
+     * The account's credit-side postings with something not yet allocated, oldest first: what a
+     * reversal re-applies to the charges it opened again (CR-27A-1 item 2). A reversed payment is
+     * not one of them: its allocations were undone and its reversal cancels it.
+     */
+    public List<OpenCredit> unallocatedCredits(UUID accountId) {
+        return jdbc
+                .query(
+                        """
+                        select p.posting_id, p.document_id, p.business_date, p.received_at,
+                               -p.amount - coalesce((select sum(a.amount) from customers.allocation a
+                                                      where a.payment_posting_id = p.posting_id and"""
+                                + LIVE_ALLOCATION
+                                + """
+                                ), 0) as open
+                          from customers.account_posting p
+                         where p.account_id = ?
+                           and (p.kind = 'CREDIT'
+                                or (p.kind = 'ADJUSTMENT' and p.amount < 0)
+                                or (p.kind = 'PAYMENT' and not exists (select 1 from customers.doc_customer_payment r
+                                                                         where r.reversal_of = p.document_id)))
+                         order by p.business_date, p.received_at
+                        """,
+                        (rs, n) -> new OpenCredit(
+                                rs.getObject("posting_id", UUID.class),
+                                rs.getObject("document_id", UUID.class),
+                                rs.getObject("business_date", LocalDate.class),
+                                rs.getTimestamp("received_at").toInstant(),
+                                rs.getBigDecimal("open")),
+                        accountId)
+                .stream()
+                .filter(credit -> credit.open().signum() > 0)
                 .toList();
     }
 }

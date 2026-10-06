@@ -4,8 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +20,8 @@ import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.AccountLimitsAmended;
 import lk.coopfed.knoweb.m7customers.api.AmendAccountLimits;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.NicCapture;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger.LockedAccount;
@@ -35,7 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@code m7.account.closed}); a reason; each amount zero or more in cents; something changes
  * ({@code m7.account.limits_unchanged}); when the limit goes up, a second factor presented within
  * {@code customers.limit_increase_mfa_max_age} ({@code mfa.required}; doc 27 section 4.2: "MFA
- * for limit increases"), as M1 asks for an entity's credit limit.
+ * for limit increases"), as M1 asks for an entity's credit limit; when the limit rises above
+ * {@code customers.nic_required_above_limit} and the customer holds no NIC, the NIC ({@link
+ * NicCapture}, {@code m7.account.nic_required}; wave 2, M7CR-03); the reason free of a phone
+ * number or NIC ({@code m7.field.personal_data}).
  *
  * <p>Mutation: the account's limit, hard block and offline cap; a LIMITS_AMENDED row in the
  * account's history with before, after and reason. The limit is never a reason to refuse a till's
@@ -47,21 +50,23 @@ import org.springframework.transaction.annotation.Transactional;
 class AmendAccountLimitsHandler implements Handles<AmendAccountLimits, UUID> {
 
     static final String AUDIT_AMENDED = "ACCOUNT_LIMIT_AMENDED";
-    static final String MFA_MAX_AGE = "customers.limit_increase_mfa_max_age";
-    static final Duration DEFAULT_MFA_MAX_AGE = Duration.ofMinutes(10);
+    static final String MFA_MAX_AGE = CustomerGuards.MFA_MAX_AGE;
 
     private final JdbcTemplate jdbc;
     private final Ledger ledger;
     private final ConfigRegistry config;
+    private final NicCapture nicCapture;
     private final CustomersClock clock;
     private final ObjectMapper json;
     private final AuditFacade audit;
     private final EventPublisher events;
 
+    @SuppressWarnings("java:S107") // the collaborators of one handler specification
     AmendAccountLimitsHandler(
             JdbcTemplate jdbc,
             Ledger ledger,
             ConfigRegistry config,
+            NicCapture nicCapture,
             CustomersClock clock,
             ObjectMapper json,
             AuditFacade audit,
@@ -69,6 +74,7 @@ class AmendAccountLimitsHandler implements Handles<AmendAccountLimits, UUID> {
         this.jdbc = jdbc;
         this.ledger = ledger;
         this.config = config;
+        this.nicCapture = nicCapture;
         this.clock = clock;
         this.json = json;
         this.audit = audit;
@@ -87,7 +93,7 @@ class AmendAccountLimitsHandler implements Handles<AmendAccountLimits, UUID> {
         if ("CLOSED".equals(account.status())) {
             throw new ProblemException("m7.account.closed");
         }
-        String reason = CustomerGuards.requiredText(command.reason(), "reason");
+        String reason = PersonalDataText.require(CustomerGuards.requiredText(command.reason(), "reason"), "reason");
         BigDecimal limit = command.creditLimit() == null
                 ? account.creditLimit()
                 : CustomerGuards.money(command.creditLimit(), "creditLimit");
@@ -100,10 +106,25 @@ class AmendAccountLimitsHandler implements Handles<AmendAccountLimits, UUID> {
                 && sameAmount(cap, account.offlineCap())) {
             throw new ProblemException("m7.account.limits_unchanged");
         }
-        if (limit.compareTo(account.creditLimit()) > 0) {
-            requireFreshMfa(scope);
+        boolean rises = limit.compareTo(account.creditLimit()) > 0;
+        if (rises) {
+            CustomerGuards.requireFreshMfa(config, clock, scope, "cus.account.manage");
+        }
+        // Wave 2, M7CR-03: a limit raised above customers.nic_required_above_limit needs the
+        // customer's NIC when none is recorded; a NIC offered is captured whatever the change.
+        // A cap or hard-block change alone never asks.
+        NicCapture.Captured nic = null;
+        boolean nicOffered = command.nic() != null && !command.nic().isBlank();
+        if (nicOffered
+                || (rises
+                        && limit.compareTo(CustomerGuards.nicRequiredAboveLimit(config, scope)) > 0
+                        && !holdsNic(account.customerId()))) {
+            nic = nicCapture.capture(command.nic(), account.customerId());
         }
 
+        if (nic != null) {
+            jdbc.update(NicCapture.WRITE_SQL, nic.hash(), nic.last4(), nic.keyId(), account.customerId());
+        }
         jdbc.update(
                 "update customers.customer_account set credit_limit = ?, hard_block = ?, offline_cap = ? where account_id = ?",
                 limit,
@@ -112,6 +133,7 @@ class AmendAccountLimitsHandler implements Handles<AmendAccountLimits, UUID> {
                 account.accountId());
         Map<String, Object> before = limits(account.creditLimit(), account.hardBlock(), account.offlineCap());
         Map<String, Object> after = limits(limit, hardBlock, cap);
+        after.put("nicCaptured", nic != null);
         jdbc.update(
                 """
                 insert into customers.account_history (history_id, account_id, action, before_value, after_value, reason,
@@ -133,13 +155,12 @@ class AmendAccountLimitsHandler implements Handles<AmendAccountLimits, UUID> {
         return account.accountId();
     }
 
-    /** The step-up of doc 27 section 4.2: a second factor presented within the configured age. */
-    private void requireFreshMfa(ScopeContext scope) {
-        Duration maxAge = config.getDuration(MFA_MAX_AGE, scope, DEFAULT_MFA_MAX_AGE);
-        Instant freshEnough = clock.now().minus(maxAge);
-        if (scope.mfaAt() == null || scope.mfaAt().isBefore(freshEnough)) {
-            throw new ProblemException("mfa.required", Map.of("permission", "cus.account.manage"));
-        }
+    private boolean holdsNic(UUID customerId) {
+        Integer held = jdbc.queryForObject(
+                "select count(*) from customers.customer where customer_id = ? and nic_hash is not null",
+                Integer.class,
+                customerId);
+        return held != null && held > 0;
     }
 
     private static boolean sameAmount(BigDecimal a, BigDecimal b) {

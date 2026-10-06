@@ -132,6 +132,21 @@ export function CreditNotePage() {
             <MoneyDisplay amount={cn.grossAmount} size="total" />
           </dd>
         </div>
+        {/* CR-24A-3 item 2: what was applied to invoices, and what is still held for the buyer. */}
+        <div className="document-header__fact">
+          <dt>{t("trading.creditnote.applied").text}</dt>
+          <dd>
+            <MoneyDisplay amount={cn.appliedAmount ?? cn.grossAmount} />
+          </dd>
+        </div>
+        {(cn.unappliedAmount ?? 0) > 0 && (
+          <div className="document-header__fact">
+            <dt>{t("trading.creditnote.unapplied").text}</dt>
+            <dd>
+              <MoneyDisplay amount={cn.unappliedAmount ?? 0} />
+            </dd>
+          </div>
+        )}
       </dl>
     </main>
   );

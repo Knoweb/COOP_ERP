@@ -4,17 +4,19 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import lk.coopfed.knoweb.m7customers.internal.privacy.PrivacyExporter;
 import lk.coopfed.knoweb.m7customers.query.PrivacyQueries;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The privacy requests, read under the caller's scope (row-level security filters). */
+/**
+ * The privacy requests, read under the caller's scope (row-level security filters). The access
+ * export is no read: it is handed over by {@code DownloadAccessExport}, a command, so that the
+ * hand-over is the officer's and audited (wave 2, M7CR-11).
+ */
 @Service
 @Transactional(readOnly = true)
 class PrivacyQueriesImpl implements PrivacyQueries {
@@ -28,11 +30,9 @@ class PrivacyQueriesImpl implements PrivacyQueries {
             """;
 
     private final JdbcTemplate jdbc;
-    private final PrivacyExporter exporter;
 
-    PrivacyQueriesImpl(JdbcTemplate jdbc, PrivacyExporter exporter) {
+    PrivacyQueriesImpl(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.exporter = exporter;
     }
 
     @Override
@@ -50,18 +50,6 @@ class PrivacyQueriesImpl implements PrivacyQueries {
     public Optional<RequestView> request(UUID requestId, ScopeContext scope) {
         return jdbc.query(SELECT + " where r.request_id = ?", PrivacyQueriesImpl::row, requestId).stream()
                 .findFirst();
-    }
-
-    @Override
-    public Optional<Map<String, Object>> accessExport(UUID requestId, ScopeContext scope) {
-        return request(requestId, scope)
-                .filter(r -> "ACCESS".equals(r.kind()) && "FULFILLED".equals(r.status()))
-                .filter(r -> !"ANONYMISED"
-                        .equals(jdbc.queryForObject(
-                                "select status from customers.customer where customer_id = ?",
-                                String.class,
-                                r.customerId())))
-                .map(r -> exporter.export(r.customerId()));
     }
 
     private static RequestView row(ResultSet rs, int n) throws SQLException {

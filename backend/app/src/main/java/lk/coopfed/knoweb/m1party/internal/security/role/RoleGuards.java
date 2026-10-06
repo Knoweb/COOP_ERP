@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m1party.internal.security.role;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -93,7 +94,8 @@ class RoleGuards {
     /**
      * The permission guards of CreateRole and AmendRole, in 21A's order: every code is in the
      * catalogue; the grantor holds every one; no FEDERATION-scope code outside a federation-owned
-     * role; no pair in ROLE mode; limits valid against each permission's schema.
+     * role; no pair in ROLE mode; limits valid against each permission's schema; and no limit
+     * above the grantor's own (CR-21A-7).
      *
      * @param federationOwned the role is a template or one of the Federation's own
      * @param sodEntity       the entity whose pairs apply; null for a template (defaults only)
@@ -132,6 +134,12 @@ class RoleGuards {
                         Map.of("permission", permission.permissionCode(), "field", problem.get()));
             }
         }
+
+        Map<String, Map<String, Object>> granted = new LinkedHashMap<>();
+        for (RolePermission permission : wanted) {
+            granted.putIfAbsent(permission.permissionCode(), permission.limits());
+        }
+        limitsWithinGrantor(scope, granted, catalogue);
     }
 
     /** "Nobody can grant a permission they do not themselves hold" (doc 19 section 3.2). */
@@ -141,6 +149,57 @@ class RoleGuards {
         if (!notHeld.isEmpty()) {
             throw new ProblemException(
                     "m1.role.permission_not_held", Map.of("permissions", String.join(", ", notHeld)));
+        }
+    }
+
+    /**
+     * AssignRole's grantor guard: the codes, as {@link #withinGrantor(ScopeContext, Collection)},
+     * then the limits the role grants them with.
+     *
+     * @param granted the role's permissions, code to limits (null when none)
+     */
+    void withinGrantor(ScopeContext scope, Map<String, Map<String, Object>> granted) {
+        withinGrantor(scope, granted.keySet());
+        limitsWithinGrantor(scope, granted, records.catalogue(granted.keySet()));
+    }
+
+    /**
+     * A granted limit never exceeds the grantor's own (wave 2, M1A-04; CR-21A-7;
+     * {@link RoleRules#aboveGrantor}): a grantor who approves up to Rs 25,000 cannot author,
+     * amend or assign a role that approves Rs 250,000, though the code check alone would pass.
+     */
+    private void limitsWithinGrantor(
+            ScopeContext scope,
+            Map<String, Map<String, Object>> granted,
+            Map<String, SecurityRecords.CatalogueEntry> catalogue) {
+        List<String> limited = granted.keySet().stream()
+                .filter(code ->
+                        catalogue.containsKey(code) && catalogue.get(code).limitsSchema() != null)
+                .sorted()
+                .toList();
+        if (limited.isEmpty()) {
+            return;
+        }
+        Map<String, List<Map<String, Object>>> holdings =
+                records.holdingLimits(scope.userId(), scope.entityId(), scope.locationId(), limited);
+        for (String code : limited) {
+            Optional<RoleRules.LimitExcess> excess = RoleRules.aboveGrantor(
+                    code,
+                    granted.get(code),
+                    catalogue.get(code).limitsSchema(),
+                    holdings.getOrDefault(code, List.of()));
+            if (excess.isPresent()) {
+                Map<String, Object> params = new LinkedHashMap<>();
+                params.put("permission", code);
+                params.put("field", excess.get().field());
+                params.put(
+                        "requested",
+                        excess.get().requested() == null
+                                ? "unlimited"
+                                : excess.get().requested().toPlainString());
+                params.put("grantorLimit", excess.get().grantorLimit().toPlainString());
+                throw new ProblemException("m1.role.limit_exceeds_grantor", params);
+            }
         }
     }
 

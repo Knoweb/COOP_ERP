@@ -13,7 +13,7 @@ import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import { StateChip } from "../../shell/components/StateChip";
 import { useInventoryApi, type Count } from "./inventoryApi";
 import { SkuLabel } from "./SkuLabel";
-import { countChip, countLinesOf, lotKey, varianceOf, type CountEntry } from "./stockControl";
+import { countChip, countedNow, countLinesOf, lotKey, varianceOf, type CountEntry } from "./stockControl";
 import { errorText, isSyntheticBatchNo } from "./stockView";
 import "./inventory.css";
 
@@ -171,7 +171,7 @@ export function CountPage() {
                           aria-label={t("inventory.count.counted_for", undefined, { batch: `${batch} ${t(`inventory.condition.${lot.condition}`).text}` }).text}
                           value={entry(key).counted}
                           disabled={!canRecord}
-                          onChange={(event) => setEntry(key, { counted: event.target.value })}
+                          onChange={(event) => setEntries({ ...entries, [key]: countedNow(entry(key), event.target.value) })}
                         />
                       </td>
                       <td className="numeric-cell">{variance === null ? "" : variance > 0 ? `+${variance}` : variance}</td>

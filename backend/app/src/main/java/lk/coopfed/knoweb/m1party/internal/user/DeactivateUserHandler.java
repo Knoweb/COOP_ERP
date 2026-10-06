@@ -27,7 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
  * holder of gov.user.manage in the entity (21A: Grant.lastAdminGuard; the entity would have
  * nobody left to manage its users, and the Federation holds no downward administration to
  * repair it, ADR-18); not the entity's responsible officer (doc 21 DR-1: the entity must name
- * another one first). "No open till session" waits for M6's query, as in M1-05.
+ * another one first); not a user who holds a sensitive permission the caller does not
+ * ({@link UserRank}, CR-21A-7). "No open till session" waits for M6's query, as in M1-05.
  */
 @Service
 @CommandHandler(permission = "gov.user.manage", requiresMfa = true)
@@ -37,6 +38,7 @@ class DeactivateUserHandler implements Handles<DeactivateUser, UUID> {
 
     private final AppUserRepository users;
     private final UserFacts facts;
+    private final UserRank rank;
     private final EntityLock lock;
     private final IdentityProviderClient provider;
     private final AuditFacade audit;
@@ -45,12 +47,14 @@ class DeactivateUserHandler implements Handles<DeactivateUser, UUID> {
     DeactivateUserHandler(
             AppUserRepository users,
             UserFacts facts,
+            UserRank rank,
             EntityLock lock,
             IdentityProviderClient provider,
             AuditFacade audit,
             EventPublisher events) {
         this.users = users;
         this.facts = facts;
+        this.rank = rank;
         this.lock = lock;
         this.provider = provider;
         this.audit = audit;
@@ -84,6 +88,7 @@ class DeactivateUserHandler implements Handles<DeactivateUser, UUID> {
         if (facts.isResponsibleOfficer(user.getId(), entityId)) {
             throw new ProblemException("m1.user.responsible_officer", Map.of("userId", user.getId()));
         }
+        rank.requireCallerNotOutranked(user, scope);
 
         Map<String, Object> before = user.auditState();
 

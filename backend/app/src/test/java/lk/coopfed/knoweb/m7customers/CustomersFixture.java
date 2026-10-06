@@ -14,6 +14,10 @@ public final class CustomersFixture {
     public static final UUID SOCIETY = UUID.fromString("0190f700-0000-7000-8000-000000000001");
     public static final UUID OTHER = UUID.fromString("0190f700-0000-7000-8000-000000000002");
     public static final UUID SHOP = UUID.fromString("0190f700-0000-7000-8000-000000000011");
+
+    /** A second shop of SOCIETY: what a snapshot change must reach beside the shop that sold. */
+    public static final UUID SHOP_2 = UUID.fromString("0190f700-0000-7000-8000-000000000012");
+
     public static final UUID OFFICE_USER = UUID.fromString("0190f700-0000-7000-8000-000000000021");
     public static final UUID OTHER_USER = UUID.fromString("0190f700-0000-7000-8000-000000000022");
     public static final UUID OFFICER_USER = UUID.fromString("0190f700-0000-7000-8000-000000000023");
@@ -76,6 +80,13 @@ public final class CustomersFixture {
                 """,
                 SHOP,
                 SOCIETY);
+        admin.update(
+                """
+                insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en, status)
+                values (?, ?, 'S2', 'SHOP', 'Junction shop', 'ACTIVE')
+                """,
+                SHOP_2,
+                SOCIETY);
     }
 
     /** Everything the M7 tests and the demo leave behind in the customers schema, and the CPRs. */
@@ -107,7 +118,9 @@ public final class CustomersFixture {
     public static void clean(JdbcTemplate admin) {
         cleanAllCustomers(admin);
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?)", SOCIETY, OTHER);
-        admin.update("delete from party.location where location_id = ?", SHOP);
+        admin.update("delete from kernel.change_log where owner_entity_id in (?, ?)", SOCIETY, OTHER);
+        admin.update("delete from kernel.location_snapshot_version where owner_entity_id in (?, ?)", SOCIETY, OTHER);
+        admin.update("delete from party.location where location_id in (?, ?)", SHOP, SHOP_2);
         admin.update("delete from party.entity_party_directory where entity_id in (?, ?)", SOCIETY, OTHER);
         admin.update("delete from party.entity where entity_id in (?, ?)", SOCIETY, OTHER);
     }

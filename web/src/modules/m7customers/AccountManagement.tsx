@@ -54,12 +54,21 @@ function LimitsForm({ account, customerId }: { account: Account; customerId: str
   const [hardBlock, setHardBlock] = useState(account.hardBlock);
   const [offlineCap, setOfflineCap] = useState(account.offlineCap == null ? "" : String(account.offlineCap));
   const [reason, setReason] = useState("");
+  const [nic, setNic] = useState("");
   const change = limitsChange(account, { creditLimit, hardBlock, offlineCap });
   const amend = useMutation({
-    mutationFn: () => api.amendLimits(account.accountId, { ...change, reason: reason.trim() }, key.current()),
+    mutationFn: () =>
+      api.amendLimits(
+        account.accountId,
+        // The NIC travels only when typed: the server asks for it (m7.account.nic_required) when
+        // the limit rises above the threshold and none is recorded yet (CR-27A-1).
+        { ...change, reason: reason.trim(), ...(nic.trim() === "" ? {} : { nic: nic.trim() }) },
+        key.current()
+      ),
     onSuccess: () => {
       key.next();
       setReason("");
+      setNic("");
       refresh();
     },
     onError: (error) => {
@@ -91,6 +100,12 @@ function LimitsForm({ account, customerId }: { account: Account; customerId: str
         {t("customers.reason").text}
         <input maxLength={200} required value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
+      {raisesLimit(account, change) && (
+        <label className="customers-field">
+          {t("customers.limits.nic").text}
+          <input maxLength={20} autoComplete="off" value={nic} onChange={(e) => setNic(e.target.value)} />
+        </label>
+      )}
       {raisesLimit(account, change) && <p role="note">{t("customers.limits.step_up").text}</p>}
       <button type="submit" disabled={amend.isPending || change === null || reason.trim() === ""}>
         {t("customers.limits.submit").text}

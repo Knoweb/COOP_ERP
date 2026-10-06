@@ -61,7 +61,9 @@ final class LedgerGuards {
             throw new ProblemException(
                     "m5.ledger.cost_required", Map.of("type", m.type().name()));
         }
-        if (m.unitCost() != null && m.unitCost().stripTrailingZeros().scale() > CostService.COST_SCALE) {
+        if (m.unitCost() != null
+                && (m.unitCost().signum() < 0
+                        || m.unitCost().stripTrailingZeros().scale() > CostService.COST_SCALE)) {
             throw new ProblemException(
                     "m5.ledger.cost_invalid", Map.of("cost", m.unitCost().toPlainString()));
         }

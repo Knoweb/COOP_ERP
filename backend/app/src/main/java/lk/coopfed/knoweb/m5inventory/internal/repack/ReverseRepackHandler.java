@@ -34,8 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
  * its lot holds exactly what was produced and nothing but the repack moved it
  * ({@code m5.repack.output_touched}: after a sale the correction is a write-off or a second recipe).
  *
- * <p>Mutation: REPACK_CONSUME of the whole output and REPACK_PRODUCE of the input quantity back at
- * the cost it left with, both citing the repack; the reversal row (the repack is REVERSED because
+ * <p>Mutation: REPACK_CONSUME of the whole output at the repack's output cost (an out movement at a
+ * given cost, so the output item's average loses exactly what the repack added) and REPACK_PRODUCE
+ * of the input quantity back at the cost it left with, both citing the repack; the reversal row (the repack is REVERSED because
  * it exists). Audit {@code REPACK_REVERSED} with the reason; event {@code repack.reversed.v1}.
  */
 @Service
@@ -95,7 +96,10 @@ class ReverseRepackHandler implements Handles<ReverseRepack, UUID> {
                                         LotCondition.GOOD,
                                         MovementType.REPACK_CONSUME,
                                         repack.actualOutputQty().negate(),
-                                        null,
+                                        // out at the repack's own output cost, not the output
+                                        // item's average of today: the reversal removes exactly
+                                        // the value the repack added (wave 2, M5-17)
+                                        repack.outputUnitCost(),
                                         null),
                                 new Movement(
                                         repack.locationId(),

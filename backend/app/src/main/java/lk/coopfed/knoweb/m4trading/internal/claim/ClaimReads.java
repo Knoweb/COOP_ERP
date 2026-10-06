@@ -122,14 +122,25 @@ public class ClaimReads {
                 .map(Timestamp::toInstant);
     }
 
-    /** What earlier claims not rejected hold of a GRN line: a line is not claimed twice over. */
+    /**
+     * What earlier claims hold of a GRN line, so a line is not claimed twice over: an undecided
+     * claim holds what it claimed, an approved one only what the seller approved, a rejected one
+     * nothing. A partial approval decides the approved quantity only, and the rest is free to
+     * claim again, as a rejection frees the whole (decision A-2, wave 2 M4MONEY-13); the seller
+     * decides every re-claim, and the per-line credit cap ({@code InvoiceCredits}) stops a double
+     * credit whatever is claimed.
+     */
     public BigDecimal claimedBefore(UUID grnLineId) {
         BigDecimal held = jdbc.queryForObject(
                 """
-                select coalesce(sum(l.claimed_qty), 0) from trading.doc_claim_line l
+                select coalesce(sum(case
+                           when d.decision = 'REJECTED' then 0
+                           when d.decision = 'APPROVED' then coalesce(dl.approved_qty, 0)
+                           else l.claimed_qty end), 0)
+                  from trading.doc_claim_line l
+                  left join trading.claim_decision d on d.claim_document_id = l.document_id
+                  left join trading.claim_decision_line dl on dl.claim_line_id = l.line_id
                  where l.grn_line_id = ?
-                   and not exists (select 1 from trading.claim_decision d
-                                    where d.claim_document_id = l.document_id and d.decision = 'REJECTED')
                 """,
                 BigDecimal.class,
                 grnLineId);
