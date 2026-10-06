@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.m7customers.internal.consumers;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import lk.coopfed.knoweb.m7customers.api.AccountCharged;
 import lk.coopfed.knoweb.m7customers.api.AccountCredited;
 import lk.coopfed.knoweb.m7customers.api.PostAccountTender;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.ledger.Allocator;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger.LockedAccount;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,19 +34,29 @@ import org.springframework.transaction.annotation.Transactional;
  *       (ACCOUNT_LIMIT_BREACH), and an ALERT (HARD_BLOCK_BYPASSED_OFFLINE) when the account is hard
  *       blocked and the till was offline;</li>
  *   <li>a CHARGE on an account that is SUSPENDED or CLOSED is posted with a REVIEW
- *       (ACCOUNT_CHARGED_NOT_OPEN), and an offline CHARGE above the account's offline cap with a
- *       REVIEW (ACCOUNT_OFFLINE_CAP_EXCEEDED): the till's snapshot was stale;</li>
- *   <li>a tender naming an account the society does not have (or not at all) is not posted, and a
- *       REVIEW (ACCOUNT_TENDER_UNKNOWN) names the receipt, so the society can follow it up.</li>
+ *       (ACCOUNT_CHARGED_NOT_OPEN), one on a customer who is INACTIVE or ANONYMISED with a REVIEW
+ *       (ACCOUNT_CHARGED_CUSTOMER_INACTIVE; wave 2, M7CR-05 and M7CR-09), and an offline CHARGE
+ *       above the account's offline cap with a REVIEW (ACCOUNT_OFFLINE_CAP_EXCEEDED): the till's
+ *       snapshot was stale;</li>
+ *   <li>a tender naming an account the society does not have is not posted, and a REVIEW
+ *       (ACCOUNT_TENDER_UNKNOWN) names the receipt, so the society can follow it up;</li>
+ *   <li>a tender central cannot post (wave 2, M7CR-06: no account, no amount, no business date,
+ *       no tender number, an amount of zero or less, or one with more than two decimals) is not
+ *       posted either, and a REVIEW (ACCOUNT_TENDER_MALFORMED) names the receipt, the fields that
+ *       were missing and the amount as text; posting a rounded amount would record an amount the
+ *       till did not send.</li>
  * </ul>
- * Guards (the shape a till cannot send if it follows the contract): the society's OWN scope; a
- * kind, an account, an amount above zero, the receipt and its business date ({@code
- * m7.tender.malformed}). The same tender posted again (a redelivery) returns the first posting.
+ * Guards (what makes the fact unusable even as a flag): the society's OWN scope; a kind and the
+ * receipt's document id ({@code m7.tender.malformed}: the gateway's bundle validation makes that
+ * a contract breach, and there is no subject to hang a REVIEW on). The same tender posted again
+ * (a redelivery) returns the first posting; that check runs under the account's lock (M7CR-07).
  *
- * <p>Mutation: the posting (CHARGE positive, CREDIT negative) at the receipt's shop, the balance
- * recomputed as the sum of the postings. Audit ACCOUNT_CHARGED or ACCOUNT_CREDITED; events
- * account.charged.v1 or account.credited.v1. Permission: the system applies it for the till with
- * no user, so none is checked there; cus.customer.view is the code of the account reads.
+ * <p>Mutation: the posting (CHARGE positive, CREDIT negative) at the receipt's shop; for a CREDIT
+ * the allocation rows that settle charges (its own receipt's charge first, then oldest first:
+ * CR-27A-1 item 2); the balance recomputed as the sum of the postings. Audit ACCOUNT_CHARGED or
+ * ACCOUNT_CREDITED; events account.charged.v1 or account.credited.v1. Permission: the system
+ * applies it for the till with no user, so none is checked there; cus.customer.view is the code
+ * of the account reads.
  */
 @Service
 @CommandHandler(permission = "cus.customer.view")
@@ -55,7 +67,9 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
     static final String AUDIT_BREACH = "ACCOUNT_LIMIT_BREACH";
     static final String AUDIT_BYPASSED = "HARD_BLOCK_BYPASSED_OFFLINE";
     static final String AUDIT_UNKNOWN = "ACCOUNT_TENDER_UNKNOWN";
+    static final String AUDIT_MALFORMED = "ACCOUNT_TENDER_MALFORMED";
     static final String AUDIT_NOT_OPEN = "ACCOUNT_CHARGED_NOT_OPEN";
+    static final String AUDIT_CUSTOMER_INACTIVE = "ACCOUNT_CHARGED_CUSTOMER_INACTIVE";
     static final String AUDIT_OVER_CAP = "ACCOUNT_OFFLINE_CAP_EXCEEDED";
 
     private final JdbcTemplate jdbc;
@@ -75,27 +89,22 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
     public UUID handle(PostAccountTender command, ScopeContext scope) {
         CustomerGuards.requireOwnScope(scope);
         if (command == null
-                || command.accountId() == null
                 || command.receiptDocumentId() == null
-                || command.businessDate() == null
-                || command.amount() == null
-                || command.amount().signum() <= 0
                 || !(PostAccountTender.CHARGE.equals(command.kind())
                         || PostAccountTender.CREDIT.equals(command.kind()))) {
             throw new ProblemException("m7.tender.malformed");
         }
-        List<UUID> posted = jdbc.queryForList(
-                """
-                select posting_id from customers.account_posting
-                 where document_id = ? and account_id = ? and kind = ? and tender_seq = ?
-                """,
-                UUID.class,
-                command.receiptDocumentId(),
-                command.accountId(),
-                command.kind(),
-                command.tenderSeq());
-        if (!posted.isEmpty()) {
-            return posted.get(0);
+        Subject receipt = Subject.of("document", command.receiptDocumentId());
+        List<String> missing = missingFields(command);
+        if (!missing.isEmpty()) {
+            Map<String, Object> flagged = new LinkedHashMap<>();
+            flagged.put("kind", command.kind());
+            flagged.put("receiptNumber", command.receiptNumber());
+            flagged.put("missing", missing);
+            flagged.put(
+                    "amount", command.amount() == null ? null : command.amount().toPlainString());
+            audit.record(AUDIT_MALFORMED, receipt, null, flagged, scope);
+            return null;
         }
 
         LockedAccount account = ledger.lock(command.accountId()).orElse(null);
@@ -104,12 +113,30 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
             flagged.put("accountId", command.accountId());
             flagged.put("receiptNumber", command.receiptNumber());
             flagged.put("amount", command.amount());
-            audit.record(AUDIT_UNKNOWN, Subject.of("document", command.receiptDocumentId()), null, flagged, scope);
+            audit.record(AUDIT_UNKNOWN, receipt, null, flagged, scope);
             return null;
         }
+        // Under the lock (wave 2, M7CR-07): two deliveries of one tender serialise here.
+        List<UUID> posted = jdbc.queryForList(
+                """
+                select posting_id from customers.account_posting
+                 where document_id = ? and account_id = ? and kind = ? and tender_seq = ?
+                """,
+                UUID.class,
+                command.receiptDocumentId(),
+                account.accountId(),
+                command.kind(),
+                command.tenderSeq());
+        if (!posted.isEmpty()) {
+            return posted.get(0);
+        }
         boolean charge = PostAccountTender.CHARGE.equals(command.kind());
-        BigDecimal amount = charge ? command.amount() : command.amount().negate();
+        BigDecimal amount = charge
+                ? command.amount().setScale(2)
+                : command.amount().setScale(2).negate();
         boolean breach = charge && account.balance().add(amount).compareTo(account.creditLimit()) > 0;
+        String customerStatus = jdbc.queryForObject(
+                "select status from customers.customer where customer_id = ?", String.class, account.customerId());
 
         UUID postingId = Ids.next();
         UUID location = scope.locationId() != null ? scope.locationId() : command.locationId();
@@ -132,6 +159,22 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
                 command.offline(),
                 breach,
                 account.ownerEntityId());
+        int settled = 0;
+        if (!charge) {
+            // A refund or a void settles charges like a payment (CR-27A-1 item 2).
+            List<Allocator.Allocation> allocations = Allocator.sameDocumentFirst(
+                    ledger.openCharges(account.accountId()), command.receiptDocumentId(), amount.negate());
+            for (Allocator.Allocation allocation : allocations) {
+                jdbc.update(
+                        Ledger.ALLOCATION_INSERT,
+                        Ids.next(),
+                        postingId,
+                        allocation.chargePostingId(),
+                        allocation.amount(),
+                        account.ownerEntityId());
+            }
+            settled = allocations.size();
+        }
         BigDecimal balance = ledger.sum(account.accountId());
         jdbc.update(
                 "update customers.customer_account set balance = ? where account_id = ?", balance, account.accountId());
@@ -145,6 +188,9 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
         after.put("offline", command.offline());
         after.put("balance", balance);
         after.put("limitBreached", breach);
+        if (!charge) {
+            after.put("charges", settled);
+        }
         Subject subject = Subject.of("customer_account", account.accountId());
         audit.record(
                 charge ? AUDIT_CHARGED : AUDIT_CREDITED, subject, Map.of("balance", account.balance()), after, scope);
@@ -167,6 +213,14 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
             review.put("receiptNumber", command.receiptNumber());
             review.put("amount", amount);
             audit.record(AUDIT_NOT_OPEN, subject, null, review, scope);
+        }
+        if (charge && !"ACTIVE".equals(customerStatus)) {
+            // An INACTIVE customer left the snapshot; an ANONYMISED one was erased after the
+            // offline window (CR-27A-1 item 3). The society settles it through REOPEN.
+            Map<String, Object> review = new LinkedHashMap<>();
+            review.put("status", customerStatus);
+            review.put("receiptNumber", command.receiptNumber());
+            audit.record(AUDIT_CUSTOMER_INACTIVE, subject, null, review, scope);
         }
         if (charge && command.offline() && account.offlineCap() != null && amount.compareTo(account.offlineCap()) > 0) {
             Map<String, Object> review = new LinkedHashMap<>();
@@ -197,5 +251,27 @@ public class PostAccountTenderHandler implements Handles<PostAccountTender, UUID
                     balance));
         }
         return postingId;
+    }
+
+    /** The fields a tender must carry to be posted; what is missing is what the REVIEW names. */
+    static List<String> missingFields(PostAccountTender command) {
+        List<String> missing = new ArrayList<>();
+        if (command.accountId() == null) {
+            missing.add("customer_account_id");
+        }
+        if (command.amount() == null) {
+            missing.add("amount");
+        } else if (command.amount().signum() <= 0) {
+            missing.add("amount_not_positive");
+        } else if (command.amount().stripTrailingZeros().scale() > 2) {
+            missing.add("amount_scale");
+        }
+        if (command.businessDate() == null) {
+            missing.add("business_date");
+        }
+        if (command.tenderSeq() == null) {
+            missing.add("seq");
+        }
+        return List.copyOf(missing);
     }
 }
