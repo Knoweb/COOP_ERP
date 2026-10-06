@@ -156,18 +156,25 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aNumberADeviceIssuedRaisesTheSeriesButNeverLowersIt() {
-        UUID seriesId = inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+    void aNumberADeviceIssuedRaisesItsOwnSeriesButNeverLowersIt() {
+        UUID seriesId = inScope(
+                BUYER,
+                () -> numbering.registerSeries(
+                        SeriesRegistration.forTillPosition("RCT", BUYER, LOCATION, POSITION, "M042", "S01", 1, DEVICE),
+                        scope(BUYER)));
         kernel.reset();
+        ScopeContext till = deviceAt(BUYER, LOCATION, DEVICE);
 
-        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(seriesId, 5)))
-                .isTrue();
-        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(seriesId, 3)))
-                .isFalse();
-        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(seriesId, 5)))
-                .isFalse();
-        assertThat(inScope(BUYER, () -> numbering.observeDeviceNumber(Ids.next(), 9)))
-                .isFalse();
+        assertThat(inScopeAt(BUYER, LOCATION, () -> numbering.observeDeviceNumber(seriesId, 5, till)))
+                .isEqualTo(new NumberingService.Observed(NumberingService.Outcome.RAISED, 1L));
+        assertThat(inScopeAt(BUYER, LOCATION, () -> numbering.observeDeviceNumber(seriesId, 3, till)))
+                .isEqualTo(new NumberingService.Observed(NumberingService.Outcome.ALREADY_PAST, 6L));
+        assertThat(inScopeAt(BUYER, LOCATION, () -> numbering.observeDeviceNumber(seriesId, 5, till)))
+                .isEqualTo(new NumberingService.Observed(NumberingService.Outcome.ALREADY_PAST, 6L));
+        assertThat(inScopeAt(BUYER, LOCATION, () -> numbering
+                        .observeDeviceNumber(Ids.next(), 9, till)
+                        .outcome()))
+                .isEqualTo(NumberingService.Outcome.UNKNOWN);
 
         assertThat(superuserJdbc()
                         .queryForObject(
@@ -178,6 +185,66 @@ class DocumentBasePostgresIntegrationTest extends PostgresIntegrationTest {
         // Derived from the applied document, whose own audit names the number.
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    /**
+     * Wave 2, M6-04: a device raises only its own series at its own shop. The society's ENTITY
+     * series (its order or invoice numbering) and a series another device holds are FOREIGN and
+     * stay where they were, whatever number a till's document carries.
+     */
+    @Test
+    void aDeviceNeverRaisesASeriesThatIsNotItsOwnAtItsShop() {
+        UUID entitySeries = inScope(BUYER, () -> numbering.registerSeries(orderSeries(), scope(BUYER)));
+        UUID othersSeries = inScope(
+                BUYER,
+                () -> numbering.registerSeries(
+                        SeriesRegistration.forTillPosition("RCT", BUYER, LOCATION, POSITION, "M042", "S01", 1, DEVICE),
+                        scope(BUYER)));
+        UUID stranger = Ids.next();
+        ScopeContext otherTill = deviceAt(BUYER, LOCATION, stranger);
+        ScopeContext tillElsewhere = deviceAt(BUYER, Ids.next(), DEVICE);
+
+        assertThat(inScopeAt(BUYER, LOCATION, () -> numbering
+                        .observeDeviceNumber(entitySeries, 90_000, otherTill)
+                        .outcome()))
+                .isEqualTo(NumberingService.Outcome.FOREIGN);
+        assertThat(inScopeAt(BUYER, LOCATION, () -> numbering
+                        .observeDeviceNumber(othersSeries, 50, otherTill)
+                        .outcome()))
+                .isEqualTo(NumberingService.Outcome.FOREIGN);
+        assertThat(inScope(BUYER, () -> numbering
+                        .observeDeviceNumber(othersSeries, 50, tillElsewhere)
+                        .outcome()))
+                .isEqualTo(NumberingService.Outcome.FOREIGN);
+        assertThat(inScope(BUYER, () -> numbering
+                        .observeDeviceNumber(othersSeries, 50, scope(BUYER))
+                        .outcome()))
+                .as("a scope without a device raises nothing")
+                .isEqualTo(NumberingService.Outcome.UNKNOWN);
+
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select next_number from kernel.numbering_series where series_id in (?, ?)",
+                                Long.class,
+                                entitySeries,
+                                othersSeries))
+                .containsOnly(1L);
+    }
+
+    /** A till's scope as the consumer framework delivers its event: OWN at its shop, the device on it. */
+    private static ScopeContext deviceAt(UUID entity, UUID location, UUID device) {
+        Scope active = new Scope(entity, location);
+        return new ScopeContext(
+                null,
+                device,
+                entity,
+                List.of(active),
+                active,
+                PolicyClass.OWN,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                Ids.next());
     }
 
     // ---- issuance ----------------------------------------------------------------------------

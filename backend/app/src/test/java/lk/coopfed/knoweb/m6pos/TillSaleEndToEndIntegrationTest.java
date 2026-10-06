@@ -402,6 +402,76 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(nextNumber()).isEqualTo(2L);
     }
 
+    /**
+     * Wave 2, M6-01 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md
+     * (1)): a receipt the till sent in the wrong shape (here two lines with the same line_no,
+     * under a hash that matches) is quarantined at the gateway, before the outbox, so it reaches
+     * none of the modules that consume the same event: M6 records no receipt, M5 deducts no stock,
+     * M7 posts no tender, M8 counts no sale. The session and the good receipt after it are applied.
+     */
+    @Test
+    void aMalformedReceiptIsQuarantinedAtTheGatewayAndReachesNoModule() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID malformed = till.sell(
+                List.of(
+                        new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00")),
+                        new Sale("4790001000028", BigDecimal.ONE, new BigDecimal("380.00"))),
+                payload -> {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> lines = (List<Map<String, Object>>) payload.get("lines");
+                    lines.get(1).put("line_no", 1);
+                });
+        UUID good = till.sell(List.of(new Sale("4790001000035", BigDecimal.ONE, new BigDecimal("95.00"))));
+        till.drain(50, Instant.now().plusSeconds(30));
+        assertThat(till.pending()).isZero();
+
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select reason from kernel.sync_quarantine where device_id = ?", String.class, DEVICE))
+                .containsExactly("SCHEMA");
+        assertThat(outboxOf(DEVICE))
+                .extracting(OutboxMessage::aggregateId)
+                .doesNotContain(malformed)
+                .contains(good);
+
+        deliverTheTillsEvents();
+
+        assertThat(pos.receipts(SHOP, own(MPCS)))
+                .extracting(r -> r.documentId())
+                .containsExactly(good);
+        assertThat(onHand(rice))
+                .as("M5 deducted nothing for the quarantined receipt")
+                .isEqualByComparingTo("10");
+        assertThat(onHand(dhal)).isEqualByComparingTo("10");
+        assertThat(onHand(soap)).isEqualByComparingTo("9");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?",
+                                Long.class,
+                                malformed))
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from reporting.shop_sale_fact where receipt_id = ?",
+                                Long.class,
+                                malformed))
+                .as("M8 counted no sale")
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from kernel.event_outbox where source = ? and aggregate_id = ?",
+                                Long.class,
+                                DEVICE.toString(),
+                                malformed))
+                .as("no consumer (M5, M6, M7 m7.tenders, M8) can see what never reached the outbox")
+                .isZero();
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("SYNC_EVENT_QUARANTINED");
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {

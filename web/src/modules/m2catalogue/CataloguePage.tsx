@@ -13,6 +13,7 @@ import "./catalogue.css";
 const STATUSES: SkuStatus[] = ["DRAFT", "LOCAL", "SHARED", "INACTIVE"];
 
 function SkuThumbnail({ skuId }: { skuId: string }) {
+  const t = useT();
   const api = useCatalogueApi();
   const images = useQuery({ 
     queryKey: ["catalogue", "images", skuId], 
@@ -43,7 +44,7 @@ function SkuThumbnail({ skuId }: { skuId: string }) {
   if (displayUrl) {
     return (
       <div className="catalogue-thumbnail-container">
-        <img src={displayUrl} alt="Thumbnail" className="catalogue-thumbnail-image" />
+        <img src={displayUrl} alt={t("catalogue.images.thumb_alt").text} className="catalogue-thumbnail-image" />
       </div>
     );
   }

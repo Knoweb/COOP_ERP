@@ -37,7 +37,7 @@ public class CommandInterceptor {
             IdempotencyStore idempotency,
             ObjectMapper mapper,
             PermissionGate gate,
-            @Value("${coop-erp.security.enforce-permissions:false}") boolean enforcePermissions) {
+            @Value("${coop-erp.security.enforce-permissions:true}") boolean enforcePermissions) {
         this.idempotency = idempotency;
         this.mapper = mapper;
         this.gate = gate;

@@ -788,3 +788,34 @@ config_items:
     change_permission: sys.config.manage
     sensitive: true
     module: m7customers
+  # wave 2, PR 03 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-kernel-defaults-and-limits.md
+  # (4), (5) and 2026-10-06-wave2-till-facts-at-the-gateway.md (5)): the device's other sync calls
+  # per minute, how long a resolved quarantine row keeps its raw event, and the browsers one
+  # instance runs at once to print.
+  - key: sync.rate.requests_per_minute
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 6000 }
+    description_en: How many snapshot, change-log, heartbeat and attachment calls one till may make in a minute before it is told to wait
+    description_si: රැඳී සිටින ලෙස දැනුම් දීමට පෙර එක් මුදල් ලේඛනයකට විනාඩියකදී කළ හැකි ස්නැප්ෂොට්, වෙනස් කිරීම් ලොග්, හෘද ස්පන්දන සහ ඇමුණුම් ඇමතුම් ගණන
+    description_ta: காத்திருக்கச் சொல்லப்படும் முன் ஒரு பணப்பெட்டி ஒரு நிமிடத்தில் செய்யக்கூடிய ஸ்னாப்ஷாட், மாற்றப் பதிவு, இதயத்துடிப்பு மற்றும் இணைப்பு அழைப்புகள்
+    default: 30
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: sync.quarantine.raw_retention_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 3650 }
+    description_en: How many days after its resolution a quarantined till event keeps the event as it arrived; the row itself stays
+    description_si: නිරෝධායනය කළ මුදල් ලේඛන සිදුවීමක් විසඳීමෙන් පසු ලැබුණු ආකාරයටම සිදුවීම තබා ගන්නා දින ගණන; පේළිය රැඳේ
+    description_ta: தனிமைப்படுத்தப்பட்ட பணப்பெட்டி நிகழ்வு தீர்க்கப்பட்ட பின் வந்தபடியே நிகழ்வை வைத்திருக்கும் நாட்கள்; வரிசை நிலைத்திருக்கும்
+    default: 30
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+  - key: render.max_concurrent
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 32 }
+    description_en: How many printouts one server instance makes at the same time; more wait, and are told to try again
+    description_si: එක් සේවාදායක අවස්ථාවක් එකවර සාදන මුද්‍රණ ගණන; වැඩිපුර ඒවා රැඳී සිට නැවත උත්සාහ කරන ලෙස දන්වනු ලැබේ
+    description_ta: ஒரு சேவையக நிகழ்வு ஒரே நேரத்தில் உருவாக்கும் அச்சுப்பிரதிகள்; மேலதிகமானவை காத்திருந்து மீண்டும் முயற்சிக்கச் சொல்லப்படும்
+    default: 2
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage

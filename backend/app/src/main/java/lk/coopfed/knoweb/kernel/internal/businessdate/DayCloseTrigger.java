@@ -16,12 +16,18 @@ import org.springframework.stereotype.Component;
  *
  * <p>Whether every session has closed is M6's knowledge, not the kernel's (the kernel reads
  * no module table). So the contract with M6 (26A, SessionHook) is in the event payload:
- * {@code locationId}, and {@code openSessionsRemaining}, the number of sessions still open at
- * that location after this one closed. Zero closes the day; anything else, or a payload
- * without the field, does nothing here and leaves the day to the cut-off job.
+ * {@code openSessionsRemaining}, the number of sessions still open at that location after this
+ * one closed. Zero closes the day; anything else, or a payload without the field, does nothing
+ * here and leaves the day to the cut-off job.
  *
- * <p>The consumer framework delivers the event in the OWN scope of the event's entity, which
- * is the scope the close needs.
+ * <p><b>Which location</b> (wave 2, TWK-23, decided 6 October 2026:
+ * docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md (7)): the one the
+ * envelope names, never the payload's. The event is a till's own, and the outbox row's
+ * {@code location_id} is set by central from the device record (DeviceEventWriter); the consumer
+ * framework hands it over as the scope's location. A payload {@code locationId} that differs is
+ * logged and ignored, so a till at one shop can never close another shop's day. An event whose
+ * envelope names no location does nothing. M6 publishing a central fact with the count it worked
+ * out from its own tables ({@code location.sessions_closed.v1}) is M6's SessionHook ticket.
  */
 @Component
 class DayCloseTrigger {
@@ -40,17 +46,26 @@ class DayCloseTrigger {
     @EventConsumer(types = EVENT_TYPE, consumer = CONSUMER)
     public void onSessionClosed(JsonNode payload, ScopeContext scope) {
         JsonNode remaining = payload.path("openSessionsRemaining");
-        JsonNode location = payload.path("locationId");
-
-        if (!remaining.isInt() || location.isMissingNode() || location.asText().isBlank()) {
-            log.debug("till_session.closed.v1 without openSessionsRemaining or locationId: the cut-off closes the day");
+        if (!remaining.isInt()) {
+            log.debug("till_session.closed.v1 without openSessionsRemaining: the cut-off closes the day");
             return;
         }
-
+        UUID location = scope.locationId();
+        if (location == null) {
+            log.debug("till_session.closed.v1 whose envelope names no location: the cut-off closes the day");
+            return;
+        }
+        JsonNode named = payload.path("locationId");
+        if (named.isTextual() && !named.asText().equals(location.toString())) {
+            log.warn(
+                    "till_session.closed.v1 names location {} in its payload, but its envelope names {}: the"
+                            + " envelope's is the one considered",
+                    named.asText(),
+                    location);
+        }
         if (remaining.asInt() != 0) {
             return;
         }
-
-        dayClose.close(UUID.fromString(location.asText()), scope);
+        dayClose.close(location, scope);
     }
 }

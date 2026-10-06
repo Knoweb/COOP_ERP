@@ -52,12 +52,37 @@ class SyncUnitTest {
     }
 
     @Test
-    void withoutAConfiguredKeyAnInstanceMakesItsOwn() {
-        TillSigner one = new TillSigner("", "");
-        TillSigner other = new TillSigner("", "");
+    void withoutAConfiguredKeyAndNotRequiredAnInstanceMakesItsOwn() {
+        TillSigner one = new TillSigner("", "", false);
+        TillSigner other = new TillSigner("", "", false);
         assertThat(one.keyId()).isNotEqualTo(other.keyId());
-        assertThatThrownBy(() -> new TillSigner("bm90IGEga2V5", "bm90IGEga2V5"))
+        assertThatThrownBy(() -> new TillSigner("bm90IGEga2V5", "bm90IGEga2V5", false))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    /** Wave 2, TWK-27: fail closed; a blank key stops the start and names the properties. */
+    @Test
+    void aRequiredKeyThatIsBlankStopsTheStart() {
+        assertThatThrownBy(() -> new TillSigner("", "", true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("coop-erp.sync.signing.private-key")
+                .hasMessageContaining("coop-erp.sync.signing.public-key");
+        assertThatThrownBy(() -> new TillSigner("  ", null, true)).isInstanceOf(IllegalStateException.class);
+    }
+
+    /** The default of application.yml is the fail-closed one; only the test resources say false. */
+    @Test
+    void theApplicationRequiresTheKeyAndEnforcesPermissionsUnlessTheTestsSayOtherwise() throws Exception {
+        org.springframework.core.env.MutablePropertySources sources =
+                new org.springframework.core.env.MutablePropertySources();
+        new org.springframework.boot.env.YamlPropertySourceLoader()
+                .load("application", new org.springframework.core.io.ClassPathResource("application.yml"))
+                .forEach(sources::addLast);
+        org.springframework.core.env.PropertySourcesPropertyResolver main =
+                new org.springframework.core.env.PropertySourcesPropertyResolver(sources);
+        assertThat(main.getProperty("coop-erp.sync.signing.required")).isEqualTo("true");
+        assertThat(main.getProperty("coop-erp.security.enforce-permissions")).isEqualTo("true");
+        assertThat(main.getProperty("coop-erp.sync.max-uncompressed-bytes")).isEqualTo("16777216");
     }
 
     @Test

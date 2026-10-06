@@ -31,25 +31,34 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Inflates a request body sent with {@code Content-Encoding: gzip} on the sync API (doc 32 S6:
- * "everything is gzip-compressed"; the weakest shop uplink is about 0.5 Mbps) before the
- * controller reads its JSON. The size as sent is kept as the request attribute
- * {@link #WIRE_BYTES}, which the batch limit of doc 32 DR-1 ("2 MB compressed") is measured
- * against.
+ * Bounds and counts every request body on the sync API before the controller reads its JSON
+ * (wave 2, TWK-24, decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-kernel-defaults-and-limits.md
+ * (3); renamed from GzipRequestFilter). The bytes actually read are kept as the request
+ * attribute {@link #WIRE_BYTES}, which the batch limit of doc 32 DR-1 and the device's hourly
+ * byte bucket are measured against, whether the body came with a Content-Length or chunked.
  *
- * <p>Two bounds, so that a body cannot fill the memory before anything else refuses it: the
- * compressed read stops at the DR-1 limit ({@code sync.batch.max_bytes} of the register) and
- * the inflated body at {@code coop-erp.sync.max-inflated-bytes}; past either the answer is 413
- * {@code sync.batch_too_large}. The filter runs after the security chain and on the sync paths
- * only, so an anonymous client cannot make the server inflate anything (the enrolment call,
- * which carries no token yet, is bounded the same way), and a compressed body on any other path
- * is left as it was sent.
+ * <ul>
+ *   <li>A body sent with {@code Content-Encoding: gzip} (doc 32 S6: "everything is
+ *       gzip-compressed"; the weakest shop uplink is about 0.5 Mbps): the compressed read stops at
+ *       the DR-1 limit ({@code sync.batch.max_bytes} of the register), the inflated body at
+ *       {@code coop-erp.sync.max-inflated-bytes}; it is inflated before the controller reads it.
+ *   <li>A plain body, chunked or not: the read stops at
+ *       {@code coop-erp.sync.max-uncompressed-bytes} (16 MB, about a 2 MB gzip batch inflated).
+ *       Plain bodies stay accepted: the till as shipped sends them, and it gzips in its own
+ *       change (wave 2, PR 16).
+ * </ul>
+ *
+ * Past any bound the answer is 413 {@code sync.batch_too_large}, after reading one byte more than
+ * the bound and never the whole of what a client chose to send. The filter runs after the
+ * security chain and on the sync paths only, so an anonymous client cannot make the server read
+ * or inflate much (the enrolment call, which carries no token yet, is bounded the same way), and
+ * a body on any other path is left to the server's own limits.
  */
 @Component
 @Order(SecurityProperties.DEFAULT_FILTER_ORDER + 3)
-class GzipRequestFilter extends OncePerRequestFilter {
+class SyncBodyFilter extends OncePerRequestFilter {
 
-    static final String WIRE_BYTES = GzipRequestFilter.class.getName() + ".wireBytes";
+    static final String WIRE_BYTES = SyncBodyFilter.class.getName() + ".wireBytes";
 
     private static final String SYNC_PATHS = "/v1/sync/";
 
@@ -58,33 +67,52 @@ class GzipRequestFilter extends OncePerRequestFilter {
     private final SyncSettings settings;
     private final CurrentScope currentScope;
     private final long maxInflatedBytes;
+    private final long maxUncompressedBytes;
 
-    GzipRequestFilter(
+    SyncBodyFilter(
             ProblemResponses problems,
             ObjectMapper mapper,
             SyncSettings settings,
             CurrentScope currentScope,
-            @Value("${coop-erp.sync.max-inflated-bytes:67108864}") long maxInflatedBytes) {
+            @Value("${coop-erp.sync.max-inflated-bytes:67108864}") long maxInflatedBytes,
+            @Value("${coop-erp.sync.max-uncompressed-bytes:16777216}") long maxUncompressedBytes) {
         this.problems = problems;
         this.mapper = mapper;
         this.settings = settings;
         this.currentScope = currentScope;
         this.maxInflatedBytes = maxInflatedBytes;
+        this.maxUncompressedBytes = Math.max(1, maxUncompressedBytes);
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String encoding = request.getHeader("Content-Encoding");
-        if (encoding == null || !encoding.toLowerCase(Locale.ROOT).contains("gzip")) {
+        String method = request.getMethod();
+        if (!"POST".equalsIgnoreCase(method) && !"PUT".equalsIgnoreCase(method) && !"PATCH".equalsIgnoreCase(method)) {
             return true;
         }
         String path = request.getRequestURI().substring(request.getContextPath().length());
         return !path.startsWith(SYNC_PATHS);
     }
 
+    private static boolean gzipped(HttpServletRequest request) {
+        String encoding = request.getHeader("Content-Encoding");
+        return encoding != null && encoding.toLowerCase(Locale.ROOT).contains("gzip");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        if (!gzipped(request)) {
+            byte[] plain = request.getInputStream()
+                    .readNBytes((int) Math.min(Integer.MAX_VALUE - 8, maxUncompressedBytes + 1));
+            if (plain.length > maxUncompressedBytes) {
+                refuse(request, response, new ProblemException("sync.batch_too_large"));
+                return;
+            }
+            request.setAttribute(WIRE_BYTES, (long) plain.length);
+            chain.doFilter(new Inflated(request, plain), response);
+            return;
+        }
         long maxCompressedBytes = maxCompressedBytes();
         // One byte more than the limit is read, and no more: enough to know the body is too
         // large, never the whole of what a client chose to send.

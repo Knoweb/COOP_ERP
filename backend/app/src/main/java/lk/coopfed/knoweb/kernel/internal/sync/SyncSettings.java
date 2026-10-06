@@ -87,6 +87,19 @@ class SyncSettings {
         return Math.max(1, config.getInt("sync.rate.bytes_per_hour", scope, 16 * 1024 * 1024));
     }
 
+    /**
+     * Wave 2, TWK-25: the device's other calls (snapshot, change page, heartbeat, presign) in a
+     * minute. A till heartbeats every five minutes and after every batch; 30 is far above that.
+     */
+    int requestsPerMinute(ScopeContext scope) {
+        return Math.max(1, config.getInt("sync.rate.requests_per_minute", scope, 30));
+    }
+
+    /** Wave 2, CR-32-1 item 2: how long the raw event of a resolved quarantine row is kept. */
+    Duration quarantineRawRetention() {
+        return Duration.ofDays(Math.max(1, config.getInt("sync.quarantine.raw_retention_days", null, 30)));
+    }
+
     /** Doc 32 section 9, global: the batches one instance ingests at the same time. */
     int maxConcurrentBatches(ScopeContext scope) {
         return Math.max(1, config.getInt("sync.ingest.max_concurrent", scope, 32));

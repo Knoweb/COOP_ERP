@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.kernel.internal.sync;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.DevicePayloadCheck;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -35,12 +37,15 @@ import org.springframework.stereotype.Component;
  *
  * <pre>
  *   SCHEMA           not an envelope of doc 19 section 6.1: no event id, an unversioned type,
- *                    a sequence other than its place in the batch, no payload, a bad time; or a
- *                    bundle whose document cannot be read
+ *                    a sequence other than its place in the batch, no payload, a bad time; a
+ *                    bundle whose document cannot be read or is not the shape of doc 32 section
+ *                    3.1 ({@link BundleShape}); another type whose payload is not the shape its
+ *                    module reads ({@link DevicePayloadCheck}; wave 2)
  *   DUPLICATE_ID     the event id was applied before at another sequence (doc 32 section 7:
  *                    "quarantine the later copy")
  *   TOO_LARGE        over sync.event.max_bytes
- *   FORBIDDEN_FIELD  the payload names personal or secret data (AGENTS.md)
+ *   FORBIDDEN_FIELD  the payload names personal or secret data (AGENTS.md); stored with the
+ *                    values of those fields replaced by [removed] (CR-32-1 item 2)
  *   HASH             a document bundle without its content hash, or with another one than its
  *                    content gives (doc 32 section 7)
  * </pre>
@@ -87,18 +92,29 @@ class EventApplier {
     private final AuditFacade audit;
     private final EventPublisher events;
     private final DeviceAuditWriter deviceAudit;
+    private final Map<String, DevicePayloadCheck> payloadChecks;
 
     EventApplier(
             JdbcTemplate jdbc,
             DeviceEventWriter outbox,
             AuditFacade audit,
             EventPublisher events,
-            DeviceAuditWriter deviceAudit) {
+            DeviceAuditWriter deviceAudit,
+            List<DevicePayloadCheck> payloadChecks) {
         this.jdbc = jdbc;
         this.outbox = outbox;
         this.audit = audit;
         this.events = events;
         this.deviceAudit = deviceAudit;
+        Map<String, DevicePayloadCheck> byType = new LinkedHashMap<>();
+        for (DevicePayloadCheck check : payloadChecks) {
+            for (String type : check.eventTypes()) {
+                if (byType.put(type, check) != null) {
+                    throw new IllegalStateException("Two payload checks for the till event " + type);
+                }
+            }
+        }
+        this.payloadChecks = Map.copyOf(byType);
     }
 
     /** A reason to refuse one event, found while reading it. */
@@ -161,8 +177,19 @@ class EventApplier {
                 if (!computed.equalsIgnoreCase(declared.strip())) {
                     throw new Refused("HASH", "content_hash does not match the document");
                 }
+                String shape = BundleShape.problemWith(payload);
+                if (shape != null) {
+                    throw new Refused("SCHEMA", shape);
+                }
                 if (aggregateId == null) {
                     aggregateId = uuid(payload.get("document"), "document_id", false);
+                }
+            }
+            DevicePayloadCheck check = payloadChecks.get(eventType);
+            if (check != null) {
+                String shape = check.problemWith(eventType, payload);
+                if (shape != null) {
+                    throw new Refused("SCHEMA", shape);
                 }
             }
             DeviceAudit auditRow = eventType.startsWith(AUDIT_FAMILY)
@@ -203,9 +230,21 @@ class EventApplier {
                     payload.toString()));
             return new Ack.Outcome(seq, eventId, Ack.APPLIED, null);
         } catch (Refused refused) {
+            String stored = "FORBIDDEN_FIELD".equals(refused.reason) ? withoutForbiddenValues(event) : raw;
             return quarantine(
-                    device, record, batchId, seq, eventId, eventType, refused.reason, refused.getMessage(), raw);
+                    device, record, batchId, seq, eventId, eventType, refused.reason, refused.getMessage(), stored);
         }
+    }
+
+    /**
+     * The event as it arrived, with the values of the payload's forbidden fields replaced
+     * (CR-32-1 item 2): the one kind of value a quarantine must not keep is the one that put the
+     * event there. FORBIDDEN_FIELD is found only in an object event with an object payload.
+     */
+    private static String withoutForbiddenValues(JsonNode event) {
+        ObjectNode copy = ((ObjectNode) event).deepCopy();
+        copy.set("payload", DeviceEventWriter.withForbiddenValuesRemoved(event.get("payload")));
+        return copy.toString();
     }
 
     /**

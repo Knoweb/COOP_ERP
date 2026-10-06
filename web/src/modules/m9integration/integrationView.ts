@@ -2,26 +2,20 @@
 // browser (integrationView.test.ts).
 
 import { ApiProblem } from "../../shell/api/client";
+import { startOfMonthBefore } from "../../shell/i18n/formats";
 
 export function errorText(error: unknown, fallback: string): string {
   return error instanceof ApiProblem && error.problem.title ? error.problem.title : fallback;
 }
 
-/** A calendar date as the API writes it (2026-09-27), from a date's local day. */
-export function isoDay(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 /**
  * The period the export form opens with: the first day of the month two months back to today,
- * which covers the demo's eight weeks of trading. A starting value for the form only; the
- * server decides what a period may be.
+ * which covers the demo's eight weeks of trading, `today` being the business day
+ * (businessToday(), Asia/Colombo). A starting value for the form only; the server decides what
+ * a period may be.
  */
-export function defaultExportPeriod(today: Date): { from: string; to: string } {
-  const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-  return { from: isoDay(start), to: isoDay(today) };
+export function defaultExportPeriod(today: string): { from: string; to: string } {
+  return { from: startOfMonthBefore(today, 2), to: today };
 }
 
 /** journal_2026-09-01_2026-09-30.csv: the name the browser saves the file under. */
