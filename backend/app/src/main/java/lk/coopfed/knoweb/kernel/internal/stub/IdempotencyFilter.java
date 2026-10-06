@@ -21,11 +21,9 @@ import java.util.Locale;
 import java.util.Set;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import lk.coopfed.knoweb.kernel.api.KeyedHash;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.internal.IdempotencyRequestAttributes;
-import lk.coopfed.knoweb.kernel.internal.security.JwtClaimsMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.core.annotation.Order;
@@ -45,7 +43,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * PIN reset), and a plain digest of it in the table or a backup would give the PIN back in at
  * most a million tries. With the secret the stored hash tells nothing. The secret has no
  * default outside development (an issuer on localhost or a .test host, as
- * {@link JwtClaimsMapper#isDevelopmentIssuer}); a deployed environment sets its own, and every
+ * {@link KeyedHash#isDevelopmentIssuer}); a deployed environment sets its own, and every
  * instance the same one, since the hash of a replay is compared with the stored one.
  *
  * <p>After the security chain, like the gzip filter before it: the body is read into memory
@@ -64,8 +62,6 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     /** Development only: what a developer's stack hashes with when nothing is configured. */
     static final String DEVELOPMENT_SECRET = "coop-erp-idempotency-dev";
 
-    private static final Logger log = LoggerFactory.getLogger(IdempotencyFilter.class);
-
     private final ProblemResponses problems;
     private final ObjectMapper mapper;
     private final byte[] secret;
@@ -80,18 +76,17 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         this.secret = secretOrDevelopment(secret, issuer).getBytes(StandardCharsets.UTF_8);
     }
 
-    /** The configured secret; on a development stack a fixed one with a warning; else the start fails. */
+    /**
+     * The configured secret; on a development stack a fixed one with a warning; else the start
+     * fails. The rule is {@link KeyedHash#configuredOrDevelopment}, shared by every key of the
+     * application (wave 2, 6 October 2026).
+     */
     static String secretOrDevelopment(String configured, String issuer) {
-        if (configured != null && !configured.isBlank()) {
-            return configured;
-        }
-        if (JwtClaimsMapper.isDevelopmentIssuer(issuer)) {
-            log.warn("coop-erp.idempotency.hash-secret is not set; using the development secret"
-                    + " (the issuer is a development one). Set COOP_ERP_IDEMPOTENCY_SECRET outside development.");
-            return DEVELOPMENT_SECRET;
-        }
-        throw new IllegalStateException("coop-erp.idempotency.hash-secret must be set outside development:"
-                + " the request hashes of the idempotency store are keyed with it");
+        return KeyedHash.configuredOrDevelopment(
+                "coop-erp.idempotency.hash-secret (COOP_ERP_IDEMPOTENCY_SECRET)",
+                configured,
+                issuer,
+                DEVELOPMENT_SECRET);
     }
 
     @Override

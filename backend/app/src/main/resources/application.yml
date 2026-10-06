@@ -100,10 +100,11 @@ coop-erp:
     historical-time: ${COOP_ERP_DEMO_LOAD:false}
 
   # K-03b resolves every command's permission from M1's roles; it refuses only when this is
-  # true. Off by default: on in compose, where the dev realm's users hold the roles of the dev
-  # seed (seed/m1security/users.dev.sql); off in the module tests, which run as users of their own.
+  # true. On by default (wave 2, TWK-29: a forgotten environment variable must not open the
+  # server); off only in the module tests, which run as users of their own
+  # (src/test/resources/config/application.yml).
   security:
-    enforce-permissions: ${COOP_ERP_ENFORCE_PERMISSIONS:false}
+    enforce-permissions: ${COOP_ERP_ENFORCE_PERMISSIONS:true}
     # The OIDC provider (19A section 2), any one: the issuer its tokens carry (the public
     # address, the one the browser signed in at) and the JWKS the backend fetches the signing
     # keys from (inside compose, the provider's container address). The step-up address is
@@ -132,19 +133,28 @@ coop-erp:
     # The second factor (doc 19 section 2.2). A token says when the user last authenticated
     # (auth_time); it counts as the second factor when the token's acr or amr names one of
     # these, or, on a developer stack whose realm has no OTP, when password-reauth-counts is
-    # true: a fresh password sign-in then satisfies the step-up. Never true outside development.
+    # true: a fresh password sign-in then satisfies the step-up. Never true outside development:
+    # with a public issuer the start is refused unless password-reauth-public-issuer-ack is the
+    # literal "demo-data-only", which only the demo server's compose file sets (wave 2, D-5).
     # The freshness window itself is the register's security.mfa.freshness.
     mfa:
       acr-values: ${COOP_ERP_MFA_ACR_VALUES:2,loa2,mfa,otp}
       password-reauth-counts: ${COOP_ERP_MFA_PASSWORD_REAUTH_COUNTS:false}
+      password-reauth-public-issuer-ack: ${COOP_ERP_MFA_PASSWORD_REAUTH_PUBLIC_ACK:}
 
-  # K-08: the key that signs what central sends a till (the revoke instruction now, snapshots
-  # later; doc 32 section 9): Ed25519, PKCS#8 and X.509 in base64, the same on every instance.
-  # Empty on a developer machine: each instance then makes a key of its own (and says so).
+  # K-08: the key that signs what central sends a till (the revoke instruction, the snapshot
+  # manifests; doc 32 section 9): Ed25519, PKCS#8 and X.509 in base64, the same on every
+  # instance. Required (wave 2, TWK-27): a blank key stops the start; the local stack and the
+  # deploy kit set one, and only the tests set required to false.
   sync:
     signing:
       private-key: ${SYNC_SIGNING_PRIVATE_KEY:}
       public-key: ${SYNC_SIGNING_PUBLIC_KEY:}
+      required: true
+    # Wave 2, TWK-24: the largest uncompressed body read on /v1/sync/ (about a 2 MB gzip batch
+    # inflated); a gzip body is bounded by the register's sync.batch.max_bytes as sent and by
+    # max-inflated-bytes once inflated (SyncBodyFilter).
+    max-uncompressed-bytes: ${COOP_ERP_SYNC_MAX_UNCOMPRESSED_BYTES:16777216}
 
   # K-03a: the request hash of the idempotency store is an HMAC under this secret, the same on
   # every instance, so that a stored hash tells nothing about a body that carried a PIN. No
@@ -161,9 +171,15 @@ coop-erp:
   # (`openssl rand -base64 32`), the same on every instance. No default outside development:
   # empty, the backend starts only against a development issuer, with a fixed development key.
   # To change it, move the old key to pending-key-previous for 24 hours (the longest a row lives).
+  #
+  # Wave 2 (6 Oct 2026, TWK-20, M9-07): the recipient on kernel.notification_log is an HMAC-SHA-256
+  # under recipient-hash-key, its own key (base64 of 32 random bytes, the same on every instance),
+  # never pending-key, which rotates. The same rule: no default outside development. Rotate it
+  # only in a maintenance window: an event replayed across a rotation may notify once more.
   notification:
     pending-key: ${COOP_ERP_NOTIFICATION_KEY:}
     pending-key-previous: ${COOP_ERP_NOTIFICATION_KEY_PREVIOUS:}
+    recipient-hash-key: ${COOP_ERP_NOTIFICATION_RECIPIENT_KEY:}
 
   # The per-instance cache fan-out (doc 19 section 8, 19A section 3): every instance, in every
   # role, holds an exclusive queue on the domain exchange for the events that empty its

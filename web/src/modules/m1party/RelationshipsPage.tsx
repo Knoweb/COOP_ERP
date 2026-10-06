@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatDate } from "../../shell/i18n/formats";
+import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { StateChip } from "../../shell/components/StateChip";
 import { usePartyApi } from "./partyApi";
 import { errorText } from "./SocietyRegisterPage";
 import { PartyName } from "./PartyName";
-import { businessToday, latestPerPair, relationshipChip } from "./relationshipView";
+import { latestPerPair, relationshipChip } from "./relationshipView";
 
 /**
  * The relationships in which the caller's entity sells (21A section 8, the Relationships tab):

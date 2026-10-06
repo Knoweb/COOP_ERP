@@ -6,13 +6,15 @@ import java.time.Instant;
 import java.util.List;
 import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
  * The floor and its grace (doc 31 section 6: "when a release raises the floor, devices below it
- * get a configurable grace period (default 14 days) during which sync continues"; doc 32 section
- * 3.3 step 1: "below floor after grace: 426").
+ * get a configurable grace period (default 14 days) during which sync continues"). After the
+ * grace a device's batches are still accepted (CR-30-1 point 4, CR-32-1 item 1: facts are always
+ * accepted) and its snapshot and change log are withheld, 426 (SyncController).
  *
  * <p>When does the grace of a version start? At the moment the floor rose above it and stayed
  * there. The register keeps every value it was ever given ({@code kernel.config_value} is
@@ -32,11 +34,13 @@ class AppVersionFloors implements AppVersionFloor {
     private final SyncSettings settings;
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final SystemScope system;
 
-    AppVersionFloors(SyncSettings settings, JdbcTemplate jdbc, Clock clock) {
+    AppVersionFloors(SyncSettings settings, JdbcTemplate jdbc, Clock clock, SystemScope system) {
         this.settings = settings;
         this.jdbc = jdbc;
         this.clock = clock;
+        this.system = system;
     }
 
     @Override
@@ -48,6 +52,37 @@ class AppVersionFloors implements AppVersionFloor {
         Instant now = clock.instant();
         Instant graceEndsAt = belowSince(appVersion).plus(settings.appVersionFloorGrace(scope));
         return new Standing(floor, true, graceEndsAt, !now.isBefore(graceEndsAt));
+    }
+
+    /**
+     * Where the device's application stands, by the version it last reported (its latest heartbeat
+     * or batch, whichever names the higher version: an updated till reports the new one on the
+     * first of either). A device that never reported a version is not held below the floor. Read
+     * in the device's own scope, inside a transaction of its own: the call it serves (a snapshot,
+     * a change page) carries no version.
+     */
+    Standing standingOfDevice(ScopeContext device) {
+        List<String> reported = system.inScope(
+                device,
+                () -> jdbc.queryForList(
+                        """
+                        select app_version from kernel.device_heartbeat where device_id = ?
+                        union all
+                        select app_version from kernel.device_sync_cursor where device_id = ?
+                        """,
+                        String.class,
+                        device.deviceId(),
+                        device.deviceId()));
+        String latest = null;
+        for (String version : reported) {
+            if (version != null && (latest == null || AppVersions.atLeast(version, latest))) {
+                latest = version;
+            }
+        }
+        if (latest == null) {
+            return new Standing(settings.appVersionFloor(device), false, null, false);
+        }
+        return standing(latest, device);
     }
 
     /**

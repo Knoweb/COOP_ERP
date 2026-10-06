@@ -35,7 +35,7 @@ const invoice: Invoice = {
 const api = {
   invoice: vi.fn(async () => invoice),
   grn: vi.fn(async () => ({ grnId: GRN_ID, docNumber: "D101-GRN-0000001", deliveryNoteId: NOTE_ID })),
-  invoicePrint: vi.fn(async () => "http://storage.local/reports/x.pdf"),
+  invoicePrint: vi.fn(async () => `${window.location.origin}/reports/x.pdf`),
   sku: vi.fn(async () => null),
   entity: vi.fn(async () => null)
 };
@@ -74,7 +74,7 @@ describe("the invoice", () => {
     expect(screen.getByRole("link", { name: text("trading.note.open") }).getAttribute("href")).toBe(`/trading/delivery-notes/${NOTE_ID}`);
     fireEvent.click(screen.getByRole("button", { name: text("trading.invoice.print") }));
 
-    await waitFor(() => expect(tab.location.href).toBe("http://storage.local/reports/x.pdf"));
+    await waitFor(() => expect(tab.location.href).toBe(`${window.location.origin}/reports/x.pdf`));
     expect(open).toHaveBeenCalledOnce();
     open.mockRestore();
   }, 15000);
@@ -87,7 +87,7 @@ describe("the invoice", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: text("trading.invoice.print") }, { timeout: 10000 }));
 
-    await waitFor(() => expect(tab.location.href).toBe("http://storage.local/reports/x.pdf"));
+    await waitFor(() => expect(tab.location.href).toBe(`${window.location.origin}/reports/x.pdf`));
     expect(open).toHaveBeenCalledOnce();
     open.mockRestore();
   }, 15000);

@@ -99,7 +99,9 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
         // The update's row lock also serialises two receipts of one series for the check below.
         List<UUID> sameNumber = List.of();
         if (command.seriesId() != null && command.docNumber() != null) {
-            numbering.observeDeviceNumber(command.seriesId(), command.docNumber());
+            // Only the device's own series at its shop moves (wave 2, M6-04: the kernel's half);
+            // the flags of a foreign series and a jump are M6's own ticket (wave 2, PR 13).
+            numbering.observeDeviceNumber(command.seriesId(), command.docNumber(), scope);
             sameNumber = jdbc.queryForList(
                     "select document_id from pos.receipt where series_id = ? and doc_number = ? and document_id <> ?",
                     UUID.class,

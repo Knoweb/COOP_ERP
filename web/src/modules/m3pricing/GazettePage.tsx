@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
-import { useFormatDate } from "../../shell/i18n/formats";
+import { businessToday, useFormatDate } from "../../shell/i18n/formats";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
@@ -11,7 +11,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import { usePricingApi } from "./pricingApi";
 import type { ControlPrice, Sku } from "./pricingApi";
 import { SkuName, SkuPicker } from "./SkuPicker";
-import { controlPriceChip, controlPriceState, errorText, isoToday } from "./priceListState";
+import { controlPriceChip, controlPriceState, errorText } from "./priceListState";
 import { PricingTabs } from "./PricingTabs";
 import "./pricing.css";
 
@@ -28,7 +28,7 @@ export function GazettePage() {
   const api = usePricingApi();
   const queryClient = useQueryClient();
   const canEnter = useHasPermission("prc.controlprice.enter");
-  const today = isoToday();
+  const today = businessToday();
 
   const rows = useQuery({ queryKey: ["pricing", "controlPrices"], queryFn: () => api.listControlPrices() });
 
@@ -108,7 +108,7 @@ function EnterForm({ onEntered }: { onEntered: () => void }) {
   const key = useIdempotencyKey();
   const [sku, setSku] = useState<Sku | null>(null);
   const [ceiling, setCeiling] = useState("");
-  const [from, setFrom] = useState(isoToday());
+  const [from, setFrom] = useState(businessToday());
   const [to, setTo] = useState("");
   const [gazette, setGazette] = useState("");
 
@@ -191,7 +191,7 @@ function RescindForm({ row, onRescinded }: { row: ControlPrice; onRescinded: () 
   const api = usePricingApi();
   const key = useIdempotencyKey();
   const [open, setOpen] = useState(false);
-  const [lastDay, setLastDay] = useState(isoToday());
+  const [lastDay, setLastDay] = useState(businessToday());
   const [reason, setReason] = useState("");
   const [gazette, setGazette] = useState("");
 

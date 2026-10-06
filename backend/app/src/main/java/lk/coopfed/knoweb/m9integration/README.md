@@ -60,12 +60,19 @@ The kernel (K-10) dispatches, renders, suppresses, retries and logs. M9 gives it
   party of seller and buyer that is not the owner (the kernel's dispatcher, 29 September 2026).
 - **Adapters**: `SmtpEmailChannel` (JavaMail to `coop-erp.integration.smtp.*`; Mailpit in
   compose) and `SmsChannel` over the provider `coop-erp.integration.sms.provider` (only `log`,
-  which sends nothing and logs the id and length). A failure is thrown without the relay's text;
-  the kernel retries (1, 5, 15 minutes).
+  which sends nothing and logs the id and length). A failure is thrown without the relay's or the
+  gateway's text (`SmsChannel` throws the kernel's `NotificationChannel.SendFailed` with a
+  category; wave 2, M9-10); the kernel retries (1, 5, 15 minutes) and keeps the class and the
+  category only.
 - **Rule toggle**: `SetNotificationRuleStatus` (`int.notify.manage`, the Federation only)
   activates or retires a federation-wide rule and publishes `notification_rule.changed.v1`,
   which empties the dispatcher's cache.
 - **Delivery log**: the kernel's `kernel.notification_log`, read select-only under its policies.
+  The screen names the recipient's entity (this entity, or another by the end of its id: M9
+  reads no party names), the role, and eight characters of the keyed hash, never the hash
+  itself (wave 2, M9-07); a QUEUED row with no attempt and a future `nextAttemptAt` reads
+  "deferred (quiet hours) until" (CR-19A-12). `ContactAudience` gives the kernel the entity and
+  the role, so the recipient's entity's quiet hours hold.
 
 `coop-erp.integration.notify.enabled=false` removes all of M9's notification beans (the kernel's
 own delivery test stands in its test channels).

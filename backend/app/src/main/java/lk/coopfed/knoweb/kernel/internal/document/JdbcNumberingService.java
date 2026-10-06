@@ -186,18 +186,37 @@ class JdbcNumberingService implements NumberingService {
     }
 
     @Override
-    public boolean observeDeviceNumber(UUID seriesId, long number) {
+    public Observed observeDeviceNumber(UUID seriesId, long number, ScopeContext scope) {
         requireTransaction("observeDeviceNumber");
 
-        if (seriesId == null || number < 1) {
-            return false;
+        if (seriesId == null || number < 1 || scope == null || scope.deviceId() == null) {
+            return new Observed(Outcome.UNKNOWN, null);
         }
-        return jdbc.update(
-                        "update kernel.numbering_series set next_number = ? where series_id = ? and next_number < ?",
-                        number + 1,
-                        seriesId,
-                        number + 1)
-                > 0;
+        // The row lock serialises two documents of the same series (and the caller's check of a
+        // duplicate number after this call).
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select next_number, holder_device_id, location_id from kernel.numbering_series
+                 where series_id = ?
+                   for update
+                """,
+                seriesId);
+        if (rows.isEmpty()) {
+            return new Observed(Outcome.UNKNOWN, null);
+        }
+        Map<String, Object> series = rows.getFirst();
+        long before = ((Number) series.get("next_number")).longValue();
+        boolean own = scope.deviceId().equals(series.get("holder_device_id"))
+                && scope.locationId() != null
+                && scope.locationId().equals(series.get("location_id"));
+        if (!own) {
+            return new Observed(Outcome.FOREIGN, before);
+        }
+        if (before >= number + 1) {
+            return new Observed(Outcome.ALREADY_PAST, before);
+        }
+        jdbc.update("update kernel.numbering_series set next_number = ? where series_id = ?", number + 1, seriesId);
+        return new Observed(Outcome.RAISED, before);
     }
 
     @Override

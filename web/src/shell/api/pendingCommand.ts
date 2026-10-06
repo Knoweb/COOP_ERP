@@ -9,9 +9,15 @@
 // command the server had in fact already run is answered with its first result and not run
 // twice (AGENTS.md: every mutating operation carries an Idempotency-Key).
 //
-// What is NOT kept: the bearer token (it is the old one; the new session has a new one) and a
-// multipart body (a file is too large for the login state; the bulk upload is asked for again).
+// What is NOT kept: the bearer token (it is the old one; the new session has a new one), a
+// multipart body (a file is too large for the login state; the bulk upload is asked for again),
+// a command whose URL is not under the API base, and a command whose JSON body has a key the
+// kernel refuses in an event payload (NIC, phone, ...; forbiddenFields.ts). Session storage is
+// readable by any script of the origin, and a replay would send the new bearer token to the
+// stored URL. For those the person signs in, and the form is shown again (CR-30-2).
 
+import { resolveConfig } from "../runtimeConfig";
+import { hasForbiddenField } from "./forbiddenFields";
 import { problemOf, type Problem } from "./problem";
 import type { Session } from "../auth/session";
 
@@ -38,11 +44,39 @@ export type ReplayOutcome = { ok: true } | { ok: false; problem: Problem };
 /** The headers of a request worth keeping: what names the command, never what names the user. */
 const KEPT_HEADERS = ["Idempotency-Key", "Content-Type"];
 
+/** True when `url` is the API base itself or a path under it ("https://api.x" does not cover "https://api.x.evil"). */
+export function isUnderApiBase(url: string, apiBase: string): boolean {
+  const base = apiBase.replace(/\/+$/, "");
+  return url === base || url.startsWith(`${base}/`) || url.startsWith(`${base}?`);
+}
+
 /**
- * A copy of a request as plain data, or null when it cannot be replayed (a multipart body).
- * Reads the body from a clone, so the request itself is still sent.
+ * Whether a command may be kept in the login state while the person signs in again (CR-30-2):
+ * its URL is under the API base (the bearer token is never sent anywhere else) and no key of its
+ * JSON body is one the kernel refuses in an event payload (a NIC, a phone: browser storage is
+ * the same class of place as a log line). A body that is not JSON is not kept either.
  */
-export async function pendingCommandOf(request: Request): Promise<PendingCommand | null> {
+export function mayKeep(pending: PendingCommand, apiBase: string): boolean {
+  if (!isUnderApiBase(pending.url, apiBase)) {
+    return false;
+  }
+  if (pending.body === null) {
+    return true;
+  }
+  try {
+    return !hasForbiddenField(JSON.parse(pending.body));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A copy of a request as plain data, or null when it must not or cannot be replayed: a
+ * multipart body (too large for the login state), a URL outside the API base, or a body with a
+ * personal or secret field (mayKeep). The step-up then goes ahead without it, and the form is
+ * shown again. Reads the body from a clone, so the request itself is still sent.
+ */
+export async function pendingCommandOf(request: Request, apiBase: string = resolveConfig().apiBase): Promise<PendingCommand | null> {
   const contentType = request.headers.get("Content-Type") ?? "";
   if (contentType.startsWith("multipart/")) {
     return null;
@@ -55,7 +89,8 @@ export async function pendingCommandOf(request: Request): Promise<PendingCommand
     }
   }
   const body = request.method === "GET" || request.method === "HEAD" ? null : await request.clone().text();
-  return { method: request.method, url: request.url, headers, body: body === "" ? null : body };
+  const pending = { method: request.method, url: request.url, headers, body: body === "" ? null : body };
+  return mayKeep(pending, apiBase) ? pending : null;
 }
 
 /**

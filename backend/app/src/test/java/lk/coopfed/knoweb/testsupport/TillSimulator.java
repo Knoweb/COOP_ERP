@@ -284,6 +284,15 @@ public final class TillSimulator {
      * @return the receipt's document id
      */
     public UUID sell(List<Sale> sales) {
+        return sell(sales, payload -> {});
+    }
+
+    /**
+     * The same sale, with the payload changed by {@code tamper} before it is hashed: a till with a
+     * bug that sends a bundle of the wrong shape under a hash that matches it (the gateway's shape
+     * check, wave 2, is what such a bundle meets).
+     */
+    public UUID sell(List<Sale> sales, java.util.function.Consumer<Map<String, Object>> tamper) {
         if (sessionId == null || seriesId == null) {
             throw new IllegalStateException("Open a session and say what the till sells as first");
         }
@@ -333,12 +342,13 @@ public final class TillSimulator {
         payload.put("tenders", List.of(Map.of("seq", 1, "kind", "CASH", "amount", gross.toPlainString())));
         payload.put("session_id", sessionId.toString());
         cashTaken = cashTaken.add(gross);
+        tamper.accept(payload);
 
         // The content hash by the kernel's rule (doc 18: SHA-256 over the canonical header and
         // lines), so that the gateway accepts the bundle; the conformance cases of the hash are
         // the gateway's own tests.
         String hash = lk.coopfed.knoweb.kernel.internal.document.BundleHash.of(
-                json.valueToTree(document), json.valueToTree(lines));
+                json.valueToTree(payload.get("document")), json.valueToTree(payload.get("lines")));
         payload.put("content_hash", hash);
         long recorded = nextSeq++;
         outbox.put(

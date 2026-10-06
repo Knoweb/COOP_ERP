@@ -24,6 +24,8 @@ case "${1:-}" in
 esac
 
 [ -f "$APP_DIR/.env" ] || fail "$APP_DIR/.env is missing: run bootstrap.sh first"
+# A key added after this server was bootstrapped (wave 2: the notification recipient hash key).
+env_ensure_key COOP_ERP_NOTIFICATION_RECIPIENT_KEY
 
 sync_files
 render_realm

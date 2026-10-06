@@ -82,19 +82,19 @@ describe("the API client", () => {
   it("sends the user for a fresh second factor when the server asks for one, and still reports the problem", async () => {
     const stepUp = vi.fn();
     const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
-    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp, apiBase: "http://api.test" })));
 
     const error = await client.GET("/v1/hello/greetings").catch((e: unknown) => e);
 
     expect(stepUp).toHaveBeenCalledTimes(1);
-    expect(stepUp).toHaveBeenCalledWith(null); // a read has nothing to take again
+    expect(stepUp).toHaveBeenCalledWith(null, false); // a read has nothing to take again
     expect((error as ApiProblem).problem.code).toBe("mfa.required");
   });
 
   it("hands the step-up the command that was refused, with its key and body and without the token, so it can be taken again after the sign-in", async () => {
     const stepUp = vi.fn();
     const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
-    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp, apiBase: "http://api.test" })));
 
     await client
       .POST("/v1/hello/greetings", { params: { header: { "Idempotency-Key": "key-7" } }, body: { textEn: "Hello" } })
@@ -113,7 +113,7 @@ describe("the API client", () => {
   it("starts one step-up for two requests refused at the same moment, and reports both", async () => {
     const stepUp = vi.fn();
     const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
-    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp })));
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp, apiBase: "http://api.test" })));
 
     const outcomes = await Promise.all([
       client.GET("/v1/hello/greetings").catch((e: unknown) => e),

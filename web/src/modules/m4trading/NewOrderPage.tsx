@@ -3,13 +3,14 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useIntl } from "react-intl";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { businessToday } from "../../shell/i18n/formats";
 import { useT } from "../../shell/i18n/useT";
 import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { EntityOption, inLocale, skuText } from "./labels";
 import { useTradingApi, type Sku } from "./tradingApi";
-import { businessToday, errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
+import { errorText, lineAmount, orderRequest, requisitionReady, type RequisitionRow } from "./tradingView";
 
 /**
  * The requisition book (doc 30 section 5.4; 24A section 8, "Requisition", demo scope): the buyer

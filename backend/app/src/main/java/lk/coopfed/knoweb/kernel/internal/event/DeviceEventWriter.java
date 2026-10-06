@@ -109,4 +109,37 @@ public class DeviceEventWriter {
         }
         return null;
     }
+
+    /** What a forbidden field's value is replaced with in a quarantined payload. */
+    public static final String REMOVED = "[removed]";
+
+    /**
+     * A copy of the payload with the value of every forbidden field, at any depth, replaced by
+     * {@value #REMOVED} (wave 2, CR-32-1 item 2): the key stays, so the person who reads the
+     * quarantine sees what the till sent and where, and the value, never needed for the repair,
+     * is not stored. The same word rule as {@link #forbiddenFieldIn}.
+     */
+    public static JsonNode withForbiddenValuesRemoved(JsonNode node) {
+        JsonNode copy = node.deepCopy();
+        removeForbiddenValues(copy);
+        return copy;
+    }
+
+    private static void removeForbiddenValues(JsonNode node) {
+        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
+            java.util.List<String> keys = new java.util.ArrayList<>();
+            object.fieldNames().forEachRemaining(keys::add);
+            for (String key : keys) {
+                if (OutboxWriter.isForbiddenField(key)) {
+                    object.put(key, REMOVED);
+                } else {
+                    removeForbiddenValues(object.get(key));
+                }
+            }
+        } else if (node != null && node.isArray()) {
+            for (JsonNode child : node) {
+                removeForbiddenValues(child);
+            }
+        }
+    }
 }

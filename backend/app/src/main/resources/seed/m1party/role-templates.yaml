@@ -43,6 +43,7 @@ templates:
       - "sys.device.view"
       - "sys.device.enrol"
       - "sys.device.suspend"
+      - "sync.quarantine.resolve"
       - "cat.sku.view"
       - "inv.stock.view"
       - "cat.sku.create_local"

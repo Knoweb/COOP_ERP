@@ -67,7 +67,20 @@
     "catalogue.images.status.hashing": "Computing hash...",
     "catalogue.images.status.getting_url": "Requesting upload URL...",
     "catalogue.images.status.uploading": "Uploading to storage...",
-    "catalogue.images.status.done": "Upload successful! The thumbnail will be generated in the background."
+    "catalogue.images.status.done": "Upload successful! The thumbnail will be generated in the background.",
+    "catalogue.item_details": "Item details",
+    "catalogue.images.card_title": "Item image",
+    "catalogue.images.alt": "Item image",
+    "catalogue.images.thumb_alt": "Thumbnail",
+    "catalogue.images.processing": "Processing image...",
+    "catalogue.images.processing_wait": "Please wait up to 15 minutes.",
+    "catalogue.images.none": "No image uploaded",
+    "catalogue.images.change": "Change image",
+    "catalogue.images.remove": "Remove",
+    "catalogue.images.remove_failed": "The image could not be removed",
+    "catalogue.images.formats": "Supported formats: JPG, PNG (max 2MB)",
+    "catalogue.images.settings_title": "Upload settings",
+    "catalogue.images.settings_hint": "Select a barcode before uploading an image if the image is specific to a variant."
   },
   "si": {
     "catalogue.nav": "භාණ්ඩ නාමාවලිය",
@@ -137,7 +150,20 @@
     "catalogue.images.status.hashing": "හැෂ් ගණනය කරමින්...",
     "catalogue.images.status.getting_url": "උඩුගත කිරීමේ URL ඉල්ලමින්...",
     "catalogue.images.status.uploading": "ආචයනයට උඩුගත කරමින්...",
-    "catalogue.images.status.done": "සාර්ථකයි! පසුබිමෙහි සිඟිති රූපය ජනනය කෙරේ."
+    "catalogue.images.status.done": "සාර්ථකයි! පසුබිමෙහි සිඟිති රූපය ජනනය කෙරේ.",
+    "catalogue.item_details": "අයිතම විස්තර",
+    "catalogue.images.card_title": "අයිතමයේ පින්තූරය",
+    "catalogue.images.alt": "අයිතමයේ පින්තූරය",
+    "catalogue.images.thumb_alt": "සිඟිති රූපය",
+    "catalogue.images.processing": "පින්තූරය සකසමින්...",
+    "catalogue.images.processing_wait": "කරුණාකර විනාඩි 15ක් දක්වා රැඳී සිටින්න.",
+    "catalogue.images.none": "පින්තූරයක් උඩුගත කර නැත",
+    "catalogue.images.change": "පින්තූරය වෙනස් කරන්න",
+    "catalogue.images.remove": "ඉවත් කරන්න",
+    "catalogue.images.remove_failed": "පින්තූරය ඉවත් කළ නොහැකි විය",
+    "catalogue.images.formats": "සහාය දක්වන ආකෘති: JPG, PNG (උපරිම 2MB)",
+    "catalogue.images.settings_title": "උඩුගත කිරීමේ සැකසුම්",
+    "catalogue.images.settings_hint": "පින්තූරය විශේෂිත ප්‍රභේදයකට අයත් නම්, උඩුගත කිරීමට පෙර තීරු කේතයක් තෝරන්න."
   },
   "ta": {
     "catalogue.nav": "பொருள் பட்டியல்",
@@ -207,6 +233,19 @@
     "catalogue.images.status.hashing": "ஹாஷைக் கணக்கிடுகிறது...",
     "catalogue.images.status.getting_url": "பதிவேற்ற URL ஐக் கோருகிறது...",
     "catalogue.images.status.uploading": "சேமிப்பகத்தில் பதிவேற்றுகிறது...",
-    "catalogue.images.status.done": "வெற்றிகரமானது! பின்னணியில் சிறுபடம் உருவாக்கப்படும்."
+    "catalogue.images.status.done": "வெற்றிகரமானது! பின்னணியில் சிறுபடம் உருவாக்கப்படும்.",
+    "catalogue.item_details": "பொருள் விவரங்கள்",
+    "catalogue.images.card_title": "பொருளின் படம்",
+    "catalogue.images.alt": "பொருளின் படம்",
+    "catalogue.images.thumb_alt": "சிறுபடம்",
+    "catalogue.images.processing": "படம் செயலாக்கப்படுகிறது...",
+    "catalogue.images.processing_wait": "தயவுசெய்து 15 நிமிடங்கள் வரை காத்திருக்கவும்.",
+    "catalogue.images.none": "படம் பதிவேற்றப்படவில்லை",
+    "catalogue.images.change": "படத்தை மாற்று",
+    "catalogue.images.remove": "அகற்று",
+    "catalogue.images.remove_failed": "படத்தை அகற்ற முடியவில்லை",
+    "catalogue.images.formats": "ஆதரிக்கப்படும் வடிவங்கள்: JPG, PNG (அதிகபட்சம் 2MB)",
+    "catalogue.images.settings_title": "பதிவேற்ற அமைப்புகள்",
+    "catalogue.images.settings_hint": "படம் ஒரு குறிப்பிட்ட வகைக்கு உரியதாக இருந்தால், பதிவேற்றும் முன் பார்கோடைத் தேர்ந்தெடுக்கவும்."
   }
 }
