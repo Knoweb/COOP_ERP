@@ -250,7 +250,8 @@ jobs:
               lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,lk.coopfed.knoweb.m9integration.,
               lk.coopfed.knoweb.demo.,lk.coopfed.knoweb.hello.,lk.coopfed.knoweb.config.,
               lk.coopfed.knoweb.testsupport.,lk.coopfed.knoweb.SchemaRulesIntegrationTest,
-              lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest,lk.coopfed.knoweb.RuntimeRolesIntegrationTest
+              lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest,lk.coopfed.knoweb.RuntimeRolesIntegrationTest,
+              lk.coopfed.knoweb.ModuleMigrationsFromThePreviousNumberIntegrationTest
     env:
       COOP_ERP_INTEGRATION_FORKS: "1"
       COOP_ERP_TEST_SHARD_PACKAGES: ${{ matrix.shard.packages }}
