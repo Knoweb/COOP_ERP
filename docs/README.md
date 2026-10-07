@@ -7,6 +7,7 @@ Operating instructions for everything under `docs/`, for people and for every AI
 ```
 docs/
   DECISIONS_PENDING.md     doc 10 Open Items Register in Markdown: the assumption in force for every open decision
+  GO_LIVE.md               the production go-live task list: gates, load testing, security assurance and certification, rollout
   PROGRESS.md              how progress is kept (not edited per ticket)
   progress/                done/ and deviations/ (one file per entry, added by every ticket) and NEXT.md; the resume point for any person or tool
   README.md                this file
