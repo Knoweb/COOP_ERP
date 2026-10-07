@@ -72,9 +72,11 @@ class CreateUserHandler implements Handles<CreateUser, UUID> {
 
         UUID homeEntityId = command.homeEntityId() == null ? scope.entityId() : command.homeEntityId();
         if (!homeEntityId.equals(scope.entityId())) {
-            // ADR-18: an administrator creates users of its own entity only; the Federation holds
-            // no downward administration.
-            throw new ProblemException("m1.user.home_entity_out_of_scope", Map.of("homeEntityId", homeEntityId));
+            if (!facts.isManagingDistributor(scope.entityId(), homeEntityId)) {
+                // ADR-18: an administrator creates users of its own entity only; the Federation holds
+                // no downward administration. Distributors can administer MPCS they manage.
+                throw new ProblemException("m1.user.home_entity_out_of_scope", Map.of("homeEntityId", homeEntityId));
+            }
         }
 
         String kind = command.userKind();

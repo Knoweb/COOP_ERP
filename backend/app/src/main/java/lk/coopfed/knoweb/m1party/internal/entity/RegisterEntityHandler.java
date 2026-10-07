@@ -36,11 +36,18 @@ class RegisterEntityHandler implements Handles<RegisterEntity, UUID> {
     @Transactional
     public UUID handle(RegisterEntity command, ScopeContext scope) {
 
-        // 1. caller must be the Federation in an entity-wide OWN scope.
-        FederationCaller.require(scope, repository);
+        // 1. caller must be the Federation or Distributor in an entity-wide OWN scope.
+        Entity caller = FederationCaller.requireFederationOrDistributor(scope, repository);
 
         // 2 to 4. the rules and the entity they produce (EntityRegistrar).
         Entity entity = registrar.prepare(command);
+
+        if (caller.isDistributor()) {
+            if (!Entity.TYPE_MPCS.equals(command.entityType())) {
+                throw new lk.coopfed.knoweb.kernel.api.ProblemException("m1.entity.distributor_can_only_register_mpcs");
+            }
+            entity.setManagingDistributorId(caller.getId());
+        }
 
         // 5. mutation.
         try {

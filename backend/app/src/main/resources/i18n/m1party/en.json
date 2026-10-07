@@ -44,6 +44,7 @@
   "m1.entity.code_invalid": "Enter a valid entity code",
   "m1.entity.default_language_invalid": "Select a valid default language",
   "m1.entity.federation_exists": "A Federation entity already exists",
+  "m1.entity.federation_or_distributor_required": "Only the Federation or a managing Distributor can perform this action",
   "m1.entity.federation_required": "Only the Federation can register an entity",
   "m1.entity.financial_year_start_month_invalid": "Financial year start month must be between 1 and 12",
   "m1.entity.legal_name_required": "Enter the legal name in English",

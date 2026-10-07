@@ -105,4 +105,14 @@ class UserFacts {
                 entityId,
                 userId));
     }
+
+    /** Whether the distributor manages the given MPCS entity. */
+    boolean isManagingDistributor(UUID distributorId, UUID mpcsId) {
+        if (distributorId == null || mpcsId == null) return false;
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from party.entity where entity_id = ? and managing_distributor_id = ?)",
+                Boolean.class,
+                mpcsId,
+                distributorId));
+    }
 }

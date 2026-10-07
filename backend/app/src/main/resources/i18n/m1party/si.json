@@ -44,6 +44,7 @@
   "m1.entity.code_invalid": "වලංගු ආයතන කේතයක් ඇතුළත් කරන්න",
   "m1.entity.default_language_invalid": "වලංගු පෙරනිමි භාෂාවක් තෝරන්න",
   "m1.entity.federation_exists": "සම්මේලන ආයතනයක් දැනටමත් පවතී",
+  "m1.entity.federation_or_distributor_required": "මෙම ක්‍රියාව කළ හැක්කේ සම්මේලනයට හෝ කළමනාකරණය කරන බෙදාහරින්නෙකුට පමණි",
   "m1.entity.federation_required": "ආයතනයක් ලියාපදිංචි කළ හැක්කේ සම්මේලනයට පමණි",
   "m1.entity.financial_year_start_month_invalid": "මූල්‍ය වර්ෂය ආරම්භ වන මාසය 1 සහ 12 අතර විය යුතුය",
   "m1.entity.legal_name_required": "නීතිමය නාමය ඉංග්‍රීසියෙන් ඇතුළත් කරන්න",
