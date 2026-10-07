@@ -182,6 +182,7 @@ export function OrderPage() {
             {accepted && <th>{t("trading.column.allocated").text}</th>}
             {accepted && <th>{t("trading.column.tier_price").text}</th>}
             {accepted && <th>{t("trading.column.delivered").text}</th>}
+            {accepted && <th>{t("trading.column.back_order").text}</th>}
           </tr>
         </thead>
         <tbody>
@@ -216,6 +217,7 @@ export function OrderPage() {
                 </td>
               )}
               {accepted && <td>{line.fulfilledQty}</td>}
+              {accepted && <td>{line.backOrderQty}</td>}
             </tr>
           ))}
         </tbody>

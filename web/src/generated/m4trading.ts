@@ -1064,6 +1064,7 @@ export interface components {
             indicativePrice?: number;
             allocatedQty?: number;
             fulfilledQty?: number;
+            backOrderQty?: number;
             tierPrice?: number;
         };
         AvailabilityResponse: {

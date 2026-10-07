@@ -123,6 +123,15 @@ class OrderQueriesImpl implements OrderQueries {
                     line.unitPrice(),
                     allocatedQty,
                     fulfilledQty,
+                    allocatedQty == null || fulfilledQty == null
+                            ? null
+                            : (req.get("requested_qty") == null ? line.qty() : (BigDecimal) req.get("requested_qty"))
+                                    .subtract(
+                                            req.get("cancelled_qty") == null
+                                                    ? BigDecimal.ZERO
+                                                    : (BigDecimal) req.get("cancelled_qty"))
+                                    .subtract(fulfilledQty)
+                                    .max(BigDecimal.ZERO),
                     alloc == null ? null : (BigDecimal) alloc.get("tier_price")));
         }
 
