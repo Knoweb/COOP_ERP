@@ -13,24 +13,24 @@ The back office part only (M7). The till's own account sales and repayments come
 3. **Statement of the account.** Eight weeks of sales on account (`DEMO-KHATA-…`, the till's charges) and a repayment with its receipt number (CPR). Point out the opening, running and closing balance.
 4. **Record a repayment.** 2,000 in cash. The receipt number `M101-CPR-…` appears and the balance falls; the statement shows the payment settling the oldest charges first.
 5. **Register a member.** Name, phone, and the consent to hold a credit account. Type a name like "Perera" to see the likely duplicates (shown, not refused). Use a phone number another member gave up recently to see the confirmation step: the officer confirms it is a different person.
-6. **Open a credit account** on the new member's card, with a limit and the NIC. Only the last four characters of the NIC are ever shown.
+6. **Open a credit account** on the new member's card, with a limit and the NIC (required for any limit above `customers.nic_required_above_limit`, zero in the demo). Only the last four characters of the NIC are ever shown. A NIC already held by a member of another society is refused without naming the society or the person: one person holds credit at one society.
 
 ## Account controls and privacy
 
 As `m101-office` unless said.
 
-- **A suspended account.** Open Sita Kumari's card: the account shows *Suspended*, and *Changes to the account* has "Repayments overdue: suspended until the member calls at the office". Reinstate it with a reason (Suspend, reinstate or close → Reinstate), then suspend it again. The tills refuse account sales on a suspended account; a sale an offline till took anyway is still posted, with a review record.
-- **Limits.** On K. Perera's card (95 % of the limit), lower the limit or tick the hard block with a reason: saved at once. Raise it: the form says a higher limit needs the second factor, and the server asks for it (401) unless you signed in with it in the last ten minutes.
+- **A suspended account.** Open Sita Kumari's card: the account shows *Suspended*, and *Changes to the account* has "Repayments overdue: suspended until the member calls at the office". Reinstate it with a reason (Suspend, reinstate, reopen or close → Reinstate), then suspend it again. The tills refuse account sales on a suspended account; a sale an offline till took anyway is still posted, with a review record. A closed account can be reopened (*Reopen as suspended*), to settle what a till posted on it after it closed.
+- **Limits.** On K. Perera's card (95 % of the limit), lower the limit or tick the hard block with a reason: saved at once. Raise it: the form says a higher limit needs the second factor, and the server asks for it (401) unless you signed in with it in the last ten minutes. For a member with no NIC recorded, the form also asks for the NIC before the limit can rise.
 - **Reverse a repayment.** Open a statement, press *Reverse* on a repayment, give a reason ("Deposit bounced"): a reversing CPR is issued (`M101-CPR-…`), the repayment is marked reversed, the balance goes back up and the charges it settled are open again. Needs the second factor.
 - **Adjustments.** Ask for an adjustment on the card (amount and reason); it waits for approval. Sign in as `m101-manager` and approve it: it is posted. The clerk who asked cannot approve their own.
-- **Privacy requests.** Members → *Privacy requests*: Rizwan Hameed's erasure is fulfilled by Ruwan Dissanayake (the society's responsible officer); the member shows as "Customer", no phone. To show a new one: on a member's card record an *Access to their data* request; as `m101-manager` open Privacy requests, *Fulfil*, then *Download the export* (every row the society holds about the member). An erasure of a member who owes money is refused until the balance is settled.
+- **Privacy requests.** Members → *Privacy requests*: Rizwan Hameed's erasure is fulfilled by Ruwan Dissanayake (the society's responsible officer); the member shows as "Customer", no phone. To show a new one: on a member's card record an *Access to their data* request; as `m101-manager` open Privacy requests, *Fulfil*, then *Download the export* (every row the society holds about the member; each download is recorded in the audit trail). An erasure waits until every account the member holds, at any society, is closed at a zero balance, and the last one closed at least three days ago (`customers.erasure_wait_days`), so the shops' offline sales have arrived; it removes the name, phone numbers and NIC and keeps the account's entries as the society's records. Officers' free-text fields (reasons, notes) refuse a phone number or a NIC.
 
 ## What to point out
 
 - **A sale at the till is never refused for credit.** A charge over the limit is posted and flagged for review; the society decides what to do, not a rule that fires while the customer waits.
 - **The ledger is only added to.** Nothing is edited or deleted: a balance is the sum of its postings, and what a repayment settled is written as its own rows.
 - **One phone number, one person at a time.** A number held by a member now is refused for another; a number released recently needs a confirmation.
-- **The NIC is not stored in the clear**: a hash to find duplicates, and the last four characters to show.
+- **The NIC is not stored in the clear**: a keyed hash (with a secret held by the server, not the database) to find duplicates, and the last four characters to show.
 
 ## What can go wrong
 
