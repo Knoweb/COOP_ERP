@@ -16,7 +16,7 @@ export interface paths {
         put?: never;
         /**
          * Generate the journal of the caller's entity for a period
-         * @description Takes every posting of the period that no earlier export took (each posting is exported once), builds the balanced journal and records its totals and the SHA-256 of its file. Codes this operation can answer with 422: m9.journal.entity_required (a user of the whole entity), m9.journal.period_invalid, m9.journal.nothing_to_export, m9.journal.unbalanced, idempotency.request_mismatch.
+         * @description Takes every posting of the period that no earlier export took (each posting is exported once), builds the balanced journal, stores its file and records its totals and the SHA-256 of that file. A period whose end is today or later in the business time zone is open and is refused unless the request says provisional; a provisional export is marked so in the list, the file name and the file, and what arrives later for its period is a supplement. Codes this operation can answer with 422: m9.journal.entity_required (a user of the whole entity), m9.journal.period_invalid, m9.journal.period_open, m9.journal.nothing_to_export, m9.journal.unbalanced, idempotency.request_mismatch.
          */
         post: operations["requestJournalExport"];
         delete?: never;
@@ -68,7 +68,7 @@ export interface paths {
         };
         /**
          * The journal file for the accounting package (CSV, two entries per line)
-         * @description entry, date, doc_type, doc_number, line_kind, side, account_role, debit, credit, document_id; the debit entry and the credit entry of every line. The same bytes every time: the SHA-256 of this file is the export's contentHash.
+         * @description entry, date, doc_type, doc_number, line_kind, side, account_role, debit, credit, document_id, export (FINAL or PROVISIONAL; format version 2); the debit entry and the credit entry of every line. The bytes stored when the export was generated, the same every time: the SHA-256 of this file is the export's contentHash. An export made before the file was stored is rebuilt by the frozen version-1 writer, without the export column.
          */
         get: operations["downloadJournalExport"];
         put?: never;
@@ -108,6 +108,26 @@ export interface paths {
          * @description The postings of the period that no export took yet. Codes this operation can answer with 422: m9.journal.period_invalid.
          */
         get: operations["getPendingPostings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/journal-postings/supplement-due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Postings for periods already exported that no export took (the supplement due)
+         * @description The postings no export took that are dated on or before the latest period end this entity has exported: what arrived late for a period the accountant already has a file for, through consumer lag, a replay or a provisional export of an open period. The next export over that period takes them as the supplement. Zero, with no dates, when nothing is due or nothing was ever exported.
+         */
+        get: operations["getSupplementDue"];
         put?: never;
         post?: never;
         delete?: never;
@@ -219,6 +239,11 @@ export interface components {
             periodFrom: string;
             /** Format: date */
             periodTo: string;
+            /**
+             * @description The caller knows the period is still open (periodTo is today or later in the business time zone) and wants the file anyway, marked PROVISIONAL. Without it an open period is refused (m9.journal.period_open).
+             * @default false
+             */
+            provisional: boolean;
         };
         JournalExportResponse: {
             /** Format: uuid */
@@ -231,6 +256,8 @@ export interface components {
             format: "JSON" | "CSV" | "ADAPTER";
             /** @enum {string} */
             status: "REQUESTED" | "GENERATED" | "FAILED" | "ACKNOWLEDGED" | "SUPERSEDED";
+            /** @description the period was open when the export was made; its file carries the PROVISIONAL mark */
+            provisional: boolean;
             lineCount: number;
             totalDebit: number;
             totalCredit: number;
@@ -283,6 +310,19 @@ export interface components {
             /** Format: date */
             latest?: string | null;
         };
+        SupplementDueResponse: {
+            postings: number;
+            amount: number;
+            /** Format: date */
+            earliest?: string | null;
+            /** Format: date */
+            latest?: string | null;
+            /**
+             * Format: date
+             * @description the latest period end this entity has exported; null when it never exported
+             */
+            upTo?: string | null;
+        };
         NotificationTemplateResponse: {
             templateId: string;
             /** @enum {string} */
@@ -329,8 +369,20 @@ export interface components {
             attempts: number;
             suppressedReason?: string | null;
             lastError?: string | null;
-            /** @description the first twelve characters of the recipient's hash */
-            recipientHash: string;
+            /**
+             * Format: uuid
+             * @description the entity whose contact the recipient is, when the audience named it (wave 2, M9-07)
+             */
+            recipientEntityId?: string | null;
+            /** @description the role the recipient was reached as (ACCOUNTS, MANAGER), when the audience named one */
+            audienceRole?: string | null;
+            /** @description eight characters of the recipient's keyed hash, to tell two numbers of one role apart; never reversible without the key */
+            recipientTag?: string | null;
+            /**
+             * Format: date-time
+             * @description when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)
+             */
+            nextAttemptAt?: string | null;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -579,6 +631,26 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    getSupplementDue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The count and the amount due, their dates, and the latest period end exported */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplementDueResponse"];
+                };
+            };
         };
     };
     listNotificationTemplates: {

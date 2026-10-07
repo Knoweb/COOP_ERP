@@ -9,6 +9,7 @@ Step-by-step scripts for showing the system to people who will use it, not to de
 3. Open http://localhost:5173 once yourself and sign in as `fed-steward` / `demo` to check the stack answers before the audience is watching.
 4. Have the users table open in a second tab: `docs/DEMO.md`, section "Who is who". Every demo user's password is **demo**.
 5. Decide who is "driving" (typing and clicking) versus "narrating" (talking to the audience). Switching users means signing out and back in — do it in the same browser tab, or keep a private window per user if you want two logged in side by side (needed for "languages and permissions").
+6. If you also show the desktop till trial (`till/README.md`): a trial database made before 6 October 2026 (PR #266 changed the till's own schema) must be re-created. Delete the till's data folder (`COOP_TILL_HOME`), run `./gradlew :desktop:devEnrolmentCode` in `till/` again (it now also writes `trial_cashier=true`), start the till and enrol. The server address must be `https://`, or `localhost` on the same PC.
 
 ## Order of a full demo (about 45–60 minutes)
 

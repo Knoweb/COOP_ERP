@@ -29,10 +29,13 @@ paths:
       summary: Generate the journal of the caller's entity for a period
       description: >
         Takes every posting of the period that no earlier export took (each posting is exported
-        once), builds the balanced journal and records its totals and the SHA-256 of its file.
+        once), builds the balanced journal, stores its file and records its totals and the SHA-256
+        of that file. A period whose end is today or later in the business time zone is open and
+        is refused unless the request says provisional; a provisional export is marked so in the
+        list, the file name and the file, and what arrives later for its period is a supplement.
         Codes this operation can answer with 422: m9.journal.entity_required (a user of the whole
-        entity), m9.journal.period_invalid, m9.journal.nothing_to_export, m9.journal.unbalanced,
-        idempotency.request_mismatch.
+        entity), m9.journal.period_invalid, m9.journal.period_open, m9.journal.nothing_to_export,
+        m9.journal.unbalanced, idempotency.request_mismatch.
       x-permission: int.journal.export
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -94,8 +97,10 @@ paths:
       summary: The journal file for the accounting package (CSV, two entries per line)
       description: >
         entry, date, doc_type, doc_number, line_kind, side, account_role, debit, credit,
-        document_id; the debit entry and the credit entry of every line. The same bytes every
-        time: the SHA-256 of this file is the export's contentHash.
+        document_id, export (FINAL or PROVISIONAL; format version 2); the debit entry and the
+        credit entry of every line. The bytes stored when the export was generated, the same every
+        time: the SHA-256 of this file is the export's contentHash. An export made before the file
+        was stored is rebuilt by the frozen version-1 writer, without the export column.
       x-permission: int.journal.export
       parameters:
         - $ref: '#/components/parameters/ExportId'
@@ -149,6 +154,24 @@ paths:
               schema: { $ref: '#/components/schemas/PendingPostingsResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/integration/journal-postings/supplement-due:
+    get:
+      tags: [Integration]
+      operationId: getSupplementDue
+      summary: Postings for periods already exported that no export took (the supplement due)
+      description: >
+        The postings no export took that are dated on or before the latest period end this entity
+        has exported: what arrived late for a period the accountant already has a file for, through
+        consumer lag, a replay or a provisional export of an open period. The next export over that
+        period takes them as the supplement. Zero, with no dates, when nothing is due or nothing was
+        ever exported.
+      x-permission: int.journal.read
+      responses:
+        '200':
+          description: The count and the amount due, their dates, and the latest period end exported
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplementDueResponse' }
   /v1/integration/templates:
     get:
       tags: [Integration]
@@ -263,16 +286,26 @@ components:
       properties:
         periodFrom: { type: string, format: date }
         periodTo: { type: string, format: date }
+        provisional:
+          type: boolean
+          default: false
+          description: >
+            The caller knows the period is still open (periodTo is today or later in the business
+            time zone) and wants the file anyway, marked PROVISIONAL. Without it an open period is
+            refused (m9.journal.period_open).
     JournalExportResponse:
       type: object
-      required: [exportId, periodFrom, periodTo, format, status, lineCount, totalDebit, totalCredit, contentHash,
-        generatedAt]
+      required: [exportId, periodFrom, periodTo, format, status, provisional, lineCount, totalDebit, totalCredit,
+        contentHash, generatedAt]
       properties:
         exportId: { type: string, format: uuid }
         periodFrom: { type: string, format: date }
         periodTo: { type: string, format: date }
         format: { type: string, enum: [JSON, CSV, ADAPTER] }
         status: { type: string, enum: [REQUESTED, GENERATED, FAILED, ACKNOWLEDGED, SUPERSEDED] }
+        provisional:
+          type: boolean
+          description: the period was open when the export was made; its file carries the PROVISIONAL mark
         lineCount: { type: integer }
         totalDebit: { type: number }
         totalCredit: { type: number }
@@ -326,6 +359,18 @@ components:
         amount: { type: number }
         earliest: { type: [string, 'null'], format: date }
         latest: { type: [string, 'null'], format: date }
+    SupplementDueResponse:
+      type: object
+      required: [postings, amount]
+      properties:
+        postings: { type: integer }
+        amount: { type: number }
+        earliest: { type: [string, 'null'], format: date }
+        latest: { type: [string, 'null'], format: date }
+        upTo:
+          type: [string, 'null']
+          format: date
+          description: the latest period end this entity has exported; null when it never exported
     NotificationTemplateResponse:
       type: object
       required: [templateId, channel, bodyEn, placeholders, status]
@@ -359,7 +404,7 @@ components:
         federationWide: { type: boolean }
     NotificationLogResponse:
       type: object
-      required: [notificationId, createdAt, channel, status, attempts, recipientHash]
+      required: [notificationId, createdAt, channel, status, attempts]
       properties:
         notificationId: { type: string, format: uuid }
         createdAt: { type: string, format: date-time }
@@ -372,4 +417,17 @@ components:
         attempts: { type: integer }
         suppressedReason: { type: [string, 'null'] }
         lastError: { type: [string, 'null'] }
-        recipientHash: { type: string, description: the first twelve characters of the recipient's hash }
+        recipientEntityId:
+          type: [string, 'null']
+          format: uuid
+          description: the entity whose contact the recipient is, when the audience named it (wave 2, M9-07)
+        audienceRole:
+          type: [string, 'null']
+          description: the role the recipient was reached as (ACCOUNTS, MANAGER), when the audience named one
+        recipientTag:
+          type: [string, 'null']
+          description: eight characters of the recipient's keyed hash, to tell two numbers of one role apart; never reversible without the key
+        nextAttemptAt:
+          type: [string, 'null']
+          format: date-time
+          description: when a QUEUED row is due; with no attempt made, it was deferred by quiet hours until then (CR-19A-12)

@@ -102,21 +102,29 @@ class ReportSources {
      * @param today the business date today, for what is due and overdue
      */
     List<Map<String, String>> rows(
-            String source, ReportParameters parameters, Names names, boolean cost, LocalDate today) {
-        return switch (source) {
-            case "stock-position" -> stock(parameters, names, cost);
-            case "trade-received" -> trade(parameters, names);
-            case "invoices-issued" -> invoices(parameters, names);
-            case "statement-of-account" -> statement(parameters, names, today);
-            case "receivables-ageing" -> ageing(names, today);
-            case "fill-rate" -> fillRate(parameters, names);
-            case "shop-sales-by-shop" -> shopSalesByShop(parameters, names);
-            case "shop-sales-by-item" -> shopSalesByItem(parameters, names);
-            default -> throw new ProblemException("m8.report.unknown", Map.of("reportId", source));
-        };
+            String source, ReportParameters parameters, Names names, boolean cost, LocalDate today, int maxRows) {
+        // One row more than the cap is read, in SQL, so that "too many" is known without loading
+        // them all (wave 2, M8-09); the names are resolved only for rows that are answered.
+        String cap = " limit " + (maxRows + 1);
+        List<Map<String, String>> rows =
+                switch (source) {
+                    case "stock-position" -> stock(parameters, names, cost, cap);
+                    case "trade-received" -> trade(parameters, names, cap);
+                    case "invoices-issued" -> invoices(parameters, names, cap);
+                    case "statement-of-account" -> statement(parameters, names, today, cap);
+                    case "receivables-ageing" -> ageing(names, today, cap);
+                    case "fill-rate" -> fillRate(parameters, names, cap);
+                    case "shop-sales-by-shop" -> shopSalesByShop(parameters, names, cap);
+                    case "shop-sales-by-item" -> shopSalesByItem(parameters, names, cap);
+                    default -> throw new ProblemException("m8.report.unknown", Map.of("reportId", source));
+                };
+        if (rows.size() > maxRows) {
+            throw new ProblemException("m8.report.too_many_rows", Map.of("rows", maxRows));
+        }
+        return rows;
     }
 
-    private List<Map<String, String>> stock(ReportParameters parameters, Names names, boolean cost) {
+    private List<Map<String, String>> stock(ReportParameters parameters, Names names, boolean cost, String cap) {
         return jdbc.query(
                 """
                 select owner_entity_id, location_id, canonical_sku_id,
@@ -126,7 +134,8 @@ class ReportSources {
                  group by owner_entity_id, location_id, canonical_sku_id
                 having sum(qty_on_hand) <> 0
                  order by owner_entity_id, location_id, canonical_sku_id
-                """,
+                """
+                        + cap,
                 (rs, n) -> {
                     UUID sku = rs.getObject("canonical_sku_id", UUID.class);
                     Map<String, String> row = new LinkedHashMap<>();
@@ -144,7 +153,7 @@ class ReportSources {
                 parameters.locationId());
     }
 
-    private List<Map<String, String>> trade(ReportParameters parameters, Names names) {
+    private List<Map<String, String>> trade(ReportParameters parameters, Names names, String cap) {
         return jdbc.query(
                 """
                 select business_date, seller_entity_id, buyer_entity_id, sku_id, sum(qty) as qty, sum(value) as value
@@ -152,7 +161,8 @@ class ReportSources {
                  where measure = 'RECEIVED' and business_date between ? and ?
                  group by business_date, seller_entity_id, buyer_entity_id, sku_id
                  order by business_date, seller_entity_id, buyer_entity_id, sku_id
-                """,
+                """
+                        + cap,
                 (rs, n) -> {
                     UUID sku = rs.getObject("sku_id", UUID.class);
                     Map<String, String> row = new LinkedHashMap<>();
@@ -169,7 +179,7 @@ class ReportSources {
                 Date.valueOf(parameters.to()));
     }
 
-    private List<Map<String, String>> invoices(ReportParameters parameters, Names names) {
+    private List<Map<String, String>> invoices(ReportParameters parameters, Names names, String cap) {
         // One row per invoice: the Federation view reads the seller's row only once, and a
         // buyer reads the seller's row through party_read.
         return jdbc.query(
@@ -178,8 +188,9 @@ class ReportSources {
                        business_date, doc_number, seller_entity_id, buyer_entity_id, net, tax, gross
                   from reporting.trade_document_event
                  where doc_type = 'INVOICE' and event_kind = 'ISSUED' and business_date between ? and ?
-                 order by business_date, doc_number, document_id
-                """,
+                 order by business_date, doc_number, document_id, occurred_at desc, event_id desc
+                """
+                        + cap,
                 (rs, n) -> {
                     Map<String, String> row = new LinkedHashMap<>();
                     row.put("date", date(rs, "business_date"));
@@ -195,10 +206,10 @@ class ReportSources {
                 Date.valueOf(parameters.to()));
     }
 
-    private List<Map<String, String>> statement(ReportParameters parameters, Names names, LocalDate today) {
+    private List<Map<String, String>> statement(ReportParameters parameters, Names names, LocalDate today, String cap) {
         return jdbc.query(
                 "select * from " + TradeSql.INVOICES + " inv where business_date between ? and ?"
-                        + " order by business_date, doc_number, document_id",
+                        + " order by business_date, doc_number, document_id" + cap,
                 (rs, n) -> {
                     Map<String, String> row = new LinkedHashMap<>();
                     row.put("date", date(rs, "business_date"));
@@ -222,7 +233,7 @@ class ReportSources {
                 Date.valueOf(parameters.to()));
     }
 
-    private List<Map<String, String>> ageing(Names names, LocalDate today) {
+    private List<Map<String, String>> ageing(Names names, LocalDate today, String cap) {
         // Days past the due date, today: not yet due, 1-30, 31-60, 61-90, over 90. An invoice
         // with no due date counts as due on its tax point.
         return jdbc.query(
@@ -239,7 +250,8 @@ class ReportSources {
                  group by seller_entity_id, buyer_entity_id
                  order by seller_entity_id, buyer_entity_id
                 """
-                        .formatted(TradeSql.INVOICES),
+                                .formatted(TradeSql.INVOICES)
+                        + cap,
                 (rs, n) -> {
                     Map<String, String> row = new LinkedHashMap<>();
                     row.put("seller", names.entity(rs.getObject("seller_entity_id", UUID.class)));
@@ -256,7 +268,7 @@ class ReportSources {
                 Date.valueOf(today));
     }
 
-    private List<Map<String, String>> fillRate(ReportParameters parameters, Names names) {
+    private List<Map<String, String>> fillRate(ReportParameters parameters, Names names, String cap) {
         // The fill rate: what was received of what the delivery notes expected, a line never
         // counting more than it expected (an over-delivery does not make up for a short one).
         // On time: a GRN received on or before the latest date committed for its orders.
@@ -279,7 +291,8 @@ class ReportSources {
                  group by l.seller_entity_id, l.buyer_entity_id
                  order by l.seller_entity_id, l.buyer_entity_id
                 """
-                        .formatted(TradeSql.GRN_ETA),
+                                .formatted(TradeSql.GRN_ETA)
+                        + cap,
                 (rs, n) -> {
                     Map<String, String> row = new LinkedHashMap<>();
                     row.put("seller", names.entity(rs.getObject("seller_entity_id", UUID.class)));
@@ -303,7 +316,7 @@ class ReportSources {
                 Date.valueOf(parameters.to()));
     }
 
-    private List<Map<String, String>> shopSalesByShop(ReportParameters parameters, Names names) {
+    private List<Map<String, String>> shopSalesByShop(ReportParameters parameters, Names names, String cap) {
         return jdbc.query(
                 """
                 select business_date, location_id, count(*) as receipts,
@@ -312,7 +325,8 @@ class ReportSources {
                  where business_date between ? and ? and (?::uuid is null or location_id = ?)
                  group by business_date, location_id
                  order by business_date, location_id
-                """,
+                """
+                        + cap,
                 (rs, n) -> {
                     Map<String, String> row = new LinkedHashMap<>();
                     row.put("date", date(rs, "business_date"));
@@ -329,7 +343,7 @@ class ReportSources {
                 parameters.locationId());
     }
 
-    private List<Map<String, String>> shopSalesByItem(ReportParameters parameters, Names names) {
+    private List<Map<String, String>> shopSalesByItem(ReportParameters parameters, Names names, String cap) {
         return jdbc.query(
                 """
                 select sku_id, sum(qty) as qty, sum(line_total) as value
@@ -337,7 +351,8 @@ class ReportSources {
                  where business_date between ? and ? and (?::uuid is null or location_id = ?)
                  group by sku_id
                  order by sum(line_total) desc nulls last, sku_id
-                """,
+                """
+                        + cap,
                 (rs, n) -> {
                     UUID sku = rs.getObject("sku_id", UUID.class);
                     Map<String, String> row = new LinkedHashMap<>();

@@ -25,8 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
  * AssignRole (21A section 6: "role owner = scope entity or template; scope within caller's
  * scope; user in scope; role class permits"; doc 21 flow 6.3: "AssignRole scoped to the shop
  * location"). Two guards beyond the table, both from doc 19 section 3.2: assigning is granting,
- * so the grantor must hold every permission of the role; and a person may not come to hold both
- * halves of a pair in ROLE mode through two roles.
+ * so the grantor must hold every permission of the role, each with a limit at least the role's
+ * (CR-21A-7); and a person may not come to hold both halves of a pair in ROLE mode through two
+ * roles.
  */
 @Service
 @CommandHandler(permission = "gov.role.manage", requiresMfa = true)
@@ -133,8 +134,11 @@ class AssignRoleHandler implements Handles<AssignRole, UUID> {
                     "m1.assignment.exists", Map.of("userId", user.userId(), "roleId", role.roleId()));
         }
 
-        Set<String> rolePermissions = records.permissionsOf(role.roleId()).keySet();
-        guards.withinGrantor(scope, rolePermissions);
+        // The codes and the limits they are granted with: assigning a role that approves up to
+        // Rs 250,000 is granting that limit (CR-21A-7).
+        Map<String, Map<String, Object>> granted = records.permissionsOf(role.roleId());
+        Set<String> rolePermissions = granted.keySet();
+        guards.withinGrantor(scope, granted);
 
         // What the user holds anywhere in the entity, not only where this caller may see
         // (m1security V0013): a half held at another shop still counts.

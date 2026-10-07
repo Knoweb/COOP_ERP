@@ -20,22 +20,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  * relay that is down for a moment answers: the adapter throws and the kernel retries. The stand-in
  * for Mailpit in the tests (29A section 9: "SMTP against mailpit"), with no container to start.
  */
-final class FakeSmtpServer implements AutoCloseable {
+public final class FakeSmtpServer implements AutoCloseable {
 
-    final List<String> messages = new CopyOnWriteArrayList<>();
-    final AtomicInteger failNext = new AtomicInteger();
+    public final List<String> messages = new CopyOnWriteArrayList<>();
+    public final AtomicInteger failNext = new AtomicInteger();
 
     private final ServerSocket socket;
     private final Thread acceptor;
 
-    FakeSmtpServer() throws IOException {
+    public FakeSmtpServer() throws IOException {
         socket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
         acceptor = new Thread(this::acceptLoop, "fake-smtp");
         acceptor.setDaemon(true);
         acceptor.start();
     }
 
-    int port() {
+    public int port() {
         return socket.getLocalPort();
     }
 

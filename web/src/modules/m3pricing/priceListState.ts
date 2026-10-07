@@ -52,6 +52,14 @@ export function controlPriceState(row: ControlPrice, date: string): "future" | "
   return "in_force";
 }
 
+/**
+ * The numbers (1-based) of the shelf lines whose price is blank or not a plain decimal: those
+ * are "incomplete" and the list is not saved (TWK-13; Number("") is 0, which saved a free item).
+ */
+export function incompleteLines(rows: { price: string }[]): number[] {
+  return rows.flatMap((row, index) => (/^\d+(\.\d+)?$/.test(row.price.trim()) ? [] : [index + 1]));
+}
+
 /** The look of a control price's state: in force is issued, a future one a draft, an ended one void. */
 export function controlPriceChip(state: "future" | "in_force" | "ended"): ChipState {
   switch (state) {
@@ -62,11 +70,4 @@ export function controlPriceChip(state: "future" | "in_force" | "ended"): ChipSt
     default:
       return "void";
   }
-}
-
-/** Today as the browser's calendar date, ISO (yyyy-mm-dd): the default of a date field, never a rule. */
-export function isoToday(now: Date = new Date()): string {
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
 }

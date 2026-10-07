@@ -2,31 +2,46 @@
 // browser (integrationView.test.ts).
 
 import { ApiProblem } from "../../shell/api/client";
+import { startOfMonthBefore } from "../../shell/i18n/formats";
 
 export function errorText(error: unknown, fallback: string): string {
   return error instanceof ApiProblem && error.problem.title ? error.problem.title : fallback;
 }
 
-/** A calendar date as the API writes it (2026-09-27), from a date's local day. */
-export function isoDay(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+/**
+ * The period the export form opens with: the first day of the month two months back to yesterday,
+ * which covers the demo's eight weeks of trading and ends on a closed day, `today` being the
+ * business day (businessToday(), Asia/Colombo). Yesterday, not today: a period that ends today is
+ * still open, and the server refuses it unless the export is marked provisional (wave 2, CR-29-1).
+ * A starting value for the form only; the server decides what a period may be.
+ */
+export function defaultExportPeriod(today: string): { from: string; to: string } {
+  return { from: startOfMonthBefore(today, 2), to: dayBefore(today) };
+}
+
+/** The ISO date one day before an ISO date, in the calendar alone (no time zone, no clock). */
+export function dayBefore(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
 }
 
 /**
- * The period the export form opens with: the first day of the month two months back to today,
- * which covers the demo's eight weeks of trading. A starting value for the form only; the
- * server decides what a period may be.
+ * Whether a period ending on `to` is still open on the business day `today`: the day has not
+ * ended, so an export of it is provisional by the server's rule (periodTo >= today). ISO dates
+ * compare as text.
  */
-export function defaultExportPeriod(today: Date): { from: string; to: string } {
-  const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-  return { from: isoDay(start), to: isoDay(today) };
+export function periodIsOpen(to: string, today: string): boolean {
+  return to !== "" && to >= today;
 }
 
-/** journal_2026-09-01_2026-09-30.csv: the name the browser saves the file under. */
-export function journalFileName(periodFrom: string, periodTo: string): string {
-  return `journal_${periodFrom}_${periodTo}.csv`;
+/**
+ * journal_2026-09-01_2026-09-30.csv: the name the browser saves the file under;
+ * journal_2026-09-01_2026-09-30_PROVISIONAL.csv when the export was made before its period closed.
+ */
+export function journalFileName(periodFrom: string, periodTo: string, provisional = false): string {
+  return `journal_${periodFrom}_${periodTo}${provisional ? "_PROVISIONAL" : ""}.csv`;
 }
 
 /** The text of a template in a language, English when that language has none (P-07). */

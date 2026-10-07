@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -20,7 +21,8 @@ import java.util.TreeMap;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import lk.coopfed.knoweb.m9integration.internal.journal.JournalFile;
+import lk.coopfed.knoweb.m9integration.internal.journal.JournalFileV1;
+import lk.coopfed.knoweb.m9integration.internal.journal.JournalFiles;
 import lk.coopfed.knoweb.m9integration.query.IntegrationQueries;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -48,7 +50,7 @@ class IntegrationQueriesImpl implements IntegrationQueries {
     }
 
     private static final String EXPORT_COLUMNS =
-            "export_id, period_from, period_to, format, status, line_count, total_debit, total_credit,"
+            "export_id, period_from, period_to, format, status, provisional, line_count, total_debit, total_credit,"
                     + " content_hash, generated_at, requested_by";
 
     private static final RowMapper<JournalExportView> EXPORT = (rs, i) -> new JournalExportView(
@@ -57,6 +59,7 @@ class IntegrationQueriesImpl implements IntegrationQueries {
             rs.getDate("period_to").toLocalDate(),
             rs.getString("format"),
             rs.getString("status"),
+            rs.getBoolean("provisional"),
             rs.getInt("line_count"),
             rs.getBigDecimal("total_debit"),
             rs.getBigDecimal("total_credit"),
@@ -108,12 +111,52 @@ class IntegrationQueriesImpl implements IntegrationQueries {
                 exportId);
     }
 
+    /** The stored file of an export: its writer's version and its bytes (wave 2, CR-29-1 item 2). */
+    private record StoredFile(int formatVersion, byte[] content, String contentHash) {}
+
+    private Optional<StoredFile> storedFile(UUID exportId) {
+        return jdbc
+                .query(
+                        "select format_version, content, content_hash from integration.journal_export_file"
+                                + " where export_id = ?",
+                        (rs, i) -> new StoredFile(
+                                rs.getInt("format_version"), rs.getBytes("content"), rs.getString("content_hash")),
+                        exportId)
+                .stream()
+                .findFirst();
+    }
+
     @Override
     public Optional<String> file(UUID exportId, ScopeContext scope) {
-        if (export(exportId, scope).isEmpty()) {
+        Optional<JournalExportView> found = export(exportId, scope);
+        if (found.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(JournalFile.csv(lines(exportId, scope)));
+        // The bytes stored at generation, byte for byte; an export from before V0006 has none and
+        // is rebuilt by the frozen version-1 writer, which is what its hash was taken over.
+        return Optional.of(storedFile(exportId)
+                .map(stored -> new String(stored.content(), StandardCharsets.UTF_8))
+                .orElseGet(() -> JournalFileV1.csv(lines(exportId, scope))));
+    }
+
+    @Override
+    public SupplementDue supplementDue(ScopeContext scope) {
+        return jdbc.queryForObject(
+                """
+                with exported as (select max(period_to) as up_to from integration.journal_export)
+                select count(p.posting_id) as postings, coalesce(sum(p.amount), 0) as amount,
+                       min(p.business_date) as earliest, max(p.business_date) as latest,
+                       (select up_to from exported) as up_to
+                  from integration.journal_posting p
+                 where p.business_date <= (select up_to from exported)
+                   and not exists (select 1 from integration.journal_line l where l.posting_id = p.posting_id)
+                """,
+                (rs, i) -> new SupplementDue(
+                        rs.getInt("postings"),
+                        rs.getBigDecimal("amount"),
+                        date(rs, "earliest"),
+                        date(rs, "latest"),
+                        date(rs, "up_to")));
     }
 
     @Override
@@ -143,8 +186,26 @@ class IntegrationQueriesImpl implements IntegrationQueries {
         boolean totals = lines.size() == export.lineCount()
                 && debit.compareTo(export.totalDebit()) == 0
                 && credit.compareTo(export.totalCredit()) == 0;
-        boolean hash = JournalFile.sha256(JournalFile.csv(lines)).equals(export.contentHash());
+        boolean hash = fileStillMatches(export, lines);
         return Optional.of(new Reconciliation(exportId, lines.size(), debit, credit, balanced, totals, hash, accounts));
+    }
+
+    /**
+     * Whether the file still is the one generated (wave 2, CR-29-1 item 2): the stored bytes hash
+     * to the recorded hash, and the writer of the recorded format version regenerates them from
+     * the lines, so lines and file agree. An export from before V0006 has no stored file; for it
+     * the frozen version-1 writer's file of the lines is hashed against the record.
+     */
+    private boolean fileStillMatches(JournalExportView export, List<JournalLineView> lines) {
+        Optional<StoredFile> stored = storedFile(export.exportId());
+        if (stored.isEmpty()) {
+            return JournalFiles.sha256(JournalFileV1.csv(lines)).equals(export.contentHash());
+        }
+        StoredFile file = stored.get();
+        byte[] regenerated = JournalFiles.bytes(file.formatVersion(), lines, export.provisional());
+        return JournalFiles.sha256(file.content()).equals(export.contentHash())
+                && file.contentHash().equals(export.contentHash())
+                && Arrays.equals(regenerated, file.content());
     }
 
     @Override
@@ -218,7 +279,9 @@ class IntegrationQueriesImpl implements IntegrationQueries {
         return jdbc.query(
                 """
                 select notification_id, created_at, rule_id, event_id, channel, template_id, language, status,
-                       attempts, suppressed_reason, last_error, recipient_hash
+                       attempts, suppressed_reason, last_error, recipient_entity_id, audience_role,
+                       next_attempt_at,
+                       case when recipient_hash_key_id is not null then left(recipient_hash, 8) end as recipient_tag
                   from kernel.notification_log
                  where (?::text is null or status = ?::text)
                  order by created_at desc, notification_id desc
@@ -238,8 +301,12 @@ class IntegrationQueriesImpl implements IntegrationQueries {
                         rs.getInt("attempts"),
                         rs.getString("suppressed_reason"),
                         rs.getString("last_error"),
-                        // The first twelve characters are enough to tell recipients apart on the screen.
-                        rs.getString("recipient_hash").substring(0, 12)),
+                        rs.getObject("recipient_entity_id", UUID.class),
+                        rs.getString("audience_role"),
+                        // Eight characters of the keyed hash tell two numbers of one role apart and
+                        // give nothing back without the key; a row whose hash V0085 replaced has none.
+                        rs.getString("recipient_tag"),
+                        instant(rs.getTimestamp("next_attempt_at"))),
                 status,
                 status,
                 rows);

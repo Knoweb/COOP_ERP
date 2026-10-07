@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.NotificationAudience;
 import lk.coopfed.knoweb.kernel.api.NotificationChannel;
 import lk.coopfed.knoweb.kernel.api.Notifications;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -59,6 +60,7 @@ class NotificationService implements Notifications {
     private final Map<String, NotificationChannel> secondaries = new HashMap<>();
     private final AuditFacade audit;
     private final Clock clock;
+    private final RecipientHash recipientHash;
 
     NotificationService(
             NotificationLog logRows,
@@ -67,7 +69,9 @@ class NotificationService implements Notifications {
             NotificationTransactions transactions,
             List<NotificationChannel> channelBeans,
             AuditFacade audit,
-            Clock clock) {
+            Clock clock,
+            RecipientHash recipientHash) {
+        this.recipientHash = recipientHash;
         this.logRows = logRows;
         this.renderer = renderer;
         this.suppression = suppression;
@@ -98,9 +102,7 @@ class NotificationService implements Notifications {
         UUID notificationId = deliver(
                 DIRECT_RULE,
                 dedupKey == null ? Ids.next() : dedupKey,
-                channel,
-                recipient,
-                language,
+                new NotificationAudience.Recipient(channel, recipient, language),
                 templateId,
                 arguments,
                 ctx);
@@ -118,43 +120,59 @@ class NotificationService implements Notifications {
     UUID deliver(
             UUID ruleId,
             UUID eventId,
-            String channel,
-            String recipient,
-            String language,
+            NotificationAudience.Recipient to,
             String templateId,
             Map<String, Object> arguments,
             ScopeContext ctx) {
         requireTransaction();
 
-        String channelCode = channel == null ? "" : channel.toUpperCase();
+        String channelCode = to.channel() == null ? "" : to.channel().toUpperCase();
         if (!channels.containsKey(channelCode)) {
             throw new ProblemException("notification.channel_unknown", Map.of("channel", channelCode));
         }
+        String recipient = to.recipient();
         if (recipient == null || recipient.isBlank()) {
             throw new ProblemException("notification.recipient_required");
         }
         if (ctx == null || ctx.entityId() == null) {
             throw new ProblemException("scope.required");
         }
+        String language = to.language();
 
         Instant now = clock.instant();
         UUID notificationId = Ids.next();
-        String hash = NotificationLog.hash(channelCode, recipient);
+        String hash = recipientHash.of(channelCode, recipient);
+        UUID recipientEntityId = to.entityId();
 
         if (!logRows.queue(
-                notificationId, ruleId, eventId, ctx.entityId(), hash, channelCode, templateId, language, now)) {
+                notificationId,
+                ruleId,
+                eventId,
+                ctx.entityId(),
+                new NotificationLog.Recipient(hash, recipientHash.keyId(), recipientEntityId, to.roleCode()),
+                channelCode,
+                templateId,
+                language,
+                now)) {
             log.debug("Notification for rule {} event {} already logged for this recipient", ruleId, eventId);
             return notificationId;
         }
 
-        Optional<String> suppress =
-                suppression.reasonToSuppress(channelCode, hash, templateId, eventId, notificationId, ctx);
-        if (suppress.isPresent()) {
-            logRows.suppressed(notificationId, suppress.get());
+        NotificationSuppression.Decision decision =
+                suppression.decide(channelCode, hash, templateId, eventId, notificationId, ctx, recipientEntityId);
+        if (decision instanceof NotificationSuppression.Suppress suppress) {
+            logRows.suppressed(notificationId, suppress.reason());
             return notificationId;
         }
 
         logRows.hold(notificationId, ctx.entityId(), recipient, templateId, language, arguments, now);
+
+        if (decision instanceof NotificationSuppression.Defer defer) {
+            // Quiet hours (CR-19A-12): held and QUEUED, due when the window ends; the sweep sends
+            // it then. No attempt now, so none is registered after the commit.
+            logRows.defer(notificationId, defer.until());
+            return notificationId;
+        }
 
         // The provider is called once the row is committed, never inside the handler's transaction.
         UUID ownerEntityId = ctx.entityId();
@@ -162,7 +180,7 @@ class NotificationService implements Notifications {
             @Override
             public void afterCommit() {
                 try {
-                    attempt(notificationId, channelCode, hash, templateId, eventId, ownerEntityId);
+                    attempt(notificationId, channelCode, hash, templateId, eventId, ownerEntityId, recipientEntityId);
                 } catch (RuntimeException e) {
                     // The row is QUEUED and due: the sweep takes it from here.
                     log.error("First attempt of notification {} failed outside the transaction", notificationId, e);
@@ -178,7 +196,8 @@ class NotificationService implements Notifications {
      * the provider call in none, the outcome in another. A row another sweep already claimed
      * is left alone.
      *
-     * @return true when the row was attempted (sent, failed or suppressed), false when it was not due
+     * @param recipientEntityId the recipient's entity, whose quiet hours hold; null for the owner's
+     * @return true when the row was attempted (sent, failed, suppressed or deferred), false when it was not due
      */
     boolean attempt(
             UUID notificationId,
@@ -186,12 +205,15 @@ class NotificationService implements Notifications {
             String recipientHash,
             String templateId,
             UUID eventId,
-            UUID ownerEntityId) {
+            UUID ownerEntityId,
+            UUID recipientEntityId) {
         ScopeContext owner = SystemScope.own(ownerEntityId, null);
         Instant now = clock.instant();
 
         record Claimed(
-                NotificationLog.Claim claim, Optional<NotificationLog.Pending> pending, Optional<String> suppress) {}
+                NotificationLog.Claim claim,
+                Optional<NotificationLog.Pending> pending,
+                NotificationSuppression.Decision decision) {}
 
         Optional<Claimed> claimed = transactions.inOwnScope(owner, () -> {
             // The hold is the longest backoff: a crash in the middle of the send leaves the row
@@ -204,24 +226,31 @@ class NotificationService implements Notifications {
             }
             Optional<NotificationLog.Pending> pending = logRows.pending(notificationId);
             if (pending.isEmpty()) {
-                return Optional.of(new Claimed(claim.get(), pending, Optional.empty()));
+                return Optional.of(new Claimed(claim.get(), pending, new NotificationSuppression.Send()));
             }
             // 19A section 10: the kill switch, quiet hours and the hourly de-duplication are
             // checked before every send, a retry included.
-            Optional<String> suppress = suppression.reasonToSuppress(
-                    channelCode, recipientHash, templateId, eventId, notificationId, owner);
-            if (suppress.isPresent()) {
-                logRows.suppressed(notificationId, suppress.get());
+            NotificationSuppression.Decision decision = suppression.decide(
+                    channelCode, recipientHash, templateId, eventId, notificationId, owner, recipientEntityId);
+            if (decision instanceof NotificationSuppression.Suppress suppress) {
+                logRows.suppressed(notificationId, suppress.reason());
                 logRows.clear(notificationId, now);
+            } else if (decision instanceof NotificationSuppression.Defer defer) {
+                // CR-19A-12: quiet hours began since the last attempt. The row waits for the end
+                // of the window with the attempt the claim counted given back, and the hold kept.
+                // MAX_AGE needs no exemption: a window is at most 15 hours (the register refuses
+                // longer), the three backoffs add 21 minutes, and 24 hours are counted from
+                // created_at only when an attempt fails.
+                logRows.defer(notificationId, defer.until());
             }
-            return Optional.of(new Claimed(claim.get(), pending, suppress));
+            return Optional.of(new Claimed(claim.get(), pending, decision));
         });
 
         if (claimed.isEmpty()) {
             return false;
         }
         NotificationLog.Claim claim = claimed.get().claim();
-        if (claimed.get().suppress().isPresent()) {
+        if (!(claimed.get().decision() instanceof NotificationSuppression.Send)) {
             return true;
         }
         if (claimed.get().pending().isEmpty()) {
@@ -252,12 +281,16 @@ class NotificationService implements Notifications {
         } catch (RuntimeException failure) {
             boolean spent = claim.attempts() >= maxAttempts(channelCode)
                     || claim.createdAt().plus(MAX_AGE).isBefore(now);
-            String error = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+            // The provider's own text can name the recipient or quote the body: it goes to the
+            // application log at DEBUG with the id, and the row and the insert-only audit get the
+            // class and a category only (TWK-21, M9-10; AGENTS.md: no phone number in an audit row).
+            log.debug("Notification {} attempt {} failed", notificationId, claim.attempts(), failure);
+            String error = errorOf(failure);
             transactions.inOwnScope(owner, () -> {
                 logRows.failedAttempt(notificationId, error, now.plus(backoffAfter(claim.attempts())), spent);
                 if (spent) {
                     logRows.clear(notificationId, now);
-                    recordFailure(notificationId, owner, String.valueOf(failure.getMessage()));
+                    recordFailure(notificationId, owner, error);
                 }
                 return null;
             });
@@ -271,6 +304,22 @@ class NotificationService implements Notifications {
             return null;
         });
         return true;
+    }
+
+    /**
+     * What the log and the audit keep of a failure: the exception's class and a category the
+     * adapter chose ({@link NotificationChannel.SendFailed}), or a problem's message id; never
+     * the exception's message.
+     */
+    static String errorOf(RuntimeException failure) {
+        String kind = failure.getClass().getSimpleName();
+        if (failure instanceof NotificationChannel.SendFailed sendFailed) {
+            return kind + ": " + sendFailed.category();
+        }
+        if (failure instanceof ProblemException problem) {
+            return kind + ": " + problem.messageId();
+        }
+        return kind + ": " + NotificationChannel.FailureCategory.UNKNOWN;
     }
 
     /** Three attempts, and a fourth through the secondary provider when the channel has one. */

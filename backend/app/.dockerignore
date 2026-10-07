@@ -1,0 +1,3 @@
+# Only the packed class path goes to the demo-tools image build (infra/demo-tools/Dockerfile).
+*
+!build/demo-tools

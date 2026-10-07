@@ -195,14 +195,17 @@ class ReadPermissionsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(HttpStatus.OK);
         assertThat(owners(locations)).contains(societyA, societyB);
 
+        // CR-18-2 (wave 2, TWK-30): staff administration is the entity's; the users read is marked
+        // x-federation-view: false in the slice, so the Federation's set leaves its code out.
         ResponseEntity<JsonNode> users = get(USERS, viewer);
-        assertThat(users.getStatusCode()).as(String.valueOf(users.getBody())).isEqualTo(HttpStatus.OK);
+        assertThat(users.getStatusCode()).as(String.valueOf(users.getBody())).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(users.getBody().get("params").get("permission").asText()).isEqualTo("gov.user.view");
 
         ResponseEntity<JsonNode> session = get(SESSION, viewer);
         assertThat(session.getBody().get("policyClass").asText()).isEqualTo("FEDERATION_VIEW");
         assertThat(texts(session.getBody().get("permissions")))
-                .contains("prt.location.view", "gov.user.view", "cat.sku.view")
-                .doesNotContain("prt.location.register", "gov.entity.register");
+                .contains("prt.location.view", "cat.sku.view")
+                .doesNotContain("prt.location.register", "gov.entity.register", "gov.user.view", "cus.customer.view");
 
         // A command is refused by the class rule, although the read set carries the same code.
         ResponseEntity<JsonNode> command =
@@ -211,6 +214,68 @@ class ReadPermissionsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .as(String.valueOf(command.getBody()))
                 .isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(command.getBody().get("code").asText()).isEqualTo("permission.denied");
+    }
+
+    /**
+     * Wave 2, TWK-19: Spring serves HEAD from a GET mapping by running the same handler, so a HEAD
+     * is checked as the GET it is. One GET of every slice, sent as HEAD by a clerk whose role
+     * carries no read: 403 each time, never the answer's status and size.
+     */
+    @Test
+    void aHeadIsCheckedAsTheGetItIsOnOneReadOfEverySlice() throws Exception {
+        java.util.Map<String, String> oneReadPerSlice = new java.util.TreeMap<>();
+        org.springframework.core.io.Resource[] slices =
+                new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
+                        .getResources("classpath*:openapi/*.yaml");
+        for (org.springframework.core.io.Resource slice : slices) {
+            if ("common.yaml".equals(slice.getFilename())) {
+                continue;
+            }
+            try (java.io.InputStream in = slice.getInputStream()) {
+                Map<String, Object> document = new org.yaml.snakeyaml.Yaml().load(in);
+                String path = firstUserRead(document);
+                if (path != null) {
+                    oneReadPerSlice.put(slice.getFilename(), path);
+                }
+            }
+        }
+        assertThat(oneReadPerSlice)
+                .as("a read of every slice that has one")
+                .containsKeys("m1party.yaml", "m2catalogue.yaml", "m4trading.yaml", "m6pos.yaml");
+
+        List<String> answered = new ArrayList<>();
+        oneReadPerSlice.forEach((slice, template) -> {
+            String path = template.replaceAll("\\{[^}]+}", UUID.randomUUID().toString());
+            ResponseEntity<Void> head =
+                    http.exchange(path, HttpMethod.HEAD, new HttpEntity<>(ownHeaders(CLERK, societyA)), Void.class);
+            if (head.getStatusCode() != HttpStatus.FORBIDDEN) {
+                answered.add(slice + " HEAD " + path + ": " + head.getStatusCode());
+            }
+        });
+        assertThat(answered)
+                .as("HEAD requests answered without the read permission")
+                .isEmpty();
+    }
+
+    /** The first GET of the slice that a user holds a permission for (not the device's, not the session). */
+    @SuppressWarnings("unchecked")
+    private static String firstUserRead(Map<String, Object> document) {
+        Map<String, Object> paths = (Map<String, Object>) document.getOrDefault("paths", Map.of());
+        for (Map.Entry<String, Object> entry : paths.entrySet()) {
+            Map<String, Object> item = (Map<String, Object>) entry.getValue();
+            Object get = item.get("get");
+            if (!(get instanceof Map<?, ?> operation)) {
+                continue;
+            }
+            Object permission = operation.get("x-permission");
+            if (permission == null
+                    || SliceOperations.AUTHENTICATED.equals(permission.toString())
+                    || lk.coopfed.knoweb.kernel.internal.ScopeFilter.isDeviceOperation(entry.getKey())) {
+                continue;
+            }
+            return entry.getKey();
+        }
+        return null;
     }
 
     // ---- EXTERNAL_TIMEBOXED: doc 21 flow 6.5 --------------------------------------------------

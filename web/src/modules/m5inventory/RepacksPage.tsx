@@ -16,6 +16,7 @@ import { LocationPicker } from "./LocationPicker";
 import { SkuLabel } from "./SkuLabel";
 import { expectedOutputOf, quantityOf } from "./stockControl";
 import { errorText, isSyntheticBatchNo } from "./stockView";
+import { PageHeader } from "../../shell/components/PageHeader";
 import "./inventory.css";
 
 /** Finds an item of the catalogue by code or name and hands the chosen one back. */
@@ -79,7 +80,7 @@ export function RepacksPage() {
   const reverseKey = useIdempotencyKey();
   const [locationId, setLocationId] = useState("");
   const [draft, setDraft] = useState({ name: "", inputSkuId: "", inputQty: "", outputSkuId: "", outputQty: "", loss: "0" });
-  const [run, setRun] = useState({ recipeId: "", batchId: "", inputQty: "", actual: "" });
+  const [run, setRun] = useState({ recipeId: "", batchId: "", inputQty: "", actual: "", reason: "" });
   const [reversing, setReversing] = useState<string | null>(null);
 
   const recipes = useQuery({ queryKey: ["inventory", "recipes"], queryFn: () => api.recipes() });
@@ -143,13 +144,14 @@ export function RepacksPage() {
           locationId,
           inputBatchId: run.batchId,
           inputQty: inputQty ?? 0,
-          actualOutputQty: actual ?? 0
+          actualOutputQty: actual ?? 0,
+          ...(run.reason.trim() === "" ? {} : { varianceReason: run.reason.trim() })
         },
         executeKey.current()
       ),
     onSuccess: () => {
       executeKey.next();
-      setRun({ recipeId: "", batchId: "", inputQty: "", actual: "" });
+      setRun({ recipeId: "", batchId: "", inputQty: "", actual: "", reason: "" });
       refresh();
     },
     onError: forget(executeKey)
@@ -175,16 +177,39 @@ export function RepacksPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/inventory">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("inventory.back").text}
-      </Link>
-      <h1>{t("inventory.repack.title").text}</h1>
+      <PageHeader
+        icon="stock"
+        title={t("inventory.title").text}
+        actions={
+          <Link className="action-link" to="/inventory">
+            <span>{t("inventory.back").text}</span>
+          </Link>
+        }
+      />
 
-      <h2>{t("inventory.repack.recipes").text}</h2>
-      {recipes.data?.length === 0 && <p>{t("inventory.repack.recipe.none").text}</p>}
+      <div className="inventory-control-links">
+        <Link className="action-link" to="/inventory/counts">
+          <span>{t("inventory.counts.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/write-offs">
+          <span>{t("inventory.writeoffs.link").text}</span>
+        </Link>
+        <Link className="action-link action-link--primary" to="/inventory/repacks">
+          <span>{t("inventory.repacks.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/transfer-requests">
+          <span>{t("inventory.request.link").text}</span>
+        </Link>
+      </div>
+
+      <section className="modern-table-card" style={{ marginBottom: 'var(--space-4)' }}>
+        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+          <h2>{t("inventory.repack.recipes").text}</h2>
+        </div>
+      {recipes.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.recipe.none").text}</p>}
       {recipes.data && recipes.data.length > 0 && (
-        <table>
+        <div className="modern-table-scroll">
+          <table className="modern-table stock-table">
           <thead>
             <tr>
               <th>{t("inventory.repack.recipe.name").text}</th>
@@ -220,10 +245,12 @@ export function RepacksPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
+      </section>
 
       {canManage && (
-        <section className="inventory-section">
+        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
           <h2>{t("inventory.repack.recipe.new").text}</h2>
           <label className="inventory-form-field">
             {t("inventory.repack.recipe.name").text}
@@ -262,10 +289,14 @@ export function RepacksPage() {
         </section>
       )}
 
-      <LocationPicker value={locationId} onChange={setLocationId} />
+      <section className="modern-filter-panel modern-filter-panel--stock">
+        <div className="modern-location-picker">
+          <LocationPicker value={locationId} onChange={setLocationId} />
+        </div>
+      </section>
 
       {canExecute && locationId !== "" && (
-        <section className="inventory-section">
+        <section className="modern-table-card inventory-section" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
           <h2>{t("inventory.repack.execute_section").text}</h2>
           <label className="inventory-form-field">
             {t("inventory.repack.recipe").text}
@@ -308,6 +339,10 @@ export function RepacksPage() {
             {t("inventory.repack.actual").text}
             <input inputMode="decimal" value={run.actual} onChange={(event) => setRun({ ...run, actual: event.target.value })} />
           </label>
+          <label className="inventory-form-field">
+            {t("inventory.repack.variance_reason").text}
+            <input value={run.reason} onChange={(event) => setRun({ ...run, reason: event.target.value })} />
+          </label>
           <div className="inventory-action-bar">
             <button type="button" disabled={!runReady || execute.isPending} onClick={() => execute.mutate()}>
               {t("inventory.repack.execute").text}
@@ -317,10 +352,16 @@ export function RepacksPage() {
         </section>
       )}
 
-      {locationId !== "" && <h2>{t("inventory.repack.list").text}</h2>}
-      {repacks.data?.length === 0 && <p>{t("inventory.repack.none").text}</p>}
+      <section className="modern-table-card" style={{ marginTop: 'var(--space-4)' }}>
+      {locationId !== "" && (
+        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+          <h2>{t("inventory.repack.list").text}</h2>
+        </div>
+      )}
+      {repacks.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.repack.none").text}</p>}
       {repacks.data && repacks.data.length > 0 && (
-        <table>
+        <div className="modern-table-scroll">
+          <table className="modern-table stock-table">
           <thead>
             <tr>
               <th>{t("inventory.card.column.when").text}</th>
@@ -365,7 +406,9 @@ export function RepacksPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
+      </section>
       {reversing && (
         <ReasonCapture
           title={t("inventory.repack.reverse.question").text}

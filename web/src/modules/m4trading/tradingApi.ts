@@ -4,7 +4,8 @@
 
 import { useMemo } from "react";
 import { useApiClient } from "../../shell/api/client";
-import { businessToday, inForce } from "./tradingView";
+import { businessToday } from "../../shell/i18n/formats";
+import { inForce } from "./tradingView";
 import type { components, paths } from "../../generated/m4trading";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
@@ -315,6 +316,15 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/discrepancies/{discrepancyId}/settle", {
           params: { path: { discrepancyId }, header: { "Idempotency-Key": key } },
           body: { reason }
+        });
+        return data!;
+      },
+
+      /** Applies what a credit note holds unapplied to an open invoice of the same buyer (CR-24A-3 item 2). */
+      async applyCreditNote(creditNoteId: string, invoiceId: string, key: string): Promise<CreditNote> {
+        const { data } = await api.POST("/v1/trading/credit-notes/{creditNoteId}/apply", {
+          params: { path: { creditNoteId }, header: { "Idempotency-Key": key } },
+          body: { invoiceId }
         });
         return data!;
       },

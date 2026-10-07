@@ -56,7 +56,11 @@ public final class ChromiumPdf {
                     "--headless",
                     // The worker runs as an unprivileged user in a container, where Chromium's
                     // sandbox needs kernel features a container does not grant. What it opens is
-                    // our own page, with a policy that loads nothing from outside it.
+                    // our own page, with a policy that loads nothing from outside it. Kept on
+                    // purpose (wave 2, TWK-28): the compensating controls are the template lint
+                    // (no th:utext, no [( in templates/**, RenderSlotsTest), the cap on
+                    // browsers at once (RenderSlots) and a non-root user under the default seccomp
+                    // profile in the worker image.
                     "--no-sandbox",
                     "--disable-gpu",
                     "--disable-dev-shm-usage",

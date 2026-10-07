@@ -21,7 +21,7 @@ export type Adjustment = components["schemas"]["Adjustment"];
 export type AdjustmentRequest = components["schemas"]["AdjustmentRequest"];
 export type PrivacyRequest = components["schemas"]["PrivacyRequest"];
 export type PrivacyRequestRequest = components["schemas"]["PrivacyRequestRequest"];
-export type AccountAction = "suspend" | "reinstate" | "close";
+export type AccountAction = "suspend" | "reinstate" | "close" | "reopen";
 
 export function useCustomersApi() {
   const api = useApiClient<paths>();
@@ -89,7 +89,9 @@ export function useCustomersApi() {
             ? await api.POST("/v1/accounts/{accountId}/suspend", options)
             : action === "reinstate"
               ? await api.POST("/v1/accounts/{accountId}/reinstate", options)
-              : await api.POST("/v1/accounts/{accountId}/close", options);
+              : action === "reopen"
+                ? await api.POST("/v1/accounts/{accountId}/reopen", options)
+                : await api.POST("/v1/accounts/{accountId}/close", options);
         return data!;
       },
 
@@ -155,9 +157,14 @@ export function useCustomersApi() {
         return data!;
       },
 
-      /** The export of a fulfilled access request, as the JSON the officer hands over. */
-      async privacyExport(requestId: string): Promise<Record<string, unknown> | null> {
-        const { data } = await api.GET("/v1/privacy/requests/{requestId}/export", { params: { path: { requestId } } });
+      /**
+       * The export of a fulfilled access request, as the JSON the officer hands over. A command
+       * (POST with an Idempotency-Key), so the hand-over is the officer's and audited (CR-27A-1).
+       */
+      async privacyExport(requestId: string, idempotencyKey: string): Promise<Record<string, unknown> | null> {
+        const { data } = await api.POST("/v1/privacy/requests/{requestId}/export", {
+          params: { path: { requestId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
         return (data as Record<string, unknown> | undefined) ?? null;
       },
 

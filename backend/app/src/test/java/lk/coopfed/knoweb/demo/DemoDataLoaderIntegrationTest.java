@@ -233,6 +233,24 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
     }
 
     /**
+     * The society office witnesses a write-off (inv.writeoff.witness), and the list and the page it
+     * opens read through inv.stock.view and name the items through cat.sku.view; without them a new
+     * write-off stopped at "Waiting for a witness" and the office could not open it.
+     */
+    @Test
+    void theSocietyOfficeCanOpenTheWriteOffItWitnesses() {
+        JdbcTemplate admin = superuserJdbc();
+        Long held = admin.queryForObject(
+                """
+                        select count(*) from security.role_permission
+                        where role_id = '0190f0de-0000-7000-8000-000000000334'
+                          and permission_code in ('inv.writeoff.witness', 'inv.stock.view', 'cat.sku.view')
+                        """,
+                Long.class);
+        assertThat(held).isEqualTo(3L);
+    }
+
+    /**
      * DEMO-02: the history's orders, delivery notes, GRNs and invoices carry business dates over the
      * eight weeks before today, each kind later than the one before it, and every numbering series
      * the demo used numbers its documents in the order of their dates.
@@ -423,7 +441,9 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         assertThat(writeOffs).singleElement().satisfies(w -> {
             assertThat(w.status()).isEqualTo("POSTED");
             assertThat(w.category()).isEqualTo("DAMAGED_IN_STORE");
-            assertThat(w.witnessUserId()).isEqualTo(DemoCast.M101_MANAGER.userId());
+            // wave 2, M5-10: the society office witnesses in person, the manager approves.
+            assertThat(w.witnessUserId()).isEqualTo(UUID.fromString("0190f0de-0000-7000-8000-000000000234"));
+            assertThat(w.approverUserId()).isEqualTo(DemoCast.M101_MANAGER.userId());
             assertThat(w.documentNo()).isNotBlank();
             assertThat(LocalDate.ofInstant(w.decidedAt(), colombo))
                     .isEqualTo(LocalDate.ofInstant(w.requestedAt(), colombo));

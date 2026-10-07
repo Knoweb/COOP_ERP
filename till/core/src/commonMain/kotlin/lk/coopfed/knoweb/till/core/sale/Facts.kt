@@ -107,6 +107,27 @@ object Facts {
         put("content_hash", receipt.contentHash)
     }
 
+    /** The audit type a till records when wrong PINs lock it (kernel seed audit-event-types.yaml, offline_capturable). */
+    const val PIN_LOCKOUT_AUDIT = "TILL_PIN_LOCKOUT"
+    const val PIN_LOCKOUT_EVENT = "audit.till_pin_lockout.v1"
+
+    /**
+     * The till's audit row for a PIN lock-out (26A section 8, "local + audit"; doc 32 section 3.1,
+     * the audit.* family the kernel applies as a device audit row). It names the till position and
+     * the lock-out's end, never a PIN or which PINs were tried.
+     */
+    fun pinLockout(device: DeviceIdentity, failures: Int, lockedUntil: Instant): JsonObject = buildJsonObject {
+        put("event_type_code", PIN_LOCKOUT_AUDIT)
+        put("subject_table", "till_position")
+        put("subject_id", device.tillPositionId)
+        put("till_position_id", device.tillPositionId)
+        put("reason_code", "PIN_FAILURES")
+        put("after_state", buildJsonObject {
+            put("failures", failures)
+            put("locked_until", Times.iso(lockedUntil))
+        })
+    }
+
     /** The TillEvent envelope (sync.yaml TillEvent) around a payload. */
     fun event(
         eventId: String,

@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m1party.internal.relationship;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -12,15 +13,19 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m1party.api.ActivateRelationship;
+import lk.coopfed.knoweb.m1party.api.CreditLimitChanged;
 import lk.coopfed.knoweb.m1party.api.RelationshipActivated;
 import lk.coopfed.knoweb.m1party.api.TradePriceListCheck;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ActivateRelationship (21A section 6; doc 21 flow 6.2): the seller puts a DRAFT into force.
- * From here M4 accepts the buyer's orders under it.
+ * From here M4 accepts the buyer's orders under it. A draft with a credit limit passes the
+ * limit's gate ({@link CreditLimitGate}) and publishes {@code credit_limit.changed.v1}, null to
+ * the opening limit, audited as CREDIT_LIMIT_CHANGED (wave 2: CR-21A-7; M8 D6).
  */
 @Service
 @CommandHandler(permission = "prt.relationship.activate")
@@ -30,16 +35,22 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
 
     private final RelationshipRepository repository;
     private final TradePriceListCheck priceLists;
+    private final CreditLimitGate creditLimitGate;
+    private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     ActivateRelationshipHandler(
             RelationshipRepository repository,
             TradePriceListCheck priceLists,
+            CreditLimitGate creditLimitGate,
+            JdbcTemplate jdbc,
             AuditFacade audit,
             EventPublisher events) {
         this.repository = repository;
         this.priceLists = priceLists;
+        this.creditLimitGate = creditLimitGate;
+        this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
     }
@@ -69,6 +80,13 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
             throw new ProblemException("m1.relationship.payment_terms_required");
         }
 
+        // 3b. a draft that carries a credit limit puts it into force: the limit's gate
+        //     (CR-21A-7), whoever opened the draft.
+        boolean withLimit = relationship.creditLimit() != null;
+        if (withLimit) {
+            creditLimitGate.require(scope);
+        }
+
         // 4. M3: the list belongs to the seller and is published (stubbed until M3 answers).
         Optional<String> refusal = priceLists.refusal(relationship.priceListId(), relationship.sellerEntityId(), scope);
         if (refusal.isPresent()) {
@@ -95,6 +113,13 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
         } catch (DataIntegrityViolationException ex) {
             throw RelationshipRules.translate(ex, relationship);
         }
+        if (withLimit) {
+            jdbc.update(
+                    RelationshipRules.MARK_LIMIT_ANNOUNCED,
+                    relationship.sellerEntityId(),
+                    relationship.buyerEntityId(),
+                    relationship.getId());
+        }
 
         audit.record(
                 AUDIT_ACTIVATED,
@@ -102,6 +127,14 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
                 before,
                 relationship.auditState(),
                 scope);
+        if (withLimit) {
+            audit.record(
+                    AmendRelationshipTermsHandler.AUDIT_CREDIT_LIMIT_CHANGED,
+                    Subject.of("relationship", relationship.getId()),
+                    limitState(relationship.getId(), null),
+                    limitState(relationship.getId(), relationship.creditLimit()),
+                    scope);
+        }
 
         events.publish(new RelationshipActivated(
                 relationship.getId(),
@@ -110,7 +143,26 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
                 relationship.effectiveFrom(),
                 relationship.effectiveTo(),
                 relationship.terms().hash()));
+        if (withLimit) {
+            // The opening limit as an event (M8 D6): null to the limit, so a projection of the
+            // current limit needs nothing but credit_limit.changed.v1.
+            events.publish(new CreditLimitChanged(
+                    relationship.getId(),
+                    null,
+                    null,
+                    relationship.creditLimit(),
+                    relationship.effectiveFrom(),
+                    relationship.sellerEntityId(),
+                    relationship.buyerEntityId()));
+        }
 
         return relationship.getId();
+    }
+
+    static Map<String, Object> limitState(UUID relationshipId, BigDecimal creditLimit) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("relationshipId", relationshipId);
+        state.put("creditLimit", creditLimit);
+        return state;
     }
 }

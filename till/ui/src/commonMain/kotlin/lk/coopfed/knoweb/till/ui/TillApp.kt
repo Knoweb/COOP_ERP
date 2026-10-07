@@ -48,8 +48,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.time.Instant
+import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.snapshot.Item
 import lk.coopfed.knoweb.till.core.snapshot.Operator
+import lk.coopfed.knoweb.till.core.time.Times
 
 /**
  * The till, one screen at a time (research report 7A.2): enrol, sign in, open the session, sell,
@@ -64,7 +67,9 @@ fun TillApp(controller: TillController, defaults: EnrolDefaults = EnrolDefaults(
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize()) {
                 TopBar(controller)
+                Banners(controller)
                 MessageBar(controller)
+                controller.problemsShown?.let { ProblemsDialog(controller, it) }
                 Box(Modifier.fillMaxSize().padding(16.dp)) {
                     when (controller.screen) {
                         Screen.STARTING -> Text("Opening the till's database…")
@@ -110,6 +115,12 @@ private fun TopBar(c: TillController) {
             "$label · ${s.pendingFacts} to upload · snapshot v${s.snapshotVersion}",
             color = fg, modifier = Modifier.background(bg).padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 13.sp,
         )
+        if (s.problems > 0) {
+            // Facts central refused and other problems the office must see (TWK-05).
+            OutlinedButton(onClick = { c.showProblems() }) {
+                Text("${s.problems} problem${if (s.problems == 1L) "" else "s"} for the office", color = TillColors.onAccent)
+            }
+        }
         if (c.screen != Screen.ENROL && c.screen != Screen.STARTING) {
             OutlinedButton(onClick = { c.syncNow() }) { Text("Sync now", color = TillColors.onAccent) }
         }
@@ -117,6 +128,42 @@ private fun TopBar(c: TillController) {
             OutlinedButton(onClick = { c.signOut() }) { Text("Sign out", color = TillColors.onAccent) }
         }
     }
+}
+
+/** What a supervisor must see on every screen: a revoke, the version floor, a stale snapshot, uploading stopped. */
+@Composable
+private fun Banners(c: TillController) {
+    for (banner in c.status.banners) {
+        Text(
+            banner,
+            color = TillColors.alertText,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.fillMaxWidth().background(TillColors.alertBg).padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun ProblemsDialog(c: TillController, problems: List<Anomaly>) {
+    AlertDialog(
+        onDismissRequest = { c.closeProblems() },
+        title = { Text("Problems for the office") },
+        text = {
+            LazyColumn(Modifier.widthIn(max = 640.dp)) {
+                itemsIndexed(problems) { _, p ->
+                    Column(Modifier.padding(vertical = 6.dp)) {
+                        Text(
+                            Times.printed(Instant.fromEpochMilliseconds(p.notedAt), c.zoneForScreens) + " · " + p.kind,
+                            color = TillColors.textMuted, fontSize = 12.sp,
+                        )
+                        Text(p.detail)
+                    }
+                    HorizontalDivider()
+                }
+            }
+        },
+        confirmButton = { Button(onClick = { c.closeProblems() }) { Text("Seen") } },
+    )
 }
 
 @Composable
@@ -163,12 +210,19 @@ private fun SignInScreen(c: TillController) {
     var chosen by remember { mutableStateOf<Operator?>(null) }
     var pin by remember { mutableStateOf("") }
     Panel("Sign in") {
-        if (c.operators.isEmpty()) {
+        if (c.operators.isEmpty() && c.trialCashierOffered) {
             Text(
-                "The snapshot has no operator with a PIN for this shop yet. For the trial, continue as the till's trial cashier.",
+                "The snapshot has no operator with a PIN for this shop yet. This PC is set up for the trial: continue as the till's trial cashier.",
                 color = TillColors.textMuted,
             )
             Button(onClick = { c.signInTrialCashier() }, enabled = !c.busy) { Text("Continue as trial cashier") }
+        } else if (c.operators.isEmpty()) {
+            // TWK-04: no stand-in on a till that did not opt in, or once the shop has had operators.
+            Text(
+                "This till has no operator for this shop. The office must assign an operator with a PIN to this shop; " +
+                    "the till receives them with its next snapshot.",
+                color = TillColors.textMuted,
+            )
         } else {
             c.operators.forEach { op ->
                 Text(
@@ -193,6 +247,7 @@ private fun SignInScreen(c: TillController) {
 @Composable
 private fun OpenSessionScreen(c: TillController) {
     var float by remember { mutableStateOf("2000.00") }
+    var correcting by remember { mutableStateOf(false) }
     Panel("Open the session") {
         Text("Count the float into the drawer and key it.", color = TillColors.textMuted)
         OutlinedTextField(
@@ -201,7 +256,61 @@ private fun OpenSessionScreen(c: TillController) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
         )
         Button(onClick = { c.openSession(float) }, enabled = !c.busy) { Text("Open session") }
+        val date = c.businessDate
+        if (date != null) {
+            Text("The till's business date: $date", color = TillColors.textMuted)
+            // A date opened from a wrong PC clock is corrected by a supervisor (decision D-4).
+            if (c.clockDate?.let { it < date } == true) {
+                OutlinedButton(onClick = { correcting = true }) { Text("Move the business date back (supervisor)") }
+            }
+        }
     }
+    if (correcting) BusinessDateDialog(c) { correcting = false }
+}
+
+@Composable
+private fun BusinessDateDialog(c: TillController, close: () -> Unit) {
+    var date by remember { mutableStateOf(c.clockDate?.toString() ?: "") }
+    var supervisor by remember { mutableStateOf(c.supervisors.firstOrNull()) }
+    var pin by remember { mutableStateOf("") }
+    val trial = c.supervisors.isEmpty() && c.trialCashierOffered
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Move the business date back") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Receipts and sessions already issued keep their date. Check the PC's date and time first.",
+                    color = TillColors.textMuted,
+                )
+                OutlinedTextField(date, { date = it }, label = { Text("Business date (yyyy-mm-dd)") }, singleLine = true)
+                if (!trial) {
+                    if (c.supervisors.isEmpty()) {
+                        Text("No operator of this shop may correct the business date; ask the office.", color = TillColors.alertText)
+                    }
+                    c.supervisors.forEach { op ->
+                        Text(
+                            op.displayName,
+                            modifier = Modifier.fillMaxWidth().clickable { supervisor = op }
+                                .background(if (supervisor == op) TillColors.issuedBg else TillColors.surface).padding(8.dp),
+                        )
+                    }
+                    OutlinedTextField(
+                        pin, { pin = it.filter(Char::isDigit).take(8) }, label = { Text("Supervisor's PIN") },
+                        singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { c.correctBusinessDate(date, if (trial) null else supervisor, pin, close) },
+                enabled = !c.busy && (trial || (supervisor != null && pin.length >= 4)),
+            ) { Text("Correct") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable

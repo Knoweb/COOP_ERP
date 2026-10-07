@@ -6,7 +6,7 @@
 
 ## Steps
 
-1. As `fed-stores`, go to **Stock** ("තොගය"). Choose **Location**: Federation central warehouse (FW01). Point out the table: item, **Batch** (DEMO-2026-*n*), **Expiry**, **Printed MRP**, **Condition** (Good/Damaged), **On hand**, **Available**, and **Pick order** — the FEFO order stock will be picked in.
+1. As `fed-stores`, go to **Stock** ("තොගය"). Choose **Location**: Federation central warehouse (FW01). Point out the table: item, **Batch** (DEMO-2026-*n*), **Expiry**, **Printed MRP**, **Condition** (Good/Damaged), **On hand**, **Available**, and **Pick order** — the FEFO order stock will be picked in. A lot past its expiry date is marked *Expired*, has no pick order and is never available (the demo's lots are loaded with months of shelf life left, so none is expired after a fresh `make demo-data`).
 2. Sign out, sign in as `d101-stores`, choose the Kurunegala warehouse (W01) — the same screen, this warehouse's own stock, loaded and signed off the same way.
 3. Live: sign in as `m101-buyer` (or whichever user has not yet prepared an opening balance for their location), go to **Stock** → **Load opening stock**. Choose the **Location**, **Find an item by code or name**, add two or three items, type a **Quantity** and a **Unit cost** for each, click **Prepare**.
 4. The balance lands in state "Prepared". Point out the two buttons this state offers: **Sign** (the person who counted it) and, once signed, **Countersign and post** — and that the screen requires "another person than the signer" to countersign.

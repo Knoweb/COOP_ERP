@@ -111,6 +111,37 @@ public final class CustomerGuards {
 
     static final int ATTRIBUTES_BYTES_MAX = 1500;
 
+    /**
+     * The step-up of doc 27 section 4.2 on a limit increase and on a NIC re-capture: a second
+     * factor presented within {@code customers.limit_increase_mfa_max_age} ({@code mfa.required}).
+     */
+    public static void requireFreshMfa(
+            lk.coopfed.knoweb.kernel.api.ConfigRegistry config,
+            lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock clock,
+            ScopeContext scope,
+            String permission) {
+        java.time.Duration maxAge = config.getDuration(MFA_MAX_AGE, scope, DEFAULT_MFA_MAX_AGE);
+        java.time.Instant freshEnough = clock.now().minus(maxAge);
+        if (scope.mfaAt() == null || scope.mfaAt().isBefore(freshEnough)) {
+            throw new ProblemException("mfa.required", Map.of("permission", permission));
+        }
+    }
+
+    public static final String MFA_MAX_AGE = "customers.limit_increase_mfa_max_age";
+    public static final java.time.Duration DEFAULT_MFA_MAX_AGE = java.time.Duration.ofMinutes(10);
+
+    /**
+     * The limit above which an account needs the customer's NIC (doc 27 section 7,
+     * {@code customers.nic_required_above_limit}, FEDERATION, default 0): read by OpenAccount and
+     * AmendAccountLimits alike (wave 2, M7CR-03).
+     */
+    public static final String NIC_REQUIRED_ABOVE_LIMIT = "customers.nic_required_above_limit";
+
+    public static java.math.BigDecimal nicRequiredAboveLimit(
+            lk.coopfed.knoweb.kernel.api.ConfigRegistry config, ScopeContext scope) {
+        return new java.math.BigDecimal(config.getOrDefault(NIC_REQUIRED_ABOVE_LIMIT, scope, "0"));
+    }
+
     /** The customer's status, read under the caller's policies; not found when the scope may not see it. */
     public static String customerStatus(JdbcTemplate jdbc, UUID customerId) {
         List<String> status = jdbc.queryForList(

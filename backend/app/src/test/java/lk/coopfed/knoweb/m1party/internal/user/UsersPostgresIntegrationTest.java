@@ -512,7 +512,10 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID secondAdmin = insertUser(ENTITY, "second.admin", "BACK_OFFICE", "ACTIVE");
         grantUserManage(secondAdmin);
 
-        deactivateUser.handle(new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), admin);
+        // By a user manager: one who does not hold gov.user.manage cannot deactivate one who does
+        // (CR-21A-7, UserRankPostgresIntegrationTest).
+        deactivateUser.handle(
+                new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), ScopeContext.dev(secondAdmin, ENTITY, null));
         assertThat(queries.getUser(onlyAdmin, admin))
                 .get()
                 .extracting(UserView::status)
@@ -537,7 +540,8 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> deactivateUser.handle(new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), admin));
 
         superuserJdbc().update("update security.app_user set status = 'ACTIVE' where user_id = ?", pending);
-        deactivateUser.handle(new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), admin);
+        deactivateUser.handle(
+                new DeactivateUser(onlyAdmin, "LEFT_EMPLOYMENT", null), ScopeContext.dev(pending, ENTITY, null));
         assertThat(queries.getUser(onlyAdmin, admin))
                 .get()
                 .extracting(UserView::status)
@@ -569,6 +573,167 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> deactivateUser.handle(new DeactivateUser(officer, "LEFT", null), admin));
 
         assertThat(provider.calls).isEmpty();
+    }
+
+    // ---- whose credentials, and the last user manager by kind (wave 2: M1A-01, M1A-03; CR-21A-7) ----
+
+    /**
+     * Each test makes its own users, so the kernel's permission cache (keyed by user) never holds
+     * a resolution from an earlier one.
+     */
+    @Nested
+    class WhoseCredentials {
+
+        UUID manager;
+        ScopeContext asManager;
+
+        @BeforeEach
+        void aUserManager() {
+            manager = insertUser(ENTITY, unique("manager"), "BACK_OFFICE", "ACTIVE", "subject-" + UUID.randomUUID());
+            assign(manager, insertRole(ENTITY, "User manager", List.of("gov.user.manage", "gov.user.view")), null);
+            asManager = ScopeContext.dev(manager, ENTITY, null);
+        }
+
+        @Test
+        void aTargetWhoHoldsASensitiveCodeTheCallerLacksIsRefusedOnEveryPath() {
+            // The role manager: gov.role.manage is requires_mfa, and the user manager lacks it.
+            UUID roleManager = insertUser(ENTITY, unique("role.manager"), "BOTH", "ACTIVE", "subject-rm");
+            assign(
+                    roleManager,
+                    insertRole(ENTITY, "Administrator", List.of("gov.user.manage", "gov.role.manage")),
+                    null);
+
+            refused(
+                    "m1.user.target_outranks_caller",
+                    () -> resetCredential.handle(new ResetCredential(roleManager, "PASSWORD", null), asManager));
+            refused(
+                    "m1.user.target_outranks_caller",
+                    () -> resetCredential.handle(new ResetCredential(roleManager, "SECOND_FACTOR", null), asManager));
+            refused(
+                    "m1.user.target_outranks_caller",
+                    () -> resetCredential.handle(new ResetCredential(roleManager, "PIN", "4827"), asManager));
+            refused(
+                    "m1.user.target_outranks_caller",
+                    () -> updateUser.handle(new UpdateUser(roleManager, "Role Manager", "en", "TILL"), asManager));
+            refused(
+                    "m1.user.target_outranks_caller",
+                    () -> deactivateUser.handle(new DeactivateUser(roleManager, "LEFT_EMPLOYMENT", null), asManager));
+
+            assertThat(provider.calls)
+                    .as("nothing reached the identity provider")
+                    .isEmpty();
+            assertThat(queries.getUser(roleManager, asManager)).get().satisfies(view -> {
+                assertThat(view.userKind()).isEqualTo("BOTH");
+                assertThat(view.status()).isEqualTo("ACTIVE");
+                assertThat(view.pinSet()).isFalse();
+            });
+        }
+
+        @Test
+        void aTargetOfEqualRankIsServedAndTheTemporaryPasswordReturned() {
+            UUID deputy = insertUser(ENTITY, unique("deputy"), "BOTH", "ACTIVE", "subject-deputy");
+            assign(deputy, insertRole(ENTITY, "Deputy", List.of("gov.user.manage")), null);
+
+            CredentialResetResult password =
+                    resetCredential.handle(new ResetCredential(deputy, "PASSWORD", null), asManager);
+            assertThat(password.delivery()).isEqualTo("RETURNED");
+            assertThat(password.temporaryPassword()).isNotBlank();
+            assertThat(kernel.committedAudit())
+                    .extracting(AuditRecord::eventType)
+                    .contains("USER_CREDENTIAL_RESET");
+            assertThat(kernel.committedEvents())
+                    .contains(new UserCredentialReset(deputy, deputy, ENTITY, "BOTH", "ACTIVE", "PASSWORD"));
+
+            kernel.reset();
+            resetCredential.handle(new ResetCredential(deputy, "SECOND_FACTOR", null), asManager);
+            resetCredential.handle(new ResetCredential(deputy, "PIN", "4827"), asManager);
+            assertThat(provider.methodsFor("subject-deputy")).containsExactly("setTemporaryPassword", "resetTotp");
+
+            // Closing the deputy's back office: the manager remains, so the deputy is not the last.
+            kernel.reset();
+            updateUser.handle(new UpdateUser(deputy, "Deputy", "en", "TILL"), asManager);
+            assertThat(kernel.committedAudit())
+                    .extracting(AuditRecord::eventType)
+                    .containsExactly("USER_UPDATED");
+            assertThat(kernel.committedEvents())
+                    .containsExactly(new UserUpdated(deputy, deputy, ENTITY, "TILL", "ACTIVE"));
+        }
+
+        @Test
+        void aLowerTargetIsServedOnEveryPath() {
+            UUID cashier = insertUser(ENTITY, unique("cashier"), "BOTH", "ACTIVE", "subject-cashier");
+            // A cashier's role holds no requires_mfa code.
+            assign(cashier, insertRole(ENTITY, "Cashier", List.of("gov.user.view")), SHOP_A);
+
+            resetCredential.handle(new ResetCredential(cashier, "PASSWORD", null), asManager);
+            resetCredential.handle(new ResetCredential(cashier, "SECOND_FACTOR", null), asManager);
+            resetCredential.handle(new ResetCredential(cashier, "PIN", "4827"), asManager);
+            updateUser.handle(new UpdateUser(cashier, "Cashier", "en", "TILL"), asManager);
+            kernel.reset();
+
+            deactivateUser.handle(new DeactivateUser(cashier, "LEFT_EMPLOYMENT", null), asManager);
+
+            assertThat(kernel.committedAudit())
+                    .extracting(AuditRecord::eventType)
+                    .containsExactly("USER_DEACTIVATED");
+            assertThat(kernel.committedEvents())
+                    .containsExactly(new UserDeactivated(cashier, cashier, ENTITY, "TILL", "DEACTIVATED"));
+        }
+
+        @Test
+        void aSensitiveCodeHeldAtOneShopCountsToo() {
+            // inv.writeoff.approve is requires_mfa; held at a shop, it still ranks the user above
+            // a user manager who does not hold it anywhere.
+            UUID shopManager = insertUser(ENTITY, unique("shop.manager"), "BOTH", "ACTIVE", "subject-shop");
+            assign(shopManager, insertRole(ENTITY, "Shop approver", List.of("inv.writeoff.approve")), SHOP_A);
+
+            refused(
+                    "m1.user.target_outranks_caller",
+                    () -> resetCredential.handle(new ResetCredential(shopManager, "PIN", "4827"), asManager));
+        }
+
+        @Test
+        void nobodyResetsTheirOwnSecondFactor() {
+            refused(
+                    "m1.user.credential_self",
+                    () -> resetCredential.handle(new ResetCredential(manager, "SECOND_FACTOR", null), asManager));
+            assertThat(provider.calls).isEmpty();
+        }
+
+        @Test
+        void theLastUserManagerKeepsTheBackOfficeAndATillOnlyHolderIsNotAnother() {
+            // A TILL-only user who holds gov.user.manage has no login to manage users with.
+            UUID tillHolder = insertUser(ENTITY, unique("till.holder"), "TILL", "ACTIVE");
+            assign(tillHolder, insertRole(ENTITY, "Till admin", List.of("gov.user.manage")), null);
+
+            refused(
+                    "m1.user.last_user_manager",
+                    () -> updateUser.handle(new UpdateUser(manager, "Manager", "en", "TILL"), asManager));
+            assertThat(queries.getUser(manager, asManager))
+                    .get()
+                    .extracting(UserView::userKind)
+                    .isEqualTo("BACK_OFFICE");
+
+            // Nor is it another for DeactivateUser.
+            refused(
+                    "m1.user.last_user_manager",
+                    () -> deactivateUser.handle(new DeactivateUser(manager, "LEFT_EMPLOYMENT", null), asManager));
+
+            // A second back-office manager is: now the kind may change.
+            UUID second = insertUser(ENTITY, unique("second.manager"), "BACK_OFFICE", "ACTIVE");
+            assign(second, insertRole(ENTITY, "User manager 2", List.of("gov.user.manage")), null);
+            kernel.reset();
+            updateUser.handle(new UpdateUser(manager, "Manager", "en", "BOTH"), asManager);
+            updateUser.handle(new UpdateUser(manager, "Manager", "en", "TILL"), asManager);
+            assertThat(queries.getUser(manager, asManager))
+                    .get()
+                    .extracting(UserView::userKind)
+                    .isEqualTo("TILL");
+        }
+
+        private String unique(String prefix) {
+            return prefix + "." + UUID.randomUUID().toString().substring(0, 8);
+        }
     }
 
     // ---- row-level security for a shop-scoped caller (m1security V0012) ----
@@ -645,6 +810,69 @@ class UsersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(belongs).isTrue();
             assertThat(taken).isTrue();
             assertThat(takenForNobody).isFalse();
+        }
+
+        /**
+         * m1security V0018 (wave 2, RLS-16): an OWN scope with no entity (which the customizer never
+         * produces) is answered "no", not "yes for any entity" as V0016's NULL comparison did.
+         */
+        @Test
+        void theOfficerCheckAnswersNoToAScopeWithoutAnEntity() {
+            Boolean withoutEntity = new TransactionTemplate(transactions).execute(status -> {
+                jdbc.queryForObject("select set_config('app.scope_entity_id', '', true)", String.class);
+                jdbc.queryForObject("select set_config('app.scope_location_id', '', true)", String.class);
+                jdbc.queryForObject("select set_config('app.scope_class', 'OWN', true)", String.class);
+                try {
+                    return jdbc.queryForObject(
+                            "select security.user_belongs_to_entity(?, ?)", Boolean.class, atShopB, ENTITY);
+                } finally {
+                    status.setRollbackOnly();
+                }
+            });
+            Boolean forAnotherEntity = inScope(
+                    OTHER_ENTITY,
+                    null,
+                    () -> jdbc.queryForObject(
+                            "select security.user_belongs_to_entity(?, ?)", Boolean.class, atShopB, ENTITY));
+
+            assertThat(withoutEntity).isFalse();
+            assertThat(forAnotherEntity).isFalse();
+        }
+
+        /**
+         * m1security V0020 (wave 2, PR 17): the helper of app_user's own_read answers only the OWN
+         * class; any other class, or a transaction with no scope, learns nothing about a user's
+         * assignments. In OWN (where the policies call it) it answers as before.
+         */
+        @Test
+        void theAssignmentHelperAnswersOnlyTheOwnClass() {
+            for (String policyClass : List.of("FEDERATION_VIEW", "EXTERNAL_TIMEBOXED", "PARTY", "NONE", "")) {
+                Boolean answer = new TransactionTemplate(transactions).execute(status -> {
+                    jdbc.queryForObject(
+                            "select set_config('app.scope_entity_id', ?, true)", String.class, ENTITY.toString());
+                    jdbc.queryForObject("select set_config('app.scope_location_id', '', true)", String.class);
+                    jdbc.queryForObject("select set_config('app.scope_class', ?, true)", String.class, policyClass);
+                    jdbc.queryForObject(
+                            "select set_config('app.granted_entities', ?, true)", String.class, "{" + ENTITY + "}");
+                    try {
+                        return jdbc.queryForObject(
+                                "select security.user_has_any_assignment(?)", Boolean.class, atShopB);
+                    } finally {
+                        status.setRollbackOnly();
+                    }
+                });
+                assertThat(answer).as("class '" + policyClass + "'").isFalse();
+            }
+            Boolean own = inScope(
+                    ENTITY,
+                    null,
+                    () -> jdbc.queryForObject("select security.user_has_any_assignment(?)", Boolean.class, atShopB));
+            Boolean ownUnassigned = inScope(
+                    ENTITY,
+                    null,
+                    () -> jdbc.queryForObject("select security.user_has_any_assignment(?)", Boolean.class, unassigned));
+            assertThat(own).isTrue();
+            assertThat(ownUnassigned).isFalse();
         }
 
         private List<UUID> visible(ScopeContext scope) {

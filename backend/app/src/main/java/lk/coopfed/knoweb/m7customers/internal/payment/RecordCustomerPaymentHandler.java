@@ -26,6 +26,7 @@ import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentRecorded;
 import lk.coopfed.knoweb.m7customers.api.RecordCustomerPayment;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.customer.PersonalDataText;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Allocator;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
@@ -40,7 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
  * society's ENTITY series); the account of this society, OPEN or SUSPENDED; a known method; an
  * amount above zero in cents; a known allocation mode; with SPECIFIC, the chosen charges open
  * charges of this account, each no more than is open and together no more than the payment
- * ({@link Allocator#specific}).
+ * ({@link Allocator#specific}); a reference free of a phone number or NIC ({@code
+ * m7.field.personal_data}: an issued CPR is retained after an erasure).
  *
  * <p>Mutation: the CPR from the society's ENTITY series (27A: "ENTITY series in the office"; the
  * type's TILL_POSITION scope is the till's, and the numbering falls back to the entity's series
@@ -130,7 +132,8 @@ class RecordCustomerPaymentHandler implements Handles<RecordCustomerPayment, UUI
         }
         BigDecimal allocated =
                 allocations.stream().map(Allocator.Allocation::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        String reference = CustomerGuards.blankToNull(command.reference());
+        // The reference stays on the issued CPR after an erasure: no phone number or NIC in it.
+        String reference = PersonalDataText.require(CustomerGuards.blankToNull(command.reference()), "reference");
 
         // The CPR: a draft, its one line, the society's ENTITY series, the issuance.
         UUID documentId = Ids.next();

@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
  * and when it happened. The dashboard shows it beside a figure; lag detection (LAGGING against
  * the archive head) and the rebuild status wait for the rebuild service (module README). The
  * latest event wins, so an old event replayed late does not move the state back.
+ *
+ * <p>The time stored is never ahead of central's clock (wave 2, M8-02): a till whose clock runs
+ * ahead stamps its events in the future, and the guard below would then hold the stored time
+ * there, freezing the freshness the reports show until real time caught up. The event's own
+ * time is clamped to now() instead.
  */
 @Component
 public class ProjectionStateStore {
@@ -25,7 +30,7 @@ public class ProjectionStateStore {
                 """
                 insert into reporting.projection_state
                        (name, owner_entity_id, consumer, last_event_id, last_event_type, last_event_at)
-                values (?, ?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?, least(?::timestamptz, now()))
                 on conflict (name, owner_entity_id) do update
                    set last_event_id = excluded.last_event_id,
                        last_event_type = excluded.last_event_type,

@@ -12,8 +12,21 @@ import java.util.UUID;
  */
 public interface NotificationAudience {
 
-    /** One person to reach on one channel: the recipient as the channel understands it, and the language. */
-    record Recipient(String channel, String recipient, String language) {}
+    /**
+     * One person to reach on one channel: the recipient as the channel understands it, and the
+     * language. {@code entityId} and {@code roleCode} say who the recipient is without saying the
+     * number (wave 2, CR-19A-12): the entity whose contact it is (ROLE_AT_COUNTERPARTY gives the
+     * counterparty) and the role it was reached as. The kernel keeps both on the delivery log, so
+     * the log screen never needs a hash, and reads that entity's quiet hours. Null when the
+     * resolver does not know them (EXPLICIT, a direct send): then the event owner's are read.
+     */
+    record Recipient(String channel, String recipient, String language, UUID entityId, String roleCode) {
+
+        /** A recipient whose entity and role are not known. */
+        public Recipient(String channel, String recipient, String language) {
+            this(channel, recipient, language, null, null);
+        }
+    }
 
     /** The kind this bean resolves. */
     NotificationRuleQueries.AudienceKind kind();

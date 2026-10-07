@@ -6,12 +6,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
@@ -34,13 +39,17 @@ import lk.coopfed.knoweb.m3pricing.internal.list.SetLinesHandler;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
+import lk.coopfed.knoweb.testsupport.PinnedClock;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * M3-04 (23A section 7; doc 23 flows 6.2): every guard of CreatePriceList, DraftNewVersion,
@@ -48,6 +57,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * price lookup M4 uses (tiers, versions by date, the buyer's view), and M3's answer to M1's
  * price-list check.
  */
+@Import(PinnedClock.class)
 class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID FEDERATION = TEST_FEDERATION;
@@ -75,10 +85,19 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     TradePriceListCheck check;
 
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
+    @Autowired
+    java.time.Clock clock;
+
     private final UUID rice = Ids.next();
     private final UUID sugar = Ids.next();
     private final UUID draftSku = Ids.next();
-    private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Colombo"));
+    private final LocalDate today = PinnedClock.TODAY;
 
     @BeforeEach
     void arrange() {
@@ -319,6 +338,59 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents()).isEmpty();
     }
 
+    /**
+     * M3-09: the handlers read the same pinned clock as this class, at 23:59:59.9 in Colombo, so a
+     * list published "from today" is accepted however long the run takes.
+     */
+    @Test
+    void theHandlersReadThePinnedClockAtTheLastTenthOfTheColomboDay() {
+        assertThat(clock.instant()).isEqualTo(PinnedClock.INSTANT);
+        assertThat(PinnedClock.INSTANT.atZone(PinnedClock.COLOMBO).toLocalTime())
+                .isEqualTo(java.time.LocalTime.of(23, 59, 59, 900_000_000));
+        UUID list = published(List.of(line(rice, "0", "100")), today);
+        assertThat(queries.getPriceList(list, own(FEDERATION))).get().satisfies(v -> assertThat(v.applyFrom())
+                .isEqualTo(today));
+    }
+
+    /**
+     * M3-05: publication locks the list row and checks DRAFT again, so two publishes of one draft
+     * started together publish it once: one audit, one event, the other refused as not a draft.
+     */
+    @Test
+    void twoPublishesOfOneDraftAtOnceArePublishedOnce() throws Exception {
+        UUID draft = create.handle(new CreatePriceList("TRADE", "Raced"), own(FEDERATION));
+        setLines.handle(new SetLines(draft, List.of(line(rice, "0", "100"))), own(FEDERATION));
+        kernel.reset();
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<String> outcomes = new ArrayList<>();
+        try {
+            List<Future<String>> running = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                running.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        publish.handle(new PublishPriceList(draft, today), own(FEDERATION));
+                        return "published";
+                    } catch (ProblemException refused) {
+                        return refused.messageId();
+                    }
+                }));
+            }
+            start.countDown();
+            for (Future<String> result : running) {
+                outcomes.add(result.get(60, TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(outcomes).containsExactlyInAnyOrder("published", "m3.price_list.not_draft");
+        assertThat(audit("PRICELIST_PUBLISHED")).hasSize(1);
+        assertThat(events(PriceListPublished.class)).hasSize(1);
+    }
+
     @Test
     void aPublishedLineCannotBeChangedEvenBehindTheHandlers() {
         UUID list = published(List.of(line(rice, "0", "100")), today);
@@ -341,6 +413,70 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         // Another seller's list is not visible in this seller's scope.
         assertThat(check.refusal(list, DISTRIBUTOR, own(DISTRIBUTOR))).contains("m3.price_list.not_found");
         assertThat(check.refusal(list, DISTRIBUTOR, own(FEDERATION))).contains("m3.price_list.not_the_sellers");
+    }
+
+    /**
+     * m3pricing V0006 (wave 2, RLS-05): buyer_read admits the buyer of an ACTIVE relationship only. A
+     * suspended or replaced buyer cannot order, and its invoices are the record of the price it was
+     * charged; the live list is the seller's. Read directly under the policy, in the buyer's OWN and
+     * PARTY scopes, so the rule is proved in SQL and not in M1's lookup.
+     */
+    @Test
+    void aSuspendedOrReplacedBuyerNoLongerReadsTheTradeList() {
+        UUID list = published(List.of(line(rice, "0", "100")), today);
+        bind(list);
+
+        assertThat(listsVisibleTo(DISTRIBUTOR, "OWN")).containsExactly(list);
+        assertThat(listsVisibleTo(DISTRIBUTOR, "PARTY")).containsExactly(list);
+        assertThat(linesVisibleTo(DISTRIBUTOR, "OWN")).isEqualTo(1);
+
+        for (String status : List.of("SUSPENDED", "REPLACED", "DRAFT")) {
+            superuserJdbc()
+                    .update(
+                            "update party.entity_relationship set status = ? where relationship_id = ?",
+                            status,
+                            RELATIONSHIP);
+            assertThat(listsVisibleTo(DISTRIBUTOR, "OWN")).as(status).isEmpty();
+            assertThat(listsVisibleTo(DISTRIBUTOR, "PARTY")).as(status).isEmpty();
+            assertThat(linesVisibleTo(DISTRIBUTOR, "OWN")).as(status + " lines").isZero();
+        }
+
+        superuserJdbc()
+                .update(
+                        "update party.entity_relationship set status = 'ACTIVE' where relationship_id = ?",
+                        RELATIONSHIP);
+        assertThat(listsVisibleTo(DISTRIBUTOR, "OWN")).containsExactly(list);
+        assertThat(listsVisibleTo(STRANGER, "OWN")).as("no relationship at all").isEmpty();
+    }
+
+    private List<UUID> listsVisibleTo(UUID entity, String policyClass) {
+        return inScope(
+                entity,
+                policyClass,
+                () -> jdbc.queryForList(
+                        "select price_list_id from pricing.price_list where kind = 'TRADE'", UUID.class));
+    }
+
+    private int linesVisibleTo(UUID entity, String policyClass) {
+        return inScope(
+                entity,
+                policyClass,
+                () -> jdbc.queryForObject("select count(*) from pricing.price_list_line", Integer.class));
+    }
+
+    private <T> T inScope(UUID entity, String policyClass, java.util.function.Supplier<T> work) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.queryForList(
+                    "select set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                            + " set_config('app.scope_class', ?, true), set_config('app.granted_entities', '{}', true)",
+                    entity.toString(),
+                    policyClass);
+            try {
+                return work.get();
+            } finally {
+                status.setRollbackOnly();
+            }
+        });
     }
 
     // ---- helpers ----------------------------------------------------------------------------------

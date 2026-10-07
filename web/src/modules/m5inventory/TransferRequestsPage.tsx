@@ -14,6 +14,7 @@ import { LocationPicker } from "./LocationPicker";
 import "./inventory.css";
 import { SkuLabel } from "./SkuLabel";
 import { errorText, requestChip, requestLinesOf, sourceFor } from "./stockView";
+import { PageHeader } from "../../shell/components/PageHeader";
 
 /**
  * Transfer requests (doc 24 section 4.7; M4-10, demo scope). A shop (`shop.transfer.request`) asks
@@ -104,19 +105,43 @@ export function TransferRequestsPage() {
 
   return (
     <main className="shell-page">
-      <Link className="back-link" to="/inventory">
-        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /><path d="M9 12h10" /></svg>
-        {t("inventory.back").text}
-      </Link>
-      <h1>{t("inventory.request.title").text}</h1>
+      <PageHeader
+        icon="stock"
+        title={t("inventory.title").text}
+        actions={
+          <Link className="action-link" to="/inventory">
+            <span>{t("inventory.back").text}</span>
+          </Link>
+        }
+      />
+
+      <div className="inventory-control-links">
+        <Link className="action-link" to="/inventory/counts">
+          <span>{t("inventory.counts.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/write-offs">
+          <span>{t("inventory.writeoffs.link").text}</span>
+        </Link>
+        <Link className="action-link" to="/inventory/repacks">
+          <span>{t("inventory.repacks.link").text}</span>
+        </Link>
+        <Link className="action-link action-link--primary" to="/inventory/transfer-requests">
+          <span>{t("inventory.request.link").text}</span>
+        </Link>
+      </div>
 
       {canRequest && (
-        <section className="inventory-section">
+        <section className="modern-table-card inventory-section" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
           <h2>{t("inventory.request.new").text}</h2>
-          <LocationPicker value={shopId} onChange={setShopId} />
+          <section className="modern-filter-panel modern-filter-panel--stock">
+            <div className="modern-location-picker">
+              <LocationPicker value={shopId} onChange={setShopId} />
+            </div>
+          </section>
           {shelf.data && items.length === 0 && <p>{t("inventory.balances.empty").text}</p>}
           {items.length > 0 && (
-            <table>
+            <div className="modern-table-scroll" style={{ marginTop: 'var(--space-3)' }}>
+              <table className="modern-table stock-table">
               <thead>
                 <tr>
                   <th>{t("inventory.column.item").text}</th>
@@ -140,7 +165,8 @@ export function TransferRequestsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
           <label className="inventory-form-field">
             {t("inventory.request.reason").text}
@@ -157,12 +183,15 @@ export function TransferRequestsPage() {
         </section>
       )}
 
-      <h2>{t("inventory.request.list").text}</h2>
-      {requests.isLoading && <p>{t("inventory.loading").text}</p>}
-      {requests.isError && <p role="alert">{errorText(requests.error, t("inventory.error.generic").text)}</p>}
-      {requests.data?.length === 0 && <p>{t("inventory.request.none").text}</p>}
+      <section className="modern-table-card">
+        <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
+          <h2>{t("inventory.request.list").text}</h2>
+        </div>
+      {requests.isLoading && <p style={{ padding: '0 var(--space-4)' }}>{t("inventory.loading").text}</p>}
+      {requests.isError && <p role="alert" style={{ padding: '0 var(--space-4)' }}>{errorText(requests.error, t("inventory.error.generic").text)}</p>}
+      {requests.data?.length === 0 && <p style={{ padding: '0 var(--space-4) var(--space-4)' }}>{t("inventory.request.none").text}</p>}
       {(requests.data ?? []).map((request) => (
-        <section key={request.requestId} className="inventory-section">
+        <section key={request.requestId} className="inventory-section" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
           <p>
             {`${nameOf(request.fromLocationId)} → ${nameOf(request.toLocationId)} · ${formatInstant(request.requestedAt)} `}
             <StateChip
@@ -172,7 +201,8 @@ export function TransferRequestsPage() {
           </p>
           {request.reason && <p>{request.reason}</p>}
           {request.rejectReason && <p>{request.rejectReason}</p>}
-          <table>
+          <div className="modern-table-scroll">
+            <table className="modern-table stock-table">
             <thead>
               <tr>
                 <th>{t("inventory.column.item").text}</th>
@@ -189,7 +219,8 @@ export function TransferRequestsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
           {request.status === "APPROVED" && (
             <p>
               {request.transferStatus
@@ -244,6 +275,7 @@ export function TransferRequestsPage() {
           )}
         </section>
       ))}
+      </section>
       {[approve, reject].map((m, i) =>
         m.isError ? (
           <p key={i} role="alert">

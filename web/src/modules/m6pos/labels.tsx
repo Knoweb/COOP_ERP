@@ -19,6 +19,30 @@ export function useTenderText() {
   };
 }
 
+/**
+ * What central flagged about a receipt, in the reader's language, with what to do about it
+ * (pos.flag.<CODE>). A code this screen does not know yet shows as sent, so a new backend flag
+ * never breaks the page.
+ */
+export function useFlagText() {
+  const t = useT();
+  return (code: string) => {
+    const message = t(`pos.flag.${code}`);
+    return message.isFallback ? code : message.text;
+  };
+}
+
+export function FlagList({ flags }: { flags: string[] }) {
+  const flagText = useFlagText();
+  return (
+    <ul className="pos-flag-list">
+      {flags.map((code) => (
+        <li key={code}>{flagText(code)}</li>
+      ))}
+    </ul>
+  );
+}
+
 export function TenderKinds({ kinds }: { kinds: string[] }) {
   const tenderText = useTenderText();
   return <span>{kinds.map(tenderText).join(", ")}</span>;

@@ -4,12 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +33,8 @@ class NotificationLog {
             String templateId,
             String language,
             String status,
-            int attempts) {}
+            int attempts,
+            UUID recipientEntityId) {}
 
     /** A claimed attempt: how many attempts the row now counts and when it was queued. */
     record Claim(int attempts, Instant createdAt) {}
@@ -45,9 +42,15 @@ class NotificationLog {
     /** What a retry needs and the log must not hold. */
     record Pending(String recipient, String templateId, String language, Map<String, Object> arguments) {}
 
+    /**
+     * Who the row is for, without the number (kernel V0085): the keyed hash and its key id, the
+     * recipient's entity and the role it was reached as (null when the audience does not say).
+     */
+    record Recipient(String hash, String hashKeyId, UUID entityId, String roleCode) {}
+
     private static final String COLUMNS =
             "notification_id, rule_id, event_id, owner_entity_id, recipient_hash, channel,"
-                    + " template_id, language, status, attempts";
+                    + " template_id, language, status, attempts, recipient_entity_id";
 
     /** What is sealed into one row: the recipient and the placeholders, as JSON. */
     record Held(String recipient, Map<String, Object> arguments) {}
@@ -62,17 +65,6 @@ class NotificationLog {
         this.seal = seal;
     }
 
-    /** The hash a recipient is stored as: the channel and the recipient, never the recipient itself. */
-    static String hash(String channel, String recipient) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of()
-                    .formatHex(digest.digest((channel + ":" + recipient.strip()).getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is part of every JDK", e);
-        }
-    }
-
     /**
      * A QUEUED row, or false when the same rule, event and recipient were logged before: the
      * unique key is the idempotency of a replayed event.
@@ -82,7 +74,7 @@ class NotificationLog {
             UUID ruleId,
             UUID eventId,
             UUID ownerEntityId,
-            String recipientHash,
+            Recipient recipient,
             String channel,
             String templateId,
             String language,
@@ -93,20 +85,24 @@ class NotificationLog {
                 """
                     insert into kernel.notification_log (
                         notification_id, rule_id, event_id, owner_entity_id, recipient_hash, channel,
-                        template_id, language, status, created_at, next_attempt_at
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?)
+                        template_id, language, status, created_at, next_attempt_at,
+                        recipient_hash_key_id, recipient_entity_id, audience_role
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, ?, ?, ?)
                     on conflict (rule_id, event_id, recipient_hash) do nothing
                     """,
                 notificationId,
                 ruleId,
                 eventId,
                 ownerEntityId,
-                recipientHash,
+                recipient.hash(),
                 channel,
                 templateId,
                 language,
                 Timestamp.from(now),
-                Timestamp.from(now));
+                Timestamp.from(now),
+                recipient.hashKeyId(),
+                recipient.entityId(),
+                recipient.roleCode());
         return inserted == 1;
     }
 
@@ -205,6 +201,22 @@ class NotificationLog {
                 notificationId);
     }
 
+    /**
+     * Quiet hours (CR-19A-12): the row stays QUEUED and is due again when the window ends. A
+     * deferral is not an attempt: the attempt a claim counted is given back (at queue time
+     * nothing was counted, and the count stays at zero). What is held for the send is kept.
+     */
+    void defer(UUID notificationId, Instant until) {
+        jdbc.update(
+                """
+                update kernel.notification_log
+                   set attempts = greatest(attempts - 1, 0), next_attempt_at = ?
+                 where notification_id = ? and status = 'QUEUED'
+                """,
+                Timestamp.from(until),
+                notificationId);
+    }
+
     void sent(UUID notificationId, String providerRef, int renderedLength, String language) {
         jdbc.update(
                 """
@@ -280,7 +292,8 @@ class NotificationLog {
                         rs.getString("template_id"),
                         rs.getString("language"),
                         rs.getString("status"),
-                        rs.getInt("attempts")),
+                        rs.getInt("attempts"),
+                        rs.getObject("recipient_entity_id", UUID.class)),
                 Timestamp.from(now),
                 limit);
     }

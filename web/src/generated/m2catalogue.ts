@@ -182,7 +182,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The images of a SKU */
+        get: operations["listImages"];
         put?: never;
         /**
          * Attach an image to a SKU and get a pre-signed PUT for its bytes
@@ -470,6 +471,15 @@ export interface components {
             contentLength?: number;
             /** @description SHA-256 of the bytes, lower-case hex; the upload is verified against it */
             sha256Hex: string;
+        };
+        ImageResponse: {
+            /** Format: uuid */
+            imageId: string;
+            barcode?: string;
+            /** @enum {string} */
+            status: "PENDING" | "ACTIVE" | "RETIRED" | "FAILED";
+            thumbUrl?: string;
+            imageUrl?: string;
         };
         ImageUploadResponse: {
             /** Format: uuid */
@@ -1006,6 +1016,29 @@ export interface operations {
                 };
             };
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The images */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
         };
     };
     attachImage: {

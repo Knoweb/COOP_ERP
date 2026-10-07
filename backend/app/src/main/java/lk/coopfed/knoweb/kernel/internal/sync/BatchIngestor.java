@@ -30,8 +30,9 @@ import org.springframework.stereotype.Component;
  * left is, in the order of the document:
  *
  * <pre>
- *   1  the batch's shape and limits (DR-1), the application floor: below it after its grace,
- *      426; below it within the grace, accepted with a FLOOR_NOTICE (doc 31 section 6)
+ *   1  the batch's shape and limits (DR-1), the application floor: below it, accepted with a
+ *      FLOOR_NOTICE, within the grace and after it (CR-30-1 point 4, CR-32-1 item 1: facts are
+ *      always accepted; after the grace the snapshot is withheld instead)
  *   2  claim the cursor: one batch in flight per device on any instance (409)
  *   3  compare with the cursor: the same batch again (its stored acknowledgement), a gap (409 with
  *      expected_seq), a replay (answered from state), or new events to apply
@@ -193,20 +194,23 @@ class BatchIngestor {
     }
 
     /**
-     * Doc 32 section 3.3 step 1, "below floor after grace: 426 with reason". Within the grace the
-     * batch is taken and the acknowledgement carries a FLOOR_NOTICE, which the till shows its
-     * supervisor (doc 31 section 6). Selling never stops: the till keeps its outbox either way.
+     * Doc 32 section 3.3 step 1, as CR-30-1 point 4 settles it ("below the minimum version,
+     * central stops sending new snapshots, but facts are always accepted: a sale that happened is
+     * a fact"; wave 2, TWK-09, CR-32-1 item 1): below the floor the batch is taken, within the
+     * grace and after it, and the acknowledgement carries a FLOOR_NOTICE, which the till shows its
+     * supervisor (doc 31 section 6). What is withheld after the grace is the reference data
+     * (SyncController: snapshot and change log, 426), never the facts.
      */
     private AppVersionFloor.Standing checkFloor(ScopeContext device, BatchInput batch) {
         AppVersionFloor.Standing floor = floors.standing(batch.appVersion(), device);
         if (floor.afterGrace()) {
-            throw new ProblemException(
-                    "sync.app_below_floor",
-                    Map.of(
-                            "floor",
-                            floor.floor(),
-                            "grace_ended_at",
-                            floor.graceEndsAt().toString()));
+            log.info(
+                    "Device {} uploads with application {}, below the floor {} since its grace ended at {}: the"
+                            + " batch is taken, snapshots are withheld",
+                    device.deviceId(),
+                    batch.appVersion(),
+                    floor.floor(),
+                    floor.graceEndsAt());
         }
         return floor;
     }

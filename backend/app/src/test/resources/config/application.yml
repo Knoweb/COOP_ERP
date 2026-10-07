@@ -1,0 +1,14 @@
+# The test resources' overrides of src/main/resources/application.yml, for every test context
+# (Spring Boot reads classpath:/config/application.yml after classpath:/application.yml). Never
+# packaged: a deployed instance runs with the main file's fail-closed defaults (wave 2, TWK-27,
+# TWK-29; docs/progress/deviations/2026-10-06-wave2-kernel-defaults-and-limits.md (1)).
+coop-erp:
+  security:
+    # The module integration tests run as users of their own, with no roles in M1; a test that
+    # proves a permission sets it true itself (PermissionEnforcementPostgresIntegrationTest ...).
+    enforce-permissions: false
+  sync:
+    signing:
+      # The test contexts make a key of their own (TillSigner); a till in a test reads it from
+      # the enrolment answer or SyncTestKeys.
+      required: false

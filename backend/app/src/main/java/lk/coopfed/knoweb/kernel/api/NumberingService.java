@@ -72,9 +72,42 @@ public interface NumberingService {
      * record names the number. A series the caller cannot see, or no series, is left alone: the
      * fact is applied anyway and never refused for it (AGENTS.md).
      *
-     * @return true when the high-water mark moved
+     * <p><b>Only the device's own series</b> (wave 2, M6-04, decided 6 October 2026:
+     * docs/progress/deviations/2026-10-06-wave2-till-facts-at-the-gateway.md (2)): a device raises
+     * a series only when it is the series' holder and the series is at the device's own shop
+     * ({@code location_id} the scope's location; never an ENTITY series, which has none). Any
+     * other series is {@link Outcome#FOREIGN} and left alone, so a till can never push the
+     * society's invoice or order numbering forward; the caller flags the fact and applies it.
+     * The caller also decides what a jump is ({@link Observed#nextNumberBefore}): the kernel
+     * raises to {@code number + 1}, never beyond.
+     *
+     * @param scope the device's scope, as the consumer framework delivers the device's event
+     * @return what happened, with the series' next number before
      */
-    boolean observeDeviceNumber(UUID seriesId, long number);
+    Observed observeDeviceNumber(UUID seriesId, long number, ScopeContext scope);
+
+    /** What {@link #observeDeviceNumber} did. */
+    enum Outcome {
+        /** The high-water mark moved to the number + 1. */
+        RAISED,
+        /** The series is already past the number (a replay, a duplicate, a late document). */
+        ALREADY_PAST,
+        /** Not the device's own series at its shop: left alone. */
+        FOREIGN,
+        /** No series, a series the caller cannot see, a number below 1, or no device on the scope. */
+        UNKNOWN
+    }
+
+    /**
+     * @param nextNumberBefore the series' next number before this call; null when the series was
+     *                         not read (UNKNOWN)
+     */
+    record Observed(Outcome outcome, Long nextNumberBefore) {
+
+        public boolean raised() {
+            return outcome == Outcome.RAISED;
+        }
+    }
 
     /**
      * Closes a series for good: retiring a position closes its series (doc 18). A closed

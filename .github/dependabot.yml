@@ -72,6 +72,18 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "androidx.compose:compose-bom"
         update-types: ["version-update:semver-major"]
+      # Held with AGP (wave 2, #236 and #41): Compose Multiplatform 1.12 and androidx.core 1.19
+      # need AGP 9.1 and compileSdk 37 (the till pins AGP 8.13.2 and compileSdk 36), skiko must
+      # match Compose (see the catalogue comment), and Gradle 9.6 and later cannot run AGP 8.x
+      # (its internal API is gone). All four move together when the till owner moves to AGP 9.
+      - dependency-name: "org.jetbrains.compose*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "org.jetbrains.skiko*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "androidx.core:core*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /web
@@ -92,7 +104,14 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
+      # @types/node follows the Node runtime, which is the 24 LTS line (NODE_VERSION in ci.yml,
+      # the web image and the developer machines): types for Node 26 would describe an API the
+      # runtime does not have (wave 2, #256). It moves with the next LTS, by hand, everywhere.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
+  # Every action is pinned to a commit SHA with its version in a comment (wave 2, DEPLOY-15);
+  # Dependabot proposes the next SHA and rewrites the comment.
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday, time: "06:00", timezone: Asia/Colombo }
@@ -115,4 +134,33 @@ updates:
       # such as 25 live for six months; the next move is to the next LTS, by hand, everywhere
       # at once: here, NODE_VERSION in ci.yml and the developer machines.
       - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+
+  # The images of the demo server (infra/deploy; wave 2, DEPLOY-15). PostgreSQL stays on 16 and
+  # Keycloak moves by hand, with the realm it imports.
+  - package-ecosystem: docker-compose
+    directory: /infra/deploy
+    schedule: { interval: monthly }
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, infra]
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "quay.io/keycloak/keycloak"
+        update-types: ["version-update:semver-major"]
+
+  # The base images of the three images CI builds, pinned by digest (wave 2, DEPLOY-15):
+  # Dependabot proposes the next digest of the same tag. The eclipse-temurin digest is also
+  # jibBaseImage in backend/gradle.properties, which no bot reads: copy it there in the same PR.
+  - package-ecosystem: docker
+    directories: ["/infra/web-image", "/infra/demo-tools", "/infra/worker-image"]
+    schedule: { interval: monthly }
+    commit-message: { prefix: "chore(deps)" }
+    labels: [dependencies, infra]
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      # Java stays on 21 (17A section 3).
+      - dependency-name: "eclipse-temurin"
         update-types: ["version-update:semver-major"]

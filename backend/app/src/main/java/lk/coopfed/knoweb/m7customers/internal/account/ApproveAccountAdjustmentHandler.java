@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.m7customers.internal.account;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
@@ -16,6 +17,7 @@ import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m7customers.api.AccountAdjusted;
 import lk.coopfed.knoweb.m7customers.api.ApproveAdjustment;
 import lk.coopfed.knoweb.m7customers.internal.customer.CustomerGuards;
+import lk.coopfed.knoweb.m7customers.internal.ledger.Allocator;
 import lk.coopfed.knoweb.m7customers.internal.ledger.CustomersClock;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger;
 import lk.coopfed.knoweb.m7customers.internal.ledger.Ledger.LockedAccount;
@@ -32,8 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
  * second factor is the permission's ({@code cus.account.adjust_approve} requires MFA).
  *
  * <p>Mutation: the ADJUSTMENT posting (its document is the adjustment) on today's business date;
- * the adjustment APPROVED with who and when; the balance recomputed. Audit ACCOUNT_ADJUSTED;
- * event account.adjusted.v1.
+ * for a negative one, the allocation rows that settle charges oldest first (CR-27A-1 item 2); the
+ * adjustment APPROVED with who and when; the balance recomputed. Audit ACCOUNT_ADJUSTED; event
+ * account.adjusted.v1.
  */
 @Service
 @CommandHandler(permission = "cus.account.adjust_approve")
@@ -120,6 +123,23 @@ class ApproveAccountAdjustmentHandler implements Handles<ApproveAdjustment, UUID
                 Timestamp.from(clock.now()),
                 postingId,
                 command.adjustmentId());
+        int settled = 0;
+        if (adjustment.amount().signum() < 0) {
+            // An adjustment that takes off what the customer owes settles charges oldest first,
+            // like a payment (wave 2, CR-27A-1 item 2): ageing then shows what is really owed.
+            List<Allocator.Allocation> allocations = Allocator.oldestFirst(
+                    ledger.openCharges(account.accountId()), adjustment.amount().negate());
+            for (Allocator.Allocation allocation : allocations) {
+                jdbc.update(
+                        Ledger.ALLOCATION_INSERT,
+                        Ids.next(),
+                        postingId,
+                        allocation.chargePostingId(),
+                        allocation.amount(),
+                        account.ownerEntityId());
+            }
+            settled = allocations.size();
+        }
         BigDecimal balance = ledger.sum(account.accountId());
         jdbc.update(
                 "update customers.customer_account set balance = ? where account_id = ?", balance, account.accountId());
@@ -128,6 +148,7 @@ class ApproveAccountAdjustmentHandler implements Handles<ApproveAdjustment, UUID
         after.put("adjustmentId", command.adjustmentId());
         after.put("postingId", postingId);
         after.put("amount", adjustment.amount());
+        after.put("charges", settled);
         after.put("balance", balance);
         audit.record(
                 AUDIT_ADJUSTED,

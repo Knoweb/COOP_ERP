@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.till.sync
 import java.security.KeyPairGenerator
 import java.security.Signature
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import lk.coopfed.knoweb.till.core.port.UnreadablePinHash
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotDelta
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRejected
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRow
@@ -82,20 +84,58 @@ class JvmCryptoTest {
         assertEquals("The hash of table sku does not match its manifest", refusal.message)
     }
 
-    @Test
-    fun aPinIsCheckedAgainstCentralsArgon2idString() {
-        // Small parameters keep the test fast; central's are m=65536,t=3,p=2 and are read from the string the same way.
-        val salt = "fixed-test-salt!".toByteArray()
+    private val salt = "fixed-test-salt!".toByteArray()
+    private val b64 = Base64.getEncoder().withoutPadding()
+
+    /** A PHC string for PIN 1234 with these parameters. */
+    private fun phc(memoryKb: Int = 8192, iterations: Int = 1, parallelism: Int = 1): String {
         val hash = ByteArray(32)
         Argon2BytesGenerator().apply {
-            init(Argon2Parameters.Builder(Argon2Parameters.ARGON2_id).withVersion(19).withMemoryAsKB(1024)
-                .withIterations(2).withParallelism(1).withSalt(salt).build())
+            init(Argon2Parameters.Builder(Argon2Parameters.ARGON2_id).withVersion(19).withMemoryAsKB(memoryKb)
+                .withIterations(iterations).withParallelism(parallelism).withSalt(salt).build())
         }.generateBytes("1234".toByteArray(), hash)
-        val b64 = Base64.getEncoder().withoutPadding()
-        val phc = "\$argon2id\$v=19\$m=1024,t=2,p=1\$${b64.encodeToString(salt)}\$${b64.encodeToString(hash)}"
+        return "\$argon2id\$v=19\$m=$memoryKb,t=$iterations,p=$parallelism\$${b64.encodeToString(salt)}\$${b64.encodeToString(hash)}"
+    }
+
+    @Test
+    fun aPinIsCheckedAgainstCentralsArgon2idString() {
+        // The smallest parameters the till accepts keep the test fast; central's are m=65536,t=3,p=2,
+        // read from the string the same way.
+        val phc = phc()
 
         assertTrue(Argon2PinVerifier.verify("1234", phc))
         assertFalse(Argon2PinVerifier.verify("4321", phc))
-        assertFalse(Argon2PinVerifier.verify("1234", "\$bcrypt\$not-argon"))
+    }
+
+    @Test
+    fun aPinRecordTheTillCannotReadIsNotAWrongPin() {
+        val good = phc()
+        val unreadable = listOf(
+            "\$bcrypt\$not-argon",
+            "",
+            good.replace("m=8192", "m=1024"), // below 8 MB
+            good.replace("m=8192", "m=2097152"), // above 1 GB
+            good.replace("t=1", "t=0"),
+            good.replace("t=1", "t=101"),
+            good.replace("p=1", "p=17"),
+            good.replace("m=8192,", ""), // memory missing
+            good.replace("t=1", "t=x"), // not a number
+            good.replace("v=19", "v=99"),
+            good.substringBeforeLast('$') + "\$not*base64",
+        )
+        for (hash in unreadable) {
+            assertFailsWith<UnreadablePinHash>(hash) { Argon2PinVerifier.verify("1234", hash) }
+        }
+    }
+
+    @Test
+    fun theBatchBodyGzipsAndInflatesBackToTheSameText() {
+        val text = """{"batch_id":"b1","events":[${"{\"payload\":\"සහල් 5kg\"},".repeat(50).trimEnd(',')}]}"""
+        val packed = JvmGzip(text.toByteArray())
+
+        assertEquals(0x1f, packed[0].toInt() and 0xff)
+        assertEquals(0x8b, packed[1].toInt() and 0xff)
+        assertTrue(packed.size < text.toByteArray().size)
+        assertEquals(text, GZIPInputStream(packed.inputStream()).readBytes().decodeToString())
     }
 }

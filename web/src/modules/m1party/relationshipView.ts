@@ -3,20 +3,7 @@
 // clerk typed. Pure functions, tested in relationshipView.test.ts.
 
 import type { ChipState } from "../../shell/components/StateChip";
-import { BUSINESS_TIME_ZONE } from "../../shell/i18n/formats";
 import type { AmendTermsRequest, Relationship } from "./partyApi";
-
-/** Today's business date (Asia/Colombo), yyyy-mm-dd, as the server's guards read it. */
-export function businessToday(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(now);
-  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
 
 /** The look of a row's state: in force, being written, suspended, or replaced before it began. */
 export function relationshipChip(row: Relationship, today: string): ChipState {

@@ -1,15 +1,20 @@
 package lk.coopfed.knoweb.kernel.internal.event;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -21,6 +26,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class EventConsumerDispatcher {
 
     static final String AUDIT_DEAD_LETTERED = "EVENT_CONSUMER_DEAD_LETTERED";
+
+    private static final Logger log = LoggerFactory.getLogger(EventConsumerDispatcher.class);
 
     private final EventConsumerRegistry registry;
     private final InboxGuard inbox;
@@ -59,28 +66,55 @@ public class EventConsumerDispatcher {
                         "No @EventConsumer registered for " + consumer + " / " + message.eventType()));
 
         // What is read from the envelope fails the same way on every delivery (no owner entity,
-        // a payload that is not JSON): poison, not a handler failure worth retrying.
+        // a payload that is not JSON, a counterparty consumer handed a till's event): poison, not
+        // a handler failure worth retrying.
         ScopeContext scope;
         String payload;
+        UUID document = null;
 
         try {
-            scope = systemScope(message);
             payload = payloadFor(registration, message);
-        } catch (RuntimeException unreadable) {
+            if (registration.party() == EventConsumer.Party.COUNTERPARTY) {
+                JsonNode fields = mapper.readTree(payload);
+                UUID counterparty = uuidField(fields, "counterpartyEntityId");
+                if (counterparty == null) {
+                    // Not a two-party event for this consumer (one published before the field
+                    // existed, or a document with no other party): passed over, not an error.
+                    log.debug("Event {} names no counterparty; nothing for {} to do", message.eventId(), consumer);
+                    return DeliveryResult.APPLIED;
+                }
+                document = uuidField(fields, "documentId");
+                scope = counterpartyScope(message, counterparty, document);
+            } else {
+                scope = systemScope(message);
+            }
+        } catch (RuntimeException | java.io.IOException unreadable) {
             throw new PoisonMessageException(
                     "Event " + message.eventId() + " cannot be delivered to " + consumer + ": " + unreadable,
                     unreadable);
         }
+
+        UUID documentId = document;
 
         try {
 
             Boolean applied = transaction.execute(status -> {
                 applyScope(scope);
 
+                if (registration.party() == EventConsumer.Party.COUNTERPARTY) {
+                    requireDocumentOfTheParties(message, scope, documentId, consumer);
+                }
+
                 return inbox.applyOnce(consumer, message.eventId(), () -> registration.invoke(payload, scope, mapper));
             });
 
             return Boolean.TRUE.equals(applied) ? DeliveryResult.APPLIED : DeliveryResult.DUPLICATE;
+
+        } catch (PoisonMessageException poison) {
+
+            // A counterparty that is not the document's: a module tried to write into an entity's
+            // scope it has no business in. Never retried; the runtime dead-letters it with the reason.
+            throw poison;
 
         } catch (RuntimeException failure) {
 
@@ -149,6 +183,42 @@ public class EventConsumerDispatcher {
                 scope.locationId() == null ? "" : scope.locationId().toString());
     }
 
+    /**
+     * The second check of counterparty delivery (CR-19A-13), inside the counterparty's scope: the
+     * document the event names is the owner's, and the named counterparty is its
+     * {@code counterparty_entity_id}. Read through {@code kernel.document}'s own {@code
+     * party_read}, which in this scope shows the row only when the counterparty is this entity, so
+     * the policy and the predicate say the same thing twice. A document that does not answer
+     * is poison: the event is never delivered to this consumer, and nobody retries it.
+     */
+    private void requireDocumentOfTheParties(
+            OutboxMessage message, ScopeContext scope, UUID documentId, String consumer) {
+
+        if (documentId == null) {
+            throw new PoisonMessageException(
+                    "Event " + message.eventId() + " names a counterparty but no document; refused for " + consumer);
+        }
+
+        Integer found = jdbc.queryForObject(
+                """
+                SELECT count(*)
+                  FROM kernel.document
+                 WHERE document_id = ?
+                   AND owner_entity_id = ?
+                   AND counterparty_entity_id = ?
+                """,
+                Integer.class,
+                documentId,
+                message.ownerEntityId(),
+                scope.entityId());
+
+        if (found == null || found == 0) {
+            throw new PoisonMessageException("Event " + message.eventId() + " names " + scope.entityId()
+                    + " as the counterparty of document " + documentId
+                    + ", which the document does not; refused for " + consumer);
+        }
+    }
+
     private static ScopeContext systemScope(OutboxMessage message) {
 
         if (message.eventId() == null || message.ownerEntityId() == null || message.correlationId() == null) {
@@ -168,6 +238,50 @@ public class EventConsumerDispatcher {
                 null,
                 Locale.ENGLISH,
                 message.correlationId());
+    }
+
+    /**
+     * The scope of counterparty delivery (CR-19A-13): OWN, entity-wide, of the payload's
+     * counterparty, with no device. The first check is here: a till's event never reaches the
+     * other party's books this way (K-08 events carry the device as their source).
+     */
+    private static ScopeContext counterpartyScope(OutboxMessage message, UUID counterparty, UUID documentId) {
+
+        if (message.eventId() == null || message.ownerEntityId() == null || message.correlationId() == null) {
+            throw new IllegalArgumentException("The envelope lacks its event id, owner entity or correlation id");
+        }
+
+        if (message.source() != null && !"central".equals(message.source())) {
+            throw new IllegalArgumentException("Event " + message.eventId() + " was uploaded by a device ("
+                    + message.source() + "); a device event is never delivered to a counterparty consumer");
+        }
+
+        if (counterparty.equals(message.ownerEntityId())) {
+            throw new IllegalArgumentException(
+                    "Event " + message.eventId() + " names its own owner as the counterparty of " + documentId);
+        }
+
+        Scope active = new Scope(counterparty, null);
+
+        return new ScopeContext(
+                null,
+                null,
+                counterparty,
+                List.of(active),
+                active,
+                PolicyClass.OWN,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                message.correlationId());
+    }
+
+    private static UUID uuidField(JsonNode fields, String name) {
+        JsonNode value = fields.path(name);
+        if (value.isMissingNode() || value.isNull() || value.asText().isBlank()) {
+            return null;
+        }
+        return UUID.fromString(value.asText());
     }
 
     /**

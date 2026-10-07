@@ -110,15 +110,7 @@ class NotificationDispatcher implements CacheFanoutListener {
             }
             for (NotificationAudience.Recipient recipient : audience(rule, body, scope.entityId(), counterparty)) {
                 try {
-                    service.deliver(
-                            rule.ruleId(),
-                            eventId,
-                            recipient.channel(),
-                            recipient.recipient(),
-                            recipient.language(),
-                            rule.templateId(),
-                            arguments(body),
-                            scope);
+                    service.deliver(rule.ruleId(), eventId, recipient, rule.templateId(), arguments(body), scope);
                 } catch (ProblemException refused) {
                     // A rule that names a channel with no adapter, or an audience with a blank
                     // recipient, must not roll back the recipients before it (and be redelivered

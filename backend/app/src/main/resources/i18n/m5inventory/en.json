@@ -80,5 +80,9 @@
   "m5.repack.output_touched": "Packs of this repack were already sold, moved or written off; correct it with a write-off or another repack",
   "m5.claim.buyer_mismatch": "The return is applied in the buyer’s own stock only",
   "m5.claim.location_required": "The return names the location the goods leave",
-  "m5.claim.line_invalid": "A returned line needs a batch and a quantity above zero"
+  "m5.claim.line_invalid": "A returned line needs a batch and a quantity above zero",
+  "m5.writeoff.approver_is_witness": "The person who witnessed the write-off in person cannot approve it; another approver must act",
+  "m5.repack.yield_out_of_range": "More packs ({actual}) than the recipe allows from this quantity ({expected} expected); check the count of packs",
+  "m5.repack.yield_reason_required": "Fewer packs ({actual}) than the recipe expects ({expected}); give the reason for the shortfall",
+  "m5.till_fact.type_required": "The till’s fact names no type"
 }

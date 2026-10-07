@@ -4,8 +4,6 @@
 import { ApiProblem } from "../../shell/api/client";
 import type { ChipState } from "../../shell/components/StateChip";
 
-const BUSINESS_TIME_ZONE = "Asia/Colombo";
-
 /** The problem code the server answers when an action asks for a fresh second factor. */
 export const MFA_REQUIRED = "mfa.required";
 
@@ -42,13 +40,19 @@ export function statusChip(status: string): ChipState {
   return status === "OPEN" || status === "ACTIVE" ? "issued" : status === "SUSPENDED" ? "disputed" : "void";
 }
 
-/** What the office may do with an account in its state (doc 27 section 4.2). */
-export function accountActions(status: string): ("suspend" | "reinstate" | "close")[] {
+/**
+ * What the office may do with an account in its state (doc 27 section 4.2; CR-27A-1: a CLOSED
+ * account reopens as SUSPENDED, to settle what a till posted on it).
+ */
+export function accountActions(status: string): ("suspend" | "reinstate" | "close" | "reopen")[] {
   if (status === "OPEN") {
     return ["suspend", "close"];
   }
   if (status === "SUSPENDED") {
     return ["reinstate", "close"];
+  }
+  if (status === "CLOSED") {
+    return ["reopen"];
   }
   return [];
 }
@@ -89,23 +93,5 @@ export function limitUsedPercent(creditLimit: number, balance: number): number {
   return Math.floor((Math.max(balance, 0) * 100) / creditLimit);
 }
 
-/** Today's business date (Asia/Colombo): yyyy-mm-dd. */
-export function businessToday(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(now);
-  const part = (type: string) => parts.find((each) => each.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
-/** The first day of the month `months` before the month of `day` (yyyy-mm-dd): a statement's default start. */
-export function startOfMonthBefore(day: string, months: number): string {
-  const [year, month] = day.split("-").map(Number);
-  const index = year * 12 + (month - 1) - months;
-  const y = Math.floor(index / 12);
-  const m = (index % 12) + 1;
-  return `${y}-${String(m).padStart(2, "0")}-01`;
-}
+// A statement's default start: the first day of the month `months` before the month of a day.
+export { startOfMonthBefore } from "../../shell/i18n/formats";

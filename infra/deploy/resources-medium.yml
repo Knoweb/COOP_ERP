@@ -1,0 +1,77 @@
+# Size MEDIUM: a 4 vCPU / 8 GB server with 1 GB of swap (bootstrap.sh --size medium).
+# Used on top of compose.yml:  docker compose -f compose.yml -f resources-medium.yml ...
+#
+# Comfortable for about 80 testers. The measurements behind the numbers are in
+# resources-small.yml; here the two JVMs and PostgreSQL get about twice the small budget, which is
+# where the extra memory helps (more heap for concurrent sign-ins and prints, more of the
+# database in memory), and the rest grows a little:
+#
+#   backend   3072 MB   heap 60 %, about 1.8 GB, plus the Chromium the worker prints with
+#   keycloak  1536 MB   heap 60 %, about 920 MB
+#   postgres  1536 MB   shared_buffers 384 MB (a quarter), effective_cache_size 1 GB
+#   rabbitmq   512 MB   the memory alarm at 256 MB (half)
+#   minio      512 MB   caddy 256 MB   pgbouncer 32 MB   mailpit 128 MB
+#   total     7584 MB
+#
+# That leaves about 400 MB and the 1 GB of swap for the system and Docker itself; the
+# services together use far less than their ceilings on an ordinary day.
+#
+# CPU is shared, as on the small size (see resources-small.yml), and with four cores a sign-in
+# burst and a PDF print no longer wait for each other.
+
+services:
+  postgres:
+    mem_limit: 1536m
+    shm_size: 256m
+    # max_connections: PgBouncer's pool (30) + Keycloak's (20) + the relay, Flyway and the seeds
+    # + headroom.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=384MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+
+  pgbouncer:
+    mem_limit: 32m
+    environment:
+      DEFAULT_POOL_SIZE: "30"
+
+  rabbitmq:
+    mem_limit: 512m
+    environment:
+      # 256 MiB in bytes (see resources-small.yml for why the absolute form).
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit vm_memory_high_watermark {absolute,268435456}"
+
+  minio:
+    mem_limit: 512m
+
+  minio-init:
+    mem_limit: 64m
+
+  keycloak:
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:+ExitOnOutOfMemoryError"
+      KC_DB_POOL_MAX_SIZE: "20"
+
+  mailpit:
+    mem_limit: 128m
+
+  backend:
+    mem_limit: 3072m
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
+      DB_POOL: "20"
+
+  caddy:
+    mem_limit: 256m
+
+  demo-tools:
+    mem_limit: 1024m

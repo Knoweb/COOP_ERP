@@ -2,6 +2,8 @@ package lk.coopfed.knoweb.m2catalogue.internal.batch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -122,6 +124,7 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void clean() {
         JdbcTemplate admin = superuserJdbc();
+        admin.update("delete from inventory.stock_lot where owner_entity_id = ?", MPCS_A);
         admin.execute("truncate table catalogue.batch, catalogue.batch_key, catalogue.supplier, catalogue.sku cascade");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
@@ -335,7 +338,17 @@ class BatchHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aLotHolderThatDidNotRegisterTheBatchCorrectsItsExpiry() {
         RegisteredBatch keyed = registered(milk("B7", "500.00"), own(FEDERATION));
-        doReturn(true).when(lots).holdsLotOf(keyed.batchId(), MPCS_A);
+        doReturn(true).when(lots).holdsLotOf(eq(keyed.batchId()), any());
+        // The database asks M5's lots itself (V0008's trigger), so the holder needs a real lot.
+        superuserJdbc()
+                .update(
+                        "insert into inventory.stock_lot (stock_lot_id, owner_entity_id, location_id, batch_id, sku_id,"
+                                + " qty_on_hand, unit_cost, received_at) values (?, ?, ?, ?, ?, 24, 450, now())",
+                        Ids.next(),
+                        MPCS_A,
+                        Ids.next(),
+                        keyed.batchId(),
+                        trackedSku);
         kernel.reset();
 
         UUID replacement = correct.handle(

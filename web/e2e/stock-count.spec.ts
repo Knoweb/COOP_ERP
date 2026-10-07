@@ -1,6 +1,6 @@
 // A stock count through the browser, on the demo data of phase 3 (docs/DEMO.md): the society's
-// buyer counts one item at Kuliyapitiya stores and finds one unit short, which is within tolerance
-// (2 units), so the count closes and posts at once; the item's stock card then shows the count
+// buyer counts red dhal at Kuliyapitiya stores and finds one unit short, which is within tolerance
+// (2 units, and well under the Rs 1,000 value tolerance), so the count closes and posts at once; the item's stock card then shows the count
 // adjustment as its latest movement. Then the society manager opens the demo's own count, whose
 // shortfall beyond tolerance he approved (DemoStockOperations), and reads it as approved.
 //
@@ -18,8 +18,10 @@ test("a count within tolerance posts at once and the stock card shows the adjust
   await page.getByLabel(textOf(buyer, "inventory.field.location")).selectOption(DEMO_LOCATIONS.m101Stores);
   await expect(page.getByRole("heading", { level: 2, name: textOf(buyer, "inventory.count.start_section") })).toBeVisible();
 
-  // By items (the default): the first item held at the stores.
-  await page.getByRole("checkbox").first().check();
+  // By items (the default): red dhal, which the demo holds at the stores (DemoStockOperations counts
+  // it too). Since wave 2 (M5-14) a variance auto-posts only within the value tolerance as well
+  // (Rs 1,000): one bag of red dhal (about Rs 315) is; one 5 kg bag of rice (Rs 1,210) waits.
+  await page.getByRole("checkbox", { name: /රතු පරිප්පු 1 kg/ }).check();
   await page.getByRole("button", { name: textOf(buyer, "inventory.count.start"), exact: true }).click();
   await expect(page).toHaveURL(/\/inventory\/counts\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1, name: textOf(buyer, "inventory.count.sheet_title") })).toBeVisible();

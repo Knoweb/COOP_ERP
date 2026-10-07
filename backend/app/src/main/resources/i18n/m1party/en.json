@@ -90,6 +90,8 @@
   "m1.position.number_duplicate": "This till number is already used at the shop",
   "m1.relationship.allocation_rule_invalid": "Select a valid allocation rule",
   "m1.relationship.buyer_not_found": "The buying entity could not be found",
+  "m1.relationship.credit_limit_announced": "The credit limit of this trading relationship has already been announced",
+  "m1.relationship.credit_limit_none": "This trading relationship has no credit limit",
   "m1.relationship.credit_limit_permission_required": "You do not have permission to change the credit limit",
   "m1.relationship.effective_from_after_end": "The new terms must start before the current terms end",
   "m1.relationship.effective_from_in_past": "The new terms cannot start before today",
@@ -117,6 +119,7 @@
   "m1.role.federation_required": "Only the Federation can author role templates",
   "m1.role.has_assignments": "Users still hold this role; revoke their assignments before retiring it",
   "m1.role.last_user_manager": "Removing this permission would leave the entity with nobody who can manage its users",
+  "m1.role.limit_exceeds_grantor": "You cannot grant a limit higher than your own limit on this permission",
   "m1.role.limits_invalid": "A limit on this permission is not valid",
   "m1.role.limits_not_accepted": "This permission does not take limits",
   "m1.role.name_required": "Enter the name of the role in English",
@@ -140,6 +143,7 @@
   "m1.sod.same_permission": "Choose two different permissions",
   "m1.sod.unchanged": "This rule is already in force",
   "m1.user.credential_invalid": "Select the credential to reset",
+  "m1.user.credential_self": "You cannot reset your own second factor; ask another user manager",
   "m1.user.deactivated": "This user has been deactivated and cannot be changed",
   "m1.user.display_name_required": "Enter the name to show for the user",
   "m1.user.entity_scope_required": "Users are managed for the whole entity; choose the entity, not a shop",
@@ -160,6 +164,7 @@
   "m1.user.reason_required": "A reason is required to deactivate a user",
   "m1.user.responsible_officer": "This user is the entity’s responsible officer; appoint another officer first",
   "m1.user.succeeds_invalid": "The user this one succeeds must be a deactivated user of the same entity",
+  "m1.user.target_outranks_caller": "This user holds sensitive permissions that you do not; a user who holds them must do this",
   "m1.user.username_invalid": "The user name must be 3 to 64 letters, digits, dots, dashes or underscores",
   "m1.user.username_taken": "This user name is already taken"
 }

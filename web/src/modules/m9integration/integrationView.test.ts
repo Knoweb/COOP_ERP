@@ -1,21 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { defaultExportPeriod, isoDay, journalFileName, templateText } from "./integrationView";
+import { dayBefore, defaultExportPeriod, journalFileName, periodIsOpen, templateText } from "./integrationView";
 import messages from "./integration.messages.json";
 import { integrationModule } from "./module";
 
 describe("the export form", () => {
-  it("opens on the first of the month two months back to today, from the local day", () => {
-    // A fixed date: the test never depends on today (Asia/Colombo midnight).
-    expect(defaultExportPeriod(new Date(2026, 8, 29, 23, 30))).toEqual({ from: "2026-07-01", to: "2026-09-29" });
-    expect(defaultExportPeriod(new Date(2026, 0, 15))).toEqual({ from: "2025-11-01", to: "2026-01-15" });
+  it("opens on the first of the month two months back to yesterday, a closed day", () => {
+    // Fixed dates: the test never depends on today (Asia/Colombo midnight).
+    expect(defaultExportPeriod("2026-09-29")).toEqual({ from: "2026-07-01", to: "2026-09-28" });
+    expect(defaultExportPeriod("2026-01-15")).toEqual({ from: "2025-11-01", to: "2026-01-14" });
   });
 
-  it("writes a calendar day with two-digit month and day", () => {
-    expect(isoDay(new Date(2026, 2, 5))).toBe("2026-03-05");
+  it("steps back one day across a month and a year", () => {
+    expect(dayBefore("2026-03-01")).toBe("2026-02-28");
+    expect(dayBefore("2028-03-01")).toBe("2028-02-29");
+    expect(dayBefore("2026-01-01")).toBe("2025-12-31");
   });
 
-  it("names the file after the period", () => {
+  it("knows a period ending today or later is still open", () => {
+    expect(periodIsOpen("2026-09-28", "2026-09-29")).toBe(false);
+    expect(periodIsOpen("2026-09-29", "2026-09-29")).toBe(true);
+    expect(periodIsOpen("2026-10-05", "2026-09-29")).toBe(true);
+    expect(periodIsOpen("", "2026-09-29")).toBe(false);
+  });
+
+  it("names the file after the period, and marks a provisional one", () => {
     expect(journalFileName("2026-09-01", "2026-09-30")).toBe("journal_2026-09-01_2026-09-30.csv");
+    expect(journalFileName("2026-09-01", "2026-09-30", false)).toBe("journal_2026-09-01_2026-09-30.csv");
+    expect(journalFileName("2026-09-01", "2026-09-30", true)).toBe("journal_2026-09-01_2026-09-30_PROVISIONAL.csv");
   });
 });
 

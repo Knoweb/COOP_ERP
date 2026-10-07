@@ -69,6 +69,7 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
     private static final UUID BUYER_SI = UUID.fromString("0190e9b0-0000-7000-8000-000000000002");
     private static final UUID BUYER_TA = UUID.fromString("0190e9b0-0000-7000-8000-000000000003");
     private static final UUID BUYER_EN = UUID.fromString("0190e9b0-0000-7000-8000-000000000004");
+    private static final UUID STRANGER = UUID.fromString("0190e9b0-0000-7000-8000-000000000005");
     private static final UUID USER = UUID.fromString("0190e9b0-0000-7000-8000-000000000010");
     private static final UUID INVOICE_RULE = UUID.fromString("0190f9a0-0000-7000-8000-000000000001");
 
@@ -115,14 +116,25 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
         contact(BUYER_SI, "SMS", "0700000901", "si");
         contact(BUYER_TA, "EMAIL", "accounts@buyer-ta.coop-erp.test", "ta");
         contact(BUYER_EN, "EMAIL", "accounts@buyer-en.coop-erp.test", "en");
+        contact(STRANGER, "EMAIL", "accounts@stranger.coop-erp.test", "en");
+        // The contact door (wave 2, M9-06; m9integration V0006) opens for the entities the caller
+        // trades with, ACTIVE or SUSPENDED (M1's party.caller_trades_with): the seller sells to the
+        // three buyers, the Tamil one suspended; the stranger has no relationship with anybody.
+        admin.update("delete from party.entity_relationship where seller_entity_id = ?", SELLER);
+        relationship(BUYER_SI, "ACTIVE");
+        relationship(BUYER_TA, "SUSPENDED");
+        relationship(BUYER_EN, "ACTIVE");
         SMTP.messages.clear();
         SMTP.failNext.set(0);
         invoke("invalidateRules");
-        // No quiet hours for the seller in this test: the clock is whatever it is.
-        inScope(SELLER, () -> {
-            config.set("notification.sms.quiet_hours", ConfigScope.entity(SELLER), "", scope(SELLER), "test");
-            return null;
-        });
+        // No quiet hours for the buyers in this test: the clock is whatever it is. The buyers',
+        // not the seller's: the window of the entity whose contact is reached holds (CR-19A-12).
+        for (UUID buyer : List.of(BUYER_SI, BUYER_TA, BUYER_EN)) {
+            inScope(buyer, () -> {
+                config.set("notification.sms.quiet_hours", ConfigScope.entity(buyer), "", scope(buyer), "test");
+                return null;
+            });
+        }
         kernel.reset();
     }
 
@@ -170,9 +182,16 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
             assertThat(row.get("owner_entity_id")).isEqualTo(SELLER);
         });
 
-        // The seller's delivery log on the screen: newest first, hashes cut short.
-        assertThat(queries.log(null, 10, user(SELLER))).hasSize(3).allSatisfy(entry -> assertThat(entry.recipientHash())
-                .hasSize(12));
+        // The seller's delivery log on the screen: whose desk was reached, never a hash a reader
+        // could reverse (M9-07): the buyer, the role, eight characters of the keyed hash.
+        assertThat(queries.log(null, 10, user(SELLER)))
+                .hasSize(3)
+                .allSatisfy(entry -> {
+                    assertThat(entry.audienceRole()).isEqualTo("ACCOUNTS");
+                    assertThat(entry.recipientTag()).hasSize(8);
+                })
+                .extracting(IntegrationQueries.LogEntry::recipientEntityId)
+                .containsExactlyInAnyOrder(BUYER_SI, BUYER_TA, BUYER_EN);
         assertThat(queries.log("FAILED", 10, user(SELLER))).isEmpty();
         assertThat(queries.log(null, 10, user(BUYER_SI))).isEmpty();
     }
@@ -279,6 +298,74 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
     }
 
     @Test
+    void theContactDoorAnswersForATradingCounterpartyOnlyAndNothingToTheFederationsView() {
+        String door = "select address from integration.notification_recipients(?, 'ACCOUNTS') where channel = 'EMAIL'";
+        // The seller reaches the buyers it trades with, the suspended one included, and itself.
+        assertThat(inScope(SELLER, () -> jdbc.queryForList(door, String.class, BUYER_SI)))
+                .containsExactly("accounts@buyer-si.coop-erp.test");
+        assertThat(inScope(SELLER, () -> jdbc.queryForList(door, String.class, BUYER_TA)))
+                .containsExactly("accounts@buyer-ta.coop-erp.test");
+        assertThat(inScope(BUYER_EN, () -> jdbc.queryForList(door, String.class, BUYER_EN)))
+                .containsExactly("accounts@buyer-en.coop-erp.test");
+        // The buyer reaches its seller's desk the same way (the relationship reads both ways).
+        contactFor(SELLER, "accounts@seller.coop-erp.test");
+        assertThat(inScope(BUYER_SI, () -> jdbc.queryForList(door, String.class, SELLER)))
+                .containsExactly("accounts@seller.coop-erp.test");
+        // A stranger: nothing, in either direction.
+        assertThat(inScope(SELLER, () -> jdbc.queryForList(door, String.class, STRANGER)))
+                .isEmpty();
+        assertThat(inScope(STRANGER, () -> jdbc.queryForList(door, String.class, BUYER_SI)))
+                .isEmpty();
+        // The Federation's view and a session with no scope: nothing at all, not even of a buyer.
+        assertThat(inClass("FEDERATION_VIEW", TEST_FEDERATION, () -> jdbc.queryForList(door, String.class, BUYER_SI)))
+                .isEmpty();
+        assertThat(inClass("NONE", SELLER, () -> jdbc.queryForList(door, String.class, BUYER_SI)))
+                .isEmpty();
+        // And the Federation's view reads no contact row by policy either (fed_view dropped, V0006).
+        assertThat(inClass(
+                        "FEDERATION_VIEW",
+                        TEST_FEDERATION,
+                        () -> jdbc.queryForObject("select count(*) from integration.notification_contact", Long.class)))
+                .isZero();
+
+        // The seller's invoice to a stranger it has no relationship with reaches nobody: the rule
+        // resolves no recipient, so nothing is queued and nothing is sent.
+        dispatch("invoice.issued.v1", invoice(STRANGER));
+        assertThat(SMTP.messages).isEmpty();
+        assertThat(superuserJdbc().queryForObject("select count(*) from kernel.notification_log", Long.class))
+                .isZero();
+    }
+
+    private void contactFor(UUID entity, String address) {
+        contact(entity, "EMAIL", address, "en");
+    }
+
+    private void relationship(UUID buyer, String status) {
+        superuserJdbc()
+                .update(
+                        "insert into party.entity_relationship (relationship_id, seller_entity_id, buyer_entity_id,"
+                                + " status, effective_from) values (?, ?, ?, ?, '2026-01-01')",
+                        Ids.next(),
+                        SELLER,
+                        buyer,
+                        status);
+    }
+
+    private <T> T inClass(String policyClass, UUID entity, Supplier<T> work) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.queryForList(
+                    "select set_config('app.user_id', ?, true), set_config('app.correlation_id', ?, true),"
+                            + " set_config('app.scope_entity_id', ?, true), set_config('app.scope_location_id', '', true),"
+                            + " set_config('app.scope_class', ?, true), set_config('app.granted_entities', '{}', true)",
+                    USER.toString(),
+                    Ids.next().toString(),
+                    entity.toString(),
+                    policyClass);
+            return work.get();
+        });
+    }
+
+    @Test
     void aRelayThatRefusesIsRetriedWithBackoffAndThenSends() throws Exception {
         SMTP.failNext.set(1);
         ObjectNode receipt = json.createObjectNode();
@@ -297,9 +384,12 @@ class NotificationDeliveryPostgresIntegrationTest extends PostgresIntegrationTes
                         + " from kernel.notification_log");
         assertThat(failed.get("status")).isEqualTo("QUEUED");
         assertThat(((Number) failed.get("attempts")).intValue()).isEqualTo(1);
+        // The class and a category, never the relay's or the adapter's text (wave 2, TWK-21, M9-10):
+        // the relay's "451 try again later" at MAIL FROM is a refusal of the message.
         assertThat(String.valueOf(failed.get("last_error")))
-                .contains("SMTP relay")
-                .doesNotContain("buyer-en");
+                .isEqualTo("SendFailed: REJECTED")
+                .doesNotContain("buyer-en")
+                .doesNotContain("451");
         // The kernel's first backoff (19A section 10): a minute after the failed attempt.
         assertThat(((Timestamp) failed.get("next_attempt_at")).toInstant())
                 .isAfter(((Timestamp) failed.get("last_attempt_at")).toInstant().plusSeconds(30));

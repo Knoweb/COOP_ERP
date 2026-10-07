@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
@@ -25,6 +26,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *   <li>the application role {@code app_rw} may not DELETE or TRUNCATE anywhere, and may not
  *       create objects (AGENTS.md; 17A section 6.2: "no DELETE anywhere for app_rw"), with the
  *       four exceptions of {@link #DELETE_BY_DESIGN};</li>
+ *   <li>every SECURITY DEFINER function, in every schema, ends its search_path in {@code pg_temp},
+ *       and every one the application role may execute tests {@code kernel.scope_class()}, with
+ *       the exceptions of {@link #DEFINER_WITHOUT_A_CLASS_TEST} (wave 2, RLS-13, RLS-17).</li>
  * </ul>
  *
  * A table every tenant may read (a reference table) still needs a policy; it says so
@@ -118,6 +122,151 @@ class SchemaRulesIntegrationTest extends PostgresIntegrationTest {
         assertThat(db.queryForObject(
                         "select has_table_privilege('app_rw', 'kernel.object_upload', 'DELETE')", Boolean.class))
                 .isFalse();
+    }
+
+    /**
+     * The sync quarantine (kernel V0084; CR-32-1 item 2): app_rw may write the four resolution
+     * columns and nothing else, the raw event included (only kernel.sync_quarantine_drop_raw nulls
+     * it), and never delete a row: a quarantined fact is resolved, never purged.
+     */
+    @Test
+    void theQuarantineTakesOnlyItsResolutionColumns() {
+        JdbcTemplate db = superuserJdbc();
+        assertThat(problemsOf(db)).noneMatch(problem -> problem.startsWith("kernel.sync_quarantine:"));
+        List<String> updatable = db.queryForList(
+                """
+                select column_name from information_schema.column_privileges
+                 where table_schema = 'kernel' and table_name = 'sync_quarantine'
+                   and grantee = 'app_rw' and privilege_type = 'UPDATE'
+                 order by column_name
+                """,
+                String.class);
+        assertThat(updatable).containsExactly("resolution", "resolution_reason", "resolved_at", "resolved_by_user_id");
+        assertThat(db.queryForObject(
+                        "select has_table_privilege('app_rw', 'kernel.sync_quarantine', 'DELETE')", Boolean.class))
+                .isFalse();
+    }
+
+    /**
+     * The SECURITY DEFINER functions the application user may call that answer without testing
+     * the scope class, each with the reason it has no class to test. Adding one here is a design
+     * decision (the fifth case of RLS_POLICY_TEMPLATE.md), not a fix for a red test.
+     */
+    static final Map<String, String> DEFINER_WITHOUT_A_CLASS_TEST = Map.of(
+            "catalogue.ensure_batch_partitions(months_ahead integer)",
+            "the partition job's DDL: creates next months' partitions of catalogue.batch, reads and returns no row",
+            "customers.ensure_posting_partitions(months_ahead integer)",
+            "the partition job's DDL: creates next months' partitions of customers.account_posting, reads and"
+                    + " returns no row",
+            "inventory.ensure_movement_partitions(months_ahead integer)",
+            "the partition job's DDL: creates next months' partitions of inventory.stock_movement, reads and"
+                    + " returns no row");
+
+    /**
+     * Wave 2 (RLS-13; {@code docs/progress/deviations/2026-10-06-wave2-cross-tenant-functions.md} (1)):
+     * a SECURITY DEFINER function whose search_path does not end in {@code pg_temp} searches the
+     * caller's temporary schema first, so a temporary table could shadow a catalogue relation it
+     * reads. Every definer function, of every schema, ends its search_path in pg_temp: the rule reads
+     * the catalogue of all {@code prosecdef} functions, so a function a future migration adds in any
+     * schema is held to it the day it lands.
+     */
+    @Test
+    void everyDefinerFunctionEndsItsSearchPathInPgTemp() {
+        assertThat(definerFunctionsWithAnOpenSearchPath(superuserJdbc()))
+                .as("SECURITY DEFINER functions whose search_path does not end in pg_temp")
+                .isEmpty();
+    }
+
+    /**
+     * Wave 2 (the fifth case of RLS_POLICY_TEMPLATE.md; {@code 2026-10-06-wave2-cross-tenant-functions.md}
+     * (1)): a SECURITY DEFINER function the application user may execute reads past every policy, and
+     * one role serves every class, so who may ask is the class test inside it, not the grant. Every
+     * such function names {@code kernel.scope_class()} in its body, or is listed in {@link
+     * #DEFINER_WITHOUT_A_CLASS_TEST} with the reason. A text check, as OwnPoliciesTestTheClass is for
+     * policies: it proves the test is there, the functions' own tests prove what it admits. A trigger
+     * function cannot be called directly and is left out.
+     */
+    @Test
+    void everyDefinerFunctionTheApplicationMayCallTestsTheScopeClass() {
+        List<String> ungated = definerFunctionsWithoutAClassTest(superuserJdbc());
+        assertThat(DEFINER_WITHOUT_A_CLASS_TEST.keySet())
+                .as("every allowed definer function without a class test still exists and still has none")
+                .allSatisfy(function -> assertThat(ungated).contains(function));
+        assertThat(ungated.stream()
+                        .filter(function -> !DEFINER_WITHOUT_A_CLASS_TEST.containsKey(function))
+                        .toList())
+                .as("SECURITY DEFINER functions executable by app_rw that do not test kernel.scope_class()")
+                .isEmpty();
+    }
+
+    /** Proof that the two definer rules bite: a function that breaks each is reported, by name. */
+    @Test
+    void aDefinerFunctionThatBreaksTheRulesIsReported() {
+        JdbcTemplate db = superuserJdbc();
+        try {
+            db.execute(
+                    """
+                    create function hello.zz_open_definer() returns boolean language sql security definer
+                        set search_path = pg_catalog, hello as $$ select kernel.scope_class() = 'OWN' $$
+                    """);
+            db.execute(
+                    """
+                    create function hello.zz_ungated_definer() returns boolean language sql security definer
+                        set search_path = pg_catalog, hello, pg_temp as $$ select true $$
+                    """);
+            db.execute("revoke all on function hello.zz_ungated_definer() from public");
+            db.execute("grant execute on function hello.zz_ungated_definer() to app_rw");
+            db.execute(
+                    """
+                    create function hello.zz_unreachable_definer() returns boolean language sql security definer
+                        set search_path = pg_catalog, hello, pg_temp as $$ select true $$
+                    """);
+            db.execute("revoke all on function hello.zz_unreachable_definer() from public");
+
+            assertThat(definerFunctionsWithAnOpenSearchPath(db))
+                    .contains("hello.zz_open_definer(): search_path=pg_catalog, hello")
+                    .noneMatch(f -> f.startsWith("hello.zz_ungated_definer()"));
+            assertThat(definerFunctionsWithoutAClassTest(db))
+                    .contains("hello.zz_ungated_definer()")
+                    .doesNotContain("hello.zz_open_definer()", "hello.zz_unreachable_definer()");
+        } finally {
+            for (String function : List.of("zz_open_definer", "zz_ungated_definer", "zz_unreachable_definer")) {
+                db.execute("drop function if exists hello." + function + "()");
+            }
+        }
+    }
+
+    private static List<String> definerFunctionsWithAnOpenSearchPath(JdbcTemplate db) {
+        return db.queryForList(
+                """
+                select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+                       || ': ' || coalesce((select c from unnest(p.proconfig) c where c like 'search_path=%'),
+                                           'search_path not set')
+                  from pg_proc p
+                  join pg_namespace n on n.oid = p.pronamespace
+                 where p.prosecdef
+                   and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+                   and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c
+                                    where c ~ '^search_path=.*[, ]pg_temp\\s*$')
+                 order by 1
+                """,
+                String.class);
+    }
+
+    private static List<String> definerFunctionsWithoutAClassTest(JdbcTemplate db) {
+        return db.queryForList(
+                """
+                select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+                  from pg_proc p
+                  join pg_namespace n on n.oid = p.pronamespace
+                 where p.prosecdef
+                   and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+                   and p.prorettype <> 'trigger'::regtype
+                   and has_function_privilege('app_rw', p.oid, 'EXECUTE')
+                   and position('kernel.scope_class()' in p.prosrc) = 0
+                 order by 1
+                """,
+                String.class);
     }
 
     /** Proof that the rules bite: tables that break each of them are reported, by name. */
