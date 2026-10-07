@@ -47,6 +47,7 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("doc_discrepancy_line", FOLLOWS_HEADER),
             Map.entry("doc_invoice", FOLLOWS_HEADER_UPDATED),
             Map.entry("doc_credit_note", FOLLOWS_HEADER_UPDATED),
+            Map.entry("doc_debit_note", FOLLOWS_HEADER_UPDATED),
             Map.entry("invoice_dispute", TEMPLATE_WITH_PARTY),
             Map.entry("discrepancy_settlement", TEMPLATE_WITH_PARTY),
             Map.entry("doc_payment_receipt", FOLLOWS_HEADER_UPDATED),
@@ -81,8 +82,9 @@ class TradingSchemaIntegrationTest extends PostgresIntegrationTest {
             "doc_grn", Set.of("confirmed_by", "confirmed_at"),
             "doc_grn_line", Set.of("batch_id", "unit_cost"),
             "order_allocation_line", Set.of("fulfilled_qty"),
-            "doc_invoice", Set.of("print_object_key", "credited_amount", "settled_amount"),
+            "doc_invoice", Set.of("print_object_key", "credited_amount", "settled_amount", "debited_amount"),
             "doc_credit_note", Set.of("print_object_key"),
+            "doc_debit_note", Set.of("print_object_key"),
             "doc_payment_receipt", Set.of("print_object_key"));
 
     @Test

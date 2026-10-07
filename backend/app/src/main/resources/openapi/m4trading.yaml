@@ -887,6 +887,93 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
+  /v1/trading/debit-notes:
+
+    post:
+      tags: [Billing]
+      operationId: issueDebitNote
+      summary: The seller debits chosen quantities of lines of its invoice
+      description: >
+        At each line's price and VAT rate. Asks for a fresh second factor.
+        Problems: m4.invoice.not_found, m4.debitnote.not_seller,
+        m4.invoice.not_issued, m4.debitnote.line_unknown, m4.debitnote.qty_invalid,
+        m4.debitnote.nothing_to_debit, document.link.exceeds_balance.
+      x-permission: bil.debitnote.issue
+      x-scope: ENTITY
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueDebitNoteRequest'
+      responses:
+        '201':
+          description: The issued debit note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebitNoteResponse'
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+  /v1/trading/debit-notes/{debitNoteId}:
+
+    parameters:
+      - $ref: '#/components/parameters/DebitNoteId'
+
+    get:
+      tags: [Billing]
+      operationId: getDebitNote
+      summary: One debit note the caller's entity issued or received
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The debit note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebitNoteResponse'
+        '404':
+          description: m4.debitnote.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+
+  /v1/trading/debit-notes/{debitNoteId}/print:
+
+    parameters:
+      - $ref: '#/components/parameters/DebitNoteId'
+
+    get:
+      tags: [Billing]
+      operationId: getDebitNotePrint
+      summary: A fresh link to the printed A4 copy of the seller's debit note
+      description: >
+        Printed by the worker after the issue (m4.debitnote.print_not_ready
+        until then), stored under the seller, printed by either party through the debit note.
+      x-permission: trd.document.view
+      responses:
+        '200':
+          description: The link, pre-signed for a short while
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebitNotePrintResponse'
+        '404':
+          description: m4.debitnote.not_found
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Problem'
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
   /v1/trading/discrepancies:
 
     get:
@@ -1591,6 +1678,14 @@ components:
         type: string
         format: uuid
 
+    DebitNoteId:
+      in: path
+      name: debitNoteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
     ReceiptId:
       in: path
       name: receiptId
@@ -2184,9 +2279,12 @@ components:
         creditedAmount:
           type: number
           description: What the invoice's credit notes took off it
+        debitedAmount:
+          type: number
+          description: What the invoice's debit notes added to it
         amountDue:
           type: number
-          description: The gross amount less what was credited and settled
+          description: The gross amount plus what was debited less what was credited and settled
         settledAmount:
           type: number
           description: What payments settled of it, net of bounced cheques
@@ -2214,6 +2312,10 @@ components:
             money unapplied, which applyCreditNote can apply to this invoice
           items:
             $ref: '#/components/schemas/CreditNoteSummary'
+        debitNotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebitNoteSummary'
         lines:
           type: array
           items:
@@ -2393,6 +2495,128 @@ components:
         url:
           type: string
           format: uri
+
+    IssueDebitNoteRequest:
+      type: object
+      required: [invoiceId, lines, reason]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: Invoice lines and quantities to debit
+          items:
+            $ref: '#/components/schemas/DebitNoteLineRequest'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    DebitNoteLineRequest:
+      type: object
+      required: [invoiceLineId, qty]
+      properties:
+        invoiceLineId:
+          type: string
+          format: uuid
+        qty:
+          $ref: '#/components/schemas/Quantity'
+
+    DebitNoteResponse:
+      type: object
+      required: [debitNoteId, status, invoiceId, sellerEntityId, buyerEntityId, reason, netAmount, taxAmount,
+        grossAmount, lines]
+      properties:
+        debitNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        status:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceDocNumber:
+          type: string
+        sellerEntityId:
+          type: string
+          format: uuid
+        buyerEntityId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        netAmount:
+          type: number
+        taxAmount:
+          type: number
+        grossAmount:
+          type: number
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebitNoteLineResponse'
+
+    DebitNoteLineResponse:
+      type: object
+      required: [lineId, lineNo, skuId, uomCode, qty, unitPrice, taxRatePercent, taxAmount, lineTotal]
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+        skuId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        uomCode:
+          type: string
+        qty:
+          type: number
+        unitPrice:
+          type: number
+        taxRatePercent:
+          type: number
+        taxAmount:
+          type: number
+        lineTotal:
+          type: number
+        invoiceLineId:
+          type: string
+          format: uuid
+
+    DebitNotePrintResponse:
+      type: object
+      required: [debitNoteId, url]
+      properties:
+        debitNoteId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+
+    DebitNoteSummary:
+      type: object
+      required: [debitNoteId, grossAmount]
+      properties:
+        debitNoteId:
+          type: string
+          format: uuid
+        docNumber:
+          type: string
+        grossAmount:
+          type: number
 
     DiscrepancyResponse:
       type: object

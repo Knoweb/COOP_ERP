@@ -16,8 +16,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class M4SeedLoaderTest extends PostgresIntegrationTest {
 
-    /** 24A section 3.1's eleven rows, plus the two CN GOODS BUYER rows of wave 2 (CR-24A-3 item 5). */
-    private static final int POSTING_MAP_ROWS = 13;
+    /** 24A section 3.1's eleven rows, plus the two CN GOODS BUYER rows of wave 2 (CR-24A-3 item 5) and Debit Note rows. */
+    private static final int POSTING_MAP_ROWS = 14;
 
     @Autowired
     private M4SeedLoader loader;

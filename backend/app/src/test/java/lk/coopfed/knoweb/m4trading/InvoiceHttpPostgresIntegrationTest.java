@@ -227,6 +227,29 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         .decimalValue())
                 .isEqualByComparingTo("1372.80");
 
+        // A debit note of a chosen line (one dhal, EXEMPT, 80.00), read by the buyer.
+        JsonNode debitNote = post(
+                "/v1/trading/debit-notes",
+                Map.of(
+                        "invoiceId",
+                        invoiceId,
+                        "lines",
+                        List.of(Map.of("invoiceLineId", dhalLine, "qty", 1)),
+                        "reason",
+                        "Additional charge"),
+                SELLER_USER,
+                SELLER);
+        assertThat(debitNote.get("docNumber").asText()).isEqualTo("D4S-DN2-0000001");
+        String debitNoteId = debitNote.get("debitNoteId").asText();
+        assertThat(get("/v1/trading/debit-notes/" + debitNoteId, BUYER_USER, BUYER)
+                        .get("grossAmount")
+                        .decimalValue())
+                .isEqualByComparingTo("80.00");
+        assertThat(get("/v1/trading/invoices/" + invoiceId, BUYER_USER, BUYER)
+                        .get("amountDue")
+                        .decimalValue())
+                .isEqualByComparingTo("1452.80"); // 1372.80 + 80.00
+
         // The buyer disputes, the seller resolves.
         assertThat(post("/v1/trading/invoices/" + invoiceId + "/dispute", Map.of("reason", "Short"), BUYER_USER, BUYER)
                         .get("disputed")
@@ -248,6 +271,17 @@ class InvoiceHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         .get("url")
                         .asText())
                 .contains(objectKey);
+
+        String debitNoteObjectKey = "reports/" + SELLER + "/" + UUID.randomUUID() + ".pdf";
+        superuserJdbc()
+                .update(
+                        "update trading.doc_debit_note set print_object_key = ? where document_id = ?::uuid",
+                        debitNoteObjectKey,
+                        debitNoteId);
+        assertThat(get("/v1/trading/debit-notes/" + debitNoteId + "/print", BUYER_USER, BUYER)
+                        .get("url")
+                        .asText())
+                .contains(debitNoteObjectKey);
     }
 
     private JsonNode get(String path, UUID user, UUID entity) {

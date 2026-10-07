@@ -16,6 +16,7 @@ import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { AccountPage } from "./AccountPage";
 import { ClaimPage } from "./ClaimPage";
 import { CreditNotePage } from "./CreditNotePage";
+import { DebitNotePage } from "./DebitNotePage";
 import { DeliveryNotePage } from "./DeliveryNotePage";
 import { DiscrepancyPage } from "./DiscrepancyPage";
 import { GrnPage } from "./GrnPage";
@@ -72,6 +73,7 @@ export const tradingModule: ModuleDefinition = {
     },
     { path: "trading/claims/:claimId", element: <ClaimPage /> },
     { path: "trading/credit-notes/:creditNoteId", element: <CreditNotePage /> },
+    { path: "trading/debit-notes/:debitNoteId", element: <DebitNotePage /> },
     { path: "trading/payments/:receiptId", element: <PaymentPage /> },
     { path: "trading/accounts/:role/:counterpartyId", element: <AccountPage /> }
   ],

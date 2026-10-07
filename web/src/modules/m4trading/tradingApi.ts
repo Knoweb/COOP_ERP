@@ -26,6 +26,8 @@ export type Grn = components["schemas"]["GrnResponse"];
 export type CaptureGrnRequest = components["schemas"]["CaptureGrnRequest"];
 export type Invoice = components["schemas"]["InvoiceResponse"];
 export type CreditNote = components["schemas"]["CreditNoteResponse"];
+export type DebitNote = components["schemas"]["DebitNoteResponse"];
+export type IssueDebitNoteRequest = components["schemas"]["IssueDebitNoteRequest"];
 export type Discrepancy = components["schemas"]["DiscrepancyResponse"];
 export type PaymentReceipt = components["schemas"]["PaymentReceiptResponse"];
 export type RecordPaymentReceiptRequest = components["schemas"]["RecordPaymentReceiptRequest"];
@@ -136,6 +138,20 @@ export function useTradingApi() {
       async creditNotePrint(creditNoteId: string): Promise<string> {
         const { data } = await api.GET("/v1/trading/credit-notes/{creditNoteId}/print", {
           params: { path: { creditNoteId } }
+        });
+        return data!.url;
+      },
+
+      async debitNote(debitNoteId: string): Promise<DebitNote> {
+        const { data } = await api.GET("/v1/trading/debit-notes/{debitNoteId}", {
+          params: { path: { debitNoteId } }
+        });
+        return data!;
+      },
+
+      async debitNotePrint(debitNoteId: string): Promise<string> {
+        const { data } = await api.GET("/v1/trading/debit-notes/{debitNoteId}/print", {
+          params: { path: { debitNoteId } }
         });
         return data!.url;
       },
@@ -304,6 +320,14 @@ export function useTradingApi() {
         const { data } = await api.POST("/v1/trading/invoices", {
           params: { header: { "Idempotency-Key": key } },
           body: { grnIds }
+        });
+        return data!;
+      },
+
+      async issueDebitNote(body: IssueDebitNoteRequest, key: string): Promise<DebitNote> {
+        const { data } = await api.POST("/v1/trading/debit-notes", {
+          params: { header: { "Idempotency-Key": key } },
+          body
         });
         return data!;
       },

@@ -509,6 +509,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/debit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The seller debits chosen quantities of lines of its invoice
+         * @description At each line's price and VAT rate. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.debitnote.not_seller, m4.invoice.not_issued, m4.debitnote.line_unknown, m4.debitnote.qty_invalid, m4.debitnote.nothing_to_debit, document.link.exceeds_balance.
+         */
+        post: operations["issueDebitNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/debit-notes/{debitNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                debitNoteId: components["parameters"]["DebitNoteId"];
+            };
+            cookie?: never;
+        };
+        /** One debit note the caller's entity issued or received */
+        get: operations["getDebitNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/debit-notes/{debitNoteId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                debitNoteId: components["parameters"]["DebitNoteId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A fresh link to the printed A4 copy of the seller's debit note
+         * @description Printed by the worker after the issue (m4.debitnote.print_not_ready until then), stored under the seller, printed by either party through the debit note.
+         */
+        get: operations["getDebitNotePrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/discrepancies": {
         parameters: {
             query?: never;
@@ -1194,7 +1255,9 @@ export interface components {
             grossAmount: number;
             /** @description What the invoice's credit notes took off it */
             creditedAmount?: number;
-            /** @description The gross amount less what was credited and settled */
+            /** @description What the invoice's debit notes added to it */
+            debitedAmount?: number;
+            /** @description The gross amount plus what was debited less what was credited and settled */
             amountDue?: number;
             /** @description What payments settled of it, net of bounced cheques */
             settledAmount?: number;
@@ -1208,6 +1271,7 @@ export interface components {
             creditNotes?: components["schemas"]["CreditNoteSummary"][];
             /** @description For the seller, while something is due: its credit notes to this buyer that still hold money unapplied, which applyCreditNote can apply to this invoice */
             availableCredits?: components["schemas"]["CreditNoteSummary"][];
+            debitNotes?: components["schemas"]["DebitNoteSummary"][];
             lines: components["schemas"]["InvoiceLineResponse"][];
         };
         CreditNoteSummary: {
@@ -1295,6 +1359,67 @@ export interface components {
             creditNoteId: string;
             /** Format: uri */
             url: string;
+        };
+        IssueDebitNoteRequest: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** @description Invoice lines and quantities to debit */
+            lines: components["schemas"]["DebitNoteLineRequest"][];
+            reason: string;
+        };
+        DebitNoteLineRequest: {
+            /** Format: uuid */
+            invoiceLineId: string;
+            qty: components["schemas"]["Quantity"];
+        };
+        DebitNoteResponse: {
+            /** Format: uuid */
+            debitNoteId: string;
+            docNumber?: string;
+            status: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceDocNumber?: string;
+            /** Format: uuid */
+            sellerEntityId: string;
+            /** Format: uuid */
+            buyerEntityId: string;
+            reason: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            netAmount: number;
+            taxAmount: number;
+            grossAmount: number;
+            lines: components["schemas"]["DebitNoteLineResponse"][];
+        };
+        DebitNoteLineResponse: {
+            /** Format: uuid */
+            lineId: string;
+            lineNo: number;
+            /** Format: uuid */
+            skuId: string;
+            /** Format: uuid */
+            batchId?: string;
+            uomCode: string;
+            qty: number;
+            unitPrice: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            /** Format: uuid */
+            invoiceLineId?: string;
+        };
+        DebitNotePrintResponse: {
+            /** Format: uuid */
+            debitNoteId: string;
+            /** Format: uri */
+            url: string;
+        };
+        DebitNoteSummary: {
+            /** Format: uuid */
+            debitNoteId: string;
+            docNumber?: string;
+            grossAmount: number;
         };
         DiscrepancyResponse: {
             /** Format: uuid */
@@ -1719,6 +1844,7 @@ export interface components {
         GrnId: string;
         InvoiceId: string;
         CreditNoteId: string;
+        DebitNoteId: string;
         ReceiptId: string;
         ClaimId: string;
         TransferRequestId: string;
@@ -2538,6 +2664,98 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    issueDebitNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueDebitNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The issued debit note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebitNoteResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDebitNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                debitNoteId: components["parameters"]["DebitNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The debit note */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebitNoteResponse"];
+                };
+            };
+            /** @description m4.debitnote.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getDebitNotePrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                debitNoteId: components["parameters"]["DebitNoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, pre-signed for a short while */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebitNotePrintResponse"];
+                };
+            };
+            /** @description m4.debitnote.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             422: components["responses"]["RuleBroken"];
         };
     };

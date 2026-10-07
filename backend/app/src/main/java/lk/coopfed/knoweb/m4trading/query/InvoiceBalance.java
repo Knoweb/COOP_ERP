@@ -12,6 +12,7 @@ import java.util.UUID;
 public record InvoiceBalance(
         UUID invoiceId,
         BigDecimal creditedAmount,
+        BigDecimal debitedAmount,
         BigDecimal settledAmount,
         BigDecimal amountDue,
         boolean disputed,

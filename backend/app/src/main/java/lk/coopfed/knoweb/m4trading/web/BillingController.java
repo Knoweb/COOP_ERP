@@ -10,15 +10,19 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.api.ApplyCreditNote;
 import lk.coopfed.knoweb.m4trading.api.DisputeInvoice;
 import lk.coopfed.knoweb.m4trading.api.IssueCreditNote;
+import lk.coopfed.knoweb.m4trading.api.IssueDebitNote;
 import lk.coopfed.knoweb.m4trading.api.IssueInvoice;
 import lk.coopfed.knoweb.m4trading.api.ResolveInvoiceDispute;
 import lk.coopfed.knoweb.m4trading.internal.invoice.ApplyCreditNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.DisputeInvoiceHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueCreditNoteHandler;
+import lk.coopfed.knoweb.m4trading.internal.invoice.IssueDebitNoteHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.IssueInvoiceHandler;
 import lk.coopfed.knoweb.m4trading.internal.invoice.ResolveInvoiceDisputeHandler;
 import lk.coopfed.knoweb.m4trading.query.CreditNoteQueries;
 import lk.coopfed.knoweb.m4trading.query.CreditNoteView;
+import lk.coopfed.knoweb.m4trading.query.DebitNoteQueries;
+import lk.coopfed.knoweb.m4trading.query.DebitNoteView;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
@@ -30,12 +34,17 @@ import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNotePrintResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreditNoteSummary;
+import lk.coopfed.knoweb.m4trading.web.generated.DebitNoteLineResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.DebitNotePrintResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.DebitNoteResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.DebitNoteSummary;
 import lk.coopfed.knoweb.m4trading.web.generated.DisputeInvoiceRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoiceLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoicePaymentSummary;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoicePrintResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.InvoiceResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueCreditNoteRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.IssueDebitNoteRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.IssueInvoiceRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.ResolveInvoiceDisputeRequest;
 import org.springframework.http.ResponseEntity;
@@ -53,8 +62,10 @@ class BillingController implements BillingApi {
     private final ResolveInvoiceDisputeHandler resolveDispute;
     private final IssueCreditNoteHandler issueCreditNote;
     private final ApplyCreditNoteHandler applyCreditNote;
+    private final IssueDebitNoteHandler issueDebitNote;
     private final InvoiceQueries queries;
     private final CreditNoteQueries creditNotes;
+    private final DebitNoteQueries debitNotes;
     private final PaymentQueries payments;
     private final CurrentScope currentScope;
     private final A4Renderer renderer;
@@ -66,8 +77,10 @@ class BillingController implements BillingApi {
             ResolveInvoiceDisputeHandler resolveDispute,
             IssueCreditNoteHandler issueCreditNote,
             ApplyCreditNoteHandler applyCreditNote,
+            IssueDebitNoteHandler issueDebitNote,
             InvoiceQueries queries,
             CreditNoteQueries creditNotes,
+            DebitNoteQueries debitNotes,
             PaymentQueries payments,
             CurrentScope currentScope,
             A4Renderer renderer) {
@@ -77,8 +90,10 @@ class BillingController implements BillingApi {
         this.resolveDispute = resolveDispute;
         this.issueCreditNote = issueCreditNote;
         this.applyCreditNote = applyCreditNote;
+        this.issueDebitNote = issueDebitNote;
         this.queries = queries;
         this.creditNotes = creditNotes;
+        this.debitNotes = debitNotes;
         this.currentScope = currentScope;
         this.renderer = renderer;
     }
@@ -181,6 +196,41 @@ class BillingController implements BillingApi {
                 creditNoteId, renderer.presignGetOfParty(objectKey, note.sellerEntityId(), scope)));
     }
 
+    @Override
+    public ResponseEntity<DebitNoteResponse> issueDebitNote(String idempotencyKey, IssueDebitNoteRequest request) {
+        ScopeContext scope = currentScope.get();
+        List<IssueDebitNote.Line> lines = request.getLines() == null
+                ? List.of()
+                : request.getLines().stream()
+                        .map(line -> new IssueDebitNote.Line(line.getInvoiceLineId(), line.getQty()))
+                        .toList();
+        UUID debitNoteId =
+                issueDebitNote.handle(new IssueDebitNote(request.getInvoiceId(), lines, request.getReason()), scope);
+        return ResponseEntity.created(URI.create("/v1/trading/debit-notes/" + debitNoteId))
+                .body(readDebitNote(debitNoteId, scope));
+    }
+
+    @Override
+    public ResponseEntity<DebitNoteResponse> getDebitNote(UUID debitNoteId) {
+        return ResponseEntity.ok(readDebitNote(debitNoteId, currentScope.get()));
+    }
+
+    @Override
+    public ResponseEntity<DebitNotePrintResponse> getDebitNotePrint(UUID debitNoteId) {
+        ScopeContext scope = currentScope.get();
+        DebitNoteView note = debitNotes
+                .getDebitNote(debitNoteId, scope)
+                .orElseThrow(() -> new ProblemException("m4.debitnote.not_found"));
+        String objectKey = debitNotes
+                .printObjectKey(debitNoteId, scope)
+                .orElseThrow(() -> new ProblemException("m4.debitnote.print_not_ready"));
+        if (note.sellerEntityId().equals(scope.entityId())) {
+            return ResponseEntity.ok(new DebitNotePrintResponse(debitNoteId, renderer.presignGet(objectKey, scope)));
+        }
+        return ResponseEntity.ok(new DebitNotePrintResponse(
+                debitNoteId, renderer.presignGetOfParty(objectKey, note.sellerEntityId(), scope)));
+    }
+
     private InvoiceResponse read(UUID invoiceId, ScopeContext scope) {
         return queries.getInvoice(invoiceId, scope)
                 .map(invoice -> toResponse(invoice, scope))
@@ -192,6 +242,13 @@ class BillingController implements BillingApi {
                 .getCreditNote(creditNoteId, scope)
                 .map(BillingController::toResponse)
                 .orElseThrow(() -> new ProblemException("m4.creditnote.not_found"));
+    }
+
+    private DebitNoteResponse readDebitNote(UUID debitNoteId, ScopeContext scope) {
+        return debitNotes
+                .getDebitNote(debitNoteId, scope)
+                .map(BillingController::toResponse)
+                .orElseThrow(() -> new ProblemException("m4.debitnote.not_found"));
     }
 
     private InvoiceResponse toResponse(InvoiceView invoice, ScopeContext scope) {
@@ -214,6 +271,7 @@ class BillingController implements BillingApi {
         response.setIssuedAt(invoice.issuedAt());
         queries.balance(invoice.invoiceId(), scope).ifPresent(balance -> {
             response.setCreditedAmount(balance.creditedAmount());
+            response.setDebitedAmount(balance.debitedAmount());
             response.setAmountDue(balance.amountDue());
             response.setDisputed(balance.disputed());
             response.setDisputeReason(balance.disputeReason());
@@ -249,6 +307,13 @@ class BillingController implements BillingApi {
                             .map(BillingController::toSummary)
                             .toList());
         }
+        response.setDebitNotes(debitNotes.debitNotesOf(invoice.invoiceId(), scope).stream()
+                .map(note -> {
+                    DebitNoteSummary summary = new DebitNoteSummary(note.debitNoteId(), note.grossAmount());
+                    summary.setDocNumber(note.docNumberDisplay());
+                    return summary;
+                })
+                .toList());
         return response;
     }
 
@@ -310,6 +375,41 @@ class BillingController implements BillingApi {
         response.setIssuedAt(note.issuedAt());
         response.setAppliedAmount(note.appliedAmount());
         response.setUnappliedAmount(note.unappliedAmount());
+        return response;
+    }
+
+    static DebitNoteResponse toResponse(DebitNoteView note) {
+        DebitNoteResponse response = new DebitNoteResponse(
+                note.debitNoteId(),
+                note.status(),
+                note.invoiceId(),
+                note.sellerEntityId(),
+                note.buyerEntityId(),
+                note.reason(),
+                note.netAmount(),
+                note.taxAmount(),
+                note.grossAmount(),
+                note.lines().stream()
+                        .map(line -> {
+                            DebitNoteLineResponse row = new DebitNoteLineResponse(
+                                    line.lineId(),
+                                    line.lineNo(),
+                                    line.skuId(),
+                                    line.uomCode(),
+                                    line.qty(),
+                                    line.unitPrice(),
+                                    line.taxRatePercent(),
+                                    line.taxAmount(),
+                                    line.lineTotal());
+                            row.setBatchId(line.batchId());
+                            row.setInvoiceLineId(
+                                    line.grnLineId()); // M4 debit/credit note views map invoice line id to grnLineId
+                            return row;
+                        })
+                        .toList());
+        response.setDocNumber(note.docNumberDisplay());
+        response.setInvoiceDocNumber(note.invoiceDocNumberDisplay());
+        response.setIssuedAt(note.issuedAt());
         return response;
     }
 }

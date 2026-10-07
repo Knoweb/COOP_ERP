@@ -97,12 +97,14 @@ class InvoiceQueriesImpl implements InvoiceQueries {
             return Optional.empty();
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "select credited_amount, settled_amount from trading.doc_invoice where document_id = ?", invoiceId);
+                "select credited_amount, debited_amount, settled_amount from trading.doc_invoice where document_id = ?",
+                invoiceId);
         Optional<DocumentRecord> header = documents.findById(invoiceId);
         if (rows.isEmpty() || header.isEmpty()) {
             return Optional.empty();
         }
         BigDecimal credited = (BigDecimal) rows.get(0).get("credited_amount");
+        BigDecimal debited = (BigDecimal) rows.get(0).get("debited_amount");
         BigDecimal settled = (BigDecimal) rows.get(0).get("settled_amount");
         BigDecimal gross = header.get().grossAmount() == null
                 ? BigDecimal.ZERO
@@ -110,10 +112,11 @@ class InvoiceQueriesImpl implements InvoiceQueries {
         Optional<InvoiceDisputes.Latest> dispute = disputes.latest(invoiceId);
         boolean disputed = dispute.map(latest -> InvoiceDisputes.DISPUTED.equals(latest.action()))
                 .orElse(false);
-        BigDecimal due = gross.subtract(credited).subtract(settled);
+        BigDecimal due = gross.subtract(credited).add(debited).subtract(settled);
         return Optional.of(new InvoiceBalance(
                 invoiceId,
                 credited,
+                debited,
                 settled,
                 due,
                 disputed,
