@@ -110,7 +110,7 @@ class OrderController implements OrderApi {
                 .map(line -> new CreateOrder.Line(line.getSkuId(), line.getUomCode(), line.getQty()))
                 .toList();
         UUID nextId =
-                amend.handle(new AmendOrder(orderId, request.getRequestedEta(), request.getNotes(), lines), scope);
+                amend.handle(new AmendOrder(orderId, request.getReason(), request.getRequestedEta(), request.getNotes(), lines), scope);
         return ResponseEntity.created(URI.create("/v1/trading/orders/" + nextId))
                 .body(read(nextId, scope));
     }

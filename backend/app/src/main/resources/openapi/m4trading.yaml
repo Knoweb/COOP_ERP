@@ -227,7 +227,7 @@ paths:
         m4.order.not_amendable, m4.order.relationship_inactive, m4.order.eta_past,
         m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
         m4.order.uom_invalid, m4.order.qty_not_positive.
-      x-permission: ord.order.submit
+      x-permission: ord.order.amend
       x-scope: ENTITY
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -1757,8 +1757,11 @@ components:
 
     AmendOrderRequest:
       type: object
-      required: [lines]
+      required: [reason, lines]
       properties:
+        reason:
+          type: string
+          maxLength: 50
         requestedEta:
           type: string
           format: date

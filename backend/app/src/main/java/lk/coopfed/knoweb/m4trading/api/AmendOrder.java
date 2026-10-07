@@ -12,4 +12,4 @@ import java.util.UUID;
  *
  * @param lines every line of the next version (the whole set, not a difference)
  */
-public record AmendOrder(UUID orderId, LocalDate requestedEta, String notes, List<CreateOrder.Line> lines) {}
+public record AmendOrder(UUID orderId, String reason, LocalDate requestedEta, String notes, List<CreateOrder.Line> lines) {}

@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m4trading.internal.order;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,7 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
  * order.submitted.v1 of the new one.
  */
 @Service
-@CommandHandler(permission = "ord.order.submit")
+@CommandHandler(permission = "ord.order.amend")
 public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
 
     static final String AUDIT_AMENDED = "ORDER_AMENDED";
@@ -112,13 +113,21 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
         if (!OrderStatus.DRAFT.equals(status) && !OrderStatus.SUBMITTED.equals(status)) {
             throw new ProblemException("m4.order.not_amendable", Map.of("status", status));
         }
+        String reason = TradingGuards.required(command.reason(), "reason");
         // The seller's decision takes the same lock: read the allocation only once it is held
         // (wave 2, M4MONEY-06).
         OrderLocks.lock(jdbc, amendedId);
         List<String> decision = jdbc.queryForList(
                 "select status from trading.order_allocation where order_id = ?", String.class, amendedId);
-        if (!decision.isEmpty()) {
-            throw new ProblemException("m4.order.not_amendable", Map.of("status", decision.get(0)));
+        if (decision.contains(OrderStatus.REJECTED)) {
+            throw new ProblemException("m4.order.not_amendable", Map.of("status", OrderStatus.REJECTED));
+        }
+        BigDecimal fulfilled = jdbc.queryForObject(
+                "select coalesce(sum(fulfilled_qty), 0) from trading.order_allocation_line where order_id = ?",
+                BigDecimal.class,
+                amendedId);
+        if (fulfilled != null && fulfilled.signum() > 0) {
+            throw new ProblemException("m4.order.dispatched");
         }
         Map<String, Object> order = jdbc.queryForMap(
                 """
@@ -182,7 +191,7 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
 
         // the amended order: closed, as CancelOrder closes it.
         documents.addStateTransition(
-                clock.transition(amendedId, status, OrderStatus.CANCELLED, scope.userId(), AMENDED_REASON, null),
+                clock.transition(amendedId, status, OrderStatus.CANCELLED, scope.userId(), reason, null),
                 scope);
         jdbc.update("update trading.doc_order_line set cancelled_qty = requested_qty where document_id = ?", amendedId);
 
@@ -199,7 +208,8 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
         after.put("version", version);
         after.put("requestedEta", command.requestedEta());
         after.put("lines", lines.size());
-        audit.record(AUDIT_AMENDED, Subject.of("order", orderId), before, after, scope);
+        after.put("reason", reason);
+        audit.record(AUDIT_AMENDED, Subject.of("order", orderId), before, after, scope, reason);
 
         events.publish(new OrderAmended(
                 orderId,
@@ -211,9 +221,10 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
                 seller,
                 command.requestedEta(),
                 status,
+                reason,
                 List.copyOf(lines)));
         events.publish(new OrderCancelled(
-                amendedId, (UUID) order.get("relationship_id"), buyer, seller, buyer, AMENDED_REASON));
+                amendedId, (UUID) order.get("relationship_id"), buyer, seller, buyer, reason));
         if (docNumber != null) {
             events.publish(new OrderSubmitted(
                     orderId,

@@ -25,6 +25,7 @@ public record OrderAmended(
         UUID sellerEntityId,
         LocalDate requestedEta,
         String status,
+        String reason,
         List<OrderLineSummary> lines)
         implements DomainEvent {
 
