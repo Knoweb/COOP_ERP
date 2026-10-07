@@ -335,3 +335,17 @@ FROM (VALUES
      ) AS grant_row (role_id, permission_code)
 JOIN security.permission p ON p.permission_code = grant_row.permission_code
 ON CONFLICT DO NOTHING;
+
+-- wave 2, PR demo-office-view (the society office can open the write-off list it witnesses).
+-- PR 10 let the office (m101-office) witness a write-off, but the list and the page it opens read
+-- through inv.stock.view (listWriteOffs, getWriteOff, the lot balances), and the page names each
+-- item through the catalogue read (cat.sku.view). Without them a NEW write-off stopped at
+-- 'Waiting for a witness' and the office could not open it on screen. Reads only, nothing more.
+INSERT INTO security.role_permission (role_id, permission_code)
+SELECT grant_row.role_id, p.permission_code
+FROM (VALUES
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'inv.stock.view'),
+        ('0190f0de-0000-7000-8000-000000000334'::uuid, 'cat.sku.view')
+     ) AS grant_row (role_id, permission_code)
+JOIN security.permission p ON p.permission_code = grant_row.permission_code
+ON CONFLICT DO NOTHING;
