@@ -62,5 +62,6 @@ public record OrderView(
             BigDecimal indicativePrice,
             BigDecimal allocatedQty,
             BigDecimal fulfilledQty,
+            BigDecimal backOrderQty,
             BigDecimal tierPrice) {}
 }

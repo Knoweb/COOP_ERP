@@ -169,4 +169,17 @@ describe("the order card", () => {
     const link = screen.getByRole("link", { name: text("trading.note.new") });
     expect(link.getAttribute("href")).toBe(`/trading/delivery-notes/new?orderId=${ORDER_ID}`);
   });
+  it("shows the back order quantity when accepted", async () => {
+    current = {
+      ...current,
+      status: "PARTIALLY_FULFILLED",
+      committedEta: "2026-09-30",
+      lines: [{ ...current.lines[0], allocatedQty: 120, fulfilledQty: 100, backOrderQty: 20, tierPrice: 1200 }]
+    };
+    Object.assign(state, { entityId: BUYER, permissions: new Set(["ord.order.submit"]) });
+    renderOrder();
+
+    expect(await screen.findByRole("columnheader", { name: text("trading.column.back_order") })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "20" })).toBeTruthy();
+  });
 });

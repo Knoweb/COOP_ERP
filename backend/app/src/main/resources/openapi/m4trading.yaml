@@ -1891,6 +1891,8 @@ components:
           type: number
         fulfilledQty:
           type: number
+        backOrderQty:
+          type: number
         tierPrice:
           type: number
 
