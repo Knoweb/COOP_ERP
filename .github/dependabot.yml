@@ -72,6 +72,18 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "androidx.compose:compose-bom"
         update-types: ["version-update:semver-major"]
+      # Held with AGP (wave 2, #236 and #41): Compose Multiplatform 1.12 and androidx.core 1.19
+      # need AGP 9.1 and compileSdk 37 (the till pins AGP 8.13.2 and compileSdk 36), skiko must
+      # match Compose (see the catalogue comment), and Gradle 9.6 and later cannot run AGP 8.x
+      # (its internal API is gone). All four move together when the till owner moves to AGP 9.
+      - dependency-name: "org.jetbrains.compose*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "org.jetbrains.skiko*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "androidx.core:core*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /web
@@ -91,6 +103,11 @@ updates:
       - dependency-name: "@types/react*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      # @types/node follows the Node runtime, which is the 24 LTS line (NODE_VERSION in ci.yml,
+      # the web image and the developer machines): types for Node 26 would describe an API the
+      # runtime does not have (wave 2, #256). It moves with the next LTS, by hand, everywhere.
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
   # Every action is pinned to a commit SHA with its version in a comment (wave 2, DEPLOY-15);
