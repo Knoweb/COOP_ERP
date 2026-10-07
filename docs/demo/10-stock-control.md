@@ -24,4 +24,5 @@
 
 - **No counts or write-offs listed**: choose the location *Kuliyapitiya stores*; a stack loaded before stock control was added needs `make demo-data` again.
 - **Approve asks for a second factor and fails**: the development realm accepts a fresh password sign-in as the second factor; sign out and in again, then approve.
-- **"The person who witnessed the write-off in person cannot approve it"**: the manager witnessed this write-off; have `m101-office` witness it instead. **`m101-office` has no Stock entry in the navigation**: as of 7 October 2026 the society office's demo role holds the witness permission but not `inv.stock.view`, which the write-off list and page need, so a live write-off stops at *Waiting for a witness*. Show the loaded one (step 3) instead.
+- **"The person who witnessed the write-off in person cannot approve it"**: the manager witnessed this write-off; have `m101-office` witness it instead.
+- **`m101-office` has no Stock entry, or cannot open Write-offs**: the grants that let the office open the write-off list (`inv.stock.view`, `cat.sku.view`, PR #287) are demo seed rows. `make demo-data` (on a server, `demo-data.sh`) re-applies the demo seeds, so run it once on a demo loaded before 7 October 2026, then sign `m101-office` out and in again so the new permissions reach the session.

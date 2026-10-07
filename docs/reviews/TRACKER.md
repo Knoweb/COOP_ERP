@@ -229,6 +229,7 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | #232 | 2026-09-29 | m4 | feat(m4): claims and returns, and transfer requests | Reviewed (wave 2) | `docs/reviews/wave2-m4-money.md` | #268, #276, #281, #282 |
 | #234 | 2026-09-29 | demo | docs(demo): accounting export and notifications, account controls and privacy, claims, and asking the stores f | Not reviewed |  | |
 | #235 | 2026-09-29 | agents | docs(agents): the till is one Kotlin Multiplatform app (CR-30-1) | Not reviewed |  | |
+| #236 | 2026-10-06 | deps | chore(deps): bump the till-minor-and-patch group across 1 directory with 18 updates (three versions held back) | Dependency update (CI) |  |  |
 | #237 | 2026-09-29 | demo | docs(demo): who receives which mail, as the walkthrough found | Not reviewed |  | |
 | #238 | 2026-09-29 | m6 | fix(m6): a till's session is applied before its receipts | Reviewed (wave 2) | `docs/reviews/wave2-m6-m8-m1admin.md` | #265, #269, #278 |
 | #239 | 2026-09-29 | web | fix(web): dates, money and names as the demo walkthrough found them | Reviewed (wave 2) | `docs/reviews/wave2-till-web-kernel.md` | #264, #267 |
@@ -239,6 +240,7 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | #246 | 2026-10-01 | m5 | feat(m5): polish inventory UI pages to match premium styling | Reviewed (wave 2) | `docs/reviews/wave2-m5-m3.md` | #277, #280, #282 (area; no finding names this PR) |
 | #248 | 2026-10-01 | deploy | feat(deploy): host the demo on one server, in a 2 vCPU / 4 GB and a 4 vCPU / 8 GB size | Reviewed (wave 2) | `docs/reviews/wave2-deploy.md` | #265, #267 |
 | #249 | 2026-10-06 | m2catalogue | feat(m2catalogue): add SKU images display and upload | Not reviewed |  | |
+| #251 | 2026-10-06 | deps | chore(deps): bump keycloak/keycloak from 26.7.4 to 26.8.0 in /infra/compose | Dependency update (CI) |  |  |
 | #253 | 2026-10-06 | deps | chore(deps): bump the backend-minor-and-patch group across 1 directory with 4 updates | Dependency update (CI) |  |  |
 | #257 | 2026-10-06 | deps | chore(deps): bump source-map-js from 1.2.1 to 1.2.2 in /web | Dependency update (CI) |  |  |
 | #259 | 2026-10-06 | reviews | docs(reviews): a code review tracker, one row per merged pull request | Docs (wave 2) |  |  |
@@ -252,6 +254,10 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | #267 | 2026-10-06 | deploy | fix(deploy): deploy in lockstep with the clone, a restore that works, Keycloak behind the realm paths, hardening, pinned actions, a sign-in page in three languages | Review fix (not re-reviewed) | `docs/reviews/wave2-deploy.md`, `wave2-till-web-kernel.md` (DEPLOY-01 to 18; TWK-18, 24) |  |
 | #268 | 2026-10-06 | rls | fix(rls): cross-tenant functions know the caller, only the Federation writes a ceiling, definer hygiene, the open-for-write helper | Review fix (not re-reviewed) | `docs/reviews/wave2-rls.md` (RLS-04, 05, 07, 12, 13, 14, 16; the helper of RLS-09) |  |
 | #269 | 2026-10-06 | m6 | fix(m6): receipt flags, the replay check, the series guard, paged receipts and sessions with a flagged filter | Review fix (not re-reviewed) | `docs/reviews/wave2-m6-m8-m1admin.md` (M6-02 to 06, 08 to 10) |  |
+| #270 | 2026-10-06 | deps | chore(deps): bump axllent/mailpit from v1.31.1 to v1.31.4 in /infra/deploy | Dependency update (CI) |  |  |
+| #271 | 2026-10-06 | deps | chore(deps): bump keycloak/keycloak from 26.7.4 to 26.8.0 in /infra/deploy | Dependency update (CI) |  |  |
+| #272 | 2026-10-06 | deps | chore(deps): bump axllent/mailpit from v1.31.1 to v1.31.4 in /infra/compose | Dependency update (CI) |  |  |
+| #273 | 2026-10-06 | deps | ci(deps): bump the actions group across 1 directory with 2 updates | Dependency update (CI) |  |  |
 | #274 | 2026-10-06 | deps | chore(deps): bump the web-minor-and-patch group across 1 directory with 4 updates | Dependency update (CI) |  |  |
 | #275 | 2026-10-06 | m3 | fix(m3): a markdown on the right batch, no free goods through a price, a bounded backdate, a locked publish, pinned test clocks | Review fix (not re-reviewed) | `docs/reviews/wave2-m5-m3.md`, `wave2-till-web-kernel.md` (M3-01, 02, 03, 05, 07, 09; TWK-13) |  |
 | #276 | 2026-10-06 | m4 | fix(m4): credit an invoice line once across settlement, claim and credit note; apply a credit note up to what is due; one advisory lock per order | Review fix (not re-reviewed) | `docs/reviews/wave2-m4-money.md` (M4MONEY-01 to 07, 11 to 13) |  |
@@ -263,3 +269,6 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | #283 | 2026-10-06 | m9 | feat(m9): the stored export file, provisional periods and the supplement signal, the contact door, SMTP auth; the buyer's invoice postings by counterparty delivery | Review fix (not re-reviewed) | `docs/reviews/wave2-m9-integration.md`, `wave2-rls.md`, `wave2-m4-money.md` (M9-02, 03, 05, 06, 09, 11; RLS-06, 13; M4MONEY-10) |  |
 | #284 | 2026-10-06 | m8 | fix(m8): projections per shop and per event, sales by item from real tills, the dashboard cache key, exposure from the current limit, bounded and audited exports | Review fix (not re-reviewed) | `docs/reviews/wave2-m6-m8-m1admin.md`, `wave2-rls.md` (M8-02 to 04, 06 to 12; RLS-08) |  |
 | #285 | 2026-10-06 | rls | fix(rls): the last two definer functions test the scope class, and matrices that keep it so | Review fix (not re-reviewed) | `docs/reviews/wave2-rls.md` (RLS-17) |  |
+| #286 | 2026-10-07 | reviews | docs(reviews): wave 2 closed out: tracker, demo flows and what was fixed | Docs (wave 2) |  |  |
+| #287 | 2026-10-07 | demo | fix(demo): the society office can open the write-off list it witnesses | Review fix (not re-reviewed) | `docs/reviews/wave2-m5-m3.md` (a follow-up of M5-10: the office witnesses the demo write-off) |  |
+| #289 | 2026-10-07 | deps | chore(deps): hold the packages that wait for AGP 9 and the Node LTS line | Dependency update (CI) |  |  |
