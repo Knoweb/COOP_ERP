@@ -535,6 +535,6 @@ permissions:
   - code: "pos.session.manage"
     module: "m6pos"
     description_en: "Move the business date backward on a till while no session is open"
-    scope: "OWN_LOCATION"
+    scope: "LOCATION"
     requires_mfa: false
     offline_allowed: true
