@@ -106,6 +106,7 @@ class OrderLockRacePostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> amendOrder.handle(
                         new AmendOrder(
                                 orderId,
+                                "lock race 1",
                                 today().plusDays(5),
                                 null,
                                 List.of(new CreateOrder.Line(RICE, "EA", new BigDecimal("6")))),
@@ -129,6 +130,7 @@ class OrderLockRacePostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> amendOrder.handle(
                         new AmendOrder(
                                 orderId,
+                                "lock race 2",
                                 today().plusDays(5),
                                 null,
                                 List.of(new CreateOrder.Line(RICE, "EA", new BigDecimal("6")))),

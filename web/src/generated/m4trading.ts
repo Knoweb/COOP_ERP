@@ -992,6 +992,7 @@ export interface components {
             lines: components["schemas"]["OrderLineRequest"][];
         };
         AmendOrderRequest: {
+            reason: string;
             /** Format: date */
             requestedEta?: string;
             notes?: string;

@@ -1,0 +1,1 @@
+- **M4-XX Order amendments**: Added business rules and strict domain guards to capture the "amendment reason" during order amendments. Implemented `AmendOrderRequest` OpenAPI type changes and updated frontend UI to correctly collect and send the amendment reason, fixing all TypeScript build errors.

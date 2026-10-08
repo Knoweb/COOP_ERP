@@ -264,7 +264,7 @@ describe("amending an order and the relationship in force", () => {
     expect(amendReady(rows)).toBe(true);
     expect(amendReady([{ skuId: "a", uomCode: "EA", qty: "0" }])).toBe(false);
     expect(amendReady([{ skuId: "a", uomCode: "EA", qty: "" }])).toBe(false);
-    expect(amendRequest(rows, "")).toEqual({ requestedEta: undefined, notes: undefined, lines: [{ skuId: "b", uomCode: "KG", qty: 2.5 }] });
+    expect(amendRequest(rows, "", "Testing amendment")).toEqual({ reason: "Testing amendment", requestedEta: undefined, notes: undefined, lines: [{ skuId: "b", uomCode: "KG", qty: 2.5 }] });
   });
 });
 

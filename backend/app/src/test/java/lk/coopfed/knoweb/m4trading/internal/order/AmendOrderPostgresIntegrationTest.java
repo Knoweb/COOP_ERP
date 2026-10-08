@@ -94,6 +94,7 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
     private static AmendOrder riceOnly(UUID orderId, String qty) {
         return new AmendOrder(
                 orderId,
+                "less rice please",
                 today().plusDays(5),
                 "less rice",
                 List.of(new CreateOrder.Line(RICE, "EA", new BigDecimal(qty))));
@@ -133,7 +134,7 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
         });
         assertThat(events(OrderCancelled.class)).singleElement().satisfies(event -> {
             assertThat(event.orderId()).isEqualTo(first);
-            assertThat(event.reasonCode()).isEqualTo(AmendOrderHandler.AMENDED_REASON);
+            assertThat(event.reasonCode()).isEqualTo("less rice please");
         });
         assertThat(events(OrderSubmitted.class)).singleElement().satisfies(event -> assertThat(event.orderId())
                 .isEqualTo(next));
@@ -166,11 +167,14 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
         kernel.reset();
 
         refused(() -> amend.handle(riceOnly(first, "6"), seller()), "m4.order.not_buyer");
-        refused(() -> amend.handle(new AmendOrder(first, null, null, List.of()), buyer()), "m4.order.lines_required");
+        refused(
+                () -> amend.handle(new AmendOrder(first, "empty", null, null, List.of()), buyer()),
+                "m4.order.lines_required");
         refused(
                 () -> amend.handle(
                         new AmendOrder(
                                 first,
+                                "too early",
                                 today().minusDays(1),
                                 null,
                                 List.of(new CreateOrder.Line(RICE, "EA", BigDecimal.ONE))),

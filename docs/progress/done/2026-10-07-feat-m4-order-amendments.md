@@ -1,0 +1,1 @@
+- **M4-08 Order Amendments**: Implemented the "M4 changes after an order is accepted" ticket. The `AmendOrder` flow was audited and updated to permit amendment of `ACCEPTED` orders. Captured the exact `reason` for the amendment via strict domain guards, recorded it into the history log with `audit.record`, and exposed it in the OpenAPI schema with `x-permission: ord.order.amend`.
