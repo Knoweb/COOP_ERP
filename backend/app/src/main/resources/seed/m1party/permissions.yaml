@@ -532,3 +532,9 @@ permissions:
   # max_value required, so a role grants each up to a value (doc 25 section 7: "writeoff_bands as
   # role limits (M1)"); M1SeedLoader writes it with a new catalogue row, and m1security V0019 sets
   # it on an existing database, since the loader never updates a row.
+  - code: "pos.session.manage"
+    module: "m6pos"
+    description_en: "Move the business date backward on a till while no session is open"
+    scope: "OWN_LOCATION"
+    requires_mfa: false
+    offline_allowed: true
