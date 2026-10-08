@@ -183,7 +183,8 @@ build:
 
 test:
 	cd backend && ./gradlew spotlessCheck test
-	node --test tools/new-module.test.mjs tools/checks.test.mjs
+	node tools/normalize-components-puml.mjs
+	node --test tools/normalize-components-puml.test.mjs tools/new-module.test.mjs tools/checks.test.mjs
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 	node tools/check-permissions.mjs

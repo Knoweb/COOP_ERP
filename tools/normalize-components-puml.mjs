@@ -9,9 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const toolsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(toolsDir, "..");
-const modulesDir = path.join(repoRoot, "docs", "modules");
+const modulesDir = process.env.MODULE_DOCS_DIR || path.join(repoRoot, "docs", "modules");
 
-for (const name of fs.readdirSync(modulesDir).filter((file) => file.endsWith(".puml")).sort()) {
+for (const name of fs.readdirSync(modulesDir).filter((file) => file.endsWith(".puml") || file.endsWith(".adoc")).sort()) {
   normalise(path.join(modulesDir, name));
 }
 
@@ -50,8 +50,8 @@ function normalise(file) {
 
   const output = lines.join("\n") + (hadFinalNewline ? "\n" : "");
 
-  // Written only when the order changed, so an untouched diagram keeps its bytes.
-  if (output !== normalisedNewlines && output !== original) {
+  // Written only when the output differs from original (either relations order changed, or line endings were fixed).
+  if (output !== original) {
     fs.writeFileSync(file, output, "utf8");
   }
 }
