@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.m4trading.internal.invoice;
 
 import static lk.coopfed.knoweb.m4trading.TradingFixture.BUYER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SHOP;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.seller;
@@ -23,6 +24,7 @@ import lk.coopfed.knoweb.m4trading.internal.grn.CaptureGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.grn.ConfirmGrnHandler;
 import lk.coopfed.knoweb.m4trading.internal.payment.RecordPaymentReceiptHandler;
 import lk.coopfed.knoweb.m4trading.query.DeliveryQueries;
+import lk.coopfed.knoweb.m4trading.query.ExposureQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
@@ -73,6 +75,9 @@ class CrossFeatureBalancePostgresIntegrationTest extends PostgresIntegrationTest
 
     @Autowired
     InvoiceQueries invoices;
+
+    @Autowired
+    ExposureQueries exposureQueries;
 
     @Autowired
     TradingClock clock;
@@ -132,6 +137,12 @@ class CrossFeatureBalancePostgresIntegrationTest extends PostgresIntegrationTest
         assertThat(invoice.grossAmount()).isEqualByComparingTo("1452.80");
         assertThat(balance.amountDue()).isEqualByComparingTo("1452.80");
 
+        assertThat(exposureQueries
+                        .exposure(SELLER, BUYER, seller())
+                        .orElseThrow()
+                        .amount())
+                .isEqualByComparingTo("1452.80");
+
         UUID riceInvoiceLineId = invoice.lines().stream()
                 .filter(l -> l.skuId().equals(RICE))
                 .findFirst()
@@ -149,6 +160,12 @@ class CrossFeatureBalancePostgresIntegrationTest extends PostgresIntegrationTest
         assertThat(afterDebit.debitedAmount()).isEqualByComparingTo("283.20");
         assertThat(afterDebit.amountDue()).isEqualByComparingTo("1736.00");
 
+        assertThat(exposureQueries
+                        .exposure(SELLER, BUYER, seller())
+                        .orElseThrow()
+                        .amount())
+                .isEqualByComparingTo("1736.00");
+
         issueCreditNote.handle(
                 new IssueCreditNote(
                         invoiceId,
@@ -160,19 +177,29 @@ class CrossFeatureBalancePostgresIntegrationTest extends PostgresIntegrationTest
         assertThat(afterCredit.creditedAmount()).isEqualByComparingTo("141.60");
         assertThat(afterCredit.amountDue()).isEqualByComparingTo("1594.40");
 
+        assertThat(exposureQueries
+                        .exposure(SELLER, BUYER, seller())
+                        .orElseThrow()
+                        .amount())
+                .isEqualByComparingTo("1594.40");
+
         recordPayment.handle(
                 new RecordPaymentReceipt(
                         BUYER,
                         "CASH",
-                        new BigDecimal("1000.00"),
+                        new BigDecimal("1594.40"),
                         "Receipt-001",
                         clock.today(),
                         null,
-                        List.of(new RecordPaymentReceipt.Settlement(invoiceId, new BigDecimal("1000.00")))),
+                        List.of(new RecordPaymentReceipt.Settlement(invoiceId, new BigDecimal("1594.40")))),
                 seller());
 
         InvoiceBalance finalInvoice = invoices.balance(invoiceId, seller()).orElseThrow();
-        assertThat(finalInvoice.settledAmount()).isEqualByComparingTo("1000.00");
-        assertThat(finalInvoice.amountDue()).isEqualByComparingTo("594.40");
+        assertThat(finalInvoice.settledAmount()).isEqualByComparingTo("1594.40");
+        assertThat(finalInvoice.amountDue()).isEqualByComparingTo("0.00");
+
+        lk.coopfed.knoweb.m4trading.query.ExposureView exposure =
+                exposureQueries.exposure(SELLER, BUYER, seller()).orElseThrow();
+        assertThat(exposure.amount()).isEqualByComparingTo("0.00");
     }
 }

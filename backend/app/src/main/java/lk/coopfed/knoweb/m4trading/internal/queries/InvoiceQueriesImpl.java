@@ -11,6 +11,7 @@ import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceDisputes;
+import lk.coopfed.knoweb.m4trading.internal.invoice.InvoiceSettlements;
 import lk.coopfed.knoweb.m4trading.query.InvoiceBalance;
 import lk.coopfed.knoweb.m4trading.query.InvoiceQueries;
 import lk.coopfed.knoweb.m4trading.query.InvoiceView;
@@ -112,7 +113,7 @@ class InvoiceQueriesImpl implements InvoiceQueries {
         Optional<InvoiceDisputes.Latest> dispute = disputes.latest(invoiceId);
         boolean disputed = dispute.map(latest -> InvoiceDisputes.DISPUTED.equals(latest.action()))
                 .orElse(false);
-        BigDecimal due = gross.subtract(credited).add(debited).subtract(settled);
+        BigDecimal due = InvoiceSettlements.amountDue(gross, credited, debited, settled);
         return Optional.of(new InvoiceBalance(
                 invoiceId,
                 credited,

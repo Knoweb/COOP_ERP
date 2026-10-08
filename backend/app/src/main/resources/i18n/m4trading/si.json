@@ -112,6 +112,7 @@
   "m4.creditnote.print.reason": "හේතුව",
   "m4.creditnote.print.gross": "බැර කළ මුළු මුදල",
   "m4.debitnote.not_seller": "ඉන්වොයිසිය හර කළ හැක්කේ එහි විකුණුම්කරුට පමණි",
+  "m4.debitnote.invoice_disputed": "ඉන්වොයිසිය ආරවුල් වී ඇත; පළමුව ආරවුල සමථයකට පත්කරන්න",
   "m4.debitnote.not_found": "හර සටහන හමු නොවීය",
   "m4.debitnote.nothing_to_debit": "හර කිරීමට කිසිවක් නැත",
   "m4.debitnote.line_unknown": "පේළිය මෙම ඉන්වොයිසියේ පේළියක් නොවේ",
