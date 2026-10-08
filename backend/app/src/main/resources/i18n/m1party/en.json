@@ -1,4 +1,5 @@
 {
+  "permission.pos.session.manage": "Move the business date backward on a till while no session is open",
   "bulk.file.empty": "The file has no rows to register",
   "bulk.file.header_invalid": "The file is missing a required column: {0}",
   "bulk.file.too_many_rows": "The file has {0} rows; at most {1} can be registered at once",
