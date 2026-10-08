@@ -123,7 +123,7 @@ public class ExposureCalculator {
         BigDecimal sum = BigDecimal.ZERO;
         for (Map<String, Object> row : jdbc.queryForList(
                 """
-                select document_id, credited_amount, settled_amount from trading.doc_invoice
+                select document_id, credited_amount, debited_amount, settled_amount from trading.doc_invoice
                  where seller_entity_id = ? and buyer_entity_id = ?
                 """,
                 seller,
@@ -133,9 +133,11 @@ public class ExposureCalculator {
             if (invoice == null || !invoice.isIssued() || invoice.grossAmount() == null) {
                 continue;
             }
-            BigDecimal due = invoice.grossAmount()
-                    .subtract((BigDecimal) row.get("credited_amount"))
-                    .subtract((BigDecimal) row.get("settled_amount"));
+            BigDecimal due = InvoiceSettlements.amountDue(
+                    invoice.grossAmount(),
+                    (BigDecimal) row.get("credited_amount"),
+                    (BigDecimal) row.get("debited_amount"),
+                    (BigDecimal) row.get("settled_amount"));
             if (due.signum() > 0) {
                 sum = sum.add(due);
             }

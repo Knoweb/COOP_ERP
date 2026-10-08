@@ -56,6 +56,7 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
     private final DocumentLinks links;
     private final TradingSeries series;
     private final PostingMapper postings;
+    private final InvoiceDisputes disputes;
     private final AuditFacade audit;
     private final EventPublisher events;
 
@@ -67,6 +68,7 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
             DocumentLinks links,
             TradingSeries series,
             PostingMapper postings,
+            InvoiceDisputes disputes,
             AuditFacade audit,
             EventPublisher events) {
         this.jdbc = jdbc;
@@ -75,6 +77,7 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
         this.links = links;
         this.series = series;
         this.postings = postings;
+        this.disputes = disputes;
         this.audit = audit;
         this.events = events;
     }
@@ -99,9 +102,13 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
         if (!invoice.isIssued()) {
             throw new ProblemException("m4.invoice.not_issued");
         }
+        if (disputes.isDisputed(invoiceId)) {
+            throw new ProblemException("m4.debitnote.invoice_disputed", Map.of("invoiceId", invoiceId));
+        }
         if (command.lines().isEmpty()) {
             throw new ProblemException("m4.debitnote.nothing_to_debit");
         }
+        documents.lockForLinking(invoiceId);
         UUID debitNoteId = Ids.next();
         List<DocumentLineRecord> lines = chosenLines(debitNoteId, command.lines(), documents.findLines(invoiceId));
 

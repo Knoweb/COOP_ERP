@@ -81,16 +81,27 @@ public class InvoiceSettlements {
         }
     }
 
-    /** Gross less credited less settled; zero when the invoice is not found. */
+    /** Gross less credited plus debited less settled. */
+    public static BigDecimal amountDue(BigDecimal gross, BigDecimal credited, BigDecimal debited, BigDecimal settled) {
+        BigDecimal g = gross == null ? BigDecimal.ZERO : gross;
+        BigDecimal c = credited == null ? BigDecimal.ZERO : credited;
+        BigDecimal d = debited == null ? BigDecimal.ZERO : debited;
+        BigDecimal s = settled == null ? BigDecimal.ZERO : settled;
+        return g.subtract(c).add(d).subtract(s);
+    }
+
+    /** Gross less credited plus debited less settled; zero when the invoice is not found. */
     public BigDecimal amountDue(UUID invoiceId) {
         DocumentRecord invoice = documents.findById(invoiceId).orElse(null);
-        List<Map<String, Object>> rows =
-                jdbc.queryForList("select credited_amount from trading.doc_invoice where document_id = ?", invoiceId);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select credited_amount, debited_amount from trading.doc_invoice where document_id = ?", invoiceId);
         if (invoice == null || rows.isEmpty()) {
             return BigDecimal.ZERO;
         }
-        BigDecimal gross = invoice.grossAmount() == null ? BigDecimal.ZERO : invoice.grossAmount();
-        BigDecimal credited = (BigDecimal) rows.get(0).get("credited_amount");
-        return gross.subtract(credited).subtract(settled(invoiceId));
+        return amountDue(
+                invoice.grossAmount(),
+                (BigDecimal) rows.get(0).get("credited_amount"),
+                (BigDecimal) rows.get(0).get("debited_amount"),
+                settled(invoiceId));
     }
 }

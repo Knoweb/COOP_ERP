@@ -112,6 +112,7 @@
   "m4.creditnote.print.reason": "Reason",
   "m4.creditnote.print.gross": "Total credited",
   "m4.debitnote.not_seller": "Only the seller of the invoice can debit it",
+  "m4.debitnote.invoice_disputed": "The invoice is disputed; settle the dispute first",
   "m4.debitnote.not_found": "The debit note was not found",
   "m4.debitnote.nothing_to_debit": "There is nothing to debit",
   "m4.debitnote.line_unknown": "The line is not a line of this invoice",

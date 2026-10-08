@@ -112,6 +112,7 @@
   "m4.creditnote.print.reason": "காரணம்",
   "m4.creditnote.print.gross": "வரவு வைக்கப்பட்ட மொத்தம்",
   "m4.debitnote.not_seller": "விலைப்பட்டியலின் விற்பனையாளர் மட்டுமே அதை பற்று வைக்க முடியும்",
+  "m4.debitnote.invoice_disputed": "பட்டியல் சர்ச்சைக்குரியது; முதலில் சர்ச்சையைத் தீர்க்கவும்",
   "m4.debitnote.not_found": "பற்றுக் குறிப்பு கண்டுபிடிக்கப்படவில்லை",
   "m4.debitnote.nothing_to_debit": "பற்று வைக்க எதுவும் இல்லை",
   "m4.debitnote.line_unknown": "இந்த வரி இந்த விலைப்பட்டியலின் வரி அல்ல",
