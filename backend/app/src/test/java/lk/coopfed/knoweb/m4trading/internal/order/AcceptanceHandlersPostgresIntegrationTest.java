@@ -213,6 +213,21 @@ class AcceptanceHandlersPostgresIntegrationTest extends PostgresIntegrationTest 
         refused(() -> cancel.handle(new CancelOrder(orderId, "LATE", null), buyer()), "m4.order.not_cancellable");
     }
 
+    @Test
+    void anAcceptedOrderCannotBeCancelledOnceLockAtPasses() {
+        // Accept the order
+        accept.handle(new AcceptOrder(orderId, today().plusDays(1), List.of()), seller());
+
+        // Update lock_at to be in the past
+        superuserJdbc()
+                .update(
+                        "update trading.order_allocation set lock_at = now() - interval '1 second' where order_id = ?",
+                        orderId);
+
+        // Attempting to cancel should now be refused
+        refused(() -> cancel.handle(new CancelOrder(orderId, "TOO_LATE", null), buyer()), "m4.order.not_cancellable");
+    }
+
     private static void refused(ThrowingCallable call, String messageId) {
         assertThatThrownBy(call).isInstanceOf(ProblemException.class).satisfies(error -> assertThat(
                         ((ProblemException) error).messageId())

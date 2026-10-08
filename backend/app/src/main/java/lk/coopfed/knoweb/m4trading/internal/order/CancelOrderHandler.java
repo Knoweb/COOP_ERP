@@ -76,10 +76,18 @@ public class CancelOrderHandler implements Handles<CancelOrder, Void> {
         // The seller's decision and its delivery note take the same lock: read the allocation and
         // what was dispatched only once it is held (wave 2, M4MONEY-06 and -07).
         OrderLocks.lock(jdbc, orderId);
-        List<String> decision = jdbc.queryForList(
-                "select status from trading.order_allocation where order_id = ?", String.class, orderId);
-        if (decision.contains(OrderStatus.REJECTED)) {
-            throw new ProblemException("m4.order.not_cancellable", Map.of("status", OrderStatus.REJECTED));
+        List<Map<String, Object>> allocation =
+                jdbc.queryForList("select status, lock_at from trading.order_allocation where order_id = ?", orderId);
+        if (!allocation.isEmpty()) {
+            Map<String, Object> row = allocation.get(0);
+            String allocStatus = (String) row.get("status");
+            if (OrderStatus.REJECTED.equals(allocStatus)) {
+                throw new ProblemException("m4.order.not_cancellable", Map.of("status", OrderStatus.REJECTED));
+            }
+            java.sql.Timestamp lockAtTs = (java.sql.Timestamp) row.get("lock_at");
+            if (lockAtTs != null && !lockAtTs.toInstant().isAfter(clock.now())) {
+                throw new ProblemException("m4.order.not_cancellable", Map.of("status", OrderStatus.LOCKED));
+            }
         }
         BigDecimal fulfilled = jdbc.queryForObject(
                 "select coalesce(sum(fulfilled_qty), 0) from trading.order_allocation_line where order_id = ?",
