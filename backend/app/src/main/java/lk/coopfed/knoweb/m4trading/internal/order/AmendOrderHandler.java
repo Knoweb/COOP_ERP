@@ -119,8 +119,8 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
         OrderLocks.lock(jdbc, amendedId);
         List<String> decision = jdbc.queryForList(
                 "select status from trading.order_allocation where order_id = ?", String.class, amendedId);
-        if (decision.contains(OrderStatus.REJECTED)) {
-            throw new ProblemException("m4.order.not_amendable", Map.of("status", OrderStatus.REJECTED));
+        if (!decision.isEmpty()) {
+            throw new ProblemException("m4.order.not_amendable", Map.of("status", decision.get(0)));
         }
         BigDecimal fulfilled = jdbc.queryForObject(
                 "select coalesce(sum(fulfilled_qty), 0) from trading.order_allocation_line where order_id = ?",

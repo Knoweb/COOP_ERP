@@ -134,7 +134,7 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
         });
         assertThat(events(OrderCancelled.class)).singleElement().satisfies(event -> {
             assertThat(event.orderId()).isEqualTo(first);
-            assertThat(event.reasonCode()).isEqualTo(AmendOrderHandler.AMENDED_REASON);
+            assertThat(event.reasonCode()).isEqualTo("less rice please");
         });
         assertThat(events(OrderSubmitted.class)).singleElement().satisfies(event -> assertThat(event.orderId())
                 .isEqualTo(next));
