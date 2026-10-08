@@ -178,8 +178,10 @@ class OrderHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 headers(BUYER_USER, BUYER));
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(again.getBody().get("code").asText()).isEqualTo("m4.order.not_amendable");
-        ResponseEntity<JsonNode> noLines =
-                post("/v1/trading/orders/" + first + "/amend", Map.of("reason", "another reason", "lines", List.of()), headers(BUYER_USER, BUYER));
+        ResponseEntity<JsonNode> noLines = post(
+                "/v1/trading/orders/" + first + "/amend",
+                Map.of("reason", "another reason", "lines", List.of()),
+                headers(BUYER_USER, BUYER));
         assertThat(noLines.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
