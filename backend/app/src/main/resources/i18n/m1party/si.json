@@ -1,5 +1,10 @@
 {
   "permission.pos.session.manage": "සැසියක් විවෘතව නොමැති විට අයකැමි යන්ත්‍රයේ ව්‍යාපාරික දිනය පසුපසට ගෙනයන්න",
+  "permission.pos.receipt.issue": "විකුණුම් රිසිට්පතක් නිකුත් කරන්න",
+  "permission.pos.receipt.void": "රිසිට්පතක් අවලංගු කරන්න",
+  "permission.pos.refund.same_session": "වත්මන් සැසියේ රිසිට්පතක් සඳහා මුදල් ආපසු ලබා දෙන්න",
+  "permission.pos.negative_stock.acknowledge": "ඍණ තොග අනතුරු ඇඟවීමක් පිළිගන්න",
+  "permission.pos.mrp.pick": "කාණ්ඩ කිහිපයක් සහිත SKU එකක් සඳහා MRP තෝරන්න",
   "bulk.file.empty": "ගොනුවේ ලියාපදිංචි කිරීමට පේළි නොමැත",
   "bulk.file.header_invalid": "ගොනුවේ අවශ්‍ය තීරුවක් නොමැත: {0}",
   "bulk.file.too_many_rows": "ගොනුවේ පේළි {0} ක් ඇත; එකවර ලියාපදිංචි කළ හැක්කේ උපරිම {1} ක් පමණි",

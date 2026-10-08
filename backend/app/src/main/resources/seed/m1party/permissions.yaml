@@ -538,3 +538,28 @@ permissions:
     scope: "LOCATION"
     requires_mfa: false
     offline_allowed: true
+  - code: "pos.receipt.issue"
+    module: "m6pos"
+    description_en: "Issue a sale receipt"
+    scope: "LOCATION"
+    offline_allowed: true
+  - code: "pos.receipt.void"
+    module: "m6pos"
+    description_en: "Void an entire receipt"
+    scope: "LOCATION"
+    offline_allowed: true
+  - code: "pos.refund.same_session"
+    module: "m6pos"
+    description_en: "Issue a refund for a receipt from the current session"
+    scope: "LOCATION"
+    offline_allowed: true
+  - code: "pos.negative_stock.acknowledge"
+    module: "m6pos"
+    description_en: "Acknowledge a negative stock warning"
+    scope: "LOCATION"
+    offline_allowed: true
+  - code: "pos.mrp.pick"
+    module: "m6pos"
+    description_en: "Pick MRP for a SKU with multiple batches"
+    scope: "LOCATION"
+    offline_allowed: true

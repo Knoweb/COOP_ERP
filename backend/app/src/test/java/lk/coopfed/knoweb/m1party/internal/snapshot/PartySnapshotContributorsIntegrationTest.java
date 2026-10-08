@@ -93,11 +93,11 @@ class PartySnapshotContributorsIntegrationTest extends PostgresIntegrationTest {
                 OFFLINE,
                 ROLE,
                 ONLINE_ONLY);
-        assign(db, CASHIER, SHOP); // at the shop
-        assign(db, SUPERVISOR, null); // entity-wide
-        assign(db, ELSEWHERE, OTHER_SHOP); // at another shop only
-        assign(db, GONE, SHOP);
-        assign(db, BACK_OFFICE, SHOP);
+        assign(db, CASHIER, ROLE, SHOP); // at the shop
+        assign(db, SUPERVISOR, ROLE, null); // entity-wide
+        assign(db, ELSEWHERE, ROLE, OTHER_SHOP); // at another shop only
+        assign(db, GONE, ROLE, SHOP);
+        assign(db, BACK_OFFICE, ROLE, SHOP);
     }
 
     @AfterEach
@@ -167,22 +167,77 @@ class PartySnapshotContributorsIntegrationTest extends PostgresIntegrationTest {
                 status);
     }
 
-    private static void assign(JdbcTemplate db, UUID user, UUID location) {
+    private static void assign(JdbcTemplate db, UUID user, UUID role, UUID location) {
         db.update(
                 "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id) values (?, ?, ?, ?)",
                 user,
-                ROLE,
+                role,
                 ENTITY,
                 location);
     }
 
     private static void forget(JdbcTemplate db) {
         db.update("delete from security.user_role where role_id = ?", ROLE);
+        db.update("delete from security.user_role where role_id = '01999a10-2c4e-7f1a-8b3d-5e6f70819a11'"); // Cashier
+        db.update("delete from security.user_role where role_id = '01999a10-2c4e-7f1a-8b3d-5e6f70819a12'"); // Shop
+        // Supervisor
         db.update("delete from security.role_permission where role_id = ?", ROLE);
         db.update("delete from security.role where role_id = ?", ROLE);
         db.update("delete from security.app_user where username like 'm1snap-%'");
         db.update("update party.location set primary_till_position_id = null where owner_entity_id = ?", ENTITY);
         db.update("delete from party.till_position where owner_entity_id = ?", ENTITY);
         db.update("delete from party.location where owner_entity_id = ?", ENTITY);
+    }
+
+    @Test
+    void cashierAndSupervisorTemplatesCarryTillPermissions() {
+        JdbcTemplate db = superuserJdbc();
+
+        // Seed cashier and supervisor templates if not present (since this test might run isolated without full DB
+        // seed)
+        // Actually M1SeedLoader might have run, but just in case, ensure they exist
+        db.update(
+                "INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status) VALUES ('01999a10-2c4e-7f1a-8b3d-5e6f70819a11', NULL, 'Cashier', true, 'OWN', 'ACTIVE') ON CONFLICT DO NOTHING");
+        db.update(
+                "INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status) VALUES ('01999a10-2c4e-7f1a-8b3d-5e6f70819a12', NULL, 'Shop Supervisor', true, 'OWN', 'ACTIVE') ON CONFLICT DO NOTHING");
+
+        // Assign to new users
+        UUID cashierUser = UUID.randomUUID();
+        UUID supervisorUser = UUID.randomUUID();
+        user(db, cashierUser, "m1snap-cashier-template", "TILL", "ACTIVE");
+        user(db, supervisorUser, "m1snap-supervisor-template", "BOTH", "ACTIVE");
+
+        assign(db, cashierUser, UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a11"), SHOP);
+        assign(db, supervisorUser, UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a12"), SHOP);
+
+        Map<UUID, Map<String, Object>> rows = transactions.inScope(
+                till, () -> operators.rows("operator", theShop, List.of(cashierUser, supervisorUser)));
+
+        assertThat(rows).containsOnlyKeys(cashierUser, supervisorUser);
+
+        // Verify cashier has pos.receipt.issue
+        Map<String, Object> c = rows.get(cashierUser);
+        assertThat(c).containsEntry("display_name", "m1snap-cashier-template");
+        @SuppressWarnings("unchecked")
+        List<String> cPerms = (List<String>) c.get("permissions");
+        assertThat(cPerms).contains("pos.receipt.issue", "pos.mrp.pick");
+
+        // Verify supervisor has supervisor permissions
+        Map<String, Object> s = rows.get(supervisorUser);
+        assertThat(s).containsEntry("display_name", "m1snap-supervisor-template");
+        @SuppressWarnings("unchecked")
+        List<String> sPerms = (List<String>) s.get("permissions");
+        assertThat(sPerms)
+                .contains(
+                        "pos.receipt.issue",
+                        "pos.mrp.pick",
+                        "pos.receipt.void",
+                        "pos.refund.same_session",
+                        "pos.negative_stock.acknowledge",
+                        "pos.session.manage");
+
+        // Cleanup
+        db.update("delete from security.user_role where user_id in (?, ?)", cashierUser, supervisorUser);
+        db.update("delete from security.app_user where user_id in (?, ?)", cashierUser, supervisorUser);
     }
 }

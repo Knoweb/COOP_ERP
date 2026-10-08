@@ -19,7 +19,13 @@ public class SeedRecords {
 
     public record RoleTemplatesSeed(List<RoleTemplateData> templates) {}
 
-    public record RoleTemplateData(UUID role_id, String name_en, String role_class, List<String> permissions) {}
+    public record RoleTemplateData(
+            UUID role_id,
+            String name_en,
+            String name_si,
+            String name_ta,
+            String role_class,
+            List<String> permissions) {}
 
     public record SodPairsSeed(List<SodPairData> pairs) {}
 
