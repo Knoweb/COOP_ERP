@@ -44,6 +44,7 @@ export function OrderPage() {
   // AmendOrder (24A section 6): the buyer edits the quantities and the delivery date it asks for.
   const [amendRows, setAmendRows] = useState<AmendRow[] | null>(null);
   const [amendEta, setAmendEta] = useState("");
+  const [amendReason, setAmendReason] = useState("");
   const [asking, setAsking] = useState<"cancel" | "reject" | null>(null);
   const [eta, setEta] = useState("");
 
@@ -101,7 +102,7 @@ export function OrderPage() {
   const cancel = useMutation(run(cancelKey, (k, reason) => api.cancelOrder(orderId, reason.code, reason.text, k)));
   const reject = useMutation(run(rejectKey, (k, reason) => api.rejectOrder(orderId, reason.code, reason.text, k)));
   const amend = useMutation({
-    mutationFn: () => api.amendOrder(orderId, amendRequest(amendRows ?? [], amendEta), amendKey.current()),
+    mutationFn: () => api.amendOrder(orderId, amendRequest(amendRows ?? [], amendEta, amendReason), amendKey.current()),
     onSuccess: (next: { orderId: string }) => {
       amendKey.next();
       setAmendRows(null);
@@ -138,6 +139,7 @@ export function OrderPage() {
   const startAmend = () => {
     setAmendRows(o.lines.map((line) => ({ skuId: line.skuId, uomCode: line.uomCode, qty: String(line.requestedQty) })));
     setAmendEta(o.requestedEta ?? "");
+    setAmendReason("");
   };
   const setAmendQty = (index: number, qty: string) =>
     setAmendRows((rows) => (rows ?? []).map((row, i) => (i === index ? { ...row, qty } : row)));
@@ -235,7 +237,11 @@ export function OrderPage() {
               {t("trading.order.amend.eta").text}
               <input type="date" min={businessToday()} value={amendEta} onChange={(event) => setAmendEta(event.target.value)} />
             </label>
-            <button type="button" disabled={amend.isPending || !amendReady(amendRows)} onClick={() => amend.mutate()}>
+            <label className="trading-form-field">
+              {t("trading.order.amend.reason").text ?? "Reason"}
+              <input type="text" value={amendReason} onChange={(event) => setAmendReason(event.target.value)} required />
+            </label>
+            <button type="button" disabled={amend.isPending || !amendReady(amendRows) || !amendReason.trim()} onClick={() => amend.mutate()}>
               {t("trading.order.amend.save").text}
             </button>
             <button type="button" onClick={() => setAmendRows(null)}>

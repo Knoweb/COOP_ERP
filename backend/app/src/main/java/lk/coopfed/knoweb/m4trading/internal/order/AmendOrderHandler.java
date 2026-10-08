@@ -191,8 +191,7 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
 
         // the amended order: closed, as CancelOrder closes it.
         documents.addStateTransition(
-                clock.transition(amendedId, status, OrderStatus.CANCELLED, scope.userId(), reason, null),
-                scope);
+                clock.transition(amendedId, status, OrderStatus.CANCELLED, scope.userId(), reason, null), scope);
         jdbc.update("update trading.doc_order_line set cancelled_qty = requested_qty where document_id = ?", amendedId);
 
         List<OrderLineSummary> lines = new ArrayList<>(priced.summary());
@@ -223,8 +222,8 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
                 status,
                 reason,
                 List.copyOf(lines)));
-        events.publish(new OrderCancelled(
-                amendedId, (UUID) order.get("relationship_id"), buyer, seller, buyer, reason));
+        events.publish(
+                new OrderCancelled(amendedId, (UUID) order.get("relationship_id"), buyer, seller, buyer, reason));
         if (docNumber != null) {
             events.publish(new OrderSubmitted(
                     orderId,

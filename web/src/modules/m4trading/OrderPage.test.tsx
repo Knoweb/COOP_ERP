@@ -137,12 +137,13 @@ describe("the order card", () => {
     fireEvent.click(await screen.findByRole("button", { name: text("trading.order.amend") }));
     fireEvent.change(screen.getByRole("spinbutton", { name: "Quantity of line 1" }), { target: { value: "80" } });
     fireEvent.change(screen.getByLabelText(text("trading.order.amend.eta")), { target: { value: "2099-01-15" } });
+    fireEvent.change(screen.getByLabelText(text("trading.order.amend.reason") ?? "Reason"), { target: { value: "Changed my mind" } });
     fireEvent.click(screen.getByRole("button", { name: text("trading.order.amend.save") }));
 
     await waitFor(() => expect(api.amendOrder).toHaveBeenCalledOnce());
     expect(api.amendOrder.mock.calls[0]).toEqual([
       ORDER_ID,
-      { requestedEta: "2099-01-15", notes: undefined, lines: [{ skuId: SKU, uomCode: "EA", qty: 80 }] },
+      { reason: "Changed my mind", requestedEta: "2099-01-15", notes: undefined, lines: [{ skuId: SKU, uomCode: "EA", qty: 80 }] },
       expect.any(String)
     ]);
   });

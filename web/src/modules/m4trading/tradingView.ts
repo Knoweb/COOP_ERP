@@ -209,8 +209,9 @@ export function amendReady(rows: AmendRow[]): boolean {
 }
 
 /** AmendOrder's body: the whole set of lines, those at zero left out, and the requested delivery date. */
-export function amendRequest(rows: AmendRow[], requestedEta: string, notes?: string): AmendOrderRequest {
+export function amendRequest(rows: AmendRow[], requestedEta: string, reason: string, notes?: string): AmendOrderRequest {
   return {
+    reason,
     requestedEta: requestedEta || undefined,
     notes: notes || undefined,
     lines: rows
