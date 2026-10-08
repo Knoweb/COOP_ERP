@@ -155,12 +155,14 @@ public class M1SeedLoader {
         for (SeedRecords.RoleTemplateData t : seed.templates()) {
             inserted(jdbc.sql(
                             """
-                INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
-                VALUES (:id, NULL, :name, true, :roleClass, 'ACTIVE')
+                INSERT INTO security.role (role_id, owner_entity_id, name_en, name_si, name_ta, is_template, role_class, status)
+                VALUES (:id, NULL, :name, :nameSi, :nameTa, true, :roleClass, 'ACTIVE')
                 ON CONFLICT (role_id) DO NOTHING
             """)
                     .param("id", t.role_id())
                     .param("name", t.name_en())
+                    .param("nameSi", t.name_si(), java.sql.Types.VARCHAR)
+                    .param("nameTa", t.name_ta(), java.sql.Types.VARCHAR)
                     .param("roleClass", t.role_class())
                     .update());
 

@@ -1,5 +1,10 @@
 {
   "permission.pos.session.manage": "அமர்வு திறக்கப்படாதபோது காசாளர் இயந்திரத்தில் வணிக தேதியை பின்னோக்கி நகர்த்தவும்",
+  "permission.pos.receipt.issue": "விற்பனை ரசீதை வழங்கவும்",
+  "permission.pos.receipt.void": "ரசீதை ரத்து செய்யவும்",
+  "permission.pos.refund.same_session": "தற்போதைய அமர்வின் ரசீதுக்கு பணத்தை திரும்ப வழங்கவும்",
+  "permission.pos.negative_stock.acknowledge": "எதிர்மறை இருப்பு எச்சரிக்கையை ஏற்கவும்",
+  "permission.pos.mrp.pick": "பல தொகுதிகளைக் கொண்ட SKU க்கு MRP ஐத் தேர்ந்தெடுக்கவும்",
   "bulk.file.empty": "கோப்பில் பதிவு செய்ய வரிசைகள் இல்லை",
   "bulk.file.header_invalid": "கோப்பில் தேவையான நெடுவரிசை இல்லை: {0}",
   "bulk.file.too_many_rows": "கோப்பில் {0} வரிசைகள் உள்ளன; ஒரே நேரத்தில் அதிகபட்சம் {1} மட்டுமே பதிவு செய்ய முடியும்",
