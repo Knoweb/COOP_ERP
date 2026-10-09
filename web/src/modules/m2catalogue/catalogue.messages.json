@@ -80,7 +80,8 @@
     "catalogue.images.remove_failed": "The image could not be removed",
     "catalogue.images.formats": "Supported formats: JPG, PNG (max 2MB)",
     "catalogue.images.settings_title": "Upload settings",
-    "catalogue.images.settings_hint": "Select a barcode before uploading an image if the image is specific to a variant."
+    "catalogue.images.settings_hint": "Select a barcode before uploading an image if the image is specific to a variant.",
+    "catalogue.column.image": "Image"
   },
   "si": {
     "catalogue.nav": "භාණ්ඩ නාමාවලිය",
@@ -163,7 +164,8 @@
     "catalogue.images.remove_failed": "පින්තූරය ඉවත් කළ නොහැකි විය",
     "catalogue.images.formats": "සහාය දක්වන ආකෘති: JPG, PNG (උපරිම 2MB)",
     "catalogue.images.settings_title": "උඩුගත කිරීමේ සැකසුම්",
-    "catalogue.images.settings_hint": "පින්තූරය විශේෂිත ප්‍රභේදයකට අයත් නම්, උඩුගත කිරීමට පෙර තීරු කේතයක් තෝරන්න."
+    "catalogue.images.settings_hint": "පින්තූරය විශේෂිත ප්‍රභේදයකට අයත් නම්, උඩුගත කිරීමට පෙර තීරු කේතයක් තෝරන්න.",
+    "catalogue.column.image": "පින්තූරය"
   },
   "ta": {
     "catalogue.nav": "பொருள் பட்டியல்",
@@ -246,6 +248,7 @@
     "catalogue.images.remove_failed": "படத்தை அகற்ற முடியவில்லை",
     "catalogue.images.formats": "ஆதரிக்கப்படும் வடிவங்கள்: JPG, PNG (அதிகபட்சம் 2MB)",
     "catalogue.images.settings_title": "பதிவேற்ற அமைப்புகள்",
-    "catalogue.images.settings_hint": "படம் ஒரு குறிப்பிட்ட வகைக்கு உரியதாக இருந்தால், பதிவேற்றும் முன் பார்கோடைத் தேர்ந்தெடுக்கவும்."
+    "catalogue.images.settings_hint": "படம் ஒரு குறிப்பிட்ட வகைக்கு உரியதாக இருந்தால், பதிவேற்றும் முன் பார்கோடைத் தேர்ந்தெடுக்கவும்.",
+    "catalogue.column.image": "படம்"
   }
 }
