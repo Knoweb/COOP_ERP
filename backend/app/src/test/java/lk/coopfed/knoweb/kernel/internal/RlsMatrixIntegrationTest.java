@@ -396,11 +396,76 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             new Departure(
                     "trading.transfer_request_decision",
                     "dest_read (m4trading V0008): the asking shop reads the decision on its request",
-                    RlsMatrixIntegrationTest::addressedToTheShop)
-            // pricing.price_list and price_list_line follow the template since m3pricing V0003
-            // (M3-03); beyond it, buyer_read admits the buyer of a relationship that binds the list,
-            // which no made-up row is. party.entity has its ext_view since m1party V0010.
-            );
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
+                    "kernel.config_value",
+                    "own_read and own_write admit a NULL location; only SELECT and INSERT are granted",
+                    check -> {
+                        if (check.op() == Op.UPDATE
+                                || check.op() == Op.DELETE
+                                || check.op() == Op.MOVE
+                                || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                            return REFUSED;
+                        }
+                        if (check.op() == Op.INSERT_WITHOUT_LOCATION || check.op() == Op.INSERT_AT_ANOTHER_LOCATION) {
+                            return check.scope().is("OWN") ? DONE : null;
+                        }
+                        if (check.op() == Op.SELECT
+                                && check.scope().is("OWN")
+                                && check.scope().location() != null
+                                && "A wide".equals(check.row())) {
+                            return VISIBLE;
+                        }
+                        return null;
+                    }),
+            new Departure("security.user_role", "own_read admits a NULL location; UPDATE is not granted", check -> {
+                if (check.op() == Op.UPDATE || check.op() == Op.MOVE || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                    return REFUSED;
+                }
+                if (check.op() == Op.SELECT
+                        && check.scope().is("OWN")
+                        && check.scope().location() != null
+                        && "A wide".equals(check.row())) {
+                    return VISIBLE;
+                }
+                return null;
+            }),
+            new Departure(
+                    "security.role_permission",
+                    "own policies follow the parent role so the made-up row is hidden/refused; fed_view reads it",
+                    check -> {
+                        if (check.op() == Op.SELECT
+                                && check.scope().policyClass().equals("FEDERATION_VIEW")) {
+                            return VISIBLE;
+                        }
+                        if (check.op() == Op.SELECT) {
+                            return HIDDEN;
+                        }
+                        if (check.op() == Op.INSERT
+                                || check.op() == Op.UPDATE
+                                || check.op() == Op.DELETE
+                                || check.op() == Op.MOVE
+                                || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                            return REFUSED;
+                        }
+                        return null;
+                    }),
+            new Departure(
+                    "kernel.idempotency_key",
+                    "policies check kernel.user_id(), which the matrix test does not set",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return HIDDEN;
+                        }
+                        if (check.op() == Op.INSERT
+                                || check.op() == Op.UPDATE
+                                || check.op() == Op.DELETE
+                                || check.op() == Op.MOVE
+                                || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                            return REFUSED;
+                        }
+                        return null;
+                    }));
 
     private static String everyClassButNoneReadsEverything(Check check) {
         return check.op() == Op.SELECT
@@ -859,6 +924,33 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         }
     }
 
+    @Test
+    void configValueNoScopeReadReturnsNothing() throws SQLException {
+        try (Connection db = superuser()) {
+            db.setAutoCommit(false);
+            try (Statement st = db.createStatement()) {
+                st.execute("set local session_replication_role = replica");
+
+                st.execute(
+                        "insert into kernel.config_item (key, value_type, description_en, default_value, scope_kind, change_permission) values ('TEST_KEY', 'STRING', 'test', '\"def\"', 'FEDERATION', 'ADMIN')");
+                st.execute(
+                        "insert into kernel.config_value (key, scope_entity_id, value) values ('TEST_KEY', null, '\"test\"')");
+
+                String result = asApp(st, Scope.of("NONE", "NONE", null, null, Set.of()), () -> {
+                    try (ResultSet rs =
+                            st.executeQuery("select count(*) from kernel.config_value where key = 'TEST_KEY'")) {
+                        rs.next();
+                        return rs.getInt(1) == 0 ? "NOTHING" : "FOUND";
+                    }
+                });
+
+                assertThat(result).isEqualTo("NOTHING");
+            } finally {
+                db.rollback();
+            }
+        }
+    }
+
     // ---- the engine -----------------------------------------------------------------------------
 
     private List<String> runMatrix(Connection db, String table, List<Departure> exceptions) throws SQLException {
@@ -1120,6 +1212,12 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         /** The column that decides the owner: owner_entity_id, or what it is generated from. */
         String ownerSource() {
             Column owner = find("owner_entity_id");
+            if (owner == null) {
+                if (find("scope_entity_id") != null) return "scope_entity_id";
+                if (table.equals("kernel.idempotency_key")) return "user_id";
+                if (table.equals("security.role_permission")) return "role_id";
+                throw new IllegalStateException("no owner column in " + table);
+            }
             if (!owner.generated()) {
                 return "owner_entity_id";
             }
@@ -1279,7 +1377,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                          where c.relkind in ('r', 'p') and not c.relispartition
                            and n.nspname not like 'pg\\_%' and n.nspname <> 'information_schema'
                            and (exists (select 1 from pg_attribute a where a.attrelid = c.oid
-                                         and a.attname in ('owner_entity_id', 'document_id') and not a.attisdropped)
+                                         and a.attname in ('owner_entity_id', 'document_id', 'scope_entity_id') and not a.attisdropped)
+                                or c.relname in ('role_permission', 'idempotency_key')
                                 or exists (select 1 from pg_policy p where p.polrelid = c.oid
                                             and coalesce(pg_get_expr(p.polqual, p.polrelid), '')
                                                 || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '')

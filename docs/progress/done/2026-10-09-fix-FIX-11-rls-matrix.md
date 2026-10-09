@@ -1,0 +1,1 @@
+* **FIX-11**: Narrowed `config_value.own_read` to forbid federation rows from un-scoped sessions, and mapped `config_value`, `user_role`, `role_permission`, and `idempotency_key` (which lack `owner_entity_id`) into `RlsMatrixIntegrationTest` so they are fully asserted by the matrix with their respective deviations.
