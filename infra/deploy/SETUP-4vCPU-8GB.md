@@ -81,7 +81,7 @@ What it does, each step safe to repeat:
 
 If it stops at "pull access denied", do the GHCR sign-in of step 3 and run the same command again.
 
-**Keep a copy of `/opt/coop-erp/.env` somewhere safe**, off the server (a password manager). It holds every password, and a backup cannot be used without it.
+**Keep a copy of `/opt/coop-erp/.env` somewhere safe**, off the server (a password manager). It holds every password, and a backup cannot be used without it. It also holds the only copy of `COOP_ERP_CUSTOMERS_NIC_PEPPER`, the key the members' NICs are stored under: losing it makes every captured NIC unmatchable until each member presents the card again, and `backup.sh` does not copy `.env`. Take the copy again after a `deploy.sh` that says it generated a key.
 
 ## 5. First sign-in
 
