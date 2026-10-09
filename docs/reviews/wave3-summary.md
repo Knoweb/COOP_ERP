@@ -4,7 +4,7 @@ Reviewed 9 October 2026 against `main` at ec4c5758. Scope: every merged code pul
 
 Each area had one reviewer and a second-pass verifier. The findings files are `docs/reviews/wave3-<area>.md`; each finding carries its verdict, a "Verified by" line and a suggested fix scope. Docker was down during verification, so every verdict rests on reading the code, except two pricing-engine findings reproduced with a unit test (M1M2M3M5-05 and -06) and the nightly CI diagnosis, which rests on the CI logs. The web unit tests were run and pass.
 
-**Status: findings verified; no fix has been made yet.**
+**Status: findings verified; the urgent findings and the small ones without a design decision were fixed on 9 October 2026 (see "Fixes" below); the rest are open.**
 
 ## Counts (after verification)
 
@@ -64,3 +64,26 @@ The partly closed ones are listed in each file's "closed or not" table, with wha
 ## What was not covered
 
 Documentation-only PRs (the demo flows and change requests keep "Not reviewed"; the review records are "Docs (wave 2)"; the go-live list PRs are "Docs (no code review)"), Dependabot bumps, and the open PR #247.
+
+## Fixes (9 October 2026)
+
+Each fix PR was built from `main`, ran the whole CI, and was merged one at a time; none has had a second review yet (tracker status "Review fix (not re-reviewed)").
+
+| PR | Findings closed |
+|---|---|
+| #317 | M7M8M9-01 (high: the deploy kit generates and passes the NIC pepper), WCD-14, WCD-17 |
+| #318 | M4-01 (high: AmendOrder asks `ord.order.submit` again), M4-02, M4-07, M4-09 (the buyer sees invoice lines), M4-11 |
+| #319 | KRN-04, KRN-06, KRN-16, KRN-18, KRN-21, KRN-23, M7M8M9-04, M7M8M9-09 |
+| #320 | M1M2M3M5-01, -04, -08, -14, -16 to -23, -29 |
+| #322 | WCD-01, -02, -03, -04, -05, -06, -07, -09, -10, -11, -12, -13, -15, -16, -20, -23, -24, -25 |
+| #323 | TILLM6-02, -03, -05, -07, -08, -09 |
+| #321 | M1M2M3M5-26 (high), on the branch of open PR #314; it closes when #314's author merges it and #314 lands |
+
+Also #325: the unit test task runs on a 1 GB heap (main failed once with "Java heap space" after #319; not a finding).
+
+Deviations taken on the architect's delegation are in `docs/progress/deviations/2026-10-09-wave3-*.md`. The WCD-23, WCD-24 and WCD-25 changes run only in the nightly job; the first nightly after #322 is their proof.
+
+**Still open (52):**
+- High: KRN-01 (the gap check reads only `kernel.document`), KRN-07 (outbox relay fairness), M1M2M3M5-10 (nothing consumes `batch.corrected.v1`), TILLM6-01 and M1M2M3M5-26 (with open PR #314).
+- With the open PRs #313 and #315: KRN-09, KRN-10, KRN-11, KRN-12.
+- Medium and low, larger than S or needing a design decision: M4-03, -04, -05, -06, -08, -10; KRN-02, -03, -05, -08, -13, -14, -15, -17, -19, -20, -22, -24; TILLM6-04, -06; M7M8M9-02, -03, -05, -06, -07, -08; M1M2M3M5-02, -03, -05, -06, -07, -09, -11, -12, -13, -15, -24, -25, -27, -28; WCD-18, -21, -22.
