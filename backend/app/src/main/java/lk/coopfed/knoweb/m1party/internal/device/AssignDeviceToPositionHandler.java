@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
-import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.NumberingService;
@@ -61,15 +61,12 @@ class AssignDeviceToPositionHandler implements Handles<AssignDeviceToPosition, U
     static final String AUDIT_POSITION_CHANGED = "DEVICE_POSITION_CHANGED";
     static final String AUDIT_OUTBOX_LOSS = "DEVICE_OUTBOX_LOSS_RECORDED";
 
-    /** The lowest release a device may run to be assigned (doc 31 section 6; config register). */
-    static final String VERSION_FLOOR = "m1.device.version_floor";
-
     /** SQLSTATE unique_violation: the one_device_per_position index refused a second holder. */
     private static final String UNIQUE_VIOLATION = "23505";
 
     private final DeviceRepository devices;
     private final DevicePlaces places;
-    private final ConfigRegistry config;
+    private final AppVersionFloor floors;
     private final SyncStatus sync;
     private final NumberingService numbering;
     private final AuditFacade audit;
@@ -78,14 +75,14 @@ class AssignDeviceToPositionHandler implements Handles<AssignDeviceToPosition, U
     AssignDeviceToPositionHandler(
             DeviceRepository devices,
             DevicePlaces places,
-            ConfigRegistry config,
+            AppVersionFloor floors,
             SyncStatus sync,
             NumberingService numbering,
             AuditFacade audit,
             EventPublisher events) {
         this.devices = devices;
         this.places = places;
-        this.config = config;
+        this.floors = floors;
         this.sync = sync;
         this.numbering = numbering;
         this.audit = audit;
@@ -143,11 +140,12 @@ class AssignDeviceToPositionHandler implements Handles<AssignDeviceToPosition, U
         }
         // 5. the device runs a release at or above the floor: the release it last reported, or
         //    the one it was enrolled with when it never reported.
-        String floor = config.getOrDefault(VERSION_FLOOR, scope, "0");
         String appVersion = reportedVersion(device, scope);
-        if (!AppVersion.isWellFormed(appVersion) || !AppVersion.isAtLeast(appVersion, floor)) {
+        AppVersionFloor.Standing standing = floors.standing(appVersion, scope);
+        if (standing.afterGrace()) {
             throw new ProblemException(
-                    "m1.device.below_floor", Map.of("appVersion", String.valueOf(appVersion), "floor", floor));
+                    "m1.device.below_floor",
+                    Map.of("appVersion", String.valueOf(appVersion), "floor", standing.floor()));
         }
         // 6. a reason.
         String reason = DeviceGuards.reason(command.reasonCode(), command.reasonText());
