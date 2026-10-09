@@ -60,8 +60,7 @@ public class Device implements Persistable<UUID> {
     @Column(name = "enrolled_at", updatable = false)
     private Instant enrolledAt;
 
-    // Written by the sync gateway's heartbeat (K-08) and the update service (doc 31), never here.
-    @Column(name = "last_seen_at", insertable = false, updatable = false)
+    @Column(name = "last_seen_at")
     private Instant lastSeenAt;
 
     @Column(name = "app_version")
@@ -139,6 +138,11 @@ public class Device implements Persistable<UUID> {
 
     String hardwareSerial() {
         return hardwareSerial;
+    }
+
+    void updateFromHeartbeat(String appVersion, Instant lastSeenAt) {
+        this.appVersion = appVersion;
+        this.lastSeenAt = lastSeenAt;
     }
 
     String deviceKind() {

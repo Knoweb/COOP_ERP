@@ -32,6 +32,7 @@ import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
+import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
@@ -692,7 +693,8 @@ class ArchitectureTests {
 
     /** Used under noClasses(): every write found is reported as one violation. */
     private static ArchCondition<JavaClass> writeToTheDatabase() {
-        return new ArchCondition<>("write to the database (only @CommandHandler classes may)") {
+        return new ArchCondition<>(
+                "write to the database (only @CommandHandler classes and @EventConsumer methods may)") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 for (JavaMethodCall c : javaClass.getMethodCallsFromSelf()) {
@@ -702,12 +704,12 @@ class ArchitectureTests {
                             || (target.isAssignableTo(EntityManager.class)
                                     && ENTITY_MANAGER_WRITE.contains(c.getName()))
                             || (target.isAssignableTo(JdbcOperations.class) && JDBC_WRITE.contains(c.getName()));
-                    if (write) {
+                    if (write && !c.getOrigin().isAnnotatedWith(EventConsumer.class)) {
                         events.add(SimpleConditionEvent.satisfied(
                                 c,
                                 javaClass.getName() + " writes through "
                                         + target.getSimpleName() + "." + c.getName()
-                                        + "(...) but is not a @CommandHandler; "
+                                        + "(...) but is not a @CommandHandler or @EventConsumer; "
                                         + c.getSourceCodeLocation()));
                     }
                 }

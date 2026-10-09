@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.DeviceHeartbeatReported;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -147,6 +148,8 @@ public class HeartbeatService {
                 report.deviceUptimeS(),
                 report.openSession(),
                 offset);
+
+        events.publish(new DeviceHeartbeatReported(Ids.next(), deviceId, report.appVersion(), now));
 
         long threshold = settings.clockDriftReviewAfter(device).toMillis();
         if (offset != null
