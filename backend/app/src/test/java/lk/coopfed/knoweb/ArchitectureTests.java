@@ -693,7 +693,8 @@ class ArchitectureTests {
 
     /** Used under noClasses(): every write found is reported as one violation. */
     private static ArchCondition<JavaClass> writeToTheDatabase() {
-        return new ArchCondition<>("write to the database (only @CommandHandler classes and @EventConsumer methods may)") {
+        return new ArchCondition<>(
+                "write to the database (only @CommandHandler classes and @EventConsumer methods may)") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 for (JavaMethodCall c : javaClass.getMethodCallsFromSelf()) {
