@@ -35,7 +35,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
     private static Map<String, String> previous() {
         Map<String, String> streams = new LinkedHashMap<>();
         // Wave 2, PR 17: kernel V0087 (change_log_append tests the class) from V0086.
-        streams.put("kernel", "86");
+        streams.put("kernel", "89");
         streams.put("hello", null);
         streams.put("m1party", "14");
         // Wave 2, PR 17 (m1security V0020, user_has_any_assignment tests the class): from V0019,
@@ -148,7 +148,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         }
 
         assertThat(after)
-                .containsEntry("kernel", 89)
+                .containsEntry("kernel", 90)
                 .containsEntry("m1party", 15)
                 .containsEntry("m1security", 20)
                 .containsEntry("m2catalogue", 8)

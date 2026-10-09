@@ -31,9 +31,6 @@ class OwnPoliciesTestTheClassIntegrationTest extends PostgresIntegrationTest {
      * (schema.table.policy clause, as a pattern: partitions carry their parent's policies).
      */
     static final Map<String, String> OWN_READS_OF_NOBODYS_ROWS = Map.of(
-            "kernel\\.config_value\\.own_read USING",
-            "the federation-wide values (scope_entity_id NULL) are nobody's: every caller resolves its"
-                    + " configuration from them (kernel V0052)",
             "security\\.role_permission\\.own_read USING",
             "follows the parent role inside EXISTS, whose two branches each test the class (own role, or a"
                     + " Federation template for every class but NONE, m1security V0001); a text check does not"
