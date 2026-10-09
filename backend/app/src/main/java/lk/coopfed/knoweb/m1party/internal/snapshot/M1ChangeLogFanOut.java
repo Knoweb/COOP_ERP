@@ -102,20 +102,21 @@ class M1ChangeLogFanOut {
         if (roleId == null) {
             throw new IllegalArgumentException("Role changed event payload is missing roleId");
         }
+        // The holders of a Federation template are assigned in every society's own scope, which
+        // security.user_role's own_read hides from this consumer (it runs in the Federation's OWN
+        // scope). security.role_holder_shops (m1security V0021) answers the role's manager across
+        // entities: the owner for its own role, the Federation for a template.
         Map<Target, List<Change>> changesPerTarget = new HashMap<>();
         jdbc.query(
-                "select distinct ur.user_id, l.owner_entity_id, l.location_id " + "  from security.user_role ur "
-                        + "  join party.location l on l.owner_entity_id = ur.scope_entity_id "
-                        + " where ur.role_id = :roleId and l.location_type = 'SHOP' "
-                        + "   and (ur.scope_location_id is null or ur.scope_location_id = l.location_id)",
+                "select holder_user_id, shop_entity_id, shop_location_id from security.role_holder_shops(:roleId)",
                 Map.of("roleId", roleId),
                 rs -> {
                     Target t = new Target(
-                            rs.getObject("owner_entity_id", UUID.class), rs.getObject("location_id", UUID.class));
+                            rs.getObject("shop_entity_id", UUID.class), rs.getObject("shop_location_id", UUID.class));
                     changesPerTarget
                             .computeIfAbsent(t, k -> new ArrayList<>())
                             .add(Change.upsert(
-                                    OperatorSnapshotContributor.OPERATOR, rs.getObject("user_id", UUID.class)));
+                                    OperatorSnapshotContributor.OPERATOR, rs.getObject("holder_user_id", UUID.class)));
                 });
         for (Map.Entry<Target, List<Change>> entry : changesPerTarget.entrySet()) {
             changeLog.append(List.of(entry.getKey()), entry.getValue(), null, true, scope);
