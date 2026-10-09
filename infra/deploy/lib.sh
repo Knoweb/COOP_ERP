@@ -119,8 +119,13 @@ sync_files() {
   rm -rf "$APP_DIR/seed"
   cp -R "$REPO_DIR/backend/app/src/main/resources/seed" "$APP_DIR/seed"
   # The Keycloak and postgres containers read these as other users: readable by all, and the
-  # folders enterable. Nothing secret is in them (the rendered realm is 0600, below).
-  chmod -R a+rX "$APP_DIR/postgres" "$APP_DIR/keycloak" "$APP_DIR/seed"
+  # folders enterable. Nothing secret is in them. Not the whole keycloak/ folder (WCD-17): the
+  # rendered realm-coop.json beside them holds the backend client's secret and the demo
+  # password, and stays 0600 (render_realm), also while this runs and if a later render fails.
+  chmod a+rx "$APP_DIR/keycloak"
+  chmod -R a+rX "$APP_DIR/postgres" "$APP_DIR/seed" "$APP_DIR/keycloak/theme" "$APP_DIR/keycloak/realm-dev.json"
+  # A realm rendered by an older kit, whose recursive chmod left it readable by all.
+  if [ -f "$APP_DIR/keycloak/realm-coop.json" ]; then chmod 600 "$APP_DIR/keycloak/realm-coop.json"; fi
 }
 
 # IMAGE_TAG := the clone's commit (D-1, DEPLOY-02), once GHCR has every image of it; the tag it
@@ -183,7 +188,12 @@ render_realm() {
   [ -n "$url" ] && [ -n "$pw" ] && [ -n "$secret" ] || fail "PUBLIC_URL, DEMO_PASSWORD or KEYCLOAK_BACKEND_CLIENT_SECRET missing in .env"
   src="$APP_DIR/keycloak/realm-dev.json"; out="$APP_DIR/keycloak/realm-coop.json"
   [ -f "$src" ] || fail "$src is missing; run the script from a clone of the repository"
-  sed -e "s|http://localhost:5173|$url|g" \
+  # The temporary file holds the secret too: written 0600 from its first byte (WCD-17), in a
+  # subshell so the umask does not reach the rest of the script. A leftover .tmp would keep its
+  # old mode, so it goes first.
+  rm -f "$out.tmp"
+  ( umask 077
+    sed -e "s|http://localhost:5173|$url|g" \
       -e "s|\"value\": \"dev\"|\"value\": \"$pw\"|g" \
       -e "s|\"value\": \"demo\"|\"value\": \"$pw\"|g" \
       -e "s|\"secret\": \"coop-erp-backend-dev\"|\"secret\": \"$secret\"|" \
@@ -191,7 +201,7 @@ render_realm() {
       -e "s|\"directAccessGrantsEnabled\": true|\"directAccessGrantsEnabled\": false|g" \
       -e "s|COOP ERP (development)|COOP ERP (demo)|" \
       -e "s|(development)\"|(demo)\"|g" \
-      "$src" > "$out.tmp"
+      "$src" > "$out.tmp" )
   if grep -q 'localhost:5173' "$out.tmp" || grep -Eq '"value": "(dev|demo)"' "$out.tmp" \
      || grep -q 'coop-erp-backend-dev' "$out.tmp" || grep -q '"directAccessGrantsEnabled": true' "$out.tmp" \
      || ! grep -q '"bruteForceProtected": true' "$out.tmp"; then

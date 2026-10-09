@@ -487,6 +487,51 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aReportedVersionThatIsNotDottedNumbersIsRefusedEvenUnderTheDefaultFloor() {
+        // No floor is set, so the default "0" is in force; the floor's comparison reads a
+        // malformed version as "0" and would let it through, so the handler refuses it itself.
+        UUID floorShop = UUID.randomUUID();
+        UUID floorPosition = UUID.randomUUID();
+        insertShop(superuserJdbc(), floorShop, MPCS, "F" + floorShop.toString().substring(0, 6));
+        insertPosition(superuserJdbc(), floorPosition, floorShop, MPCS, 1, "ACTIVE");
+        UUID garbled = enrolDevice.handle(
+                new EnrolDevice("SN-GARBLED", "POS_TERMINAL", floorShop, "1.4.0", "STG-GARBLED"), own(MPCS));
+        sync.versions.put(garbled, "unknown");
+        kernel.reset();
+
+        assertThatThrownBy(() -> assignDevice.handle(assign(garbled, floorPosition), atShop(MPCS, floorShop)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> {
+                    assertThat(e.messageId()).isEqualTo("m1.device.below_floor");
+                    assertThat(e.parameters()).containsEntry("appVersion", "unknown");
+                });
+        assertNothingCommitted();
+        assertThat(deviceRow(garbled)).containsEntry("status", "ENROLLED");
+    }
+
+    @Test
+    void aDeviceBelowTheFloorIsAssignableWithinTheGrace() {
+        // AppVersionFloor: a device below a newly raised floor keeps working for the grace; only
+        // after it is the device refused a new position.
+        UUID floorShop = UUID.randomUUID();
+        UUID floorPosition = UUID.randomUUID();
+        insertShop(superuserJdbc(), floorShop, MPCS, "F" + floorShop.toString().substring(0, 6));
+        insertPosition(superuserJdbc(), floorPosition, floorShop, MPCS, 1, "ACTIVE");
+        UUID behind = enrolDevice.handle(
+                new EnrolDevice("SN-BEHIND", "POS_TERMINAL", floorShop, "1.4.0", "STG-BEHIND"), own(MPCS));
+        sync.versions.put(behind, "1.0.0");
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, value, reason) values (?, '\"1.3\"'::jsonb, 'test'), ('sync.app_version_floor.grace', '\"PT336H\"'::jsonb, 'test')",
+                        FLOOR_KEY);
+        kernel.reset();
+
+        assertThat(assignDevice.handle(assign(behind, floorPosition), atShop(MPCS, floorShop)))
+                .isEqualTo(behind);
+        assertThat(deviceRow(behind)).containsEntry("current_till_position_id", floorPosition);
+        assertThat(audit("DEVICE_ASSIGNED")).hasSize(1);
+    }
+
+    @Test
     void anAssignmentWaitsForTheLockAnotherTransactionHoldsOnThePosition() throws Exception {
         // Another transaction holds the position row (as a second assignment to it, or its
         // retirement, would): this one blocks until it ends, so the two never pass each other.

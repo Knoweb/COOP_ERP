@@ -268,6 +268,10 @@ tasks.test {
     // IntegrationTestShardCoverageTest reads the shard lists from ci.yml: a change there alone
     // must run the tests again, not answer "up to date".
     inputs.file(rootProject.file("../.github/workflows/ci.yml"))
+    // ArchitectureTests and the Modulith verification load every class of the application into
+    // one JVM; on the default 512 MB heap the executor ran out of memory while the suite started
+    // (main at ab723c0c, 9 Oct 2026), a run before it passing on the same code.
+    maxHeapSize = "1g"
 }
 
 // A failed test prints its message and the whole stack trace in the log, not only the exception

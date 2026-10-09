@@ -70,7 +70,10 @@ public class SetLinesHandler implements Handles<SetLines, SetLinesResult> {
             throw new ProblemException("request.invalid");
         }
         PriceListRules.requireOwnerScope(scope);
-        PriceListView list = store.find(command.priceListId())
+        // Locked (wave 3, M1M2M3M5-08): a SetLines that read the list before a concurrent Publish
+        // committed would replace the lines that publish validated and announced. It waits here
+        // for the publish, then reads PUBLISHED and is refused below.
+        PriceListView list = store.findForUpdate(command.priceListId())
                 .filter(found -> found.ownerEntityId().equals(scope.entityId()))
                 .orElseThrow(() -> new ProblemException("m3.price_list.not_found"));
         if (!PriceListStore.DRAFT.equals(list.status())) {

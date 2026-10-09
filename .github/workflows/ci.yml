@@ -872,8 +872,11 @@ jobs:
           fetch-depth: 0
 
       - name: gitleaks
+        # Pinned by digest, as every action and base image (WCD-14): this image gets the whole
+        # history mounted. Dependabot does not read an inline `docker run`: bump tag and digest
+        # together, by hand.
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 detect --source /repo --no-banner --redact
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 detect --source /repo --no-banner --redact
 
   # Tells the team. By itself GitHub mails a failed run to the one person who caused it, and a
   # failed nightly run to whoever last edited the schedule line, so main was once red for a day

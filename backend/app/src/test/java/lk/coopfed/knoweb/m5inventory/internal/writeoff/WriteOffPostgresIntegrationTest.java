@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -310,6 +311,79 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aLimitGrantedAtOneLocationDoesNotApproveAtAnother() {
+        // wave 3, M1M2M3M5-18: the limit counts only assignments that are entity-wide or at the
+        // write-off's location, as the M1 resolver reads them.
+        receive(stores, "250");
+        UUID id = witnessed(expired(stores, "260"));
+
+        UUID shopApprover = user("inv.writeoff.approve", "{\"max_value\": 250000}", shop);
+        kernel.reset();
+        assertProblem(
+                () -> approve.handle(new ApproveWriteOff(id), own(MPCS, shopApprover)), "m5.approval.limit_exceeded");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(qty(stores)).isEqualByComparingTo("300");
+
+        UUID storesApprover = user("inv.writeoff.approve", "{\"max_value\": 250000}", stores);
+        approve.handle(new ApproveWriteOff(id), own(MPCS, storesApprover));
+        assertThat(control.writeOff(id, own(MPCS)).orElseThrow().status()).isEqualTo("POSTED");
+        assertThat(qty(stores)).isEqualByComparingTo("40");
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("WRITEOFF_POSTED");
+    }
+
+    @Test
+    void whatAPickListHoldsForADeliveryIsNotFreeToWriteOff() {
+        // wave 3, M1M2M3M5-20: the stores' lot holds 50, of which an open pick list holds 45 for a
+        // delivery note; writing off 10 would leave the dispatch to take the lot to -5.
+        Map<String, Object> lot = superuserJdbc()
+                .queryForMap(
+                        "select stock_lot_id, sku_id from inventory.stock_lot where location_id = ? and batch_id = ?",
+                        stores,
+                        batch);
+        UUID pickList = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into inventory.pick_list (pick_list_id, owner_entity_id, delivery_document_id) values (?, ?, ?)",
+                        pickList,
+                        MPCS,
+                        Ids.next());
+        superuserJdbc()
+                .update(
+                        """
+                        insert into inventory.pick_list_line
+                            (pick_line_id, pick_list_id, owner_entity_id, delivery_line_id, sku_id, location_id,
+                             stock_lot_id, batch_id, qty)
+                        values (?, ?, ?, ?, ?, ?, ?, ?, 45)
+                        """,
+                        Ids.next(),
+                        pickList,
+                        MPCS,
+                        Ids.next(),
+                        lot.get("sku_id"),
+                        stores,
+                        lot.get("stock_lot_id"),
+                        batch);
+        UUID id = witnessed(expired(stores, "10"));
+
+        kernel.reset();
+        assertProblem(
+                () -> approve.handle(new ApproveWriteOff(id), own(MPCS, user("inv.writeoff.approve"))),
+                "m5.writeoff.insufficient_stock");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(qty(stores)).isEqualByComparingTo("50");
+
+        // Five are free: a write-off of five is approved.
+        UUID five = witnessed(expired(stores, "5"));
+        approve.handle(new ApproveWriteOff(five), own(MPCS, user("inv.writeoff.approve")));
+        assertThat(control.writeOff(five, own(MPCS)).orElseThrow().status()).isEqualTo("POSTED");
+        assertThat(qty(stores)).isEqualByComparingTo("45");
+    }
+
+    @Test
     void aGrantWithoutALimitStillApprovesASmallWriteOff() {
         UUID id = witnessed(expired(stores, "2"));
         approve.handle(new ApproveWriteOff(id), own(MPCS, user("inv.writeoff.approve")));
@@ -546,6 +620,11 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UUID user(String permission, String limits) {
+        return user(permission, limits, null);
+    }
+
+    /** A user holding the permission through a role assigned at the entity, or only at {@code atLocation}. */
+    private UUID user(String permission, String limits, UUID atLocation) {
         JdbcTemplate admin = superuserJdbc();
         UUID user = Ids.next();
         admin.update(
@@ -571,10 +650,11 @@ class WriteOffPostgresIntegrationTest extends PostgresIntegrationTest {
                     limits);
             admin.update(
                     "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id)"
-                            + " values (?, ?, ?, null)",
+                            + " values (?, ?, ?, ?)",
                     user,
                     role,
-                    MPCS);
+                    MPCS,
+                    atLocation);
             roles.add(role);
         }
         return user;

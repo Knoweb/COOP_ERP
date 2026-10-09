@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.ApprovalLimit;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m1party.query.SecurityQueries;
@@ -36,7 +37,7 @@ public class ControlPolicy {
 
     static final String TOLERANCE_PCT = "inventory.count_tolerance_pct";
     static final String TOLERANCE_QTY = "inventory.count_tolerance_qty";
-    static final String BAND1_LIMIT = "inventory.approval_band1_limit";
+    static final String BAND1_LIMIT = ApprovalLimit.BAND1_LIMIT;
     static final String BAND2_LIMIT = "inventory.approval_band2_limit";
     static final String SINGLE_STAFF = "inventory.single_staff";
     static final String REMOTE_WITNESS_ALLOWED = "inventory.remote_witness_allowed";
@@ -126,20 +127,31 @@ public class ControlPolicy {
      * (M5-09; decided 6 October 2026, {@code 2026-10-06-wave2-stock-approvals.md} (1)):
      * <ul>
      *   <li>the limit is the highest {@code max_value} of the permission over the approver's role
-     *       assignments at the decision's entity;
+     *       assignments at the decision's entity that are entity-wide or at the decision's location
+     *       (wave 3, M1M2M3M5-18: a limit granted at shop A does not approve at shop B, as the M1
+     *       resolver reads it);
      *   <li>a grant without {@code max_value} (a seeded template, a role from before the permission
-     *       took a limits schema) approves up to {@code inventory.approval_band1_limit} only;
+     *       took a limits schema) approves up to {@code inventory.approval_band1_limit} only; M1
+     *       reads the same meaning when it compares a grant with the grantor's ({@link
+     *       ApprovalLimit}; wave 3, M1M2M3M5-01);
      *   <li>no grant at the entity is no authority: the limit is zero;
      *   <li>a decision with a line of no cost needs more than the band-1 limit (band 2).
      * </ul>
      * Refuses {@code m5.approval.limit_exceeded} when the value is above the limit: the next band's
      * approver must act (doc 25 flow 6.3).
+     *
+     * @param locationId the location of the stock the decision moves
      */
-    public void requireWithinLimit(BigDecimal value, boolean zeroCostLine, String permission, ScopeContext scope) {
-        BigDecimal band1 = decimal(BAND1_LIMIT, scope, "25000");
+    public void requireWithinLimit(
+            BigDecimal value, boolean zeroCostLine, String permission, UUID locationId, ScopeContext scope) {
+        BigDecimal band1 = ApprovalLimit.band1(config, scope);
         BigDecimal limit = BigDecimal.ZERO;
         for (SecurityQueries.AssignmentView assignment : security.listAssignments(scope.userId(), scope)) {
             if (!scope.entityId().equals(assignment.scopeEntityId())) {
+                continue;
+            }
+            if (assignment.scopeLocationId() != null
+                    && !assignment.scopeLocationId().equals(locationId)) {
                 continue;
             }
             Optional<SecurityQueries.RoleView> role = security.getRole(assignment.roleId(), scope);
@@ -148,8 +160,7 @@ public class ControlPolicy {
                 if (!permission.equals(p.permissionCode())) {
                     continue;
                 }
-                Object max = p.limits() == null ? null : p.limits().get("max_value");
-                limit = limit.max(max == null ? band1 : new BigDecimal(max.toString()));
+                limit = limit.max(ApprovalLimit.of(p.limits(), band1));
             }
         }
         BigDecimal required = zeroCostLine ? value.max(band1.add(ONE_CENT)) : value;
