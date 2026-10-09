@@ -396,19 +396,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             new Departure(
                     "trading.transfer_request_decision",
                     "dest_read (m4trading V0008): the asking shop reads the decision on its request",
-                    RlsMatrixIntegrationTest::addressedToTheShop),
-            // ---- found by the matrix, to fix in the owning module ------------------------------
-            // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
-            // (hello README); K-01 has landed, so hello can add it.
-            new Departure("hello.greeting", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing),
-            // The scaffolder's throwaway copy of hello (make test-scaffold: integration.webhook)
-            // carries hello's policies, so it carries hello's departure; it exists only during
-            // that proof, hence it is not required to exist.
-            new Departure(
-                    "integration.webhook",
-                    "the scaffolded copy of hello.greeting: no ext_view yet",
-                    RlsMatrixIntegrationTest::externalReadsNothing,
-                    false)
+                    RlsMatrixIntegrationTest::addressedToTheShop)
             // pricing.price_list and price_list_line follow the template since m3pricing V0003
             // (M3-03); beyond it, buyer_read admits the buyer of a relationship that binds the list,
             // which no made-up row is. party.entity has its ext_view since m1party V0010.
