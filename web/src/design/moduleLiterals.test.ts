@@ -21,7 +21,6 @@ const ALLOWED: Allowed[] = [
   { file: "shell/design/DesignPage.tsx", text: "StateChip", reason: "Component name shown as literal code in the design gallery, not natural language." },
   { file: "shell/design/DesignPage.tsx", text: "TrainingBadge", reason: "Component name shown as literal code in the design gallery, not natural language." },
   { file: "shell/i18n/LangFallbackTag.tsx", text: "EN", reason: "The language code itself is untranslated by definition, indicating English fallback." },
-  { file: "modules/m9integration/NotificationsPage.tsx", text: "[EN]", reason: "The language code of a template body shown in English as the fallback, untranslated by definition like LangFallbackTag." },
   { file: "router.tsx", text: "COOPFED ERP", reason: "The product's brand name in the sidebar, the same in every language." },
 ];
 
