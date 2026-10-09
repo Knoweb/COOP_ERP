@@ -16,18 +16,8 @@
 --    caller, NONE, FEDERATION_VIEW and EXTERNAL_TIMEBOXED included, gets no row. It returns ids
 --    only, and only of SHOP locations: what the producer appends to the change log.
 --
--- 2. definer_read on party.location TO app_seed: the function runs as its owner, the migrator,
---    whom FORCE ROW LEVEL SECURITY binds too; app_seed is the migrator's group (kernel V0005),
---    a role no application connection is a member of, as security.user_role's definer_read
---    (V0010) lets the same function read the assignments.
---
--- Numbered V0021: M1's two streams share their numbers (m1party ends at V0015, m1security at
--- V0020 on main and on PR #314's branch), so V0021 is free in both.
-
-CREATE POLICY definer_read ON party.location
-    FOR SELECT
-    TO app_seed
-    USING (true);
+-- 2. The function reads party.location through the definer_read policy that m1party V0016 adds
+--    for app_seed (rule R4 keeps it in m1party's own stream; m1party migrates first).
 
 CREATE FUNCTION security.role_holder_shops(p_role_id uuid)
 RETURNS TABLE (holder_user_id uuid, shop_entity_id uuid, shop_location_id uuid)
