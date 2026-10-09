@@ -7,7 +7,7 @@ import { locationText } from "../../shell/i18n/localName";
 import { businessToday, useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
-import { openServerFile } from "../../shell/api/openServerFile";
+import { isOpenableFileUrl, openServerFile } from "../../shell/api/openServerFile";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useReportingApi, type ReportQuery, type ReportRun } from "./reportingApi";
 import { csvFileName, defaultPeriod, errorText, isNumeric, queryOf } from "./reportView";
@@ -197,8 +197,9 @@ export function ReportPage() {
       {run && (
         <p role="status">
           {run.status === "REQUESTED" && t("reporting.print.waiting").text}
-          {run.status === "READY" && run.downloadUrl && (
-            <a href={run.downloadUrl} target="_blank" rel="noreferrer">
+          {/* The link is the server's: anchored only when it is http(s) to our own origins (React 18 does not stop a javascript: href). */}
+          {run.status === "READY" && run.downloadUrl && isOpenableFileUrl(run.downloadUrl) && (
+            <a href={run.downloadUrl} target="_blank" rel="noopener noreferrer">
               {t("reporting.print.ready").text}
             </a>
           )}

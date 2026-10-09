@@ -99,3 +99,22 @@ export function requestOf(form: SkuForm, existing?: Sku): SkuDetailsRequest {
     attributes: existing?.attributes
   };
 }
+
+/**
+ * The Idempotency-Key for attaching `fingerprint` (the file's hash and the barcode it goes
+ * with). A retry of the same file after a failed storage upload keeps the key, so the server
+ * renews the PENDING row; a different file is a new action and gets a new key, so it is never
+ * sent with a key the server has seen with another body. `lastSent` remembers what the key was
+ * last used for.
+ */
+export function keyForUpload(
+  key: { current: () => string; next: () => void },
+  lastSent: { current: string | null },
+  fingerprint: string
+): string {
+  if (lastSent.current !== null && lastSent.current !== fingerprint) {
+    key.next();
+  }
+  lastSent.current = fingerprint;
+  return key.current();
+}

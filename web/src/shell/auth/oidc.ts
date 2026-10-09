@@ -61,6 +61,15 @@ export function takeCommandNotKept(): boolean {
   return flag;
 }
 
+/**
+ * Whether a command the sign-in brought back may be taken again: its URL and body pass mayKeep,
+ * and it was sent by the user who has just signed in (`sub`). A command with no subject is not
+ * kept: nobody can tell whose it is.
+ */
+export function keepsFor(pending: PendingCommand, signedInSub: string | undefined, apiBase: string): boolean {
+  return mayKeep(pending, apiBase) && !!pending.subject && pending.subject === signedInSub;
+}
+
 export const oidcConfig: AuthProviderProps = {
   authority: AUTHORITY,
   client_id: CLIENT_ID,
@@ -76,8 +85,10 @@ export const oidcConfig: AuthProviderProps = {
   // command a step-up interrupted, if there was one.
   onSigninCallback: (user) => {
     const state = (user?.state as LoginState | undefined) ?? {};
-    // Checked again here: the state sat in session storage, where a crafted one could name any URL.
-    const kept = state.pendingCommand && mayKeep(state.pendingCommand, CONFIG.apiBase) ? state.pendingCommand : null;
+    // Checked again here: the state sat in session storage, where a crafted one could name any
+    // URL. And kept only when the person who signed in is the one who sent the command: the
+    // sign-in page lets anyone type a name, and on a shared PC that may be someone else.
+    const kept = state.pendingCommand && keepsFor(state.pendingCommand, user?.profile.sub, CONFIG.apiBase) ? state.pendingCommand : null;
     broughtBack = kept;
     notKept = kept === null && (state.commandNotKept === true || state.pendingCommand !== undefined);
     window.history.replaceState({}, document.title, state.returnTo || window.location.pathname);

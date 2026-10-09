@@ -109,7 +109,9 @@ export function apiMiddleware(getContext: () => RequestContext): Middleware {
         request.headers.set("X-Scope-Location", locationId);
       }
       if (MUTATING.has(request.method)) {
-        pendingOf.set(request, await pendingCommandOf(request, getContext().apiBase ?? API_BASE));
+        const pending = await pendingCommandOf(request, getContext().apiBase ?? API_BASE);
+        // Who sent it: the replay after the sign-in runs only for this same user.
+        pendingOf.set(request, pending ? { ...pending, subject: session.userId } : null);
       }
       return request;
     },
@@ -158,8 +160,12 @@ export function useApiClient<Paths extends object>(options?: { locationId: strin
         pendingCommand: pending ?? undefined,
         commandNotKept: interrupted && pending === null ? true : undefined
       };
+      // login_hint fills in the user's own name on the sign-in page. The name stays editable,
+      // so the callback (oidc.ts) and the replay still check that the same user came back.
+      const loginHint = auth.user?.profile.preferred_username;
       void auth.signinRedirect({
         prompt: "login",
+        ...(loginHint ? { login_hint: loginHint } : {}),
         ...(STEP_UP_ACR_VALUES ? { acr_values: STEP_UP_ACR_VALUES } : {}),
         state
       });

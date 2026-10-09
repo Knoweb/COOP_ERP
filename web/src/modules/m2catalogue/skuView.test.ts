@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
 import messages from "./catalogue.messages.json" with { type: "json" };
 import type { Sku } from "./catalogueApi";
-import { chipOf, EMPTY_FORM, formOf, languageOf, nameIn, requestOf } from "./skuView";
+import { chipOf, EMPTY_FORM, formOf, keyForUpload, languageOf, nameIn, requestOf } from "./skuView";
+
+describe("the key of an image upload", () => {
+  function fakeKey() {
+    let n = 1;
+    return { current: () => `key-${n}`, next: () => void n++ };
+  }
+
+  it("stays the same for a retry of the same file, and changes for a different file after a failed upload", () => {
+    const key = fakeKey();
+    const lastSent = { current: null as string | null };
+
+    expect(keyForUpload(key, lastSent, "hash-a|")).toBe("key-1");
+    // The storage PUT of a.jpg failed: the retry of a.jpg renews the same PENDING row.
+    expect(keyForUpload(key, lastSent, "hash-a|")).toBe("key-1");
+    // The user picks b.jpg instead: a new action, a new key.
+    expect(keyForUpload(key, lastSent, "hash-b|")).toBe("key-2");
+    // The same file with another barcode is another body too.
+    expect(keyForUpload(key, lastSent, "hash-b|4790000000001")).toBe("key-3");
+  });
+});
 
 const SKU: Sku = {
   skuId: "0190e620-0000-7000-8000-000000000001",

@@ -24,10 +24,20 @@ import type { Session } from "../auth/session";
 export type PendingCommand = {
   method: string;
   url: string;
-  /** The request's own headers: Idempotency-Key, Content-Type. Never Authorization. */
+  /**
+   * The request's own headers: Idempotency-Key, Content-Type, and the scope it was sent in
+   * (X-Scope-Entity, X-Scope-Location: ids of an entity and a location, not personal data).
+   * Never Authorization.
+   */
   headers: Record<string, string>;
   /** The JSON body as text, or null for a command without one. */
   body: string | null;
+  /**
+   * The `sub` of the user who sent it. The command is taken again only for that same user: on a
+   * shared counter PC another person may complete the sign-in, and must not run a command they
+   * never confirmed (oidc.ts keepsFor, StepUpReplay.tsx).
+   */
+  subject?: string;
 };
 
 /** The headers every request of a signed-in user carries (shell/api/client.ts adds the same). */
@@ -41,8 +51,13 @@ export type ReplayContext = {
 
 export type ReplayOutcome = { ok: true } | { ok: false; problem: Problem };
 
-/** The headers of a request worth keeping: what names the command, never what names the user. */
-const KEPT_HEADERS = ["Idempotency-Key", "Content-Type"];
+/**
+ * The headers of a request worth keeping: what names the command and the scope it was sent in,
+ * never what names the user. The scope is kept because the replay runs on the first render after
+ * the sign-in, before the session read has told the shell the user's location, and a
+ * one-location user's command sent without X-Scope-Location is refused.
+ */
+const KEPT_HEADERS = ["Idempotency-Key", "Content-Type", "X-Scope-Entity", "X-Scope-Location"];
 
 /** True when `url` is the API base itself or a path under it ("https://api.x" does not cover "https://api.x.evil"). */
 export function isUnderApiBase(url: string, apiBase: string): boolean {
@@ -94,7 +109,8 @@ export async function pendingCommandOf(request: Request, apiBase: string = resol
 }
 
 /**
- * Sends the kept command once more, with the fresh token and the same scope headers. A second
+ * Sends the kept command once more, with the fresh token and the scope it was first sent in (the
+ * context's scope only when the kept command names none). A second
  * mfa.required is reported like any other problem and never starts another step-up: one
  * replay, then the person decides.
  */
@@ -106,10 +122,13 @@ export async function replayPendingCommand(
   const headers = new Headers(pending.headers);
   headers.set("Authorization", `Bearer ${context.accessToken}`);
   headers.set("Accept-Language", context.locale);
-  if (context.session.entityId) {
+  // The kept scope is taken whole (an entity-wide command stays entity-wide); only a command
+  // that names no scope at all gets the scope the shell knows now.
+  const keptScope = headers.has("X-Scope-Entity") || headers.has("X-Scope-Location");
+  if (!keptScope && context.session.entityId) {
     headers.set("X-Scope-Entity", context.session.entityId);
   }
-  if (context.locationId) {
+  if (!keptScope && context.locationId) {
     headers.set("X-Scope-Location", context.locationId);
   }
   const response = await fetchFn(pending.url, { method: pending.method, headers, body: pending.body });
