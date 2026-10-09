@@ -14,9 +14,13 @@ type Allowed = { file: string; text: string; reason: string };
 
 const ALLOWED: Allowed[] = [
   // A product or party name is data that came from the server, not a string of ours; none yet.
+  { file: "shell/design/DesignPage.tsx", text: "MoneyDisplay", reason: "Component name shown as literal code in the design gallery, not natural language." },
+  { file: "shell/design/DesignPage.tsx", text: "StateChip", reason: "Component name shown as literal code in the design gallery, not natural language." },
+  { file: "shell/design/DesignPage.tsx", text: "TrainingBadge", reason: "Component name shown as literal code in the design gallery, not natural language." },
+  { file: "shell/i18n/LangFallbackTag.tsx", text: "EN", reason: "The language code itself is untranslated by definition, indicating English fallback." },
 ];
 
-const JSX_TEXT = />\s*([A-Z][^<>{}=;"`]*\s[^<>{}=;"`]*?)\s*</g;
+const JSX_TEXT = /(?<!=)>\s*([A-Z][^<>{}=;"`]*?)\s*</g;
 const LITERAL_ATTRIBUTE = /\b(aria-label|alt|title|placeholder)=(?:"([^"{}]*)"|\{\s*"([^"]*)"\s*\})/g;
 const BROWSER_DIALOG = /(?<![\w.])(?:alert|confirm|prompt)\(/g;
 
@@ -29,7 +33,7 @@ export function literalsIn(source: string): { text: string; found: string }[] {
   const found: { text: string; found: string }[] = [];
   for (const match of source.matchAll(JSX_TEXT)) {
     const text = match[1].replace(/\s+/g, " ").trim();
-    if (!/\s/.test(text)) continue; // one word ("SKU", "EN") is a code, not a sentence
+    // No single-word check, we want to catch one-word literals like "Image".
     found.push({ text, found: `${lineOf(source, match.index ?? 0)}: JSX text "${text}"` });
   }
   for (const match of source.matchAll(LITERAL_ATTRIBUTE)) {
@@ -47,6 +51,8 @@ export function literalsIn(source: string): { text: string; found: string }[] {
 describe("the search for user-visible literals", () => {
   it("finds JSX text, a literal label and a browser alert", () => {
     expect(literalsIn(`<p>Failed to remove image</p>`)).toHaveLength(1);
+    expect(literalsIn(`<th>Image</th>`)).toHaveLength(1);
+    expect(literalsIn(`<th>SKU</th>`)).toHaveLength(1);
     expect(literalsIn(`<p>\n  No image uploaded\n</p>`)).toHaveLength(1);
     expect(literalsIn(`<button aria-label="Notifications">`)).toHaveLength(1);
     expect(literalsIn(`<img alt="Thumbnail" />`)).toHaveLength(1);
@@ -54,12 +60,12 @@ describe("the search for user-visible literals", () => {
     expect(literalsIn(`alert("Failed")`)).toHaveLength(1);
   });
 
-  it("accepts message ids, one-word texts, expressions, empty alt text and code", () => {
+  it("accepts message ids, expressions, empty alt text and code", () => {
     expect(literalsIn(`<p>{t("pricing.saved").text}</p>`)).toEqual([]);
-    expect(literalsIn(`<th>SKU</th>`)).toEqual([]);
     expect(literalsIn(`<img alt="" aria-hidden="true" />`)).toEqual([]);
     expect(literalsIn(`<button aria-label={t("shell.user.notifications").text}>`)).toEqual([]);
     expect(literalsIn(`const rows: Array<Row> = [];`)).toEqual([]);
+    expect(literalsIn(`const call = (k: string) => Promise<unknown>;`)).toEqual([]);
     expect(literalsIn(`window.alert.bind(x); const prompts = 1;`)).toEqual([]);
   });
 });
