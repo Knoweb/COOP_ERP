@@ -18,7 +18,10 @@ permissions:
   contents: read
 
 env:
-  TRIVY_IMAGE: aquasec/trivy:0.67.2
+  # Pinned by digest (WCD-14): the scan hands this image the runner's Docker socket, which it
+  # needs to read the locally built backend image. Dependabot does not read it: bump tag and
+  # digest together, by hand.
+  TRIVY_IMAGE: aquasec/trivy:0.67.2@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08
 
 jobs:
   vulnerabilities:
