@@ -54,7 +54,10 @@ till track's (CR-30-1); this module gives them the snapshot and applies what the
   key id. **Residual exposure**: whoever holds both the pepper and a dump (the application host)
   can still enumerate the 7.3e5 candidates behind a last four; that is the application, which
   must compare anyway. Losing the pepper makes every captured NIC unmatchable until each member
-  presents the card again: back it up with the database. The duplicate check sees every society
+  presents the card again. On the demo server the pepper lives in `/opt/coop-erp/.env` only
+  (`bootstrap.sh` generates it, `deploy.sh` adds it to an older server, `infra/deploy/compose.yml`
+  refuses to start without it); `backup.sh` does not copy `.env`, so the operator keeps the copy
+  of `.env` off the server that the SETUP guides ask for. The duplicate check sees every society
   and names only the caller's own customer (`m7.account.nic_held` with the id;
   `m7.account.nic_held_elsewhere` with nobody).
 - **One person holds credit at one society in v1** (CR-27A-1 item 5). `nic_holders` and
