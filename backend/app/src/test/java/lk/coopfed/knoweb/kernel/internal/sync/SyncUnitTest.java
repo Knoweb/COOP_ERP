@@ -7,11 +7,17 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.config.YamlMapFactoryBean;
+import org.springframework.core.io.ClassPathResource;
 
 /**
  * The pieces of the sync gateway that need no database: the application floor, the signer, the
@@ -92,6 +98,38 @@ class SyncUnitTest {
         assertThat(EventApplier.isBundle("grn.confirmed.v1")).isTrue();
         assertThat(EventApplier.isBundle("till_session.opened.v1")).isFalse();
         assertThat(EventApplier.isBundle("audit.mode_switch.v1")).isFalse();
+    }
+
+    /**
+     * A quarantined bundle explains its gap only when its document type lists the bundle's event
+     * (kernel.numbering_gaps, V0089), so every bundle type must belong to exactly one offline
+     * document type in the seed, or its quarantined numbers are reported as missing every night.
+     */
+    @Test
+    void everyBundleTypeBelongsToExactlyOneOfflineDocumentType() {
+        YamlMapFactoryBean factory = new YamlMapFactoryBean();
+        factory.setResources(new ClassPathResource("seed/kernel/document-types.yaml"));
+        List<?> types = (List<?>) factory.getObject().get("document_types");
+
+        Map<String, List<String>> owners = new HashMap<>();
+        for (Object entry : types) {
+            Map<?, ?> type = (Map<?, ?>) entry;
+            if (type.get("allowed_sync_events") instanceof List<?> events) {
+                assertThat(type.get("offline_issuable"))
+                        .as("%s lists sync events but is not offline issuable", type.get("code"))
+                        .isEqualTo(true);
+                for (Object event : events) {
+                    owners.computeIfAbsent(event.toString(), e -> new ArrayList<>())
+                            .add(type.get("code").toString());
+                }
+            }
+        }
+
+        for (String bundle : EventApplier.BUNDLE_TYPES) {
+            assertThat(owners.getOrDefault(bundle, List.of()))
+                    .as("document types listing the bundle %s", bundle)
+                    .hasSize(1);
+        }
     }
 
     @Test

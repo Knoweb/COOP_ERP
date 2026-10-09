@@ -54,7 +54,10 @@ till track's (CR-30-1); this module gives them the snapshot and applies what the
   key id. **Residual exposure**: whoever holds both the pepper and a dump (the application host)
   can still enumerate the 7.3e5 candidates behind a last four; that is the application, which
   must compare anyway. Losing the pepper makes every captured NIC unmatchable until each member
-  presents the card again: back it up with the database. The duplicate check sees every society
+  presents the card again. On the demo server the pepper lives in `/opt/coop-erp/.env` only
+  (`bootstrap.sh` generates it, `deploy.sh` adds it to an older server, `infra/deploy/compose.yml`
+  refuses to start without it); `backup.sh` does not copy `.env`, so the operator keeps the copy
+  of `.env` off the server that the SETUP guides ask for. The duplicate check sees every society
   and names only the caller's own customer (`m7.account.nic_held` with the id;
   `m7.account.nic_held_elsewhere` with nobody).
 - **One person holds credit at one society in v1** (CR-27A-1 item 5). `nic_holders` and
@@ -111,7 +114,9 @@ till track's (CR-30-1); this module gives them the snapshot and applies what the
   OWN caller its own customers' ids, whether the caller holds the number, and when each holder let
   it go; another society's customer is a row with no id. `nic_holders`, `accounts_with_balance`
   and `lock_accounts_for_erasure` follow the same pattern; `legacy_nic_rows` and `rekey_nic`
-  answer the platform's FEDERATION_VIEW reader (the re-key job) alone.
+  answer the platform's FEDERATION_VIEW reader (the re-key job) alone: since V0005 the class, no
+  user id and the all-zero entity of the job's scope, so a person's Federation viewer session gets
+  nothing (review wave 3, M7M8M9-04); both are to be dropped once the job finds no legacy row.
 - **A repayment at the office** is recorded entity-wide and numbered from the society's ENTITY
   series of CPR (`M101-CPR-0000001`); a till's CPR keeps the till's own number and series. A
   reversal is a CPR from the ENTITY series naming the original (`reversal_of`, and a REVERSES

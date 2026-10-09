@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class EventConsumerDispatcher {
 
     static final String AUDIT_DEAD_LETTERED = "EVENT_CONSUMER_DEAD_LETTERED";
+    static final String AUDIT_COUNTERPARTY_REFUSED = "EVENT_COUNTERPARTY_REFUSED";
 
     private static final Logger log = LoggerFactory.getLogger(EventConsumerDispatcher.class);
 
@@ -110,10 +111,17 @@ public class EventConsumerDispatcher {
 
             return Boolean.TRUE.equals(applied) ? DeliveryResult.APPLIED : DeliveryResult.DUPLICATE;
 
-        } catch (PoisonMessageException poison) {
+        } catch (CounterpartyRefused refused) {
 
             // A counterparty that is not the document's: a module tried to write into an entity's
-            // scope it has no business in. Never retried; the runtime dead-letters it with the reason.
+            // scope it has no business in. Never retried; the runtime dead-letters it with the
+            // reason. The attempt is recorded in the owner's scope, in a transaction of its own (the
+            // delivery's was rolled back), so an auditor of cross-scope attempts finds it.
+            recordRefusal(consumer, message, documentId, scope.entityId(), refused.getMessage());
+            throw refused;
+
+        } catch (PoisonMessageException poison) {
+
             throw poison;
 
         } catch (RuntimeException failure) {
@@ -195,7 +203,7 @@ public class EventConsumerDispatcher {
             OutboxMessage message, ScopeContext scope, UUID documentId, String consumer) {
 
         if (documentId == null) {
-            throw new PoisonMessageException(
+            throw new CounterpartyRefused(
                     "Event " + message.eventId() + " names a counterparty but no document; refused for " + consumer);
         }
 
@@ -213,9 +221,42 @@ public class EventConsumerDispatcher {
                 scope.entityId());
 
         if (found == null || found == 0) {
-            throw new PoisonMessageException("Event " + message.eventId() + " names " + scope.entityId()
+            throw new CounterpartyRefused("Event " + message.eventId() + " names " + scope.entityId()
                     + " as the counterparty of document " + documentId
                     + ", which the document does not; refused for " + consumer);
+        }
+    }
+
+    /** The second check of counterparty delivery failed: poison, and recorded (M7M8M9-09). */
+    static final class CounterpartyRefused extends PoisonMessageException {
+
+        CounterpartyRefused(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * EVENT_COUNTERPARTY_REFUSED in the owner's OWN scope, which is where the event came from and
+     * where the owner's auditors look. Identifiers only: the consumer, the event, the document and
+     * the entity it named. A failure to record is logged and does not change the refusal.
+     */
+    private void recordRefusal(String consumer, OutboxMessage message, UUID documentId, UUID named, String reason) {
+        try {
+            ScopeContext owner = systemScope(message);
+            transaction.executeWithoutResult(status -> {
+                applyScope(owner);
+
+                Map<String, Object> after = new java.util.LinkedHashMap<>();
+                after.put("consumer", consumer);
+                after.put("eventType", message.eventType());
+                after.put("documentId", documentId == null ? null : documentId.toString());
+                after.put("counterpartyEntityId", named.toString());
+
+                audit.record(
+                        AUDIT_COUNTERPARTY_REFUSED, Subject.of("event", message.eventId()), null, after, owner, reason);
+            });
+        } catch (RuntimeException e) {
+            log.error("Counterparty refusal of event {} for {} could not be audited", message.eventId(), consumer, e);
         }
     }
 

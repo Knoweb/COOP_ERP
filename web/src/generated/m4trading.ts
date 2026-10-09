@@ -520,7 +520,7 @@ export interface paths {
         put?: never;
         /**
          * The seller debits chosen quantities of lines of its invoice
-         * @description At each line's price and VAT rate. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.debitnote.not_seller, m4.invoice.not_issued, m4.debitnote.line_unknown, m4.debitnote.qty_invalid, m4.debitnote.nothing_to_debit, document.link.exceeds_balance.
+         * @description At each line's price and VAT rate. Asks for a fresh second factor. Problems: m4.invoice.not_found, m4.debitnote.not_seller, m4.invoice.not_issued, m4.debitnote.invoice_disputed, m4.debitnote.line_unknown, m4.debitnote.line_duplicate, m4.debitnote.qty_invalid, m4.debitnote.nothing_to_debit, document.link.exceeds_balance.
          */
         post: operations["issueDebitNote"];
         delete?: never;

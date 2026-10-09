@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.YamlMapFactoryBean;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -51,6 +53,16 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
      * sod-pairs.yaml, and no M1 operation reads the audit trail.
      */
     private static final Set<String> M1_CODES_WITHOUT_OPERATION = Set.of("gov.audit.review");
+
+    /**
+     * The x-permission values of a slice that are not codes of the catalogue, each for a reason:
+     * "authenticated" is any signed-in principal on a read of its own facts (CR-19A-9);
+     * "sync.device" and "sync.enrolment_code" name the till's own principal and credential, not a
+     * permission a role holds (the header of sync.yaml); the hello codes are the template module's,
+     * seeded for the development stack by users.dev.sql.
+     */
+    private static final Set<String> SLICE_CODES_OUTSIDE_THE_CATALOGUE = Set.of(
+            "authenticated", "sync.device", "sync.enrolment_code", "hello.greeting.read", "hello.greeting.register");
 
     private static final Pattern PERMISSION_CODE = Pattern.compile("^  - code: \"([^\"]+)\"$");
     private static final Pattern TEMPLATE_ID = Pattern.compile("^  - role_id: \"([^\"]+)\"$");
@@ -141,6 +153,36 @@ class M1SeedLoaderTest extends PostgresIntegrationTest {
                         Integer.class,
                         (Object) RETIRED.toArray(String[]::new)))
                 .isZero();
+    }
+
+    /**
+     * Every x-permission of every slice, not only M1's, is a code of the catalogue (wave 3, M4-01):
+     * AmendOrder once named ord.order.amend, which nobody could hold, so every amendment was
+     * refused with the permission check on, and nothing failed because tools/check-permissions.mjs
+     * compares a slice with its handlers only and the test configuration turns enforcement off.
+     */
+    @Test
+    void everyPermissionOfEverySliceIsACodeOfTheCatalogue() throws IOException {
+        Set<String> catalogue = new TreeSet<>(idsIn("permissions.yaml", PERMISSION_CODE));
+        Resource[] slices = new PathMatchingResourcePatternResolver().getResources("classpath*:openapi/*.yaml");
+        assertThat(slices).as("the OpenAPI slices on the classpath").hasSizeGreaterThan(5);
+
+        Set<String> missing = new TreeSet<>();
+        for (Resource slice : slices) {
+            String text = slice.getContentAsString(StandardCharsets.UTF_8);
+            for (String each : text.split("\\R")) {
+                Matcher matcher = SLICE_PERMISSION.matcher(each);
+                if (matcher.matches()) {
+                    String code = matcher.group(1).replace("\"", "").replace("'", "");
+                    if (!catalogue.contains(code) && !SLICE_CODES_OUTSIDE_THE_CATALOGUE.contains(code)) {
+                        missing.add(slice.getFilename() + ": " + code);
+                    }
+                }
+            }
+        }
+        assertThat(missing)
+                .as("x-permission codes that no role can hold (add them to seed/m1party/permissions.yaml)")
+                .isEmpty();
     }
 
     @Test

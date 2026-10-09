@@ -47,7 +47,17 @@ class OutboxWriterForbiddenFieldsTest {
                 "birthDate",
                 "pinCode",
                 "tokenId",
-                "customer_name"
+                "customer_name",
+                // An acronym before a word, and joined forms of the short words (review wave 3, KRN-21).
+                "NICNumber",
+                "customerNICNumber",
+                "PINHash",
+                "OTPCode",
+                "nicno",
+                "pincode",
+                "customername",
+                "otpvalue",
+                "dobdate"
             })
     void aFieldThatNamesPersonalOrSecretDataIsRefused(String field) {
         assertThat(OutboxWriter.isForbiddenField(field)).as(field).isTrue();
@@ -79,7 +89,12 @@ class OutboxWriterForbiddenFieldsTest {
                 "nameEn",
                 "nameSi",
                 "nameTa",
-                "name_en"
+                "name_en",
+                "SKUCode",
+                "VATAmount",
+                "technician",
+                "shippingFee",
+                "GRNNumber"
             })
     void anIdentifierThatMerelyContainsAForbiddenWordIsNotRefused(String field) {
         assertThat(OutboxWriter.isForbiddenField(field)).as(field).isFalse();

@@ -5,6 +5,7 @@ import static lk.coopfed.knoweb.m4trading.TradingFixture.DHAL;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SHOP;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.STRANGER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.seller;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,9 +14,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m4trading.TradingFixture;
 import lk.coopfed.knoweb.m4trading.TradingFlow;
 import lk.coopfed.knoweb.m4trading.api.CaptureGrn;
@@ -235,6 +240,60 @@ class InvoiceHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(event.invoiceId()).isEqualTo(invoiceId);
             assertThat(event.objectKey()).isEqualTo(key);
         });
+    }
+
+    /**
+     * Wave 3, M4-09: the buyer's PARTY session reads an invoice IssueInvoice issued (type INV)
+     * through the masking views with all its lines, as its own session reads it; a third entity's
+     * PARTY session reads nothing; and the views carry neither the document's notes nor a line's
+     * cost. The earlier test inserted a document typed 'INVOICE' with the foreign keys off, so it
+     * passed against a view that matched no real invoice.
+     */
+    @Test
+    void theBuyersPartySessionReadsTheIssuedInvoiceWithItsLines() {
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        UUID invoiceId = issue.handle(new IssueInvoice(List.of(grnId)), seller());
+
+        InvoiceView own = invoices.getInvoice(invoiceId, buyer()).orElseThrow();
+        InvoiceView party = invoices.getInvoice(invoiceId, party(buyer())).orElseThrow();
+
+        assertThat(party.docNumberDisplay()).isEqualTo(own.docNumberDisplay());
+        assertThat(party.grossAmount()).isEqualByComparingTo("1452.80");
+        assertThat(party.lines()).hasSize(2);
+        assertThat(party.lines())
+                .extracting(l -> l.skuId() + " " + l.qty().stripTrailingZeros().toPlainString() + " "
+                        + l.lineTotal().toPlainString())
+                .containsExactlyInAnyOrderElementsOf(own.lines().stream()
+                        .map(l -> l.skuId() + " " + l.qty().stripTrailingZeros().toPlainString() + " "
+                                + l.lineTotal().toPlainString())
+                        .toList());
+        assertThat(invoices.getInvoice(invoiceId, party(ScopeContext.dev(UUID.randomUUID(), STRANGER, null))))
+                .isEmpty();
+
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select table_name || '.' || column_name from information_schema.columns"
+                                        + " where table_schema = 'trading'"
+                                        + " and table_name in ('v_invoice_party', 'v_invoice_line_party')"
+                                        + " and column_name in ('notes', 'unit_cost_at_issue')",
+                                String.class))
+                .as("the masking views carry no notes and no cost")
+                .isEmpty();
+    }
+
+    /** The same caller, its session classed PARTY (a counterparty's API client, doc 19). */
+    private static ScopeContext party(ScopeContext own) {
+        return new ScopeContext(
+                own.userId(),
+                null,
+                own.homeEntityId(),
+                own.scopes(),
+                own.activeScope(),
+                PolicyClass.PARTY,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                null);
     }
 
     private static CaptureGrn.Line line(UUID sku, String received) {

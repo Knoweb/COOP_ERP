@@ -41,8 +41,10 @@ done
 require_clone
 [ "$DIRTY_OK" -eq 1 ] || require_clean_clone
 [ -f "$APP_DIR/.env" ] || fail "$APP_DIR/.env is missing: run bootstrap.sh first"
-# A key added after this server was bootstrapped (wave 2: the notification recipient hash key).
+# Keys added after this server was bootstrapped (wave 2: the notification recipient hash key;
+# wave 3: the NIC pepper, without which the backend refuses to start on a public issuer).
 env_ensure_key COOP_ERP_NOTIFICATION_RECIPIENT_KEY
+env_ensure_key COOP_ERP_CUSTOMERS_NIC_PEPPER
 ensure_env_additions
 
 pin_image_tag "$PULL"

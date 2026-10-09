@@ -153,7 +153,9 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 20)
                 .containsEntry("m2catalogue", 8)
                 .containsEntry("m3pricing", 6)
-                .containsEntry("m5inventory", 8);
+                .containsEntry("m5inventory", 8)
+                // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
+                .containsEntry("m7customers", 5);
 
         // What the new numbers leave in place, read from the catalogue.
         List<String> functions = admin.queryForList(
@@ -213,7 +215,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .contains("party.caller_trades_with(p_entity)");
 
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
-        assertThat(after).containsEntry("m4trading", 12);
+        // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
+        assertThat(after).containsEntry("m4trading", 13);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",

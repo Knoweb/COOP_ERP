@@ -118,6 +118,15 @@ class ObjectStoragePostgresIntegrationTest extends PostgresIntegrationTest {
         refused(
                 () -> inScope(OWNER, () -> storage.presignPut(key, "image/jpeg", null, null, own(OWNER))),
                 "object.content_type_mismatch");
+        // Once the window has ended a verification may be hashing the bytes: no new URL.
+        windowOver(key);
+        refused(() -> inScope(OWNER, () -> presign(key)), "object.upload_expired");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select upload_expires_at < now() from kernel.object_upload where object_key = ?",
+                                Boolean.class,
+                                key))
+                .isTrue();
 
         // The register's limits, as for a document's attachment.
         String other = ObjectStorage.keyOf(ObjectStoragePostgresIntegrationTest.class, OWNER, Ids.next());

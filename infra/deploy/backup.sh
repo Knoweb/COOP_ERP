@@ -26,7 +26,9 @@
 # Not backed up: the bucket audit-anchors (demo anchors can be made again; before real data it
 # must go to an object-locked bucket off the server, it is evidence), the mail catcher, and .env
 # itself: without its passwords and its till signing key a dump restores into a server the tills
-# and users no longer match. Keep a copy of .env apart from the server, once. The dumps are not
+# and users no longer match, and without its NIC pepper (COOP_ERP_CUSTOMERS_NIC_PEPPER) no
+# captured NIC matches again until each member presents the card. Keep a copy of .env apart from
+# the server, once, and again whenever deploy.sh reports a key it generated. The dumps are not
 # encrypted: demo data only (before real data: age, with the private key kept off the server).
 #
 # Every night at 02:00, for example:  echo '0 2 * * * root /opt/coop-erp/backup.sh' > /etc/cron.d/coop-erp-backup
@@ -100,8 +102,10 @@ if [ -n "$BUCKET" ]; then
     echo "AWS_SECRET_ACCESS_KEY=$(env_get BACKUP_S3_SECRET_KEY)"
     echo "AWS_DEFAULT_REGION=us-east-1"
   } > "$ENV_FILE"
+  # Pinned by digest (WCD-14): it is handed the bucket's keys. Bump tag and digest together.
   aws() {
-    docker run --rm --env-file "$ENV_FILE" -v "$B:/backups:ro" amazon/aws-cli:2.27.0 \
+    docker run --rm --env-file "$ENV_FILE" -v "$B:/backups:ro" \
+      amazon/aws-cli:2.27.0@sha256:e3e329e1d2894b7b4bbb0aacacd0a155262159b2e7a3b4275eb1f24046d3e06c \
       --endpoint-url "$(env_get BACKUP_S3_ENDPOINT)" --only-show-errors "$@"
   }
   for f in "${FILES[@]}"; do

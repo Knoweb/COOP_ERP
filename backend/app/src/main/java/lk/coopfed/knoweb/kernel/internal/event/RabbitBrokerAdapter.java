@@ -106,6 +106,18 @@ public class RabbitBrokerAdapter implements BrokerAdapter {
                         "RabbitMQ rejected event " + message.eventId() + ": " + confirm.getReason());
             }
 
+            // The broker confirms an unroutable message too, after handing it back (mandatory):
+            // no queue was bound for it yet (the consumers' bindings are declared after the relay
+            // starts) or the consumer's queue is gone. It was delivered nowhere, so it is a
+            // failure and the relay's batch rolls back to be sent again (review wave 3, KRN-23).
+            // Spring AMQP sets the returned message before it completes the confirm.
+            if (correlation.getReturned() != null) {
+
+                throw new IllegalStateException("RabbitMQ could not route event " + message.eventId() + " to "
+                        + (exchange.isEmpty() ? "queue " : "exchange " + exchange + " with key ") + routingKey
+                        + ": " + correlation.getReturned().getReplyText());
+            }
+
         } catch (InterruptedException e) {
 
             Thread.currentThread().interrupt();
