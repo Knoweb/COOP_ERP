@@ -128,6 +128,25 @@ object Facts {
         })
     }
 
+    /** The audit type a till records when a supervisor moves its business date back (kernel seed audit-event-types.yaml, offline_capturable). */
+    const val BUSINESS_DATE_CORRECTED_AUDIT = "TILL_BUSINESS_DATE_CORRECTED"
+    const val BUSINESS_DATE_CORRECTED_EVENT = "audit.till_business_date_corrected.v1"
+
+    /**
+     * The till's audit row for a business date moved back (decision D-4; TILLM6-05): the till
+     * position, the date before and after. Who moved it is the envelope's actor (the supervisor);
+     * no PIN is carried.
+     */
+    fun businessDateCorrected(device: DeviceIdentity, from: LocalDate, to: LocalDate): JsonObject = buildJsonObject {
+        put("event_type_code", BUSINESS_DATE_CORRECTED_AUDIT)
+        put("subject_table", "till_position")
+        put("subject_id", device.tillPositionId)
+        put("till_position_id", device.tillPositionId)
+        put("reason_code", "BUSINESS_DATE_BACK")
+        put("before_state", buildJsonObject { put("business_date", from.toString()) })
+        put("after_state", buildJsonObject { put("business_date", to.toString()) })
+    }
+
     /** The TillEvent envelope (sync.yaml TillEvent) around a payload. */
     fun event(
         eventId: String,
