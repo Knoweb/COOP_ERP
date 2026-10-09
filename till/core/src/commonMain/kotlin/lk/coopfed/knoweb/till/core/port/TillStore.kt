@@ -78,9 +78,16 @@ object Settings {
     const val LAST_SNAPSHOT_AT = "last_snapshot_at"
     /** The till's clock (epoch ms) at enrolment: a revoke issued before it is an old one. */
     const val ENROLLED_AT = "enrolled_at"
-    /** Wrong PINs in a row at this till, and the lock-out's end (epoch ms), 26A section 8 (TWK-03). */
-    const val PIN_FAILURES = "pin_failures"
+    /**
+     * The lock-out's end by the till's clock (epoch ms), 26A section 8 (TWK-03), and the time it has
+     * still to run (ms), counted down on the monotonic clock so that moving the PC's clock forward
+     * does not end it (TILLM6-07).
+     */
     const val PIN_LOCKED_UNTIL = "pin_locked_until"
+    const val PIN_LOCK_REMAINING_MS = "pin_lock_remaining_ms"
+
+    /** Wrong PINs in a row for one operator (TILLM6-02): only that operator's correct PIN clears them. */
+    fun pinFailures(userId: String): String = "pin_failures:$userId"
     /** "true" once a snapshot has carried an operator: the trial cashier is never offered again (TWK-04). */
     const val OPERATORS_SEEN = "operators_seen"
     const val TRIAL_OPERATOR_ID = "trial_operator_id"

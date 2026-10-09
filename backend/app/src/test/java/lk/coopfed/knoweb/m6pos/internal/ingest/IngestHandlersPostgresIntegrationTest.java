@@ -172,6 +172,44 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aRunawayCounterMovesTheSeriesByTheLimitOnceAndNotWithEveryReceipt() {
+        UUID session = openSession();
+        receipts.handle(receipt(Ids.next(), session, OWN_SERIES, 5, MORNING.plusSeconds(60), "100.00"), device());
+        receipts.handle(
+                receipt(Ids.next(), session, OWN_SERIES, 900_000_000_000L, MORNING.plusSeconds(120), "100.00"),
+                device());
+        assertThat(nextNumberOf(OWN_SERIES)).isEqualTo(10_006L);
+        kernel.reset();
+
+        // The till's counter stays wild (TILLM6-08): each receipt is flagged, the series stays.
+        UUID again = receipts.handle(
+                receipt(Ids.next(), session, OWN_SERIES, 900_000_000_001L, MORNING.plusSeconds(180), "100.00"),
+                device());
+        UUID andAgain = receipts.handle(
+                receipt(Ids.next(), session, OWN_SERIES, 900_000_000_002L, MORNING.plusSeconds(240), "100.00"),
+                device());
+
+        assertThat(flagsOf(again)).containsExactly("NUMBER_JUMP");
+        assertThat(flagsOf(andAgain)).containsExactly("NUMBER_JUMP");
+        assertThat(nextNumberOf(OWN_SERIES)).as("not moved again").isEqualTo(10_006L);
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly(
+                        "RECEIPT_RECORDED",
+                        "RECEIPT_FLAGGED",
+                        "RECEIPT_NUMBER_JUMPED",
+                        "RECEIPT_RECORDED",
+                        "RECEIPT_FLAGGED",
+                        "RECEIPT_NUMBER_JUMPED");
+
+        // A number in reach of the series still moves it as before.
+        UUID inReach = receipts.handle(
+                receipt(Ids.next(), session, OWN_SERIES, 10_006L, MORNING.plusSeconds(300), "100.00"), device());
+        assertThat(flagsOf(inReach)).isEmpty();
+        assertThat(nextNumberOf(OWN_SERIES)).isEqualTo(10_007L);
+    }
+
+    @Test
     void aReplayWithOtherContentKeepsTheFirstAndRaisesAnAlert() {
         UUID session = openSession();
         UUID id = Ids.next();

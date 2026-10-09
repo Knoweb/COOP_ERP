@@ -593,6 +593,32 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
+        void theSeededEntityAdministratorAssignsTheThreeTillTemplatesAtAShop() {
+            // TILLM6-03: the seeded templates of role-templates.yaml, as a real society holds them.
+            UUID entityAdministrator = UUID.fromString("01921319-bf93-78c6-a67b-117865c69784");
+            UUID cashier = UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a11");
+            UUID shopSupervisor = UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a12");
+            UUID shopInCharge = UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a13");
+            UUID societyAdmin = fx.user(mpcs);
+            fx.assign(societyAdmin, entityAdministrator, mpcs, null);
+            ScopeContext asSocietyAdmin = ScopeContext.dev(societyAdmin, mpcs, null);
+
+            assignRole.handle(new AssignRole(clerk, shopSupervisor, shop), asSocietyAdmin);
+            assignRole.handle(new AssignRole(clerk, cashier, secondShop), asSocietyAdmin);
+            UUID manager = fx.user(mpcs);
+            assignRole.handle(new AssignRole(manager, shopInCharge, shop), asSocietyAdmin);
+
+            assertThat(kernel.committedEvents())
+                    .containsExactly(
+                            new RoleAssigned(shopSupervisor, clerk, mpcs, shop),
+                            new RoleAssigned(cashier, clerk, mpcs, secondShop),
+                            new RoleAssigned(shopInCharge, manager, mpcs, shop));
+            assertThat(kernel.committedAudit())
+                    .extracting(record -> record.eventType())
+                    .containsExactly("ROLE_ASSIGNED", "ROLE_ASSIGNED", "ROLE_ASSIGNED");
+        }
+
+        @Test
         void anotherEntitysRoleIsNotFound() {
             UUID theirs = fx.role(otherMpcs, "prt.location.view");
             refused(() -> assignRole.handle(new AssignRole(clerk, theirs, null), asAdmin()), "m1.role.not_found");

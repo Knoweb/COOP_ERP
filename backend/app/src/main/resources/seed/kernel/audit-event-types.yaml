@@ -134,3 +134,9 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: true
     description_en: Wrong PINs in a row locked a till's sign-in for a while
+  # wave 3, fix-till-small-review-findings (TILLM6-05): a supervisor's move of a till's business
+  # date back is recorded offline as an audit.* fact, like the PIN lock-out (decision D-4).
+  - code: TILL_BUSINESS_DATE_CORRECTED
+    severity: REVIEW
+    offline_capturable: true
+    description_en: A supervisor moved a till's business date back while no session was open

@@ -116,6 +116,55 @@ class TrustAndDurabilityTest {
     }
 
     @Test
+    fun signingInAsOneselfBetweenGuessesDoesNotResetTheCountAgainstAnotherOperator() = runTest {
+        val till = twoOperators()
+        repeat(4) { assertFailsWith<TillRefusal> { till.service.signIn(till.kamal(), "0000") } }
+        // The cashier signs in with her own PIN and out again (TILLM6-02).
+        till.service.signIn(till.nimali(), "1234")
+        till.service.signOut()
+
+        val fifth = assertFailsWith<TillRefusal> { till.service.signIn(till.kamal(), "0001") }
+
+        assertTrue(fifth.message!!.startsWith("Too many wrong PINs"))
+        assertTrue(till.store.pendingOutbox(10).any { it.eventType == Facts.PIN_LOCKOUT_EVENT })
+        val locked = assertFailsWith<TillRefusal> { till.service.signIn(till.nimali(), "1234") }
+        assertTrue(locked.message!!.startsWith("Too many wrong PINs"), "the lock-out holds the whole till")
+    }
+
+    @Test
+    fun aCorrectPinClearsOnlyTheCountOfTheOperatorWhoSignedIn() = runTest {
+        val till = twoOperators()
+        repeat(4) { assertFailsWith<TillRefusal> { till.service.signIn(till.kamal(), "0000") } }
+        till.service.signIn(till.kamal(), "9999")
+        till.service.signOut()
+
+        repeat(4) { assertEquals("Wrong PIN", assertFailsWith<TillRefusal> { till.service.signIn(till.kamal(), "0000") }.message) }
+
+        assertNull(till.store.setting(Settings.PIN_LOCKED_UNTIL))
+        assertTrue(till.store.pendingOutbox(10).none { it.eventType == Facts.PIN_LOCKOUT_EVENT })
+    }
+
+    @Test
+    fun movingThePcClockForwardDoesNotEndTheLockOut() = runTest {
+        val till = TillFixture().enrolled()
+        val nimali = till.service.catalogue.operators.single()
+        repeat(5) { assertFailsWith<TillRefusal> { till.service.signIn(nimali, "0000") } }
+
+        // The PC's clock is set 16 minutes ahead; no real time passed (TILLM6-07).
+        till.clock.setWallClock(till.clock.instant + 16.minutes)
+        assertTrue(assertFailsWith<TillRefusal> { till.service.signIn(nimali, "1234") }.message!!.startsWith("Too many wrong PINs"))
+        till.restart()
+        assertTrue(assertFailsWith<TillRefusal> { till.service.signIn(nimali, "1234") }.message!!.startsWith("Too many wrong PINs"))
+
+        till.clock.advance(10.minutes)
+        assertTrue(assertFailsWith<TillRefusal> { till.service.signIn(nimali, "1234") }.message!!.startsWith("Too many wrong PINs"))
+        till.clock.advance(6.minutes)
+        till.service.signIn(nimali, "1234")
+        assertEquals("Nimali", till.service.operator?.displayName)
+        assertNull(till.store.setting(Settings.PIN_LOCK_REMAINING_MS))
+    }
+
+    @Test
     fun aPinRecordTheTillCannotReadSaysAskTheOfficeAndDoesNotCount() = runTest {
         val till = TillFixture(operators = listOf(Samples.operator("\$argon2id\$garbled"))).enrolled()
         val nimali = till.service.catalogue.operators.single()
@@ -276,6 +325,20 @@ class TrustAndDurabilityTest {
         }
         assertEquals("Wrong PIN", assertFailsWith<TillRefusal> { till.service.correctBusinessDate(LocalDate(2026, 9, 29), till.kamal(), "0000") }.message)
         till.service.correctBusinessDate(LocalDate(2026, 9, 29), till.kamal(), "9999")
+
+        // Central learns who moved it, from what to what (TILLM6-05).
+        val audit = till.store.pendingOutbox(50).single { it.eventType == Facts.BUSINESS_DATE_CORRECTED_EVENT }
+        val event = Json.parseToJsonElement(audit.json).jsonObject
+        assertEquals(till.kamal().userId, event.getValue("actor_user_id").jsonPrimitive.content)
+        val payload = event.getValue("payload").jsonObject
+        assertEquals("TILL_BUSINESS_DATE_CORRECTED", payload.getValue("event_type_code").jsonPrimitive.content)
+        assertEquals("2027-09-29", payload.getValue("before_state").jsonObject.getValue("business_date").jsonPrimitive.content)
+        assertEquals("2026-09-29", payload.getValue("after_state").jsonObject.getValue("business_date").jsonPrimitive.content)
+        assertEquals(
+            setOf("event_type_code", "subject_table", "subject_id", "till_position_id", "reason_code", "before_state", "after_state"),
+            payload.keys,
+            "no PIN",
+        )
 
         val next = till.service.openSession(Money.parse("0"))
         assertEquals(LocalDate(2026, 9, 29), next.businessDate)
