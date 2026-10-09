@@ -36,6 +36,7 @@ import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.ActivateRelationship;
 import lk.coopfed.knoweb.m1party.api.AmendRelationshipTerms;
+import lk.coopfed.knoweb.m1party.api.AnnounceCreditLimit;
 import lk.coopfed.knoweb.m1party.api.CreditLimitChanged;
 import lk.coopfed.knoweb.m1party.api.OpenTradingRelationship;
 import lk.coopfed.knoweb.m1party.api.RelationshipActivated;
@@ -550,6 +551,99 @@ class RelationshipScenariosIntegrationTest extends PostgresIntegrationTest {
         assertThat(backfill.announceOpeningLimits(job())).isZero();
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    // ---- wave 3, M1M2M3M5-29: AnnounceCreditLimit's own guards --------------------------------
+
+    @Autowired
+    private Handles<AnnounceCreditLimit, UUID> announce;
+
+    /** An ACTIVE row as an earlier release left it, written directly; limit null for none. */
+    private UUID legacyActive(UUID buyer, String limit) {
+        UUID id = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                        insert into party.entity_relationship (relationship_id, seller_entity_id,
+                            buyer_entity_id, price_list_id, credit_limit, payment_terms_days, status, effective_from)
+                        values (?, ?, ?, ?, cast(? as numeric), 30, 'ACTIVE', ?)
+                        """,
+                        id,
+                        DISTRIBUTOR,
+                        buyer,
+                        PRICE_LIST,
+                        limit,
+                        APRIL);
+        return id;
+    }
+
+    @Test
+    void aRelationshipWithoutALimitHasNothingToAnnounce() {
+        UUID id = legacyActive(SOCIETY, null);
+        kernel.reset();
+
+        assertThatThrownBy(() -> announce.handle(new AnnounceCreditLimit(id), own(DISTRIBUTOR)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
+                        .isEqualTo("m1.relationship.credit_limit_none"));
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject("select count(*) from security.credit_limit_announcement", Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void aPairIsAnnouncedOnlyOnce() {
+        UUID id = legacyActive(SOCIETY, "2500000.00");
+        announce.handle(new AnnounceCreditLimit(id), own(DISTRIBUTOR));
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOf(CreditLimitChanged.class);
+        kernel.reset();
+
+        assertThatThrownBy(() -> announce.handle(new AnnounceCreditLimit(id), own(DISTRIBUTOR)))
+                .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
+                        .isEqualTo("m1.relationship.credit_limit_announced"));
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    // ---- wave 3, M1M2M3M5-04: a successor row announces the change from its predecessor's limit --
+
+    @Test
+    void aSuccessorWithoutALimitTellsReportingThatThePredecessorsLimitIsGone() {
+        UUID predecessor = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                        insert into party.entity_relationship (relationship_id, seller_entity_id,
+                            buyer_entity_id, price_list_id, credit_limit, payment_terms_days, status,
+                            effective_from, effective_to)
+                        values (?, ?, ?, ?, 1000000.00, 30, 'ACTIVE', ?, ?)
+                        """,
+                        predecessor,
+                        DISTRIBUTOR,
+                        SOCIETY,
+                        PRICE_LIST,
+                        LocalDate.of(2026, 1, 1),
+                        APRIL.minusDays(1));
+        UUID successor = open.handle(
+                new OpenTradingRelationship(SOCIETY, PRICE_LIST, null, 30, null, null, null, APRIL, null),
+                own(DISTRIBUTOR));
+        kernel.reset();
+
+        activate.handle(new ActivateRelationship(successor), own(DISTRIBUTOR));
+
+        assertThat(kernel.committedAudit())
+                .extracting(a -> a.eventType())
+                .containsExactly("RELATIONSHIP_ACTIVATED", "CREDIT_LIMIT_CHANGED");
+        assertThat(kernel.committedEvents())
+                .filteredOn(CreditLimitChanged.class::isInstance)
+                .singleElement()
+                .isInstanceOfSatisfying(CreditLimitChanged.class, e -> {
+                    assertThat(e.relationshipId()).isEqualTo(successor);
+                    assertThat(e.previousRelationshipId()).isEqualTo(predecessor);
+                    assertThat(e.previousCreditLimit()).isEqualByComparingTo("1000000.00");
+                    assertThat(e.creditLimit()).isNull();
+                });
     }
 
     /** A run of the job outside the scheduler: the two scopes are the interface's own defaults. */

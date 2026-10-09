@@ -10,6 +10,7 @@ import lk.coopfed.knoweb.m2catalogue.api.ImageUpload;
 import lk.coopfed.knoweb.m2catalogue.api.RetireImage;
 import lk.coopfed.knoweb.m2catalogue.internal.image.AttachImageHandler;
 import lk.coopfed.knoweb.m2catalogue.internal.image.RetireImageHandler;
+import lk.coopfed.knoweb.m2catalogue.internal.image.Thumbnailer;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.ImageView;
 import lk.coopfed.knoweb.m2catalogue.web.generated.AttachImageRequest;
@@ -82,8 +83,10 @@ class ImageController implements ImageApi {
                     if (("ACTIVE".equals(view.status()) || "RETIRED".equals(view.status()))
                             && view.objectKeyFull() != null) {
                         try {
-                            r.setImageUrl(storage.presignGet(view.objectKeyFull(), "image/jpeg", currentScope.get())
-                                    .toString());
+                            // The type it was uploaded as, a PNG as image/png (wave 3, M1M2M3M5-14).
+                            r.setImageUrl(
+                                    storage.presignGet(view.objectKeyFull(), view.contentType(), currentScope.get())
+                                            .toString());
                         } catch (lk.coopfed.knoweb.kernel.api.ProblemException e) {
                             // Ignore if the kernel attachment is missing, unverified, or out of scope
                         }
@@ -91,7 +94,9 @@ class ImageController implements ImageApi {
                     if (("ACTIVE".equals(view.status()) || "RETIRED".equals(view.status()))
                             && view.objectKeyThumb() != null) {
                         try {
-                            r.setThumbUrl(storage.presignGet(view.objectKeyThumb(), "image/webp", currentScope.get())
+                            // The thumbnail job writes JPEG (Thumbnailer), never WebP.
+                            r.setThumbUrl(storage.presignGet(
+                                            view.objectKeyThumb(), Thumbnailer.CONTENT_TYPE, currentScope.get())
                                     .toString());
                         } catch (lk.coopfed.knoweb.kernel.api.ProblemException e) {
                             // Ignore if the kernel attachment is missing, unverified, or out of scope

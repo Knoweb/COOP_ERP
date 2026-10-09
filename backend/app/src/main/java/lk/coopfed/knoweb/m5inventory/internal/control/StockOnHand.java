@@ -70,6 +70,27 @@ public class StockOnHand {
         return held;
     }
 
+    /**
+     * What open pick lists hold of the lot for delivery notes not yet dispatched (wave 3,
+     * M1M2M3M5-20): not free for a write-off, a transfer or a repack, or the dispatch would take
+     * the lot below zero. Read after {@link #lockLots}, under the same lock.
+     */
+    public BigDecimal reserved(UUID locationId, LotRef lot) {
+        BigDecimal held = jdbc.queryForObject(
+                """
+                select coalesce(sum(p.qty), 0)
+                  from inventory.pick_list_line p
+                  join inventory.pick_list pl on pl.pick_list_id = p.pick_list_id
+                  join inventory.stock_lot l on l.stock_lot_id = p.stock_lot_id
+                 where pl.status = 'OPEN' and l.location_id = ? and l.batch_id = ? and l.condition = ?
+                """,
+                BigDecimal.class,
+                locationId,
+                lot.batchId(),
+                lot.condition());
+        return held == null ? BigDecimal.ZERO : held;
+    }
+
     /** The value of one unit of the lot: the entity average, else the lot's cost, else zero. */
     public BigDecimal unitValue(UUID skuId, UUID locationId, UUID batchId, String condition, ScopeContext scope) {
         BigDecimal average = inventory

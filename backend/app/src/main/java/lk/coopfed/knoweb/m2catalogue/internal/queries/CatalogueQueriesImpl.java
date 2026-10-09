@@ -176,7 +176,7 @@ class CatalogueQueriesImpl implements CatalogueQueries {
         }
         return jdbc.query(
                 """
-                select image_id, barcode, status, object_key_full, object_key_thumb
+                select image_id, barcode, status, object_key_full, object_key_thumb, content_type
                 from catalogue.sku_image
                 where sku_id = ?
                 order by created_at desc
@@ -186,7 +186,8 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                         rs.getString("barcode"),
                         rs.getString("status"),
                         rs.getString("object_key_full"),
-                        rs.getString("object_key_thumb")),
+                        rs.getString("object_key_thumb"),
+                        rs.getString("content_type")),
                 skuId);
     }
 
