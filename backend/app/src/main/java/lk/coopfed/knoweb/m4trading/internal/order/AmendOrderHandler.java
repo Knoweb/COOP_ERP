@@ -59,7 +59,9 @@ import org.springframework.transaction.annotation.Transactional;
  * order.submitted.v1 of the new one.
  */
 @Service
-@CommandHandler(permission = "ord.order.amend")
+// Doc 24 section 3.1 (the AmendOrder row) and the catalogue ("Submit, amend and cancel the
+// entity's own orders"): amending is covered by ord.order.submit (wave 3, M4-01).
+@CommandHandler(permission = "ord.order.submit")
 public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
 
     static final String AUDIT_AMENDED = "ORDER_AMENDED";
@@ -189,9 +191,12 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
             docNumber = issued.docNumberDisplay();
         }
 
-        // the amended order: closed, as CancelOrder closes it.
+        // the amended order: closed, as CancelOrder closes it. The code stays ORDER_AMENDED, so a
+        // reader can tell an amendment from a cancellation; the buyer's words are the reason text
+        // (wave 3, M4-02).
         documents.addStateTransition(
-                clock.transition(amendedId, status, OrderStatus.CANCELLED, scope.userId(), reason, null), scope);
+                clock.transition(amendedId, status, OrderStatus.CANCELLED, scope.userId(), AMENDED_REASON, reason),
+                scope);
         jdbc.update("update trading.doc_order_line set cancelled_qty = requested_qty where document_id = ?", amendedId);
 
         List<OrderLineSummary> lines = new ArrayList<>(priced.summary());
@@ -222,8 +227,8 @@ public class AmendOrderHandler implements Handles<AmendOrder, UUID> {
                 status,
                 reason,
                 List.copyOf(lines)));
-        events.publish(
-                new OrderCancelled(amendedId, (UUID) order.get("relationship_id"), buyer, seller, buyer, reason));
+        events.publish(new OrderCancelled(
+                amendedId, (UUID) order.get("relationship_id"), buyer, seller, buyer, AMENDED_REASON));
         if (docNumber != null) {
             events.publish(new OrderSubmitted(
                     orderId,

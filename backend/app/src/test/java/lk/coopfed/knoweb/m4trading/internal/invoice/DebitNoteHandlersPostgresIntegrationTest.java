@@ -1,6 +1,8 @@
 package lk.coopfed.knoweb.m4trading.internal.invoice;
 
+import static lk.coopfed.knoweb.m4trading.TradingFixture.BUYER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
+import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SHOP;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.seller;
@@ -11,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
+import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.m4trading.TradingFixture;
 import lk.coopfed.knoweb.m4trading.TradingFlow;
@@ -174,5 +177,108 @@ class DebitNoteHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(kernel.committedAudit()).isEmpty();
         assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    /**
+     * Wave 3, M4-11 and M4-07: one refusal per guard of IssueDebitNote, nothing committed. The
+     * repeated line and the quantity of more than three decimals are the credit note's guards of
+     * wave 2 (M4MONEY-02, -04), carried over: 0.0004 of rice at 120.00 would debit 0.05 for a
+     * stored quantity of 0.000.
+     */
+    @Test
+    void everyGuardOfIssueDebitNoteRefusesAndNothingIsCommitted() {
+        UUID invoiceId = issuedInvoice();
+        UUID rice = riceLineOf(invoiceId);
+        UUID draftInvoice = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into kernel.document (document_id, doc_type_code, owner_entity_id,"
+                                + " counterparty_entity_id, status) values (?, 'INV', ?, ?, 'DRAFT')",
+                        draftInvoice,
+                        SELLER,
+                        BUYER);
+        kernel.reset();
+
+        refused(() -> issueDebitNote.handle(debit(invoiceId, rice, "2", " "), seller()), "request.field.required");
+        refused(
+                () -> issueDebitNote.handle(debit(Ids.next(), rice, "2", "Price correction"), seller()),
+                "m4.invoice.not_found");
+        refused(
+                () -> issueDebitNote.handle(debit(invoiceId, rice, "2", "Price correction"), buyer()),
+                "m4.debitnote.not_seller");
+        refused(
+                () -> issueDebitNote.handle(debit(draftInvoice, rice, "2", "Price correction"), seller()),
+                "m4.invoice.not_issued");
+        refused(
+                () -> issueDebitNote.handle(new IssueDebitNote(invoiceId, List.of(), "Price correction"), seller()),
+                "m4.debitnote.nothing_to_debit");
+        refused(
+                () -> issueDebitNote.handle(debit(invoiceId, Ids.next(), "2", "Price correction"), seller()),
+                "m4.debitnote.line_unknown");
+        refused(
+                () -> issueDebitNote.handle(
+                        new IssueDebitNote(
+                                invoiceId,
+                                List.of(
+                                        new IssueDebitNote.Line(rice, new BigDecimal("1")),
+                                        new IssueDebitNote.Line(rice, new BigDecimal("1"))),
+                                "Price correction"),
+                        seller()),
+                "m4.debitnote.line_duplicate");
+        for (String qty : List.of("0", "-1", "0.0004")) {
+            refused(
+                    () -> issueDebitNote.handle(debit(invoiceId, rice, qty, "Price correction"), seller()),
+                    "m4.debitnote.qty_invalid");
+        }
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        // Three decimals are what a line keeps, and are accepted.
+        issueDebitNote.handle(debit(invoiceId, rice, "0.125", "Price correction"), seller());
+        assertThat(kernel.committedEvents())
+                .filteredOn(e -> e instanceof DebitNoteIssued)
+                .hasSize(1);
+    }
+
+    private UUID issuedInvoice() {
+        OrderView order = flow.acceptedOrder();
+        UUID noteId = flow.draftNote(order, SHOP);
+        issueNote.handle(new lk.coopfed.knoweb.m4trading.api.IssueDeliveryNote(noteId), seller());
+        dispatchNote.handle(
+                new lk.coopfed.knoweb.m4trading.api.DispatchDeliveryNote(noteId, null, null, null), seller());
+        UUID dropId = deliveries
+                .getDeliveryNote(noteId, buyer())
+                .orElseThrow()
+                .drops()
+                .get(0)
+                .dropId();
+        UUID grnId = capture.handle(
+                new CaptureGrn(
+                        dropId,
+                        SHOP,
+                        null,
+                        List.of(new CaptureGrn.Line(
+                                RICE, "EA", new BigDecimal("10"), BigDecimal.ZERO, null, null, null, null))),
+                buyer());
+        confirm.handle(new ConfirmGrn(grnId), buyer());
+        return issueInvoice.handle(new IssueInvoice(List.of(grnId)), seller());
+    }
+
+    private UUID riceLineOf(UUID invoiceId) {
+        return invoices.getInvoice(invoiceId, seller()).orElseThrow().lines().stream()
+                .filter(l -> l.skuId().equals(RICE))
+                .findFirst()
+                .orElseThrow()
+                .lineId();
+    }
+
+    private static IssueDebitNote debit(UUID invoiceId, UUID lineId, String qty, String reason) {
+        return new IssueDebitNote(invoiceId, List.of(new IssueDebitNote.Line(lineId, new BigDecimal(qty))), reason);
+    }
+
+    private static void refused(ThrowingCallable call, String messageId) {
+        assertThatThrownBy(call).isInstanceOf(ProblemException.class).satisfies(error -> assertThat(
+                        ((ProblemException) error).messageId())
+                .isEqualTo(messageId));
     }
 }

@@ -213,7 +213,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .contains("party.caller_trades_with(p_entity)");
 
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
-        assertThat(after).containsEntry("m4trading", 12);
+        // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
+        assertThat(after).containsEntry("m4trading", 13);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
