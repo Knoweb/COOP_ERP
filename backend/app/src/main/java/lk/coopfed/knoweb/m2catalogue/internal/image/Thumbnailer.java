@@ -33,9 +33,10 @@ import javax.imageio.stream.ImageOutputStream;
  * than {@code maxPixels} is refused there: a small file can declare a huge image (a
  * decompression bomb), and decoding it would take the job's memory.
  */
-final class Thumbnailer {
+public final class Thumbnailer {
 
-    static final String CONTENT_TYPE = "image/jpeg";
+    /** What a thumbnail is written as, and so the type its presigned GET declares (wave 3, M1M2M3M5-14). */
+    public static final String CONTENT_TYPE = "image/jpeg";
 
     /** The JPEG qualities tried in turn, best first (an encoder setting, not a business limit). */
     private static final float[] QUALITIES = {0.85f, 0.75f, 0.65f, 0.55f, 0.45f};
