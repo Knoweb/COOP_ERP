@@ -22,6 +22,7 @@
 * `l.c.k.k.api.DocumentTypes` (in Platform Kernel)
 * `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 * `l.c.k.k.api.ConfigSeeder` (in Platform Kernel)
+* `l.c.k.k.api.ChangeLog` (in Platform Kernel)
 * `l.c.k.k.api.IdentityProviderClient` (in Platform Kernel)
 * `l.c.k.k.api.PinHasher` (in Platform Kernel)
 * `l.c.k.k.api.Notifications` (in Platform Kernel)
