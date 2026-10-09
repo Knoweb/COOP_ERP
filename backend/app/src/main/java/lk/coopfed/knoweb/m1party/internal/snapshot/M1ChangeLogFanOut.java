@@ -48,8 +48,11 @@ class M1ChangeLogFanOut {
 
     @EventConsumer(
             types = {
-                    LocationRegistered.TYPE, LocationUpdated.TYPE, LocationActivated.TYPE,
-                    LocationDormant.TYPE, LocationPrimaryChanged.TYPE
+                LocationRegistered.TYPE,
+                LocationUpdated.TYPE,
+                LocationActivated.TYPE,
+                LocationDormant.TYPE,
+                LocationPrimaryChanged.TYPE
             },
             consumer = CONSUMER)
     public void onShopEvent(JsonNode payload, ScopeContext scope) {
@@ -65,11 +68,16 @@ class M1ChangeLogFanOut {
             throw new IllegalArgumentException("Shop event payload is missing required identifiers");
         }
 
-        changeLog.append(List.of(new Target(ownerEntityId, locationId)), List.of(Change.upsert(ShopSnapshotContributor.LOCATION, locationId)), null, false, scope);
+        changeLog.append(
+                List.of(new Target(ownerEntityId, locationId)),
+                List.of(Change.upsert(ShopSnapshotContributor.LOCATION, locationId)),
+                null,
+                false,
+                scope);
     }
 
     @EventConsumer(
-            types = { TillPositionRegistered.TYPE, TillPositionRetired.TYPE },
+            types = {TillPositionRegistered.TYPE, TillPositionRetired.TYPE},
             consumer = CONSUMER)
     public void onTillPositionEvent(JsonNode payload, ScopeContext scope) {
         UUID tillPositionId = uuid(payload, "tillPositionId");
@@ -78,11 +86,16 @@ class M1ChangeLogFanOut {
         if (tillPositionId == null || locationId == null || ownerEntityId == null) {
             throw new IllegalArgumentException("Till position event payload is missing required identifiers");
         }
-        changeLog.append(List.of(new Target(ownerEntityId, locationId)), List.of(Change.upsert(ShopSnapshotContributor.TILL_POSITION, tillPositionId)), null, false, scope);
+        changeLog.append(
+                List.of(new Target(ownerEntityId, locationId)),
+                List.of(Change.upsert(ShopSnapshotContributor.TILL_POSITION, tillPositionId)),
+                null,
+                false,
+                scope);
     }
 
     @EventConsumer(
-            types = { RoleChanged.TYPE },
+            types = {RoleChanged.TYPE},
             consumer = CONSUMER)
     public void onRoleChanged(JsonNode payload, ScopeContext scope) {
         UUID roleId = uuid(payload, "roleId");
@@ -91,32 +104,33 @@ class M1ChangeLogFanOut {
         }
         Map<Target, List<Change>> changesPerTarget = new HashMap<>();
         jdbc.query(
-                "select distinct ur.user_id, l.owner_entity_id, l.location_id " +
-                "  from security.user_role ur " +
-                "  join party.location l on l.owner_entity_id = ur.scope_entity_id " +
-                " where ur.role_id = :roleId and l.location_type = 'SHOP' " +
-                "   and (ur.scope_location_id is null or ur.scope_location_id = l.location_id)",
+                "select distinct ur.user_id, l.owner_entity_id, l.location_id " + "  from security.user_role ur "
+                        + "  join party.location l on l.owner_entity_id = ur.scope_entity_id "
+                        + " where ur.role_id = :roleId and l.location_type = 'SHOP' "
+                        + "   and (ur.scope_location_id is null or ur.scope_location_id = l.location_id)",
                 Map.of("roleId", roleId),
                 rs -> {
-                    Target t = new Target(rs.getObject("owner_entity_id", UUID.class), rs.getObject("location_id", UUID.class));
-                    changesPerTarget.computeIfAbsent(t, k -> new ArrayList<>())
-                                    .add(Change.upsert(OperatorSnapshotContributor.OPERATOR, rs.getObject("user_id", UUID.class)));
-                }
-        );
+                    Target t = new Target(
+                            rs.getObject("owner_entity_id", UUID.class), rs.getObject("location_id", UUID.class));
+                    changesPerTarget
+                            .computeIfAbsent(t, k -> new ArrayList<>())
+                            .add(Change.upsert(
+                                    OperatorSnapshotContributor.OPERATOR, rs.getObject("user_id", UUID.class)));
+                });
         for (Map.Entry<Target, List<Change>> entry : changesPerTarget.entrySet()) {
             changeLog.append(List.of(entry.getKey()), entry.getValue(), null, true, scope);
         }
     }
 
     @EventConsumer(
-            types = { RoleAssigned.TYPE },
+            types = {RoleAssigned.TYPE},
             consumer = CONSUMER)
     public void onRoleAssigned(JsonNode payload, ScopeContext scope) {
         fanOutRoleAssignment(payload, scope, false);
     }
 
     @EventConsumer(
-            types = { RoleRevoked.TYPE },
+            types = {RoleRevoked.TYPE},
             consumer = CONSUMER)
     public void onRoleRevoked(JsonNode payload, ScopeContext scope) {
         fanOutRoleAssignment(payload, scope, true);
@@ -137,23 +151,23 @@ class M1ChangeLogFanOut {
             targets = jdbc.query(
                     "select location_id from party.location where owner_entity_id = :entity and location_type = 'SHOP'",
                     Map.of("entity", scopeEntityId),
-                    (rs, i) -> new Target(scopeEntityId, rs.getObject(1, UUID.class))
-            );
+                    (rs, i) -> new Target(scopeEntityId, rs.getObject(1, UUID.class)));
         }
         if (!targets.isEmpty()) {
-            changeLog.append(targets, List.of(Change.upsert(OperatorSnapshotContributor.OPERATOR, userId)), null, urgent, scope);
+            changeLog.append(
+                    targets, List.of(Change.upsert(OperatorSnapshotContributor.OPERATOR, userId)), null, urgent, scope);
         }
     }
 
     @EventConsumer(
-            types = { UserDeactivated.TYPE, UserCredentialReset.TYPE },
+            types = {UserDeactivated.TYPE, UserCredentialReset.TYPE},
             consumer = CONSUMER)
     public void onUrgentUserEvent(JsonNode payload, ScopeContext scope) {
         fanOutUser(payload, scope, true);
     }
 
     @EventConsumer(
-            types = { UserCreated.TYPE, UserUpdated.TYPE, UserActivated.TYPE },
+            types = {UserCreated.TYPE, UserUpdated.TYPE, UserActivated.TYPE},
             consumer = CONSUMER)
     public void onNormalUserEvent(JsonNode payload, ScopeContext scope) {
         fanOutUser(payload, scope, false);
@@ -165,17 +179,16 @@ class M1ChangeLogFanOut {
             throw new IllegalArgumentException("User event payload is missing userId");
         }
         List<Target> targets = jdbc.query(
-                "select distinct l.owner_entity_id, l.location_id " +
-                "  from security.user_role ur " +
-                "  join party.location l on l.owner_entity_id = ur.scope_entity_id " +
-                " where ur.user_id = :userId " +
-                "   and l.location_type = 'SHOP' " +
-                "   and (ur.scope_location_id is null or ur.scope_location_id = l.location_id)",
+                "select distinct l.owner_entity_id, l.location_id " + "  from security.user_role ur "
+                        + "  join party.location l on l.owner_entity_id = ur.scope_entity_id "
+                        + " where ur.user_id = :userId "
+                        + "   and l.location_type = 'SHOP' "
+                        + "   and (ur.scope_location_id is null or ur.scope_location_id = l.location_id)",
                 Map.of("userId", userId),
-                (rs, i) -> new Target(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class))
-        );
+                (rs, i) -> new Target(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)));
         if (!targets.isEmpty()) {
-            changeLog.append(targets, List.of(Change.upsert(OperatorSnapshotContributor.OPERATOR, userId)), null, urgent, scope);
+            changeLog.append(
+                    targets, List.of(Change.upsert(OperatorSnapshotContributor.OPERATOR, userId)), null, urgent, scope);
         }
     }
 
