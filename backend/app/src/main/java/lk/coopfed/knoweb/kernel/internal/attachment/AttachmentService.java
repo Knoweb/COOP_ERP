@@ -120,7 +120,9 @@ class AttachmentService implements Attachments {
 
         // Asking again for the same attachment (a till that lost its connection and comes back,
         // doc 32 section 4: the upload is resumable and the URL lasts fifteen minutes) renews the
-        // window of the PENDING row; a settled row or another document's row is refused.
+        // window of the PENDING row; a settled row or another document's row is refused. So is a
+        // row whose window has already ended: the verifier may be hashing its bytes at this very
+        // moment, and a new URL would let them be replaced after the hash it settles with.
         Optional<Existing> existing = existing(id);
         if (existing.isPresent()) {
             if (!existing.get().documentId().equals(documentId)) {
@@ -131,12 +133,21 @@ class AttachmentService implements Attachments {
                         "attachment.not_pending",
                         Map.of("status", existing.get().status()));
             }
-            jdbc.update(
+            Instant windowEnds = existing.get().uploadExpiresAt();
+            if (windowEnds == null || !now.isBefore(windowEnds)) {
+                throw new ProblemException("attachment.upload_expired");
+            }
+            // The window is re-checked in the update itself: it may end between the read and here.
+            int renewed = jdbc.update(
                     "update kernel.document_attachment set upload_expires_at = ?, content_hash = coalesce(?, content_hash)"
-                            + " where attachment_id = ? and status = 'PENDING'",
+                            + " where attachment_id = ? and status = 'PENDING' and upload_expires_at > ?",
                     Timestamp.from(expiresAt),
                     hash,
-                    id);
+                    id,
+                    Timestamp.from(now));
+            if (renewed == 0) {
+                throw new ProblemException("attachment.upload_expired");
+            }
         } else {
             jdbc.update(
                     """
@@ -192,13 +203,19 @@ class AttachmentService implements Attachments {
                 .findFirst();
     }
 
-    private record Existing(UUID documentId, String status) {}
+    private record Existing(UUID documentId, String status, Instant uploadExpiresAt) {}
 
     private Optional<Existing> existing(UUID attachmentId) {
         return jdbc
                 .query(
-                        "select document_id, status from kernel.document_attachment where attachment_id = ?",
-                        (rs, rowNum) -> new Existing(rs.getObject("document_id", UUID.class), rs.getString("status")),
+                        "select document_id, status, upload_expires_at from kernel.document_attachment"
+                                + " where attachment_id = ?",
+                        (rs, rowNum) -> new Existing(
+                                rs.getObject("document_id", UUID.class),
+                                rs.getString("status"),
+                                rs.getTimestamp("upload_expires_at") == null
+                                        ? null
+                                        : rs.getTimestamp("upload_expires_at").toInstant()),
                         attachmentId)
                 .stream()
                 .findFirst();
@@ -291,15 +308,18 @@ class AttachmentService implements Attachments {
     /**
      * The object is there and its hash is right: COMPLETE, audited, published. A row that is no
      * longer PENDING (another run settled it) is left as it is, with nothing audited or published.
+     * So is a row whose window is no longer the one the verifier read before hashing: its bytes
+     * may have been replaced through a newer URL, so the hash may not describe them.
      */
     boolean complete(Pending row, String hash, ScopeContext ctx) {
         requireTransaction();
         int settled = jdbc.update(
                 "update kernel.document_attachment set status = 'COMPLETE', content_hash = ?, settled_at = ?"
-                        + " where attachment_id = ? and status = 'PENDING'",
+                        + " where attachment_id = ? and status = 'PENDING' and upload_expires_at is not distinct from ?",
                 hash,
                 Timestamp.from(clock.instant()),
-                row.attachmentId());
+                row.attachmentId(),
+                seenWindow(row));
         if (settled == 0) {
             return false;
         }
@@ -313,14 +333,19 @@ class AttachmentService implements Attachments {
         return true;
     }
 
+    private static Timestamp seenWindow(Pending row) {
+        return row.uploadExpiresAt() == null ? null : Timestamp.from(row.uploadExpiresAt());
+    }
+
     /** The object never came, came with another hash, or is too large: FAILED with a REVIEW record. */
     boolean fail(Pending row, String why, ScopeContext ctx) {
         requireTransaction();
         int settled = jdbc.update(
                 "update kernel.document_attachment set status = 'FAILED', settled_at = ?"
-                        + " where attachment_id = ? and status = 'PENDING'",
+                        + " where attachment_id = ? and status = 'PENDING' and upload_expires_at is not distinct from ?",
                 Timestamp.from(clock.instant()),
-                row.attachmentId());
+                row.attachmentId(),
+                seenWindow(row));
         if (settled == 0) {
             return false;
         }

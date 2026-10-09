@@ -10,10 +10,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.kernel.api.Scope;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.m7customers.api.AmendAccountLimits;
 import lk.coopfed.knoweb.m7customers.api.CustomerNicRecaptured;
@@ -30,6 +35,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * The NIC after wave 2 (M7CR-01, -02, -03, -15; {@code 2026-10-06-wave2-keyed-hashes.md}): one
@@ -65,6 +71,29 @@ class NicIdentityIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     NicRekeyJob rekeyJob;
+
+    @Autowired
+    SystemScope system;
+
+    @Autowired
+    JdbcTemplate appJdbc;
+
+    /** A person signed in as a Federation viewer: the job's class, with a user and a real entity. */
+    private static ScopeContext federationViewer() {
+        UUID federation = UUID.fromString("0190f700-0000-7000-8000-000000000099");
+        Scope active = new Scope(federation, null);
+        return new ScopeContext(
+                CustomersFixture.OFFICE_USER,
+                null,
+                federation,
+                List.of(active),
+                active,
+                PolicyClass.FEDERATION_VIEW,
+                Set.of(),
+                null,
+                Locale.ENGLISH,
+                UUID.randomUUID());
+    }
 
     @BeforeEach
     void arrange() {
@@ -122,6 +151,24 @@ class NicIdentityIntegrationTest extends PostgresIntegrationTest {
         assertThatThrownBy(
                         () -> open.handle(new OpenAccount(d, new BigDecimal("1000"), null, null, NEW_FORM), office()))
                 .hasMessageContaining("m7.account.nic_held");
+
+        // A person's Federation viewer session is the same class as the job's, but it is not the
+        // job: it gets no legacy hash and re-keys nothing (M7M8M9-04, V0005), here through the
+        // job's own page and directly through rekey_nic.
+        ScopeContext viewer = federationViewer();
+        assertThat(rekeyJob.rekeyPage(viewer)).isZero();
+        assertThat(system.inScope(
+                        viewer,
+                        () -> appJdbc.queryForObject(
+                                "select customers.rekey_nic(?, ?, ?, ?)",
+                                Boolean.class,
+                                c,
+                                legacy,
+                                hasher.rekey(legacy),
+                                hasher.keyId())))
+                .isFalse();
+        assertThat(nicRow(c).get("nic_hash")).isEqualTo(legacy);
+        assertThat(nicRow(c).get("nic_key_id")).isNull();
 
         // The job: HMAC(pepper, stored_sha256), the pepper never in SQL, the NIC never known.
         assertThat(rekeyJob.rekeyPage(SystemScope.federationView())).isEqualTo(1);
