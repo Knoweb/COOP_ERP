@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useIntl } from "react-intl";
@@ -13,7 +13,7 @@ import { StateChip } from "../../shell/components/StateChip";
 import "./catalogue.css";
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
-import { chipOf, EMPTY_FORM, errorText, formOf, languageOf, nameIn, requestOf, type SkuForm } from "./skuView";
+import { chipOf, EMPTY_FORM, errorText, formOf, keyForUpload, languageOf, nameIn, requestOf, type SkuForm } from "./skuView";
 import type { AttachImageRequest } from "./catalogueApi";
 
 const SYMBOLOGIES: Symbology[] = ["EAN13", "EAN8", "UPCA", "GS1_128", "GS1_DATAMATRIX", "GS1_QR", "INTERNAL"];
@@ -360,7 +360,9 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
   const api = useCatalogueApi();
   const queryClient = useQueryClient();
   const key = useIdempotencyKey();
-  
+  // What the key was last sent with to attachImage: a different file gets a new key (keyForUpload).
+  const uploadSent = useRef<string | null>(null);
+
   const [uploadStatus, setUploadStatus] = useState<"IDLE" | "HASHING" | "GETTING_URL" | "UPLOADING" | "DONE" | "ERROR">("IDLE");
   const [errorMsg, setErrorMsg] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -423,7 +425,7 @@ function Images({ skuId, canEdit }: { skuId: string; canEdit: boolean }) {
         req.barcode = barcode;
       }
       
-      const response = await api.attachImage(skuId, req, key.current());
+      const response = await api.attachImage(skuId, req, keyForUpload(key, uploadSent, `${sha256Hex}|${barcode}`));
 
       setUploadStatus("UPLOADING");
       const putResp = await fetch(response.uploadUrl, {

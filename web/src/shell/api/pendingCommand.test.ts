@@ -90,6 +90,22 @@ describe("the command a step-up interrupted", () => {
     expect(headers.get("Idempotency-Key")).toBe("key-7");
   });
 
+  it("is sent again in the scope it was first sent in, whatever the shell knows at the moment of the replay", async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
+    const entityWide = { ...pending, headers: { ...pending.headers, "X-Scope-Entity": "e-kept" } };
+    const atAShop = { ...pending, headers: { ...pending.headers, "X-Scope-Entity": "e-kept", "X-Scope-Location": "loc-kept" } };
+
+    await replayPendingCommand(atAShop, context, fetchFn as unknown as typeof fetch);
+    await replayPendingCommand(entityWide, { ...context, locationId: "loc-now" }, fetchFn as unknown as typeof fetch);
+
+    const sent = fetchFn.mock.calls.map((call) => (call as unknown as [string, RequestInit])[1].headers as Headers);
+    expect(sent[0].get("X-Scope-Entity")).toBe("e-kept");
+    expect(sent[0].get("X-Scope-Location")).toBe("loc-kept");
+    // An entity-wide command stays entity-wide.
+    expect(sent[1].get("X-Scope-Entity")).toBe("e-kept");
+    expect(sent[1].get("X-Scope-Location")).toBeNull();
+  });
+
   it("reports the server's problem when the replay is refused, a second mfa.required included, and asks for no further step-up", async () => {
     const fetchFn = vi.fn(async () => problem(401, "mfa.required", "Fresh second factor needed"));
 

@@ -305,7 +305,9 @@ test-scaffold:
 	@echo "--- replace them, as the developer does in step 1 of the module README"
 	grep -rl "todo\.integration\.webhook\." backend/app/src web/src | xargs sed -i "s/todo\.integration\.webhook\./int.webhook./g"
 	node tools/check-permissions.mjs
-	cd backend && ./gradlew $(SCAFFOLD_TESTS)
+	@# COOP_ERP_SCAFFOLD_PROOF: the two tests that pin the built M9 (its migration numbers, its
+	@# notification tables) leave it out while the copy stands in for it (testsupport.ScaffoldProof).
+	cd backend && COOP_ERP_SCAFFOLD_PROOF=true ./gradlew $(SCAFFOLD_TESTS)
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 	cd web && pnpm install --frozen-lockfile && pnpm build && pnpm test

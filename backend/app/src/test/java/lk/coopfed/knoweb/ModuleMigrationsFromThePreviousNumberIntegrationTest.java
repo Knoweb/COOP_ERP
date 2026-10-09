@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.ScaffoldProof;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
@@ -52,8 +53,10 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 2, PR 08: m8reporting V0007 (projections by location, event and line) from V0006.
         streams.put("m8reporting", "6");
         // Wave 2, PR 14: m9integration V0006 (the stored file, the owner in the posting key, the
-        // contact door) on a database at V0005.
-        streams.put("m9integration", "5");
+        // contact door) on a database at V0005. In the scaffold proof the stream is the copy's
+        // (V0001 up from hello), which has no V0005: it is migrated whole, and M9's own checks
+        // below are left out.
+        streams.put("m9integration", ScaffoldProof.active() ? null : "5");
         return streams;
     }
 
@@ -103,26 +106,9 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         admin.update(
                 "insert into kernel.system_identity (singleton, entity_id) values (true, ?::uuid)", TEST_FEDERATION_ID);
         // An M9 posting and an export over it, as the demo server holds them before V0006.
-        admin.update(
-                """
-                insert into integration.journal_posting (posting_id, owner_entity_id, document_id, seq, doc_type_code,
-                    doc_number_display, line_kind, side, debit_role, credit_role, amount_source, amount, business_date,
-                    recorded_at)
-                values ('0190e9f0-0000-7000-8000-000000000001', ?::uuid, '0190e9f0-0000-7000-8000-000000000002', 1,
-                    'INV', 'D101-INV-000001', 'GOODS', 'SELLER', 'RECEIVABLE', 'REVENUE', 'net', 10.00, '2026-08-05',
-                    '2026-08-05T04:00:00Z')
-                """,
-                TEST_FEDERATION_ID);
-        admin.update(
-                """
-                insert into integration.journal_export (export_id, owner_entity_id, period_from, period_to, format,
-                    provisional, status, line_count, total_debit, total_credit, content_hash, generated_at,
-                    requested_by, requested_at)
-                values ('0190e9f0-0000-7000-8000-000000000003', ?::uuid, '2026-08-01', '2026-08-31', 'CSV', false,
-                    'GENERATED', 1, 10.00, 10.00, repeat('0', 64), '2026-09-01T04:00:00Z',
-                    '0190e9f0-0000-7000-8000-000000000004', '2026-09-01T04:00:00Z')
-                """,
-                TEST_FEDERATION_ID);
+        if (!ScaffoldProof.active()) {
+            insertTheDemoServersPostingAndExport(admin);
+        }
 
         // Two lines of a till receipt projected before V0007: keyed by line_id, no number.
         String receipt = "0190e8aa-0000-7000-8000-000000000001";
@@ -195,24 +181,11 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .contains("kernel.system_entity()");
 
         // Wave 2, PR 14: m9integration V0006 over a database at V0005, with a posting and an export
-        // of the demo's in place: the key changes under rows, and the export has no file row.
-        assertThat(after).containsEntry("m9integration", 6);
-        assertThat(admin.queryForList(
-                        "select conname from pg_constraint where conrelid = 'integration.journal_posting'::regclass"
-                                + " and contype = 'u'",
-                        String.class))
-                .containsExactly("journal_posting_owner_document_seq_uq");
-        assertThat(admin.queryForObject(
-                        "select count(*) from pg_policies where schemaname = 'integration'"
-                                + " and tablename = 'notification_contact' and policyname = 'fed_view'",
-                        Integer.class))
-                .isZero();
-        assertThat(admin.queryForObject(
-                        "select prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace"
-                                + " where n.nspname = 'integration' and p.proname = 'notification_recipients'",
-                        String.class))
-                .contains("kernel.scope_class() = 'OWN'")
-                .contains("party.caller_trades_with(p_entity)");
+        // of the demo's in place: the key changes under rows, and the export has no file row. Not
+        // in the scaffold proof, where the stream is the copy's.
+        if (!ScaffoldProof.active()) {
+            assertWhatM9sV0006LeavesInPlace(admin, after);
+        }
 
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
@@ -249,6 +222,51 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .contains("kernel.scope_location()");
         assertThat(admin.queryForObject("select to_regclass('reporting.credit_limit_fact')::text", String.class))
                 .isEqualTo("reporting.credit_limit_fact");
+    }
+
+    /** An M9 posting and an export over it, as the demo server holds them before M9's V0006. */
+    private static void insertTheDemoServersPostingAndExport(JdbcTemplate admin) {
+        admin.update(
+                """
+                insert into integration.journal_posting (posting_id, owner_entity_id, document_id, seq, doc_type_code,
+                    doc_number_display, line_kind, side, debit_role, credit_role, amount_source, amount, business_date,
+                    recorded_at)
+                values ('0190e9f0-0000-7000-8000-000000000001', ?::uuid, '0190e9f0-0000-7000-8000-000000000002', 1,
+                    'INV', 'D101-INV-000001', 'GOODS', 'SELLER', 'RECEIVABLE', 'REVENUE', 'net', 10.00, '2026-08-05',
+                    '2026-08-05T04:00:00Z')
+                """,
+                TEST_FEDERATION_ID);
+        admin.update(
+                """
+                insert into integration.journal_export (export_id, owner_entity_id, period_from, period_to, format,
+                    provisional, status, line_count, total_debit, total_credit, content_hash, generated_at,
+                    requested_by, requested_at)
+                values ('0190e9f0-0000-7000-8000-000000000003', ?::uuid, '2026-08-01', '2026-08-31', 'CSV', false,
+                    'GENERATED', 1, 10.00, 10.00, repeat('0', 64), '2026-09-01T04:00:00Z',
+                    '0190e9f0-0000-7000-8000-000000000004', '2026-09-01T04:00:00Z')
+                """,
+                TEST_FEDERATION_ID);
+    }
+
+    /** M9's V0006 over the demo server's rows: the new posting key, the closed door, the definer function. */
+    private static void assertWhatM9sV0006LeavesInPlace(JdbcTemplate admin, Map<String, Integer> after) {
+        assertThat(after).containsEntry("m9integration", 6);
+        assertThat(admin.queryForList(
+                        "select conname from pg_constraint where conrelid = 'integration.journal_posting'::regclass"
+                                + " and contype = 'u'",
+                        String.class))
+                .containsExactly("journal_posting_owner_document_seq_uq");
+        assertThat(admin.queryForObject(
+                        "select count(*) from pg_policies where schemaname = 'integration'"
+                                + " and tablename = 'notification_contact' and policyname = 'fed_view'",
+                        Integer.class))
+                .isZero();
+        assertThat(admin.queryForObject(
+                        "select prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace"
+                                + " where n.nspname = 'integration' and p.proname = 'notification_recipients'",
+                        String.class))
+                .contains("kernel.scope_class() = 'OWN'")
+                .contains("party.caller_trades_with(p_entity)");
     }
 
     /** One stream as FlywayConfig runs it, strict. */
