@@ -82,7 +82,7 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(500);
         assertThat(inScope(
                         SOCIETY, null, () -> config.getDuration("till.idle_lock", scope(SOCIETY, null), Duration.ZERO)))
-                .isEqualTo(Duration.ofMinutes(5));
+                .isEqualTo(Duration.ofMinutes(2));
         assertThat(inScope(SOCIETY, null, () -> config.get("business.timezone", scope(SOCIETY, null))))
                 .contains("Asia/Colombo");
         assertThat(inScope(SOCIETY, null, () -> config.get("nobody.registered.this", scope(SOCIETY, null))))
@@ -111,7 +111,7 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
                         FEDERATION,
                         null,
                         () -> config.getDuration("till.idle_lock", scope(FEDERATION, null), Duration.ZERO)))
-                .isEqualTo(Duration.ofMinutes(5));
+                .isEqualTo(Duration.ofMinutes(2));
     }
 
     @Test
