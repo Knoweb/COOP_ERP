@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -114,6 +115,9 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     DeviceQueries queries;
+
+    @Autowired
+    DeviceHeartbeatConsumer heartbeatConsumer;
 
     @Autowired
     TestBeans.SwitchableSyncStatus sync;
@@ -743,6 +747,22 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
                                 atShop2))
                 .isInstanceOf(DataAccessException.class);
         assertThat(deviceRow(atShop2)).containsEntry("status", "ENROLLED");
+    }
+
+    @Test
+    void heartbeatsUpdateDeviceVersionAndLastSeen() {
+        UUID deviceId = enrol("SN-HB", SHOP1);
+        kernel.reset();
+
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        String version = "1.2.3";
+        heartbeatConsumer.consume(
+                new lk.coopfed.knoweb.kernel.api.DeviceHeartbeatReported(deviceId, version, now), own(MPCS));
+
+        assertThat(queries.getDevice(deviceId, own(MPCS))).hasValueSatisfying(view -> {
+            assertThat(view.appVersion()).isEqualTo(version);
+            assertThat(view.lastSeenAt()).isEqualTo(now);
+        });
     }
 
     // ---- over HTTP ---------------------------------------------------------------------------
