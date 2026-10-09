@@ -265,6 +265,10 @@ tasks.test {
     // Gradle runs the tests again when those files were deleted or edited by hand, and does
     // not answer "up to date" while the committed diagrams are wrong.
     outputs.dir(rootProject.file("../docs/modules"))
+    // ArchitectureTests and the Modulith verification load every class of the application into
+    // one JVM; on the default 512 MB heap the executor ran out of memory while the suite started
+    // (main at ab723c0c, 9 Oct 2026), a run before it passing on the same code.
+    maxHeapSize = "1g"
 }
 
 // `make test-int`: the tests tagged "integration" (Testcontainers). Same source folder as the
