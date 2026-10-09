@@ -1,0 +1,1 @@
+- The unit test task (`make test`, `:app:test`) runs on a 1 GB heap: from main at ab723c0c the executor ran out of the default 512 MB while ArchitectureTests and the Modulith verification loaded the application, so `Build, verify, unit tests` failed on main and on every PR brought up to date with it.

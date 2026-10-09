@@ -49,3 +49,10 @@ web/.vite/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Local scratch at the repository root: a pasted container log (often UTF-16, which the secret
+# scan reads as binary), a saved sign-in page, a one-off script
+/*_logs.txt
+/login.html
+/login_html.txt
+/fix-colors.js

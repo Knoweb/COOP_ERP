@@ -265,6 +265,22 @@ tasks.test {
     // Gradle runs the tests again when those files were deleted or edited by hand, and does
     // not answer "up to date" while the committed diagrams are wrong.
     outputs.dir(rootProject.file("../docs/modules"))
+    // IntegrationTestShardCoverageTest reads the shard lists from ci.yml: a change there alone
+    // must run the tests again, not answer "up to date".
+    inputs.file(rootProject.file("../.github/workflows/ci.yml"))
+    // ArchitectureTests and the Modulith verification load every class of the application into
+    // one JVM; on the default 512 MB heap the executor ran out of memory while the suite started
+    // (main at ab723c0c, 9 Oct 2026), a run before it passing on the same code.
+    maxHeapSize = "1g"
+}
+
+// A failed test prints its message and the whole stack trace in the log, not only the exception
+// class and line: a red nightly or pull request run is read from its log (WCD-25).
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
 }
 
 // `make test-int`: the tests tagged "integration" (Testcontainers). Same source folder as the
@@ -366,6 +382,9 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     // count (COOP_ERP_PROPERTY_TRIES in ci.yml); unset, each test runs its own full count, as
     // main and the nightly run do.
     System.getenv("COOP_ERP_PROPERTY_TRIES")?.let { systemProperty("coop-erp.test.property-tries", it) }
+    // The scaffold proof (Makefile test-scaffold) sets COOP_ERP_SCAFFOLD_PROOF=true while its
+    // copy stands in for the built M9; testsupport.ScaffoldProof reads it. Unset everywhere else.
+    System.getenv("COOP_ERP_SCAFFOLD_PROOF")?.let { systemProperty("coop-erp.test.scaffold-proof", it) }
     // Which package(s) of test classes this run covers, for the sharded pull request job
     // (ci.yml's integration-test-shard-*): a comma-separated list of fully-qualified prefixes,
     // e.g. "lk.coopfed.knoweb.kernel.,lk.coopfed.knoweb.m1party.". Unset (a laptop, main,

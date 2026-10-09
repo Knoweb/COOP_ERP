@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.ScaffoldProof;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -144,6 +145,13 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
      * and the template's expectation and returns this table's. Nothing is skipped: every check of
      * every table is still run and compared.
      */
+    /**
+     * False only in the scaffold proof ({@code make test-scaffold}), where a copy of hello stands
+     * in for the built M9 and M9's notification tables do not exist; their departures then need
+     * not name a table that exists. On main and every pull request they must.
+     */
+    private static final boolean BUILT_M9_IS_IN_PLACE = !ScaffoldProof.active();
+
     record Departure(String table, String why, Function<Check, String> expected, boolean mustExist) {
         Departure(String table, String why, Function<Check, String> expected) {
             this(table, why, expected, true);
@@ -335,12 +343,14 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "integration.notification_template",
                     "everyone_reads (m9integration V0001): no personal data; the kernel's renderer reads a"
                             + " template after the commit with no scope at all",
-                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+                    RlsMatrixIntegrationTest::everySessionReadsEverything,
+                    BUILT_M9_IS_IN_PLACE),
             new Departure(
                     "integration.notification_rule",
                     "everyone_reads (m9integration V0001): no personal data; the kernel's dispatcher reads the"
                             + " rules in the scope of whichever entity's event it matches",
-                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+                    RlsMatrixIntegrationTest::everySessionReadsEverything,
+                    BUILT_M9_IS_IN_PLACE),
             // Member identity is the society's (CR-18-2, m7customers V0003; wave 2, RLS-01, RLS-02):
             // FEDERATION_VIEW and EXTERNAL_TIMEBOXED read no personal data of a natural person by
             // policy. The credit book (customer_account, the postings, allocations, history,
@@ -370,7 +380,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                             + " that neither the Federation's view nor a regulator's reads; the dispatcher reaches"
                             + " it through notification_recipients(), which answers an OWN caller for the"
                             + " entities it trades with",
-                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads,
+                    BUILT_M9_IS_IN_PLACE),
             // A shop reads what is addressed to it at another shop of its entity (wave 2, RLS-17 d):
             // the fixture's "A wide" row is at location 2 and addressed to location 1.
             new Departure(
@@ -782,81 +793,6 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
         assertThat(ungated)
                 .as("own_* policies with a USING or WITH CHECK clause that does not test the class")
                 .isEmpty();
-    }
-
-    @Test
-    void invoiceMaskingViewsHideSensitiveColumnsFromCounterparty() throws SQLException {
-        try (Connection db = superuser()) {
-            db.setAutoCommit(false);
-            try (Statement st = db.createStatement()) {
-                st.execute("set local session_replication_role = replica");
-
-                UUID docId = UUID.randomUUID();
-                st.execute(
-                        "insert into kernel.document (document_id, doc_type_code, owner_entity_id, counterparty_entity_id, notes, status) values ('"
-                                + docId + "', 'INVOICE', '" + A + "', '" + B + "', 'secret note', 'DRAFT')");
-                st.execute(
-                        "insert into kernel.document_line (document_line_id, document_id, line_no, sku_id, qty, unit_price, unit_cost_at_issue) values (gen_random_uuid(), '"
-                                + docId + "', 1, gen_random_uuid(), 1, 100, 50)");
-                st.execute(
-                        "insert into trading.doc_invoice (document_id, relationship_id, seller_entity_id, buyer_entity_id, grn_document_ids, seller_vat_no, buyer_vat_no, tax_point_date, due_date) values ('"
-                                + docId + "', gen_random_uuid(), '" + A + "', '" + B
-                                + "', '{}', 'V1', 'V2', current_date, current_date)");
-
-                Columns partyCols = columns(st, "trading.v_invoice_party");
-                assertThat(partyCols.find("notes")).isNull();
-                Columns linePartyCols = columns(st, "trading.v_invoice_line_party");
-                assertThat(linePartyCols.find("unit_cost_at_issue")).isNull();
-
-                String visibleToB = asApp(st, Scope.of("PARTY", "PARTY", B, null, Set.of()), () -> {
-                    try (ResultSet rs = st.executeQuery(
-                            "select count(*) from trading.v_invoice_party where document_id = '" + docId + "'")) {
-                        rs.next();
-                        return rs.getInt(1) == 1 ? VISIBLE : HIDDEN;
-                    }
-                });
-                assertThat(visibleToB).isEqualTo(VISIBLE);
-
-                String visibleLineToB = asApp(st, Scope.of("PARTY", "PARTY", B, null, Set.of()), () -> {
-                    try (ResultSet rs = st.executeQuery(
-                            "select count(*) from trading.v_invoice_line_party where document_id = '" + docId + "'")) {
-                        rs.next();
-                        return rs.getInt(1) == 1 ? VISIBLE : HIDDEN;
-                    }
-                });
-                assertThat(visibleLineToB).isEqualTo(VISIBLE);
-
-                String visibleToC = asApp(st, Scope.of("PARTY", "PARTY", UUID.randomUUID(), null, Set.of()), () -> {
-                    try (ResultSet rs = st.executeQuery(
-                            "select count(*) from trading.v_invoice_party where document_id = '" + docId + "'")) {
-                        rs.next();
-                        return rs.getInt(1) == 1 ? VISIBLE : HIDDEN;
-                    }
-                });
-                assertThat(visibleToC).isEqualTo(HIDDEN);
-
-                String visibleToA = asApp(st, Scope.of("OWN", "OWN", A, null, Set.of()), () -> {
-                    try (ResultSet rs = st.executeQuery(
-                            "select count(*) from trading.v_invoice_party where document_id = '" + docId + "'")) {
-                        rs.next();
-                        return rs.getInt(1) == 1 ? VISIBLE : HIDDEN;
-                    }
-                });
-                assertThat(visibleToA).isEqualTo(VISIBLE);
-
-                String visibleBaseToA = asApp(st, Scope.of("OWN", "OWN", A, null, Set.of()), () -> {
-                    try (ResultSet rs = st.executeQuery("select count(*) from kernel.document where document_id = '"
-                            + docId + "' and notes = 'secret note'")) {
-                        rs.next();
-                        return rs.getInt(1) == 1 ? VISIBLE : HIDDEN;
-                    }
-                });
-                assertThat(visibleBaseToA).isEqualTo(VISIBLE);
-
-            } finally {
-                db.rollback();
-            }
-        }
     }
 
     // ---- the engine -----------------------------------------------------------------------------

@@ -90,9 +90,17 @@ jobs:
   #   docs only (docs/**, any *.md)  the title check, the secret scan and the docs check only
   #   web only (web/**, with docs)   everything but the integration tests and the scaffolder
   #                                  proof; the stack smoke runs, because the web e2e lives there
+  #                                  (but the scaffolder proof does run when the web files it
+  #                                  copies or tests change: the registry, the message index,
+  #                                  the design guards, the hello module)
   #   anything else                  everything
-  # A file under backend/shared-engine, the kernel, .github, infra or tools, or the Makefile, is
-  # never "docs" even when it is a *.md, so it always runs everything. A push to main, the nightly
+  # A file under backend/shared-engine, the kernel, backend/app/src/main/resources, .github, infra
+  # or tools, or the Makefile, is never "docs" even when it is a *.md, so it always runs
+  # everything; so do docs/modules (checked by make check-generated) and docs/change-requests
+  # (read by check-frozen-contracts.mjs), which tests read although they are docs. The RLS policy
+  # template (db/migration/RLS_POLICY_TEMPLATE.md) is the SQL RlsMatrixIntegrationTest proves.
+  # Renames are listed as a deletion and an addition (--no-renames), so moving a file out of
+  # infra/ into docs/ still counts as an infra change. A push to main, the nightly
   # run and a dispatch run everything. A job with nothing to do is skipped by its `if`, and GitHub
   # reports a skipped job as a success, so a required check still reports and does not block
   # the merge. No job retries itself: a red job is read, not rerun blind.
@@ -103,6 +111,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.decide.outputs.docs_only }}
       backend: ${{ steps.decide.outputs.backend }}
+      scaffolder: ${{ steps.decide.outputs.scaffolder }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -118,13 +127,17 @@ jobs:
           if [ "$EVENT" != "pull_request" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "scaffolder=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          files=$(git diff --name-only "$BASE"...HEAD)
+          files=$(git diff --name-only --no-renames "$BASE"...HEAD)
           echo "$files"
-          always='^(backend/app/src/main/java/lk/coopfed/knoweb/kernel/|backend/shared-engine/|\.github/|infra/|tools/|Makefile$)'
+          always='^(backend/app/src/main/java/lk/coopfed/knoweb/kernel/|backend/app/src/main/resources/|backend/shared-engine/|docs/modules/|docs/change-requests/|\.github/|infra/|tools/|Makefile$)'
+          # What the scaffolder proof copies or runs from web/ (tools/new-module.mjs, Makefile test-scaffold).
+          scaffolded_web='^web/src/(modules/registry\.ts$|shell/i18n/messages\.ts$|design/|modules/hello/)'
           docs_only=true
           web_only=true
+          scaffolded=false
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             if printf '%s' "$file" | grep -Eq "$always"; then
@@ -133,15 +146,19 @@ jobs:
               :
             elif printf '%s' "$file" | grep -Eq '^web/'; then
               docs_only=false
+              if printf '%s' "$file" | grep -Eq "$scaffolded_web"; then scaffolded=true; fi
             else
               docs_only=false; web_only=false
             fi
           done <<< "$files"
           backend=true
           if [ "$docs_only" = true ] || [ "$web_only" = true ]; then backend=false; fi
-          echo "docs only: $docs_only, web only: $web_only, backend: $backend"
+          scaffolder=$backend
+          if [ "$scaffolded" = true ]; then scaffolder=true; fi
+          echo "docs only: $docs_only, web only: $web_only, backend: $backend, scaffolder: $scaffolder"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "scaffolder=$scaffolder" >> "$GITHUB_OUTPUT"
 
   # The docs checks, on every run: the progress entries under docs/progress are named and shaped
   # as tools/progress-index.mjs expects (it also builds the one-page view).
@@ -228,8 +245,9 @@ jobs:
   # because it took as long as everything else in the old build-verify-test together. Sharded by
   # package (29 September 2026): each matrix leg runs a disjoint set of the 108 integration test
   # classes (IntegrationTestShardCoverageTest, in make test, fails the build when a class matches
-  # none of the three prefix lists below or more than one, so a new module lands in a shard
-  # automatically as long as its prefix is added there). A pull request also excludes the tests
+  # none of the three prefix lists below or more than one, or a prefix matches no class; it reads
+  # the lists from THIS file, so they exist once: a new module's prefix is added here and nowhere
+  # else). A pull request also excludes the tests
   # tagged slow (DemoDataLoaderIntegrationTest; stack-smoke already loads the demo) and runs the
   # randomised property tests at a smaller count (COOP_ERP_PROPERTY_TRIES); a push to main and
   # the nightly run do neither, so main is still exercised at full strength. One fork per shard
@@ -252,7 +270,7 @@ jobs:
           - name: m5inventory+m6pos+m7customers+m8reporting+demo+others
             packages: >-
               lk.coopfed.knoweb.m5inventory.,lk.coopfed.knoweb.m6pos.,lk.coopfed.knoweb.m7customers.,lk.coopfed.knoweb.m8reporting.,lk.coopfed.knoweb.m9integration.,
-              lk.coopfed.knoweb.demo.,lk.coopfed.knoweb.hello.,lk.coopfed.knoweb.config.,
+              lk.coopfed.knoweb.demo.,lk.coopfed.knoweb.hello.,
               lk.coopfed.knoweb.testsupport.,lk.coopfed.knoweb.SchemaRulesIntegrationTest,
               lk.coopfed.knoweb.OwnPoliciesTestTheClassIntegrationTest,lk.coopfed.knoweb.RuntimeRolesIntegrationTest,
               lk.coopfed.knoweb.ModuleMigrationsFromThePreviousNumberIntegrationTest
@@ -468,12 +486,13 @@ jobs:
 
   # S0-13 done criterion: a module scaffolded from hello compiles, keeps the architecture rules
   # green and passes the integration tests it inherits. Catches a change to hello that the
-  # scaffolder can no longer copy correctly.
+  # scaffolder can no longer copy correctly. Runs for a web-only pull request too when it touches
+  # what the proof copies or tests in web/ (the changes job's `scaffolder` output).
   scaffolder:
     name: Scaffolder proof
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.backend == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.scaffolder == 'true') }}
     timeout-minutes: 30
 
     steps:
@@ -506,6 +525,18 @@ jobs:
 
       - name: make test-scaffold
         run: make test-scaffold
+
+      # A failed proof leaves the copy in place, so the reports are those of the copy's run.
+      - name: Upload test reports when something failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scaffolder-test-reports
+          path: |
+            backend/app/build/reports/tests
+            backend/app/build/test-results
+          retention-days: 7
+          if-no-files-found: ignore
 
   # The whole stack as `make up-2` starts it: PostgreSQL, PgBouncer, RabbitMQ, MinIO, Keycloak,
   # Mailpit, two backend instances behind nginx and the web client. Then tools/smoke.mjs from
@@ -729,7 +760,9 @@ jobs:
   package-main:
     name: Package (main)
     runs-on: ubuntu-latest
-    needs: [build-verify, integration-test, till, scaffolder, stack-smoke]
+    # The secret scan and the docs checks too: a commit that leaks a secret or breaks the
+    # progress entries is not packaged either.
+    needs: [build-verify, integration-test, till, scaffolder, stack-smoke, secret-scan, docs-check]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
     # packages: write for the publish steps (a push to main only); the anchor's other steps read.
@@ -786,10 +819,33 @@ jobs:
       - name: make down (before the scaffolder proof)
         run: make down
 
+      # K-06b, as in the integration shards: the A4 renderer's tests print with the worker image's
+      # Chromium through tools/chromium-in-docker.sh, never with the runner's Google Chrome, which
+      # does not exit after --print-to-pdf (the nightly of 9 October timed out on it, WCD-24).
+      # `make up` builds this image already; built again here (cached, seconds) so the proof does
+      # not depend on what `make up` happens to build.
+      - name: Worker base image (Chromium for the A4 renderer tests)
+        run: docker build --quiet --tag coop-erp/worker-base:dev infra/worker-image
+
       # The pull request runs the narrowed proof (the copy's own tests and the rules every
       # module must keep); the whole unit and integration suite on the copy runs here.
       - name: make test-scaffold, whole suite
+        env:
+          CHROMIUM_PATH: ${{ github.workspace }}/tools/chromium-in-docker.sh
         run: make test-scaffold SCAFFOLD_TESTS=":app:test :app:integrationTest"
+
+      # Gradle prints each failed test's message and stack trace (build.gradle.kts, testLogging);
+      # the reports hold the rest. A failed proof leaves the copy in place, so its reports are here.
+      - name: Upload test reports when something failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-test-reports
+          path: |
+            backend/app/build/reports/tests
+            backend/app/build/test-results
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Container logs when something failed
         if: failure()
@@ -816,8 +872,11 @@ jobs:
           fetch-depth: 0
 
       - name: gitleaks
+        # Pinned by digest, as every action and base image (WCD-14): this image gets the whole
+        # history mounted. Dependabot does not read an inline `docker run`: bump tag and digest
+        # together, by hand.
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 detect --source /repo --no-banner --redact
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 detect --source /repo --no-banner --redact
 
   # Tells the team. By itself GitHub mails a failed run to the one person who caused it, and a
   # failed nightly run to whoever last edited the schedule line, so main was once red for a day
@@ -828,7 +887,7 @@ jobs:
   notify:
     name: Notify the team
     runs-on: ubuntu-latest
-    needs: [build-verify, integration-test, jacoco-merge, till, scaffolder, stack-smoke, package-main, secret-scan, nightly-fresh-clone]
+    needs: [changes, docs-check, build-verify, integration-test, jacoco-merge, till, scaffolder, stack-smoke, package-main, secret-scan, nightly-fresh-clone]
     if: always() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     timeout-minutes: 5
     permissions:
