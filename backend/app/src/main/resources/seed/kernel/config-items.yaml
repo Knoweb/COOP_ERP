@@ -171,7 +171,7 @@ config_items:
     description_en: How long a till may stand idle before it locks
     description_si: මුදල් ලේඛනයක් අගුලු දැමීමට පෙර නිකම් තිබිය හැකි කාලය
     description_ta: பணப்பெட்டி பூட்டப்படும் முன் செயலற்று இருக்கக்கூடிய நேரம்
-    default: "PT5M"
+    default: "PT2M"
     scope_kind: LOCATION
     change_permission: sys.config.manage
     till_visible: true
