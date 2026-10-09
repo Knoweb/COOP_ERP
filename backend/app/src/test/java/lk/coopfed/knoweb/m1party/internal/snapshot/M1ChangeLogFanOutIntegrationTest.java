@@ -17,10 +17,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 public class M1ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
 
-    static final UUID ENTITY = UUID.fromString("0190a810-0000-7000-8000-000000000001");
-    static final UUID SHOP = UUID.fromString("0190a810-0000-7000-8000-000000000101");
-    static final UUID CASHIER = UUID.fromString("0190a810-0000-7000-8000-000000000401");
-    static final UUID ROLE = UUID.fromString("0190a810-0000-7000-8000-000000000501");
+    static final UUID ENTITY = UUID.fromString("0190a810-0000-7000-8900-000000000001");
+    static final UUID SHOP = UUID.fromString("0190a810-0000-7000-8900-000000000101");
+    static final UUID CASHIER = UUID.fromString("0190a810-0000-7000-8900-000000000401");
+    static final UUID ROLE = UUID.fromString("0190a810-0000-7000-8900-000000000501");
 
     @Autowired
     M1ChangeLogFanOut fanOut;
