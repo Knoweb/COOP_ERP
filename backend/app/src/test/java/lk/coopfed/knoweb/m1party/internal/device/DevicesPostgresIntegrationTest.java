@@ -95,7 +95,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID RCT_P2 = UUID.fromString("0190e600-0000-7000-8000-000000000304");
     private static final UUID USER = UUID.fromString("0190e600-0000-7000-8000-000000000010");
 
-    private static final String FLOOR_KEY = AssignDeviceToPositionHandler.VERSION_FLOOR;
+    private static final String FLOOR_KEY = "sync.app_version_floor";
 
     @Autowired
     Handles<EnrolDevice, UUID> enrolDevice;
@@ -131,7 +131,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
     void twoSocietiesThreeShopsFourPositions() {
         JdbcTemplate admin = superuserJdbc();
         admin.update("delete from kernel.numbering_series where owner_entity_id in (?, ?)", MPCS, OTHER);
-        admin.update("delete from kernel.config_value where key = ?", FLOOR_KEY);
+        admin.update("delete from kernel.config_value where key in (?, 'sync.app_version_floor.grace')", FLOOR_KEY);
         admin.execute("truncate table party.device, party.till_position, party.location, party.entity_relationship,"
                 + " party.entity_party_directory, party.entity cascade");
         sync.drained.clear();
@@ -158,7 +158,8 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void noFloorLeftBehind() {
-        superuserJdbc().update("delete from kernel.config_value where key = ?", FLOOR_KEY);
+        superuserJdbc()
+                .update("delete from kernel.config_value where key in (?, 'sync.app_version_floor.grace')", FLOOR_KEY);
     }
 
     // ---- EnrolDevice -------------------------------------------------------------------------
@@ -471,7 +472,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
         sync.versions.put(downgraded, "1.0.0");
         superuserJdbc()
                 .update(
-                        "insert into kernel.config_value (key, value, reason) values (?, '\"1.3\"'::jsonb, 'test')",
+                        "insert into kernel.config_value (key, value, reason) values (?, '\"1.3\"'::jsonb, 'test'), ('sync.app_version_floor.grace', '\"PT0S\"'::jsonb, 'test')",
                         FLOOR_KEY);
         kernel.reset();
 
@@ -559,7 +560,7 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
         // The version floor comes from the configuration register (doc 31 section 6).
         superuserJdbc()
                 .update(
-                        "insert into kernel.config_value (key, value, reason) values (?, '\"1.3\"'::jsonb, 'test')",
+                        "insert into kernel.config_value (key, value, reason) values (?, '\"1.3\"'::jsonb, 'test'), ('sync.app_version_floor.grace', '\"PT0S\"'::jsonb, 'test')",
                         FLOOR_KEY);
         refused(
                 () -> assignDevice.handle(assign(old, floorPosition), atShop(MPCS, floorShop)),

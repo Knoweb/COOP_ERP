@@ -14,8 +14,7 @@ import java.time.Instant;
  *
  * <p>Decided on the architect's delegation, 27 September 2026 (branch {@code feat/decisions-sync}):
  * one floor, owned by the sync gateway, instead of the gateway's {@code sync.app_version_floor}
- * and M1's {@code m1.device.version_floor} side by side. M1's assignment guard moves to this
- * interface in its follow-up ticket ({@code docs/PLAN_TO_M2.md}, K-08-F1).
+ * and M1's {@code m1.device.version_floor} side by side.
  */
 public interface AppVersionFloor {
 
