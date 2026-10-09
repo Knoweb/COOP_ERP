@@ -148,7 +148,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         }
 
         assertThat(after)
-                .containsEntry("kernel", 87)
+                .containsEntry("kernel", 89)
                 .containsEntry("m1party", 15)
                 .containsEntry("m1security", 20)
                 .containsEntry("m2catalogue", 8)
