@@ -232,7 +232,16 @@ class EventApplier {
         } catch (Refused refused) {
             String stored = "FORBIDDEN_FIELD".equals(refused.reason) ? withoutForbiddenValues(event) : raw;
             return quarantine(
-                    device, record, batchId, seq, eventId, eventType, refused.reason, refused.getMessage(), stored);
+                    device,
+                    record,
+                    batchId,
+                    seq,
+                    eventId,
+                    eventType,
+                    refused.reason,
+                    refused.getMessage(),
+                    stored,
+                    event);
         }
     }
 
@@ -314,7 +323,7 @@ class EventApplier {
         return value.toString();
     }
 
-    private Ack.Outcome quarantine(
+    Ack.Outcome quarantine(
             ScopeContext device,
             DeviceRecord record,
             UUID batchId,
@@ -323,14 +332,40 @@ class EventApplier {
             String eventType,
             String reason,
             String detail,
-            String raw) {
+            String raw,
+            JsonNode event) {
         UUID quarantineId = Ids.next();
         String type = eventType == null ? null : eventType.substring(0, Math.min(eventType.length(), 200));
+        UUID seriesId = null;
+        Long docNumber = null;
+        if (type != null && isBundle(type) && event != null && event.hasNonNull("payload")) {
+            JsonNode payload = event.get("payload");
+            if (payload.hasNonNull("document")) {
+                JsonNode doc = payload.get("document");
+                if (doc.hasNonNull("series_id") && doc.get("series_id").isTextual()) {
+                    try {
+                        seriesId = UUID.fromString(doc.get("series_id").asText());
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+                JsonNode numNode = doc.get("doc_number");
+                if (numNode != null && numNode.isIntegralNumber()) {
+                    try {
+                        long n = Long.parseLong(numNode.asText());
+                        if (n > 0) {
+                            docNumber = n;
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+        }
         jdbc.update(
                 """
                 insert into kernel.sync_quarantine (quarantine_id, device_id, owner_entity_id, location_id, batch_id,
-                                                    device_seq, event_id, event_type, reason, detail, raw_event)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                                    device_seq, event_id, event_type, reason, detail, raw_event,
+                                                    series_id, doc_number)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 quarantineId,
                 record.deviceId(),
@@ -342,7 +377,9 @@ class EventApplier {
                 type,
                 reason,
                 detail,
-                raw);
+                raw,
+                seriesId,
+                docNumber);
         jdbc.update(
                 """
                 insert into kernel.sync_event (device_id, device_seq, owner_entity_id, event_id, event_type,
