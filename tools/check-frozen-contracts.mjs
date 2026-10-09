@@ -13,7 +13,10 @@
 //      version bump), or
 //   2. info.x-change-request here names a file under docs/change-requests/ that exists and
 //      differs from origin/main's info.x-change-request value (an api/query-only Java change,
-//      recorded against a change request instead of a version bump).
+//      recorded against a change request instead of a version bump), and that change request is
+//      not an old one borrowed: either its file is added or changed in this diff, or no slice on
+//      origin/main cites it yet. A change request already cited for another contract change does
+//      not cover this one (wave 3, WCD-15).
 //
 // Rule 2 exists because a change to the api or query package (records, query interfaces) is a
 // change to the contract even when the REST slice's shape does not move, and 21A/22A-style
@@ -82,9 +85,19 @@ export function infoField(yamlText, field) {
 /**
  * The rule for one slice, given whether anything the freeze watches changed. Pure: no git, no
  * filesystem. `existingChangeRequests` is the set of file names under docs/change-requests/
- * (e.g. "CR-21A-4.md") that actually exist.
+ * (e.g. "CR-21A-4.md") that actually exist; `changedChangeRequests` the ones added or changed
+ * against origin/main; `citedOnMain` the file names some slice's x-change-request names on
+ * origin/main already.
  */
-export function problemsOfFrozenContract(sliceRelative, mainText, localText, changed, existingChangeRequests) {
+export function problemsOfFrozenContract(
+  sliceRelative,
+  mainText,
+  localText,
+  changed,
+  existingChangeRequests,
+  changedChangeRequests = new Set(),
+  citedOnMain = new Set()
+) {
   const mainVersion = infoField(mainText, "version");
 
   if (!mainVersion || compareVersions(mainVersion, "1.0.0") < 0) {
@@ -110,7 +123,14 @@ export function problemsOfFrozenContract(sliceRelative, mainText, localText, cha
   if (localChangeRequest && localChangeRequest !== mainChangeRequest) {
     const crFile = `CR-${localChangeRequest.replace(/^CR-/, "")}.md`;
     if (existingChangeRequests.has(crFile)) {
-      return []; // rule 2 satisfied
+      if (changedChangeRequests.has(crFile) || !citedOnMain.has(crFile)) {
+        return []; // rule 2 satisfied
+      }
+      return [
+        `${sliceRelative}: info.x-change-request "${localChangeRequest}" is already cited by a slice on ` +
+          `origin/main and docs/change-requests/${crFile} is not changed here: an old change request does ` +
+          `not cover a new contract change. Name a new change request, or amend that one in this change.`
+      ];
     }
     return [`${sliceRelative}: info.x-change-request "${localChangeRequest}" names no file docs/change-requests/${crFile}`];
   }
@@ -154,6 +174,8 @@ export function problemsOfFrozenContracts() {
   const existingChangeRequests = fs.existsSync(CHANGE_REQUESTS_DIR)
     ? new Set(fs.readdirSync(CHANGE_REQUESTS_DIR))
     : new Set();
+  const changedChangeRequests = changeRequestsChangedAgainstMain();
+  const citedOnMain = changeRequestsCitedOnMain();
 
   return fs
     .readdirSync(SLICES_DIR)
@@ -180,9 +202,48 @@ export function problemsOfFrozenContracts() {
         mainText,
         localText,
         changedAgainstMain(watchedPaths),
-        existingChangeRequests
+        existingChangeRequests,
+        changedChangeRequests,
+        citedOnMain
       );
     });
+}
+
+/** The file names under docs/change-requests/ added or changed against origin/main, committed or not. */
+function changeRequestsChangedAgainstMain() {
+  const names = new Set();
+  for (const args of [
+    ["diff", "--name-only", "--no-renames", "origin/main", "HEAD", "--", CHANGE_REQUESTS_DIR],
+    ["diff", "--name-only", "--no-renames", "origin/main", "--", CHANGE_REQUESTS_DIR]
+  ]) {
+    try {
+      git(args)
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .forEach((line) => names.add(path.basename(line)));
+    } catch {
+      // no origin/main (a shallow clone): nothing counts as changed
+    }
+  }
+  return names;
+}
+
+/** The change request files that some slice's info.x-change-request names on origin/main. */
+function changeRequestsCitedOnMain() {
+  const cited = new Set();
+  let files = [];
+  try {
+    files = git(["ls-tree", "--name-only", `origin/main:${SLICES_DIR}`]).split("\n");
+  } catch {
+    return cited;
+  }
+  for (const file of files.filter((f) => f.endsWith(".yaml"))) {
+    const value = infoField(readAtRef("origin/main", `${SLICES_DIR}/${file}`), "x-change-request");
+    if (value) {
+      cited.add(`CR-${value.replace(/^CR-/, "")}.md`);
+    }
+  }
+  return cited;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
