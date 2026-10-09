@@ -360,9 +360,20 @@ public class OutboxWriter implements EventPublisher {
     private static final Set<String> SECRET_WORDS =
             Set.of("pin", "otp", "password", "token", "secret", "credential", "nic", "passport");
 
+    /**
+     * Words that begin or end with a short forbidden word without naming personal or secret data
+     * ("pinned" is not a PIN). Each one is a known false positive of the rule below; add one only
+     * with the field that needs it.
+     */
+    static final Set<String> ALLOWED_WORDS = Set.of("pinned");
+
     static boolean isForbiddenField(String key) {
-        String[] words =
-                key.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase().split("[^a-z0-9]+");
+        // Split on case both ways: "customerName" -> customer, name; and an acronym before a word,
+        // "NICNumber" -> nic, number; "PINHash" -> pin, hash (review wave 3, KRN-21).
+        String[] words = key.replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
+                .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+                .toLowerCase()
+                .split("[^a-z0-9]+");
         if (ALLOWED_FIELDS.contains(String.join("", words))) {
             return false;
         }
@@ -382,7 +393,20 @@ public class OutboxWriter implements EventPublisher {
                 return true;
             }
         }
-        // Joined forms a split cannot see: "firstname", "dateofbirth", "emailaddress".
+        // Joined forms a split cannot see. A short forbidden word (nic, pin, otp, dob, name, mail,
+        // city) counts at the start or the end of a word, "nicno", "pincode", "customername"; it
+        // is not looked for inside one, where it is mostly chance ("technician", "shipping").
+        for (String word : words) {
+            if (ALLOWED_WORDS.contains(word)) {
+                continue;
+            }
+            for (String forbidden : FORBIDDEN_WORDS) {
+                if (forbidden.length() < 5 && (word.startsWith(forbidden) || word.endsWith(forbidden))) {
+                    return true;
+                }
+            }
+        }
+        // The longer ones anywhere in the whole name: "firstname", "dateofbirth", "emailaddress".
         String joined = String.join("", words);
         for (String forbidden : FORBIDDEN_WORDS) {
             if (forbidden.length() >= 5 && joined.contains(forbidden)) {
