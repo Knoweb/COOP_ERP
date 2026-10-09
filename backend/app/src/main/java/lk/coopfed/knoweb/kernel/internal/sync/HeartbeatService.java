@@ -149,7 +149,7 @@ public class HeartbeatService {
                 report.openSession(),
                 offset);
 
-        events.publish(new DeviceHeartbeatReported(deviceId, report.appVersion(), now));
+        events.publish(new DeviceHeartbeatReported(Ids.next(), deviceId, report.appVersion(), now));
 
         long threshold = settings.clockDriftReviewAfter(device).toMillis();
         if (offset != null

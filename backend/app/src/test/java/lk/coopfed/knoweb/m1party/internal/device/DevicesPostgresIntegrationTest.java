@@ -757,7 +757,9 @@ class DevicesPostgresIntegrationTest extends PostgresIntegrationTest {
         Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         String version = "1.2.3";
         heartbeatConsumer.consume(
-                new lk.coopfed.knoweb.kernel.api.DeviceHeartbeatReported(deviceId, version, now), own(MPCS));
+                new lk.coopfed.knoweb.kernel.api.DeviceHeartbeatReported(
+                        lk.coopfed.knoweb.kernel.api.Ids.next(), deviceId, version, now),
+                own(MPCS));
 
         assertThat(queries.getDevice(deviceId, own(MPCS))).hasValueSatisfying(view -> {
             assertThat(view.appVersion()).isEqualTo(version);
