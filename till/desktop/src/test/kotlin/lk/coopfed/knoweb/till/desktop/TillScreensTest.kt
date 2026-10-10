@@ -25,7 +25,6 @@ import javax.imageio.ImageIO
 import kotlin.io.path.listDirectoryEntries
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -121,20 +120,23 @@ class TillScreensTest {
         shot("4-cash", dialog = true)
         onNode(hasText("Complete (Enter)")).performClick()
         waitForText("change LKR 2,560.00", substring = true)
-        waitUntil(timeoutMillis = 10_000) { runCatching { home.resolve("print").listDirectoryEntries("*.png").isNotEmpty() }.getOrDefault(false) }
+        // The printer writes the PNG and then the .bin, and the till stays busy (its buttons
+        // disabled) until the print returns: wait for both, or the next click can be dropped.
+        waitForPrints(1)
+        waitUntil(timeoutMillis = 10_000) { !controller.busy }
         shot("5-sold")
 
         onNode(hasText("Close the session  (F10)")).performClick()
         waitForText("Counted cash (LKR)")
         onNode(hasSetTextAction() and hasText("Counted cash (LKR)")).performTextInput("4440")
         onNode(hasText("Close and print the Z-report")).performClick()
-        waitForText("Z-report", substring = true)
+        // The Z-report panel's title ("Z-report · <date>"), not the button that was just clicked.
+        waitForText("Z-report · ", substring = true)
         shot("6-z-report")
 
         assertEquals(1, controller.lastReceipt?.number)
         assertEquals("0.00", controller.lastZReport?.variance?.plain())
-        waitUntil(timeoutMillis = 10_000) { home.resolve("print").listDirectoryEntries("*.png").size == 2 }
-        assertTrue(home.resolve("print").listDirectoryEntries("*.bin").size == 2)
+        waitForPrints(2)
         driver.close()
     }
 
@@ -142,6 +144,16 @@ class TillScreensTest {
         val roots = onAllNodes(isRoot())
         val root = if (dialog) roots.onLast() else roots.onFirst()
         ImageIO.write(root.captureToImage().toAwtImage(), "png", File(shots, "$name.png"))
+    }
+
+    /** Waits until [count] slips are in the preview folder, each as its PNG and its .bin. */
+    private fun androidx.compose.ui.test.ComposeUiTest.waitForPrints(count: Int) {
+        val folder = home.resolve("print")
+        waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                folder.listDirectoryEntries("*.png").size == count && folder.listDirectoryEntries("*.bin").size == count
+            }.getOrDefault(false)
+        }
     }
 
     private fun androidx.compose.ui.test.ComposeUiTest.waitForText(text: String, substring: Boolean = false) {
