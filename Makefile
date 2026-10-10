@@ -242,8 +242,8 @@ gen-clients:
 # when git then sees a difference, which means somebody changed a slice or a module
 # dependency and did not commit what it generates. The pipeline runs it on every push.
 # ARCH_TESTS is the Gradle call that runs the documenter (ArchitectureTests writes docs/modules).
-# The pipeline passes ARCH_TESTS=:app:test: right after `make test` that task is up to date and
-# Gradle skips it, instead of starting a filtered run of the architecture tests a second time.
+# The pipeline uses the default to run only the architecture tests. (Overriding with :app:test
+# runs the full suite again because tools/normalize-components-puml.mjs breaks the cache.)
 ARCH_TESTS ?= :app:test --tests "*ArchitectureTests*"
 check-generated:
 	sh tools/gen-clients.sh

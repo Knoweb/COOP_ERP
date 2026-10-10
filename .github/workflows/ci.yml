@@ -224,7 +224,7 @@ jobs:
       # The committed web clients and module diagrams must be what the slices and the code
       # generate today.
       - name: make check-generated
-        run: make check-generated ARCH_TESTS=:app:test
+        run: make check-generated
 
       - name: Web build
         working-directory: web

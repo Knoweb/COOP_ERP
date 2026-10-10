@@ -258,6 +258,7 @@ jib {
 
 // `make test`: fast tests only. Anything tagged "integration" needs Docker and is left out.
 tasks.test {
+    maxHeapSize = "768m"
     useJUnitPlatform {
         excludeTags("integration")
     }
