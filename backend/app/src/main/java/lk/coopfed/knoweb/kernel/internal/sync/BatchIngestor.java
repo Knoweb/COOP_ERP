@@ -66,12 +66,19 @@ class BatchIngestor {
     private final IngestTransactions transactions;
     private final SyncSettings settings;
     private final AppVersionFloor floors;
+    private final FloorAlerts floorAlerts;
     private final Clock clock;
 
-    BatchIngestor(IngestTransactions transactions, SyncSettings settings, AppVersionFloor floors, Clock clock) {
+    BatchIngestor(
+            IngestTransactions transactions,
+            SyncSettings settings,
+            AppVersionFloor floors,
+            FloorAlerts floorAlerts,
+            Clock clock) {
         this.transactions = transactions;
         this.settings = settings;
         this.floors = floors;
+        this.floorAlerts = floorAlerts;
         this.clock = clock;
     }
 
@@ -121,6 +128,9 @@ class BatchIngestor {
         int applied = 0;
         int quarantined = 0;
         try {
+            // After the claim, so a batch refused with 409 or answered from a stored acknowledgement
+            // raises nothing; once per device and floor (doc 31 section 6; K4-01).
+            floorAlerts.raiseOnce(device, batch.appVersion(), floor);
             // The overlap with what is already at central: answered from state, not applied again.
             if (batch.firstSeq() <= lastApplied) {
                 List<Ack.Outcome> known = transactions.fromState(device, batch.firstSeq(), lastApplied);
@@ -211,7 +221,6 @@ class BatchIngestor {
                     batch.appVersion(),
                     floor.floor(),
                     floor.graceEndsAt());
-            transactions.recordFloorAlert(device, batch.appVersion(), floor);
         }
         return floor;
     }
