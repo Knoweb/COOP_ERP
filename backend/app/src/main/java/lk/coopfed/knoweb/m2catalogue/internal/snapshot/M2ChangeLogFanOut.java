@@ -1,7 +1,6 @@
 package lk.coopfed.knoweb.m2catalogue.internal.snapshot;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -13,8 +12,6 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeLinked;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeRegistered;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeRetired;
-import lk.coopfed.knoweb.m2catalogue.api.BatchCorrected;
-import lk.coopfed.knoweb.m2catalogue.api.BatchRegistered;
 import lk.coopfed.knoweb.m2catalogue.api.ConversionDefined;
 import lk.coopfed.knoweb.m2catalogue.api.ImageAttached;
 import lk.coopfed.knoweb.m2catalogue.api.ImageRetired;
@@ -32,14 +29,20 @@ import org.springframework.stereotype.Component;
 /**
  * Change-log producer for M2 Catalogue & Batch (22A section 7.2; doc 32 section 5.2).
  *
- * <p>Listens to domain events for SKUs, barcodes, unit conversions, product images and batches,
- * and records delta rows into {@code kernel.change_log} for the appropriate shops:
+ * <p>Listens to domain events for SKUs, barcodes, unit conversions and product images, and
+ * records delta rows into {@code kernel.change_log} for the appropriate shops (every shop in any
+ * status, see {@link CatalogueShops}):
  * <ul>
- *   <li>SHARED SKU mutations fan out to all active shops across the federation.
- *   <li>LOCAL SKU mutations fan out strictly to active shops of the owning entity.
+ *   <li>SHARED SKU mutations fan out to every shop across the federation.
+ *   <li>LOCAL SKU mutations fan out strictly to the shops of the owning entity.
  *   <li>Local image overrides on a SHARED SKU fan out strictly to the overriding entity's shops.
  *   <li>SKU deactivations are flagged urgent so enrolled tills pick them up on the next heartbeat.
  * </ul>
+ *
+ * <p>Batches are not recorded here: doc 32 section 5.1 puts the batches a till holds in the Lots
+ * table set ("batches with positive on-hand at the location", from M5 with the batch identity
+ * from M2), and the till reads no batch rows yet. A batch registration or correction reaches a
+ * till through M5's lot contributor once it exists (wave 4 TD-02 and TD-04).
  */
 @Component
 public class M2ChangeLogFanOut {
@@ -48,7 +51,6 @@ public class M2ChangeLogFanOut {
 
     static final String CONSUMER = "m2.snapshot";
     static final String SKU = CatalogueSnapshotContributor.SKU;
-    static final String BATCH = CatalogueSnapshotContributor.BATCH;
     static final String STATUS_SHARED = "SHARED";
 
     private final ChangeLog changeLog;
@@ -83,7 +85,7 @@ public class M2ChangeLogFanOut {
         }
 
         boolean shared = STATUS_SHARED.equalsIgnoreCase(status) || isFederation(ownerEntityId);
-        List<Target> targets = shared ? shops.all(scope) : shops.of(ownerEntityId, scope);
+        List<Target> targets = shared ? shops.all() : shops.of(ownerEntityId);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
         }
@@ -101,7 +103,7 @@ public class M2ChangeLogFanOut {
         }
 
         boolean wasShared = STATUS_SHARED.equalsIgnoreCase(priorStatus) || isFederation(ownerEntityId);
-        List<Target> targets = wasShared ? shops.all(scope) : shops.of(ownerEntityId, scope);
+        List<Target> targets = wasShared ? shops.all() : shops.of(ownerEntityId);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, true, scope);
         }
@@ -123,7 +125,7 @@ public class M2ChangeLogFanOut {
         boolean shared = meta != null ? STATUS_SHARED.equalsIgnoreCase(meta.status()) : isFederation(ownerEntityId);
         UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : ownerEntityId;
 
-        List<Target> targets = shared ? shops.all(scope) : shops.of(targetOwner, scope);
+        List<Target> targets = shared ? shops.all() : shops.of(targetOwner);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
         }
@@ -145,7 +147,7 @@ public class M2ChangeLogFanOut {
         boolean shared = meta != null ? STATUS_SHARED.equalsIgnoreCase(meta.status()) : isFederation(ownerEntityId);
         UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : ownerEntityId;
 
-        List<Target> targets = shared ? shops.all(scope) : shops.of(targetOwner, scope);
+        List<Target> targets = shared ? shops.all() : shops.of(targetOwner);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
         }
@@ -170,47 +172,17 @@ public class M2ChangeLogFanOut {
                     && !isFederation(imageOwnerId)
                     && !Objects.equals(imageOwnerId, meta.ownerEntityId())) {
                 // Local override on a SHARED SKU by an MPCS entity: reaches that entity's shops only.
-                targets = shops.of(imageOwnerId, scope);
+                targets = shops.of(imageOwnerId);
             } else {
-                targets = shops.all(scope);
+                targets = shops.all();
             }
         } else {
             UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : imageOwnerId;
-            targets = shops.of(targetOwner, scope);
+            targets = shops.of(targetOwner);
         }
 
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
-        }
-    }
-
-    // ---- Batches ------------------------------------------------------------------------------
-
-    @EventConsumer(
-            types = {BatchRegistered.TYPE, BatchCorrected.TYPE},
-            consumer = CONSUMER)
-    public void onBatchChanged(JsonNode payload, ScopeContext scope) {
-        UUID batchId = uuid(payload, "batchId");
-        UUID skuId = uuid(payload, "skuId");
-        UUID ownerEntityId = uuid(payload, "ownerEntityId");
-        UUID correctsBatchId = uuid(payload, "correctsBatchId");
-        if (batchId == null) {
-            throw new IllegalArgumentException("Batch event payload is missing batchId");
-        }
-
-        List<Change> changes = new ArrayList<>();
-        changes.add(Change.upsert(BATCH, batchId));
-        if (correctsBatchId != null) {
-            changes.add(Change.upsert(BATCH, correctsBatchId));
-        }
-
-        SkuMeta meta = skuId != null ? skuMeta(skuId) : null;
-        boolean shared = meta != null ? STATUS_SHARED.equalsIgnoreCase(meta.status()) : isFederation(ownerEntityId);
-        UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : ownerEntityId;
-
-        List<Target> targets = shared ? shops.all(scope) : shops.of(targetOwner, scope);
-        if (!targets.isEmpty()) {
-            changeLog.append(targets, changes, null, false, scope);
         }
     }
 

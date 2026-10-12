@@ -168,10 +168,37 @@ class M1ChangeLogFanOut {
     }
 
     @EventConsumer(
-            types = {UserCreated.TYPE, UserUpdated.TYPE, UserActivated.TYPE},
+            types = {UserCreated.TYPE, UserActivated.TYPE},
             consumer = CONSUMER)
     public void onNormalUserEvent(JsonNode payload, ScopeContext scope) {
         fanOutUser(payload, scope, false);
+    }
+
+    /**
+     * An update is urgent when it takes the operator off the tills: a kind that does not sign in at
+     * a till (anything but TILL or BOTH, such as BACK_OFFICE) or a status other than ACTIVE removes
+     * the user from the operator table (OperatorSnapshotContributor), and the till must drop her at
+     * the next heartbeat, not at its next normal pull (doc 32 section 5.2, "permission revoked").
+     * The payload does not carry the kind before the update, so an update of a user who never was
+     * at a till is urgent as well; it reaches only the shops of her roles, which is cheap.
+     */
+    @EventConsumer(
+            types = {UserUpdated.TYPE},
+            consumer = CONSUMER)
+    public void onUserUpdated(JsonNode payload, ScopeContext scope) {
+        fanOutUser(payload, scope, takesTheOperatorOffTheTill(payload));
+    }
+
+    static boolean takesTheOperatorOffTheTill(JsonNode payload) {
+        String kind = text(payload, "userKind");
+        String status = text(payload, "status");
+        boolean signsInAtATill = "TILL".equals(kind) || "BOTH".equals(kind);
+        return !signsInAtATill || !"ACTIVE".equals(status);
+    }
+
+    private static String text(JsonNode payload, String field) {
+        JsonNode value = payload.path(field);
+        return value.isMissingNode() || value.isNull() ? null : value.asText();
     }
 
     private void fanOutUser(JsonNode payload, ScopeContext scope, boolean urgent) {

@@ -17,8 +17,6 @@ import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.kernel.internal.sync.SnapshotBuilder;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeRegistered;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeRetired;
-import lk.coopfed.knoweb.m2catalogue.api.BatchCorrected;
-import lk.coopfed.knoweb.m2catalogue.api.BatchRegistered;
 import lk.coopfed.knoweb.m2catalogue.api.ConversionDefined;
 import lk.coopfed.knoweb.m2catalogue.api.ImageAttached;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDeactivated;
@@ -31,8 +29,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * PostgreSQL integration tests for {@link M2ChangeLogFanOut}: verifies that central SKU, barcode,
- * conversion, image, and batch lifecycle events produce the correct change-log records and that
- * enrolled tills receive expected upserts, overrides, and tombstones in their deltas.
+ * conversion and image lifecycle events produce the correct change-log records at shops in any
+ * status, and that enrolled tills receive expected upserts, overrides, and tombstones in their
+ * deltas.
  */
 public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
 
@@ -40,6 +39,8 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
     static final UUID ENTITY_B = UUID.fromString("0190a820-0000-7000-8800-000000000002");
     static final UUID SHOP_A = UUID.fromString("0190a820-0000-7000-8800-000000000101");
     static final UUID SHOP_B = UUID.fromString("0190a820-0000-7000-8800-000000000102");
+    static final UUID SHOP_A_ONBOARDING = UUID.fromString("0190a820-0000-7000-8800-000000000103");
+    static final UUID SHOP_B_DORMANT = UUID.fromString("0190a820-0000-7000-8800-000000000104");
 
     static final UUID SKU_SHARED = UUID.fromString("0190a820-0000-7000-8800-000000000301");
     static final UUID SKU_LOCAL_A = UUID.fromString("0190a820-0000-7000-8800-000000000302");
@@ -65,6 +66,8 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
     private final ScopeContext centralScope = SystemScope.own(TEST_FEDERATION, null);
     private final ScopeContext tillScopeA = SystemScope.own(ENTITY_A, SHOP_A);
     private final ScopeContext tillScopeB = SystemScope.own(ENTITY_B, SHOP_B);
+    private final ScopeContext tillScopeOnboarding = SystemScope.own(ENTITY_A, SHOP_A_ONBOARDING);
+    private final ScopeContext tillScopeDormant = SystemScope.own(ENTITY_B, SHOP_B_DORMANT);
 
     @BeforeEach
     void setupFixtures() {
@@ -81,8 +84,18 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
         db.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_ID);
         db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_ID);
 
-        db.update("delete from kernel.change_log where location_id in (?, ?)", SHOP_A, SHOP_B);
-        db.update("delete from party.location where location_id in (?, ?)", SHOP_A, SHOP_B);
+        db.update(
+                "delete from kernel.change_log where location_id in (?, ?, ?, ?)",
+                SHOP_A,
+                SHOP_B,
+                SHOP_A_ONBOARDING,
+                SHOP_B_DORMANT);
+        db.update(
+                "delete from party.location where location_id in (?, ?, ?, ?)",
+                SHOP_A,
+                SHOP_B,
+                SHOP_A_ONBOARDING,
+                SHOP_B_DORMANT);
         db.update("delete from party.entity_party_directory where entity_id in (?, ?)", ENTITY_A, ENTITY_B);
         db.update("delete from party.entity where entity_id in (?, ?)", ENTITY_A, ENTITY_B);
 
@@ -108,6 +121,22 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
                 values (?, ?, 'SH-B1', 'SHOP', 'Shop B1', 'en', 'ACTIVE')
                 """,
                 SHOP_B,
+                ENTITY_B);
+
+        // A shop of A not activated yet (its till enrols first) and a dormant shop of B (TD-01)
+        db.update(
+                """
+                insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en, language, status)
+                values (?, ?, 'SH-A2', 'SHOP', 'Shop A2', 'en', 'ONBOARDING')
+                """,
+                SHOP_A_ONBOARDING,
+                ENTITY_A);
+        db.update(
+                """
+                insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en, language, status)
+                values (?, ?, 'SH-B2', 'SHOP', 'Shop B2', 'en', 'DORMANT')
+                """,
+                SHOP_B_DORMANT,
                 ENTITY_B);
 
         // Shared tax category
@@ -337,14 +366,60 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
         assertThat(deltaB.path("tables").path("sku").path("upserts").toString()).doesNotContain(SKU_SHARED.toString());
     }
 
+    /**
+     * TD-01: a till enrols before its shop is activated, and a dormant shop's till keeps its
+     * version, so a catalogue change is recorded at a shop in any status, not only ACTIVE ones.
+     */
     @Test
-    void batchRegistrationAndCorrectionPropagatesToTillsInDeltas() throws Exception {
-        long baselineVersion = initializeTillBaseline(tillScopeA, SHOP_A, SKU_SHARED);
+    void catalogueChangesReachShopsThatAreNotActiveYetOrDormant() throws Exception {
+        long baselineOnboarding = initializeTillBaseline(tillScopeOnboarding, SHOP_A_ONBOARDING, SKU_SHARED);
+        long baselineDormant = initializeTillBaseline(tillScopeDormant, SHOP_B_DORMANT, SKU_SHARED);
 
-        UUID batchId = UUID.fromString("0190a820-0000-7000-8800-000000000501");
-        UUID replacementId = UUID.fromString("0190a820-0000-7000-8800-000000000502");
+        superuserJdbc()
+                .update("update catalogue.sku set short_name_en = 'Rice before opening' where sku_id = ?", SKU_SHARED);
+        SkuUpdated shared = new SkuUpdated(SKU_SHARED, TEST_FEDERATION, "SKU-SHR", "SHARED");
+        transactions.inOwnTransaction(centralScope, () -> {
+            fanOut.onSkuChanged(mapper.valueToTree(shared), centralScope);
+            return null;
+        });
 
-        // 1. Batch registration
+        assertThat(fetchDelta(tillScopeOnboarding, baselineOnboarding)
+                        .path("tables")
+                        .path("sku")
+                        .path("upserts")
+                        .toString())
+                .as("the ONBOARDING shop's till")
+                .contains(SKU_SHARED.toString());
+        assertThat(fetchDelta(tillScopeDormant, baselineDormant)
+                        .path("tables")
+                        .path("sku")
+                        .path("upserts")
+                        .toString())
+                .as("the DORMANT shop's till")
+                .contains(SKU_SHARED.toString());
+
+        // A LOCAL item of society A reaches its ONBOARDING shop as well (the entity's shops).
+        long afterShared = fetchDelta(tillScopeOnboarding, 0).path("version").asLong();
+        SkuUpdated local = new SkuUpdated(SKU_LOCAL_A, ENTITY_A, "SKU-LOC-A", "LOCAL");
+        ScopeContext scopeA = SystemScope.own(ENTITY_A, null);
+        transactions.inOwnTransaction(scopeA, () -> {
+            fanOut.onSkuChanged(mapper.valueToTree(local), scopeA);
+            return null;
+        });
+        assertThat(fetchDelta(tillScopeOnboarding, afterShared)
+                        .path("tables")
+                        .path("sku")
+                        .path("upserts")
+                        .toString())
+                .contains(SKU_LOCAL_A.toString());
+    }
+
+    /**
+     * TD-02 and TD-04: M2 serves no batch table and records no batch change; the batches a till
+     * holds are M5's lots with on-hand at the location (doc 32 section 5.1).
+     */
+    @Test
+    void aFullSnapshotCarriesNoBatchesOfTheFederation() throws Exception {
         superuserJdbc()
                 .update(
                         """
@@ -352,83 +427,15 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
                                                      printed_mrp, expiry_date, created_at)
                         values (?, ?, 'B-TEST-01', ?, 'REGISTERED', 450.00, '2027-06-30', clock_timestamp())
                         """,
-                        batchId,
+                        UUID.fromString("0190a820-0000-7000-8800-000000000501"),
                         SKU_SHARED,
                         TEST_FEDERATION);
 
-        BatchRegistered regEvent = new BatchRegistered(
-                batchId,
-                SKU_SHARED,
-                null,
-                TEST_FEDERATION,
-                "B-TEST-01",
-                null,
-                LocalDate.of(2027, 6, 30),
-                new BigDecimal("450.00"),
-                false,
-                null);
+        JsonNode full = fetchDelta(tillScopeA, 0);
 
-        transactions.inOwnTransaction(centralScope, () -> {
-            fanOut.onBatchChanged(mapper.valueToTree(regEvent), centralScope);
-            return null;
-        });
-
-        JsonNode delta1 = fetchDelta(tillScopeA, baselineVersion);
-        assertThat(delta1.path("tables").path("batch").path("upserts").toString())
-                .contains(batchId.toString());
-        JsonNode batchRow = findRow(delta1.path("tables").path("batch").path("upserts"), batchId.toString());
-        assertThat(batchRow.path("data").path("status").asText()).isEqualTo("REGISTERED");
-        assertThat(batchRow.path("data").path("printed_mrp").asText()).isEqualTo("450.00");
-
-        long version1 = delta1.path("version").asLong();
-
-        // 2. Batch correction: database trigger marks old SUPERSEDED when replacement is registered
-        try (var conn = superuserJdbc().getDataSource().getConnection();
-                var stmt = conn.createStatement()) {
-            stmt.execute("set app.scope_class = 'OWN'");
-            stmt.execute("set app.scope_entity_id = '" + TEST_FEDERATION + "'");
-            try (var ps = conn.prepareStatement(
-                    """
-                    insert into catalogue.batch (batch_id, sku_id, batch_no, owner_entity_id, status,
-                                                 printed_mrp, expiry_date, corrects_batch_id, created_at)
-                    values (?, ?, 'B-TEST-01', ?, 'REGISTERED', 475.00, '2027-06-30', ?, clock_timestamp())
-                    """)) {
-                ps.setObject(1, replacementId);
-                ps.setObject(2, SKU_SHARED);
-                ps.setObject(3, TEST_FEDERATION);
-                ps.setObject(4, batchId);
-                ps.executeUpdate();
-            }
-        }
-
-        BatchCorrected corrEvent = new BatchCorrected(
-                replacementId,
-                batchId,
-                SKU_SHARED,
-                null,
-                TEST_FEDERATION,
-                "B-TEST-01",
-                LocalDate.of(2027, 6, 30),
-                new BigDecimal("475.00"),
-                "PRICE_REVISED");
-
-        transactions.inOwnTransaction(centralScope, () -> {
-            fanOut.onBatchChanged(mapper.valueToTree(corrEvent), centralScope);
-            return null;
-        });
-
-        JsonNode delta2 = fetchDelta(tillScopeA, version1);
-        assertThat(delta2.path("tables").path("batch").path("upserts").toString())
-                .contains(replacementId.toString())
-                .contains(batchId.toString());
-
-        JsonNode replacementRow =
-                findRow(delta2.path("tables").path("batch").path("upserts"), replacementId.toString());
-        assertThat(replacementRow.path("data").path("status").asText()).isEqualTo("REGISTERED");
-        assertThat(replacementRow.path("data").path("printed_mrp").asText()).isEqualTo("475.00");
-
-        JsonNode oldRow = findRow(delta2.path("tables").path("batch").path("upserts"), batchId.toString());
-        assertThat(oldRow.path("data").path("status").asText()).isEqualTo("SUPERSEDED");
+        assertThat(full.path("full").asBoolean()).isTrue();
+        assertThat(full.path("tables").has("sku")).isTrue();
+        assertThat(full.path("tables").has("batch")).isFalse();
     }
 
     // ---- Helpers ------------------------------------------------------------------------------

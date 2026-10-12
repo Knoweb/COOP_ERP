@@ -36,15 +36,16 @@ import org.springframework.stereotype.Component;
  * <p>Which SKUs: until the assortment of M2-09 exists, every SKU the shop's entity may sell, its
  * own LOCAL ones and every SHARED one (row-level security in the device's scope shows exactly
  * those). A DRAFT or INACTIVE SKU is not returned, so the till receives a tombstone for it.
- * {@code batch} is M5's lot contributor's to name (22A: "ids supplied by M5") and is not served
- * yet.
+ * {@code batch} is M5's lot contributor's to name (22A: "ids supplied by M5"; doc 32 section 5.1:
+ * "batches with positive on-hand at the location", in the Lots table set) and is not served here:
+ * the till reads no batch rows yet, and serving every batch the till's scope can read would carry
+ * the whole federation's batches (wave 4 TD-02 and TD-04).
  */
 @Component
 class CatalogueSnapshotContributor implements SnapshotContributor {
 
     static final String SKU = "sku";
     static final String TAX_CATEGORY = "tax_category";
-    static final String BATCH = "batch";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -54,7 +55,7 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
 
     @Override
     public Set<String> tables() {
-        return Set.of(SKU, TAX_CATEGORY, BATCH);
+        return Set.of(SKU, TAX_CATEGORY);
     }
 
     @Override
@@ -74,7 +75,6 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
         return switch (table) {
             case SKU -> skus(shop, ids);
             case TAX_CATEGORY -> taxCategories(ids);
-            case BATCH -> batches(shop, ids);
             default -> throw new IllegalArgumentException("Not an M2 snapshot table: " + table);
         };
     }
@@ -241,37 +241,6 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
                             .add(rate);
                 });
         return categories;
-    }
-
-    // ---- batch --------------------------------------------------------------------------------
-
-    private Map<UUID, Map<String, Object>> batches(Shop shop, Collection<UUID> ids) {
-        MapSqlParameterSource params = new MapSqlParameterSource("ids", ids);
-        String onlyIds = ids == null ? "" : " and b.batch_id in (:ids)";
-
-        Map<UUID, Map<String, Object>> batches = new LinkedHashMap<>();
-        jdbc.query(
-                """
-                select b.batch_id, b.sku_id, b.batch_no, b.manufacture_date, b.expiry_date,
-                       b.printed_mrp, b.status
-                  from catalogue.batch b
-                  join catalogue.sku s on s.sku_id = b.sku_id
-                 where s.status in ('LOCAL', 'SHARED')"""
-                        + onlyIds
-                        + " order by b.created_at, b.batch_id",
-                params,
-                rs -> {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("sku_id", rs.getObject("sku_id", UUID.class).toString());
-                    row.put("batch_no", rs.getString("batch_no"));
-                    row.put("manufacture_date", text(rs.getDate("manufacture_date")));
-                    row.put("expiry_date", text(rs.getDate("expiry_date")));
-                    row.put("expiry", text(rs.getDate("expiry_date")));
-                    row.put("printed_mrp", text(rs.getBigDecimal("printed_mrp")));
-                    row.put("status", rs.getString("status"));
-                    batches.put(rs.getObject("batch_id", UUID.class), row);
-                });
-        return batches;
     }
 
     // ---- helpers ------------------------------------------------------------------------------
