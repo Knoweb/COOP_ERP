@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import lk.coopfed.knoweb.till.core.crypto.Sha256
 import lk.coopfed.knoweb.till.core.json.CanonicalJson
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotDelta
@@ -121,6 +122,52 @@ class SnapshotVerificationTest {
 
         assertNotNull(till.service.catalogue.byBarcode("4790000000035"))
         assertNull(till.service.catalogue.byBarcode(TillFixture.DHAL))
+        assertNotNull(till.service.catalogue.byBarcode(TillFixture.RICE))
+    }
+
+    @Test
+    fun aNewlyRegisteredBarcodeScansAtAnEnrolledTillAfterNextDelta() = runTest {
+        val till = TillFixture().enrolled()
+        val newGtin = "4791234567891"
+
+        // 1. Barcode is initially unknown on the till
+        assertNull(till.service.catalogue.byBarcode(newGtin))
+
+        // 2. Central registers the new barcode on existing Rice SKU and sends updated SKU in delta
+        val riceWithNewBarcode = SnapshotRow(
+            "sku", Samples.SKU_RICE, null,
+            buildJsonObject {
+                put("sku_code", "RICE")
+                put("status", "SHARED")
+                put("short_name_en", "Rice 5kg")
+                put("short_name_si", "සහල් 5kg")
+                put("base_uom_code", "EA")
+                put("sold_by_weight", false)
+                putJsonArray("barcodes") {
+                    add(buildJsonObject { put("barcode", TillFixture.RICE) })
+                    add(buildJsonObject { put("barcode", newGtin) })
+                }
+            },
+        )
+        till.central.snapshotAnswer = Samples.snapshotAnswer(8, listOf(riceWithNewBarcode), since = 7, full = false)
+
+        assertEquals(8, till.service.refreshSnapshot())
+
+        // 3. Offline till barcode lookup resolves the newly synced barcode to the right item
+        val item = till.service.catalogue.byBarcode(newGtin)
+        assertNotNull(item)
+        assertEquals(Samples.SKU_RICE, item.skuId)
+        assertEquals("Rice 5kg", item.name.en)
+        assertNotNull(till.service.catalogue.byBarcode(TillFixture.RICE))
+
+        // 4. When the barcode is retired at central, next delta updates the SKU without it
+        val riceBarcodeRetired = Samples.sku(Samples.SKU_RICE, "Rice 5kg", "සහල් 5kg", TillFixture.RICE)
+        till.central.snapshotAnswer = Samples.snapshotAnswer(9, listOf(riceBarcodeRetired), since = 8, full = false)
+
+        assertEquals(9, till.service.refreshSnapshot())
+
+        // 5. Retired barcode no longer resolves
+        assertNull(till.service.catalogue.byBarcode(newGtin))
         assertNotNull(till.service.catalogue.byBarcode(TillFixture.RICE))
     }
 

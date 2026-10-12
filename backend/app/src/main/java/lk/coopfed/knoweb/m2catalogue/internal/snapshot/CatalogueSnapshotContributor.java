@@ -44,6 +44,7 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
 
     static final String SKU = "sku";
     static final String TAX_CATEGORY = "tax_category";
+    static final String BATCH = "batch";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -53,7 +54,7 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
 
     @Override
     public Set<String> tables() {
-        return Set.of(SKU, TAX_CATEGORY);
+        return Set.of(SKU, TAX_CATEGORY, BATCH);
     }
 
     @Override
@@ -73,6 +74,7 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
         return switch (table) {
             case SKU -> skus(shop, ids);
             case TAX_CATEGORY -> taxCategories(ids);
+            case BATCH -> batches(shop, ids);
             default -> throw new IllegalArgumentException("Not an M2 snapshot table: " + table);
         };
     }
@@ -239,6 +241,37 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
                             .add(rate);
                 });
         return categories;
+    }
+
+    // ---- batch --------------------------------------------------------------------------------
+
+    private Map<UUID, Map<String, Object>> batches(Shop shop, Collection<UUID> ids) {
+        MapSqlParameterSource params = new MapSqlParameterSource("ids", ids);
+        String onlyIds = ids == null ? "" : " and b.batch_id in (:ids)";
+
+        Map<UUID, Map<String, Object>> batches = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select b.batch_id, b.sku_id, b.batch_no, b.manufacture_date, b.expiry_date,
+                       b.printed_mrp, b.status
+                  from catalogue.batch b
+                  join catalogue.sku s on s.sku_id = b.sku_id
+                 where s.status in ('LOCAL', 'SHARED')"""
+                        + onlyIds
+                        + " order by b.created_at, b.batch_id",
+                params,
+                rs -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("sku_id", rs.getObject("sku_id", UUID.class).toString());
+                    row.put("batch_no", rs.getString("batch_no"));
+                    row.put("manufacture_date", text(rs.getDate("manufacture_date")));
+                    row.put("expiry_date", text(rs.getDate("expiry_date")));
+                    row.put("expiry", text(rs.getDate("expiry_date")));
+                    row.put("printed_mrp", text(rs.getBigDecimal("printed_mrp")));
+                    row.put("status", rs.getString("status"));
+                    batches.put(rs.getObject("batch_id", UUID.class), row);
+                });
+        return batches;
     }
 
     // ---- helpers ------------------------------------------------------------------------------
