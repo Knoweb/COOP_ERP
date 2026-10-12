@@ -169,7 +169,7 @@ class ReviewConsumersPostgresIntegrationTest extends PostgresIntegrationTest {
                 kind,
                 version,
                 root == null ? id : root,
-                status,
+                "DRAFT",
                 Date.valueOf(applyFrom));
         for (int i = 0; i < lines.length; i += 2) {
             admin.update(
@@ -183,6 +183,9 @@ class ReviewConsumersPostgresIntegrationTest extends PostgresIntegrationTest {
                     Date.valueOf(applyFrom),
                     owner);
         }
+        // Lines go only on a DRAFT (trigger price_list_line_draft_only); then the state the case needs,
+        // as PublishPriceList moves it.
+        admin.update("update pricing.price_list set status = ? where price_list_id = ?", status, id);
         return id;
     }
 
