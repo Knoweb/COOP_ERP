@@ -1,11 +1,19 @@
 package lk.coopfed.knoweb.m3pricing.internal.queries;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.engine.Basket;
+import lk.coopfed.knoweb.engine.BasketResult;
 import lk.coopfed.knoweb.engine.Quantity;
+import lk.coopfed.knoweb.engine.TenderKind;
 import lk.coopfed.knoweb.engine.TradeLine;
 import lk.coopfed.knoweb.engine.TradePriceResolver;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -21,8 +29,10 @@ import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m3pricing.query.ReviewItem;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +51,8 @@ class PricingQueriesImpl implements PricingQueries {
     private final ControlPriceStore controlPrices;
     private final EffectivePolicy policies;
     private final RetailPriceResolution retail;
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper mapper;
 
     PricingQueriesImpl(
             PriceListStore store,
@@ -48,13 +60,17 @@ class PricingQueriesImpl implements PricingQueries {
             RuleStore rules,
             ControlPriceStore controlPrices,
             EffectivePolicy policies,
-            RetailPriceResolution retail) {
+            RetailPriceResolution retail,
+            JdbcTemplate jdbc,
+            ObjectMapper mapper) {
         this.store = store;
         this.relationships = relationships;
         this.rules = rules;
         this.controlPrices = controlPrices;
         this.policies = policies;
         this.retail = retail;
+        this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     @Override
@@ -181,5 +197,56 @@ class PricingQueriesImpl implements PricingQueries {
                         quote.getTierFromQty().getValue(),
                         quote.getUnitPrice(),
                         quote.getEngineVersion()));
+    }
+
+    @Override
+    public Optional<BasketResult> resolveBasket(
+            UUID locationId, LocalDate date, TenderKind tender, Basket basket, ScopeContext scope) {
+        return retail.resolveBasket(locationId, date, tender, basket, scope);
+    }
+
+    @Override
+    public List<ReviewItem> listReviews(String kind, String status, ScopeContext scope) {
+        String sql =
+                "select a.audit_id, a.event_type_code, a.occurred_at, a.owner_entity_id, a.subject_id, a.after_state "
+                        + "from kernel.audit_event a "
+                        + "join kernel.audit_event_type t on t.event_type_code = a.event_type_code "
+                        + "where t.severity = 'REVIEW' "
+                        + "  and a.event_type_code in ('BATCH_MRP_BELOW_LIST', 'TRADE_ABOVE_MRP', 'LIST_ABOVE_CEILING_AT_GAZETTE') "
+                        + "  and a.owner_entity_id = ?";
+        List<Object> args = new ArrayList<>();
+        args.add(scope.entityId());
+
+        if (kind != null && !kind.isBlank()) {
+            sql += " and a.event_type_code = ?";
+            args.add(kind);
+        }
+
+        sql += " order by a.occurred_at desc limit 100";
+
+        return jdbc.query(
+                sql,
+                (rs, rowNum) -> {
+                    Map<String, Object> details = null;
+                    String json = rs.getString("after_state");
+                    if (json != null) {
+                        try {
+                            details = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+                        } catch (Exception e) {
+                        }
+                    }
+                    return new ReviewItem(
+                            UUID.fromString(rs.getString("audit_id")),
+                            rs.getString("event_type_code"),
+                            "REVIEW",
+                            rs.getObject("occurred_at", OffsetDateTime.class),
+                            UUID.fromString(rs.getString("owner_entity_id")),
+                            UUID.fromString(rs.getString("subject_id")),
+                            null,
+                            null,
+                            details,
+                            false);
+                },
+                args.toArray());
     }
 }

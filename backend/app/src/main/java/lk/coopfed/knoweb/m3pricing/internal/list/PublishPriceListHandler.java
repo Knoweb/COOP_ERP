@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -19,7 +20,9 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m3pricing.api.PriceListPublished;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
+import lk.coopfed.knoweb.m3pricing.api.ReviewRaised;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
+import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +55,7 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
     private final JdbcTemplate jdbc;
     private final PriceListStore store;
     private final AuthoringValidator validator;
+    private final ConfigRegistry config;
     private final AuditFacade audit;
     private final EventPublisher events;
     private final Clock clock;
@@ -61,6 +65,7 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
             JdbcTemplate jdbc,
             PriceListStore store,
             AuthoringValidator validator,
+            ConfigRegistry config,
             AuditFacade audit,
             EventPublisher events,
             Clock clock,
@@ -68,6 +73,7 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         this.jdbc = jdbc;
         this.store = store;
         this.validator = validator;
+        this.config = config;
         this.audit = audit;
         this.events = events;
         this.clock = clock;
@@ -99,9 +105,34 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         List<SetLines.Line> asAuthored = lines.stream()
                 .map(line -> new SetLines.Line(line.skuId(), line.uomCode(), line.tierFromQty(), line.price()))
                 .toList();
-        if (validator.check(list.kind(), asAuthored, command.applyFrom(), scope).stream()
-                .anyMatch(outcome -> !outcome.ok())) {
+        List<SetLinesResult.Outcome> outcomes = validator.check(list.kind(), asAuthored, command.applyFrom(), scope);
+        if (outcomes.stream().anyMatch(outcome -> !outcome.ok())) {
             throw new ProblemException("m3.price_list.lines_invalid");
+        }
+
+        if (PriceListStore.TRADE.equals(list.kind())
+                && config.getBoolean("pricing.trade_above_mrp_review", scope, true)) {
+            outcomes.stream()
+                    .filter(o -> "m3.price_list.review.above_mrp".equals(o.review()))
+                    .forEach(o -> {
+                        Map<String, Object> details = new LinkedHashMap<>();
+                        details.put("priceListId", list.priceListId());
+                        details.put(
+                                "price",
+                                asAuthored.stream()
+                                        .filter(l -> l.skuId().equals(o.skuId())
+                                                && l.uomCode().equals(o.uomCode()))
+                                        .findFirst()
+                                        .get()
+                                        .price());
+                        details.put("mrp", o.ceilingValue());
+                        audit.record("TRADE_ABOVE_MRP", Subject.of("sku", o.skuId()), null, details, scope);
+                        events.publish(new ReviewRaised(
+                                "TRADE_ABOVE_MRP",
+                                o.skuId(),
+                                scope.entityId(),
+                                list.priceListId().toString()));
+                    });
         }
 
         Optional<PriceListView> previous = store.published(list.rootPriceListId());

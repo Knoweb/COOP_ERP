@@ -222,6 +222,27 @@ paths:
         '404':
           description: No visible relationship, no bound list in force, or no line for the SKU and unit
   /v1/pricing/resolve/retail:
+    post:
+      tags: [Pricing]
+      operationId: resolveBasket
+      summary: Resolve a basket at a shop
+      description: Steps 1 to 4 of doc 23 section 3.5 through the shared engine for a whole basket.
+      x-permission: prc.pricelist.view
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveBasketRequest' }
+      responses:
+        '200':
+          description: The resolved basket
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BasketResult' }
+        '404':
+          description: The location is not visible to the caller
     get:
       tags: [Pricing]
       operationId: resolveRetailPrice
@@ -555,6 +576,29 @@ paths:
               schema: { $ref: '#/components/schemas/RuleResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/reviews:
+    get:
+      tags: [Pricing]
+      operationId: listReviews
+      summary: The pricing reviews in the caller's scope
+      x-permission: prc.review.view
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          schema: { type: string, enum: [BATCH_MRP_BELOW_LIST, TRADE_ABOVE_MRP, LIST_ABOVE_CEILING_AT_GAZETTE] }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [OPEN, SETTLED] }
+      responses:
+        '200':
+          description: The reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReviewItem' }
 components:
   schemas:
     RulePredicate:
@@ -776,3 +820,80 @@ components:
         tierFromQty: { type: number }
         unitPrice: { type: number, description: Per unit and tax-exclusive with four decimals }
         engineVersion: { type: string }
+
+    ResolveBasketRequest:
+      type: object
+      required: [locationId, businessDate, tenderKind, lines]
+      properties:
+        locationId: { type: string, format: uuid }
+        businessDate: { type: string, format: date }
+        tenderKind: { type: string, enum: [CASH, CARD, KHATA, CHEQUE, VOUCHER] }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/ResolveBasketLineRequest' }
+    ResolveBasketLineRequest:
+      type: object
+      required: [skuId, uom, qty]
+      properties:
+        skuId: { type: string, format: uuid }
+        uom: { type: string }
+        qty: { type: number, exclusiveMinimum: 0 }
+        batchId: { type: [string, 'null'], format: uuid }
+        pickedBatchId: { type: [string, 'null'], format: uuid }
+    BatchCandidate:
+      type: object
+      required: [batchId, batchNo, printedMrp, thumbKey]
+      properties:
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        printedMrp: { type: number }
+        expiry: { type: [string, 'null'], format: date }
+        thumbKey: { type: string }
+    LineResult:
+      type: object
+      required: [skuId, uom, qty, unitPrice, taxRatePercent, taxAmount, lineTotal, discountAmount]
+      properties:
+        skuId: { type: string, format: uuid }
+        uom: { type: string }
+        qty: { type: number }
+        batchId: { type: [string, 'null'], format: uuid }
+        unitPrice: { type: number }
+        mrpApplied: { type: [number, 'null'] }
+        controlPriceApplied: { type: [number, 'null'] }
+        capReason: { type: [string, 'null'], enum: [MRP, CONTROL_PRICE] }
+        ruleId: { type: [string, 'null'], format: uuid }
+        discountAmount: { type: number }
+        taxRatePercent: { type: number }
+        taxAmount: { type: number }
+        lineTotal: { type: number }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/BatchCandidate' }
+    BasketResult:
+      type: object
+      required: [lines, subtotal, total, rounding, engineVersion, snapshotVersion]
+      properties:
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/LineResult' }
+        billRuleId: { type: [string, 'null'], format: uuid }
+        billDiscount: { type: number }
+        subtotal: { type: number }
+        total: { type: number }
+        rounding: { type: number }
+        engineVersion: { type: string }
+        snapshotVersion: { type: string }
+    ReviewItem:
+      type: object
+      required: [reviewId, kind, severity, occurredAt, ownerEntityId, skuId, escalated]
+      properties:
+        reviewId: { type: string, format: uuid }
+        kind: { type: string }
+        severity: { type: string }
+        occurredAt: { type: string, format: date-time }
+        ownerEntityId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuName: { type: [string, 'null'] }
+        skuCode: { type: [string, 'null'] }
+        details: { type: object }
+        escalated: { type: boolean }

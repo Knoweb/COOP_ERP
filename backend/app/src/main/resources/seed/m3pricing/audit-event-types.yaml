@@ -58,3 +58,19 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Multi-MRP policy of an item set
+
+  # M3-08 pricing reviews
+  - code: BATCH_MRP_BELOW_LIST
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A batch received with an MRP below the shelf/list price
+
+  - code: TRADE_ABOVE_MRP
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A trade list price above the lowest printed MRP
+
+  - code: LIST_ABOVE_CEILING_AT_GAZETTE
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A published retail or trade list line is above the newly entered control price

@@ -2,11 +2,16 @@ package lk.coopfed.knoweb.m3pricing.internal.queries;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import lk.coopfed.knoweb.engine.Basket;
+import lk.coopfed.knoweb.engine.BasketResolver;
+import lk.coopfed.knoweb.engine.BasketResult;
 import lk.coopfed.knoweb.engine.BatchCandidate;
 import lk.coopfed.knoweb.engine.Ceiling;
 import lk.coopfed.knoweb.engine.EngineVersionKt;
@@ -17,8 +22,10 @@ import lk.coopfed.knoweb.engine.PriceResolver;
 import lk.coopfed.knoweb.engine.PricingSnapshotIndex;
 import lk.coopfed.knoweb.engine.Quantity;
 import lk.coopfed.knoweb.engine.RetailLine;
+import lk.coopfed.knoweb.engine.Rule;
 import lk.coopfed.knoweb.engine.SkuFacts;
 import lk.coopfed.knoweb.engine.StackingPolicy;
+import lk.coopfed.knoweb.engine.TenderKind;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
@@ -29,6 +36,7 @@ import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ShelfBatches;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
 import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
+import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
@@ -52,19 +60,23 @@ class RetailPriceResolution {
     private final ShelfBatches shelf;
     private final EffectivePolicy policies;
 
+    private final RuleStore rules;
+
     RetailPriceResolution(
             PartyQueries party,
             CatalogueQueries catalogue,
             PriceListStore lists,
             ControlPriceStore controlPrices,
             ShelfBatches shelf,
-            EffectivePolicy policies) {
+            EffectivePolicy policies,
+            RuleStore rules) {
         this.party = party;
         this.catalogue = catalogue;
         this.lists = lists;
         this.controlPrices = controlPrices;
         this.shelf = shelf;
         this.policies = policies;
+        this.rules = rules;
     }
 
     Optional<RetailPrice> resolve(
@@ -157,5 +169,113 @@ class RetailPriceResolution {
                 policy.policy(),
                 result.getBatch() == null ? null : result.getBatch().getBatchId(),
                 EngineVersionKt.ENGINE_VERSION));
+    }
+
+    public Optional<BasketResult> resolveBasket(
+            UUID locationId, LocalDate date, TenderKind tender, Basket basket, ScopeContext scope) {
+
+        Optional<LocationView> location = party.getLocation(locationId, scope);
+        if (location.isEmpty()) {
+            return Optional.empty();
+        }
+        UUID owner = location.get().ownerEntityId();
+
+        Set<UUID> skus = basket.getLines().stream().map(l -> l.getSkuId()).collect(Collectors.toSet());
+
+        List<SkuFacts> facts = new ArrayList<>();
+        Map<UUID, List<RetailLine>> retailLinesMap = new java.util.HashMap<>();
+        Map<UUID, List<BatchCandidate>> candidatesMap = new java.util.HashMap<>();
+        Map<UUID, lk.coopfed.knoweb.engine.Policy> policiesMap = new java.util.HashMap<>();
+        Map<UUID, List<Ceiling>> ceilingsMap = new java.util.HashMap<>();
+
+        Optional<PriceListView> version =
+                lists.rootOfKind("RETAIL", owner).flatMap(root -> lists.versionInForce(root, date));
+
+        List<RetailLine> allRetail = version.map(v -> lists.lines(v.priceListId()).stream()
+                        .filter(l -> skus.contains(l.skuId()))
+                        .map(line -> new RetailLine(
+                                line.skuId(),
+                                line.uomCode(),
+                                Money.rounded(line.price()),
+                                line.effectiveFrom(),
+                                line.effectiveTo(),
+                                Quantity.of(line.tierFromQty())))
+                        .toList())
+                .orElse(List.of());
+
+        for (UUID skuId : skus) {
+            Optional<SkuView> sku = catalogue.getSku(skuId, scope);
+            if (sku.isEmpty()) continue;
+
+            BigDecimal taxRate = catalogue
+                    .taxRateInForce(skuId, date, scope)
+                    .map(TaxRateView::ratePercent)
+                    .orElse(BigDecimal.ZERO);
+            facts.add(new SkuFacts(skuId, sku.get().hasPrintedMrp(), taxRate, Set.of()));
+
+            List<BatchCandidate> candidates = shelf.inStock(List.of(locationId), skuId, scope).stream()
+                    .map(batch -> new BatchCandidate(
+                            batch.batchId(),
+                            batch.batchNo(),
+                            batch.printedMrp() == null ? null : Money.rounded(batch.printedMrp()),
+                            batch.expiry(),
+                            Quantity.of(batch.onHand())))
+                    .toList();
+            if (!candidates.isEmpty()) {
+                candidatesMap.put(skuId, candidates);
+            }
+
+            MrpPolicyView policy = policies.of(skuId, owner, scope);
+            policiesMap.put(skuId, EffectivePolicy.toEngine(policy));
+
+            Optional<ControlPriceView> control = controlPrices.ceilingFor(skuId, null, date);
+            control.ifPresent(c -> {
+                ceilingsMap.put(
+                        skuId,
+                        List.of(new Ceiling(
+                                Money.rounded(c.ceilingPrice()),
+                                c.ceilingUomCode(),
+                                c.gazetteReference(),
+                                c.effectiveFrom(),
+                                c.effectiveTo())));
+            });
+        }
+
+        List<Rule> engineRules = rules.activeOnOrAfter(date).stream()
+                .filter(r -> r.ownerEntityId().equals(owner)
+                        && !date.isBefore(r.validFrom())
+                        && (r.validTo() == null || !date.isAfter(r.validTo())))
+                .map(r -> new Rule(
+                        r.ruleId(),
+                        lk.coopfed.knoweb.engine.RuleKind.valueOf(r.kind()),
+                        r.priority(),
+                        r.validFrom(),
+                        r.validTo(),
+                        r.predicate().skuId(),
+                        null,
+                        r.predicate().uomCode(),
+                        r.predicate().minQty() == null
+                                ? null
+                                : Quantity.of(r.predicate().minQty()),
+                        r.predicate().daysToExpiry(),
+                        r.predicate().billTotalFrom() == null
+                                ? null
+                                : Money.rounded(r.predicate().billTotalFrom()),
+                        lk.coopfed.knoweb.engine.BenefitKind.valueOf(r.benefit().kind()),
+                        r.benefit().value()))
+                .toList();
+
+        PricingSnapshotIndex index = new PricingSnapshotIndex(
+                0L,
+                StackingPolicy.PRIORITY_THEN_BEST,
+                facts,
+                allRetail,
+                candidatesMap,
+                policiesMap,
+                ceilingsMap,
+                Map.of(),
+                engineRules);
+
+        return Optional.of(BasketResolver.resolve(basket, index, date, tender));
     }
 }

@@ -399,6 +399,58 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .hasMessageContaining("is not a draft");
     }
 
+    @Test
+    void tradePriceListPublishedAboveMrpRaisesReview() {
+        UUID batchId = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.batch (batch_id, sku_id, batch_no, printed_mrp, owner_entity_id)"
+                                + " values (?, ?, 'MRP90', 90.00, ?)",
+                        batchId,
+                        rice,
+                        FEDERATION);
+
+        UUID location = UUID.fromString("0190e760-0000-7000-8000-000000000101");
+        superuserJdbc()
+                .update(
+                        "insert into inventory.stock_lot (stock_lot_id, sku_id, location_id, condition, qty_on_hand, unit_cost, received_at, owner_entity_id, batch_id)"
+                                + " values (?, ?, ?, 'GOOD', 10.000, 90.00, now(), ?, ?)",
+                        Ids.next(),
+                        rice,
+                        location,
+                        FEDERATION,
+                        batchId);
+        kernel.reset();
+
+        UUID list = create.handle(new CreatePriceList("TRADE", "Above MRP"), own(FEDERATION));
+        setLines.handle(new SetLines(list, List.of(line(rice, "0", "95.00"))), own(FEDERATION));
+        publish.handle(new PublishPriceList(list, today), own(FEDERATION));
+
+        assertThat(audit("TRADE_ABOVE_MRP")).singleElement().satisfies(r -> {
+            assertThat(r.subject().id()).isEqualTo(rice);
+            Map<?, ?> details = (Map<?, ?>) r.after();
+            assertThat(details.get("priceListId").toString()).isEqualTo(list.toString());
+            assertThat(new BigDecimal(details.get("price").toString())).isEqualByComparingTo(new BigDecimal("95.00"));
+            assertThat(new BigDecimal(details.get("mrp").toString())).isEqualByComparingTo(new BigDecimal("90.00"));
+        });
+
+        assertThat(events(lk.coopfed.knoweb.m3pricing.api.ReviewRaised.class))
+                .singleElement()
+                .satisfies(e -> {
+                    assertThat(e.kind()).isEqualTo("TRADE_ABOVE_MRP");
+                    assertThat(e.ownerEntityId()).isEqualTo(FEDERATION);
+                    assertThat(e.skuId()).isEqualTo(rice);
+                    assertThat(e.details()).isEqualTo(list.toString());
+                });
+
+        // Compliant scenario
+        UUID list2 = create.handle(new CreatePriceList("TRADE", "Below MRP"), own(FEDERATION));
+        setLines.handle(new SetLines(list2, List.of(line(rice, "0", "85.00"))), own(FEDERATION));
+        publish.handle(new PublishPriceList(list2, today), own(FEDERATION));
+
+        assertThat(audit("TRADE_ABOVE_MRP")).hasSize(1); // Still 1 from before
+    }
+
     // ---- M1's question: may this list be bound to a relationship of this seller? ----------------
 
     @Test

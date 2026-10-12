@@ -146,7 +146,11 @@ export interface paths {
          */
         get: operations["resolveRetailPrice"];
         put?: never;
-        post?: never;
+        /**
+         * Resolve a basket at a shop
+         * @description Steps 1 to 4 of doc 23 section 3.5 through the shared engine for a whole basket.
+         */
+        post: operations["resolveBasket"];
         delete?: never;
         options?: never;
         head?: never;
@@ -335,6 +339,23 @@ export interface paths {
          * @description Codes this operation can answer with 422: m3.rule.not_found, m3.rule.not_active, scope.invalid.
          */
         post: operations["withdrawRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pricing/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pricing reviews in the caller's scope */
+        get: operations["listReviews"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -596,6 +617,81 @@ export interface components {
             /** @description Per unit and tax-exclusive with four decimals */
             unitPrice: number;
             engineVersion: string;
+        };
+        ResolveBasketRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date */
+            businessDate: string;
+            /** @enum {string} */
+            tenderKind: "CASH" | "CARD" | "KHATA" | "CHEQUE" | "VOUCHER";
+            lines: components["schemas"]["ResolveBasketLineRequest"][];
+        };
+        ResolveBasketLineRequest: {
+            /** Format: uuid */
+            skuId: string;
+            uom: string;
+            qty: number;
+            /** Format: uuid */
+            batchId?: string | null;
+            /** Format: uuid */
+            pickedBatchId?: string | null;
+        };
+        BatchCandidate: {
+            /** Format: uuid */
+            batchId: string;
+            batchNo: string;
+            printedMrp: number;
+            /** Format: date */
+            expiry?: string | null;
+            thumbKey: string;
+        };
+        LineResult: {
+            /** Format: uuid */
+            skuId: string;
+            uom: string;
+            qty: number;
+            /** Format: uuid */
+            batchId?: string | null;
+            unitPrice: number;
+            mrpApplied?: number | null;
+            controlPriceApplied?: number | null;
+            /** @enum {string|null} */
+            capReason?: "MRP" | "CONTROL_PRICE" | null;
+            /** Format: uuid */
+            ruleId?: string | null;
+            discountAmount: number;
+            taxRatePercent: number;
+            taxAmount: number;
+            lineTotal: number;
+            candidates?: components["schemas"]["BatchCandidate"][];
+        };
+        BasketResult: {
+            lines: components["schemas"]["LineResult"][];
+            /** Format: uuid */
+            billRuleId?: string | null;
+            billDiscount?: number;
+            subtotal: number;
+            total: number;
+            rounding: number;
+            engineVersion: string;
+            snapshotVersion: string;
+        };
+        ReviewItem: {
+            /** Format: uuid */
+            reviewId: string;
+            kind: string;
+            severity: string;
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: uuid */
+            ownerEntityId: string;
+            /** Format: uuid */
+            skuId: string;
+            skuName?: string | null;
+            skuCode?: string | null;
+            details?: Record<string, never>;
+            escalated: boolean;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -884,6 +980,40 @@ export interface operations {
                 };
             };
             /** @description The location or the SKU is not visible in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resolveBasket: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBasketRequest"];
+            };
+        };
+        responses: {
+            /** @description The resolved basket */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasketResult"];
+                };
+            };
+            /** @description The location is not visible to the caller */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1209,6 +1339,29 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
+        };
+    };
+    listReviews: {
+        parameters: {
+            query?: {
+                kind?: "BATCH_MRP_BELOW_LIST" | "TRADE_ABOVE_MRP" | "LIST_ABOVE_CEILING_AT_GAZETTE";
+                status?: "OPEN" | "SETTLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The reviews */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"][];
+                };
+            };
         };
     };
 }
