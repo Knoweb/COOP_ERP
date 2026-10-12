@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.AuditReviewReader;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -29,6 +30,7 @@ public class ReviewConsumers {
     private final Clock clock;
     private final ZoneId businessZone;
     private final ScopedExecution execution;
+    private final AuditReviewReader auditReviews;
 
     public ReviewConsumers(
             JdbcTemplate jdbc,
@@ -36,13 +38,15 @@ public class ReviewConsumers {
             EventPublisher events,
             Clock clock,
             @Value("${coop-erp.business-timezone}") String businessZone,
-            ScopedExecution execution) {
+            ScopedExecution execution,
+            AuditReviewReader auditReviews) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
         this.clock = clock;
         this.businessZone = businessZone != null ? ZoneId.of(businessZone) : ZoneId.systemDefault();
         this.execution = execution;
+        this.auditReviews = auditReviews;
     }
 
     private record Breach(UUID ownerId, BigDecimal price, String uomCode, String kind) {}
@@ -74,13 +78,12 @@ public class ReviewConsumers {
         for (Breach breach : breaches) {
             ScopeContext ownerScope = execution.own(breach.ownerId());
             execution.inOwnTransaction(ownerScope, () -> {
-                Long existing = jdbc.queryForObject(
-                        "select count(*) from kernel.audit_event where event_type_code = 'BATCH_MRP_BELOW_LIST' and owner_entity_id = ? and subject_id = ? and after_state->>'batchId' = ?",
-                        Long.class,
-                        breach.ownerId(),
+                if (auditReviews.reviewExists(
+                        "BATCH_MRP_BELOW_LIST",
                         event.skuId(),
-                        event.batchId().toString());
-                if (existing != null && existing > 0) {
+                        "batchId",
+                        event.batchId().toString(),
+                        ownerScope)) {
                     return null;
                 }
 
@@ -121,13 +124,12 @@ public class ReviewConsumers {
         for (Breach breach : breaches) {
             ScopeContext ownerScope = execution.own(breach.ownerId());
             execution.inOwnTransaction(ownerScope, () -> {
-                Long existing = jdbc.queryForObject(
-                        "select count(*) from kernel.audit_event where event_type_code = 'LIST_ABOVE_CEILING_AT_GAZETTE' and owner_entity_id = ? and subject_id = ? and after_state->>'controlPriceId' = ?",
-                        Long.class,
-                        breach.ownerId(),
+                if (auditReviews.reviewExists(
+                        "LIST_ABOVE_CEILING_AT_GAZETTE",
                         event.skuId(),
-                        event.controlPriceId().toString());
-                if (existing != null && existing > 0) {
+                        "controlPriceId",
+                        event.controlPriceId().toString(),
+                        ownerScope)) {
                     return null;
                 }
 
