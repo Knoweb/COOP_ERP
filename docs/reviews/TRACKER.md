@@ -1,4 +1,4 @@
-| #341 | 2026-10-12 | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches || #340 | 2026-10-12 | undefined | fix(m3): central price ceiling, basket contract and a pricing review job || #339 | 2026-10-12 | undefined | fix(kernel): raise the version-floor ALERT once per floor and write config values at the caller's location |# Code review tracker
+# Code review tracker
 
 One row per merged pull request: whether it has had an independent code review, in which wave, and where its findings and fixes are. The building agent's own tests and CI are not a review here.
 
@@ -314,6 +314,6 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | #336 | 2026-10-12 | till | feat(till-data-02): sync M2 catalogue changes and batches to tills | Reviewed (wave 4) | `docs/reviews/wave4-till-data.md` | #341 |
 | #337 | 2026-10-12 | m1 | fix(m1): a Federation template amendment reaches every society's tills | Review fix (not re-reviewed) |  |  |
 | #338 | 2026-10-12 | reviews | docs(reviews): wave 4 findings for the team PRs merged after wave 3 | Docs (no code review) |  |  |
-| #339 | 2026-10-13 | kernel | fix(kernel): raise the version-floor ALERT once per floor and write config values at the caller's location | Review fix (not re-reviewed) |  |  |
-| #341 | 2026-10-13 | m2 | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches | Review fix (not re-reviewed) |  |  |
-| #340 | 2026-10-13 | m3 | fix(m3): central price ceiling, basket contract and a pricing review job | Review fix (not re-reviewed) |  |  |
+| #339 | 2026-10-12 | kernel | fix(kernel): raise the version-floor ALERT once per floor and write config values at the caller's location | Review fix (not re-reviewed) |  |  |
+| #341 | 2026-10-12 | m2 | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches | Review fix (not re-reviewed) |  |  |
+| #340 | 2026-10-12 | m3 | fix(m3): central price ceiling, basket contract and a pricing review job | Review fix (not re-reviewed) |  |  |
