@@ -71,7 +71,6 @@
   "series.type_unknown": "The document type of the series is not in the registry",
   "sod.same_person": "The person who made the request cannot approve it",
   "sync.app_below_floor": "This till application is too old; update it before it can sync",
-  "sync.app_version_below_floor": "This till application is below the version floor after the grace period has expired",
   "sync.batch_in_flight": "Another batch from this device is still being received; try again shortly",
   "sync.batch_inconsistent": "The events of the batch do not match its first and last sequence numbers",
   "sync.batch_too_large": "The batch is larger than central accepts; send fewer events at a time",

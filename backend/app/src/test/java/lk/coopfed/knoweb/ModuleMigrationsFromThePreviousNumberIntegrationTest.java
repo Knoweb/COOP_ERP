@@ -37,6 +37,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
     private static Map<String, String> previous() {
         Map<String, String> streams = new LinkedHashMap<>();
         // Wave 2, PR 17: kernel V0087 (change_log_append tests the class) from V0086.
+        // Wave 4 (K4-01, K4-03): kernel V0092 (floor_alerted, config_value own_write) from V0091.
         // Wave 4, M3R-09: kernel V0093 (the audit review reader role) from V0091 (#339 takes V0092).
         streams.put("kernel", "91");
         streams.put("hello", null);

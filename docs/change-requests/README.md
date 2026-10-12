@@ -88,3 +88,4 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 ### 32 (Sync Contract)
 
 - `CR-32-1` — §3.3, §7, §8, §9 (also doc 31 §6, doc 26 §3.5): facts are accepted below the version floor, snapshots withheld (CR-30-1 point 4); a quarantined FORBIDDEN_FIELD event stores `[removed]` for the offending values; a quarantine row is resolved (REPAIRED or DISCARDED) by an audited command, never purged by time; a revoked till keeps its outbox and resumes on reinstatement; the till's business date may be moved back by a supervisor with no session open. Wave 2, 6 Oct 2026.
+- `CR-32-2` — §4: an attachment's upload URL lasts `attachment.upload_url_minutes` (default 15) and is renewed only inside that window; after it the till requests a new attachment for the same document (KRN-16, CR-19A-8); a decision waits only on the live (non-FAILED) attachments. Wave 4, 13 Oct 2026.
