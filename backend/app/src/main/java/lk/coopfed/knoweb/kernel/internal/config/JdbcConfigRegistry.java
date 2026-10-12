@@ -165,6 +165,11 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
         } else if (!scope.entityId().equals(ctx.entityId())) {
             throw new ProblemException("config.owner_mismatch", Map.of("key", key));
         }
+        // K4-03: a location-scoped caller (a shop's administrator) sets only its own location's
+        // values, never an entity-wide one nor a sibling shop's; own_write says the same (V0092).
+        if (ctx.locationId() != null && !ctx.locationId().equals(scope.locationId())) {
+            throw new ProblemException("config.owner_mismatch", Map.of("key", key));
+        }
 
         if (item.sensitive() && !stepUp.isFresh(ctx)) {
             throw new ProblemException("mfa.required", Map.of("key", key));
