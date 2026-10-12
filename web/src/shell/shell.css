@@ -611,6 +611,12 @@ textarea {
   background: var(--color-surface);
 }
 
+input,
+select,
+textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
 input:hover,
 select:hover,
 textarea:hover {
@@ -1456,10 +1462,12 @@ textarea {
   font-weight: var(--font-weight-strong);
   text-decoration: none;
   white-space: nowrap;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .action-link:hover {
   background: var(--color-training-bg);
+  box-shadow: 0 3px 10px var(--color-polish-6);
 }
 
 .action-link--primary {
@@ -1674,6 +1682,12 @@ textarea {
   stroke-width: var(--border-width-strong);
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.action-link:focus-visible,
+.modern-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 
 /* ---------- Filter card --------------------------------------------------------------- */
@@ -2129,7 +2143,7 @@ textarea {
   background: var(--color-polish-24);
   font-size: 14px;
   color: var(--color-text);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   outline: none;
   appearance: none;
 }
@@ -2165,6 +2179,11 @@ textarea {
   border: 1px solid var(--color-polish-14);
   overflow: hidden;
   margin-bottom: 24px;
+  transition: box-shadow 0.2s ease;
+}
+
+.modern-table-card:hover {
+  box-shadow: 0 10px 32px var(--color-polish-23);
 }
 
 .modern-table-scroll {
@@ -2518,8 +2537,20 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shell-sidebar {
-    transition: none;
+  .shell-sidebar,
+  .action-link,
+  .modern-btn,
+  .modern-table-card {
+    input,
+    select,
+    textarea {
+      transition: none;
+    }
+  }
+
+  .modern-btn:hover,
+  .modern-btn:active {
+    transform: none;
   }
 }
 

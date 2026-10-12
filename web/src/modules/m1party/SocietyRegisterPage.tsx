@@ -12,6 +12,35 @@ import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
 
+const DISTRICTS = [
+  "Ampara",
+  "Anuradhapura",
+  "Badulla",
+  "Batticaloa",
+  "Colombo",
+  "Galle",
+  "Gampaha",
+  "Hambantota",
+  "Jaffna",
+  "Kalutara",
+  "Kandy",
+  "Kegalle",
+  "Kilinochchi",
+  "Kurunegala",
+  "Mannar",
+  "Matale",
+  "Matara",
+  "Monaragala",
+  "Mullaitivu",
+  "Nuwara Eliya",
+  "Polonnaruwa",
+  "Puttalam",
+  "Ratnapura",
+  "Trincomalee",
+  "Vavuniya"
+];
+
+
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
  * governs, as a list a clerk can narrow. Status, district and the search box all go to the
@@ -31,6 +60,7 @@ export function SocietyRegisterPage() {
 
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -111,9 +141,33 @@ export function SocietyRegisterPage() {
           </div>
         </label>
         <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
-          <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
+          <span className="modern-field__label party-filter-label">
+            {t("party.filter.district").text}
+          </span>
+          <input
+            type="text"
+            list="society-district-options"
+            value={districtSearch}
+            onChange={(event) => {
+              const value = event.target.value;
+              setDistrictSearch(value);
+
+              const match = DISTRICTS.find(
+                (name) => name.toLowerCase() === value.trim().toLowerCase()
+              );
+
+              setDistrict(match ?? "");
+            }}
+            className="party-filter-input"
+            autoComplete="off"
+          />
+          <datalist id="society-district-options">
+            {DISTRICTS.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </label>
+
       </form>
 )}
 
