@@ -21,10 +21,6 @@ include::module-hello.adoc[]
 plantuml::module-m1party.puml[,,format=svg]
 include::module-m1party.adoc[]
 
-== M2 Catalogue & Batch
-plantuml::module-m2catalogue.puml[,,format=svg]
-include::module-m2catalogue.adoc[]
-
 == M6 Point of Sale
 plantuml::module-m6pos.puml[,,format=svg]
 include::module-m6pos.adoc[]
@@ -33,13 +29,17 @@ include::module-m6pos.adoc[]
 plantuml::module-m9integration.puml[,,format=svg]
 include::module-m9integration.adoc[]
 
-== M3 Pricing & Rules
-plantuml::module-m3pricing.puml[,,format=svg]
-include::module-m3pricing.adoc[]
+== M2 Catalogue & Batch
+plantuml::module-m2catalogue.puml[,,format=svg]
+include::module-m2catalogue.adoc[]
 
 == M7 Customers & Payment Recording
 plantuml::module-m7customers.puml[,,format=svg]
 include::module-m7customers.adoc[]
+
+== M3 Pricing & Rules
+plantuml::module-m3pricing.puml[,,format=svg]
+include::module-m3pricing.adoc[]
 
 == M8 Reporting Pipeline
 plantuml::module-m8reporting.puml[,,format=svg]
