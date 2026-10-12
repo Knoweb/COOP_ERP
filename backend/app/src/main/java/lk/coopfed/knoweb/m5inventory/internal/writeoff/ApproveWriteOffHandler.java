@@ -113,7 +113,8 @@ class ApproveWriteOffHandler implements Handles<ApproveWriteOff, UUID> {
         });
         WriteOffStore.Valuation valuation = store.value(lines, writeOff.locationId(), scope);
         BigDecimal value = valuation.value();
-        policy.requireWithinLimit(value, valuation.zeroCostLine(), "inv.writeoff.approve", scope);
+        policy.requireWithinLimit(
+                value, valuation.zeroCostLine(), "inv.writeoff.approve", writeOff.locationId(), scope);
 
         List<Movement> movements = lines.stream()
                 .map(line -> new Movement(

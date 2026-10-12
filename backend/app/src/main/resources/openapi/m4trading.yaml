@@ -227,7 +227,7 @@ paths:
         m4.order.not_amendable, m4.order.relationship_inactive, m4.order.eta_past,
         m4.order.lines_required, m4.order.sku_not_found, m4.order.sku_not_active,
         m4.order.uom_invalid, m4.order.qty_not_positive.
-      x-permission: ord.order.amend
+      x-permission: ord.order.submit
       x-scope: ENTITY
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -896,7 +896,8 @@ paths:
       description: >
         At each line's price and VAT rate. Asks for a fresh second factor.
         Problems: m4.invoice.not_found, m4.debitnote.not_seller,
-        m4.invoice.not_issued, m4.debitnote.line_unknown, m4.debitnote.qty_invalid,
+        m4.invoice.not_issued, m4.debitnote.invoice_disputed, m4.debitnote.line_unknown,
+        m4.debitnote.line_duplicate, m4.debitnote.qty_invalid,
         m4.debitnote.nothing_to_debit, document.link.exceeds_balance.
       x-permission: bil.debitnote.issue
       x-scope: ENTITY

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -121,16 +123,19 @@ class RoleRulesTest {
             "{\"properties\":{\"max_value\":{\"type\":\"number\",\"minimum\":0},\"note\":{\"type\":\"string\"}},"
                     + "\"required\":[\"max_value\"]}";
 
+    /** What a holding without max_value is worth: the band-1 limit (wave 3, M1M2M3M5-01). */
+    private static final BigDecimal BAND1 = new BigDecimal("25000");
+
     @Test
     void aLimitAtOrBelowTheGrantorsIsGrantedAndAboveItIsNot() throws Exception {
         JsonNode schema = new ObjectMapper().readTree(APPROVAL_SCHEMA);
         List<Map<String, Object>> grantor = List.of(Map.of("max_value", 25000));
 
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 25000), schema, grantor))
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 25000), schema, grantor, BAND1))
                 .isEmpty();
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 24999.5), schema, grantor))
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 24999.5), schema, grantor, BAND1))
                 .isEmpty();
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 250000), schema, grantor))
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 250000), schema, grantor, BAND1))
                 .hasValueSatisfying(excess -> {
                     assertThat(excess.permission()).isEqualTo("c");
                     assertThat(excess.field()).isEqualTo("max_value");
@@ -138,31 +143,53 @@ class RoleRulesTest {
                     assertThat(excess.grantorLimit()).isEqualByComparingTo("25000");
                 });
         // A grant that sets no value is unlimited, which is above any limit.
-        assertThat(RoleRules.aboveGrantor("c", null, schema, grantor))
+        assertThat(RoleRules.aboveGrantor("c", null, schema, grantor, BAND1))
                 .hasValueSatisfying(excess -> assertThat(excess.requested()).isNull());
     }
 
     @Test
-    void theGrantorsHighestHoldingCountsAndAHoldingWithoutALimitIsUnlimited() throws Exception {
+    void theGrantorsHighestHoldingCountsAndAHoldingWithoutMaxValueIsBandOne() throws Exception {
         JsonNode schema = new ObjectMapper().readTree(APPROVAL_SCHEMA);
-        List<Map<String, Object>> two = List.of(Map.of("max_value", 25000), Map.of("max_value", 100000));
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100000), schema, two))
+        List<Map<String, Object>> two = List.of(Map.of("max_value", 10000), Map.of("max_value", 100000));
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100000), schema, two, BAND1))
                 .isEmpty();
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100001), schema, two))
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100001), schema, two, BAND1))
                 .isPresent();
 
-        java.util.ArrayList<Map<String, Object>> withAnUnlimited = new java.util.ArrayList<>(two);
-        withAnUnlimited.add(null);
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 9_999_999), schema, withAnUnlimited))
+        // The meaning M5 gives a holding without max_value (ControlPolicy, decided 6 October
+        // 2026): band 1, never unlimited. A holding with no limits at all is the same.
+        List<Map<String, Object>> legacy = new ArrayList<>();
+        legacy.add(null);
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 25000), schema, legacy, BAND1))
                 .isEmpty();
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 9_999_999), schema, List.of(Map.of("note", "x"))))
-                .as("a holding without the property is unlimited in it")
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 50_000_000), schema, legacy, BAND1))
+                .hasValueSatisfying(excess -> assertThat(excess.grantorLimit()).isEqualByComparingTo("25000"));
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 25001), schema, List.of(Map.of("note", "x")), BAND1))
+                .as("a holding without max_value is worth band 1")
+                .isPresent();
+        // A higher holding beside a band-1 one still counts.
+        List<Map<String, Object>> withALegacy = new ArrayList<>(two);
+        withALegacy.add(null);
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 100000), schema, withALegacy, BAND1))
                 .isEmpty();
         // Only numbers compare; a permission without a schema has no limits to compare.
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 1, "note", "y"), schema, two))
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 1, "note", "y"), schema, two, BAND1))
                 .isEmpty();
-        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 1), null, two))
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_value", 1), null, two, BAND1))
                 .isEmpty();
+    }
+
+    @Test
+    void aHoldingWithoutAnyOtherNumericPropertyIsUnlimitedInIt() throws Exception {
+        JsonNode schema = new ObjectMapper()
+                .readTree(
+                        "{\"properties\":{\"max_qty\":{\"type\":\"number\",\"minimum\":0}},\"required\":[\"max_qty\"]}");
+        List<Map<String, Object>> legacy = new ArrayList<>();
+        legacy.add(null);
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_qty", 9_999_999), schema, legacy, BAND1))
+                .isEmpty();
+        assertThat(RoleRules.aboveGrantor("c", Map.of("max_qty", 11), schema, List.of(Map.of("max_qty", 10)), BAND1))
+                .isPresent();
     }
 
     @Test

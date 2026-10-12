@@ -240,13 +240,24 @@ class ObjectStorageService implements ObjectStorage {
                         "object.content_type_mismatch",
                         Map.of("objectKey", objectKey, "contentType", contentType, "recorded", row.contentType()));
             }
-            jdbc.update(
+            // Once the window has ended a verification may be hashing the bytes: a new URL would
+            // let them be replaced after the hash it settles with. Re-checked in the update, as
+            // the window may end between the read and here.
+            if (!now.isBefore(row.uploadExpiresAt())) {
+                throw new ProblemException("object.upload_expired", Map.of("objectKey", objectKey));
+            }
+            int renewed = jdbc.update(
                     "update kernel.object_upload set upload_expires_at = ?, content_hash = coalesce(?, content_hash),"
-                            + " content_length = ? where object_key = ? and status = 'PENDING'",
+                            + " content_length = ? where object_key = ? and status = 'PENDING'"
+                            + " and upload_expires_at > ?",
                     Timestamp.from(expiresAt),
                     hash,
                     contentLength,
-                    key.base());
+                    key.base(),
+                    Timestamp.from(now));
+            if (renewed == 0) {
+                throw new ProblemException("object.upload_expired", Map.of("objectKey", objectKey));
+            }
         } else {
             jdbc.update(
                     """
@@ -336,13 +347,14 @@ class ObjectStorageService implements ObjectStorage {
             int changed = jdbc.update(
                     "update kernel.object_upload set status = ?, failure = ?, content_hash = ?,"
                             + " content_length = coalesce(?, content_length), settled_at = ?"
-                            + " where object_key = ? and status = 'PENDING'",
+                            + " where object_key = ? and status = 'PENDING' and upload_expires_at = ?",
                     verified ? "VERIFIED" : "FAILED",
                     verified ? null : outcome.name(),
                     verified ? hash : row.contentHash(),
                     size,
                     Timestamp.from(clock.instant()),
-                    key.base());
+                    key.base(),
+                    Timestamp.from(row.uploadExpiresAt()));
             if (changed == 0) {
                 return false;
             }
@@ -374,8 +386,11 @@ class ObjectStorageService implements ObjectStorage {
         if (Boolean.TRUE.equals(settledHere)) {
             return new Verification(outcome, size, hash, true);
         }
+        // Settled by another run: its answer. Still PENDING with another window: the bytes may have
+        // changed since they were hashed, so nothing is settled now.
         return system.inOwnTransaction(ctx, () -> find(key.base()))
-                .map(Row::replay)
+                .map(current ->
+                        current.settled() ? current.replay() : new Verification(Outcome.PENDING, null, null, false))
                 .orElseThrow(() -> new ProblemException("object.not_found", Map.of("objectKey", key.base())));
     }
 

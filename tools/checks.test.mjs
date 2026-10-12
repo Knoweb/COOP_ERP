@@ -1204,6 +1204,42 @@ test(
 );
 
 test(
+  "an old change request another slice already cites on origin/main does not cover a new change",
+  () => {
+    one(
+      problemsOfFrozenContract(
+        "openapi/m4trading.yaml",
+        FROZEN,
+        FROZEN_WITH_CR("CR-21A-4"),
+        true,
+        new Set(["CR-21A-4.md"]),
+        new Set(),
+        new Set(["CR-21A-4.md"])
+      ),
+      /"CR-21A-4" is already cited by a slice on origin\/main/
+    );
+  }
+);
+
+test(
+  "a cited change request passes when this change amends its file",
+  () => {
+    assert.deepEqual(
+      problemsOfFrozenContract(
+        "openapi/m4trading.yaml",
+        FROZEN,
+        FROZEN_WITH_CR("CR-21A-4"),
+        true,
+        new Set(["CR-21A-4.md"]),
+        new Set(["CR-21A-4.md"]),
+        new Set(["CR-21A-4.md"])
+      ),
+      []
+    );
+  }
+);
+
+test(
   "the real slices and Java packages pass check-frozen-contracts.mjs",
   () => {
     execFileSync(
@@ -1256,6 +1292,19 @@ test(
       problemsOfSlice("m2catalogue", slice(operation("/v1/x", "post", { operationId: "createX" }))),
       /openapi\/m2catalogue\.yaml:\d+ POST \/v1\/x: a mutating operation with no Idempotency-Key parameter/
     );
+  }
+);
+
+test(
+  "a mention of the Idempotency-Key in a description is not the parameter, and a quoted path key is still read",
+  () => {
+    const mentioned = slice(
+      "  /v1/x:\n    post:\n      operationId: createX\n      x-permission: m.x\n      description: Send an Idempotency-Key.\n"
+    );
+    one(problemsOfSlice("m2catalogue", mentioned), /POST \/v1\/x: a mutating operation with no Idempotency-Key parameter/);
+
+    const quoted = slice('  "/v1/y":\n    post:\n      operationId: createY\n      x-permission: m.y\n');
+    one(problemsOfSlice("m2catalogue", quoted), /POST \/v1\/y: a mutating operation with no Idempotency-Key parameter/);
   }
 );
 

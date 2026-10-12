@@ -48,7 +48,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code pos.receipt.total_tolerance} for the whole receipt; {@code SERIES_FOREIGN} (the series
  * is not the device's own at its shop, so the kernel leaves it alone) and {@code NUMBER_JUMP} (the
  * number is more than {@code pos.series.max_jump} past the series' next number: the series moves
- * by that much at most, and an ALERT {@code RECEIPT_NUMBER_JUMPED} is written). A document id that
+ * by that much at most, once per device and series: a later jump from a device that already has
+ * one on record is flagged and moves nothing (TILLM6-08); an ALERT {@code RECEIPT_NUMBER_JUMPED}
+ * is written each time). A document id that
  * arrives again with another content hash keeps the first copy (as M5 does) and writes the ALERT
  * {@code RECEIPT_REPLAY_DIFFERS} naming both hashes.
  *
@@ -372,11 +374,27 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
         long maxJump = maxJump(scope);
         if (command.docNumber() - next > maxJump) {
             flags.add(FLAG_NUMBER_JUMP);
-            numbering.observeDeviceNumber(command.seriesId(), next - 1 + maxJump, scope);
+            // The series moves by the cap once per device (TILLM6-08): while the device has a jump
+            // on record in this series, a further jump is flagged and moves nothing, so a runaway
+            // counter cannot walk the high-water mark on by the cap with every receipt.
+            if (!jumpedBefore(command, scope)) {
+                numbering.observeDeviceNumber(command.seriesId(), next - 1 + maxJump, scope);
+            }
             return next;
         }
         numbering.observeDeviceNumber(command.seriesId(), command.docNumber(), scope);
         return null;
+    }
+
+    /** Whether a receipt of this device in this series was flagged NUMBER_JUMP already (TILLM6-08). */
+    private boolean jumpedBefore(RecordReceipt command, ScopeContext scope) {
+        UUID device = scope.deviceId() != null ? scope.deviceId() : command.deviceId();
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from pos.receipt where series_id = ? and device_id = ? and ?::text = any (flags))",
+                Boolean.class,
+                command.seriesId(),
+                device,
+                FLAG_NUMBER_JUMP));
     }
 
     private long maxJump(ScopeContext scope) {

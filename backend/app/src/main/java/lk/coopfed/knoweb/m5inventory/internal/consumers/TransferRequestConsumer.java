@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.Handles;
-import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
@@ -22,8 +21,10 @@ import org.springframework.stereotype.Component;
  * the issue handler, which audits, publishes and refuses a second transfer for the same request.
  *
  * <p>The approval checked the availability; stock sold between the approval and this delivery is
- * sent as far as it goes, and a request with nothing left to send fails ({@code
- * m5.transfer.insufficient_stock}) and waits in the dead letter queue for a person. Since wave 2
+ * sent as far as it goes, and a request with nothing left to send issues no transfer and is
+ * flagged {@code TRANSFER_REQUEST_SHORT} with event {@code transfer_request.unfilled.v1}
+ * ({@link RecordTransferRequestUnfilledHandler}; wave 3, M1M2M3M5-17), where it used to fail and
+ * wait unseen in the dead letter queue. Since wave 2
  * (M5-03; {@code 2026-10-06-wave2-stock-movements.md} (2)) a request is filled once: each item sent
  * short or not at all is handed to the issue as a shortfall (wanted, sent), which the handler
  * audits as {@code TRANSFER_REQUEST_SHORT} (REVIEW) and counts in {@code transfer.issued.v1}'s
@@ -40,10 +41,15 @@ class TransferRequestConsumer {
     static final String APPROVED = "transfer_request.approved.v1";
 
     private final Handles<IssueTransfer, UUID> issue;
+    private final Handles<RecordTransferRequestUnfilled, Void> unfilled;
     private final InventoryQueries inventory;
 
-    TransferRequestConsumer(Handles<IssueTransfer, UUID> issue, InventoryQueries inventory) {
+    TransferRequestConsumer(
+            Handles<IssueTransfer, UUID> issue,
+            Handles<RecordTransferRequestUnfilled, Void> unfilled,
+            InventoryQueries inventory) {
         this.issue = issue;
+        this.unfilled = unfilled;
         this.inventory = inventory;
     }
 
@@ -76,7 +82,16 @@ class TransferRequestConsumer {
             }
         }
         if (lines.isEmpty()) {
-            throw new ProblemException("m5.transfer.insufficient_stock");
+            // wave 3, M1M2M3M5-17: nothing to send is flagged for a person, not thrown into the
+            // dead letter queue where nobody is told.
+            unfilled.handle(
+                    new RecordTransferRequestUnfilled(
+                            Payloads.uuid(payload, "requestId"),
+                            from,
+                            Payloads.uuid(payload, "toLocationId"),
+                            shortfalls),
+                    scope);
+            return;
         }
         issue.handle(
                 new IssueTransfer(

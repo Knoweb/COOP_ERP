@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m1party.internal.security.role;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -8,11 +9,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.PermissionResolver;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.api.RolePermission;
+import lk.coopfed.knoweb.m1party.query.ApprovalLimit;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,10 +35,12 @@ class RoleGuards {
 
     private final SecurityRecords records;
     private final PermissionResolver resolver;
+    private final ConfigRegistry config;
 
-    RoleGuards(SecurityRecords records, PermissionResolver resolver) {
+    RoleGuards(SecurityRecords records, PermissionResolver resolver, ConfigRegistry config) {
         this.records = records;
         this.resolver = resolver;
+        this.config = config;
     }
 
     /**
@@ -182,12 +187,14 @@ class RoleGuards {
         }
         Map<String, List<Map<String, Object>>> holdings =
                 records.holdingLimits(scope.userId(), scope.entityId(), scope.locationId(), limited);
+        BigDecimal band1 = ApprovalLimit.band1(config, scope);
         for (String code : limited) {
             Optional<RoleRules.LimitExcess> excess = RoleRules.aboveGrantor(
                     code,
                     granted.get(code),
                     catalogue.get(code).limitsSchema(),
-                    holdings.getOrDefault(code, List.of()));
+                    holdings.getOrDefault(code, List.of()),
+                    band1);
             if (excess.isPresent()) {
                 Map<String, Object> params = new LinkedHashMap<>();
                 params.put("permission", code);

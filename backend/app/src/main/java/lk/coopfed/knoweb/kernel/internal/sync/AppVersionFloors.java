@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
+import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -50,7 +51,7 @@ class AppVersionFloors implements AppVersionFloor {
             return new Standing(floor, false, null, false);
         }
         Instant now = clock.instant();
-        Instant graceEndsAt = belowSince(appVersion).plus(settings.appVersionFloorGrace(scope));
+        Instant graceEndsAt = belowSince(appVersion, scope).plus(settings.appVersionFloorGrace(scope));
         return new Standing(floor, true, graceEndsAt, !now.isBefore(graceEndsAt));
     }
 
@@ -89,8 +90,13 @@ class AppVersionFloors implements AppVersionFloor {
      * When the floor last rose above {@code appVersion} and stayed there. A floor that is only
      * the register's default (never set) has no history: the version has been below it forever.
      */
-    private Instant belowSince(String appVersion) {
-        List<FloorValue> history = jdbc.query(
+    private Instant belowSince(String appVersion, ScopeContext scope) {
+        ScopeContext effectiveScope = scope;
+        if (effectiveScope == null || effectiveScope.policyClass() != PolicyClass.OWN) {
+            effectiveScope = system.own().orElse(effectiveScope);
+        }
+        final ScopeContext targetScope = effectiveScope;
+        java.util.function.Supplier<List<FloorValue>> querySupplier = () -> jdbc.query(
                 """
                 select value #>> '{}' as floor, effective_from
                   from kernel.config_value
@@ -102,6 +108,9 @@ class AppVersionFloors implements AppVersionFloor {
                 (rs, n) -> new FloorValue(rs.getString("floor"), rs.getTimestamp("effective_from")),
                 FLOOR,
                 HISTORY_ROWS);
+
+        List<FloorValue> history =
+                targetScope != null ? system.inScope(targetScope, querySupplier) : querySupplier.get();
         Instant since = Instant.EPOCH;
         for (FloorValue value : history) {
             if (AppVersions.atLeast(appVersion, value.floor())) {

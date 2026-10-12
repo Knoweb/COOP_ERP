@@ -330,6 +330,9 @@ services:
       COOP_ERP_IDEMPOTENCY_SECRET: ${COOP_ERP_IDEMPOTENCY_SECRET:?}
       COOP_ERP_NOTIFICATION_KEY: ${COOP_ERP_NOTIFICATION_KEY:?}
       COOP_ERP_NOTIFICATION_RECIPIENT_KEY: ${COOP_ERP_NOTIFICATION_RECIPIENT_KEY:?}
+      # The NIC pepper (m7customers, coop-erp.customers.nic-pepper): no default on a public
+      # issuer, so a missing value stops compose here instead of the backend at its start.
+      COOP_ERP_CUSTOMERS_NIC_PEPPER: ${COOP_ERP_CUSTOMERS_NIC_PEPPER:?}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: coop

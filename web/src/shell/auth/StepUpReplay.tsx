@@ -28,6 +28,7 @@ export function StepUpReplay() {
 
   const accessToken = session?.accessToken;
   const entityId = session?.entityId ?? null;
+  const userId = session?.userId;
   const locationId = scope.locationId;
 
   useEffect(() => {
@@ -45,6 +46,12 @@ export function StepUpReplay() {
     if (!pending) {
       return;
     }
+    if (!pending.subject || pending.subject !== userId) {
+      // Someone else completed the sign-in (a shared PC): their token must not run a command
+      // they never confirmed. The callback (oidc.ts keepsFor) checks this too; this is the last word.
+      setState({ phase: "reenter" });
+      return;
+    }
     let cancelled = false;
     setState({ phase: "replaying" });
     replayPendingCommand(pending, { accessToken, locale, session: { entityId }, locationId })
@@ -57,7 +64,7 @@ export function StepUpReplay() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, entityId, locale, locationId, queryClient]);
+  }, [accessToken, entityId, userId, locale, locationId, queryClient]);
 
   if (state.phase === "none") {
     return null;

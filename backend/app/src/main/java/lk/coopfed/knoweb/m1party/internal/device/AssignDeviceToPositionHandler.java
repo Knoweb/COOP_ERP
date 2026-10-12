@@ -140,8 +140,17 @@ class AssignDeviceToPositionHandler implements Handles<AssignDeviceToPosition, U
         }
         // 5. the device runs a release at or above the floor: the release it last reported, or
         //    the one it was enrolled with when it never reported.
+        //    A release that is not dotted numbers is refused outright, whatever the floor: the
+        //    floor's comparison counts it as "0", which passes the default floor of "0".
+        //    Below the floor but within its grace, the device may still be assigned
+        //    (AppVersionFloor: only after the grace is it refused).
         String appVersion = reportedVersion(device, scope);
         AppVersionFloor.Standing standing = floors.standing(appVersion, scope);
+        if (!AppVersion.isWellFormed(appVersion)) {
+            throw new ProblemException(
+                    "m1.device.below_floor",
+                    Map.of("appVersion", String.valueOf(appVersion), "floor", standing.floor()));
+        }
         if (standing.afterGrace()) {
             throw new ProblemException(
                     "m1.device.below_floor",

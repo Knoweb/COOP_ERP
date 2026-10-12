@@ -91,10 +91,11 @@ describe("the API client", () => {
     expect((error as ApiProblem).problem.code).toBe("mfa.required");
   });
 
-  it("hands the step-up the command that was refused, with its key and body and without the token, so it can be taken again after the sign-in", async () => {
+  it("hands the step-up the command that was refused, with its key, body, scope and sender and without the token, so it can be taken again after the sign-in", async () => {
     const stepUp = vi.fn();
+    const locationId = "0190f000-0000-7000-8000-0000000000c1";
     const client = createClient<paths>({ baseUrl: "http://api.test", fetch: vi.fn(async () => stepUpRequired()) });
-    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, stepUp, apiBase: "http://api.test" })));
+    client.use(apiMiddleware(() => ({ accessToken: "the-token", locale: "ta", session, locationId, stepUp, apiBase: "http://api.test" })));
 
     await client
       .POST("/v1/hello/greetings", { params: { header: { "Idempotency-Key": "key-7" } }, body: { textEn: "Hello" } })
@@ -105,8 +106,9 @@ describe("the API client", () => {
     expect(pending).toEqual({
       method: "POST",
       url: "http://api.test/v1/hello/greetings",
-      headers: { "Idempotency-Key": "key-7", "Content-Type": "application/json" },
-      body: JSON.stringify({ textEn: "Hello" })
+      headers: { "Idempotency-Key": "key-7", "Content-Type": "application/json", "X-Scope-Entity": session.entityId, "X-Scope-Location": locationId },
+      body: JSON.stringify({ textEn: "Hello" }),
+      subject: session.userId
     });
   });
 

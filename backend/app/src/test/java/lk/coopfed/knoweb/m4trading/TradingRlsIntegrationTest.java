@@ -169,7 +169,85 @@ class TradingRlsIntegrationTest extends PostgresIntegrationTest {
         }
     }
 
+    @Test
+    void aDebitNoteRowIsReadByTheBuyerNotByAStrangerAndWrittenByTheSellerOnlyBeforeIssue() {
+        // Wave 3, M4-11: trading.doc_debit_note (m4trading V0011) follows its document: the seller
+        // and the buyer read it, a stranger does not; only the seller inserts it, and only while
+        // the document is not issued (document_open_for_write, RLS-09).
+        UUID readNote = Ids.next();
+        UUID openNote = Ids.next();
+        UUID issuedNote = Ids.next();
+        UUID series = Ids.next();
+        JdbcTemplate admin = superuserJdbc();
+        try {
+            insertDocument(admin, readNote, "DN2", SELLER, BUYER, null);
+            admin.update(
+                    "insert into trading.doc_debit_note (document_id, invoice_document_id, reason)"
+                            + " values (?, ?, 'Price correction')",
+                    readNote,
+                    Ids.next());
+            insertDocument(admin, openNote, "DN2", SELLER, BUYER, null);
+            admin.update(
+                    "insert into kernel.numbering_series (series_id, doc_type_code, series_scope, owner_entity_id,"
+                            + " prefix, next_number) values (?, 'DN2', 'ENTITY', ?, 'RLS-DN2', 2)",
+                    series,
+                    SELLER);
+            admin.update(
+                    "insert into kernel.document (document_id, doc_type_code, series_id, doc_number, doc_number_display,"
+                            + " owner_entity_id, counterparty_entity_id, status, issued_at, business_date, content_hash)"
+                            + " values (?, 'DN2', ?, 1, 'RLS-DN2-0000001', ?, ?, 'ISSUED', now(), current_date,"
+                            + " repeat('a', 64))",
+                    issuedNote,
+                    series,
+                    SELLER,
+                    BUYER);
+
+            assertThat(inScope(SELLER, "OWN", () -> debitNoteRows(readNote))).isEqualTo(1);
+            assertThat(inScope(BUYER, "OWN", () -> debitNoteRows(readNote))).isEqualTo(1);
+            assertThat(inScope(BUYER, "PARTY", () -> debitNoteRows(readNote))).isEqualTo(1);
+            assertThat(inScope(STRANGER, "OWN", () -> debitNoteRows(readNote))).isZero();
+            assertThat(inScope(STRANGER, "PARTY", () -> debitNoteRows(readNote)))
+                    .isZero();
+
+            assertThat(inScope(SELLER, "OWN", () -> tryInsertDebitNote(openNote)))
+                    .isTrue();
+            assertThat(inScope(BUYER, "OWN", () -> tryInsertDebitNote(openNote)))
+                    .isFalse();
+            assertThat(inScope(STRANGER, "OWN", () -> tryInsertDebitNote(openNote)))
+                    .isFalse();
+            assertThat(inScope(SELLER, "OWN", () -> tryInsertDebitNote(issuedNote)))
+                    .as("no extension row is added to an issued debit note")
+                    .isFalse();
+        } finally {
+            admin.update(
+                    "delete from trading.doc_debit_note where document_id in (?, ?, ?)",
+                    readNote,
+                    openNote,
+                    issuedNote);
+            admin.update("delete from kernel.document where document_id in (?, ?, ?)", readNote, openNote, issuedNote);
+            admin.update("delete from kernel.numbering_series where series_id = ?", series);
+        }
+    }
+
     // ---- reads and writes under test -------------------------------------------------------
+
+    private int debitNoteRows(UUID debitNote) {
+        return jdbc.queryForObject(
+                "select count(*) from trading.doc_debit_note where document_id = ?", Integer.class, debitNote);
+    }
+
+    private boolean tryInsertDebitNote(UUID debitNote) {
+        try {
+            return jdbc.update(
+                            "insert into trading.doc_debit_note (document_id, invoice_document_id, reason)"
+                                    + " values (?, ?, 'Price correction')",
+                            debitNote,
+                            Ids.next())
+                    == 1;
+        } catch (org.springframework.dao.DataAccessException refused) {
+            return false;
+        }
+    }
 
     private List<UUID> returns(UUID... ids) {
         return jdbc.queryForList(

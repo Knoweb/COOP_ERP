@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { IntlProvider } from "react-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PendingCommand, ReplayOutcome } from "../api/pendingCommand";
+import type { PendingCommand, ReplayContext, ReplayOutcome } from "../api/pendingCommand";
 import { messages } from "../i18n/messages";
 import { ScopeProvider } from "../scope/ScopeContext";
 import { StepUpReplay } from "./StepUpReplay";
@@ -31,7 +31,13 @@ vi.mock("./oidc", () => ({
 const replay = vi.fn<(...args: unknown[]) => Promise<ReplayOutcome>>();
 vi.mock("../api/pendingCommand", () => ({ replayPendingCommand: (...args: unknown[]) => replay(...args) }));
 
-const pending: PendingCommand = { method: "POST", url: "http://api.test/v1/party/entities/e-1/suspend", headers: { "Idempotency-Key": "k" }, body: "{}" };
+const pending: PendingCommand = {
+  method: "POST",
+  url: "http://api.test/v1/party/entities/e-1/suspend",
+  headers: { "Idempotency-Key": "k" },
+  body: "{}",
+  subject: session.userId
+};
 
 function renderReplay() {
   const queryClient = new QueryClient();
@@ -81,6 +87,46 @@ describe("the replay after a step-up", () => {
     expect(replay).toHaveBeenCalledTimes(1);
     expect(replay).toHaveBeenCalledWith(pending, { accessToken: "fresh", locale: "en", session: { entityId: session.entityId }, locationId: null });
     expect(invalidate).toHaveBeenCalled();
+  });
+
+  it("replays nothing and asks for the details again when someone else completed the sign-in", async () => {
+    // User A was interrupted on a shared PC; user B typed their own name on the sign-in page.
+    broughtBack = { ...pending, subject: "u-somebody-else" };
+    renderReplay();
+
+    expect((await screen.findByRole("status")).textContent).toBe("Your sign-in was refreshed. Enter the details again.");
+    expect(replay).not.toHaveBeenCalled();
+  });
+
+  it("replays nothing for a command that does not say whose it is", async () => {
+    broughtBack = { ...pending, subject: undefined };
+    renderReplay();
+
+    expect((await screen.findByRole("status")).textContent).toBe("Your sign-in was refreshed. Enter the details again.");
+    expect(replay).not.toHaveBeenCalled();
+  });
+
+  it("sends a one-location user's command to the location it was sent in, though the session read has not named it yet", async () => {
+    // The shop staff user: the scope is one shop. On the first render after the sign-in the
+    // permission read has not answered, so the shell's own location is still null.
+    const actual = await vi.importActual<typeof import("../api/pendingCommand")>("../api/pendingCommand");
+    const sent: Headers[] = [];
+    const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
+      sent.push(init.headers as Headers);
+      return new Response(null, { status: 204 });
+    });
+    replay.mockImplementation((p, c) => actual.replayPendingCommand(p as PendingCommand, c as ReplayContext, fetchFn as unknown as typeof fetch));
+    broughtBack = {
+      ...pending,
+      headers: { "Idempotency-Key": "k", "X-Scope-Entity": session.entityId, "X-Scope-Location": "0190f000-0000-7000-8000-0000000000c1" }
+    };
+    renderReplay();
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("is done"));
+    expect(replay).toHaveBeenCalledTimes(1);
+    expect((replay.mock.calls[0][1] as ReplayContext).locationId).toBeNull();
+    expect(sent[0].get("X-Scope-Entity")).toBe(session.entityId);
+    expect(sent[0].get("X-Scope-Location")).toBe("0190f000-0000-7000-8000-0000000000c1");
   });
 
   it("shows the server's own words when the replay is refused", async () => {

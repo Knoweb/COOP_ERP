@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useIntl } from "react-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
+import { LangFallbackTag } from "../../shell/i18n/LangFallbackTag";
 import { useFormatInstant } from "../../shell/i18n/formats";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
@@ -169,7 +170,7 @@ export function NotificationsPage() {
                   {subject.text && <p className="integration-subject">{subject.text}</p>}
                   <p>
                     {body.text}
-                    {body.fallback && <span className="integration-muted"> [EN]</span>}
+                    {body.fallback && <LangFallbackTag />}
                   </p>
                   <p className="integration-muted">
                     {t("integration.templates.placeholders", undefined, { names: template.placeholders.join(", ") }).text}

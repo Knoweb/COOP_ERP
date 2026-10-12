@@ -17,6 +17,7 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.m5inventory.InventoryFixture;
+import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.Movement;
 import lk.coopfed.knoweb.m5inventory.api.MovementType;
@@ -24,6 +25,7 @@ import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
 import lk.coopfed.knoweb.m5inventory.api.StockReturnedToSeller;
 import lk.coopfed.knoweb.m5inventory.api.TransferIssued;
+import lk.coopfed.knoweb.m5inventory.api.TransferRequestUnfilled;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
@@ -52,6 +54,9 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
 
     @Autowired
     ClaimReturnConsumer returns;
+
+    @Autowired
+    RecordTransferRequestUnfilledHandler unfilled;
 
     @Autowired
     InventoryQueries queries;
@@ -186,7 +191,9 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
     }
 
     @Test
-    void aRequestWithNothingLeftToSendFails() {
+    void aRequestWithNothingLeftToSendIsFlaggedNotDeadLettered() {
+        // wave 3, M1M2M3M5-17: it used to throw m5.transfer.insufficient_stock, be retried and
+        // land in the dead letter queue with nobody told.
         UUID requestId = Ids.next();
         UUID emptySku = fixture.sku(SOCIETY, "SALT1");
         JsonNode payload = mapper.valueToTree(Map.of(
@@ -195,11 +202,63 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
                 "fromLocationId", stores,
                 "toLocationId", shop,
                 "lines", List.of(Map.of("lineId", Ids.next(), "skuId", emptySku, "qty", new BigDecimal("1")))));
+        kernel.reset();
 
-        assertThatThrownBy(() -> requests.onApproved(payload, system(SOCIETY)))
-                .isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
-                        .isEqualTo("m5.transfer.insufficient_stock"));
+        requests.onApproved(payload, system(SOCIETY));
+
         assertThat(queries.transferOfRequest(requestId, own(SOCIETY))).isEmpty();
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("TRANSFER_REQUEST_SHORT");
+            assertThat(a.subject().id()).isEqualTo(requestId);
+            assertThat(String.valueOf(a.after())).contains(emptySku.toString(), "wanted=1", "sent=0");
+        });
+        assertThat(kernel.committedEvents())
+                .singleElement()
+                .isEqualTo(new TransferRequestUnfilled(requestId, SOCIETY, stores, shop, 1));
+    }
+
+    @Test
+    void anUnfilledRequestIsRecordedOnlyInTheSocietysOwnScopeAndWithItsItems() {
+        assertThatThrownBy(() -> unfilled.handle(
+                        new RecordTransferRequestUnfilled(
+                                Ids.next(),
+                                stores,
+                                shop,
+                                List.of(new IssueTransfer.Shortfall(sku, BigDecimal.ONE, BigDecimal.ZERO))),
+                        federationView(SOCIETY)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m5.scope.own_required"));
+        assertThatThrownBy(() -> unfilled.handle(
+                        new RecordTransferRequestUnfilled(
+                                null,
+                                stores,
+                                shop,
+                                List.of(new IssueTransfer.Shortfall(sku, BigDecimal.ONE, BigDecimal.ZERO))),
+                        system(SOCIETY)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("request.invalid"));
+        assertThatThrownBy(() -> unfilled.handle(
+                        new RecordTransferRequestUnfilled(Ids.next(), stores, shop, List.of()), system(SOCIETY)))
+                .isInstanceOfSatisfying(
+                        ProblemException.class, e -> assertThat(e.messageId()).isEqualTo("m5.transfer.lines_required"));
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    /** A read-only class at the entity: no stock command runs in it. */
+    private static lk.coopfed.knoweb.kernel.api.ScopeContext federationView(UUID entity) {
+        lk.coopfed.knoweb.kernel.api.Scope scope = new lk.coopfed.knoweb.kernel.api.Scope(entity, null);
+        return new lk.coopfed.knoweb.kernel.api.ScopeContext(
+                null,
+                null,
+                entity,
+                List.of(scope),
+                scope,
+                lk.coopfed.knoweb.kernel.api.PolicyClass.FEDERATION_VIEW,
+                java.util.Set.of(),
+                null,
+                java.util.Locale.ENGLISH,
+                null);
     }
 
     @Test

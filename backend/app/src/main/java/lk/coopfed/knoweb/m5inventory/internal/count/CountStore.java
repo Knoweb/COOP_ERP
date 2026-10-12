@@ -107,20 +107,28 @@ class CountStore {
      * What the lot held at a moment (wave 2, M5-13): what it holds now less every movement of it
      * that occurred after the moment (by {@code occurred_at}, so a till's sale uploaded late falls
      * on the right side). Zero when there is no lot.
+     *
+     * <p>One statement, so both reads see one snapshot (wave 3, M1M2M3M5-21): read in two, a sale
+     * committing between them was in the sum but not in the quantity, and the book came out short
+     * (a phantom surplus that could auto-post).
      */
     BigDecimal onHandAt(UUID locationId, UUID batchId, String condition, Instant moment) {
-        BigDecimal now = onHand(locationId, batchId, condition);
-        BigDecimal after = jdbc.queryForObject(
+        BigDecimal held = jdbc.queryForObject(
                 """
-                select coalesce(sum(qty_delta), 0) from inventory.stock_movement
-                 where location_id = ? and batch_id = ? and condition = ? and occurred_at > ?
+                select coalesce((select qty_on_hand from inventory.stock_lot
+                                  where location_id = ? and batch_id = ? and condition = ?), 0)
+                     - coalesce((select sum(qty_delta) from inventory.stock_movement
+                                  where location_id = ? and batch_id = ? and condition = ? and occurred_at > ?), 0)
                 """,
                 BigDecimal.class,
                 locationId,
                 batchId,
                 condition,
+                locationId,
+                batchId,
+                condition,
                 Timestamp.from(moment));
-        return now.subtract(after == null ? BigDecimal.ZERO : after);
+        return held == null ? BigDecimal.ZERO : held;
     }
 
     /** What the lot holds now; zero when there is none. */

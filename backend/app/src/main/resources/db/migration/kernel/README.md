@@ -140,7 +140,9 @@ every module, as K-09 holds them for `document_attachment`:
 
 - `presignPut` records the upload PENDING in the caller's transaction, in an OWN scope of the
   entity in the key, under `attachment.content_types` and `attachment.max_bytes`; asking again
-  renews a PENDING row's window; a settled row gets no new URL (`object.not_pending`).
+  renews a PENDING row's window while it is open, and is refused once it has ended
+  (`object.upload_expired`, a verification may be hashing the bytes); a settled row gets no new
+  URL (`object.not_pending`); `verify` settles only a row whose window is still the one it read.
 - `verify` answers `PENDING` while the PUT URL is valid, then settles the row once, VERIFIED or
   FAILED (MISSING only after `coop-erp.object-store.upload-window-hours`), audited
   `OBJECT_VERIFIED` or `OBJECT_FAILED`. The trigger `object_upload_transition` lets only a

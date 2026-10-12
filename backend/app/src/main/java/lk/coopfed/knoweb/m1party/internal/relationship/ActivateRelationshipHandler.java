@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
  * ActivateRelationship (21A section 6; doc 21 flow 6.2): the seller puts a DRAFT into force.
  * From here M4 accepts the buyer's orders under it. A draft with a credit limit passes the
  * limit's gate ({@link CreditLimitGate}) and publishes {@code credit_limit.changed.v1}, null to
- * the opening limit, audited as CREDIT_LIMIT_CHANGED (wave 2: CR-21A-7; M8 D6).
+ * the opening limit, audited as CREDIT_LIMIT_CHANGED (wave 2: CR-21A-7; M8 D6). A row that
+ * succeeds an earlier row of the pair announces the change from that row's limit to its own
+ * whenever the two differ, also to no limit (wave 3, M1M2M3M5-04).
  */
 @Service
 @CommandHandler(permission = "prt.relationship.activate")
@@ -105,6 +107,22 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
                 relationship.effectiveTo(),
                 relationship.getId());
 
+        // The row this one succeeds, if any: the pair's limit changes from that row's to this
+        // row's, also when this row carries none, so that M8 does not keep the old figure (wave 3,
+        // M1M2M3M5-04). With no predecessor, the opening limit is announced as before.
+        Relationship predecessor = repository
+                .inForceStartingBefore(
+                        relationship.sellerEntityId(),
+                        relationship.buyerEntityId(),
+                        relationship.effectiveFrom(),
+                        relationship.getId())
+                .stream()
+                .findFirst()
+                .orElse(null);
+        UUID previousRelationshipId = predecessor == null ? null : predecessor.getId();
+        BigDecimal previousLimit = predecessor == null ? null : predecessor.creditLimit();
+        boolean limitChanges = !sameLimit(previousLimit, relationship.creditLimit());
+
         Map<String, Object> before = relationship.auditState();
 
         relationship.activate();
@@ -113,7 +131,7 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
         } catch (DataIntegrityViolationException ex) {
             throw RelationshipRules.translate(ex, relationship);
         }
-        if (withLimit) {
+        if (withLimit || limitChanges) {
             jdbc.update(
                     RelationshipRules.MARK_LIMIT_ANNOUNCED,
                     relationship.sellerEntityId(),
@@ -127,11 +145,13 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
                 before,
                 relationship.auditState(),
                 scope);
-        if (withLimit) {
+        if (limitChanges) {
             audit.record(
                     AmendRelationshipTermsHandler.AUDIT_CREDIT_LIMIT_CHANGED,
                     Subject.of("relationship", relationship.getId()),
-                    limitState(relationship.getId(), null),
+                    limitState(
+                            previousRelationshipId == null ? relationship.getId() : previousRelationshipId,
+                            previousLimit),
                     limitState(relationship.getId(), relationship.creditLimit()),
                     scope);
         }
@@ -143,13 +163,14 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
                 relationship.effectiveFrom(),
                 relationship.effectiveTo(),
                 relationship.terms().hash()));
-        if (withLimit) {
-            // The opening limit as an event (M8 D6): null to the limit, so a projection of the
-            // current limit needs nothing but credit_limit.changed.v1.
+        if (limitChanges) {
+            // The limit as an event (M8 D6): from the predecessor's (null for the first row of
+            // the pair) to this row's (null when it carries none), so a projection of the current
+            // limit needs nothing but credit_limit.changed.v1.
             events.publish(new CreditLimitChanged(
                     relationship.getId(),
-                    null,
-                    null,
+                    previousRelationshipId,
+                    previousLimit,
                     relationship.creditLimit(),
                     relationship.effectiveFrom(),
                     relationship.sellerEntityId(),
@@ -157,6 +178,14 @@ class ActivateRelationshipHandler implements Handles<ActivateRelationship, UUID>
         }
 
         return relationship.getId();
+    }
+
+    /** Two limits are the same when both are absent or both are present and equal in value. */
+    private static boolean sameLimit(BigDecimal a, BigDecimal b) {
+        if (a == null || b == null) {
+            return a == null && b == null;
+        }
+        return a.compareTo(b) == 0;
     }
 
     static Map<String, Object> limitState(UUID relationshipId, BigDecimal creditLimit) {

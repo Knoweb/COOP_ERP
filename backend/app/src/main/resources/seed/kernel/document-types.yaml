@@ -141,6 +141,8 @@ document_types:
     fiscal: false
     offline_issuable: true
     owning_module: m5inventory
+    allowed_sync_events:
+      - writeoff.requested
   - code: CNT
     name_en: Stock count
     name_si: තොග ගණනය
@@ -173,6 +175,8 @@ document_types:
     fiscal: false
     offline_issuable: true
     owning_module: m5inventory
+    allowed_sync_events:
+      - repack.executed
   - code: XFR
     name_en: Stock transfer
     name_si: තොග මාරුව
@@ -183,6 +187,8 @@ document_types:
     fiscal: false
     offline_issuable: true
     owning_module: m5inventory
+    allowed_sync_events:
+      - transfer.issued
   - code: OPB
     name_en: Opening balance
     name_si: ආරම්භක ශේෂය

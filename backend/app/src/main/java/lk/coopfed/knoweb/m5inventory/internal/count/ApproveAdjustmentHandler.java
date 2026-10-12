@@ -99,7 +99,7 @@ class ApproveAdjustmentHandler implements Handles<ApproveAdjustment, UUID> {
                 .anyMatch(line -> !line.withinTolerance()
                         && line.varianceQty().signum() != 0
                         && line.unitCost().signum() == 0);
-        policy.requireWithinLimit(task.reviewValue(), zeroCostLine, "inv.adjust.approve", scope);
+        policy.requireWithinLimit(task.reviewValue(), zeroCostLine, "inv.adjust.approve", task.locationId(), scope);
 
         List<Movement> movements = lines.stream()
                 .filter(line -> !line.withinTolerance() && line.varianceQty().signum() != 0)

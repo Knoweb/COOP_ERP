@@ -3,6 +3,25 @@ import { isOpenableFileUrl, openServerFile } from "./openServerFile";
 
 const allowed = ["https://app.example", "http://localhost:9000"];
 
+describe("the screens", () => {
+  const sources = import.meta.glob(["../../*.tsx", "../../modules/**/*.{ts,tsx}", "../**/*.{ts,tsx}", "!../../**/*.test.{ts,tsx}"], {
+    query: "?raw",
+    import: "default",
+    eager: true
+  }) as Record<string, string>;
+
+  it("are found by this test (a wrong path would make it pass for ever)", () => {
+    expect(Object.keys(sources)).toContain("../../modules/m4trading/DebitNotePage.tsx");
+  });
+
+  it("open a server's file link only through openServerFile (TWK-17)", () => {
+    const found = Object.entries(sources)
+      .filter(([file, source]) => !file.endsWith("/openServerFile.ts") && /window\.open\(/.test(source))
+      .map(([file]) => file);
+    expect(found, "use openServerFile(() => api.somethingPrint(id)): it cuts tab.opener and checks the link").toEqual([]);
+  });
+});
+
 describe("isOpenableFileUrl", () => {
   it("accepts http(s) links to an allowed origin", () => {
     expect(isOpenableFileUrl("https://app.example/files/a.pdf?sig=1", allowed)).toBe(true);

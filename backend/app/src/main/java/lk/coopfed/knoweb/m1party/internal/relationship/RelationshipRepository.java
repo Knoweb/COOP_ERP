@@ -53,6 +53,28 @@ public interface RelationshipRepository extends JpaRepository<Relationship, UUID
             @Param("seller") UUID seller, @Param("buyer") UUID buyer, @Param("from") LocalDate from);
 
     /**
+     * The rows of the pair that were put into force (ACTIVE, or SUSPENDED since) and start before
+     * {@code from}, latest first: the first is the row a new row of the pair succeeds, whose
+     * credit limit M8 still shows until the new row's activation says otherwise (wave 3,
+     * M1M2M3M5-04).
+     */
+    @Query(
+            """
+            select r from Relationship r
+             where r.sellerEntityId = :seller
+               and r.buyerEntityId = :buyer
+               and r.status in ('ACTIVE', 'SUSPENDED')
+               and r.id <> :exclude
+               and r.effectiveFrom < :from
+             order by r.effectiveFrom desc
+            """)
+    List<Relationship> inForceStartingBefore(
+            @Param("seller") UUID seller,
+            @Param("buyer") UUID buyer,
+            @Param("from") LocalDate from,
+            @Param("exclude") UUID exclude);
+
+    /**
      * Every ACTIVE row of the pair that is in force on {@code today} or starts later, locked:
      * what a suspension stops. A row that ended before today is history and is left as it is.
      */

@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.kernel.internal.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
@@ -80,6 +82,32 @@ class RabbitBrokerAdapterTest {
         Object attempt = sent.getValue().getMessageProperties().getHeader("x-attempt");
 
         assertThat(attempt).isEqualTo(2);
+    }
+
+    @Test
+    void anUnroutableMessageIsAFailureAlthoughTheBrokerConfirmsIt() {
+
+        // RabbitMQ hands a mandatory message back when no queue is bound for it, then confirms it:
+        // it reached nobody, so the relay must not mark it published (review wave 3, KRN-23).
+        doAnswer(invocation -> {
+                    Message sent = invocation.getArgument(2);
+                    CorrelationData correlation = invocation.getArgument(3);
+
+                    correlation.setReturned(new ReturnedMessage(
+                            sent, 312, "NO_ROUTE", invocation.getArgument(0), invocation.getArgument(1)));
+                    correlation.getFuture().complete(new CorrelationData.Confirm(true, null));
+
+                    return null;
+                })
+                .when(rabbit)
+                .send(anyString(), anyString(), any(Message.class), any(CorrelationData.class));
+
+        OutboxMessage event = message();
+
+        assertThatThrownBy(() -> adapter.publish(event))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(event.eventId().toString())
+                .hasMessageContaining("NO_ROUTE");
     }
 
     private static OutboxMessage message() {

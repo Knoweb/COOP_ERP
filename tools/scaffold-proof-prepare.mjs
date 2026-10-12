@@ -9,9 +9,13 @@
 //
 // Only `make test-scaffold` runs it, on a clean working tree that the same target resets
 // (`git reset --hard && git clean -fd`) when it is done, so nothing here is ever committed.
-// Everything else that names M9 (FlywayConfig, ArchitectureTests, the CI shards, permissions and
-// demo grants in the seeds) names the module the scaffolder re-creates, or a code/table that is
-// simply unused while the copy is in place.
+// Most else that names M9 (FlywayConfig, ArchitectureTests, the CI shards, permissions and demo
+// grants in the seeds) names the module the scaffolder re-creates, or a code/table that is simply
+// unused while the copy is in place. Two integration tests do pin the built M9 and would fail on
+// the copy: ModuleMigrationsFromThePreviousNumberIntegrationTest (M9's previous number and what
+// its later migrations leave) and RlsMatrixIntegrationTest (the departures for M9's notification
+// tables, which must exist). They leave M9 out only while the target sets
+// COOP_ERP_SCAFFOLD_PROOF=true (testsupport.ScaffoldProof); everywhere else they check it in full.
 
 import fs from "node:fs";
 import path from "node:path";

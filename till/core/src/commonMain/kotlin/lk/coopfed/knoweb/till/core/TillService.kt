@@ -124,6 +124,8 @@ class TillService(
     private var offsetElapsedAt: Long? = null
     private var serverTimeElapsedAt: Long? = null
     private var clockRefusalNoted = false
+    /** The monotonic clock and the lock-out time left then (this process only; TILLM6-07). */
+    private var lockAnchor: Pair<Long, Long>? = null
 
     private val policy: TillPolicy get() = basePolicy.withConfig(catalogue.config)
 
@@ -281,10 +283,12 @@ class TillService(
 
     /**
      * Signs [candidate] in with their PIN, checked against the Argon2id hash of the signed snapshot.
-     * Wrong PINs in a row lock the till (per till, not per operator, so trying another operator does
-     * not help) for the policy's time (26A section 8: five, fifteen minutes). The count and the
-     * lock-out are kept in the database in the failure's transaction, so a restart does not reset
-     * them, and the lock-out is an audit fact for central (TWK-03).
+     * Wrong PINs in a row for one operator lock the whole till for the policy's time (26A section 8:
+     * five, fifteen minutes). The wrong PINs are counted per operator tried, and a correct PIN
+     * clears only the count of the operator who signed in, so a cashier who knows her own PIN
+     * cannot reset the count against another operator by signing in between guesses (TILLM6-02).
+     * The counts and the lock-out are kept in the database in the failure's transaction, so a
+     * restart does not reset them, and the lock-out is an audit fact for central (TWK-03).
      */
     suspend fun signIn(candidate: Operator, pin: String) {
         lock.withLock {
@@ -293,7 +297,7 @@ class TillService(
         }
         if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         lock.withLock {
-            store.transaction { store.putSetting(Settings.PIN_FAILURES, "0") }
+            store.transaction { store.removeSetting(Settings.pinFailures(candidate.userId)) }
             operator = candidate
         }
     }
@@ -309,23 +313,30 @@ class TillService(
         } catch (e: UnreadablePinHash) {
             throw TillRefusal("${candidate.displayName}'s PIN record cannot be read; ask the office")
         }
-        if (!ok) lock.withLock { countWrongPin() }
+        if (!ok) lock.withLock { countWrongPin(candidate) }
         return ok
     }
 
-    private fun countWrongPin() {
+    private fun countWrongPin(candidate: Operator) {
         val at = now()
         val limit = policy.pinFailuresBeforeLock
+        val key = Settings.pinFailures(candidate.userId)
+        var lockedNow = false
         store.transaction {
-            val failures = counterOr(Settings.PIN_FAILURES, 0).toInt() + 1
+            val failures = counterOr(key, 0).toInt() + 1
             if (failures >= limit) {
                 val until = at + policy.pinLockFor
                 store.putSetting(Settings.PIN_LOCKED_UNTIL, until.toEpochMilliseconds().toString())
-                store.putSetting(Settings.PIN_FAILURES, "0")
+                store.putSetting(Settings.PIN_LOCK_REMAINING_MS, policy.pinLockFor.inWholeMilliseconds.toString())
+                store.removeSetting(key)
+                lockedNow = true
                 device?.let { record(Facts.PIN_LOCKOUT_EVENT, at, null, Facts.pinLockout(it, failures, until)) }
             } else {
-                store.putSetting(Settings.PIN_FAILURES, failures.toString())
+                store.putSetting(key, failures.toString())
             }
+        }
+        if (lockedNow) {
+            lockAnchor = clock.elapsedMillis()?.let { it to policy.pinLockFor.inWholeMilliseconds }
         }
         publishStatus()
     }
@@ -335,8 +346,46 @@ class TillService(
     }
 
     private fun lockedOutMessage(): String? {
-        val until = store.setting(Settings.PIN_LOCKED_UNTIL)?.toLongOrNull()?.let { Instant.fromEpochMilliseconds(it) } ?: return null
-        return if (now() < until) "Too many wrong PINs; try again after ${Times.printed(until, clock.zone)}" else null
+        val left = lockOutLeftMs()
+        if (left <= 0) return null
+        return "Too many wrong PINs; try again after ${Times.printed(now() + left.milliseconds, clock.zone)}"
+    }
+
+    /**
+     * How long the lock-out has still to run (ms; 0 when none). It is counted down on the monotonic
+     * clock, never on the PC's clock, so moving the PC's clock forward does not shorten it
+     * (TILLM6-07). What is left is written back on every check; after a restart it runs again in
+     * full from the first check. Only a platform with no monotonic clock falls back to the till's
+     * corrected clock.
+     */
+    private fun lockOutLeftMs(): Long {
+        val remaining = store.setting(Settings.PIN_LOCK_REMAINING_MS)?.toLongOrNull()
+        val until = store.setting(Settings.PIN_LOCKED_UNTIL)?.toLongOrNull()
+        if (remaining == null && until == null) {
+            lockAnchor = null
+            return 0
+        }
+        val lockFor = policy.pinLockFor.inWholeMilliseconds
+        val elapsed = clock.elapsedMillis()
+        val left = if (elapsed == null) {
+            (until ?: 0L) - now().toEpochMilliseconds()
+        } else {
+            // A lock-out written before TILLM6-07 has only its end: what is left of it, at most the full time.
+            val anchor = lockAnchor
+                ?: (elapsed to (remaining ?: ((until ?: 0L) - now().toEpochMilliseconds()).coerceIn(0L, lockFor)))
+                    .also { lockAnchor = it }
+            anchor.second - (elapsed - anchor.first)
+        }
+        store.transaction {
+            if (left <= 0) {
+                store.removeSetting(Settings.PIN_LOCK_REMAINING_MS)
+                store.removeSetting(Settings.PIN_LOCKED_UNTIL)
+            } else if (elapsed != null) {
+                store.putSetting(Settings.PIN_LOCK_REMAINING_MS, left.toString())
+            }
+        }
+        if (left <= 0) lockAnchor = null
+        return left
     }
 
     /**
@@ -402,6 +451,9 @@ class TillService(
      * corrected while no session is open. Receipts and sessions already issued keep the date they
      * carry. The supervisor is an operator with [TillPolicy.SUPERVISOR_PERMISSION] and their PIN (a
      * wrong one counts toward the lock-out); on a trial till with no operators, the trial cashier.
+     * The move is an audit fact for central in the same transaction (TILLM6-05,
+     * `TILL_BUSINESS_DATE_CORRECTED`): the till position, the date before and after, the
+     * supervisor as the actor.
      */
     suspend fun correctBusinessDate(date: LocalDate, supervisor: Operator?, pin: String?) {
         lock.withLock {
@@ -425,10 +477,17 @@ class TillService(
             throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         }
         lock.withLock {
+            val identity = requireDevice()
             if (store.openSession() != null) throw TillRefusal("Close the session first: the business date changes only between sessions")
+            val from = store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) }
+            if (from == null || date >= from) {
+                throw TillRefusal("Only a move back needs a supervisor; the business date moves forward by itself when a session opens")
+            }
             store.transaction {
-                if (supervisor != null) store.putSetting(Settings.PIN_FAILURES, "0")
+                if (supervisor != null) store.removeSetting(Settings.pinFailures(supervisor.userId))
                 store.putSetting(Settings.BUSINESS_DATE, date.toString())
+                // Central learns who moved the date, from what to what (TILLM6-05).
+                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, now(), supervisor?.userId, Facts.businessDateCorrected(identity, from, date))
             }
             publishStatus()
         }

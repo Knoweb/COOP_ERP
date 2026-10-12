@@ -15,6 +15,14 @@ for (const name of fs.readdirSync(modulesDir).filter((file) => file.endsWith(".p
   normalise(path.join(modulesDir, name));
 }
 
+/** Sorts the lines at `indexes` among themselves, in place; every other line keeps its place. */
+function sortInPlace(lines, indexes) {
+  const sorted = indexes.map((index) => lines[index]).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  indexes.forEach((index, position) => {
+    lines[index] = sorted[position];
+  });
+}
+
 function normalise(file) {
   const original = fs.readFileSync(file, "utf8");
   const normalisedNewlines = original.replace(/\r\n/g, "\n");
@@ -26,26 +34,19 @@ function normalise(file) {
     lines.pop();
   }
 
-  const relationIndexes = [];
-  const relations = [];
-
+  // Each diagram (@startuml ... @enduml) is sorted on its own, so lines never move from one
+  // diagram to another; a Rel-looking line outside any diagram (prose of an .adoc) is left alone.
+  let relationIndexes = null; // the Rel line positions of the diagram being read; null outside one
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-
-    if (/^\s*Rel(?:_[A-Za-z0-9]+)?\(/.test(line)) {
+    if (/^\s*@startuml\b/.test(line)) {
+      relationIndexes = [];
+    } else if (/^\s*@enduml\b/.test(line)) {
+      sortInPlace(lines, relationIndexes ?? []);
+      relationIndexes = null;
+    } else if (relationIndexes !== null && /^\s*Rel(?:_[A-Za-z0-9]+)?\(/.test(line)) {
       relationIndexes.push(index);
-      relations.push(line);
     }
-  }
-
-  relations.sort((left, right) => {
-    if (left < right) return -1;
-    if (left > right) return 1;
-    return 0;
-  });
-
-  for (let index = 0; index < relationIndexes.length; index += 1) {
-    lines[relationIndexes[index]] = relations[index];
   }
 
   const output = lines.join("\n") + (hadFinalNewline ? "\n" : "");

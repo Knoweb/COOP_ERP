@@ -109,14 +109,17 @@ class WriteOffStore {
     /**
      * What each line's lot holds at the location, the lots locked in the ledger's order (wave 2,
      * M5-12): the guard and the posting see the same quantity, and two approvals over several
-     * lines cannot deadlock.
+     * lines cannot deadlock. What open pick lists hold of a lot for a delivery note is not free to
+     * write off (wave 3, M1M2M3M5-20): the dispatch would take the lot below zero.
      */
     Map<StockOnHand.LotRef, BigDecimal> lockLots(UUID locationId, List<Line> lines) {
-        return stock.lockLots(
+        Map<StockOnHand.LotRef, BigDecimal> held = stock.lockLots(
                 locationId,
                 lines.stream()
                         .map(line -> new StockOnHand.LotRef(line.batchId(), line.condition()))
                         .toList());
+        held.replaceAll((lot, qty) -> qty.subtract(stock.reserved(locationId, lot)));
+        return held;
     }
 
     /**

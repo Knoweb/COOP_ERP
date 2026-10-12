@@ -67,7 +67,9 @@ public class DraftNewVersionHandler implements Handles<DraftNewVersion, UUID> {
             throw new ProblemException("request.invalid");
         }
         PriceListRules.requireOwnerScope(scope);
-        PriceListView source = store.find(command.sourcePriceListId())
+        // Locked like SetLines and Publish (wave 3, M1M2M3M5-08): two drafts from the same source
+        // wait for each other, and the second then sees the first in draftExists.
+        PriceListView source = store.findForUpdate(command.sourcePriceListId())
                 .filter(list -> list.ownerEntityId().equals(scope.entityId()))
                 .orElseThrow(() -> new ProblemException("m3.price_list.not_found"));
         if (!PriceListStore.PUBLISHED.equals(source.status()) && !PriceListStore.SUPERSEDED.equals(source.status())) {

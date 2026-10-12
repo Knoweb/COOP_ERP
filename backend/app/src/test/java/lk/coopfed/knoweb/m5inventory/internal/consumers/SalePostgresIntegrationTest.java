@@ -254,6 +254,85 @@ class SalePostgresIntegrationTest extends PostgresIntegrationTest {
                 .doesNotContain("SALE_LINE_UNRESOLVED");
     }
 
+    /**
+     * Wave 3, M1M2M3M5-16: a line without its batch takes an in-date lot before an expired lot
+     * that still holds stock (waiting for its write-off), so no false SALE_OF_EXPIRED is written
+     * and the in-date lot is not overstated.
+     */
+    @Test
+    void aLineWithoutItsBatchTakesAnInDateLotBeforeAnExpiredOneWithStock() {
+        UUID expired = fixture.batch(sku, MPCS, "EXP", LocalDate.of(2026, 1, 31));
+        receive(shop, expired, "10");
+        UUID receipt = Ids.next();
+
+        sale.handle(
+                new ApplySale(
+                        receipt,
+                        shop,
+                        Instant.parse("2026-10-01T05:00:00Z"),
+                        List.of(new ApplySale.Line(null, 1, sku, null, new BigDecimal("2")))),
+                at(shop));
+
+        assertThat(queries.movementsOf(receipt, own(MPCS))).singleElement().satisfies(m -> assertThat(m.batchId())
+                .isNotEqualTo(expired));
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("STOCK_SOLD")
+                .doesNotContain("SALE_OF_EXPIRED");
+        assertThat(kernel.committedEvents()).isNotEmpty();
+    }
+
+    /**
+     * Wave 3, M1M2M3M5-22: an item the shop never held is sold from M2's newest in-date batch that
+     * is not another entity's repack batch, though a newer expired batch and a newer repack batch
+     * of another society exist.
+     */
+    @Test
+    void anItemTheShopNeverHeldIsSoldFromTheNewestFittingCatalogueBatch() {
+        UUID item = fixture.sku(MPCS, "NEVERHELD2");
+        UUID regular = fixture.batch(item, MPCS, "R-1", LocalDate.of(2027, 6, 30));
+        fixture.batch(item, MPCS, "R-EXP", LocalDate.of(2026, 2, 28));
+        UUID repack = fixture.batch(item, MPCS, "RPK", LocalDate.of(2027, 12, 31));
+        superuserJdbc()
+                .update(
+                        "update catalogue.batch set is_synthetic = true, owner_entity_id = ? where batch_id = ?",
+                        Ids.next(),
+                        repack);
+        Instant saleTime = Instant.parse("2026-10-01T05:00:00Z");
+
+        UUID first = Ids.next();
+        sale.handle(
+                new ApplySale(first, shop, saleTime, List.of(new ApplySale.Line(null, 1, item, null, BigDecimal.ONE))),
+                at(shop));
+        assertThat(queries.movementsOf(first, own(MPCS))).singleElement().satisfies(m -> assertThat(m.batchId())
+                .isEqualTo(regular));
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("SALE_WITHOUT_LOT")
+                .doesNotContain("SALE_OF_EXPIRED");
+        assertThat(kernel.committedEvents()).isNotEmpty();
+    }
+
+    private void receive(UUID location, UUID batch, String qty) {
+        outer.run(
+                own(MPCS),
+                () -> ledger.post(
+                        new PostMovements(
+                                Ids.next(),
+                                null,
+                                null,
+                                List.of(new Movement(
+                                        location,
+                                        batch,
+                                        LotCondition.GOOD,
+                                        MovementType.RECEIPT,
+                                        new BigDecimal(qty),
+                                        new BigDecimal("250"),
+                                        null))),
+                        own(MPCS)));
+        kernel.reset();
+    }
+
     /** Wave 2, M5-04: a till's stock fact M5 has no hook for yet is flagged, never dropped; central's own event is not. */
     @Test
     void aTillsStockFactWithNoHookYetIsFlaggedAndCentralsOwnEventIsNot() {

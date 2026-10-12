@@ -14,10 +14,11 @@ import lk.coopfed.knoweb.kernel.api.DomainEvent;
  * by it.
  *
  * @param relationshipId         the row that carries the new limit
- * @param previousRelationshipId the row that carried the old limit; null at activation and in an
- *                               announcement
+ * @param previousRelationshipId the row that carried the old limit; null at the activation of the
+ *                               pair's first row and in an announcement (the activation of a row
+ *                               that succeeds another names that row; wave 3, M1M2M3M5-04)
  * @param previousCreditLimit    null when there was none
- * @param creditLimit            the new limit
+ * @param creditLimit            the new limit; null when a successor row carries none
  * @param effectiveFrom          the first day of the new limit
  * @param sellerEntityId         the seller, whose relationship it is (added in wave 2, additive)
  * @param buyerEntityId          the buyer the limit is extended to (added in wave 2, additive)

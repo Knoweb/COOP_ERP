@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -234,18 +236,20 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> attachments.presignUpload(documentId, attachmentId, "image/jpeg", 12L, null, scope(OWNER)));
         superuserJdbc()
                 .update(
-                        "update kernel.document_attachment set upload_expires_at = now() - interval '1 minute'"
+                        "update kernel.document_attachment set upload_expires_at = now() + interval '1 minute'"
                                 + " where attachment_id = ?",
                         attachmentId);
 
-        // The till lost its connection and asks again with the same id (doc 32 section 4): the
-        // same row, the same key, a fresh window; still one PENDING row and no duplicate key.
+        // The till lost its connection and asks again with the same id while its window is still
+        // open (doc 32 section 4): the same row, the same key, a fresh window; still one PENDING
+        // row and no duplicate key.
         PresignedUpload again = inScope(
                 OWNER,
                 () -> attachments.presignUpload(documentId, attachmentId, "image/jpeg", 12L, null, scope(OWNER)));
         assertThat(again.attachmentId()).isEqualTo(attachmentId);
         assertThat(again.objectKey()).isEqualTo(first.objectKey());
         assertThat(again.expiresAt()).isAfter(first.expiresAt().minusSeconds(1));
+        assertThat(again.expiresAt()).isAfter(Instant.now().plus(Duration.ofMinutes(2)));
         assertThat(superuserJdbc()
                         .queryForObject(
                                 "select count(*) from kernel.document_attachment where document_id = ?",
@@ -261,6 +265,25 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit())
                 .extracting(r -> r.eventType())
                 .containsExactly("ATTACHMENT_PRESIGNED", "ATTACHMENT_PRESIGNED");
+
+        // Once the window has ended the verifier may be hashing the bytes: no new URL, and the
+        // announced hash stays what it was.
+        windowOver(attachmentId);
+        kernel.reset();
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> attachments.presignUpload(
+                                documentId, attachmentId, "image/jpeg", 12L, "a".repeat(64), scope(OWNER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.upload_expired");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select content_hash is null and upload_expires_at < now()"
+                                        + " from kernel.document_attachment where attachment_id = ?",
+                                Boolean.class,
+                                attachmentId))
+                .isTrue();
 
         // The same id on another document of the owner is refused.
         UUID otherDocument = Ids.next();

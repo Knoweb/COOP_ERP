@@ -220,7 +220,8 @@ class PartySnapshotContributorsIntegrationTest extends PostgresIntegrationTest {
         assertThat(c).containsEntry("display_name", "m1snap-cashier-template");
         @SuppressWarnings("unchecked")
         List<String> cPerms = (List<String>) c.get("permissions");
-        assertThat(cPerms).contains("pos.receipt.issue", "pos.mrp.pick");
+        assertThat(cPerms).containsExactlyInAnyOrder("pos.receipt.issue", "pos.mrp.pick");
+        assertThat(cPerms).doesNotContain("pos.session.manage");
 
         // Verify supervisor has supervisor permissions
         Map<String, Object> s = rows.get(supervisorUser);
@@ -228,7 +229,7 @@ class PartySnapshotContributorsIntegrationTest extends PostgresIntegrationTest {
         @SuppressWarnings("unchecked")
         List<String> sPerms = (List<String>) s.get("permissions");
         assertThat(sPerms)
-                .contains(
+                .containsExactlyInAnyOrder(
                         "pos.receipt.issue",
                         "pos.mrp.pick",
                         "pos.receipt.void",
@@ -236,8 +237,41 @@ class PartySnapshotContributorsIntegrationTest extends PostgresIntegrationTest {
                         "pos.negative_stock.acknowledge",
                         "pos.session.manage");
 
+        // The whole set each till template grants, as role-templates.yaml seeds it (TILLM6-09).
+        assertThat(templatePermissions(db, "01999a10-2c4e-7f1a-8b3d-5e6f70819a11"))
+                .containsExactlyInAnyOrder("pos.receipt.issue", "pos.mrp.pick");
+        assertThat(templatePermissions(db, "01999a10-2c4e-7f1a-8b3d-5e6f70819a12"))
+                .containsExactlyInAnyOrder(
+                        "pos.receipt.issue",
+                        "pos.mrp.pick",
+                        "pos.receipt.void",
+                        "pos.refund.same_session",
+                        "pos.negative_stock.acknowledge",
+                        "pos.session.manage");
+        assertThat(templatePermissions(db, "01999a10-2c4e-7f1a-8b3d-5e6f70819a13"))
+                .containsExactlyInAnyOrder(
+                        "pos.receipt.issue",
+                        "pos.mrp.pick",
+                        "pos.receipt.void",
+                        "pos.refund.same_session",
+                        "pos.negative_stock.acknowledge",
+                        "pos.session.manage",
+                        "inv.stock.view",
+                        "cat.sku.view",
+                        "prt.location.view",
+                        "shop.grn.confirm",
+                        "shop.count.record",
+                        "inv.writeoff.request");
+
         // Cleanup
         db.update("delete from security.user_role where user_id in (?, ?)", cashierUser, supervisorUser);
         db.update("delete from security.app_user where user_id in (?, ?)", cashierUser, supervisorUser);
+    }
+
+    private static List<String> templatePermissions(JdbcTemplate db, String roleId) {
+        return db.queryForList(
+                "select permission_code from security.role_permission where role_id = cast(? as uuid)",
+                String.class,
+                roleId);
     }
 }

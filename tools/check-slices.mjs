@@ -26,7 +26,10 @@ import { fileURLToPath } from "node:url";
 
 const SLICES_DIR = "backend/app/src/main/resources/openapi";
 const MUTATING_METHODS = new Set(["post", "put", "patch", "delete"]);
-const IDEMPOTENCY_KEY_PATTERN = /Idempotency-?Key/i;
+// The parameter itself, not a mention of it in a description or comment: the common.yaml $ref
+// (as OpenApiSliceRulesTest requires) or an inline parameter named Idempotency-Key.
+const IDEMPOTENCY_KEY_PATTERN =
+  /^\s*-?\s*(?:\$ref:\s*["']?[^"'\s#]*#\/components\/parameters\/IdempotencyKey["']?|name:\s*["']?Idempotency-Key["']?)\s*$/m;
 
 /**
  * Every operation of one slice, in document order. Regex-driven, like the other tools/*.mjs
@@ -52,7 +55,8 @@ export function operationsOf(sliceText) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const pathMatch = line.match(/^ {2}(\/\S*):\s*$/);
+    // A path key may be written plain or quoted ("/v1/x":); a quoted one is not skipped.
+    const pathMatch = line.match(/^ {2}["']?(\/[^\s"']*)["']?:\s*$/);
     if (pathMatch) {
       flush();
       currentPath = pathMatch[1];

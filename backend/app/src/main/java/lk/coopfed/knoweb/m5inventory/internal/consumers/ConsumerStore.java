@@ -3,6 +3,8 @@ package lk.coopfed.knoweb.m5inventory.internal.consumers;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,8 +45,45 @@ class ConsumerStore {
      * units. Only the named batch when the delivery line names one. Only lots that expire on or
      * after {@code expiresFrom} (wave 2, M5-01): the business date plus the seller's minimum shelf
      * life for a delivery note, so an expired lot never leaves on one.
+     *
+     * <p>The rows are locked in the ledger's order (location, then batch: {@code
+     * LedgerService.LotKey}, {@code StockOnHand}), not in FEFO order (wave 3, M1M2M3M5-19): a
+     * dispatch that locked B2 before B1 because B2 expires first, against a write-off approval
+     * that locks B1 then B2, was a deadlock pair. So the candidates are found without a lock, then
+     * locked one by one in that order, then read again under the lock for what is free of them.
      */
     List<Candidate> lockCandidates(UUID skuId, UUID batchId, LocalDate expiresFrom) {
+        List<Candidate> found = candidates(skuId, batchId, expiresFrom, List.of());
+        if (found.isEmpty()) {
+            return found;
+        }
+        List<Candidate> ledgerOrder = new ArrayList<>(found);
+        ledgerOrder.sort(Comparator.comparing(Candidate::locationId).thenComparing(Candidate::batchId));
+        for (Candidate lot : ledgerOrder) {
+            jdbc.queryForList(
+                    "select stock_lot_id from inventory.stock_lot where stock_lot_id = ? for update",
+                    UUID.class,
+                    lot.stockLotId());
+        }
+        return candidates(
+                skuId,
+                batchId,
+                expiresFrom,
+                found.stream().map(Candidate::stockLotId).toList());
+    }
+
+    /** The candidates in FEFO order with what is free of each; only these lots when {@code only} names any. */
+    private List<Candidate> candidates(UUID skuId, UUID batchId, LocalDate expiresFrom, List<UUID> only) {
+        List<Object> args = new ArrayList<>(List.of(skuId));
+        args.add(batchId);
+        args.add(batchId);
+        args.add(Date.valueOf(expiresFrom));
+        String onlyThese = "";
+        if (!only.isEmpty()) {
+            onlyThese = " and l.stock_lot_id in ("
+                    + String.join(",", only.stream().map(id -> "?").toList()) + ")";
+            args.addAll(only);
+        }
         return jdbc.query(
                 """
                 select l.stock_lot_id, l.location_id, l.batch_id,
@@ -56,18 +95,15 @@ class ConsumerStore {
                  where l.sku_id = ? and l.condition = 'GOOD' and l.qty_on_hand > 0
                    and (?::uuid is null or l.batch_id = ?)
                    and (l.expiry_date is null or l.expiry_date >= ?)
-                 order by l.expiry_date nulls last, l.received_at, l.stock_lot_id
-                   for update of l
-                """,
+                """
+                        + onlyThese
+                        + " order by l.expiry_date nulls last, l.received_at, l.stock_lot_id",
                 (rs, n) -> new Candidate(
                         rs.getObject("stock_lot_id", UUID.class),
                         rs.getObject("location_id", UUID.class),
                         rs.getObject("batch_id", UUID.class),
                         rs.getBigDecimal("free")),
-                skuId,
-                batchId,
-                batchId,
-                Date.valueOf(expiresFrom));
+                args.toArray());
     }
 
     Optional<PickList> pickListOf(UUID deliveryDocumentId) {

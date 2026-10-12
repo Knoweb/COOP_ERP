@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import lk.coopfed.knoweb.m1party.api.RolePermission;
+import lk.coopfed.knoweb.m1party.query.ApprovalLimit;
 
 /**
  * The guardrails of role authoring (doc 19 section 3.2 and 3.3; 21A section 6.1) as plain
@@ -168,21 +169,25 @@ final class RoleRules {
      * "A granted limit never exceeds the grantor's" (doc 19 section 3.2, applied to the limits of
      * section 3.3; CR-21A-7): for each numeric property of the permission's {@code limits_schema},
      * the value granted is at or below the grantor's effective value for that code. The grantor's
-     * effective value is the highest over their holdings of the code; a holding with no limits, or
-     * without that property, is unlimited, and so is a grant that sets no value. A permission
-     * without a schema has no limits to compare.
+     * effective value is the highest over their holdings of the code. A holding without {@code
+     * max_value} (or with no limits at all) is worth the band-1 limit, the meaning M5 gives it
+     * when it checks a decision ({@link ApprovalLimit}; wave 3, M1M2M3M5-01); a holding without
+     * any other property is unlimited in it. A grant that sets no value is unlimited. A
+     * permission without a schema has no limits to compare.
      *
      * @param requested       the limits of the grant; null for none
      * @param schema          the permission's limits_schema; null for none
      * @param grantorHoldings one entry per holding of the code by the grantor; an entry is null
      *                        when that holding carries no limits
+     * @param band1           what a holding without {@code max_value} is worth ({@link ApprovalLimit#band1})
      * @return the first property, in name order, whose granted value is above the grantor's
      */
     static Optional<LimitExcess> aboveGrantor(
             String permission,
             Map<String, Object> requested,
             JsonNode schema,
-            Collection<Map<String, Object>> grantorHoldings) {
+            Collection<Map<String, Object>> grantorHoldings,
+            BigDecimal band1) {
         JsonNode properties = schema == null ? null : schema.path("properties");
         if (properties == null || !properties.isObject()) {
             return Optional.empty();
@@ -195,7 +200,7 @@ final class RoleRules {
             if (!"number".equals(type) && !"integer".equals(type)) {
                 continue;
             }
-            Optional<BigDecimal> grantor = effectiveLimit(grantorHoldings, name);
+            Optional<BigDecimal> grantor = effectiveLimit(grantorHoldings, name, band1);
             if (grantor.isEmpty()) {
                 continue;
             }
@@ -207,11 +212,21 @@ final class RoleRules {
         return Optional.empty();
     }
 
-    /** The highest value of the property over the holdings; empty (unlimited) when any holding sets none. */
-    private static Optional<BigDecimal> effectiveLimit(Collection<Map<String, Object>> holdings, String name) {
+    /**
+     * The highest value of the property over the holdings. A holding without {@code max_value} is
+     * worth the band-1 limit ({@link ApprovalLimit#of}); for any other property, a holding that
+     * sets none makes the grantor unlimited in it (empty).
+     */
+    private static Optional<BigDecimal> effectiveLimit(
+            Collection<Map<String, Object>> holdings, String name, BigDecimal band1) {
         BigDecimal highest = null;
         for (Map<String, Object> holding : holdings) {
-            BigDecimal value = holding == null ? null : decimal(holding.get(name));
+            BigDecimal value;
+            if (ApprovalLimit.MAX_VALUE.equals(name)) {
+                value = ApprovalLimit.of(holding, band1);
+            } else {
+                value = holding == null ? null : decimal(holding.get(name));
+            }
             if (value == null) {
                 return Optional.empty();
             }

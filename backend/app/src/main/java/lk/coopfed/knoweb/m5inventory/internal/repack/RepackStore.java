@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
+import lk.coopfed.knoweb.m5inventory.internal.control.StockOnHand;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -36,9 +37,11 @@ class RepackStore {
             boolean reversed) {}
 
     private final JdbcTemplate jdbc;
+    private final StockOnHand stock;
 
-    RepackStore(JdbcTemplate jdbc) {
+    RepackStore(JdbcTemplate jdbc, StockOnHand stock) {
         this.jdbc = jdbc;
+        this.stock = stock;
     }
 
     /** The recipe, locked for the rest of the transaction, or {@code m5.recipe.not_found}. */
@@ -106,7 +109,11 @@ class RepackStore {
                         new ProblemException("m5.repack.not_found", Map.of("repackId", String.valueOf(repackId))));
     }
 
-    /** What the GOOD lot of the batch holds at the location, locked; zero when there is none. */
+    /**
+     * What the GOOD lot of the batch holds at the location and is free, locked; zero when there is
+     * none. What open pick lists hold of it for a delivery note is not free (wave 3, M1M2M3M5-20):
+     * repacking or reversing it would leave the dispatch to take the lot below zero.
+     */
     BigDecimal goodOnHand(UUID locationId, UUID batchId) {
         List<BigDecimal> found = jdbc.queryForList(
                 """
@@ -117,7 +124,32 @@ class RepackStore {
                 BigDecimal.class,
                 locationId,
                 batchId);
-        return found.isEmpty() ? BigDecimal.ZERO : found.get(0);
+        if (found.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return found.get(0).subtract(stock.reserved(locationId, new StockOnHand.LotRef(batchId, "GOOD")));
+    }
+
+    /** The entity's quantity and average of one item (inventory.entity_sku_cost). */
+    record ItemCost(BigDecimal qtyOnHand, BigDecimal avgCost) {}
+
+    /** The entity's cost row of the item a batch's GOOD lot at the location is of; zeros when there is none. */
+    ItemCost entityCostOfLot(UUID locationId, UUID batchId) {
+        return jdbc
+                .query(
+                        """
+                        select c.qty_on_hand, c.avg_cost
+                          from inventory.stock_lot l
+                          join inventory.entity_sku_cost c
+                            on c.owner_entity_id = l.owner_entity_id and c.sku_id = l.sku_id
+                         where l.location_id = ? and l.batch_id = ? and l.condition = 'GOOD'
+                        """,
+                        (rs, n) -> new ItemCost(rs.getBigDecimal("qty_on_hand"), rs.getBigDecimal("avg_cost")),
+                        locationId,
+                        batchId)
+                .stream()
+                .findFirst()
+                .orElse(new ItemCost(BigDecimal.ZERO, BigDecimal.ZERO));
     }
 
     /** Whether anything but the repack itself moved the batch at the location: a sale, a transfer, a write-off. */
