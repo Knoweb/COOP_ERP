@@ -593,6 +593,32 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
+        void theSeededEntityAdministratorAssignsTheThreeTillTemplatesAtAShop() {
+            // TILLM6-03: the seeded templates of role-templates.yaml, as a real society holds them.
+            UUID entityAdministrator = UUID.fromString("01921319-bf93-78c6-a67b-117865c69784");
+            UUID cashier = UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a11");
+            UUID shopSupervisor = UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a12");
+            UUID shopInCharge = UUID.fromString("01999a10-2c4e-7f1a-8b3d-5e6f70819a13");
+            UUID societyAdmin = fx.user(mpcs);
+            fx.assign(societyAdmin, entityAdministrator, mpcs, null);
+            ScopeContext asSocietyAdmin = ScopeContext.dev(societyAdmin, mpcs, null);
+
+            assignRole.handle(new AssignRole(clerk, shopSupervisor, shop), asSocietyAdmin);
+            assignRole.handle(new AssignRole(clerk, cashier, secondShop), asSocietyAdmin);
+            UUID manager = fx.user(mpcs);
+            assignRole.handle(new AssignRole(manager, shopInCharge, shop), asSocietyAdmin);
+
+            assertThat(kernel.committedEvents())
+                    .containsExactly(
+                            new RoleAssigned(shopSupervisor, clerk, mpcs, shop),
+                            new RoleAssigned(cashier, clerk, mpcs, secondShop),
+                            new RoleAssigned(shopInCharge, manager, mpcs, shop));
+            assertThat(kernel.committedAudit())
+                    .extracting(record -> record.eventType())
+                    .containsExactly("ROLE_ASSIGNED", "ROLE_ASSIGNED", "ROLE_ASSIGNED");
+        }
+
+        @Test
         void anotherEntitysRoleIsNotFound() {
             UUID theirs = fx.role(otherMpcs, "prt.location.view");
             refused(() -> assignRole.handle(new AssignRole(clerk, theirs, null), asAdmin()), "m1.role.not_found");
@@ -905,7 +931,7 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         }
 
         @Test
-        void theHighestHoldingCountsAndAHoldingWithoutALimitIsUnlimited() {
+        void theHighestHoldingCountsAndAHoldingWithoutALimitIsBandOne() {
             fx.assign(grantor, limitedRole(100000), mpcs, null);
 
             createRole.handle(named("hundred", approveUpTo(100000)), asGrantor());
@@ -914,15 +940,30 @@ class RoleHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                     () -> createRole.handle(named("over", approveUpTo(100001)), asGrantor()),
                     "m1.role.limit_exceeds_grantor");
 
-            // A grantor whose holding carries no limit (a legacy role) grants any.
+            // wave 3, M1M2M3M5-01: a holding without a limit (a legacy role) is worth the band-1
+            // limit (inventory.approval_band1_limit, Rs 25,000), as M5 reads it at approval; it
+            // never lets the grantor grant any value. Beside the Rs 100,000 holding it adds nothing.
             fx.assign(grantor, limitedRole(null), mpcs, null);
-            UUID any = createRole.handle(named("any", approveUpTo(9_999_999)), asGrantor());
+            kernel.reset();
+            refused(
+                    () -> createRole.handle(named("any", approveUpTo(9_999_999)), asGrantor()),
+                    "m1.role.limit_exceeds_grantor");
+
+            UUID legacyOnly = fx.user(mpcs);
+            fx.assign(legacyOnly, fx.role(mpcs, "gov.role.manage", "gov.user.manage"), mpcs, null);
+            fx.assign(legacyOnly, limitedRole(null), mpcs, null);
+            ScopeContext asLegacyOnly = ScopeContext.dev(legacyOnly, mpcs, null);
+            kernel.reset();
+            refused(
+                    () -> createRole.handle(named("legacy over", approveUpTo(25001)), asLegacyOnly),
+                    "m1.role.limit_exceeds_grantor");
+            UUID bandOne = createRole.handle(named("legacy band one", approveUpTo(25000)), asLegacyOnly);
             assertThat(superuserJdbc()
                             .queryForObject(
                                     "select limits ->> 'max_value' from security.role_permission where role_id = ?",
                                     String.class,
-                                    any))
-                    .isEqualTo("9999999");
+                                    bandOne))
+                    .isEqualTo("25000");
         }
     }
 

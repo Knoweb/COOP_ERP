@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -72,11 +72,19 @@ export function NewGrnPage() {
   });
 
   // The rows start from the drop once; the seller's batches, which arrive later, fill only the
-  // batch fields still empty, never a count the receiver has already typed.
+  // batch fields still empty, never a count the receiver has already typed. Another drop (Back
+  // and Forward between two ?dropId= addresses keep this page mounted) starts again from its
+  // own lines and with a new key: the rows of one drop are never posted under another.
   const dropKey = drop?.dropId;
+  const rowsBuiltFor = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (drop) {
-      setRows((current) => (current.length > 0 ? current : rowsOf(drop)));
+      const sameDrop = rowsBuiltFor.current === drop.dropId;
+      if (rowsBuiltFor.current !== undefined && !sameDrop) {
+        key.next();
+      }
+      rowsBuiltFor.current = drop.dropId;
+      setRows((current) => (sameDrop && current.length > 0 ? current : rowsOf(drop)));
     }
   }, [dropKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

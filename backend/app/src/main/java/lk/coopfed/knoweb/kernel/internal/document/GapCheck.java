@@ -27,8 +27,7 @@ import org.springframework.stereotype.Component;
  * <p>{@link #findGaps} reads under the caller's scope. The nightly job reads as a
  * federation-wide viewer, so it sees every series, and records each gap as a
  * {@code NUMBERING_GAP} REVIEW audit record in the system scope (K-12) when
- * {@code coop-erp.system.entity-id} is set, and logs it otherwise. The exception "unless
- * explained by sync_quarantine" waits for the quarantine table of K-08.
+ * {@code coop-erp.system.entity-id} is set, and logs it otherwise.
  */
 @Component
 public class GapCheck {

@@ -134,8 +134,16 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
         });
         assertThat(events(OrderCancelled.class)).singleElement().satisfies(event -> {
             assertThat(event.orderId()).isEqualTo(first);
-            assertThat(event.reasonCode()).isEqualTo("less rice please");
+            assertThat(event.reasonCode()).isEqualTo(AmendOrderHandler.AMENDED_REASON);
         });
+        // the code tells an amendment from a cancellation; the buyer's words are the reason text
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select reason_code, reason_text from kernel.document_state_history"
+                                        + " where document_id = ? and to_status = 'CANCELLED'",
+                                first))
+                .containsEntry("reason_code", "ORDER_AMENDED")
+                .containsEntry("reason_text", "less rice please");
         assertThat(events(OrderSubmitted.class)).singleElement().satisfies(event -> assertThat(event.orderId())
                 .isEqualTo(next));
 
@@ -181,6 +189,17 @@ class AmendOrderPostgresIntegrationTest extends PostgresIntegrationTest {
                         buyer()),
                 "m4.order.eta_past");
         refused(() -> amend.handle(riceOnly(first, "0"), buyer()), "m4.order.qty_not_positive");
+        // the reason guard of #297 (a command from outside HTTP has no schema to stop it; wave 3, M4-11)
+        refused(
+                () -> amend.handle(
+                        new AmendOrder(
+                                first,
+                                " ",
+                                today().plusDays(5),
+                                null,
+                                List.of(new CreateOrder.Line(RICE, "EA", BigDecimal.ONE))),
+                        buyer()),
+                "request.field.required");
 
         accept.handle(new AcceptOrder(first, today().plusDays(3), List.of()), seller());
         kernel.reset();

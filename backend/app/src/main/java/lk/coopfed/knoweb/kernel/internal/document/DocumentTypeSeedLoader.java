@@ -1,9 +1,11 @@
 package lk.coopfed.knoweb.kernel.internal.document;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +37,7 @@ public class DocumentTypeSeedLoader implements ApplicationRunner {
 
     private static final Set<String> SCOPES = Set.of("ENTITY", "LOCATION", "TILL_POSITION");
     private static final Set<String> ROLES = Set.of("BUYER", "SELLER", "HOLDER");
+    private static final Pattern EVENT_PREFIX = Pattern.compile("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$");
 
     private final JdbcClient jdbc;
     private final TransactionTemplate transactionTemplate;
@@ -138,6 +141,33 @@ public class DocumentTypeSeedLoader implements ApplicationRunner {
                     .param("offline", flag(type, "offline_issuable"))
                     .param("module", required(type, "owning_module", resource))
                     .update();
+
+            jdbc.sql("DELETE FROM kernel.document_type_sync_event WHERE doc_type_code = :code")
+                    .param("code", code)
+                    .update();
+
+            Object syncEventsRaw = type.get("allowed_sync_events");
+            if (syncEventsRaw instanceof List<?> syncEvents) {
+                Set<String> uniqueEvents = new HashSet<>();
+                for (Object event : syncEvents) {
+                    if (event != null && !event.toString().isBlank()) {
+                        String eventStr = event.toString();
+                        if (!EVENT_PREFIX.matcher(eventStr).matches()) {
+                            throw new IllegalStateException(resource.getDescription() + ": document type " + code
+                                    + " has malformed allowed_sync_events value '" + eventStr + "'");
+                        }
+                        if (!uniqueEvents.add(eventStr)) {
+                            throw new IllegalStateException(resource.getDescription() + ": document type " + code
+                                    + " has duplicate allowed_sync_events value '" + eventStr + "'");
+                        }
+                        jdbc.sql(
+                                        "INSERT INTO kernel.document_type_sync_event (doc_type_code, event_prefix) VALUES (:code, :event)")
+                                .param("code", code)
+                                .param("event", eventStr)
+                                .update();
+                    }
+                }
+            }
 
             count++;
         }

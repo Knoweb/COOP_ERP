@@ -52,7 +52,8 @@ function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
           <aside className="shell-sidebar">
             <div className="shell-sidebar-brand">
               <span className="brand-logo">
-                <img src={coopLogo} alt="COOPFED Logo" style={{ height: "44px", width: "auto", borderRadius: "6px", display: "block" }} />
+                {/* Decorative: the brand name is written right beside it, so a screen reader skips the image. */}
+                <img src={coopLogo} alt="" aria-hidden="true" />
               </span>
               <span className="brand-text">COOPFED ERP</span>
             </div>

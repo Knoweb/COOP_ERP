@@ -31,13 +31,21 @@
 # is recorded under, M4MONEY-08). Java only, additive; the slice's shape is unchanged. The patch
 # version is raised because x-change-request already names CR-21A-7 for the change above, and
 # tools/check-frozen-contracts.mjs needs a higher version or a different change request.
+#
+# 1.4.4 (wave 3 review, M1M2M3M5-01 and -04): Java only, additive; the slice's shape is unchanged.
+# The query package gains ApprovalLimit, the one definition of what a holding of an approval
+# permission without max_value is worth (the band-1 limit), shared by M1's grantor check and M5's
+# approval check. CreditLimitChanged's documentation now says a successor row's activation names
+# its predecessor and may carry no new limit; its fields are unchanged. The patch version is
+# raised for tools/check-frozen-contracts.mjs, as for 1.4.2.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
   # 1.4.3 (CR-18-2, wave 2): the user and device administration reads carry x-federation-view: false;
   # no request or response changes shape. 1.4.2 (CR-21A-7) is described in the header above.
-  version: 1.4.3
+  # 1.4.4 (wave 3 review) is described in the header above.
+  version: 1.4.4
   x-change-request: CR-18-2
 
 paths:

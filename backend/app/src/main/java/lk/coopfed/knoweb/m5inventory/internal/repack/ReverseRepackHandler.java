@@ -1,7 +1,10 @@
 package lk.coopfed.knoweb.m5inventory.internal.repack;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -37,7 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Mutation: REPACK_CONSUME of the whole output at the repack's output cost (an out movement at a
  * given cost, so the output item's average loses exactly what the repack added) and REPACK_PRODUCE
  * of the input quantity back at the cost it left with, both citing the repack; the reversal row (the repack is REVERSED because
- * it exists). Audit {@code REPACK_REVERSED} with the reason; event {@code repack.reversed.v1}.
+ * it exists). Audit {@code REPACK_REVERSED} with the reason, and the cost residual the output
+ * item's average could not keep when there is one ({@link #costResidual}; wave 3, M1M2M3M5-23);
+ * event {@code repack.reversed.v1}.
  */
 @Service
 @CommandHandler(permission = "inv.repack.reverse")
@@ -84,6 +89,10 @@ class ReverseRepackHandler implements Handles<ReverseRepack, UUID> {
         }
 
         String reason = command.reason().strip();
+        BigDecimal residual = costResidual(
+                store.entityCostOfLot(repack.locationId(), repack.outputBatchId()),
+                repack.actualOutputQty(),
+                repack.outputUnitCost());
         ledger.post(
                 new PostMovements(
                         repack.repackId(),
@@ -123,14 +132,37 @@ class ReverseRepackHandler implements Handles<ReverseRepack, UUID> {
                 scope.userId(),
                 Timestamp.from(clock.instant()));
 
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("status", "REVERSED");
+        if (residual.signum() != 0) {
+            after.put("costResidual", residual.toPlainString());
+        }
         audit.record(
                 AUDIT_REVERSED,
                 Subject.of("repack", repack.repackId()),
                 Map.of("status", "EXECUTED"),
-                Map.of("status", "REVERSED"),
+                after,
                 scope,
                 reason);
         events.publish(new RepackReversed(repack.repackId(), repack.ownerEntityId(), repack.locationId()));
         return repack.repackId();
+    }
+
+    /**
+     * The value the output item's average cannot keep (wave 3, M1M2M3M5-23; the clamp itself is as
+     * decided for M5-17): taking q packs out at the repack's cost c from an entity holding Q at an
+     * average a leaves the value Q*a - q*c. When that leaves no quantity, or a negative value that
+     * the average clamps at zero, the ledger keeps no trace of it, so the audit records it,
+     * rounded to the cent; zero when the average absorbs it. The cost row is read before the
+     * posting, without a lock: the figure is a record for a person, not a balance.
+     */
+    static BigDecimal costResidual(RepackStore.ItemCost before, BigDecimal outQty, BigDecimal outUnitCost) {
+        BigDecimal remainingQty = before.qtyOnHand().subtract(outQty);
+        BigDecimal remainingValue =
+                before.qtyOnHand().multiply(before.avgCost()).subtract(outQty.multiply(outUnitCost));
+        if (remainingQty.signum() <= 0 || remainingValue.signum() < 0) {
+            return remainingValue.setScale(2, RoundingMode.HALF_UP);
+        }
+        return BigDecimal.ZERO;
     }
 }

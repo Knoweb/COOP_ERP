@@ -46,7 +46,7 @@ describe("the search for style literals", () => {
 
 describe("the web modules", () => {
   // Every source file of every module, as text. Test files are left out: they hold sample data.
-  const sources = import.meta.glob(["../modules/**/*.{ts,tsx,css}", "../shell/**/*.{ts,tsx}", "!../modules/**/*.test.{ts,tsx}", "!../shell/**/*.test.{ts,tsx}"], {
+  const sources = import.meta.glob(["../*.{ts,tsx}", "../modules/**/*.{ts,tsx,css}", "../shell/**/*.{ts,tsx}", "!../*.test.{ts,tsx}", "!../modules/**/*.test.{ts,tsx}", "!../shell/**/*.test.{ts,tsx}"], {
     query: "?raw",
     import: "default",
     eager: true
@@ -54,6 +54,7 @@ describe("the web modules", () => {
 
   it("are found by this test (a wrong path would make it pass for ever)", () => {
     expect(Object.keys(sources)).toContain("../modules/hello/HelloPage.tsx");
+    expect(Object.keys(sources)).toContain("../router.tsx");
   });
 
   it("write no colour and no length of their own: tokens only", () => {

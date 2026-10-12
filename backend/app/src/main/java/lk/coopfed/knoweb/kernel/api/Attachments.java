@@ -32,10 +32,12 @@ public interface Attachments {
 
     /**
      * Authorises one upload for a document the caller owns and records the attachment as
-     * PENDING. Asking again with the same attachment id (the URL expired before the upload
-     * finished) renews the URL and the window of the PENDING row; a row already COMPLETE or
-     * FAILED, or one of another document, is refused. The row is settled by the verifier only
-     * after the URL has expired, so what was verified cannot be replaced.
+     * PENDING. Asking again with the same attachment id while its window is open (a client that
+     * lost its connection) renews the URL and the window of the PENDING row; once the window has
+     * ended it is refused ({@code attachment.upload_expired}: the verifier may be hashing the
+     * bytes), and so is a row already COMPLETE or FAILED, or one of another document. The row is
+     * settled by the verifier only after the URL has expired, so what was verified cannot be
+     * replaced.
      *
      * @param attachmentId  the id the client chose (UUIDv7), or null for a new one
      * @param contentType   what the client will upload, one of the register's
@@ -51,7 +53,8 @@ public interface Attachments {
      *                          see but does not own; {@code attachment.content_type_invalid};
      *                          {@code attachment.content_type_not_allowed};
      *                          {@code attachment.too_large}; {@code attachment.hash_invalid};
-     *                          {@code attachment.not_pending}; {@code attachment.document_mismatch}
+     *                          {@code attachment.not_pending}; {@code attachment.upload_expired};
+     *                          {@code attachment.document_mismatch}
      */
     PresignedUpload presignUpload(
             UUID documentId,

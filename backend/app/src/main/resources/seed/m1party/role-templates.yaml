@@ -55,6 +55,19 @@ templates:
       - "prc.rule.author"
       - "prc.rule.activate"
       - "prc.mrp_policy.set"
+      # wave 3, fix-till-small-review-findings (TILLM6-03, decided on the architect's delegation:
+      # docs/progress/deviations/2026-10-09-wave3-till-small-review-findings.md): AssignRole's grantor
+      # guard needs every code of a role, so the society's administrator holds the codes of the
+      # three till templates (Cashier, Shop Supervisor, Shop-in-charge) in order to assign them.
+      - "pos.receipt.issue"
+      - "pos.mrp.pick"
+      - "pos.receipt.void"
+      - "pos.refund.same_session"
+      - "pos.negative_stock.acknowledge"
+      - "pos.session.manage"
+      - "shop.grn.confirm"
+      - "shop.count.record"
+      - "inv.writeoff.request"
   # The Federation's catalogue team (22A section 3.1): the shared path (cat.sku.create with the
   # guard FederationCaller of M2), promotion, its own drafts and deactivations, and the governed tags
   # (cat.tag.govern, CR-22A-3). Assigned at the Federation entity; cat.sku.create,
@@ -138,3 +151,8 @@ templates:
       - "inv.stock.view"
       - "cat.sku.view"
       - "prt.location.view"
+      # wave 3, fix-till-small-review-findings (TILLM6-09): 21A section 3's shop-in-charge also
+      # confirms a shop's goods received, records its counts and requests its write-offs.
+      - "shop.grn.confirm"
+      - "shop.count.record"
+      - "inv.writeoff.request"

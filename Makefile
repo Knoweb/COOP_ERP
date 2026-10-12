@@ -242,8 +242,8 @@ gen-clients:
 # when git then sees a difference, which means somebody changed a slice or a module
 # dependency and did not commit what it generates. The pipeline runs it on every push.
 # ARCH_TESTS is the Gradle call that runs the documenter (ArchitectureTests writes docs/modules).
-# The pipeline passes ARCH_TESTS=:app:test: right after `make test` that task is up to date and
-# Gradle skips it, instead of starting a filtered run of the architecture tests a second time.
+# The pipeline uses the default to run only the architecture tests. (Overriding with :app:test
+# runs the full suite again because tools/normalize-components-puml.mjs breaks the cache.)
 ARCH_TESTS ?= :app:test --tests "*ArchitectureTests*"
 check-generated:
 	sh tools/gen-clients.sh
@@ -305,7 +305,9 @@ test-scaffold:
 	@echo "--- replace them, as the developer does in step 1 of the module README"
 	grep -rl "todo\.integration\.webhook\." backend/app/src web/src | xargs sed -i "s/todo\.integration\.webhook\./int.webhook./g"
 	node tools/check-permissions.mjs
-	cd backend && ./gradlew $(SCAFFOLD_TESTS)
+	@# COOP_ERP_SCAFFOLD_PROOF: the two tests that pin the built M9 (its migration numbers, its
+	@# notification tables) leave it out while the copy stands in for it (testsupport.ScaffoldProof).
+	cd backend && COOP_ERP_SCAFFOLD_PROOF=true ./gradlew $(SCAFFOLD_TESTS)
 	node tools/check-schema-ownership.mjs
 	node tools/check-i18n.mjs
 	cd web && pnpm install --frozen-lockfile && pnpm build && pnpm test

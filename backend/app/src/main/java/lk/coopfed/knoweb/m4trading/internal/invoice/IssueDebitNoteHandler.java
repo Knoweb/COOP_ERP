@@ -3,9 +3,11 @@ package lk.coopfed.knoweb.m4trading.internal.invoice;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -35,8 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * IssueDebitNote (24A section 6), chosen lines. Guards, in order: the seller's entity-wide OWN
- * scope; an invoice and a reason; the caller's own issued invoice; at least one line; each a line
- * of this invoice with a positive quantity.
+ * scope; an invoice and a reason; the caller's own issued invoice, not disputed; at least one line;
+ * each a line of this invoice, named once, with a quantity above zero of at most three decimals.
  *
  * <p>Mutation: the seller's ENTITY series of DN2, the issuance, the DEBITS link to the invoice with
  * the gross amount, {@code doc_debit_note}, and the invoice's {@code
@@ -149,10 +151,17 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
         return debitNoteId;
     }
 
-    /** Chosen quantities of the invoice's own lines, at their prices and rates. */
+    /**
+     * Chosen quantities of the invoice's own lines, at their prices and rates: each line once
+     * ({@code m4.debitnote.line_duplicate}), a quantity above zero with at most three decimals
+     * ({@code m4.debitnote.qty_invalid}: {@code document_line.qty} keeps three, so 0.0004 would
+     * debit money for a stored 0.000). The credit note's guards of wave 2 (M4MONEY-02, -04),
+     * carried over (wave 3, M4-07).
+     */
     private static List<DocumentLineRecord> chosenLines(
             UUID debitNoteId, List<IssueDebitNote.Line> chosen, List<DocumentLineRecord> invoiceLines) {
         List<DocumentLineRecord> lines = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
         int lineNo = 0;
         for (IssueDebitNote.Line want : chosen) {
             if (want == null || want.invoiceLineId() == null) {
@@ -162,7 +171,12 @@ public class IssueDebitNoteHandler implements Handles<IssueDebitNote, UUID> {
                     .filter(line -> want.invoiceLineId().equals(line.id()))
                     .findFirst()
                     .orElseThrow(() -> new ProblemException("m4.debitnote.line_unknown"));
-            if (want.qty() == null || want.qty().signum() <= 0) {
+            if (!seen.add(billed.id())) {
+                throw new ProblemException("m4.debitnote.line_duplicate", Map.of("skuId", billed.skuId()));
+            }
+            if (want.qty() == null
+                    || want.qty().signum() <= 0
+                    || want.qty().stripTrailingZeros().scale() > 3) {
                 throw new ProblemException("m4.debitnote.qty_invalid", Map.of("skuId", billed.skuId()));
             }
             lineNo++;

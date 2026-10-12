@@ -327,6 +327,79 @@ class RelationshipHandlersTest {
             assertThat(draft.isDraft()).isTrue();
         }
 
+        // wave 3, M1M2M3M5-04: a row that succeeds another announces the change from that row's
+        // limit, so M8 never keeps the predecessor's figure.
+
+        @Test
+        void aSuccessorWithoutALimitAnnouncesThatThePredecessorsLimitIsGone() {
+            Relationship predecessor =
+                    active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+            Relationship draft = draft(DISTRIBUTOR, SOCIETY);
+            when(repository.inForceStartingBefore(DISTRIBUTOR, SOCIETY, APRIL, draft.getId()))
+                    .thenReturn(List.of(predecessor));
+            ScopeContext seller = own(DISTRIBUTOR);
+
+            activate.handle(new ActivateRelationship(draft.getId()), seller);
+
+            verify(jdbc).update(RelationshipRules.MARK_LIMIT_ANNOUNCED, DISTRIBUTOR, SOCIETY, draft.getId());
+            verify(audit).record(eq("CREDIT_LIMIT_CHANGED"), any(), any(), any(), eq(seller));
+            ArgumentCaptor<DomainEvent> published = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(events, times(2)).publish(published.capture());
+            assertThat(published.getAllValues().get(1))
+                    .isEqualTo(new CreditLimitChanged(
+                            draft.getId(),
+                            predecessor.getId(),
+                            predecessor.creditLimit(),
+                            null,
+                            APRIL,
+                            DISTRIBUTOR,
+                            SOCIETY));
+        }
+
+        @Test
+        void aSuccessorWithAnotherLimitNamesThePredecessorsLimit() {
+            Relationship predecessor = Relationship.open(
+                    UUID.randomUUID(),
+                    DISTRIBUTOR,
+                    SOCIETY,
+                    terms(PRICE_LIST, new BigDecimal("1000000.00"), (short) 30),
+                    LocalDate.of(2026, 1, 1),
+                    LocalDate.of(2026, 3, 31));
+            predecessor.activate();
+            Relationship draft = draftWithLimit(DISTRIBUTOR, SOCIETY);
+            when(repository.inForceStartingBefore(DISTRIBUTOR, SOCIETY, APRIL, draft.getId()))
+                    .thenReturn(List.of(predecessor));
+
+            activate.handle(new ActivateRelationship(draft.getId()), withFreshMfa(DISTRIBUTOR));
+
+            ArgumentCaptor<DomainEvent> published = ArgumentCaptor.forClass(DomainEvent.class);
+            verify(events, times(2)).publish(published.capture());
+            assertThat(published.getAllValues().get(1))
+                    .isEqualTo(new CreditLimitChanged(
+                            draft.getId(),
+                            predecessor.getId(),
+                            new BigDecimal("1000000.00"),
+                            draft.creditLimit(),
+                            APRIL,
+                            DISTRIBUTOR,
+                            SOCIETY));
+        }
+
+        @Test
+        void aSuccessorWithTheSameLimitAnnouncesNoChange() {
+            Relationship predecessor =
+                    active(DISTRIBUTOR, SOCIETY, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+            Relationship draft = draftWithLimit(DISTRIBUTOR, SOCIETY);
+            when(repository.inForceStartingBefore(DISTRIBUTOR, SOCIETY, APRIL, draft.getId()))
+                    .thenReturn(List.of(predecessor));
+            ScopeContext seller = withFreshMfa(DISTRIBUTOR);
+
+            activate.handle(new ActivateRelationship(draft.getId()), seller);
+
+            verify(audit, never()).record(eq("CREDIT_LIMIT_CHANGED"), any(), any(), any(), any());
+            verify(events, times(1)).publish(any());
+        }
+
         @Test
         void aDraftWithoutALimitPublishesNoLimitAndMarksNothing() {
             Relationship draft = draft(DISTRIBUTOR, SOCIETY);

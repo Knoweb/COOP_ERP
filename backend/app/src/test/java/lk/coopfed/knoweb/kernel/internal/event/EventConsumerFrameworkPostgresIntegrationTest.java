@@ -195,6 +195,15 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
         assertThat(inboxRowsVisibleTo(UUID.randomUUID())).isZero();
     }
 
+    private int auditRows(String eventTypeCode, UUID subjectId) {
+        return superuserJdbc()
+                .queryForObject(
+                        "SELECT count(*) FROM kernel.audit_event WHERE event_type_code = ? AND subject_id = ?",
+                        Integer.class,
+                        eventTypeCode,
+                        subjectId);
+    }
+
     private int inboxRowsVisibleTo(UUID entity) {
         return inboxRowsVisibleTo(entity, "test.projection");
     }
@@ -339,6 +348,21 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
                         () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, stranger, 3))
                 .isInstanceOf(PoisonMessageException.class)
                 .hasMessageContaining(STRANGER.toString());
+        // The refusal leaves a record in the owner's scope (M7M8M9-09), naming identifiers only.
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                """
+                                SELECT owner_entity_id, subject_table
+                                  FROM kernel.audit_event
+                                 WHERE event_type_code = 'EVENT_COUNTERPARTY_REFUSED'
+                                   AND subject_id = ?
+                                """,
+                                stranger.eventId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.get("owner_entity_id")).isEqualTo(OWNER);
+                    assertThat(row.get("subject_table")).isEqualTo("event");
+                });
 
         // The owner naming itself.
         OutboxMessage self = twoPartyMessage(documentId, OWNER, "central");
@@ -371,6 +395,15 @@ class EventConsumerFrameworkPostgresIntegrationTest extends PostgresIntegrationT
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> dispatcher.deliver(TestCounterpartyProjection.CONSUMER, withoutDocument, 1))
                 .isInstanceOf(PoisonMessageException.class);
+
+        // The second check refused the stranger, the missing document and the absent document:
+        // each is recorded once; the owner naming itself fails the first check (no record).
+        for (OutboxMessage refused : java.util.List.of(stranger, noSuchDocument, withoutDocument)) {
+            assertThat(auditRows("EVENT_COUNTERPARTY_REFUSED", refused.eventId()))
+                    .as("refusal recorded for %s", refused.eventId())
+                    .isEqualTo(1);
+        }
+        assertThat(auditRows("EVENT_COUNTERPARTY_REFUSED", self.eventId())).isZero();
 
         assertThat(projection.applied.get()).isZero();
         for (UUID entity : java.util.List.of(OWNER, COUNTERPARTY, STRANGER)) {

@@ -168,7 +168,7 @@ export function CataloguePage() {
             <table className="modern-table catalogue-table">
               <thead>
                 <tr>
-                  <th>Image</th>
+                  <th>{t("catalogue.column.image").text}</th>
                   <th>{t("catalogue.column.code").text}</th>
                   <th>{t("catalogue.column.name").text}</th>
                   <th>{t("catalogue.column.unit").text}</th>

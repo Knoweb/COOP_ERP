@@ -103,8 +103,10 @@ public interface ObjectStorage {
     /**
      * Authorises one upload of an object the caller's module owns and records it PENDING in the
      * ledger, in the caller's transaction (it is rolled back with the module's row). Asking again
-     * for the same key while it is PENDING renews the window and the URL (a client that lost its
-     * connection); once settled it is refused. The type and the size are held to the register's
+     * for the same key while it is PENDING and its window is open renews the window and the URL
+     * (a client that lost its connection); once the window has ended it is refused
+     * ({@code object.upload_expired}: a verification may be hashing the bytes), and once settled
+     * it is refused. The type and the size are held to the register's
      * {@code attachment.content_types} and {@code attachment.max_bytes}; a module narrows the
      * types further with its own item.
      *
@@ -114,6 +116,7 @@ public interface ObjectStorage {
      *                      compares the stored bytes with it
      * @param ctx           an OWN scope of the entity in the key
      * @throws ProblemException {@code object.scope_mismatch}, {@code object.not_pending},
+     *                          {@code object.upload_expired},
      *                          {@code object.content_type_mismatch}, {@code attachment.content_type_invalid},
      *                          {@code attachment.content_type_not_allowed}, {@code attachment.too_large},
      *                          {@code attachment.hash_invalid}

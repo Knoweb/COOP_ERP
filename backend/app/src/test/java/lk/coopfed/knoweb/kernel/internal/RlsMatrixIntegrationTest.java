@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import lk.coopfed.knoweb.testsupport.ScaffoldProof;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -144,6 +145,13 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
      * and the template's expectation and returns this table's. Nothing is skipped: every check of
      * every table is still run and compared.
      */
+    /**
+     * False only in the scaffold proof ({@code make test-scaffold}), where a copy of hello stands
+     * in for the built M9 and M9's notification tables do not exist; their departures then need
+     * not name a table that exists. On main and every pull request they must.
+     */
+    private static final boolean BUILT_M9_IS_IN_PLACE = !ScaffoldProof.active();
+
     record Departure(String table, String why, Function<Check, String> expected, boolean mustExist) {
         Departure(String table, String why, Function<Check, String> expected) {
             this(table, why, expected, true);
@@ -335,12 +343,14 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "integration.notification_template",
                     "everyone_reads (m9integration V0001): no personal data; the kernel's renderer reads a"
                             + " template after the commit with no scope at all",
-                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+                    RlsMatrixIntegrationTest::everySessionReadsEverything,
+                    BUILT_M9_IS_IN_PLACE),
             new Departure(
                     "integration.notification_rule",
                     "everyone_reads (m9integration V0001): no personal data; the kernel's dispatcher reads the"
                             + " rules in the scope of whichever entity's event it matches",
-                    RlsMatrixIntegrationTest::everySessionReadsEverything),
+                    RlsMatrixIntegrationTest::everySessionReadsEverything,
+                    BUILT_M9_IS_IN_PLACE),
             // Member identity is the society's (CR-18-2, m7customers V0003; wave 2, RLS-01, RLS-02):
             // FEDERATION_VIEW and EXTERNAL_TIMEBOXED read no personal data of a natural person by
             // policy. The credit book (customer_account, the postings, allocations, history,
@@ -370,7 +380,8 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                             + " that neither the Federation's view nor a regulator's reads; the dispatcher reaches"
                             + " it through notification_recipients(), which answers an OWN caller for the"
                             + " entities it trades with",
-                    RlsMatrixIntegrationTest::onlyTheOwnerReads),
+                    RlsMatrixIntegrationTest::onlyTheOwnerReads,
+                    BUILT_M9_IS_IN_PLACE),
             // A shop reads what is addressed to it at another shop of its entity (wave 2, RLS-17 d):
             // the fixture's "A wide" row is at location 2 and addressed to location 1.
             new Departure(
@@ -396,19 +407,7 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
             new Departure(
                     "trading.transfer_request_decision",
                     "dest_read (m4trading V0008): the asking shop reads the decision on its request",
-                    RlsMatrixIntegrationTest::addressedToTheShop),
-            // ---- found by the matrix, to fix in the owning module ------------------------------
-            // TODO(hello, the template module): ext_view waited for kernel.granted_entities()
-            // (hello README); K-01 has landed, so hello can add it.
-            new Departure("hello.greeting", "no ext_view yet", RlsMatrixIntegrationTest::externalReadsNothing),
-            // The scaffolder's throwaway copy of hello (make test-scaffold: integration.webhook)
-            // carries hello's policies, so it carries hello's departure; it exists only during
-            // that proof, hence it is not required to exist.
-            new Departure(
-                    "integration.webhook",
-                    "the scaffolded copy of hello.greeting: no ext_view yet",
-                    RlsMatrixIntegrationTest::externalReadsNothing,
-                    false)
+                    RlsMatrixIntegrationTest::addressedToTheShop)
             // pricing.price_list and price_list_line follow the template since m3pricing V0003
             // (M3-03); beyond it, buyer_read admits the buyer of a relationship that binds the list,
             // which no made-up row is. party.entity has its ext_view since m1party V0010.

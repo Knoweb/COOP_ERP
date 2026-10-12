@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m5inventory.internal.consumers;
 
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -40,10 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
  *       (REVIEW) and {@code lot.negative.v1} (doc 25 section 3.2);
  *   <li>a batch the shop never held gets its lot at the entity average; audit
  *       {@code SALE_WITHOUT_LOT} (REVIEW; 25A DR-5);
- *   <li>a line whose batch is missing or unknown to M2 takes the shop's first lot of the item in
- *       FEFO order, expired lots included (the units came from somewhere); with no lot of the item
- *       at all it posts against the item's newest batch M2 knows, creating the lot below zero
- *       (wave 2, M5-05); only an item M2 does not know is {@code SALE_LINE_UNRESOLVED} (REVIEW),
+ *   <li>a line whose batch is missing or unknown to M2 takes the shop's first in-date lot of the
+ *       item in FEFO order, and an expired lot only when the shop holds no in-date one (the units
+ *       came from somewhere; wave 3, M1M2M3M5-16); with no lot of the item at all it posts against
+ *       M2's newest in-date batch that is not another entity's repack batch (wave 2, M5-05; wave
+ *       3, M1M2M3M5-22), creating the lot below zero; only an item M2 does not know is
+ *       {@code SALE_LINE_UNRESOLVED} (REVIEW),
  *       for a person to settle, never dropped silently;
  *   <li>a batch past its expiry on the receipt's business date is {@code SALE_OF_EXPIRED}
  *       (REVIEW; wave 2, M5-01).
@@ -123,7 +126,7 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
                 skipped.add(line.lineNo());
                 continue;
             }
-            Optional<UUID> batch = resolveBatch(line, shop, scope);
+            Optional<UUID> batch = resolveBatch(line, shop, saleDate, scope);
             if (batch.isEmpty()) {
                 unresolved.add(line.lineNo());
                 continue;
@@ -213,7 +216,7 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
     }
 
     /** The batch the till resolved when M2 knows it (of the line's item), else the shop's first lot of the item. */
-    private Optional<UUID> resolveBatch(ApplySale.Line line, UUID shop, ScopeContext scope) {
+    private Optional<UUID> resolveBatch(ApplySale.Line line, UUID shop, LocalDate saleDate, ScopeContext scope) {
         if (line.batchId() != null) {
             boolean known = batches.getBatch(line.batchId(), scope)
                     .filter(b -> line.skuId() == null || line.skuId().equals(b.skuId()))
@@ -225,36 +228,60 @@ class ApplySaleHandler implements Handles<ApplySale, Integer> {
         if (line.skuId() == null) {
             return Optional.empty();
         }
-        // FEFO among the lots with stock, then any lot of the item (one already oversold).
+        // In-date lots first, on the sale's own business date (wave 3, M1M2M3M5-16: an expired lot
+        // waiting for its write-off is still on the books, and draining it first would write a
+        // false SALE_OF_EXPIRED and overstate the in-date lot); then FEFO among the lots with
+        // stock, then any lot of the item (one already oversold). An expired lot is used only when
+        // the shop holds no in-date lot of the item.
         Optional<UUID> lot = jdbc
                 .queryForList(
                         """
                         select batch_id from inventory.stock_lot
                          where location_id = ? and sku_id = ? and condition = 'GOOD'
-                         order by (qty_on_hand > 0) desc, expiry_date nulls last, received_at, stock_lot_id
+                         order by (expiry_date is null or expiry_date >= ?) desc, (qty_on_hand > 0) desc,
+                                  expiry_date nulls last, received_at, stock_lot_id
                          limit 1
                         """,
                         UUID.class,
                         shop,
-                        line.skuId())
+                        line.skuId(),
+                        Date.valueOf(saleDate))
                 .stream()
                 .findFirst();
         if (lot.isPresent()) {
             return lot;
         }
         // Wave 2, M5-05 (2026-10-06-wave2-stock-movements.md (6)): the shop never held the item, so its
-        // book was nothing and the units were unrecorded stock; the sale posts against the item's
-        // newest batch M2 knows, the ledger creates the lot below zero (SALE_WITHOUT_LOT, lot.negative)
-        // and the negative-lots screen asks a person about it. Unresolved only for an item M2 lacks.
-        return newestBatchOf(line.skuId(), scope);
+        // book was nothing and the units were unrecorded stock; the sale posts against the newest
+        // fitting batch, the ledger creates the lot below zero (SALE_WITHOUT_LOT, lot.negative) and
+        // the negative-lots screen asks a person about it. Unresolved only for an item M2 lacks.
+        return newestBatchOf(line.skuId(), saleDate, scope);
     }
 
-    /** The newest batch of the item that M2 knows, a correction's replacement before the one it superseded. */
-    private Optional<UUID> newestBatchOf(UUID skuId, ScopeContext scope) {
+    /**
+     * The batch a sale of an item the shop never held posts against (wave 3, M1M2M3M5-22), the
+     * first that exists of:
+     * <ol>
+     *   <li>the newest in-date batch M2 knows that is not superseded and is not another entity's
+     *       synthetic (repack) batch;
+     *   <li>as before: M2's newest batch of the item that is not superseded, then any.
+     * </ol>
+     * So a society's sale lands neither on another society's repack batch nor, while an in-date
+     * one exists, on an expired batch (a misleading SALE_OF_EXPIRED). The review also suggested
+     * preferring a batch the entity has held elsewhere; the sale runs in the device's shop scope,
+     * whose row-level security shows only that shop's lots, so that step is not taken here (see
+     * the deviation of this change).
+     */
+    private Optional<UUID> newestBatchOf(UUID skuId, LocalDate saleDate, ScopeContext scope) {
         List<BatchView> known = batches.listBatches(new BatchFilter(skuId, null, null, 10), scope);
         return known.stream()
                 .filter(b -> !"SUPERSEDED".equals(b.status()))
+                .filter(b -> !BusinessDay.expired(b.expiryDate(), saleDate))
+                .filter(b -> !b.synthetic() || scope.entityId().equals(b.ownerEntityId()))
                 .findFirst()
+                .or(() -> known.stream()
+                        .filter(b -> !"SUPERSEDED".equals(b.status()))
+                        .findFirst())
                 .or(() -> known.stream().findFirst())
                 .map(BatchView::batchId);
     }

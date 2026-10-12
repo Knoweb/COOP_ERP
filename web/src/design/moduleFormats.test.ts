@@ -49,7 +49,7 @@ describe("the search for raw dates and money", () => {
 });
 
 describe("the web modules", () => {
-  const sources = import.meta.glob(["../modules/**/*.{ts,tsx}", "../shell/**/*.{ts,tsx}", "!../modules/**/*.test.{ts,tsx}", "!../shell/**/*.test.{ts,tsx}"], {
+  const sources = import.meta.glob(["../*.{ts,tsx}", "../modules/**/*.{ts,tsx}", "../shell/**/*.{ts,tsx}", "!../*.test.{ts,tsx}", "!../modules/**/*.test.{ts,tsx}", "!../shell/**/*.test.{ts,tsx}"], {
     query: "?raw",
     import: "default",
     eager: true
@@ -79,7 +79,7 @@ describe("the web modules", () => {
 // built from a calendar day in UTC (new Date(`${day}T00:00:00Z`)) is fine and has no empty
 // new Date().
 const CLOCK_NOW = /new Date\(\)|Date\.now\(\)/;
-const LOCAL_DAY_PARTS = /\.(?:getFullYear|getMonth|getDate)\(\)|toISOString\(\)\.slice/;
+const LOCAL_DAY_PARTS = /\.(?:getFullYear|getMonth|getDate)\(\)|toISOString\(\)\.slice|\.toLocaleDateString\(|\.toDateString\(\)/;
 
 function browserLocalDayIn(source: string): boolean {
   const code = source
@@ -93,6 +93,8 @@ describe("the search for the browser's calendar day", () => {
   it("finds the clock cut into a local day", () => {
     expect(browserLocalDayIn(`const d = new Date(); return d.getFullYear() + "-" + d.getMonth();`)).toBe(true);
     expect(browserLocalDayIn(`return new Date().toISOString().slice(0, 10);`)).toBe(true);
+    expect(browserLocalDayIn(`return new Date().toLocaleDateString("en-CA");`)).toBe(true);
+    expect(browserLocalDayIn(`return new Date().toDateString();`)).toBe(true);
   });
 
   it("accepts a clock default with no day arithmetic, a UTC calendar day, and comments", () => {

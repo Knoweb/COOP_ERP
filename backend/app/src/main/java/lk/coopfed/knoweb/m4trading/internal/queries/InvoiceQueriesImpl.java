@@ -44,18 +44,34 @@ class InvoiceQueriesImpl implements InvoiceQueries {
         if (invoiceId == null) {
             return Optional.empty();
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                """
-                select relationship_id, seller_entity_id, buyer_entity_id, grn_document_ids, seller_vat_no, buyer_vat_no,
-                       tax_point_date, due_date
-                  from trading.doc_invoice where document_id = ?
-                """,
-                invoiceId);
-        if (rows.isEmpty()) {
-            return Optional.empty();
+
+        if (scope.policyClass() == lk.coopfed.knoweb.kernel.api.PolicyClass.PARTY) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    """
+                    select document_id, doc_number_display, status, relationship_id, seller_entity_id, buyer_entity_id,
+                           seller_vat_no, buyer_vat_no, grn_document_ids, tax_point_date, due_date, issued_at,
+                           net_amount, tax_amount, gross_amount
+                      from trading.v_invoice_party where document_id = ?
+                    """,
+                    invoiceId);
+            if (rows.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(view(rows.get(0)));
+        } else {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    """
+                    select relationship_id, seller_entity_id, buyer_entity_id, grn_document_ids, seller_vat_no, buyer_vat_no,
+                           tax_point_date, due_date
+                      from trading.doc_invoice where document_id = ?
+                    """,
+                    invoiceId);
+            if (rows.isEmpty()) {
+                return Optional.empty();
+            }
+            Map<String, Object> row = rows.get(0);
+            return documents.findById(invoiceId).map(header -> view(header, row));
         }
-        Map<String, Object> row = rows.get(0);
-        return documents.findById(invoiceId).map(header -> view(header, row));
     }
 
     @Override
@@ -155,6 +171,49 @@ class InvoiceQueriesImpl implements InvoiceQueries {
                                 line.taxAmount(),
                                 line.lineTotal(),
                                 line.referenceLineId()))
+                        .toList());
+    }
+
+    private InvoiceView view(Map<String, Object> row) {
+        UUID invoiceId = (UUID) row.get("document_id");
+        List<Map<String, Object>> lines = jdbc.queryForList(
+                """
+                select line_id, line_no, sku_id, batch_id, uom_code, qty, unit_price,
+                       tax_rate_percent, tax_amount, line_total, reference_line_id
+                  from trading.v_invoice_line_party where document_id = ?
+                 order by line_no
+                """,
+                invoiceId);
+
+        return new InvoiceView(
+                invoiceId,
+                (String) row.get("doc_number_display"),
+                (String) row.get("status"),
+                (UUID) row.get("relationship_id"),
+                (UUID) row.get("seller_entity_id"),
+                (UUID) row.get("buyer_entity_id"),
+                (String) row.get("seller_vat_no"),
+                (String) row.get("buyer_vat_no"),
+                uuids(row.get("grn_document_ids")),
+                ((java.sql.Date) row.get("tax_point_date")).toLocalDate(),
+                ((java.sql.Date) row.get("due_date")).toLocalDate(),
+                row.get("issued_at") == null ? null : ((java.sql.Timestamp) row.get("issued_at")).toInstant(),
+                (BigDecimal) row.get("net_amount"),
+                (BigDecimal) row.get("tax_amount"),
+                (BigDecimal) row.get("gross_amount"),
+                lines.stream()
+                        .map(line -> new InvoiceView.InvoiceLineView(
+                                (UUID) line.get("line_id"),
+                                ((Number) line.get("line_no")).intValue(),
+                                (UUID) line.get("sku_id"),
+                                (UUID) line.get("batch_id"),
+                                (String) line.get("uom_code"),
+                                (BigDecimal) line.get("qty"),
+                                (BigDecimal) line.get("unit_price"),
+                                (BigDecimal) line.get("tax_rate_percent"),
+                                (BigDecimal) line.get("tax_amount"),
+                                (BigDecimal) line.get("line_total"),
+                                (UUID) line.get("reference_line_id")))
                         .toList());
     }
 

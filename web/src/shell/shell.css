@@ -734,6 +734,13 @@ textarea {
   box-sizing: border-box;
 }
 
+.shell-sidebar-brand .brand-logo img {
+  height: 44px;
+  width: auto;
+  border-radius: 6px;
+  display: block;
+}
+
 /* Sidebar Navigation */
 .shell-sidebar .shell-nav {
   padding: var(--space-3) 0;
