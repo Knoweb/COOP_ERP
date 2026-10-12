@@ -8,9 +8,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class IngestTransactions {
 
     static final String AUDIT_ANOMALY = "SYNC_ANOMALY";
+    static final String AUDIT_APP_VERSION_BELOW_FLOOR = "SYNC_APP_VERSION_BELOW_FLOOR";
 
     /** What the claim found. */
     sealed interface Claim {}
@@ -316,6 +319,29 @@ public class IngestTransactions {
                 ((Number) cursor.get("last_applied_seq")).longValue(),
                 resendFrom == null ? null : resendFrom.longValue(),
                 snapshotVersion(device));
+    }
+
+    /**
+     * Doc 31 section 6 (FIX-14): a till below the floor whose grace has expired raises an ALERT audit event.
+     */
+    @Transactional
+    public void recordFloorAlert(ScopeContext device, String appVersion, AppVersionFloor.Standing floor) {
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("appVersion", appVersion);
+        after.put("floor", floor.floor());
+        after.put(
+                "graceEndedAt",
+                floor.graceEndsAt() == null ? null : floor.graceEndsAt().toString());
+        after.put(
+                "graceEndsAt",
+                floor.graceEndsAt() == null ? null : floor.graceEndsAt().toString());
+        audit.record(
+                AUDIT_APP_VERSION_BELOW_FLOOR,
+                Subject.of("device", device.deviceId()),
+                null,
+                after,
+                device,
+                "Till application below version floor after grace expired");
     }
 
     /** After a failure: let the next batch in without waiting for the in-flight timeout. */

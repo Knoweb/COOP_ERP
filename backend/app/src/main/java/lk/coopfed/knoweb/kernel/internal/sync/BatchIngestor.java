@@ -211,6 +211,7 @@ class BatchIngestor {
                     batch.appVersion(),
                     floor.floor(),
                     floor.graceEndsAt());
+            transactions.recordFloorAlert(device, batch.appVersion(), floor);
         }
         return floor;
     }

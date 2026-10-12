@@ -128,6 +128,11 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: An administrator moved a device's sync cursor past numbers it lost; the gap is recorded
+  # doc 31 section 6 (FIX-14): a till below the application floor after grace expired raises ALERT.
+  - code: SYNC_APP_VERSION_BELOW_FLOOR
+    severity: ALERT
+    offline_capturable: false
+    description_en: Till application below version floor after grace expired
   # wave 2, PR 16 (till trust and durability, TWK-03): the till records a PIN lock-out offline as
   # an audit.* fact (26A section 8, "5 failures -> 15-min lockout (local + audit)").
   - code: TILL_PIN_LOCKOUT
