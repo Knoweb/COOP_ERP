@@ -241,6 +241,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BasketResult' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '404':
           description: The location is not visible to the caller
     get:
@@ -590,6 +591,7 @@ paths:
         - in: query
           name: status
           required: false
+          description: OPEN answers every review; SETTLED answers none until a settle command exists
           schema: { type: string, enum: [OPEN, SETTLED] }
       responses:
         '200':
@@ -827,7 +829,13 @@ components:
       properties:
         locationId: { type: string, format: uuid }
         businessDate: { type: string, format: date }
-        tenderKind: { type: string, enum: [CASH, CARD, KHATA, CHEQUE, VOUCHER] }
+        tenderKind:
+          type: string
+          enum: [CASH, CARD, KHATA, CHEQUE, VOUCHER]
+          description: >
+            Doc 23 section 3.5: CASH rounds the total to the rupee; CARD, KHATA (the member's
+            account) and CHEQUE are exact. VOUCHER is not priced by M3 (vouchers are a later
+            phase) and is refused with 400 m3.basket.tender_not_priced.
         lines:
           type: array
           items: { $ref: '#/components/schemas/ResolveBasketLineRequest' }
@@ -837,21 +845,26 @@ components:
       properties:
         skuId: { type: string, format: uuid }
         uom: { type: string }
-        qty: { type: number, exclusiveMinimum: 0 }
+        qty:
+          type: number
+          exclusiveMinimum: 0
+          description: At most three decimals (doc 18); a fourth is refused with 400 m3.basket.qty_precision.
         batchId: { type: [string, 'null'], format: uuid }
         pickedBatchId: { type: [string, 'null'], format: uuid }
     BatchCandidate:
       type: object
-      required: [batchId, batchNo, printedMrp, thumbKey]
+      required: [batchId, batchNo]
       properties:
         batchId: { type: string, format: uuid }
         batchNo: { type: string }
-        printedMrp: { type: number }
+        printedMrp: { type: [number, 'null'] }
         expiry: { type: [string, 'null'], format: date }
-        thumbKey: { type: string }
+        thumbKey:
+          type: [string, 'null']
+          description: The image of the batch for the picker; not filled at central yet (no image per batch)
     LineResult:
       type: object
-      required: [skuId, uom, qty, unitPrice, taxRatePercent, taxAmount, lineTotal, discountAmount]
+      required: [skuId, uom, qty, unitPrice, capReason, taxRatePercent, taxAmount, lineTotal, discountAmount]
       properties:
         skuId: { type: string, format: uuid }
         uom: { type: string }
@@ -860,7 +873,7 @@ components:
         unitPrice: { type: number }
         mrpApplied: { type: [number, 'null'] }
         controlPriceApplied: { type: [number, 'null'] }
-        capReason: { type: [string, 'null'], enum: [MRP, CONTROL_PRICE] }
+        capReason: { type: string, enum: [NONE, MRP_LOWEST, MRP_BARCODE, MRP_PICKED, CONTROL_PRICE] }
         ruleId: { type: [string, 'null'], format: uuid }
         discountAmount: { type: number }
         taxRatePercent: { type: number }
@@ -868,10 +881,11 @@ components:
         lineTotal: { type: number }
         candidates:
           type: array
+          description: Filled only when the policy is PICKER and the till must pick a batch (23A section 5)
           items: { $ref: '#/components/schemas/BatchCandidate' }
     BasketResult:
       type: object
-      required: [lines, subtotal, total, rounding, engineVersion, snapshotVersion]
+      required: [lines, subtotal, total, rounding, engineVersion]
       properties:
         lines:
           type: array
@@ -882,18 +896,26 @@ components:
         total: { type: number }
         rounding: { type: number }
         engineVersion: { type: string }
-        snapshotVersion: { type: string }
+        snapshotVersion:
+          type: [string, 'null']
+          description: The till's snapshot version; null at central, which reads the tables rather than a snapshot
     ReviewItem:
       type: object
-      required: [reviewId, kind, severity, occurredAt, ownerEntityId, skuId, escalated]
+      required: [reviewId, kind, severity, status, occurredAt, ownerEntityId, skuId]
+      description: >
+        Escalation (23A section 8) is not in the contract yet: no review is settled or escalated
+        until the exception-queue flow exists.
       properties:
         reviewId: { type: string, format: uuid }
         kind: { type: string }
         severity: { type: string }
+        status:
+          type: string
+          enum: [OPEN, SETTLED]
+          description: Every review is OPEN until a settle command exists
         occurredAt: { type: string, format: date-time }
         ownerEntityId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }
         skuName: { type: [string, 'null'] }
         skuCode: { type: [string, 'null'] }
         details: { type: object }
-        escalated: { type: boolean }

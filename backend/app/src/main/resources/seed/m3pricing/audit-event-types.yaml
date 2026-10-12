@@ -74,3 +74,9 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A published retail or trade list line is above the newly entered control price
+
+  # Wave 4, M3R-08 (CR-19A-14): the review job marks a recorded event checked once its reviews are raised.
+  - code: PRICING_REVIEW_CHECKED
+    severity: INFO
+    offline_capturable: false
+    description_en: A batch MRP or control price checked against the price lists in force

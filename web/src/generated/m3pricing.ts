@@ -623,7 +623,10 @@ export interface components {
             locationId: string;
             /** Format: date */
             businessDate: string;
-            /** @enum {string} */
+            /**
+             * @description Doc 23 section 3.5: CASH rounds the total to the rupee; CARD, KHATA (the member's account) and CHEQUE are exact. VOUCHER is not priced by M3 (vouchers are a later phase) and is refused with 400 m3.basket.tender_not_priced.
+             * @enum {string}
+             */
             tenderKind: "CASH" | "CARD" | "KHATA" | "CHEQUE" | "VOUCHER";
             lines: components["schemas"]["ResolveBasketLineRequest"][];
         };
@@ -631,6 +634,7 @@ export interface components {
             /** Format: uuid */
             skuId: string;
             uom: string;
+            /** @description At most three decimals (doc 18); a fourth is refused with 400 m3.basket.qty_precision. */
             qty: number;
             /** Format: uuid */
             batchId?: string | null;
@@ -641,10 +645,11 @@ export interface components {
             /** Format: uuid */
             batchId: string;
             batchNo: string;
-            printedMrp: number;
+            printedMrp?: number | null;
             /** Format: date */
             expiry?: string | null;
-            thumbKey: string;
+            /** @description The image of the batch for the picker; not filled at central yet (no image per batch) */
+            thumbKey?: string | null;
         };
         LineResult: {
             /** Format: uuid */
@@ -656,14 +661,15 @@ export interface components {
             unitPrice: number;
             mrpApplied?: number | null;
             controlPriceApplied?: number | null;
-            /** @enum {string|null} */
-            capReason?: "MRP" | "CONTROL_PRICE" | null;
+            /** @enum {string} */
+            capReason: "NONE" | "MRP_LOWEST" | "MRP_BARCODE" | "MRP_PICKED" | "CONTROL_PRICE";
             /** Format: uuid */
             ruleId?: string | null;
             discountAmount: number;
             taxRatePercent: number;
             taxAmount: number;
             lineTotal: number;
+            /** @description Filled only when the policy is PICKER and the till must pick a batch (23A section 5) */
             candidates?: components["schemas"]["BatchCandidate"][];
         };
         BasketResult: {
@@ -675,13 +681,20 @@ export interface components {
             total: number;
             rounding: number;
             engineVersion: string;
-            snapshotVersion: string;
+            /** @description The till's snapshot version; null at central, which reads the tables rather than a snapshot */
+            snapshotVersion?: string | null;
         };
+        /** @description Escalation (23A section 8) is not in the contract yet: no review is settled or escalated until the exception-queue flow exists. */
         ReviewItem: {
             /** Format: uuid */
             reviewId: string;
             kind: string;
             severity: string;
+            /**
+             * @description Every review is OPEN until a settle command exists
+             * @enum {string}
+             */
+            status: "OPEN" | "SETTLED";
             /** Format: date-time */
             occurredAt: string;
             /** Format: uuid */
@@ -691,7 +704,6 @@ export interface components {
             skuName?: string | null;
             skuCode?: string | null;
             details?: Record<string, never>;
-            escalated: boolean;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1013,6 +1025,7 @@ export interface operations {
                     "application/json": components["schemas"]["BasketResult"];
                 };
             };
+            400: components["responses"]["RequestProblem"];
             /** @description The location is not visible to the caller */
             404: {
                 headers: {
@@ -1345,6 +1358,7 @@ export interface operations {
         parameters: {
             query?: {
                 kind?: "BATCH_MRP_BELOW_LIST" | "TRADE_ABOVE_MRP" | "LIST_ABOVE_CEILING_AT_GAZETTE";
+                /** @description OPEN answers every review; SETTLED answers none until a settle command exists */
                 status?: "OPEN" | "SETTLED";
             };
             header?: never;

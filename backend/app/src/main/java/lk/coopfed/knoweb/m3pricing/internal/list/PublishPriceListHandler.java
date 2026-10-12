@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.m3pricing.internal.list;
 
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -23,6 +24,7 @@ import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.ReviewRaised;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
 import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
+import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import org.springframework.beans.factory.annotation.Value;
@@ -110,30 +112,10 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
             throw new ProblemException("m3.price_list.lines_invalid");
         }
 
-        if (PriceListStore.TRADE.equals(list.kind())
-                && config.getBoolean("pricing.trade_above_mrp_review", scope, true)) {
-            outcomes.stream()
-                    .filter(o -> "m3.price_list.review.above_mrp".equals(o.review()))
-                    .forEach(o -> {
-                        Map<String, Object> details = new LinkedHashMap<>();
-                        details.put("priceListId", list.priceListId());
-                        details.put(
-                                "price",
-                                asAuthored.stream()
-                                        .filter(l -> l.skuId().equals(o.skuId())
-                                                && l.uomCode().equals(o.uomCode()))
-                                        .findFirst()
-                                        .get()
-                                        .price());
-                        details.put("mrp", o.ceilingValue());
-                        audit.record("TRADE_ABOVE_MRP", Subject.of("sku", o.skuId()), null, details, scope);
-                        events.publish(new ReviewRaised(
-                                "TRADE_ABOVE_MRP",
-                                o.skuId(),
-                                scope.entityId(),
-                                list.priceListId().toString()));
-                    });
-        }
+        List<AboveMrp> aboveMrp = PriceListStore.TRADE.equals(list.kind())
+                        && config.getBoolean("pricing.trade_above_mrp_review", scope, true)
+                ? aboveMrp(asAuthored, outcomes)
+                : List.of();
 
         Optional<PriceListView> previous = store.published(list.rootPriceListId());
         jdbc.update(
@@ -161,6 +143,15 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
         after.put("version", list.version());
         after.put("lines", lines.size());
         audit.record(AUDIT_PUBLISHED, Subject.of("price_list", list.priceListId()), before, after, scope);
+        for (AboveMrp review : aboveMrp) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("priceListId", list.priceListId());
+            details.put("uomCode", review.uomCode());
+            details.put("tierFromQty", review.tierFromQty());
+            details.put("price", review.price());
+            details.put("mrp", review.mrp());
+            audit.record(PricingReviews.TRADE_ABOVE_MRP, Subject.of("sku", review.skuId()), null, details, scope);
+        }
 
         events.publish(new PriceListPublished(
                 list.priceListId(),
@@ -170,6 +161,39 @@ public class PublishPriceListHandler implements Handles<PublishPriceList, UUID> 
                 list.version(),
                 command.applyFrom(),
                 skuIds));
+        for (AboveMrp review : aboveMrp) {
+            events.publish(new ReviewRaised(
+                    PricingReviews.TRADE_ABOVE_MRP,
+                    review.skuId(),
+                    scope.entityId(),
+                    list.priceListId().toString()));
+        }
         return list.priceListId();
+    }
+
+    /** A TRADE line above the SKU's lowest printed MRP: the review of doc 23 section 3.4. */
+    private record AboveMrp(UUID skuId, String uomCode, BigDecimal tierFromQty, BigDecimal price, BigDecimal mrp) {}
+
+    /**
+     * One review per SKU and unit (M3R-06), not one per tier: the highest offending line of the
+     * pair, read from the line the outcome belongs to (the validator answers one outcome per line,
+     * in the order given).
+     */
+    private static List<AboveMrp> aboveMrp(List<SetLines.Line> lines, List<SetLinesResult.Outcome> outcomes) {
+        Map<String, AboveMrp> highest = new LinkedHashMap<>();
+        for (int i = 0; i < outcomes.size() && i < lines.size(); i++) {
+            SetLinesResult.Outcome outcome = outcomes.get(i);
+            if (!AuthoringValidator.REVIEW_ABOVE_MRP.equals(outcome.review())) {
+                continue;
+            }
+            SetLines.Line line = lines.get(i);
+            AboveMrp candidate = new AboveMrp(
+                    line.skuId(), line.uomCode(), line.tierFromQty(), line.price(), outcome.ceilingValue());
+            highest.merge(
+                    line.skuId() + "|" + line.uomCode(),
+                    candidate,
+                    (kept, next) -> next.price().compareTo(kept.price()) > 0 ? next : kept);
+        }
+        return List.copyOf(highest.values());
     }
 }

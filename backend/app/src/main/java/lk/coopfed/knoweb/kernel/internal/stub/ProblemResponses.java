@@ -47,6 +47,9 @@ public class ProblemResponses {
             Map.entry("m4.delivery.not_found", HttpStatus.NOT_FOUND),
             Map.entry("m4.grn.not_found", HttpStatus.NOT_FOUND),
             Map.entry("m4.invoice.not_found", HttpStatus.NOT_FOUND),
+            // Wave 4, M3R-02: a basket the engine cannot price is a bad request, as the slice says.
+            Map.entry("m3.basket.tender_not_priced", HttpStatus.BAD_REQUEST),
+            Map.entry("m3.basket.qty_precision", HttpStatus.BAD_REQUEST),
             // K-02: a token the resource server refuses, and a second factor that is not fresh
             // enough for the action (19A section 2: step-up is 401 with the provider's address).
             Map.entry("token.invalid", HttpStatus.UNAUTHORIZED),

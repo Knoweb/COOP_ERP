@@ -451,6 +451,68 @@ class PriceListHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(audit("TRADE_ABOVE_MRP")).hasSize(1); // Still 1 from before
     }
 
+    @Autowired
+    lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
+
+    @Test
+    void tiersAboveTheMrpRaiseOneReviewPerItemAndNoneWhenTheReviewIsSwitchedOff() {
+        UUID batchId = Ids.next();
+        superuserJdbc()
+                .update(
+                        "insert into catalogue.batch (batch_id, sku_id, batch_no, printed_mrp, owner_entity_id)"
+                                + " values (?, ?, 'MRP90T', 90.00, ?)",
+                        batchId,
+                        rice,
+                        FEDERATION);
+        superuserJdbc()
+                .update(
+                        "insert into inventory.stock_lot (stock_lot_id, sku_id, location_id, condition, qty_on_hand,"
+                                + " unit_cost, received_at, owner_entity_id, batch_id)"
+                                + " values (?, ?, ?, 'GOOD', 10.000, 90.00, now(), ?, ?)",
+                        Ids.next(),
+                        rice,
+                        UUID.fromString("0190e760-0000-7000-8000-000000000101"),
+                        FEDERATION,
+                        batchId);
+        kernel.reset();
+
+        // M3R-06: tier 0 at 95 and tier 10 at 92, both above the MRP of 90: one review, the highest price.
+        UUID list = create.handle(new CreatePriceList("TRADE", "Tiers above MRP"), own(FEDERATION));
+        setLines.handle(
+                new SetLines(list, List.of(line(rice, "0", "95.00"), line(rice, "10", "92.00"))), own(FEDERATION));
+        publish.handle(new PublishPriceList(list, today), own(FEDERATION));
+
+        assertThat(audit("TRADE_ABOVE_MRP")).singleElement().satisfies(r -> {
+            Map<?, ?> details = (Map<?, ?>) r.after();
+            assertThat(new BigDecimal(details.get("price").toString())).isEqualByComparingTo("95.00");
+            assertThat(new BigDecimal(details.get("tierFromQty").toString())).isEqualByComparingTo("0");
+        });
+        assertThat(events(lk.coopfed.knoweb.m3pricing.api.ReviewRaised.class)).hasSize(1);
+        // Guards, mutation, audit, events: the review follows the publication in both lists.
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsSubsequence("PRICELIST_PUBLISHED", "TRADE_ABOVE_MRP");
+
+        // pricing.trade_above_mrp_review false: published, no review (M3R-10).
+        superuserJdbc()
+                .update("insert into kernel.config_value (key, scope_entity_id, scope_location_id, value, changed_by)"
+                        + " values ('pricing.trade_above_mrp_review', null, null, 'false'::jsonb, gen_random_uuid())");
+        config.invalidate("pricing.trade_above_mrp_review");
+        try {
+            kernel.reset();
+            UUID quiet = create.handle(new CreatePriceList("TRADE", "Review off"), own(FEDERATION));
+            setLines.handle(new SetLines(quiet, List.of(line(rice, "0", "95.00"))), own(FEDERATION));
+            publish.handle(new PublishPriceList(quiet, today), own(FEDERATION));
+            assertThat(audit("PRICELIST_PUBLISHED")).hasSize(1);
+            assertThat(audit("TRADE_ABOVE_MRP")).isEmpty();
+            assertThat(events(lk.coopfed.knoweb.m3pricing.api.ReviewRaised.class))
+                    .isEmpty();
+        } finally {
+            superuserJdbc().update("delete from kernel.config_value where key = 'pricing.trade_above_mrp_review'");
+            config.invalidate("pricing.trade_above_mrp_review");
+        }
+    }
+
     // ---- M1's question: may this list be bound to a relationship of this seller? ----------------
 
     @Test

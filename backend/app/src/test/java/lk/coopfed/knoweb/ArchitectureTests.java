@@ -34,6 +34,9 @@ import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
+import lk.coopfed.knoweb.kernel.api.JobExecution;
+import lk.coopfed.knoweb.kernel.api.ScheduledJob;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
 import org.springframework.jdbc.core.JdbcOperations;
@@ -828,9 +831,12 @@ class ArchitectureTests {
     }
 
     @Test
-    void onlyScheduledJobsTakeAnEntitysScope() { // CR-19A-7, as revised on 27 September 2026
+    void onlyScheduledJobsTakeAnEntitysScope() { // CR-19A-7, as revised on 27 September 2026; CR-19A-14
         ownScopeOfOnlyInScheduledJobsRule().check(CLASSES);
     }
+
+    /** The methods of JobExecution that hand out a scope: another entity's, every entity's, the platform's. */
+    static final Set<String> JOB_SCOPE_METHODS = Set.of("ownScopeOf", "federationView", "systemScope");
 
     /**
      * {@code JobExecution.ownScopeOf(entity)} is the OWN scope of any entity, without a user and
@@ -839,25 +845,50 @@ class ArchitectureTests {
      * that a job passes only the owner of a row its own module read; what the build can hold is
      * that nothing but the {@code @ScheduledJob} method itself calls it, so no handler,
      * controller, consumer or helper borrows another entity's scope through a job's execution.
+     *
+     * <p>CR-19A-14 (wave 4, M3R-08) widens it to every scope a kernel API hands out. Outside the
+     * kernel: {@code federationView} and {@code systemScope} of JobExecution are called only from
+     * a {@code @ScheduledJob} method too, and no other kernel.api type that returns a ScopeContext
+     * is called at all (#334's ScopedExecution minted any entity's scope on demand, from anywhere;
+     * it was removed). {@code CurrentScope.get} has a rule of its own
+     * (onlyControllersAskForTheCurrentScope), and ScopeContext's own methods mint nothing the
+     * caller did not already hold.
      */
     static ArchRule ownScopeOfOnlyInScheduledJobsRule() {
         return classes()
+                .that()
+                .resideOutsideOfPackage("lk.coopfed.knoweb.kernel..")
                 .should(
                         new ArchCondition<JavaClass>(
-                                "call JobExecution.ownScopeOf only from a method annotated @ScheduledJob") {
+                                "take a scope from a kernel API only through JobExecution, in a method annotated"
+                                        + " @ScheduledJob") {
                             @Override
                             public void check(JavaClass javaClass, ConditionEvents events) {
                                 for (JavaMethodCall c : javaClass.getMethodCallsFromSelf()) {
-                                    if (c.getName().equals("ownScopeOf")
-                                            && c.getTargetOwner()
-                                                    .isAssignableTo(lk.coopfed.knoweb.kernel.api.JobExecution.class)
-                                            && !c.getOrigin()
-                                                    .isAnnotatedWith(lk.coopfed.knoweb.kernel.api.ScheduledJob.class)) {
+                                    JavaClass owner = c.getTargetOwner();
+                                    boolean jobScope = owner.isAssignableTo(JobExecution.class)
+                                            && JOB_SCOPE_METHODS.contains(c.getName());
+                                    boolean minted = !jobScope
+                                            && owner.getPackageName().endsWith(".kernel.api")
+                                            && !owner.isAssignableTo(CurrentScope.class)
+                                            && !owner.isEquivalentTo(ScopeContext.class)
+                                            && handsOutAScope(c);
+                                    if (minted) {
                                         events.add(SimpleConditionEvent.violated(
                                                 c,
                                                 javaClass.getName() + "."
                                                         + c.getOrigin().getName()
-                                                        + " takes an entity's OWN scope through JobExecution.ownScopeOf"
+                                                        + " takes a scope from " + owner.getSimpleName() + "."
+                                                        + c.getName() + ", a kernel API that mints scopes;"
+                                                        + " only a @ScheduledJob takes another entity's scope,"
+                                                        + " through JobExecution (CR-19A-7, CR-19A-14); "
+                                                        + c.getSourceCodeLocation()));
+                                    } else if (jobScope && !c.getOrigin().isAnnotatedWith(ScheduledJob.class)) {
+                                        events.add(SimpleConditionEvent.violated(
+                                                c,
+                                                javaClass.getName() + "."
+                                                        + c.getOrigin().getName()
+                                                        + " takes a scope through JobExecution." + c.getName()
                                                         + " but is not a @ScheduledJob method; "
                                                         + c.getSourceCodeLocation()));
                                     }
@@ -865,5 +896,20 @@ class ArchitectureTests {
                             }
                         })
                 .allowEmptyShould(true);
+    }
+
+    /** The called method returns a ScopeContext, or an Optional of one (JobExecution.systemScope's shape). */
+    private static boolean handsOutAScope(JavaMethodCall call) {
+        return call.getTarget()
+                .resolveMember()
+                .map(method -> {
+                    if (method.getRawReturnType().isEquivalentTo(ScopeContext.class)) {
+                        return true;
+                    }
+                    return method.getRawReturnType().isEquivalentTo(java.util.Optional.class)
+                            && method.reflect() instanceof java.lang.reflect.Method reflected
+                            && reflected.getGenericReturnType().getTypeName().contains(ScopeContext.class.getName());
+                })
+                .orElse(false);
     }
 }

@@ -1,13 +1,16 @@
 package lk.coopfed.knoweb.m3pricing.internal.queries;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.engine.Basket;
 import lk.coopfed.knoweb.engine.BasketResult;
@@ -20,9 +23,12 @@ import lk.coopfed.knoweb.kernel.api.AuditReviewRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
+import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
+import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
 import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
+import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
@@ -33,6 +39,8 @@ import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
 import lk.coopfed.knoweb.m3pricing.query.ReviewItem;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,8 +60,15 @@ class PricingQueriesImpl implements PricingQueries {
     private final EffectivePolicy policies;
     private final RetailPriceResolution retail;
     private final ObjectMapper mapper;
-    private final AuditReviewReader auditReviews;
+    private static final Logger log = LoggerFactory.getLogger(PricingQueriesImpl.class);
 
+    /** The newest reviews listReviews answers, as #334 shipped it (the slice has no paging yet). */
+    private static final int REVIEW_PAGE = 100;
+
+    private final AuditReviewReader auditReviews;
+    private final CatalogueQueries catalogue;
+
+    @SuppressWarnings("java:S107") // the inputs of the central resolution; a query service only reads
     PricingQueriesImpl(
             PriceListStore store,
             RelationshipQueries relationships,
@@ -62,7 +77,9 @@ class PricingQueriesImpl implements PricingQueries {
             EffectivePolicy policies,
             RetailPriceResolution retail,
             ObjectMapper mapper,
-            AuditReviewReader auditReviews) {
+            AuditReviewReader auditReviews,
+            CatalogueQueries catalogue) {
+        this.catalogue = catalogue;
         this.store = store;
         this.relationships = relationships;
         this.rules = rules;
@@ -205,32 +222,56 @@ class PricingQueriesImpl implements PricingQueries {
         return retail.resolveBasket(locationId, date, tender, basket, scope);
     }
 
+    /**
+     * The pricing reviews in the caller's scope, newest first (M3R-07). Every review is OPEN until
+     * a settle command exists, so status SETTLED answers none. The SKU's code and name come from
+     * M2, in the caller's language.
+     */
     @Override
     public List<ReviewItem> listReviews(String kind, String status, ScopeContext scope) {
-        List<AuditReviewRecord> records =
-                auditReviews.listReviews(kind != null && !kind.isBlank() ? kind : null, scope);
+        if (ReviewItem.SETTLED.equals(status)) {
+            return List.of();
+        }
+        Set<String> kinds = kind != null && !kind.isBlank()
+                ? (PricingReviews.KINDS.contains(kind) ? Set.of(kind) : Set.of())
+                : PricingReviews.KINDS;
+        List<AuditReviewRecord> records = auditReviews.listReviews(kinds, REVIEW_PAGE, scope);
 
+        Map<UUID, Optional<SkuView>> skus = new HashMap<>();
         List<ReviewItem> items = new ArrayList<>();
         for (AuditReviewRecord r : records) {
             Map<String, Object> details = null;
             if (r.afterState() != null) {
                 try {
                     details = mapper.readValue(r.afterState(), new TypeReference<Map<String, Object>>() {});
-                } catch (Exception ignored) {
+                } catch (JsonProcessingException unreadable) {
+                    log.warn("Review {} has an after-state that is not a JSON object", r.auditId(), unreadable);
                 }
             }
+            Optional<SkuView> sku = skus.computeIfAbsent(r.subjectId(), id -> catalogue.getSku(id, scope));
             items.add(new ReviewItem(
                     r.auditId(),
                     r.eventTypeCode(),
                     "REVIEW",
+                    ReviewItem.OPEN,
                     r.occurredAt(),
                     r.ownerEntityId(),
                     r.subjectId(),
-                    null,
-                    null,
-                    details,
-                    false));
+                    sku.map(s -> skuName(s, scope)).orElse(null),
+                    sku.map(SkuView::skuCode).orElse(null),
+                    details));
         }
         return items;
+    }
+
+    private static String skuName(SkuView sku, ScopeContext scope) {
+        String language = scope.locale() == null ? "en" : scope.locale().getLanguage();
+        String name =
+                switch (language) {
+                    case "si" -> sku.nameSi();
+                    case "ta" -> sku.nameTa();
+                    default -> sku.nameEn();
+                };
+        return name == null || name.isBlank() ? sku.nameEn() : name;
     }
 }
