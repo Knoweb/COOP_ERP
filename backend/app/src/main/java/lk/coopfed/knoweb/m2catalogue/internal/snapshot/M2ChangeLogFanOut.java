@@ -85,7 +85,7 @@ public class M2ChangeLogFanOut {
         }
 
         boolean shared = STATUS_SHARED.equalsIgnoreCase(status) || isFederation(ownerEntityId);
-        List<Target> targets = shared ? shops.all() : shops.of(ownerEntityId);
+        List<Target> targets = shared ? shops.all(scope) : shops.of(ownerEntityId, scope);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
         }
@@ -103,7 +103,7 @@ public class M2ChangeLogFanOut {
         }
 
         boolean wasShared = STATUS_SHARED.equalsIgnoreCase(priorStatus) || isFederation(ownerEntityId);
-        List<Target> targets = wasShared ? shops.all() : shops.of(ownerEntityId);
+        List<Target> targets = wasShared ? shops.all(scope) : shops.of(ownerEntityId, scope);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, true, scope);
         }
@@ -125,7 +125,7 @@ public class M2ChangeLogFanOut {
         boolean shared = meta != null ? STATUS_SHARED.equalsIgnoreCase(meta.status()) : isFederation(ownerEntityId);
         UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : ownerEntityId;
 
-        List<Target> targets = shared ? shops.all() : shops.of(targetOwner);
+        List<Target> targets = shared ? shops.all(scope) : shops.of(targetOwner, scope);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
         }
@@ -147,7 +147,7 @@ public class M2ChangeLogFanOut {
         boolean shared = meta != null ? STATUS_SHARED.equalsIgnoreCase(meta.status()) : isFederation(ownerEntityId);
         UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : ownerEntityId;
 
-        List<Target> targets = shared ? shops.all() : shops.of(targetOwner);
+        List<Target> targets = shared ? shops.all(scope) : shops.of(targetOwner, scope);
         if (!targets.isEmpty()) {
             changeLog.append(targets, List.of(Change.upsert(SKU, skuId)), null, false, scope);
         }
@@ -172,13 +172,13 @@ public class M2ChangeLogFanOut {
                     && !isFederation(imageOwnerId)
                     && !Objects.equals(imageOwnerId, meta.ownerEntityId())) {
                 // Local override on a SHARED SKU by an MPCS entity: reaches that entity's shops only.
-                targets = shops.of(imageOwnerId);
+                targets = shops.of(imageOwnerId, scope);
             } else {
-                targets = shops.all();
+                targets = shops.all(scope);
             }
         } else {
             UUID targetOwner = meta != null && meta.ownerEntityId() != null ? meta.ownerEntityId() : imageOwnerId;
-            targets = shops.of(targetOwner);
+            targets = shops.of(targetOwner, scope);
         }
 
         if (!targets.isEmpty()) {

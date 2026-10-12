@@ -10,7 +10,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 
 /**
  * Violates the federation-view rule: a module class builds a read over every entity's rows
- * itself instead of taking it from {@code ScopedExecution.federationView()}.
+ * itself instead of asking the kernel (a job) or a SECURITY DEFINER function (a consumer).
  */
 public class BuildsAFederationView {
 

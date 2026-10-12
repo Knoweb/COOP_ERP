@@ -15,6 +15,8 @@ import lk.coopfed.knoweb.kernel.api.ChangeLog.Target;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.kernel.internal.sync.SnapshotBuilder;
+import lk.coopfed.knoweb.m1party.query.PartyQueries;
+import lk.coopfed.knoweb.m1party.query.ShopRef;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeRegistered;
 import lk.coopfed.knoweb.m2catalogue.api.BarcodeRetired;
 import lk.coopfed.knoweb.m2catalogue.api.ConversionDefined;
@@ -62,6 +64,9 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     SnapshotBuilder snapshotBuilder;
+
+    @Autowired
+    PartyQueries parties;
 
     private final ScopeContext centralScope = SystemScope.own(TEST_FEDERATION, null);
     private final ScopeContext tillScopeA = SystemScope.own(ENTITY_A, SHOP_A);
@@ -412,6 +417,45 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
                         .path("upserts")
                         .toString())
                 .contains(SKU_LOCAL_A.toString());
+    }
+
+    /**
+     * TD-03: the shops come from M1's {@code party.change_log_shops} (m1party V0017), which decides
+     * from the caller's scope: the Federation lists every shop, an entity its own shops only (a
+     * location in its scope does not narrow that), and no other class gets any.
+     */
+    @Test
+    void onlyTheFederationListsEveryShopAndAnEntityOnlyItsOwn() {
+        ScopeContext scopeA = SystemScope.own(ENTITY_A, null);
+
+        List<ShopRef> every =
+                transactions.inOwnTransaction(centralScope, () -> parties.listChangeLogShops(null, centralScope));
+        assertThat(every)
+                .contains(
+                        new ShopRef(ENTITY_A, SHOP_A),
+                        new ShopRef(ENTITY_A, SHOP_A_ONBOARDING),
+                        new ShopRef(ENTITY_B, SHOP_B),
+                        new ShopRef(ENTITY_B, SHOP_B_DORMANT));
+        assertThat(transactions.inOwnTransaction(
+                        centralScope, () -> parties.listChangeLogShops(ENTITY_B, centralScope)))
+                .containsExactlyInAnyOrder(new ShopRef(ENTITY_B, SHOP_B), new ShopRef(ENTITY_B, SHOP_B_DORMANT));
+
+        assertThat(transactions.inOwnTransaction(scopeA, () -> parties.listChangeLogShops(ENTITY_A, scopeA)))
+                .containsExactlyInAnyOrder(new ShopRef(ENTITY_A, SHOP_A), new ShopRef(ENTITY_A, SHOP_A_ONBOARDING));
+        assertThat(transactions.inOwnTransaction(tillScopeA, () -> parties.listChangeLogShops(ENTITY_A, tillScopeA)))
+                .as("a location in the scope does not narrow it")
+                .containsExactlyInAnyOrder(new ShopRef(ENTITY_A, SHOP_A), new ShopRef(ENTITY_A, SHOP_A_ONBOARDING));
+
+        assertThat(transactions.inOwnTransaction(scopeA, () -> parties.listChangeLogShops(null, scopeA)))
+                .as("a society does not list the federation's shops")
+                .isEmpty();
+        assertThat(transactions.inOwnTransaction(scopeA, () -> parties.listChangeLogShops(ENTITY_B, scopeA)))
+                .as("nor another society's")
+                .isEmpty();
+        ScopeContext fedView = SystemScope.federationView();
+        assertThat(transactions.inOwnTransaction(fedView, () -> parties.listChangeLogShops(null, fedView)))
+                .as("only an OWN scope is answered")
+                .isEmpty();
     }
 
     /**
