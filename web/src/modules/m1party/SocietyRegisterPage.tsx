@@ -32,6 +32,7 @@ export function SocietyRegisterPage() {
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
   const [search, setSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filter = {
@@ -70,7 +71,27 @@ export function SocietyRegisterPage() {
         )}
       </div>
 
-      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel">
+      <button
+  type="button"
+  className="filter-toggle"
+  onClick={() => setFiltersOpen(!filtersOpen)}
+  aria-expanded={filtersOpen}
+  aria-controls="society-filters"
+>
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16M7 12h10M10 17h4" />
+  </svg>
+  Filters
+  <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+</button>
+
+{filtersOpen && (
+  <form
+    id="society-filters"
+    role="search"
+    onSubmit={(event) => event.preventDefault()}
+    className="modern-filter-panel"
+  >
         <label className="modern-field">
           <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
@@ -94,6 +115,7 @@ export function SocietyRegisterPage() {
           <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
         </label>
       </form>
+)}
 
       {societies.isLoading && <p>{t("party.list.loading").text}</p>}
       {societies.isError && <p role="alert">{errorText(societies.error, t("party.error.generic").text)}</p>}

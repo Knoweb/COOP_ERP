@@ -97,7 +97,7 @@ export function NotificationsPage() {
         {rules.data && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">
-              <table className="modern-table">
+              <table className="modern-table notification-rules-table">
                 <thead>
                   <tr>
                     <th scope="col">{t("integration.rules.col.name").text}</th>
@@ -212,7 +212,7 @@ export function NotificationsPage() {
         {log.data && log.data.length > 0 && (
           <div className="modern-table-card">
             <div className="modern-table-scroll">
-              <table className="modern-table">
+              <table className="modern-table notification-log-table">
                 <thead>
                   <tr>
                     <th scope="col">{t("integration.log.col.when").text}</th>

@@ -58,3 +58,26 @@
 .integration-subject {
   font-weight: var(--font-weight-strong);
 }
+
+.notification-log-table {
+  min-width: 950px;
+}
+
+.notification-log-table td:nth-child(1) {
+  min-width: 145px;
+  white-space: nowrap;
+}
+
+.notification-log-table td:nth-child(2),
+.notification-log-table td:nth-child(4),
+.notification-log-table td:nth-child(8) {
+  min-width: 120px;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+
+.notification-log-table th:nth-child(7),
+.notification-log-table td:nth-child(7) {
+  text-align: center;
+  white-space: nowrap;
+}

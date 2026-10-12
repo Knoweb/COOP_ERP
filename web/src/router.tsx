@@ -2,6 +2,7 @@
 // modules/registry.ts (that is where `make new-module` adds its line), and the shell turns
 // that list into routes and navigation (17A section 7).
 
+import { useState } from "react";
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 import { MODULES } from "./modules/registry";
@@ -25,13 +26,21 @@ function SignOutSidebar() {
   const t = useT();
   if (!session) return null;
   return (
-    <button type="button" className="btn-signout" onClick={session.signOut}>
+        <button
+          type="button"
+          className="btn-signout"
+          onClick={session.signOut}
+          title={t("shell.auth.sign_out").text}
+          aria-label={t("shell.auth.sign_out").text}
+        >
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
         <polyline points="16 17 21 12 16 7"></polyline>
         <line x1="21" y1="12" x2="9" y2="12"></line>
       </svg>
-      {t("shell.auth.sign_out").text}
+      <span className="signout-label">
+        {t("shell.auth.sign_out").text}
+      </span>
     </button>
   );
 }
@@ -43,21 +52,72 @@ function SignOutSidebar() {
  */
 function RootLayout({ modules }: { modules: ModuleDefinition[] }) {
   // Temporary source: a build flag. The real one is a later kernel/M6 concern (TrainingBadge.tsx).
+      const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("coop-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+
+      try {
+        localStorage.setItem("coop-sidebar-collapsed", String(next));
+      } catch {
+        // Ignore storage errors
+      }
+
+      return next;
+    });
+  };
   const training = isTrainingMode();
   return (
     <ScopeProvider>
       <div className={training ? "shell shell--training" : "shell"}>
         <TrainingBadge active={training} />
-        <div className="shell-layout">
+        <div
+          className={`shell-layout${sidebarCollapsed ? " shell-layout--collapsed" : ""}`}
+        >
           <aside className="shell-sidebar">
             <div className="shell-sidebar-brand">
+
+
               <span className="brand-logo">
-                {/* Decorative: the brand name is written right beside it, so a screen reader skips the image. */}
                 <img src={coopLogo} alt="" aria-hidden="true" />
               </span>
               <span className="brand-text">COOPFED ERP</span>
+              <button
+                type="button"
+                className="shell-sidebar-toggle"
+                onClick={toggleSidebar}
+                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-expanded={!sidebarCollapsed}
+                aria-controls="coop-sidebar-navigation"
+                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <line x1="9" y1="4" x2="9" y2="20" />
+                  <path d={sidebarCollapsed ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"} />
+                </svg>
+              </button>
             </div>
-            <div className="shell-sidebar-nav">
+            <div id="coop-sidebar-navigation" className="shell-sidebar-nav">
+
+
               <Navigation modules={modules} />
             </div>
             <div className="shell-sidebar-footer">
