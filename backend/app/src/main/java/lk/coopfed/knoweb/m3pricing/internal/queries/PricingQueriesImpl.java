@@ -1,13 +1,22 @@
 package lk.coopfed.knoweb.m3pricing.internal.queries;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.engine.Basket;
+import lk.coopfed.knoweb.engine.BasketResult;
 import lk.coopfed.knoweb.engine.Quantity;
+import lk.coopfed.knoweb.engine.TenderKind;
 import lk.coopfed.knoweb.engine.TradeLine;
 import lk.coopfed.knoweb.engine.TradePriceResolver;
+import lk.coopfed.knoweb.kernel.api.AuditReviewReader;
+import lk.coopfed.knoweb.kernel.api.AuditReviewRecord;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m1party.query.RelationshipQueries;
 import lk.coopfed.knoweb.m1party.query.RelationshipView;
@@ -21,6 +30,7 @@ import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RetailPrice;
+import lk.coopfed.knoweb.m3pricing.query.ReviewItem;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import org.springframework.stereotype.Service;
@@ -41,6 +51,8 @@ class PricingQueriesImpl implements PricingQueries {
     private final ControlPriceStore controlPrices;
     private final EffectivePolicy policies;
     private final RetailPriceResolution retail;
+    private final ObjectMapper mapper;
+    private final AuditReviewReader auditReviews;
 
     PricingQueriesImpl(
             PriceListStore store,
@@ -48,13 +60,17 @@ class PricingQueriesImpl implements PricingQueries {
             RuleStore rules,
             ControlPriceStore controlPrices,
             EffectivePolicy policies,
-            RetailPriceResolution retail) {
+            RetailPriceResolution retail,
+            ObjectMapper mapper,
+            AuditReviewReader auditReviews) {
         this.store = store;
         this.relationships = relationships;
         this.rules = rules;
         this.controlPrices = controlPrices;
         this.policies = policies;
         this.retail = retail;
+        this.mapper = mapper;
+        this.auditReviews = auditReviews;
     }
 
     @Override
@@ -181,5 +197,40 @@ class PricingQueriesImpl implements PricingQueries {
                         quote.getTierFromQty().getValue(),
                         quote.getUnitPrice(),
                         quote.getEngineVersion()));
+    }
+
+    @Override
+    public Optional<BasketResult> resolveBasket(
+            UUID locationId, LocalDate date, TenderKind tender, Basket basket, ScopeContext scope) {
+        return retail.resolveBasket(locationId, date, tender, basket, scope);
+    }
+
+    @Override
+    public List<ReviewItem> listReviews(String kind, String status, ScopeContext scope) {
+        List<AuditReviewRecord> records =
+                auditReviews.listReviews(kind != null && !kind.isBlank() ? kind : null, scope);
+
+        List<ReviewItem> items = new ArrayList<>();
+        for (AuditReviewRecord r : records) {
+            Map<String, Object> details = null;
+            if (r.afterState() != null) {
+                try {
+                    details = mapper.readValue(r.afterState(), new TypeReference<Map<String, Object>>() {});
+                } catch (Exception ignored) {
+                }
+            }
+            items.add(new ReviewItem(
+                    r.auditId(),
+                    r.eventTypeCode(),
+                    "REVIEW",
+                    r.occurredAt(),
+                    r.ownerEntityId(),
+                    r.subjectId(),
+                    null,
+                    null,
+                    details,
+                    false));
+        }
+        return items;
     }
 }

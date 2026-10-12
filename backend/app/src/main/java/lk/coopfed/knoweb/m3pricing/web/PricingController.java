@@ -3,8 +3,11 @@ package lk.coopfed.knoweb.m3pricing.web;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lk.coopfed.knoweb.engine.Basket;
+import lk.coopfed.knoweb.engine.TenderKind;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
@@ -36,10 +39,12 @@ import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import lk.coopfed.knoweb.m3pricing.web.generated.AuthorRuleRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.BasketResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.ControlPriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
+import lk.coopfed.knoweb.m3pricing.web.generated.LineResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.MrpPolicyResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListDetailResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListLineResponse;
@@ -47,7 +52,10 @@ import lk.coopfed.knoweb.m3pricing.web.generated.PriceListResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PricingApi;
 import lk.coopfed.knoweb.m3pricing.web.generated.PublishPriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RescindControlPriceRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketLineRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RetailPriceResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ReviewItem;
 import lk.coopfed.knoweb.m3pricing.web.generated.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.web.generated.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.web.generated.RuleResponse;
@@ -437,5 +445,94 @@ class PricingController implements PricingApi {
                 price.tierFromQty(),
                 price.unitPrice(),
                 price.engineVersion());
+    }
+
+    @Override
+    public ResponseEntity<BasketResult> resolveBasket(String idempotencyKey, ResolveBasketRequest request) {
+        ScopeContext scope = currentScope.get();
+
+        List<lk.coopfed.knoweb.engine.LineInput> engineLines = new ArrayList<>();
+        for (ResolveBasketLineRequest l : request.getLines()) {
+            engineLines.add(new lk.coopfed.knoweb.engine.LineInput(
+                    l.getSkuId(),
+                    l.getUom(),
+                    lk.coopfed.knoweb.engine.Quantity.of(l.getQty()),
+                    l.getBatchId(),
+                    l.getPickedBatchId()));
+        }
+
+        Basket basket = new Basket(engineLines);
+        TenderKind tender = TenderKind.valueOf(request.getTenderKind().getValue());
+
+        return queries.resolveBasket(request.getLocationId(), request.getBusinessDate(), tender, basket, scope)
+                .map(result -> {
+                    BasketResult br = new BasketResult();
+                    br.setTotal(result.getTotal().getAmount());
+                    br.setSubtotal(result.getSubtotal().getAmount());
+                    br.setRounding(result.getRounding().getAmount());
+                    br.setBillDiscount(result.getBillDiscount().getAmount());
+                    br.setBillRuleId(result.getBillRuleId());
+                    br.setEngineVersion(result.getEngineVersion());
+                    br.setSnapshotVersion(String.valueOf(result.getSnapshotVersion()));
+
+                    List<LineResult> mappedLines = new ArrayList<>();
+                    for (lk.coopfed.knoweb.engine.LineResult l : result.getLines()) {
+                        LineResult lr = new LineResult();
+                        lr.setSkuId(l.getSkuId());
+                        lr.setUom(l.getInput().getUom());
+                        lr.setQty(l.getInput().getQty().getValue());
+                        lr.setUnitPrice(
+                                l.getUnitPrice() != null ? l.getUnitPrice().getAmount() : null);
+                        lr.setLineTotal(
+                                l.getLineTotal() != null ? l.getLineTotal().getAmount() : null);
+                        lr.setDiscountAmount(
+                                l.getDiscountAmount() != null
+                                        ? l.getDiscountAmount().getAmount()
+                                        : null);
+                        lr.setBatchId(l.getBatch() != null ? l.getBatch().getBatchId() : null);
+                        lr.setRuleId(l.getRuleId());
+                        lr.setTaxRatePercent(l.getTaxRatePercent());
+                        lr.setTaxAmount(
+                                l.getTaxAmount() != null ? l.getTaxAmount().getAmount() : null);
+                        lr.setMrpApplied(
+                                l.getMrpApplied() != null ? l.getMrpApplied().getAmount() : null);
+                        lr.setControlPriceApplied(
+                                l.getControlPriceApplied() != null
+                                        ? l.getControlPriceApplied().getAmount()
+                                        : null);
+                        lr.setCapReason(
+                                l.getCapReason() != null
+                                        ? LineResult.CapReasonEnum.fromValue(
+                                                l.getCapReason().name())
+                                        : null);
+                        mappedLines.add(lr);
+                    }
+                    br.setLines(mappedLines);
+                    return ResponseEntity.ok(br);
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
+    public ResponseEntity<List<ReviewItem>> listReviews(String kind, String status) {
+        ScopeContext scope = currentScope.get();
+
+        List<lk.coopfed.knoweb.m3pricing.query.ReviewItem> internal = queries.listReviews(kind, status, scope);
+        List<ReviewItem> result = new ArrayList<>();
+        for (lk.coopfed.knoweb.m3pricing.query.ReviewItem r : internal) {
+            ReviewItem item = new ReviewItem();
+            item.setReviewId(r.reviewId());
+            item.setKind(r.kind());
+            item.setSeverity(r.severity());
+            item.setOccurredAt(r.occurredAt().toInstant());
+            item.setSkuId(r.skuId());
+            item.setSkuName(r.skuName());
+            item.setSkuCode(r.skuCode());
+            item.setDetails(r.details());
+            item.setEscalated(r.escalated());
+            result.add(item);
+        }
+
+        return ResponseEntity.ok(result);
     }
 }
