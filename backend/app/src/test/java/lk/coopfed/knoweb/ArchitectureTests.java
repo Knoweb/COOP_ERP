@@ -912,4 +912,48 @@ class ArchitectureTests {
                 })
                 .orElse(false);
     }
+
+    @Test
+    void onlyTheKernelBuildsAFederationView() { // wave 4 TD-03
+        onlyTheKernelBuildsAFederationViewRule().check(CLASSES);
+    }
+
+    /**
+     * A read over every entity's rows is the kernel's to hand out: a job through
+     * {@code JobExecution.federationView} (only from a {@code @ScheduledJob}, CR-19A-7); a
+     * consumer that must read across entities asks a SECURITY DEFINER function of the owning
+     * module that decides from {@code kernel.scope_class()} (as {@code party.change_log_shops},
+     * m1party V0017). A module class that builds
+     * {@code new ScopeContext(..., PolicyClass.FEDERATION_VIEW, ...)} itself goes round that, and
+     * then has to put its connection's scope back by hand (M2's {@code CatalogueShops} did, wave 4
+     * TD-03). So no class outside the kernel and the demo
+     * loader both constructs a {@code ScopeContext} and names {@code PolicyClass.FEDERATION_VIEW};
+     * comparing a caller's class with it, without constructing one, stays allowed.
+     */
+    static ArchRule onlyTheKernelBuildsAFederationViewRule() {
+        return classes()
+                .that()
+                .resideOutsideOfPackages("lk.coopfed.knoweb.kernel..", "lk.coopfed.knoweb.demo..")
+                .should(new ArchCondition<JavaClass>("not build a FEDERATION_VIEW ScopeContext") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        boolean constructs = javaClass.getConstructorCallsFromSelf().stream()
+                                .anyMatch(c -> c.getTargetOwner()
+                                        .isEquivalentTo(lk.coopfed.knoweb.kernel.api.ScopeContext.class));
+                        boolean namesFederationView = javaClass.getFieldAccessesFromSelf().stream()
+                                .anyMatch(a -> a.getName().equals("FEDERATION_VIEW")
+                                        && a.getTargetOwner()
+                                                .isEquivalentTo(lk.coopfed.knoweb.kernel.api.PolicyClass.class));
+                        if (constructs && namesFederationView) {
+                            events.add(SimpleConditionEvent.violated(
+                                    javaClass,
+                                    javaClass.getName()
+                                            + " builds a ScopeContext and names PolicyClass.FEDERATION_VIEW;"
+                                            + " a job takes it from JobExecution, a consumer asks a SECURITY"
+                                            + " DEFINER function of the owning module"));
+                        }
+                    }
+                })
+                .allowEmptyShould(true);
+    }
 }

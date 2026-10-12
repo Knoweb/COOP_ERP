@@ -123,6 +123,16 @@ class ArchitectureRulesBiteTest {
     }
 
     @Test
+    void federationViewRuleCatchesAModuleBuildingItsOwn() {
+        assertViolation(ArchitectureTests.onlyTheKernelBuildsAFederationViewRule(), "BuildsAFederationView");
+        String report = ArchitectureTests.onlyTheKernelBuildsAFederationViewRule()
+                .evaluate(FIXTURES)
+                .getFailureReport()
+                .toString();
+        assertTrue(!report.contains("ComparesWithTheFederationView"), report);
+    }
+
+    @Test
     void internalCommandRuleCatchesAControllerThatReachesOne() {
         assertViolation(ArchitectureTests.webDoesNotUseInternalCommandsRule(), "ControllerReachingAnInternalCommand");
     }
