@@ -4,7 +4,7 @@ Reviewed 12 October 2026 against `main` at 73f89f58. Scope: the team pull reques
 
 Each area had one reviewer, who then verified each finding in a second pass. Docker was down, so every verdict rests on reading the code.
 
-**Status: findings verified; no fix has been made yet.**
+**Status: findings verified; the highs and the small findings were fixed on 12 and 13 October 2026 (see "Fixes" below).**
 
 ## Counts (after verification)
 
@@ -41,3 +41,21 @@ No critical findings.
 - **M3R-08** (#334): two new kernel API interfaces without a change request; `ScopedExecution` lets any module open a cross-tenant scope.
 - **M3R-02** (#334): KHATA, CHEQUE or VOUCHER tenders and quantities with more than three decimals return a 500.
 - **K4-01** (#335): after the grace period the version-floor ALERT is written on every upload attempt, with no de-duplication (about 300 a day for a busy till), while a till that only sends heartbeats never alerts.
+
+## Fixes (12 and 13 October 2026)
+
+Each fix PR ran the whole CI and was merged one at a time; none has had a second review yet.
+
+| PR | Findings closed |
+|---|---|
+| #337 | M1M2M3M5-26 (wave 3, high): the fix of #321 rebuilt on main, since #314 merged without it; with it TILLM6-01 is closed |
+| #339 | K4-01, K4-02, K4-03; CR-32-2 (the attachment upload window, below) |
+| #340 | M3R-01 to M3R-06, M3R-07 (the contract part), M3R-08, M3R-09, M3R-10; CR-19A-14 |
+| #341 | TD-01 to TD-05 |
+
+Decisions taken on the architect's delegation (deviation files `docs/progress/deviations/2026-10-13-wave4-*.md`):
+- **M3R-08** (CR-19A-14): `kernel.api.ScopedExecution` removed. Only a `@ScheduledJob` takes another entity's scope, through `JobExecution` (CR-19A-7), and the build rule now covers every kernel API that hands out a scope. M3's review consumers record a `pricing.review_trigger` row and `PricingReviewJob` raises each review in its owner's scope, so a review appears within a minute rather than in the consumer's transaction. `AuditReviewReader` stays, with the event codes passed by the caller. A consumer that must read across entities asks a SECURITY DEFINER function of the owning module that decides from `kernel.scope_class()` (#337 `security.role_holder_shops`, #341 `party.change_log_shops`); a module may not build a FEDERATION_VIEW scope itself.
+- **The attachment upload window** (CR-32-2, from wave 3 KRN-16): renewal stays refused after the window and the default stays 15 minutes, configurable per scope (`attachment.upload_url_minutes`, CR-19A-8). A photo is at most about 300 KB (doc 32 section 4), so 15 minutes is ample; a till that comes back later asks for a new attachment on the same document, and a FAILED attachment does not block a write-off. Two gaps are recorded in the CR: an object that never arrives stays PENDING for 24 hours, and an M4 claim decision still needs every photo COMPLETE.
+- **TD-02 and TD-04**: the till contract carries no batch rows at all (doc 32 section 5.1 puts a till's batches with M5's lots), rather than a narrowed set.
+
+**Still open:** M1M2M3M5-27 and M1M2M3M5-10 (wave 3), KRN-09 to KRN-12 (wave 3, not closed by #313 and #315), M3R-07's settle flow (design), the two attachment gaps above.
