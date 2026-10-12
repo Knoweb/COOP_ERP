@@ -18,7 +18,6 @@ import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ConfigSeeder;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Ids;
-import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
@@ -103,23 +102,19 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
     private Optional<String> resolve(String key, ScopeContext scope) {
         UUID entityId = scope == null ? null : scope.entityId();
         UUID locationId = scope == null ? null : scope.locationId();
-        return cache.get(new CacheKey(key, entityId, locationId), ignored -> load(key, scope, entityId, locationId));
+        return cache.get(new CacheKey(key, entityId, locationId), ignored -> load(key, entityId, locationId));
     }
 
-    private Optional<String> load(String key, ScopeContext scope, UUID entityId, UUID locationId) {
+    private Optional<String> load(String key, UUID entityId, UUID locationId) {
         Optional<ConfigItem> item = findItem(key);
 
         if (item.isEmpty()) {
             return Optional.empty();
         }
 
-        ScopeContext effectiveScope = scope;
-        if (effectiveScope == null || effectiveScope.policyClass() != PolicyClass.OWN) {
-            effectiveScope = system.own().orElse(effectiveScope);
-        }
-
-        final ScopeContext targetScope = effectiveScope;
-        java.util.function.Supplier<List<String>> querySupplier = () -> jdbc.query(
+        // The most specific row wins: location, then entity, then federation; the query orders
+        // them so and takes the latest effective row of the first scope that has one.
+        List<String> found = jdbc.query(
                 """
                 select value from kernel.config_value
                  where key = ?
@@ -133,8 +128,6 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
                 key,
                 entityId,
                 locationId);
-
-        List<String> found = targetScope != null ? system.inScope(targetScope, querySupplier) : querySupplier.get();
 
         try {
             JsonNode value = found.isEmpty() ? item.get().defaultValue() : json.readTree(found.get(0));
@@ -178,7 +171,7 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
         }
 
         JsonNode parsed = ConfigValues.parse(item, value, json);
-        String before = currentText(key, scope, ctx);
+        String before = currentText(key, scope);
         String after = ConfigValues.text(parsed);
 
         jdbc.update(
@@ -249,13 +242,8 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
                 .findFirst();
     }
 
-    private String currentText(String key, ConfigScope scope, ScopeContext ctx) {
-        ScopeContext effectiveScope = ctx;
-        if (effectiveScope == null || effectiveScope.policyClass() != PolicyClass.OWN) {
-            effectiveScope = system.own().orElse(effectiveScope);
-        }
-        final ScopeContext targetScope = effectiveScope;
-        java.util.function.Supplier<List<String>> querySupplier = () -> jdbc.query(
+    private String currentText(String key, ConfigScope scope) {
+        List<String> rows = jdbc.query(
                 """
                 select value from kernel.config_value
                  where key = ? and scope_entity_id is not distinct from ? and scope_location_id is not distinct from ?
@@ -265,8 +253,6 @@ public class JdbcConfigRegistry implements ConfigRegistry, ConfigSeeder {
                 key,
                 scope.entityId(),
                 scope.locationId());
-
-        List<String> rows = targetScope != null ? system.inScope(targetScope, querySupplier) : querySupplier.get();
         if (rows.isEmpty()) {
             return null;
         }

@@ -110,7 +110,7 @@ class AppVersionFloors implements AppVersionFloor {
                 HISTORY_ROWS);
 
         List<FloorValue> history =
-                targetScope != null ? system.inScope(targetScope, querySupplier) : querySupplier.get();
+                targetScope != null ? system.inOwnTransaction(targetScope, querySupplier) : querySupplier.get();
         Instant since = Instant.EPOCH;
         for (FloorValue value : history) {
             if (AppVersions.atLeast(appVersion, value.floor())) {

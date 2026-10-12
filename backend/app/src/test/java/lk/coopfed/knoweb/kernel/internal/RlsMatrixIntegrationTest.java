@@ -449,14 +449,13 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                                 && check.scope().policyClass().equals("FEDERATION_VIEW")) {
                             return VISIBLE;
                         }
-                        if (check.op() == Op.SELECT) {
-                            return HIDDEN;
-                        }
-                        if (check.op() == Op.INSERT
+                        if (check.op() == Op.SELECT
                                 || check.op() == Op.UPDATE
                                 || check.op() == Op.DELETE
-                                || check.op() == Op.MOVE
-                                || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
+                                || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        if (check.op() == Op.INSERT || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
                             return REFUSED;
                         }
                         return null;
