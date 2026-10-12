@@ -41,6 +41,7 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID FEDERATION = UUID.fromString("0190f100-0000-7000-8000-000000000001");
     private static final UUID SOCIETY = UUID.fromString("0190f100-0000-7000-8000-000000000002");
     private static final UUID SHOP = UUID.fromString("0190f100-0000-7000-8000-000000000101");
+    private static final UUID SIBLING_SHOP = UUID.fromString("0190f100-0000-7000-8000-000000000102");
     private static final UUID USER = UUID.fromString("0190f100-0000-7000-8000-000000000010");
 
     @DynamicPropertySource
@@ -195,6 +196,58 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
                 }))
                 .isInstanceOf(ProblemException.class)
                 .hasMessageContaining("config.owner_mismatch");
+    }
+
+    /**
+     * K4-03 (wave 4): a shop-scoped caller sets its own location's value only; a sibling shop's
+     * value and an entity-wide one are refused by set(), and by own_write (kernel V0092) below it.
+     */
+    @Test
+    void aShopScopedCallerSetsOnlyItsOwnLocation() {
+        ScopeContext atShop = scope(SOCIETY, SHOP);
+        inScope(SOCIETY, SHOP, () -> {
+            config.set("till.idle_lock", ConfigScope.location(SOCIETY, SHOP), "PT3M", atShop, "own shop");
+            return null;
+        });
+        assertThat(kernel.committedAudit()).extracting(r -> r.eventType()).containsExactly("CONFIG_CHANGED");
+        assertThat(kernel.committedEvents()).singleElement().isInstanceOf(ConfigChanged.class);
+
+        assertThatThrownBy(() -> inScope(SOCIETY, SHOP, () -> {
+                    config.set("till.idle_lock", ConfigScope.location(SOCIETY, SIBLING_SHOP), "PT1M", atShop, null);
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.owner_mismatch");
+        assertThatThrownBy(() -> inScope(SOCIETY, SHOP, () -> {
+                    config.set("till.idle_lock", ConfigScope.entity(SOCIETY), "PT1M", atShop, null);
+                    return null;
+                }))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("config.owner_mismatch");
+        assertThat(kernel.committedAudit()).hasSize(1);
+
+        // Below the register, the policy refuses the same rows to a shop-scoped session.
+        assertThatThrownBy(() -> inScope(
+                        SOCIETY,
+                        SHOP,
+                        () -> jdbc.update(
+                                """
+                        insert into kernel.config_value (key, scope_entity_id, scope_location_id, value)
+                        values ('till.idle_lock', ?, ?, '"PT1M"'::jsonb)
+                        """,
+                                SOCIETY,
+                                SIBLING_SHOP)))
+                .hasMessageContaining("row-level security");
+        assertThatThrownBy(() -> inScope(
+                        SOCIETY,
+                        SHOP,
+                        () -> jdbc.update(
+                                """
+                        insert into kernel.config_value (key, scope_entity_id, scope_location_id, value)
+                        values ('till.idle_lock', ?, null, '"PT1M"'::jsonb)
+                        """,
+                                SOCIETY)))
+                .hasMessageContaining("row-level security");
     }
 
     @Test
