@@ -1,4 +1,4 @@
-# Code review tracker
+| #341 | 2026-10-12 | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches || #340 | 2026-10-12 | undefined | fix(m3): central price ceiling, basket contract and a pricing review job || #339 | 2026-10-12 | undefined | fix(kernel): raise the version-floor ALERT once per floor and write config values at the caller's location |# Code review tracker
 
 One row per merged pull request: whether it has had an independent code review, in which wave, and where its findings and fixes are. The building agent's own tests and CI are not a review here.
 
@@ -24,7 +24,7 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | 1 | 25–26 Sep 2026 | everything merged up to #117 | `.handover/wave1-findings.md`, `.handover/findings-*.md` | #116, #118–#131, #138, #139, #148 |
 | 2 | 6–7 Oct 2026 | by module, the code on main at 91e550d8: M4 money paths, RLS, M7, M9, deployment kit, M5/M3, M6/M8/M1 admin, till/web/kernel. Not covered: M2 (#135, #137, #146, #160, #249), M3/M1 screens, the demo loader and its data, #118–#131 review fixes outside the areas above, CI beyond the publish job | `docs/reviews/wave2-*.md`, summary in `docs/reviews/wave2-summary.md` | #262, #263, #264, #265, #266, #267, #268, #269, #275, #276, #277, #278, #280, #281, #282, #283, #284, #285 (what was fixed and what was not: `docs/reviews/wave2-summary.md`) |
 | 3 | 9 Oct 2026 | every merged code PR not reviewed before: the wave 2 fixes (#262 to #287), the wave 1 fixes (#116 to #131), the older unreviewed code PRs, and the team PRs #258 and #296 to #312; open PRs #313 to #315 read-only | `docs/reviews/wave3-*.md`, summary in `docs/reviews/wave3-summary.md` | #317, #318, #319, #320, #322, #323; #321 on the branch of open PR #314 (what was fixed and what was not: `docs/reviews/wave3-summary.md`) |
-| 4 | 12 Oct 2026 | the team PRs merged after wave 3: #313, #314, #315, #334, #335, #336 | `docs/reviews/wave4-*.md`, summary in `docs/reviews/wave4-summary.md` | (fixes to follow) |
+| 4 | 12 Oct 2026 | the team PRs merged after wave 3: #313, #314, #315, #334, #335, #336 | `docs/reviews/wave4-*.md`, summary in `docs/reviews/wave4-summary.md` | #337, #339, #340, #341 (what was fixed and what was not: `docs/reviews/wave4-summary.md`) |
 
 ## Pull requests
 
@@ -306,9 +306,14 @@ Wave 2's Fixed in column: for a PR that findings cite, the fix PRs of those find
 | #323 | 2026-10-09 | till | fix(till): wrong-PIN count per operator, the business-date move audited, society admins can assign till roles | Review fix (not re-reviewed) |  |  |
 | #325 | 2026-10-09 | build | fix(build): the unit test task runs on a 1 GB heap | Not reviewed |  |  |
 | #326 | 2026-10-09 | reviews | docs(reviews): wave 3 fixes in the tracker and the summary | Docs (no code review) |  |  |
-| #314 | 2026-10-10 | till | feat(till-data-01): add M1 change-log producers for offline tills | Reviewed (wave 4) | `docs/reviews/wave4-till-data.md` |  |
-| #313 | 2026-10-12 | kernel | fix(m4): FIX-10 update party.device from sync heartbeats | Reviewed (wave 4) | `docs/reviews/wave4-kernel.md` |  |
-| #315 | 2026-10-12 | kernel | fix(kernel): narrow config_value own_read and test matrix exclusions | Reviewed (wave 4) | `docs/reviews/wave4-kernel.md` |  |
-| #334 | 2026-10-12 | m3 | feat(m3): add pricing reviews and central resolution | Reviewed (wave 4) | `docs/reviews/wave4-m3.md` |  |
-| #335 | 2026-10-12 | kernel | fix(kernel): raise ALERT audit event when till remains below app version floor after grace(fix 14) | Reviewed (wave 4) | `docs/reviews/wave4-kernel.md` |  |
-| #336 | 2026-10-12 | till | feat(till-data-02): sync M2 catalogue changes and batches to tills | Reviewed (wave 4) | `docs/reviews/wave4-till-data.md` |  |
+| #314 | 2026-10-10 | till | feat(till-data-01): add M1 change-log producers for offline tills | Reviewed (wave 4) | `docs/reviews/wave4-till-data.md` | #337, #341 |
+| #313 | 2026-10-12 | kernel | fix(m4): FIX-10 update party.device from sync heartbeats | Reviewed (wave 4) | `docs/reviews/wave4-kernel.md` | #339 |
+| #315 | 2026-10-12 | kernel | fix(kernel): narrow config_value own_read and test matrix exclusions | Reviewed (wave 4) | `docs/reviews/wave4-kernel.md` | #339 |
+| #334 | 2026-10-12 | m3 | feat(m3): add pricing reviews and central resolution | Reviewed (wave 4) | `docs/reviews/wave4-m3.md` | #340 |
+| #335 | 2026-10-12 | kernel | fix(kernel): raise ALERT audit event when till remains below app version floor after grace(fix 14) | Reviewed (wave 4) | `docs/reviews/wave4-kernel.md` | #339 |
+| #336 | 2026-10-12 | till | feat(till-data-02): sync M2 catalogue changes and batches to tills | Reviewed (wave 4) | `docs/reviews/wave4-till-data.md` | #341 |
+| #337 | 2026-10-12 | m1 | fix(m1): a Federation template amendment reaches every society's tills | Review fix (not re-reviewed) |  |  |
+| #338 | 2026-10-12 | reviews | docs(reviews): wave 4 findings for the team PRs merged after wave 3 | Docs (no code review) |  |  |
+| #339 | 2026-10-13 | kernel | fix(kernel): raise the version-floor ALERT once per floor and write config values at the caller's location | Review fix (not re-reviewed) |  |  |
+| #341 | 2026-10-13 | m2 | fix(m2): a catalogue change reaches every enrolled till and no federation-wide batches | Review fix (not re-reviewed) |  |  |
+| #340 | 2026-10-13 | m3 | fix(m3): central price ceiling, basket contract and a pricing review job | Review fix (not re-reviewed) |  |  |
