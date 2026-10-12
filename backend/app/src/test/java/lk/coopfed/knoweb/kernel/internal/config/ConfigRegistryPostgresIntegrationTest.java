@@ -237,6 +237,7 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
                         """,
                                 SOCIETY,
                                 SIBLING_SHOP)))
+                .rootCause()
                 .hasMessageContaining("row-level security");
         assertThatThrownBy(() -> inScope(
                         SOCIETY,
@@ -247,6 +248,7 @@ class ConfigRegistryPostgresIntegrationTest extends PostgresIntegrationTest {
                         values ('till.idle_lock', ?, null, '"PT1M"'::jsonb)
                         """,
                                 SOCIETY)))
+                .rootCause()
                 .hasMessageContaining("row-level security");
     }
 
