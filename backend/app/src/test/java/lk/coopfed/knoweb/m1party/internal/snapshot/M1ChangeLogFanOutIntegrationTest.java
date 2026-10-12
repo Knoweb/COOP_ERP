@@ -182,6 +182,74 @@ public class M1ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
                 .contains("newhash");
     }
 
+    /** TD-05: a cashier moved to a back-office account leaves the till at the next heartbeat. */
+    @Test
+    void kindChangeOffTheTillProducesUrgentTombstone() throws Exception {
+        transactions.inOwnTransaction(central, () -> {
+            changeLog.append(
+                    List.of(new lk.coopfed.knoweb.kernel.api.ChangeLog.Target(ENTITY, SHOP)),
+                    List.of(lk.coopfed.knoweb.kernel.api.ChangeLog.Change.upsert("operator", CASHIER)),
+                    null,
+                    false,
+                    central);
+            return null;
+        });
+
+        long tillVersion = mapper.valueToTree(transactions.inOwnTransaction(
+                        till, () -> (Object) snapshotBuilder.build(till, 0, java.time.Duration.ofDays(30))))
+                .path("version")
+                .asLong();
+
+        superuserJdbc().update("update security.app_user set user_kind = 'BACK_OFFICE' where user_id = ?", CASHIER);
+        lk.coopfed.knoweb.m1party.api.UserUpdated event =
+                new lk.coopfed.knoweb.m1party.api.UserUpdated(CASHIER, CASHIER, ENTITY, "BACK_OFFICE", "ACTIVE");
+
+        transactions.inOwnTransaction(central, () -> {
+            fanOut.onUserUpdated(mapper.valueToTree(event), central);
+            return null;
+        });
+
+        com.fasterxml.jackson.databind.JsonNode nextJson = mapper.valueToTree(transactions.inOwnTransaction(
+                till, () -> (Object) snapshotBuilder.build(till, tillVersion, java.time.Duration.ofDays(30))));
+        assertThat(nextJson.path("urgent").asBoolean()).isTrue();
+        assertThat(nextJson.path("tables").path("operator").path("tombstones").toString())
+                .contains(CASHIER.toString());
+    }
+
+    /** A plain rename keeps the operator on the till: it waits for the normal pull. */
+    @Test
+    void renameOfATillOperatorIsNotUrgent() throws Exception {
+        transactions.inOwnTransaction(central, () -> {
+            changeLog.append(
+                    List.of(new lk.coopfed.knoweb.kernel.api.ChangeLog.Target(ENTITY, SHOP)),
+                    List.of(lk.coopfed.knoweb.kernel.api.ChangeLog.Change.upsert("operator", CASHIER)),
+                    null,
+                    false,
+                    central);
+            return null;
+        });
+
+        long tillVersion = mapper.valueToTree(transactions.inOwnTransaction(
+                        till, () -> (Object) snapshotBuilder.build(till, 0, java.time.Duration.ofDays(30))))
+                .path("version")
+                .asLong();
+
+        superuserJdbc().update("update security.app_user set display_name = 'Cashier Two' where user_id = ?", CASHIER);
+        lk.coopfed.knoweb.m1party.api.UserUpdated event =
+                new lk.coopfed.knoweb.m1party.api.UserUpdated(CASHIER, CASHIER, ENTITY, "TILL", "ACTIVE");
+
+        transactions.inOwnTransaction(central, () -> {
+            fanOut.onUserUpdated(mapper.valueToTree(event), central);
+            return null;
+        });
+
+        com.fasterxml.jackson.databind.JsonNode nextJson = mapper.valueToTree(transactions.inOwnTransaction(
+                till, () -> (Object) snapshotBuilder.build(till, tillVersion, java.time.Duration.ofDays(30))));
+        assertThat(nextJson.path("urgent").asBoolean()).isFalse();
+        assertThat(nextJson.path("tables").path("operator").path("upserts").toString())
+                .contains("Cashier Two");
+    }
+
     @Test
     void roleRevokedProducesUrgentTombstone() throws Exception {
         transactions.inOwnTransaction(central, () -> {
