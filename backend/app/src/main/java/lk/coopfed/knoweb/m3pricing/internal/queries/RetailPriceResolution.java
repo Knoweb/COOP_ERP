@@ -228,17 +228,18 @@ class RetailPriceResolution {
             MrpPolicyView policy = policies.of(skuId, owner, scope);
             policiesMap.put(skuId, EffectivePolicy.toEngine(policy));
 
-            Optional<ControlPriceView> control = controlPrices.ceilingFor(skuId, null, date);
-            control.ifPresent(c -> {
-                ceilingsMap.put(
-                        skuId,
-                        List.of(new Ceiling(
-                                Money.rounded(c.ceilingPrice()),
-                                c.ceilingUomCode(),
-                                c.gazetteReference(),
-                                c.effectiveFrom(),
-                                c.effectiveTo())));
-            });
+            // Every ceiling in force, in every unit: the index matches each line by its unit (M3R-01).
+            List<Ceiling> ceilings = controlPrices.ceilingsFor(skuId, date).stream()
+                    .map(c -> new Ceiling(
+                            Money.rounded(c.ceilingPrice()),
+                            c.ceilingUomCode(),
+                            c.gazetteReference(),
+                            c.effectiveFrom(),
+                            c.effectiveTo()))
+                    .toList();
+            if (!ceilings.isEmpty()) {
+                ceilingsMap.put(skuId, ceilings);
+            }
         }
 
         List<Rule> engineRules = rules.activeOnOrAfter(date).stream()

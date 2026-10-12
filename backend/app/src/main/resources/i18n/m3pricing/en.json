@@ -63,5 +63,10 @@
   "m3.mrp_policy.sku_not_active": "The item is not active in the catalogue",
   "m3.mrp_policy.policy_invalid": "This MRP policy is not known",
   "m3.mrp_policy.gap_not_allowed": "Only the picker policy takes a gap",
-  "m3.mrp_policy.gap_invalid": "A gap is zero or more rupees, or a percentage from 0 to 100, with at most two decimals"
+  "m3.mrp_policy.gap_invalid": "A gap is zero or more rupees, or a percentage from 0 to 100, with at most two decimals",
+  "m3.basket.tender_not_priced": "This tender is not priced yet; choose cash, card, khata or cheque",
+  "m3.basket.qty_precision": "A quantity has at most three decimal places",
+  "m3.review.already_raised": "This pricing review has already been raised",
+  "m3.review.trigger_not_found": "The pricing review check could not be found",
+  "m3.review.trigger_checked": "The pricing review check has already been done"
 }

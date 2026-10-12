@@ -38,6 +38,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         Map<String, String> streams = new LinkedHashMap<>();
         // Wave 2, PR 17: kernel V0087 (change_log_append tests the class) from V0086.
         // Wave 4 (K4-01, K4-03): kernel V0092 (floor_alerted, config_value own_write) from V0091.
+        // Wave 4, M3R-09: kernel V0093 (the audit review reader role) from V0091 (#339 takes V0092).
         streams.put("kernel", "91");
         streams.put("hello", null);
         // Wave 4, TD-03: m1party V0017 (party.change_log_shops) from V0014 as well.
@@ -47,7 +48,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
         streams.put("m1security", "20");
         streams.put("m2catalogue", "7");
-        streams.put("m3pricing", "5");
+        // Wave 4, M3R-08: m3pricing V0007 (pricing.review_trigger) from V0006.
+        streams.put("m3pricing", "6");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // Wave 2, PR 10: m5inventory V0008 (count_line.counted_at) on a database at V0007.
@@ -138,11 +140,11 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         }
 
         assertThat(after)
-                .containsEntry("kernel", 92)
+                .containsEntry("kernel", 93)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 8)
-                .containsEntry("m3pricing", 6)
+                .containsEntry("m3pricing", 7)
                 .containsEntry("m5inventory", 8)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);

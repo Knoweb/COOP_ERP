@@ -113,6 +113,8 @@ class ArchitectureRulesBiteTest {
     @Test
     void jobScopeRuleCatchesAnEntitysScopeTakenOutsideAScheduledJob() {
         assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.borrow");
+        assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.peek");
+        assertViolation(ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule(), "BorrowsAnEntitysScope.mint");
         String report = ArchitectureTests.ownScopeOfOnlyInScheduledJobsRule()
                 .evaluate(FIXTURES)
                 .getFailureReport()
