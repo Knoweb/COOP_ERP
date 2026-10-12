@@ -46,14 +46,13 @@ class AppVersionFloors implements AppVersionFloor {
 
     @Override
     public Standing standing(String appVersion, ScopeContext scope) {
-        ScopeContext effectiveScope = scope;
-        if (effectiveScope == null || effectiveScope.policyClass() != PolicyClass.OWN) {
-            effectiveScope = system.own().orElse(effectiveScope);
-        }
-        if (effectiveScope == null) {
+        ScopeContext targetScope = (scope == null || scope.policyClass() != PolicyClass.OWN)
+                ? system.own().orElse(scope)
+                : scope;
+        if (targetScope == null) {
             return computeStanding(appVersion, scope);
         }
-        return system.inOwnTransaction(effectiveScope, () -> computeStanding(appVersion, effectiveScope));
+        return system.inOwnTransaction(targetScope, () -> computeStanding(appVersion, targetScope));
     }
 
     private Standing computeStanding(String appVersion, ScopeContext scope) {
