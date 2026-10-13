@@ -2,14 +2,14 @@
 -- Releases are published centrally by Federation (DevOps); rings govern progressive rollout.
 
 CREATE TABLE kernel.app_release (
-    release_id uuid PRIMARY KEY,
+    release_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_entity_id uuid NOT NULL,
-    version varchar(32) NOT NULL DEFAULT '1.0.0',
-    platform varchar(32) NOT NULL DEFAULT 'ANDROID',
-    package_path text NOT NULL DEFAULT 'releases/package.bin',
-    package_hash varchar(64) NOT NULL DEFAULT '0000000000000000000000000000000000000000000000000000000000000000',
-    package_size_bytes bigint NOT NULL DEFAULT 0,
-    min_supported_version varchar(32) NOT NULL DEFAULT '1.0.0',
+    version varchar(32) NOT NULL,
+    platform varchar(32) NOT NULL,
+    package_path text NOT NULL,
+    package_hash varchar(64) NOT NULL,
+    package_size_bytes bigint NOT NULL,
+    min_supported_version varchar(32) NOT NULL,
     target_ring integer NOT NULL DEFAULT 3,
     status varchar(20) NOT NULL DEFAULT 'PUBLISHED' CHECK (status IN ('PUBLISHED', 'PAUSED', 'REVOKED')),
     published_at timestamptz NOT NULL DEFAULT now(),

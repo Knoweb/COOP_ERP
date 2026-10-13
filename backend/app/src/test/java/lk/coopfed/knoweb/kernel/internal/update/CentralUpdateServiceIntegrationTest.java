@@ -17,13 +17,16 @@ import lk.coopfed.knoweb.kernel.api.ReleasePublished;
 import lk.coopfed.knoweb.kernel.api.ReleaseRecord;
 import lk.coopfed.knoweb.kernel.api.ReleaseResumed;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.attachment.MemoryObjectStore;
 import lk.coopfed.knoweb.kernel.internal.job.SystemScope;
 import lk.coopfed.knoweb.testsupport.KernelRecorder;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 
+@Import(MemoryObjectStore.class)
 class CentralUpdateServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
