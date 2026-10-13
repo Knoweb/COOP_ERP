@@ -15,8 +15,9 @@ import lk.coopfed.knoweb.till.core.snapshot.SnapshotState
 /** The [TillStore] port on the SQLDelight database; the same code on every platform, only the driver differs. */
 class SqlTillStore(driver: SqlDriver) : TillStore {
 
-    private val db = TillDatabase(driver)
-    private val q = db.tillQueries
+    val db: TillDatabase = TillDatabase(driver)
+    val tillQueries: TillQueries = db.tillQueries
+    private val q = tillQueries
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun <T> transaction(block: () -> T): T = db.transactionWithResult { block() }
