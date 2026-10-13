@@ -27,8 +27,9 @@ CREATE INDEX app_release_platform_status_idx
 ALTER TABLE kernel.app_release ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kernel.app_release FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY own_read ON kernel.app_release FOR SELECT TO app_rw
-    USING (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+CREATE POLICY everyone_reads ON kernel.app_release FOR SELECT TO app_rw
+    USING (kernel.scope_class() <> 'NONE'
+           AND owner_entity_id = (SELECT kernel.system_entity()));
 
 CREATE POLICY own_write ON kernel.app_release FOR INSERT TO app_rw
     WITH CHECK (kernel.scope_class() = 'OWN'
@@ -43,19 +44,9 @@ CREATE POLICY own_update ON kernel.app_release FOR UPDATE TO app_rw
                 AND owner_entity_id = kernel.scope_entity()
                 AND owner_entity_id = (SELECT kernel.system_entity()));
 
-CREATE POLICY fed_view ON kernel.app_release FOR SELECT TO app_rw
-    USING (kernel.scope_class() = 'FEDERATION_VIEW');
-
-CREATE POLICY ext_view ON kernel.app_release FOR SELECT TO app_rw
-    USING (kernel.scope_class() = 'EXTERNAL_TIMEBOXED'
-           AND owner_entity_id = ANY (kernel.granted_entities()));
-
-CREATE POLICY everyone_reads ON kernel.app_release FOR SELECT TO app_rw
-    USING (kernel.scope_class() <> 'NONE'
-           AND owner_entity_id = (SELECT kernel.system_entity()));
-
 REVOKE ALL PRIVILEGES ON kernel.app_release FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE ON kernel.app_release TO app_rw;
+GRANT SELECT, INSERT ON kernel.app_release TO app_rw;
+GRANT UPDATE (status, paused_at, paused_by, notes) ON kernel.app_release TO app_rw;
 
 
 CREATE TABLE kernel.device_rollout_ring (

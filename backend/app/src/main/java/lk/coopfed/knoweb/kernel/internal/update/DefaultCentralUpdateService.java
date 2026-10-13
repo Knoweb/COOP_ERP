@@ -215,7 +215,7 @@ public class DefaultCentralUpdateService implements CentralUpdateService {
 
         events.publish(new ReleasePaused(Ids.next(), releaseId, version, platform, reason, now));
 
-        return getRelease(version, platform).orElseThrow();
+        return doGetRelease(version, platform).orElseThrow();
     }
 
     @Override
@@ -256,7 +256,7 @@ public class DefaultCentralUpdateService implements CentralUpdateService {
 
         events.publish(new ReleaseResumed(Ids.next(), releaseId, version, platform, now));
 
-        return getRelease(version, platform).orElseThrow();
+        return doGetRelease(version, platform).orElseThrow();
     }
 
     @Override
@@ -305,6 +305,11 @@ public class DefaultCentralUpdateService implements CentralUpdateService {
 
     @Override
     public Optional<ReleaseRecord> resolveTargetRelease(UUID deviceId, String currentVersion, String platform) {
+        return systemScope.inOwnTransaction(
+                SystemScope.federationView(), () -> doResolveTargetRelease(deviceId, currentVersion, platform));
+    }
+
+    private Optional<ReleaseRecord> doResolveTargetRelease(UUID deviceId, String currentVersion, String platform) {
         int deviceRing = 3;
         if (deviceId != null) {
             List<Integer> rings = jdbc.queryForList(
@@ -410,6 +415,10 @@ public class DefaultCentralUpdateService implements CentralUpdateService {
 
     @Override
     public Optional<ReleaseRecord> getRelease(String version, String platform) {
+        return systemScope.inOwnTransaction(SystemScope.federationView(), () -> doGetRelease(version, platform));
+    }
+
+    private Optional<ReleaseRecord> doGetRelease(String version, String platform) {
         List<ReleaseRecord> list = jdbc.query(
                 """
                 select release_id, owner_entity_id, version, platform, package_path, package_hash,
@@ -426,6 +435,10 @@ public class DefaultCentralUpdateService implements CentralUpdateService {
 
     @Override
     public List<ReleaseRecord> listReleases(String platform) {
+        return systemScope.inOwnTransaction(SystemScope.federationView(), () -> doListReleases(platform));
+    }
+
+    private List<ReleaseRecord> doListReleases(String platform) {
         return jdbc.query(
                 """
                 select release_id, owner_entity_id, version, platform, package_path, package_hash,
