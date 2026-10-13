@@ -488,4 +488,50 @@ class SnapshotVerificationTest {
         // Sugar has no M3 price; must NOT silently fall back to legacy price 250.00
         assertNull(catalogue.byBarcode("4790000000028")?.price)
     }
+
+    @Test
+    fun changedOfflineKhataCapAndRetentionReachTillThroughDelta() {
+        val capRow = SnapshotRow(
+            "config",
+            "8b51d8b2-6cb1-3a05-9e6b-a2ebcf218f0c",
+            null,
+            buildJsonObject {
+                put("key", "customers.offline_account_cap")
+                put("value", "10000")
+            },
+        )
+        val retentionRow = SnapshotRow(
+            "config",
+            "9c52d8b2-6cb1-3a05-9e6b-a2ebcf218f0d",
+            null,
+            buildJsonObject {
+                put("key", "sync.outbox.retention_days")
+                put("value", "14")
+            },
+        )
+        val stalenessRow = SnapshotRow(
+            "config",
+            "ad53d8b2-6cb1-3a05-9e6b-a2ebcf218f0e",
+            null,
+            buildJsonObject {
+                put("key", "pos.snapshot_staleness_days")
+                put("value", "5")
+            },
+        )
+
+        val state = SnapshotState.EMPTY.apply(
+            SnapshotDelta.fromJson(Samples.snapshotAnswer(11, listOf(capRow, retentionRow, stalenessRow))),
+            LocalDate(2026, 10, 1),
+        )
+
+        val catalogue = Catalogue(state)
+        assertEquals("10000", catalogue.config["customers.offline_account_cap"])
+        assertEquals("14", catalogue.config["sync.outbox.retention_days"])
+        assertEquals("5", catalogue.config["pos.snapshot_staleness_days"])
+
+        val basePolicy = TillPolicy()
+        val updatedPolicy = basePolicy.withConfig(catalogue.config)
+        assertEquals(14.days, updatedPolicy.outboxRetention)
+        assertEquals(5.days, updatedPolicy.snapshotStaleness)
+    }
 }
