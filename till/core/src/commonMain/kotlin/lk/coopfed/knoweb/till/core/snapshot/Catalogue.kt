@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.till.core.snapshot
 
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -68,7 +69,11 @@ data class Shop(
  * sends one, then a local price book (a file the shop can be given for the trial), and otherwise
  * asks the cashier to key the price. See the till README, "Deviations".
  */
-class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = emptyMap()) {
+class Catalogue(
+    snapshot: SnapshotState,
+    localPrices: Map<String, Money> = emptyMap(),
+    val businessDate: LocalDate? = null,
+) {
 
     val items: List<Item>
     val operators: List<Operator>
@@ -88,27 +93,61 @@ class Catalogue(snapshot: SnapshotState, localPrices: Map<String, Money> = empty
             val value = d.str("value") ?: return@mapNotNull null
             key to value
         }.toMap()
-        val centralPrices = snapshot.table("price").mapNotNull { row ->
-            val data = row.data ?: return@mapNotNull null
-            val sku = data.str("sku_id") ?: return@mapNotNull null
-            val price = data.str("unit_price") ?: return@mapNotNull null
-            sku to Money.parse(price)
-        }.toMap()
+
+        val hasAuthoritativePriceList = snapshot.table("price_list_line").isNotEmpty()
+
+        val retailPriceLines = snapshot.table("price_list_line").mapNotNull { row ->
+            val d = row.data ?: return@mapNotNull null
+            if (row.applyFrom != null && businessDate != null && row.applyFrom > businessDate) return@mapNotNull null
+            val effFromStr = d.str("effective_from")
+            val effFromDate = effFromStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (businessDate != null && effFromDate != null && effFromDate > businessDate) return@mapNotNull null
+            val effToStr = d.str("effective_to")
+            val effToDate = effToStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (businessDate != null && effToDate != null && effToDate < businessDate) return@mapNotNull null
+
+            val tierStr = d.str("tier_from_qty")
+            if (tierStr != null && (tierStr.toDoubleOrNull() ?: 0.0) > 0.0) return@mapNotNull null
+
+            val sku = d.str("sku_id") ?: return@mapNotNull null
+            val uom = d.str("uom_code") ?: return@mapNotNull null
+            val priceStr = d.str("price") ?: d.str("unit_price") ?: return@mapNotNull null
+            (sku to uom) to ((effFromStr ?: "") to Money.parse(priceStr))
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, entries) -> entries.maxByOrNull { it.first }?.second }
+
+        val legacyTestPrices = if (hasAuthoritativePriceList) {
+            emptyMap()
+        } else {
+            snapshot.table("price").mapNotNull { row ->
+                val data = row.data ?: return@mapNotNull null
+                val sku = data.str("sku_id") ?: return@mapNotNull null
+                val priceStr = data.str("unit_price") ?: data.str("price") ?: return@mapNotNull null
+                sku to Money.parse(priceStr)
+            }.toMap()
+        }
+
         items = snapshot.table("sku").mapNotNull { row ->
             val d = row.data ?: return@mapNotNull null
             if (d.str("status") == "RETIRED") return@mapNotNull null
             val barcodes = (d["barcodes"] as? JsonArray).orEmpty().mapNotNull {
                 (it as? JsonObject)?.str("barcode")
             }
+            val baseUom = d.str("base_uom_code") ?: "EA"
+            val authoritativePrice = retailPriceLines[row.rowId to baseUom]
+            val resolvedPrice = authoritativePrice
+                ?: legacyTestPrices[row.rowId]
+                ?: barcodes.firstNotNullOfOrNull { localPrices[it] }
+                ?: localPrices[row.rowId]
+                ?: localPrices[d.str("sku_code") ?: ""]
             Item(
                 skuId = row.rowId,
                 skuCode = d.str("sku_code") ?: "",
                 name = Trilingual(d.str("short_name_en") ?: d.str("sku_code") ?: "?", d.str("short_name_si"), d.str("short_name_ta")),
-                baseUom = d.str("base_uom_code") ?: "EA",
+                baseUom = baseUom,
                 soldByWeight = d["sold_by_weight"]?.jsonPrimitive?.booleanOrNull ?: false,
                 barcodes = barcodes,
-                price = centralPrices[row.rowId] ?: barcodes.firstNotNullOfOrNull { localPrices[it] }
-                    ?: localPrices[row.rowId] ?: localPrices[d.str("sku_code") ?: ""],
+                price = resolvedPrice,
             )
         }.sortedBy { it.name.en }
         byBarcode = buildMap { items.forEach { item -> item.barcodes.forEach { put(it, item) } } }
