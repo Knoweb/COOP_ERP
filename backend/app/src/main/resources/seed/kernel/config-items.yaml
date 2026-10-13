@@ -703,6 +703,7 @@ config_items:
     default: 5000
     scope_kind: ENTITY
     change_permission: cus.account.manage
+    till_visible: true
     module: m7customers
   # M5 stock control (25A section 3.1; doc 25 section 7): the count tolerance below which a variance
   # posts without approval (F-10), the value bands of an adjustment or a write-off (E-07), remote
@@ -965,3 +966,28 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m8reporting
+  # wave 4, TILL-DATA-06: kernel configuration sync (doc 32 section 5.2, CR-32-1 item 3).
+  - key: sync.outbox.retention_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 90 }
+    description_en: How many days of acknowledged sync outbox rows an enrolled till keeps before purging
+    description_si: පිළිගත් සමමුහුර්ත පිටත ලිපිගොනු පේළි මකා දැමීමට පෙර ලියාපදිංචි ටිල් එකක් තබා ගන්නා දින ගණන
+    description_ta: ஒப்புக்கொள்ளப்பட்ட ஒத்திசைவு வெளிப்பெட்டி வரிசைகளை அழிப்பதற்கு முன் பதிவுசெய்யப்பட்ட டில் வைத்திருக்கும் நாட்களின் எண்ணிக்கை
+    default: 7
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: true
+    module: kernel
+  - key: pos.snapshot_staleness_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 30 }
+    description_en: How many days without a verified snapshot before a till warns that prices and ceilings may be stale
+    description_si: මිල සහ උපරිම සීමාවන් යල් පැන ගොස් තිබිය හැකි බවට ටිල් එකක් අනතුරු ඇඟවීමට පෙර තහවුරු කළ ස්නැප්ෂොට් එකක් නොමැති දින ගණන
+    description_ta: விலைகள் மற்றும் உச்சவரம்புகள் காலாவதியாகியிருக்கலாம் என்று டில் எச்சரிப்பதற்கு முன் சரிபார்க்கப்பட்ட ஸ்னாப்ஷாட் இல்லாத நாட்களின் எண்ணிக்கை
+    default: 3
+    scope_kind: LOCATION
+    change_permission: sys.config.manage
+    sensitive: false
+    till_visible: true
+    module: m6pos
