@@ -5,16 +5,16 @@ package lk.coopfed.knoweb.kernel.internal.sync;
  * version is dotted numbers, "1.4.2"; anything after the numbers ("1.4.2-rc1", "1.4.2+build7")
  * is ignored, and a missing part counts as zero, so "1.4" equals "1.4.0".
  */
-final class AppVersions {
+public final class AppVersions {
 
     private AppVersions() {}
 
     /** Whether {@code version} is at or above {@code floor}; a version that is not dotted numbers is below any floor above 0. */
-    static boolean atLeast(String version, String floor) {
+    public static boolean atLeast(String version, String floor) {
         return compare(version, floor) >= 0;
     }
 
-    static int compare(String left, String right) {
+    public static int compare(String left, String right) {
         long[] a = parts(left);
         long[] b = parts(right);
         for (int i = 0; i < Math.max(a.length, b.length); i++) {

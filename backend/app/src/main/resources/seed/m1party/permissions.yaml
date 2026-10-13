@@ -531,6 +531,12 @@ permissions:
     module: "kernel"
     description_en: "Resolve a till event the sync gateway quarantined, as repaired or discarded"
     scope: "ENTITY"
+  # doc 31 section 4 (TILL-PLAT-07): publish, pause, resume till releases and manage rollout rings
+  - code: "sync.release.manage"
+    module: "kernel"
+    description_en: "Publish, pause, resume till application releases and assign rollout rings"
+    scope: "FEDERATION"
+    requires_mfa: true
   # wave 2, PR 11 (CR-21A-7; docs/progress/deviations/2026-10-06-wave2-stock-approvals.md (1)): no
   # new code. inv.writeoff.approve and inv.adjust.approve above now carry a limits_schema with
   # max_value required, so a role grants each up to a value (doc 25 section 7: "writeoff_bands as
