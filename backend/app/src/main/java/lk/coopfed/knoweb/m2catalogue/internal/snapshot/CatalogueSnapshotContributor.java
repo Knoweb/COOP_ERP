@@ -36,8 +36,10 @@ import org.springframework.stereotype.Component;
  * <p>Which SKUs: until the assortment of M2-09 exists, every SKU the shop's entity may sell, its
  * own LOCAL ones and every SHARED one (row-level security in the device's scope shows exactly
  * those). A DRAFT or INACTIVE SKU is not returned, so the till receives a tombstone for it.
- * {@code batch} is M5's lot contributor's to name (22A: "ids supplied by M5") and is not served
- * yet.
+ * {@code batch} is M5's lot contributor's to name (22A: "ids supplied by M5"; doc 32 section 5.1:
+ * "batches with positive on-hand at the location", in the Lots table set) and is not served here:
+ * the till reads no batch rows yet, and serving every batch the till's scope can read would carry
+ * the whole federation's batches (wave 4 TD-02 and TD-04).
  */
 @Component
 class CatalogueSnapshotContributor implements SnapshotContributor {

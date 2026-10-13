@@ -6,6 +6,7 @@
 |_Services_
 
 * `l.c.k.k.api.A4Renderer` (via `l.c.k.k.internal.render.A4RenderService`)
+* `l.c.k.k.api.CentralUpdateService` (via `l.c.k.k.internal.update.DefaultCentralUpdateService`)
 
 _Others_
 
@@ -13,6 +14,7 @@ _Others_
 * `l.c.k.k.api.Attachments` (via `l.c.k.k.internal.attachment.AttachmentService`)
 * `l.c.k.k.api.ObjectStorage` (via `l.c.k.k.internal.attachment.ObjectStorageService`)
 * `l.c.k.k.api.AuditFacade` (via `l.c.k.k.internal.audit.AuditFacadeImpl`)
+* `l.c.k.k.api.AuditReviewReader` (via `l.c.k.k.internal.audit.JdbcAuditReviewReader`)
 * `l.c.k.k.api.BusinessDate`, `l.c.k.k.api.DayClose` (via `l.c.k.k.internal.businessdate.LocationBusinessDates`)
 * `l.c.k.k.api.ConfigRegistry`, `l.c.k.k.api.ConfigSeeder` (via `l.c.k.k.internal.config.JdbcConfigRegistry`)
 * `l.c.k.k.api.DocumentLinks` (via `l.c.k.k.internal.document.DocumentLinksImpl`)

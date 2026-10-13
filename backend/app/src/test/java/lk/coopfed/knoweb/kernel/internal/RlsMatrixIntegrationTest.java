@@ -330,6 +330,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0059, V0063): what a retry of a queued notification needs, sealed, held until it"
                             + " is settled; the sweep reads it in the owner's scope, nobody else at all",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "kernel.app_release",
+                    "the Federation's rows only (kernel V0094): releases published by Federation are readable by"
+                            + " every class but NONE, and only Federation writes",
+                    RlsMatrixIntegrationTest::federationRowsOnly),
             // The ENTITY series is the whole entity's: a shop-scoped session reads and advances it,
             // because a document at a shop may draw its number from an ENTITY series (24B) and a
             // counter carries no business content (kernel V0055; decided 27 September 2026 on the
@@ -410,16 +415,16 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     RlsMatrixIntegrationTest::addressedToTheShop),
             new Departure(
                     "kernel.config_value",
-                    "own_read and own_write admit a NULL location; only SELECT and INSERT are granted",
+                    // own_write keeps the template's location line (kernel V0092, K4-03): a shop
+                    // writes only at its own location, so the INSERT cells are the template's.
+                    "own_read admits a NULL location (the entity-wide value a shop inherits); only SELECT and"
+                            + " INSERT are granted",
                     check -> {
                         if (check.op() == Op.UPDATE
                                 || check.op() == Op.DELETE
                                 || check.op() == Op.MOVE
                                 || check.op() == Op.MOVE_TO_ANOTHER_LOCATION) {
                             return REFUSED;
-                        }
-                        if (check.op() == Op.INSERT_WITHOUT_LOCATION || check.op() == Op.INSERT_AT_ANOTHER_LOCATION) {
-                            return check.scope().is("OWN") ? DONE : null;
                         }
                         if (check.op() == Op.SELECT
                                 && check.scope().is("OWN")
@@ -880,6 +885,47 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                 });
 
                 assertThat(result).isEqualTo("NOTHING");
+            } finally {
+                db.rollback();
+            }
+        }
+    }
+
+    /**
+     * K4-03 (wave 4, kernel V0092): a federation-wide value (no entity) is written in the system
+     * entity's OWN scope only; any other entity's OWN session is refused by own_write itself, not
+     * only by ConfigRegistry.set.
+     */
+    @Test
+    void configValueFederationRowIsTheSystemEntitysAlone() throws SQLException {
+        try (Connection db = superuser()) {
+            db.setAutoCommit(false);
+            try (Statement st = db.createStatement()) {
+                st.execute("set local session_replication_role = replica");
+                UUID federation;
+                try (ResultSet rs = st.executeQuery("select kernel.system_entity()")) {
+                    rs.next();
+                    federation = UUID.fromString(rs.getString(1));
+                }
+                String insert =
+                        "insert into kernel.config_value (key, scope_entity_id, value) values ('TEST_KEY', null, '\"x\"')";
+
+                String byAnEntity = asApp(
+                        st,
+                        Scope.of("OWN(A)", "OWN", A, null, Set.of()),
+                        () -> st.executeUpdate(insert) == 1 ? DONE : HIDDEN);
+                String byAShopOfTheFederation = asApp(
+                        st,
+                        Scope.of("OWN(F@1)", "OWN", federation, LOCATION_1, Set.of()),
+                        () -> st.executeUpdate(insert) == 1 ? DONE : HIDDEN);
+                String byTheFederation = asApp(
+                        st,
+                        Scope.of("OWN(F)", "OWN", federation, null, Set.of()),
+                        () -> st.executeUpdate(insert) == 1 ? DONE : HIDDEN);
+
+                assertThat(byAnEntity).isEqualTo(REFUSED);
+                assertThat(byAShopOfTheFederation).isEqualTo(REFUSED);
+                assertThat(byTheFederation).isEqualTo(DONE);
             } finally {
                 db.rollback();
             }

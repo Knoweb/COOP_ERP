@@ -102,20 +102,21 @@ class M1ChangeLogFanOut {
         if (roleId == null) {
             throw new IllegalArgumentException("Role changed event payload is missing roleId");
         }
+        // The holders of a Federation template are assigned in every society's own scope, which
+        // security.user_role's own_read hides from this consumer (it runs in the Federation's OWN
+        // scope). security.role_holder_shops (m1security V0021) answers the role's manager across
+        // entities: the owner for its own role, the Federation for a template.
         Map<Target, List<Change>> changesPerTarget = new HashMap<>();
         jdbc.query(
-                "select distinct ur.user_id, l.owner_entity_id, l.location_id " + "  from security.user_role ur "
-                        + "  join party.location l on l.owner_entity_id = ur.scope_entity_id "
-                        + " where ur.role_id = :roleId and l.location_type = 'SHOP' "
-                        + "   and (ur.scope_location_id is null or ur.scope_location_id = l.location_id)",
+                "select holder_user_id, shop_entity_id, shop_location_id from security.role_holder_shops(:roleId)",
                 Map.of("roleId", roleId),
                 rs -> {
                     Target t = new Target(
-                            rs.getObject("owner_entity_id", UUID.class), rs.getObject("location_id", UUID.class));
+                            rs.getObject("shop_entity_id", UUID.class), rs.getObject("shop_location_id", UUID.class));
                     changesPerTarget
                             .computeIfAbsent(t, k -> new ArrayList<>())
                             .add(Change.upsert(
-                                    OperatorSnapshotContributor.OPERATOR, rs.getObject("user_id", UUID.class)));
+                                    OperatorSnapshotContributor.OPERATOR, rs.getObject("holder_user_id", UUID.class)));
                 });
         for (Map.Entry<Target, List<Change>> entry : changesPerTarget.entrySet()) {
             changeLog.append(List.of(entry.getKey()), entry.getValue(), null, true, scope);
@@ -167,10 +168,37 @@ class M1ChangeLogFanOut {
     }
 
     @EventConsumer(
-            types = {UserCreated.TYPE, UserUpdated.TYPE, UserActivated.TYPE},
+            types = {UserCreated.TYPE, UserActivated.TYPE},
             consumer = CONSUMER)
     public void onNormalUserEvent(JsonNode payload, ScopeContext scope) {
         fanOutUser(payload, scope, false);
+    }
+
+    /**
+     * An update is urgent when it takes the operator off the tills: a kind that does not sign in at
+     * a till (anything but TILL or BOTH, such as BACK_OFFICE) or a status other than ACTIVE removes
+     * the user from the operator table (OperatorSnapshotContributor), and the till must drop her at
+     * the next heartbeat, not at its next normal pull (doc 32 section 5.2, "permission revoked").
+     * The payload does not carry the kind before the update, so an update of a user who never was
+     * at a till is urgent as well; it reaches only the shops of her roles, which is cheap.
+     */
+    @EventConsumer(
+            types = {UserUpdated.TYPE},
+            consumer = CONSUMER)
+    public void onUserUpdated(JsonNode payload, ScopeContext scope) {
+        fanOutUser(payload, scope, takesTheOperatorOffTheTill(payload));
+    }
+
+    static boolean takesTheOperatorOffTheTill(JsonNode payload) {
+        String kind = text(payload, "userKind");
+        String status = text(payload, "status");
+        boolean signsInAtATill = "TILL".equals(kind) || "BOTH".equals(kind);
+        return !signsInAtATill || !"ACTIVE".equals(status);
+    }
+
+    private static String text(JsonNode payload, String field) {
+        JsonNode value = payload.path(field);
+        return value.isMissingNode() || value.isNull() ? null : value.asText();
     }
 
     private void fanOutUser(JsonNode payload, ScopeContext scope, boolean urgent) {

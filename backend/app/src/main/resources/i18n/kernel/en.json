@@ -71,7 +71,6 @@
   "series.type_unknown": "The document type of the series is not in the registry",
   "sod.same_person": "The person who made the request cannot approve it",
   "sync.app_below_floor": "This till application is too old; update it before it can sync",
-  "sync.app_version_below_floor": "This till application is below the version floor after the grace period has expired",
   "sync.batch_in_flight": "Another batch from this device is still being received; try again shortly",
   "sync.batch_inconsistent": "The events of the batch do not match its first and last sequence numbers",
   "sync.batch_too_large": "The batch is larger than central accepts; send fewer events at a time",
@@ -110,5 +109,14 @@
   "report.document.item": "Item",
   "report.document.quantity": "Quantity",
   "report.document.unit_price": "Unit price",
-  "report.document.amount": "Amount"
+  "report.document.amount": "Amount",
+  "release.not_found": "The release could not be found",
+  "release.already_exists": "A release for this version and platform already exists",
+  "release.already_paused": "This release is already paused",
+  "release.not_paused": "This release is not paused",
+  "release.revoked": "This release has been revoked and cannot be changed",
+  "release.federation_only": "Only the Federation can manage application releases",
+  "release.version_invalid": "The release version must be valid dot-separated numbers",
+  "release.platform_invalid": "The platform is not valid",
+  "device.ring_invalid": "The rollout ring must be between 0 and 3"
 }

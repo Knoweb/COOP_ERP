@@ -89,6 +89,7 @@ class RetailPricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.execute("truncate table pricing.control_price, pricing.mrp_policy");
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.execute("truncate table kernel.audit_event");
     }
 
     @Test
@@ -223,6 +224,146 @@ class RetailPricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 send(HttpMethod.GET, "/v1/pricing/advisory-lines?date=" + tomorrow, SOCIETY, null);
         assertThat(advice.getBody()).hasSize(1);
         assertThat(advice.getBody().get(0).get("price").decimalValue()).isEqualByComparingTo("210");
+    }
+
+    @Test
+    void resolveBasketWorksForRetailLines() {
+        ResponseEntity<JsonNode> created = send(
+                HttpMethod.POST, "/v1/pricing/lists", SOCIETY, Map.of("kind", "RETAIL", "name", "Shelf prices basket"));
+        String listId = created.getBody().get("priceListId").asText();
+
+        send(
+                HttpMethod.PUT,
+                "/v1/pricing/lists/" + listId + "/lines",
+                SOCIETY,
+                Map.of("lines", List.of(Map.of("skuId", rice, "uomCode", "EA", "tierFromQty", 0, "price", 185))));
+        send(
+                HttpMethod.POST,
+                "/v1/pricing/lists/" + listId + "/publish",
+                SOCIETY,
+                Map.of("applyFrom", tomorrow.toString()));
+
+        Map<String, Object> request = Map.of(
+                "locationId", SHOP.toString(),
+                "businessDate", tomorrow.toString(),
+                "tenderKind", "CASH",
+                "lines", List.of(Map.of("skuId", rice.toString(), "uom", "EA", "qty", 2.0)));
+
+        ResponseEntity<JsonNode> resolved = send(HttpMethod.POST, "/v1/pricing/resolve/retail", SOCIETY, request);
+
+        assertThat(resolved.getStatusCode())
+                .as(String.valueOf(resolved.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        JsonNode body = resolved.getBody();
+        assertThat(body.get("lines").size()).isEqualTo(1);
+        JsonNode lineResult = body.get("lines").get(0);
+        assertThat(lineResult.get("skuId").asText()).isEqualTo(rice.toString());
+        assertThat(lineResult.get("unitPrice").decimalValue()).isEqualByComparingTo("185");
+        assertThat(lineResult.get("lineTotal").decimalValue()).isEqualByComparingTo("370");
+        assertThat(body.get("total").decimalValue()).isEqualByComparingTo("370");
+        assertThat(lineResult.get("capReason").asText()).isEqualTo("NONE");
+        // Central has no snapshot (M3R-03).
+        assertThat(body.get("snapshotVersion") == null
+                        || body.get("snapshotVersion").isNull())
+                .isTrue();
+    }
+
+    @Test
+    void theBasketIsCappedByAControlPriceAndRefusesWhatTheEngineCannotPrice() {
+        // The list is published first at 240; a gazette of 220 lands after it (M3R-01).
+        ResponseEntity<JsonNode> created = send(
+                HttpMethod.POST,
+                "/v1/pricing/lists",
+                SOCIETY,
+                Map.of("kind", "RETAIL", "name", "Shelf before gazette"));
+        String listId = created.getBody().get("priceListId").asText();
+        send(
+                HttpMethod.PUT,
+                "/v1/pricing/lists/" + listId + "/lines",
+                SOCIETY,
+                Map.of("lines", List.of(Map.of("skuId", rice, "uomCode", "EA", "tierFromQty", 0, "price", 240))));
+        assertThat(send(
+                                HttpMethod.POST,
+                                "/v1/pricing/lists/" + listId + "/publish",
+                                SOCIETY,
+                                Map.of("applyFrom", tomorrow.toString()))
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(send(HttpMethod.POST, "/v1/pricing/control-prices", FEDERATION, gazette("220"))
+                        .getStatusCode()
+                        .is2xxSuccessful())
+                .isTrue();
+
+        ResponseEntity<JsonNode> khata =
+                send(HttpMethod.POST, "/v1/pricing/resolve/retail", SOCIETY, basket("KHATA", 1.5));
+        assertThat(khata.getStatusCode()).as(String.valueOf(khata.getBody())).isEqualTo(HttpStatus.OK);
+        JsonNode line = khata.getBody().get("lines").get(0);
+        assertThat(line.get("unitPrice").decimalValue()).isEqualByComparingTo("220");
+        assertThat(line.get("controlPriceApplied").decimalValue()).isEqualByComparingTo("220");
+        assertThat(line.get("capReason").asText()).isEqualTo("CONTROL_PRICE");
+        // KHATA is the engine's ACCOUNT: exact, no cash rounding (M3R-02).
+        assertThat(khata.getBody().get("rounding").decimalValue()).isEqualByComparingTo("0");
+
+        ResponseEntity<JsonNode> voucher =
+                send(HttpMethod.POST, "/v1/pricing/resolve/retail", SOCIETY, basket("VOUCHER", 1.0));
+        assertThat(voucher.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(voucher.getBody().get("code").asText()).isEqualTo("m3.basket.tender_not_priced");
+
+        ResponseEntity<JsonNode> fourDecimals =
+                send(HttpMethod.POST, "/v1/pricing/resolve/retail", SOCIETY, basket("CASH", 1.0005));
+        assertThat(fourDecimals.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(fourDecimals.getBody().get("code").asText()).isEqualTo("m3.basket.qty_precision");
+    }
+
+    private Map<String, Object> basket(String tender, double qty) {
+        return Map.of(
+                "locationId", SHOP.toString(),
+                "businessDate", tomorrow.toString(),
+                "tenderKind", tender,
+                "lines", List.of(Map.of("skuId", rice.toString(), "uom", "EA", "qty", qty)));
+    }
+
+    @Test
+    void reviewsEndpointReturnsReviewsForAuthorizedEntity() {
+        // Insert a review directly into the audit log
+        superuserJdbc()
+                .update(
+                        "insert into kernel.audit_event (audit_id, event_type_code, occurred_at, owner_entity_id, subject_table, subject_id, correlation_id, after_state) "
+                                + "values (?, 'BATCH_MRP_BELOW_LIST', now(), ?, 'sku', ?, ?, ?::jsonb)",
+                        Ids.next(),
+                        SOCIETY,
+                        rice,
+                        Ids.next(),
+                        "{\"batchId\":\"" + Ids.next() + "\", \"printedMrp\": 90, \"listPrice\": 95}");
+
+        ResponseEntity<JsonNode> societyReviews = send(HttpMethod.GET, "/v1/pricing/reviews", SOCIETY, null);
+        assertThat(societyReviews.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(societyReviews.getBody()).hasSize(1);
+        assertThat(societyReviews.getBody().get(0).get("kind").asText()).isEqualTo("BATCH_MRP_BELOW_LIST");
+        // M3R-07: the owner, the SKU and the status are filled.
+        assertThat(societyReviews.getBody().get(0).get("ownerEntityId").asText())
+                .isEqualTo(SOCIETY.toString());
+        assertThat(societyReviews.getBody().get(0).get("skuCode").asText()).isEqualTo("M3H-RICE");
+        assertThat(societyReviews.getBody().get(0).get("status").asText()).isEqualTo("OPEN");
+        assertThat(send(HttpMethod.GET, "/v1/pricing/reviews?status=SETTLED", SOCIETY, null)
+                        .getBody())
+                .isEmpty();
+        assertThat(societyReviews
+                        .getBody()
+                        .get(0)
+                        .get("details")
+                        .get("printedMrp")
+                        .decimalValue())
+                .isEqualByComparingTo("90");
+
+        ResponseEntity<JsonNode> federationReviews = send(HttpMethod.GET, "/v1/pricing/reviews", FEDERATION, null);
+        assertThat(federationReviews.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(federationReviews.getBody()).isEmpty(); // unrelated entity cannot see them
+
+        ResponseEntity<JsonNode> filteredReviews =
+                send(HttpMethod.GET, "/v1/pricing/reviews?kind=TRADE_ABOVE_MRP", SOCIETY, null);
+        assertThat(filteredReviews.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(filteredReviews.getBody()).isEmpty(); // filtered out
     }
 
     private Map<String, Object> gazette(String ceiling) {

@@ -71,7 +71,6 @@
   "series.type_unknown": "මාලාවේ ලේඛන වර්ගය ලේඛනගත කර නැත",
   "sod.same_person": "ඉල්ලීම කළ පුද්ගලයාට එය අනුමත කළ නොහැක",
   "sync.app_below_floor": "මෙම මුදල් ලේඛන යෙදුම ඉතා පැරණියි; සමමුහුර්ත කිරීමට පෙර එය යාවත්කාලීන කරන්න",
-  "sync.app_version_below_floor": "සහන කාලය අවසන් වූ පසු මෙම මුදල් ලේඛන යෙදුම අවම අනුවාද සීමාවට වඩා අඩුය",
   "sync.batch_in_flight": "මෙම උපාංගයෙන් තවත් කාණ්ඩයක් තවමත් ලැබෙමින් පවතී; ටික වේලාවකින් නැවත උත්සාහ කරන්න",
   "sync.batch_inconsistent": "කාණ්ඩයේ සිදුවීම් එහි පළමු සහ අවසාන අනුක්‍රම අංක සමඟ නොගැළපේ",
   "sync.batch_too_large": "කාණ්ඩය මධ්‍යස්ථානය පිළිගන්නා ප්‍රමාණයට වඩා විශාලයි; වරකට අඩු සිදුවීම් ගණනක් යවන්න",
@@ -110,5 +109,14 @@
   "report.document.item": "අයිතමය",
   "report.document.quantity": "ප්‍රමාණය",
   "report.document.unit_price": "ඒකක මිල",
-  "report.document.amount": "මුදල"
+  "report.document.amount": "මුදල",
+  "release.not_found": "නිකුතුව සොයාගත නොහැක",
+  "release.already_exists": "මෙම අනුවාදය සහ වේදිකාව සඳහා නිකුතුවක් දැනටමත් පවතී",
+  "release.already_paused": "මෙම නිකුතුව දැනටමත් විරාම ගන්වා ඇත",
+  "release.not_paused": "මෙම නිකුතුව විරාම ගන්වා නැත",
+  "release.revoked": "මෙම නිකුතුව අවලංගු කර ඇති අතර වෙනස් කළ නොහැක",
+  "release.federation_only": "යෙදුම් නිකුතු කළමනාකරණය කළ හැක්කේ සම්මේලනයට පමණි",
+  "release.version_invalid": "නිකුතු අනුවාදය තිත් වලින් වෙන් කළ වලංගු සංඛ්‍යා විය යුතුය",
+  "release.platform_invalid": "වේදිකාව වලංගු නොවේ",
+  "device.ring_invalid": "ක්‍රියාත්මක කිරීමේ වළල්ල 0 සහ 3 අතර විය යුතුය"
 }

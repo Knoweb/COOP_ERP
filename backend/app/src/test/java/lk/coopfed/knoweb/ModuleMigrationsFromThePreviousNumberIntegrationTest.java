@@ -18,7 +18,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 /**
  * The demo server's situation (wave 2 fix plan, "a Flyway test start on a database at the previous
  * migration"): a database whose every stream stands at the number before this pull request's
- * migrations (kernel {@code V0086} and m1security {@code V0019} since PR 17, m1party {@code V0014}, m2catalogue
+ * migrations (kernel {@code V0086} since PR 17, m1security {@code V0020} since M1M2M3M5-26,
+ * m1party {@code V0014} (V0016 since M1M2M3M5-26, V0017 since wave 4 TD-03), m2catalogue
  * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09,
  * m8reporting {@code V0006} since PR 08) migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
@@ -36,14 +37,20 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
     private static Map<String, String> previous() {
         Map<String, String> streams = new LinkedHashMap<>();
         // Wave 2, PR 17: kernel V0087 (change_log_append tests the class) from V0086.
-        streams.put("kernel", "89");
+        // Wave 4 (K4-01, K4-03): kernel V0092 (floor_alerted, config_value own_write) from V0091.
+        // Wave 4, M3R-09: kernel V0093 (the audit review reader role) from V0091 (#339 takes V0092).
+        // Wave 4, TILL-PLAT-07: kernel V0094 (release registry and central update) from V0093.
+        streams.put("kernel", "93");
         streams.put("hello", null);
+        // Wave 4, TD-03: m1party V0017 (party.change_log_shops) from V0014 as well.
         streams.put("m1party", "14");
         // Wave 2, PR 17 (m1security V0020, user_has_any_assignment tests the class): from V0019,
         // where the demo server stands after PR 11.
-        streams.put("m1security", "19");
+        // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
+        streams.put("m1security", "20");
         streams.put("m2catalogue", "7");
-        streams.put("m3pricing", "5");
+        // Wave 4, M3R-08: m3pricing V0007 (pricing.review_trigger) from V0006.
+        streams.put("m3pricing", "6");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // Wave 2, PR 10: m5inventory V0008 (count_line.counted_at) on a database at V0007.
@@ -134,11 +141,11 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         }
 
         assertThat(after)
-                .containsEntry("kernel", 90)
-                .containsEntry("m1party", 15)
-                .containsEntry("m1security", 20)
+                .containsEntry("kernel", 94)
+                .containsEntry("m1party", 17)
+                .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 8)
-                .containsEntry("m3pricing", 6)
+                .containsEntry("m3pricing", 7)
                 .containsEntry("m5inventory", 8)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
@@ -159,7 +166,9 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 2, PR 17: the last two definer functions test the class, and keep their grant.
         for (String function : List.of(
                 "kernel.change_log_append(uuid, uuid, text[], uuid[], text[], date, boolean)",
-                "security.user_has_any_assignment(uuid)")) {
+                "security.user_has_any_assignment(uuid)",
+                // Wave 3, M1M2M3M5-26: the holders of a role, for its manager only.
+                "security.role_holder_shops(uuid)")) {
             assertThat(admin.queryForObject(
                             "select position('kernel.scope_class()' in prosrc) > 0"
                                     + " and has_function_privilege('coop_app', oid, 'EXECUTE')"

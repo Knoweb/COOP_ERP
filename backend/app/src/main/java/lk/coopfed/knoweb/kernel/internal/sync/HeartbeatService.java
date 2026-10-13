@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.AppVersionFloor;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.DeviceHeartbeatReported;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
@@ -35,7 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   the device holds more acknowledged than central  central was restored from backup (doc 32
  *                                                    section 7): SYNC_CURSOR_BEHIND (REVIEW) and
  *                                                    RESEND_FROM cursor + 1 until the cursor passes
- *   application below the floor                      FLOOR_NOTICE; its health is still recorded
+ *   application below the floor                      FLOOR_NOTICE; its health is still recorded;
+ *                                                    after the grace SYNC_APP_VERSION_BELOW_FLOOR
+ *                                                    (ALERT), once per floor (FloorAlerts)
  *   an urgent change after the device's version      urgent_change: download now (doc 32 section 5.2)
  * </pre>
  */
@@ -74,6 +77,8 @@ public class HeartbeatService {
     private final ObjectMapper json;
     private final Clock clock;
     private final SyncSettings settings;
+    private final AppVersionFloor floors;
+    private final FloorAlerts floorAlerts;
 
     HeartbeatService(
             JdbcTemplate jdbc,
@@ -81,13 +86,17 @@ public class HeartbeatService {
             EventPublisher events,
             ObjectMapper json,
             Clock clock,
-            SyncSettings settings) {
+            SyncSettings settings,
+            AppVersionFloor floors,
+            FloorAlerts floorAlerts) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
         this.json = json;
         this.clock = clock;
         this.settings = settings;
+        this.floors = floors;
+        this.floorAlerts = floorAlerts;
     }
 
     @Transactional
@@ -204,10 +213,13 @@ public class HeartbeatService {
         if (resendFrom != null) {
             instructions.add(Ack.Instruction.resendFrom(resendFrom));
         }
-        String floor = settings.appVersionFloor(device);
-        if (!AppVersions.atLeast(report.appVersion(), floor)) {
-            instructions.add(Ack.Instruction.floorNotice(floor));
+        AppVersionFloor.Standing floor = floors.standing(report.appVersion(), device);
+        if (floor.below()) {
+            instructions.add(Ack.Instruction.floorNotice(floor.floor()));
         }
+        // Doc 31 section 6 (K4-01): a till past its grace that only heartbeats (nothing to upload)
+        // is alerted too; once per device and floor, whichever of a batch or a heartbeat comes first.
+        floorAlerts.raiseOnce(device, report.appVersion(), floor);
 
         long snapshotVersion = 0;
         boolean urgent = false;
