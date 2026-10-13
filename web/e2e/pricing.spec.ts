@@ -250,7 +250,7 @@ test("pricing reviews screen lists exceptions with kind filtering and no status 
       printedMrp: 1050,
       listPrice: 1100
     },
-    escalated: false
+    status: "OPEN"
   };
 
   await page.route("**/v1/pricing/reviews*", async (route) => {
@@ -276,7 +276,7 @@ test("pricing reviews screen lists exceptions with kind filtering and no status 
 
   await expect(page.getByRole("heading", { name: text("pricing.reviews.title"), exact: true })).toBeVisible();
 
-  // Verify review row renders with required fields: kind, severity, SKU context, details pills, escalation
+  // Verify review row renders with required fields: kind, severity, SKU context, details pills, status
   const reviewRow = page.getByRole("row").filter({ hasText: "SKU-NADU-5KG" });
   await expect(reviewRow).toBeVisible();
   await expect(reviewRow.getByText(text("pricing.reviews.kind.BATCH_MRP_BELOW_LIST"), { exact: true })).toBeVisible();
@@ -285,7 +285,7 @@ test("pricing reviews screen lists exceptions with kind filtering and no status 
   await expect(reviewRow.getByText(/BAT-2026-001/)).toBeVisible();
   await expect(reviewRow.getByText(/1050/)).toBeVisible();
   await expect(reviewRow.getByText(/1100/)).toBeVisible();
-  await expect(reviewRow.getByText(text("pricing.reviews.escalated_no"), { exact: true })).toBeVisible();
+  await expect(reviewRow.getByText(text("pricing.reviews.status.OPEN"), { exact: true })).toBeVisible();
 
   // Filter dropdown changes selection and filters displayed rows
   const kindFilter = page.getByLabel(text("pricing.reviews.filter_kind"), { exact: true });

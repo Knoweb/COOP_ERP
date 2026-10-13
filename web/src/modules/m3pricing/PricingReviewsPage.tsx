@@ -73,7 +73,7 @@ export function PricingReviewsPage() {
                     <th>{t("pricing.reviews.column.severity").text}</th>
                     <th>{t("pricing.reviews.column.sku").text}</th>
                     <th>{t("pricing.reviews.column.details").text}</th>
-                    <th>{t("pricing.reviews.column.escalated").text}</th>
+                    <th>{t("pricing.reviews.column.status").text}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,11 +105,10 @@ export function PricingReviewsPage() {
                         <ReviewDetails details={review.details} />
                       </td>
                       <td>
-                        {review.escalated ? (
-                          <StateChip state="alert" label={t("pricing.reviews.escalated_yes").text} />
-                        ) : (
-                          <span className="pricing-muted">{t("pricing.reviews.escalated_no").text}</span>
-                        )}
+                        <StateChip
+                          state={review.status === "OPEN" ? "alert" : "issued"}
+                          label={t(`pricing.reviews.status.${review.status}`).text}
+                        />
                       </td>
                     </tr>
                   ))}
