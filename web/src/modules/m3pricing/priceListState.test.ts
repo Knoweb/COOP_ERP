@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import messages from "./pricing.messages.json" with { type: "json" };
-import { bindingCeiling, chipOf, controlPriceChip, controlPriceState, incompleteLines, reasonMessageId } from "./priceListState";
+import { bindingCeiling, chipOf, controlPriceChip, controlPriceState, incompleteLines, reasonMessageId, ruleStatusChip } from "./priceListState";
 import type { ControlPrice, LineOutcome } from "./pricingApi";
 
 // The reasons SetLines answers with (openapi/m3pricing.yaml, setLines): each must have a text on
@@ -52,6 +52,13 @@ describe("price list state", () => {
     expect(chipOf("PUBLISHED")).toBe("issued");
     expect(chipOf("SUPERSEDED")).toBe("void");
     expect(chipOf("WITHDRAWN")).toBe("void");
+  });
+
+  it("maps rule statuses to chip looks", () => {
+    expect(ruleStatusChip("DRAFT")).toBe("draft");
+    expect(ruleStatusChip("ACTIVE")).toBe("issued");
+    expect(ruleStatusChip("EXPIRED")).toBe("void");
+    expect(ruleStatusChip("WITHDRAWN")).toBe("void");
   });
 
   it("has a text for every line reason and every enum value in every language", () => {

@@ -7,6 +7,7 @@ import { useApiClient } from "../../shell/api/client";
 import type { components, paths } from "../../generated/m3pricing";
 import type { components as catalogueComponents, paths as cataloguePaths } from "../../generated/m2catalogue";
 import type { components as partyComponents, paths as partyPaths } from "../../generated/m1party";
+import type { components as inventoryComponents, paths as inventoryPaths } from "../../generated/m5inventory";
 
 export type PriceList = components["schemas"]["PriceListResponse"];
 export type PriceListDetail = components["schemas"]["PriceListDetailResponse"];
@@ -20,6 +21,11 @@ export type RescindControlPriceRequest = components["schemas"]["RescindControlPr
 export type MrpPolicy = components["schemas"]["MrpPolicyResponse"];
 export type SetMrpPolicyRequest = components["schemas"]["SetMrpPolicyRequest"];
 export type RetailPrice = components["schemas"]["RetailPriceResponse"];
+export type Rule = components["schemas"]["RuleResponse"];
+export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
+export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
+export type ReviewItem = components["schemas"]["ReviewItem"];
+export type LotBalance = inventoryComponents["schemas"]["LotBalanceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
 export type Relationship = partyComponents["schemas"]["RelationshipResponse"];
@@ -31,6 +37,8 @@ export function usePricingApi() {
   const catalogue = useApiClient<cataloguePaths>();
   // The shop picker of the shelf price check reads M1's published location list.
   const party = useApiClient<partyPaths>();
+  // The markdown queue reads M5's published lot balances.
+  const inventory = useApiClient<inventoryPaths>();
 
   return useMemo(
     () => ({
@@ -153,8 +161,60 @@ export function usePricingApi() {
           params: { query: { locationId, skuId, uom, qty: 1, date } }
         });
         return data ?? null;
+      },
+
+      /** Discount rules in the caller's scope, filtered by kind and/or status. */
+      async listRules(filters?: { kind?: Rule["kind"]; status?: Rule["status"] }): Promise<Rule[]> {
+        const { data } = await api.GET("/v1/pricing/rules", { params: { query: filters } });
+        return data ?? [];
+      },
+
+      async getRule(ruleId: string): Promise<Rule | null> {
+        const { data } = await api.GET("/v1/pricing/rules/{ruleId}", { params: { path: { ruleId } } });
+        return data ?? null;
+      },
+
+      async authorRule(body: AuthorRuleRequest, idempotencyKey: string): Promise<Rule> {
+        const { data } = await api.POST("/v1/pricing/rules", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async activateRule(ruleId: string, idempotencyKey: string): Promise<Rule> {
+        const { data } = await api.POST("/v1/pricing/rules/{ruleId}/activate", {
+          params: { path: { ruleId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+        return data!;
+      },
+
+      async withdrawRule(ruleId: string, body: WithdrawRuleRequest, idempotencyKey: string): Promise<Rule> {
+        const { data } = await api.POST("/v1/pricing/rules/{ruleId}/withdraw", {
+          params: { path: { ruleId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      /** Pricing exception reviews in the caller's scope, filtered by kind. */
+      async listReviews(kind?: ReviewItem["kind"]): Promise<ReviewItem[]> {
+        const { data } = await api.GET("/v1/pricing/reviews", {
+          params: {
+            query: kind ? { kind: kind as "BATCH_MRP_BELOW_LIST" | "TRADE_ABOVE_MRP" | "LIST_ABOVE_CEILING_AT_GAZETTE" } : {}
+          }
+        });
+        return data ?? [];
+      },
+
+      /** Good and damaged lots at a location with on-hand quantity, for the markdown queue. */
+      async listBalances(locationId: string): Promise<LotBalance[]> {
+        const { data } = await inventory.GET("/v1/inventory/locations/{locationId}/balances", {
+          params: { path: { locationId } }
+        });
+        return data ?? [];
       }
     }),
-    [api, catalogue, party]
+    [api, catalogue, party, inventory]
   );
 }
