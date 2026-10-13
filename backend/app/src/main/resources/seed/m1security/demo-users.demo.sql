@@ -11,34 +11,37 @@
 -- The permission codes are those of seed/m1party/permissions.yaml; a code the catalogue does not
 -- have is skipped by the join below rather than failing the load.
 
-INSERT INTO security.app_user (user_id, home_entity_id, username, display_name, language, user_kind, status)
+INSERT INTO security.app_user (user_id, home_entity_id, username, display_name, language, user_kind, status, pin_hash)
 VALUES
     -- the Federation (0190f000-0000-7000-8000-000000000001)
-    ('0190f0de-0000-7000-8000-000000000201', '0190f000-0000-7000-8000-000000000001', 'fed-steward',  'Nirmala Perera',       'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000202', '0190f000-0000-7000-8000-000000000001', 'fed-pricing',  'Suresh Fernando',      'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000203', '0190f000-0000-7000-8000-000000000001', 'fed-stores',   'Kamal Jayasinghe',     'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000204', '0190f000-0000-7000-8000-000000000001', 'fed-sales',    'Tharindu Silva',       'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000205', '0190f000-0000-7000-8000-000000000001', 'fed-accounts', 'Fathima Rizwan',       'en', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000201', '0190f000-0000-7000-8000-000000000001', 'fed-steward',  'Nirmala Perera',       'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000202', '0190f000-0000-7000-8000-000000000001', 'fed-pricing',  'Suresh Fernando',      'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000203', '0190f000-0000-7000-8000-000000000001', 'fed-stores',   'Kamal Jayasinghe',     'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000204', '0190f000-0000-7000-8000-000000000001', 'fed-sales',    'Tharindu Silva',       'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000205', '0190f000-0000-7000-8000-000000000001', 'fed-accounts', 'Fathima Rizwan',       'en', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- D101 Wayamba Cooperative Distributors
-    ('0190f0de-0000-7000-8000-000000000211', '0190f0de-0000-7000-8000-0000000000e1', 'd101-buyer',    'Chaminda Rathnayake', 'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000212', '0190f0de-0000-7000-8000-0000000000e1', 'd101-stores',   'Lasantha Herath',     'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000213', '0190f0de-0000-7000-8000-0000000000e1', 'd101-accounts', 'Dilani Wijesekara',   'si', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000211', '0190f0de-0000-7000-8000-0000000000e1', 'd101-buyer',    'Chaminda Rathnayake', 'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000212', '0190f0de-0000-7000-8000-0000000000e1', 'd101-stores',   'Lasantha Herath',     'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000213', '0190f0de-0000-7000-8000-0000000000e1', 'd101-accounts', 'Dilani Wijesekara',   'si', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- D102 Northern Cooperative Distributors
-    ('0190f0de-0000-7000-8000-000000000221', '0190f0de-0000-7000-8000-0000000000e2', 'd102-buyer',    'Kumaran Sivalingam',  'ta', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000222', '0190f0de-0000-7000-8000-0000000000e2', 'd102-stores',   'Arun Thevarajah',     'ta', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000223', '0190f0de-0000-7000-8000-0000000000e2', 'd102-accounts', 'Priya Nadarajah',     'ta', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000221', '0190f0de-0000-7000-8000-0000000000e2', 'd102-buyer',    'Kumaran Sivalingam',  'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000222', '0190f0de-0000-7000-8000-0000000000e2', 'd102-stores',   'Arun Thevarajah',     'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000223', '0190f0de-0000-7000-8000-0000000000e2', 'd102-accounts', 'Priya Nadarajah',     'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- the societies
-    ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-0000000000e3', 'm101-buyer',    'Sandya Kumari',       'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-0000000000e3', 'm101-manager',  'Ruwan Dissanayake',   'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE'),
+    ('0190f0de-0000-7000-8000-000000000231', '0190f0de-0000-7000-8000-0000000000e3', 'm101-buyer',    'Sandya Kumari',       'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-0000000000e3', 'm101-manager',  'Ruwan Dissanayake',   'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-0000000000e3', 'm101-shop',     'Malani Gunawardena',  'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-0000000000e3', 'm101-office',   'Shanthi Wijeratne',   'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    -- the till operators of Kuliyapitiya town shop S01 (TILL-PLAT-02): Cashier (PIN 1234) and Supervisor (PIN 5678)
+    ('0190f0de-0000-7000-8000-000000000235', '0190f0de-0000-7000-8000-0000000000e3', 'm101-cashier',  'Nimali Jayawardena',  'si', 'TILL',        'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o'),
+    ('0190f0de-0000-7000-8000-000000000236', '0190f0de-0000-7000-8000-0000000000e3', 'm101-supervisor','Kamal Perera',      'si', 'TILL',        'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$908LNOIyKO6h79VZQmL3TA$qZ7GKCe9DXMDVBK8w4p2u9fjfohvVFs/M2vH1syzfcQ'),
+    ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-0000000000e4', 'm102-manager',  'Nimal Bandara',       'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-0000000000e5', 'm103-manager',  'Selvaraj Yogarajah',  'ta', 'BACK_OFFICE', 'ACTIVE', NULL),
     -- the shop staff of Pannala and Point Pedro (29 Sep 2026): each counts and signs its shop's
     -- opening stock, which the society manager countersigns (DemoShopStock)
-    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BACK_OFFICE', 'ACTIVE')
-ON CONFLICT (user_id) DO NOTHING;
+    ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-0000000000e4', 'm102-shop',     'Dilrukshi Senanayake', 'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f0de-0000-7000-8000-000000000253', '0190f0de-0000-7000-8000-0000000000e5', 'm103-shop',     'Tharshini Kanagaratnam', 'ta', 'BACK_OFFICE', 'ACTIVE', NULL)
+ON CONFLICT (user_id) DO UPDATE SET user_kind = EXCLUDED.user_kind, pin_hash = EXCLUDED.pin_hash;
 
 INSERT INTO security.role (role_id, owner_entity_id, name_en, is_template, role_class, status)
 VALUES
@@ -227,6 +230,9 @@ VALUES
     ('0190f0de-0000-7000-8000-000000000232', '0190f0de-0000-7000-8000-000000000332', '0190f0de-0000-7000-8000-0000000000e3', NULL),
     ('0190f0de-0000-7000-8000-000000000233', '0190f0de-0000-7000-8000-000000000333', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
     ('0190f0de-0000-7000-8000-000000000234', '0190f0de-0000-7000-8000-000000000334', '0190f0de-0000-7000-8000-0000000000e3', NULL),
+    -- the till operators of shop S01: Cashier template and Shop Supervisor template
+    ('0190f0de-0000-7000-8000-000000000235', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
+    ('0190f0de-0000-7000-8000-000000000236', '01999a10-2c4e-7f1a-8b3d-5e6f70819a12', '0190f0de-0000-7000-8000-0000000000e3', '0190f0de-0000-7000-8000-000000000132'),
     ('0190f0de-0000-7000-8000-000000000242', '0190f0de-0000-7000-8000-000000000342', '0190f0de-0000-7000-8000-0000000000e4', NULL),
     ('0190f0de-0000-7000-8000-000000000252', '0190f0de-0000-7000-8000-000000000352', '0190f0de-0000-7000-8000-0000000000e5', NULL),
     ('0190f0de-0000-7000-8000-000000000243', '0190f0de-0000-7000-8000-000000000343', '0190f0de-0000-7000-8000-0000000000e4', '0190f0de-0000-7000-8000-000000000142'),

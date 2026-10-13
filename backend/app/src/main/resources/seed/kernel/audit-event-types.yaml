@@ -151,6 +151,11 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: true
     description_en: A supervisor moved a till's business date back while no session was open
+  # doc 26A section 8 (TILL-PLAT-02): operator switch on the till audited offline as an audit.* fact.
+  - code: TILL_OPERATOR_SWITCH
+    severity: INFO
+    offline_capturable: true
+    description_en: Operators switched on a till
   # doc 31 section 4 (TILL-PLAT-07): release registry and rollout control.
   - code: RELEASE_PUBLISHED
     severity: INFO

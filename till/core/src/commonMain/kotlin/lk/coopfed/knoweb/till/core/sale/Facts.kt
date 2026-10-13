@@ -147,6 +147,24 @@ object Facts {
         put("after_state", buildJsonObject { put("business_date", to.toString()) })
     }
 
+    /** The audit type a till records when operators switch (kernel seed audit-event-types.yaml, offline_capturable). */
+    const val OPERATOR_SWITCH_AUDIT = "TILL_OPERATOR_SWITCH"
+    const val OPERATOR_SWITCH_EVENT = "audit.till_operator_switch.v1"
+
+    /**
+     * The till's audit row for an operator switch (doc 26A section 8; C-02; TILL-PLAT-02).
+     */
+    fun operatorSwitched(device: DeviceIdentity, fromOperatorId: String?, toOperatorId: String, reason: String? = null): JsonObject = buildJsonObject {
+        put("event_type_code", OPERATOR_SWITCH_AUDIT)
+        put("subject_table", "till_position")
+        put("subject_id", device.tillPositionId)
+        put("till_position_id", device.tillPositionId)
+        put("reason_code", "OPERATOR_SWITCH")
+        if (reason != null) put("reason_text", reason)
+        if (fromOperatorId != null) put("before_state", buildJsonObject { put("operator_user_id", fromOperatorId) })
+        put("after_state", buildJsonObject { put("operator_user_id", toOperatorId) })
+    }
+
     /** The TillEvent envelope (sync.yaml TillEvent) around a payload. */
     fun event(
         eventId: String,

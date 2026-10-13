@@ -274,7 +274,7 @@ object Samples {
         "price", "p-$sku", null, buildJsonObject { put("sku_id", sku); put("unit_price", price) },
     )
 
-    fun operator(pinHash: String, id: String = OPERATOR, name: String = "Nimali", permissions: List<String> = emptyList()) = SnapshotRow(
+    fun operator(pinHash: String, id: String = OPERATOR, name: String = "Nimali", permissions: List<String> = listOf(TillPolicy.RECEIPT_ISSUE_PERMISSION)) = SnapshotRow(
         "operator", id, null,
         buildJsonObject {
             put("display_name", name)
