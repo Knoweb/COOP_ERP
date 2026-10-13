@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -192,6 +193,7 @@ public class SnapshotBuilder {
 
     private Map<String, Table> fullTables(Shop shop) {
         Map<String, Map<UUID, LocalDate>> applyFrom = latestApplyFrom(shop.locationId());
+        Map<String, List<Tombstone>> futureDeletes = futureTombstones(shop.locationId());
         Map<String, Table> tables = new TreeMap<>();
         for (Map.Entry<String, SnapshotContributor> entry : contributors.entrySet()) {
             String table = entry.getKey();
@@ -200,7 +202,8 @@ public class SnapshotBuilder {
             entry.getValue()
                     .allRows(table, shop)
                     .forEach((rowId, data) -> rows.add(new Row(rowId, dates.get(rowId), data)));
-            tables.put(table, new Table(rows, List.of()));
+            List<Tombstone> tombstones = futureDeletes.getOrDefault(table, List.of());
+            tables.put(table, new Table(rows, tombstones));
         }
         return tables;
     }
@@ -209,14 +212,14 @@ public class SnapshotBuilder {
      * The apply_from of the latest change-log entry of each row, where it has one: a row
      * published for a later business date is held on the till in the full snapshot as well.
      */
-    private Map<String, Map<UUID, LocalDate>> latestApplyFrom(UUID location) {
+    Map<String, Map<UUID, LocalDate>> latestApplyFrom(UUID location) {
         Map<String, Map<UUID, LocalDate>> dates = new HashMap<>();
         jdbc.query(
                 """
                 select table_name, row_id, apply_from
                   from (select distinct on (table_name, row_id) table_name, row_id, apply_from
                           from kernel.change_log
-                         where location_id = ?
+                         where location_id = ? and op = 'UPSERT'
                          order by table_name, row_id, version desc) latest
                  where apply_from is not null
                 """,
@@ -226,6 +229,34 @@ public class SnapshotBuilder {
                 },
                 location);
         return dates;
+    }
+
+    /**
+     * Scheduled future deletions: when a row is superseded or deleted with an apply_from in the
+     * future, a new till enrolled before that date must hold the tombstone so it removes the row
+     * when that day opens.
+     */
+    private Map<String, List<Tombstone>> futureTombstones(UUID location) {
+        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
+        Map<String, List<Tombstone>> tombstones = new HashMap<>();
+        jdbc.query(
+                """
+                select table_name, row_id, apply_from
+                  from (select distinct on (table_name, row_id) table_name, row_id, op, apply_from
+                          from kernel.change_log
+                         where location_id = ?
+                         order by table_name, row_id, version desc) latest
+                 where op = 'DELETE' and apply_from > ?
+                """,
+                rs -> {
+                    tombstones
+                            .computeIfAbsent(rs.getString("table_name"), t -> new ArrayList<>())
+                            .add(new Tombstone(
+                                    rs.getObject("row_id", UUID.class), toLocalDate(rs.getDate("apply_from"))));
+                },
+                location,
+                Date.valueOf(today));
+        return tombstones;
     }
 
     // ---- versions -----------------------------------------------------------------------------

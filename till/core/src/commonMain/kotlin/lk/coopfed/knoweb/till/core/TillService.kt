@@ -146,7 +146,7 @@ class TillService(
         }
         val snapshot = store.loadSnapshot()
         snapshotVersion = snapshot.version
-        catalogue = Catalogue(snapshot, localPrices)
+        catalogue = Catalogue(snapshot, localPrices, businessDate())
         operatorsSeen = store.setting(Settings.OPERATORS_SEEN) == "true" || catalogue.operators.isNotEmpty()
         revoked = store.setting(Settings.REVOKED) != null
         repairCounters()
@@ -272,7 +272,7 @@ class TillService(
                 if (next.table("operator").isNotEmpty()) store.putSetting(Settings.OPERATORS_SEEN, "true")
             }
             snapshotVersion = next.version
-            catalogue = Catalogue(next, localPrices)
+            catalogue = Catalogue(next, localPrices, businessDate())
             if (catalogue.operators.isNotEmpty()) operatorsSeen = true
             publishStatus()
             return next.version
@@ -969,7 +969,7 @@ class TillService(
                 if (snapshot.held.isNotEmpty()) {
                     val next = snapshot.dayOpen(date)
                     store.saveSnapshot(next)
-                    catalogue = Catalogue(next, localPrices)
+                    catalogue = Catalogue(next, localPrices, date)
                 }
             }
         }

@@ -334,7 +334,14 @@ object Samples {
                             buildJsonObject { put("row_id", row.rowId); put("apply_from", row.applyFrom?.toString()); put("data", row.data!!) }
                         }))
                         put("tombstones", buildJsonArray {
-                            t.tombstones.forEach { row -> add(buildJsonObject { put("row_id", row.rowId) }) }
+                            t.tombstones.forEach { row ->
+                                add(
+                                    buildJsonObject {
+                                        put("row_id", row.rowId)
+                                        put("apply_from", row.applyFrom?.toString())
+                                    },
+                                )
+                            }
                         })
                     }
                 }
