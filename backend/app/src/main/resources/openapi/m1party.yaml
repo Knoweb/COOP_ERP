@@ -38,14 +38,20 @@
 # approval check. CreditLimitChanged's documentation now says a successor row's activation names
 # its predecessor and may carry no new limit; its fields are unchanged. The patch version is
 # raised for tools/check-frozen-contracts.mjs, as for 1.4.2.
+#
+# 1.4.5 (wave 4 review, TD-03): Java only, additive; the slice's shape is unchanged. The query
+# contract PartyQueries gains listChangeLogShops and the record ShopRef: the shops a change to
+# central reference data must reach, answered by the SECURITY DEFINER function
+# party.change_log_shops (m1party V0017) from the caller's scope. The patch version is raised for
+# tools/check-frozen-contracts.mjs, as for 1.4.2.
 openapi: 3.1.0
 
 info:
   title: COOP ERP M1 Party API
   # 1.4.3 (CR-18-2, wave 2): the user and device administration reads carry x-federation-view: false;
   # no request or response changes shape. 1.4.2 (CR-21A-7) is described in the header above.
-  # 1.4.4 (wave 3 review) is described in the header above.
-  version: 1.4.4
+  # 1.4.4 (wave 3 review) and 1.4.5 (wave 4 review) are described in the header above.
+  version: 1.4.5
   x-change-request: CR-18-2
 
 paths:

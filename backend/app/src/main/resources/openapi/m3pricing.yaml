@@ -222,6 +222,28 @@ paths:
         '404':
           description: No visible relationship, no bound list in force, or no line for the SKU and unit
   /v1/pricing/resolve/retail:
+    post:
+      tags: [Pricing]
+      operationId: resolveBasket
+      summary: Resolve a basket at a shop
+      description: Steps 1 to 4 of doc 23 section 3.5 through the shared engine for a whole basket.
+      x-permission: prc.pricelist.view
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveBasketRequest' }
+      responses:
+        '200':
+          description: The resolved basket
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BasketResult' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: The location is not visible to the caller
     get:
       tags: [Pricing]
       operationId: resolveRetailPrice
@@ -555,6 +577,30 @@ paths:
               schema: { $ref: '#/components/schemas/RuleResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/pricing/reviews:
+    get:
+      tags: [Pricing]
+      operationId: listReviews
+      summary: The pricing reviews in the caller's scope
+      x-permission: prc.review.view
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          schema: { type: string, enum: [BATCH_MRP_BELOW_LIST, TRADE_ABOVE_MRP, LIST_ABOVE_CEILING_AT_GAZETTE] }
+        - in: query
+          name: status
+          required: false
+          description: OPEN answers every review; SETTLED answers none until a settle command exists
+          schema: { type: string, enum: [OPEN, SETTLED] }
+      responses:
+        '200':
+          description: The reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReviewItem' }
 components:
   schemas:
     RulePredicate:
@@ -776,3 +822,100 @@ components:
         tierFromQty: { type: number }
         unitPrice: { type: number, description: Per unit and tax-exclusive with four decimals }
         engineVersion: { type: string }
+
+    ResolveBasketRequest:
+      type: object
+      required: [locationId, businessDate, tenderKind, lines]
+      properties:
+        locationId: { type: string, format: uuid }
+        businessDate: { type: string, format: date }
+        tenderKind:
+          type: string
+          enum: [CASH, CARD, KHATA, CHEQUE, VOUCHER]
+          description: >
+            Doc 23 section 3.5: CASH rounds the total to the rupee; CARD, KHATA (the member's
+            account) and CHEQUE are exact. VOUCHER is not priced by M3 (vouchers are a later
+            phase) and is refused with 400 m3.basket.tender_not_priced.
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/ResolveBasketLineRequest' }
+    ResolveBasketLineRequest:
+      type: object
+      required: [skuId, uom, qty]
+      properties:
+        skuId: { type: string, format: uuid }
+        uom: { type: string }
+        qty:
+          type: number
+          exclusiveMinimum: 0
+          description: At most three decimals (doc 18); a fourth is refused with 400 m3.basket.qty_precision.
+        batchId: { type: [string, 'null'], format: uuid }
+        pickedBatchId: { type: [string, 'null'], format: uuid }
+    BatchCandidate:
+      type: object
+      required: [batchId, batchNo]
+      properties:
+        batchId: { type: string, format: uuid }
+        batchNo: { type: string }
+        printedMrp: { type: [number, 'null'] }
+        expiry: { type: [string, 'null'], format: date }
+        thumbKey:
+          type: [string, 'null']
+          description: The image of the batch for the picker; not filled at central yet (no image per batch)
+    LineResult:
+      type: object
+      required: [skuId, uom, qty, unitPrice, capReason, taxRatePercent, taxAmount, lineTotal, discountAmount]
+      properties:
+        skuId: { type: string, format: uuid }
+        uom: { type: string }
+        qty: { type: number }
+        batchId: { type: [string, 'null'], format: uuid }
+        unitPrice: { type: number }
+        mrpApplied: { type: [number, 'null'] }
+        controlPriceApplied: { type: [number, 'null'] }
+        capReason: { type: string, enum: [NONE, MRP_LOWEST, MRP_BARCODE, MRP_PICKED, CONTROL_PRICE] }
+        ruleId: { type: [string, 'null'], format: uuid }
+        discountAmount: { type: number }
+        taxRatePercent: { type: number }
+        taxAmount: { type: number }
+        lineTotal: { type: number }
+        candidates:
+          type: array
+          description: Filled only when the policy is PICKER and the till must pick a batch (23A section 5)
+          items: { $ref: '#/components/schemas/BatchCandidate' }
+    BasketResult:
+      type: object
+      required: [lines, subtotal, total, rounding, engineVersion]
+      properties:
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/LineResult' }
+        billRuleId: { type: [string, 'null'], format: uuid }
+        billDiscount: { type: number }
+        subtotal: { type: number }
+        total: { type: number }
+        rounding: { type: number }
+        engineVersion: { type: string }
+        snapshotVersion:
+          type: [string, 'null']
+          description: The till's snapshot version; null at central, which reads the tables rather than a snapshot
+    ReviewItem:
+      type: object
+      required: [reviewId, kind, severity, status, occurredAt, ownerEntityId, skuId]
+      description: >
+        Escalation (23A section 8) is not in the contract yet: no review is settled or escalated
+        until the exception-queue flow exists.
+      properties:
+        reviewId: { type: string, format: uuid }
+        kind: { type: string }
+        severity: { type: string }
+        status:
+          type: string
+          enum: [OPEN, SETTLED]
+          description: Every review is OPEN until a settle command exists
+        occurredAt: { type: string, format: date-time }
+        ownerEntityId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        skuName: { type: [string, 'null'] }
+        skuCode: { type: [string, 'null'] }
+        details: { type: object }

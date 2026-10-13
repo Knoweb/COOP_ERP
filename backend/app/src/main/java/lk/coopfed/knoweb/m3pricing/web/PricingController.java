@@ -3,9 +3,14 @@ package lk.coopfed.knoweb.m3pricing.web;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import lk.coopfed.knoweb.engine.Basket;
+import lk.coopfed.knoweb.engine.TenderKind;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.ActivateRule;
 import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
@@ -36,10 +41,13 @@ import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import lk.coopfed.knoweb.m3pricing.query.TradePrice;
 import lk.coopfed.knoweb.m3pricing.web.generated.AuthorRuleRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.BasketResult;
+import lk.coopfed.knoweb.m3pricing.web.generated.BatchCandidate;
 import lk.coopfed.knoweb.m3pricing.web.generated.ControlPriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
+import lk.coopfed.knoweb.m3pricing.web.generated.LineResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.MrpPolicyResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListDetailResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListLineResponse;
@@ -47,7 +55,10 @@ import lk.coopfed.knoweb.m3pricing.web.generated.PriceListResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PricingApi;
 import lk.coopfed.knoweb.m3pricing.web.generated.PublishPriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RescindControlPriceRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketLineRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RetailPriceResponse;
+import lk.coopfed.knoweb.m3pricing.web.generated.ReviewItem;
 import lk.coopfed.knoweb.m3pricing.web.generated.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.web.generated.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.web.generated.RuleResponse;
@@ -437,5 +448,120 @@ class PricingController implements PricingApi {
                 price.tierFromQty(),
                 price.unitPrice(),
                 price.engineVersion());
+    }
+
+    // ---- basket resolution and reviews (M3-08) ---------------------------------------------------
+
+    /**
+     * The tenders of the slice the engine prices (M3R-02). Doc 23 section 3.5 (FR-PRC-100, G-10):
+     * cash rounds the receipt to the rupee, card and account are exact, and "other tenders exact".
+     * KHATA is the member's credit account, the engine's ACCOUNT; a CHEQUE is exact, priced as a
+     * card. A VOUCHER is out of scope for M3 (doc 23 section 1: coupons and vouchers are later
+     * phases), so it is refused with a 400, not priced as something it is not.
+     */
+    static TenderKind engineTender(ResolveBasketRequest.TenderKindEnum tender) {
+        return switch (tender) {
+            case CASH -> TenderKind.CASH;
+            case CARD, CHEQUE -> TenderKind.CARD;
+            case KHATA -> TenderKind.ACCOUNT;
+            default ->
+                throw new ProblemException("m3.basket.tender_not_priced", Map.of("tenderKind", tender.getValue()));
+        };
+    }
+
+    @Override
+    public ResponseEntity<BasketResult> resolveBasket(String idempotencyKey, ResolveBasketRequest request) {
+        ScopeContext scope = currentScope.get();
+        TenderKind tender = engineTender(request.getTenderKind());
+
+        List<lk.coopfed.knoweb.engine.LineInput> engineLines = new ArrayList<>();
+        for (ResolveBasketLineRequest l : request.getLines()) {
+            lk.coopfed.knoweb.engine.Quantity qty;
+            try {
+                qty = lk.coopfed.knoweb.engine.Quantity.of(l.getQty());
+            } catch (ArithmeticException moreThanThreeDecimals) {
+                // doc 18: a quantity is numeric(14,3); the engine refuses a fourth decimal (M3R-02).
+                throw new ProblemException("m3.basket.qty_precision", Map.of("skuId", l.getSkuId()));
+            }
+            engineLines.add(new lk.coopfed.knoweb.engine.LineInput(
+                    l.getSkuId(), l.getUom(), qty, l.getBatchId(), l.getPickedBatchId()));
+        }
+
+        return queries.resolveBasket(
+                        request.getLocationId(), request.getBusinessDate(), tender, new Basket(engineLines), scope)
+                .map(result -> ResponseEntity.ok(toResponse(result)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private static BasketResult toResponse(lk.coopfed.knoweb.engine.BasketResult result) {
+        BasketResult br = new BasketResult();
+        br.setTotal(result.getTotal().getAmount());
+        br.setSubtotal(result.getSubtotal().getAmount());
+        br.setRounding(result.getRounding().getAmount());
+        br.setBillDiscount(result.getBillDiscount().getAmount());
+        br.setBillRuleId(result.getBillRuleId());
+        br.setEngineVersion(result.getEngineVersion());
+        // Central reads the tables, not a snapshot: there is no snapshot version to report (M3R-03).
+        br.setSnapshotVersion(null);
+        List<LineResult> lines = new ArrayList<>();
+        for (lk.coopfed.knoweb.engine.LineResult l : result.getLines()) {
+            lines.add(toResponse(l));
+        }
+        br.setLines(lines);
+        return br;
+    }
+
+    private static LineResult toResponse(lk.coopfed.knoweb.engine.LineResult l) {
+        LineResult lr = new LineResult();
+        lr.setSkuId(l.getSkuId());
+        lr.setUom(l.getInput().getUom());
+        lr.setQty(l.getInput().getQty().getValue());
+        lr.setUnitPrice(l.getUnitPrice().getAmount());
+        lr.setLineTotal(l.getLineTotal().getAmount());
+        lr.setDiscountAmount(l.getDiscountAmount().getAmount());
+        lr.setBatchId(l.getBatch() != null ? l.getBatch().getBatchId() : null);
+        lr.setRuleId(l.getRuleId());
+        lr.setTaxRatePercent(l.getTaxRatePercent());
+        lr.setTaxAmount(l.getTaxAmount().getAmount());
+        lr.setMrpApplied(l.getMrpApplied() != null ? l.getMrpApplied().getAmount() : null);
+        lr.setControlPriceApplied(
+                l.getControlPriceApplied() != null ? l.getControlPriceApplied().getAmount() : null);
+        // The engine's own names, as RetailPriceResponse reports them (M3R-03).
+        lr.setCapReason(LineResult.CapReasonEnum.fromValue(l.getCapReason().name()));
+        // 23A section 5: "candidates only for PICKER"; the engine fills them when the till must pick.
+        List<BatchCandidate> candidates = new ArrayList<>();
+        for (lk.coopfed.knoweb.engine.BatchCandidate c : l.getCandidates()) {
+            BatchCandidate candidate = new BatchCandidate();
+            candidate.setBatchId(c.getBatchId());
+            candidate.setBatchNo(c.getBatchNo());
+            candidate.setPrintedMrp(
+                    c.getPrintedMrp() != null ? c.getPrintedMrp().getAmount() : null);
+            candidate.setExpiry(c.getExpiry());
+            candidates.add(candidate);
+        }
+        lr.setCandidates(candidates);
+        return lr;
+    }
+
+    @Override
+    public ResponseEntity<List<ReviewItem>> listReviews(String kind, String status) {
+        ScopeContext scope = currentScope.get();
+
+        List<ReviewItem> result = new ArrayList<>();
+        for (lk.coopfed.knoweb.m3pricing.query.ReviewItem r : queries.listReviews(kind, status, scope)) {
+            ReviewItem item = new ReviewItem();
+            item.setReviewId(r.reviewId());
+            item.setKind(r.kind());
+            item.setSeverity(r.severity());
+            item.setStatus(ReviewItem.StatusEnum.fromValue(r.status()));
+            item.setOccurredAt(r.occurredAt().toInstant());
+            item.setOwnerEntityId(r.ownerEntityId());
+            item.setSkuId(r.skuId());
+            item.setSkuName(r.skuName());
+            item.setSkuCode(r.skuCode());
+            item.setDetails(r.details());
+            result.add(item);
+        }
+        return ResponseEntity.ok(result);
     }
 }

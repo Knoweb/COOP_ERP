@@ -641,6 +641,15 @@ config_items:
     change_permission: prc.mrp_policy.set
     till_visible: true
     module: m3pricing
+  - key: pricing.trade_above_mrp_review
+    value_type: BOOLEAN
+    description_en: Whether a trade list price above the lowest printed MRP raises a review
+    description_si: වෙළඳ ලැයිස්තු මිල අඩුම මුද්‍රිත MRP එකට වඩා වැඩි වූ විට සමාලෝචනයක් ඇතිකරනවාද
+    description_ta: வர்த்தக பட்டியல் விலை குறைந்த அச்சிடப்பட்ட MRP ஐ விட அதிகமாக இருக்கும் போது மதிப்பாய்வு எழுப்பப்படுமா
+    default: "true"
+    scope_kind: FEDERATION
+    change_permission: prc.pricelist.publish
+    module: m3pricing
   - key: pricing.picker_gap_amount
     value_type: DECIMAL
     schema: { minimum: 0, maximum: 100000 }

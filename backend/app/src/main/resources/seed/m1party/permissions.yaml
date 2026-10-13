@@ -153,6 +153,10 @@ permissions:
     module: "m3pricing"
     description_en: "Set the multi-MRP policy of an item"
     scope: "ENTITY"
+  - code: "prc.review.view"
+    module: "m3pricing"
+    description_en: "View pricing reviews"
+    scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes

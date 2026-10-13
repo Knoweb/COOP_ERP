@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * M2's snapshot contributor (22A section 7.3) in the scope of a till: the SKUs the shop's entity
  * may sell (its own LOCAL ones and every SHARED one) each with its conversions, ACTIVE barcodes
- * and tags inside the row, the tax categories with their rates, and batches; decimals as text.
+ * and tags inside the row, the tax categories with their rates; decimals as text. No batches (TD-02, TD-04).
  */
 class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTest {
 
@@ -30,11 +30,6 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
     static final UUID OTHERS = UUID.fromString("0190a820-0000-7000-8000-000000000303");
     static final UUID SHARED = UUID.fromString("0190a820-0000-7000-8000-000000000304");
     static final UUID TAX = UUID.fromString("0190a820-0000-7000-8000-000000000901");
-    static final UUID BATCH_LOCAL = UUID.fromString("0190a820-0000-7000-8000-000000000501");
-    static final UUID BATCH_SHARED = UUID.fromString("0190a820-0000-7000-8000-000000000502");
-    static final UUID BATCH_DRAFT = UUID.fromString("0190a820-0000-7000-8000-000000000503");
-    static final UUID BATCH_OTHERS = UUID.fromString("0190a820-0000-7000-8000-000000000504");
-    static final UUID BATCH_SUPERSEDED = UUID.fromString("0190a820-0000-7000-8000-000000000505");
 
     @Autowired
     CatalogueSnapshotContributor catalogue;
@@ -167,82 +162,13 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
         assertThat(rows.get(TAX).get("rates").toString()).contains("12.50").doesNotContain("10.00");
     }
 
+    /**
+     * Batches are M5's to serve, as the batches with on-hand at the location (doc 32 section 5.1);
+     * M2 serving every batch its scope can read carried the whole federation's (TD-02, TD-04).
+     */
     @Test
-    void tablesDeclareBatchSkuAndTaxCategory() {
-        assertThat(catalogue.tables()).containsExactlyInAnyOrder("sku", "tax_category", "batch");
-    }
-
-    @Test
-    void theTillGetsBatchesOfItsEntityMaySellAndTheirDetails() {
-        JdbcTemplate db = superuserJdbc();
-        batch(
-                db,
-                BATCH_LOCAL,
-                LOCAL,
-                "BN-LOC-01",
-                ENTITY,
-                "REGISTERED",
-                new java.math.BigDecimal("150.00"),
-                java.time.LocalDate.of(2026, 12, 31));
-        batch(
-                db,
-                BATCH_SHARED,
-                SHARED,
-                "BN-SHR-01",
-                TEST_FEDERATION,
-                "REGISTERED",
-                new java.math.BigDecimal("250.00"),
-                java.time.LocalDate.of(2027, 1, 31));
-        batch(
-                db,
-                BATCH_DRAFT,
-                DRAFT,
-                "BN-DRF-01",
-                ENTITY,
-                "REGISTERED",
-                new java.math.BigDecimal("100.00"),
-                java.time.LocalDate.of(2026, 10, 31));
-        batch(
-                db,
-                BATCH_OTHERS,
-                OTHERS,
-                "BN-OTH-01",
-                OTHER_ENTITY,
-                "REGISTERED",
-                new java.math.BigDecimal("120.00"),
-                java.time.LocalDate.of(2026, 11, 30));
-        batch(
-                db,
-                BATCH_SUPERSEDED,
-                LOCAL,
-                "BN-SUP-01",
-                ENTITY,
-                "SUPERSEDED",
-                new java.math.BigDecimal("140.00"),
-                java.time.LocalDate.of(2026, 9, 30));
-
-        // allRows: LOCAL and SHARED batches (with REGISTERED or SUPERSEDED status) appear; DRAFT and OTHERS do not.
-        Map<UUID, Map<String, Object>> allBatches = transactions.inScope(till, () -> catalogue.allRows("batch", shop));
-        assertThat(allBatches)
-                .containsKeys(BATCH_LOCAL, BATCH_SHARED, BATCH_SUPERSEDED)
-                .doesNotContainKeys(BATCH_DRAFT, BATCH_OTHERS);
-
-        // rows by ID: DRAFT is not sellable, so not returned (becomes a tombstone in the delta).
-        Map<UUID, Map<String, Object>> deltaBatches = transactions.inScope(
-                till, () -> catalogue.rows("batch", shop, List.of(BATCH_LOCAL, BATCH_SUPERSEDED, BATCH_DRAFT)));
-        assertThat(deltaBatches).containsOnlyKeys(BATCH_LOCAL, BATCH_SUPERSEDED);
-
-        Map<String, Object> localRow = deltaBatches.get(BATCH_LOCAL);
-        assertThat(localRow)
-                .containsEntry("sku_id", LOCAL.toString())
-                .containsEntry("batch_no", "BN-LOC-01")
-                .containsEntry("printed_mrp", "150.00")
-                .containsEntry("expiry_date", "2026-12-31")
-                .containsEntry("expiry", "2026-12-31")
-                .containsEntry("status", "REGISTERED");
-
-        Map<String, Object> supersededRow = deltaBatches.get(BATCH_SUPERSEDED);
-        assertThat(supersededRow).containsEntry("batch_no", "BN-SUP-01").containsEntry("status", "SUPERSEDED");
+    void tablesAreSkuAndTaxCategoryWithoutBatches() {
+        assertThat(catalogue.tables()).containsExactlyInAnyOrder("sku", "tax_category");
     }
 
     private static void sku(JdbcTemplate db, UUID id, String code, UUID owner, String status) {
@@ -271,29 +197,6 @@ class CatalogueSnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 owner,
                 thumb,
                 status);
-    }
-
-    private static void batch(
-            JdbcTemplate db,
-            UUID batchId,
-            UUID skuId,
-            String batchNo,
-            UUID owner,
-            String status,
-            java.math.BigDecimal mrp,
-            java.time.LocalDate expiry) {
-        db.update(
-                """
-                insert into catalogue.batch (batch_id, sku_id, batch_no, owner_entity_id, status, printed_mrp, expiry_date, created_at)
-                values (?, ?, ?, ?, ?, ?, ?, clock_timestamp())
-                """,
-                batchId,
-                skuId,
-                batchNo,
-                owner,
-                status,
-                mrp,
-                expiry);
     }
 
     private static void forget(JdbcTemplate db) {

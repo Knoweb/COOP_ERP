@@ -61,6 +61,146 @@ CREATE TABLE anomaly (
 
 CREATE UNIQUE INDEX anomaly_fact ON anomaly(kind, device_seq);
 
+CREATE TABLE document_lines (
+    line_id TEXT NOT NULL PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    line_no INTEGER NOT NULL,
+    sku_id TEXT NOT NULL,
+    batch_id TEXT,
+    uom_code TEXT NOT NULL,
+    qty TEXT NOT NULL,
+    unit_price TEXT NOT NULL,
+    mrp_applied TEXT,
+    control_price_applied TEXT,
+    cap_reason TEXT,
+    discount_rule_id TEXT,
+    discount_amount TEXT,
+    tax_rate_percent TEXT,
+    tax_amount TEXT,
+    line_total TEXT NOT NULL,
+    unit_cost_at_issue TEXT,
+    loss_category TEXT,
+    reference_line_id TEXT,
+    negative_ack INTEGER NOT NULL DEFAULT 0,
+    picked INTEGER NOT NULL DEFAULT 0,
+    weight_kg TEXT
+);
+
+CREATE INDEX document_lines_doc ON document_lines(document_id);
+
+CREATE TABLE tenders (
+    tender_id TEXT NOT NULL PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    reference TEXT,
+    customer_account_id TEXT,
+    change_given TEXT,
+    offline INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX tenders_doc ON tenders(document_id);
+
+CREATE TABLE state_history (
+    history_id TEXT NOT NULL PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    occurred_at INTEGER NOT NULL,
+    occurred_local TEXT,
+    actor_user_id TEXT NOT NULL,
+    reason_code TEXT,
+    reason_text TEXT
+);
+
+CREATE INDEX state_history_doc ON state_history(document_id);
+
+CREATE TABLE stock_movements (
+    movement_id TEXT NOT NULL PRIMARY KEY,
+    movement_seq INTEGER,
+    location_id TEXT NOT NULL,
+    sku_id TEXT,
+    batch_id TEXT,
+    lot_id TEXT,
+    condition TEXT NOT NULL DEFAULT 'GOOD',
+    qty_delta TEXT NOT NULL,
+    movement_type TEXT NOT NULL,
+    unit_cost_at_movement TEXT,
+    document_id TEXT,
+    document_line_id TEXT,
+    occurred_at INTEGER NOT NULL,
+    occurred_local TEXT,
+    operator_user_id TEXT NOT NULL,
+    device_id TEXT
+);
+
+CREATE INDEX stock_movements_doc ON stock_movements(document_id);
+CREATE INDEX stock_movements_sku ON stock_movements(sku_id);
+
+CREATE TABLE audit (
+    audit_id TEXT NOT NULL PRIMARY KEY,
+    event_type_code TEXT NOT NULL,
+    occurred_at INTEGER NOT NULL,
+    occurred_local TEXT,
+    owner_entity_id TEXT,
+    location_id TEXT,
+    actor_user_id TEXT NOT NULL,
+    device_id TEXT,
+    till_position_id TEXT,
+    subject_table TEXT,
+    subject_id TEXT,
+    document_id TEXT,
+    before_state TEXT,
+    after_state TEXT,
+    reason_code TEXT,
+    reason_text TEXT,
+    device_seq INTEGER,
+    correlation_id TEXT
+);
+
+CREATE INDEX audit_occurred ON audit(occurred_at);
+
+CREATE TABLE cash_movements (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    operator_user_id TEXT NOT NULL,
+    reason TEXT
+);
+
+CREATE INDEX cash_movements_session ON cash_movements(session_id);
+
+CREATE TABLE parked_sales (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT,
+    lines_json TEXT NOT NULL,
+    parked_at INTEGER NOT NULL,
+    operator_user_id TEXT NOT NULL,
+    customer_id TEXT,
+    notes TEXT
+);
+
+CREATE INDEX parked_sales_session ON parked_sales(session_id);
+
+CREATE TABLE lot_cache (
+    lot_id TEXT NOT NULL PRIMARY KEY,
+    sku_id TEXT NOT NULL,
+    batch_id TEXT,
+    location_id TEXT NOT NULL,
+    cost_price TEXT,
+    selling_price TEXT,
+    mrp TEXT,
+    available_qty TEXT NOT NULL DEFAULT '0',
+    expiry_date TEXT,
+    condition TEXT NOT NULL DEFAULT 'GOOD',
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX lot_cache_sku ON lot_cache(sku_id);
+
 selectSetting:
 SELECT value FROM setting WHERE key = ?;
 
@@ -135,3 +275,80 @@ UPDATE anomaly SET seen = 1 WHERE seen = 0;
 
 countQuarantinedAmong:
 SELECT count(*) FROM anomaly WHERE kind = 'QUARANTINED' AND device_seq IN ?;
+
+insertDocumentLine:
+INSERT INTO document_lines(
+    line_id, document_id, line_no, sku_id, batch_id, uom_code, qty, unit_price,
+    mrp_applied, control_price_applied, cap_reason, discount_rule_id, discount_amount,
+    tax_rate_percent, tax_amount, line_total, unit_cost_at_issue, loss_category,
+    reference_line_id, negative_ack, picked, weight_kg
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectDocumentLinesByDocument:
+SELECT * FROM document_lines WHERE document_id = ? ORDER BY line_no;
+
+insertTender:
+INSERT INTO tenders(
+    tender_id, document_id, seq, kind, amount, reference, customer_account_id, change_given, offline
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectTendersByDocument:
+SELECT * FROM tenders WHERE document_id = ? ORDER BY seq;
+
+insertStateHistory:
+INSERT INTO state_history(
+    history_id, document_id, from_status, to_status, occurred_at, occurred_local, actor_user_id, reason_code, reason_text
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectStateHistoryByDocument:
+SELECT * FROM state_history WHERE document_id = ? ORDER BY occurred_at;
+
+insertStockMovement:
+INSERT INTO stock_movements(
+    movement_id, movement_seq, location_id, sku_id, batch_id, lot_id, condition, qty_delta,
+    movement_type, unit_cost_at_movement, document_id, document_line_id, occurred_at,
+    occurred_local, operator_user_id, device_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectStockMovementsByDocument:
+SELECT * FROM stock_movements WHERE document_id = ? ORDER BY occurred_at;
+
+insertAuditEvent:
+INSERT INTO audit(
+    audit_id, event_type_code, occurred_at, occurred_local, owner_entity_id, location_id,
+    actor_user_id, device_id, till_position_id, subject_table, subject_id, document_id,
+    before_state, after_state, reason_code, reason_text, device_seq, correlation_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAuditEvents:
+SELECT * FROM audit ORDER BY occurred_at DESC LIMIT ?;
+
+insertCashMovement:
+INSERT INTO cash_movements(
+    id, session_id, kind, amount, at, operator_user_id, reason
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectCashMovementsBySession:
+SELECT * FROM cash_movements WHERE session_id = ? ORDER BY at;
+
+insertParkedSale:
+INSERT INTO parked_sales(
+    id, session_id, lines_json, parked_at, operator_user_id, customer_id, notes
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectParkedSalesBySession:
+SELECT * FROM parked_sales WHERE session_id = ? ORDER BY parked_at;
+
+deleteParkedSale:
+DELETE FROM parked_sales WHERE id = ?;
+
+insertLotCache:
+INSERT OR REPLACE INTO lot_cache(
+    lot_id, sku_id, batch_id, location_id, cost_price, selling_price, mrp, available_qty, expiry_date, condition, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectLotCacheBySku:
+SELECT * FROM lot_cache WHERE sku_id = ? AND available_qty > '0';
+
+deleteLotCache:
+DELETE FROM lot_cache;

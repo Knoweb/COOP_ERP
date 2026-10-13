@@ -296,6 +296,38 @@ class AttachmentsPostgresIntegrationTest extends PostgresIntegrationTest {
                 .hasMessageContaining("attachment.document_mismatch");
     }
 
+    /**
+     * CR-32-2 (wave 4, KRN-16 kept): a till that comes back after the upload window cannot renew
+     * the old URL; it asks for a new attachment on the same document, and the verifier fails the
+     * old one, which never came, and completes the replacement.
+     */
+    @Test
+    void aTillBackAfterTheWindowAttachesAReplacementAndTheOldOneFails() {
+        UUID lost = Ids.next();
+        inScope(OWNER, () -> attachments.presignUpload(documentId, lost, "image/jpeg", null, null, scope(OWNER)));
+        superuserJdbc()
+                .update(
+                        "update kernel.document_attachment set captured_at = now() - interval '2 days',"
+                                + " upload_expires_at = now() - interval '2 days' where attachment_id = ?",
+                        lost);
+        assertThatThrownBy(() -> inScope(
+                        OWNER,
+                        () -> attachments.presignUpload(documentId, lost, "image/jpeg", null, null, scope(OWNER))))
+                .isInstanceOf(ProblemException.class)
+                .hasMessageContaining("attachment.upload_expired");
+
+        PresignedUpload replacement = inScope(
+                OWNER, () -> attachments.presignUpload(documentId, null, "image/jpeg", null, null, scope(OWNER)));
+        assertThat(replacement.attachmentId()).isNotEqualTo(lost);
+        store.objects.put(replacement.objectKey(), "the photograph".getBytes(StandardCharsets.UTF_8));
+        windowOver(replacement.attachmentId());
+
+        assertThat(verifier.verifyPending()).isEqualTo(2);
+        assertThat(inScope(OWNER, () -> attachments.status(lost))).contains("FAILED");
+        assertThat(inScope(OWNER, () -> attachments.status(replacement.attachmentId())))
+                .contains("COMPLETE");
+    }
+
     @Test
     void theSizeAndTheTypeAreLimitedByTheRegister() {
         // The declared size is checked at presign (and signed into the URL) ...
