@@ -129,6 +129,12 @@ class TillController(
         afterSignIn()
     }
 
+    fun switchOperator(operator: Operator, pin: String, reason: String? = null) = act {
+        withContext(Dispatchers.Default) { service.switchOperator(operator, pin, reason) }
+        afterSignIn()
+        say("Switched operator to ${service.operator?.displayName}")
+    }
+
     fun signInTrialCashier() = act {
         service.signInTrialCashier()
         afterSignIn()

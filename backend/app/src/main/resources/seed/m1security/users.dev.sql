@@ -34,13 +34,14 @@ VALUES
     ('hello.greeting.register', 'hello', 'Register a greeting (template module)', false, false, 'ENTITY')
 ON CONFLICT (permission_code) DO NOTHING;
 
-INSERT INTO security.app_user (user_id, home_entity_id, username, display_name, language, user_kind, status)
+INSERT INTO security.app_user (user_id, home_entity_id, username, display_name, language, user_kind, status, pin_hash)
 VALUES
-    ('0190f000-0000-7000-8000-0000000000a1', '0190f000-0000-7000-8000-000000000001', 'fed-admin',   'Federation Admin',   'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f000-0000-7000-8000-0000000000a2', '0190f000-0000-7000-8000-000000000001', 'fed-officer', 'Federation Officer', 'en', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f000-0000-7000-8000-0000000000a3', '0190f000-0000-7000-8000-000000000002', 'mpcs-admin',  'MPCS Admin',         'si', 'BACK_OFFICE', 'ACTIVE'),
-    ('0190f000-0000-7000-8000-0000000000a4', '0190f000-0000-7000-8000-000000000002', 'cashier',     'Shop Cashier',       'ta', 'BACK_OFFICE', 'ACTIVE')
-ON CONFLICT (user_id) DO NOTHING;
+    ('0190f000-0000-7000-8000-0000000000a1', '0190f000-0000-7000-8000-000000000001', 'fed-admin',   'Federation Admin',   'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f000-0000-7000-8000-0000000000a2', '0190f000-0000-7000-8000-000000000001', 'fed-officer', 'Federation Officer', 'en', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f000-0000-7000-8000-0000000000a3', '0190f000-0000-7000-8000-000000000002', 'mpcs-admin',  'MPCS Admin',         'si', 'BACK_OFFICE', 'ACTIVE', NULL),
+    ('0190f000-0000-7000-8000-0000000000a4', '0190f000-0000-7000-8000-000000000002', 'cashier',     'Shop Cashier',       'ta', 'BOTH',        'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$YKJZ+HhfOVd56BBEjJSQog$rSa2t8Zor0Ml+6eOsWnoXzGZd2dXY40RamtRuM3Nk5o'),
+    ('0190f000-0000-7000-8000-0000000000a5', '0190f000-0000-7000-8000-000000000002', 'supervisor',  'Shop Supervisor',    'si', 'BOTH',        'ACTIVE', '$argon2id$v=19$m=65536,t=3,p=2$908LNOIyKO6h79VZQmL3TA$qZ7GKCe9DXMDVBK8w4p2u9fjfohvVFs/M2vH1syzfcQ')
+ON CONFLICT (user_id) DO UPDATE SET user_kind = EXCLUDED.user_kind, pin_hash = EXCLUDED.pin_hash;
 
 -- One development role per entity, class OWN, every permission of the catalogue; and one for
 -- the society's cashier with the reads alone (the codes a GET of a slice asks for, by the
@@ -77,5 +78,7 @@ VALUES
     ('0190f000-0000-7000-8000-0000000000a1', '0190f000-0000-7000-8000-0000000000b1', '0190f000-0000-7000-8000-000000000001', NULL),
     ('0190f000-0000-7000-8000-0000000000a2', '0190f000-0000-7000-8000-0000000000b1', '0190f000-0000-7000-8000-000000000001', NULL),
     ('0190f000-0000-7000-8000-0000000000a3', '0190f000-0000-7000-8000-0000000000b2', '0190f000-0000-7000-8000-000000000002', NULL),
-    ('0190f000-0000-7000-8000-0000000000a4', '0190f000-0000-7000-8000-0000000000b3', '0190f000-0000-7000-8000-000000000002', NULL)
+    ('0190f000-0000-7000-8000-0000000000a4', '0190f000-0000-7000-8000-0000000000b3', '0190f000-0000-7000-8000-000000000002', NULL),
+    ('0190f000-0000-7000-8000-0000000000a4', '01999a10-2c4e-7f1a-8b3d-5e6f70819a11', '0190f000-0000-7000-8000-000000000002', NULL),
+    ('0190f000-0000-7000-8000-0000000000a5', '01999a10-2c4e-7f1a-8b3d-5e6f70819a12', '0190f000-0000-7000-8000-000000000002', NULL)
 ON CONFLICT DO NOTHING;

@@ -291,14 +291,62 @@ class TillService(
      * restart does not reset them, and the lock-out is an audit fact for central (TWK-03).
      */
     suspend fun signIn(candidate: Operator, pin: String) {
-        lock.withLock {
+        val previous = lock.withLock {
             requireNotRevoked()
             requireNotLockedOut()
+            operator
         }
         if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         lock.withLock {
-            store.transaction { store.removeSetting(Settings.pinFailures(candidate.userId)) }
+            val at = now()
+            val identity = device
+            store.transaction {
+                store.removeSetting(Settings.pinFailures(candidate.userId))
+                if (previous != null && previous.userId != candidate.userId && identity != null) {
+                    record(
+                        Facts.OPERATOR_SWITCH_EVENT,
+                        at,
+                        candidate.userId,
+                        Facts.operatorSwitched(identity, previous.userId, candidate.userId),
+                    )
+                }
+            }
             operator = candidate
+            publishStatus()
+        }
+    }
+
+    /**
+     * Switches the active operator to [candidate] with their PIN, auditing the switch as an
+     * offline fact (TILL_OPERATOR_SWITCH, audit.till_operator_switch.v1).
+     */
+    suspend fun switchOperator(candidate: Operator, pin: String, reason: String? = null): Operator {
+        val previous = lock.withLock {
+            requireDevice()
+            requireNotRevoked()
+            requireNotLockedOut()
+            val current = operator ?: throw TillRefusal("Sign in first")
+            if (current.userId == candidate.userId) {
+                throw TillRefusal("${candidate.displayName} is already signed in")
+            }
+            current
+        }
+        if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
+        return lock.withLock {
+            val identity = requireDevice()
+            val at = now()
+            store.transaction {
+                store.removeSetting(Settings.pinFailures(candidate.userId))
+                record(
+                    Facts.OPERATOR_SWITCH_EVENT,
+                    at,
+                    candidate.userId,
+                    Facts.operatorSwitched(identity, previous.userId, candidate.userId, reason),
+                )
+            }
+            operator = candidate
+            publishStatus()
+            candidate
         }
     }
 
@@ -418,6 +466,10 @@ class TillService(
         val identity = requireDevice()
         requireNotRevoked()
         val cashier = operator ?: throw TillRefusal("Sign in first")
+        if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
+            TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
+            throw TillRefusal("${cashier.displayName} may not open a session (${TillPolicy.RECEIPT_ISSUE_PERMISSION})")
+        }
         if (store.openSession() != null) throw TillRefusal("A session is already open at this till")
         if (floatAmount.cents < 0) throw TillRefusal("The float cannot be negative")
         val now = now()
@@ -455,8 +507,8 @@ class TillService(
      * `TILL_BUSINESS_DATE_CORRECTED`): the till position, the date before and after, the
      * supervisor as the actor.
      */
-    suspend fun correctBusinessDate(date: LocalDate, supervisor: Operator?, pin: String?) {
-        lock.withLock {
+    suspend fun correctBusinessDate(date: LocalDate, supervisor: Operator? = null, pin: String? = null) {
+        val actingSupervisor = lock.withLock {
             requireDevice()
             requireNotRevoked()
             if (store.openSession() != null) throw TillRefusal("Close the session first: the business date changes only between sessions")
@@ -464,16 +516,19 @@ class TillService(
             if (current == null || date >= current) {
                 throw TillRefusal("Only a move back needs a supervisor; the business date moves forward by itself when a session opens")
             }
-            if (supervisor == null) {
+            val acting = supervisor ?: operator
+            if (acting == null) {
                 if (!trialCashierOffered) throw TillRefusal("A supervisor must sign the correction with their PIN")
+                null
             } else {
-                if (TillPolicy.SUPERVISOR_PERMISSION !in supervisor.permissions) {
-                    throw TillRefusal("${supervisor.displayName} may not correct the business date (${TillPolicy.SUPERVISOR_PERMISSION})")
+                if (TillPolicy.SUPERVISOR_PERMISSION !in acting.permissions) {
+                    throw TillRefusal("${acting.displayName} may not correct the business date (${TillPolicy.SUPERVISOR_PERMISSION})")
                 }
                 requireNotLockedOut()
+                acting
             }
         }
-        if (supervisor != null && !checkPin(supervisor, pin.orEmpty())) {
+        if (actingSupervisor != null && !checkPin(actingSupervisor, pin.orEmpty())) {
             throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         }
         lock.withLock {
@@ -484,10 +539,10 @@ class TillService(
                 throw TillRefusal("Only a move back needs a supervisor; the business date moves forward by itself when a session opens")
             }
             store.transaction {
-                if (supervisor != null) store.removeSetting(Settings.pinFailures(supervisor.userId))
+                if (actingSupervisor != null) store.removeSetting(Settings.pinFailures(actingSupervisor.userId))
                 store.putSetting(Settings.BUSINESS_DATE, date.toString())
                 // Central learns who moved the date, from what to what (TILLM6-05).
-                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, now(), supervisor?.userId, Facts.businessDateCorrected(identity, from, date))
+                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, now(), actingSupervisor?.userId, Facts.businessDateCorrected(identity, from, date))
             }
             publishStatus()
         }
@@ -502,6 +557,10 @@ class TillService(
         val identity = requireDevice()
         requireNotRevoked()
         val cashier = operator ?: throw TillRefusal("Sign in first")
+        if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
+            TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
+            throw TillRefusal("${cashier.displayName} may not issue receipts (${TillPolicy.RECEIPT_ISSUE_PERMISSION})")
+        }
         val session = store.openSession() ?: throw TillRefusal("Open a session first")
         if (basket.isEmpty) throw TillRefusal("The basket is empty")
         val gross = basket.total

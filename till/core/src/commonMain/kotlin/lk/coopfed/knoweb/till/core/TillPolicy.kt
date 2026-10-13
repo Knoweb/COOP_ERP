@@ -36,5 +36,7 @@ data class TillPolicy(
     companion object {
         /** The permission (21A, shop-in-charge) that lets a supervisor correct the till's business date. */
         const val SUPERVISOR_PERMISSION = "pos.session.manage"
+        /** The permission (Cashier, Supervisor) required to open a session and issue sale receipts. */
+        const val RECEIPT_ISSUE_PERMISSION = "pos.receipt.issue"
     }
 }
