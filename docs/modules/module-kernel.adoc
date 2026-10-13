@@ -6,6 +6,7 @@
 |_Services_
 
 * `l.c.k.k.api.A4Renderer` (via `l.c.k.k.internal.render.A4RenderService`)
+* `l.c.k.k.api.CentralUpdateService` (via `l.c.k.k.internal.update.DefaultCentralUpdateService`)
 
 _Others_
 
