@@ -151,3 +151,21 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: true
     description_en: A supervisor moved a till's business date back while no session was open
+  # doc 31 section 4 (TILL-PLAT-07): release registry and rollout control.
+  - code: RELEASE_PUBLISHED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till application release published
+  - code: RELEASE_PAUSED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Till application release paused from rollout
+  - code: RELEASE_RESUMED
+    severity: INFO
+    offline_capturable: false
+    description_en: Till application release resumed for rollout
+  - code: DEVICE_RING_ASSIGNED
+    severity: INFO
+    offline_capturable: false
+    description_en: Device rollout ring assigned
+

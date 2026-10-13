@@ -330,6 +330,11 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "own_* only (kernel V0059, V0063): what a retry of a queued notification needs, sealed, held until it"
                             + " is settled; the sweep reads it in the owner's scope, nobody else at all",
                     RlsMatrixIntegrationTest::onlyTheOwnerReads),
+            new Departure(
+                    "kernel.app_release",
+                    "the Federation's rows only (kernel V0094): releases published by Federation are readable by"
+                            + " every class but NONE, and only Federation writes",
+                    RlsMatrixIntegrationTest::federationRowsOnly),
             // The ENTITY series is the whole entity's: a shop-scoped session reads and advances it,
             // because a document at a shop may draw its number from an ENTITY series (24B) and a
             // counter carries no business content (kernel V0055; decided 27 September 2026 on the
