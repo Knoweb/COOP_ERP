@@ -44,6 +44,9 @@
 # central reference data must reach, answered by the SECURITY DEFINER function
 # party.change_log_shops (m1party V0017) from the caller's scope. The patch version is raised for
 # tools/check-frozen-contracts.mjs, as for 1.4.2.
+#
+# 1.5.0 (CAT-08, bulk network register): POST /v1/party/locations/bulk bulk registers a network
+# of shops, till positions, users and devices in one transaction. Additive.
 openapi: 3.1.0
 
 info:
@@ -51,7 +54,8 @@ info:
   # 1.4.3 (CR-18-2, wave 2): the user and device administration reads carry x-federation-view: false;
   # no request or response changes shape. 1.4.2 (CR-21A-7) is described in the header above.
   # 1.4.4 (wave 3 review) and 1.4.5 (wave 4 review) are described in the header above.
-  version: 1.4.5
+  # 1.5.0 (CAT-08) adds bulkRegisterNetwork for shops, positions, users, and devices.
+  version: 1.5.0
   x-change-request: CR-18-2
 
 paths:
@@ -391,6 +395,41 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/party/locations/bulk:
+    post:
+      tags: [Bulk]
+      operationId: bulkRegisterNetwork
+      summary: Bulk register locations (shops), till positions, users and devices in one transaction
+      description: >
+        Registers a network of shops, till positions, till users and POS devices for an entity.
+        Every item is validated first; when any item has a problem nothing is registered and the
+        report says which items and why. When all pass, all are registered in one transaction (CAT-08).
+      x-permission: prt.location.register
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkRegisterNetworkRequest'
+
+      responses:
+        '200':
+          description: Bulk network registration report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkNetworkReport'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
   /v1/party/locations:
@@ -2266,6 +2305,154 @@ components:
         code:
           type: string
           description: A message id from the bulk.* catalogue
+
+    BulkRegisterNetworkRequest:
+      type: object
+      properties:
+        shops:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkShopItem'
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkUserItem'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkDeviceItem'
+
+    BulkShopItem:
+      type: object
+      required: [locationCode, nameEn]
+      properties:
+        locationCode:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type:
+            - string
+            - 'null'
+        nameTa:
+          type:
+            - string
+            - 'null'
+        address:
+          type:
+            - string
+            - 'null'
+        district:
+          type:
+            - string
+            - 'null'
+        geoLat:
+          type:
+            - number
+            - 'null'
+        geoLng:
+          type:
+            - number
+            - 'null'
+        language:
+          type:
+            - string
+            - 'null'
+          enum: [en, si, ta]
+        sizeBand:
+          type:
+            - string
+            - 'null'
+          enum: [S, M, L]
+        tillPositions:
+          type: array
+          items:
+            type: integer
+
+    BulkUserItem:
+      type: object
+      required: [username, displayName]
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        language:
+          type:
+            - string
+            - 'null'
+          enum: [en, si, ta]
+        userKind:
+          type:
+            - string
+            - 'null'
+          enum: [BACK_OFFICE, TILL, BOTH]
+        pin:
+          type:
+            - string
+            - 'null'
+        locationCode:
+          type:
+            - string
+            - 'null'
+
+    BulkDeviceItem:
+      type: object
+      required: [hardwareSerial, locationCode]
+      properties:
+        hardwareSerial:
+          type: string
+        deviceKind:
+          type:
+            - string
+            - 'null'
+          enum: [POS_TERMINAL, WORKSTATION, DRIVER_MOBILE]
+        locationCode:
+          type: string
+        positionNo:
+          type:
+            - integer
+            - 'null'
+        appVersion:
+          type:
+            - string
+            - 'null'
+
+    BulkNetworkReport:
+      type: object
+      required: [status, shopsRegistered, positionsRegistered, usersRegistered, devicesRegistered, problems]
+      properties:
+        status:
+          type: string
+          enum: [REGISTERED, REJECTED]
+        shopsRegistered:
+          type: integer
+        positionsRegistered:
+          type: integer
+        usersRegistered:
+          type: integer
+        devicesRegistered:
+          type: integer
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkNetworkProblem'
+
+    BulkNetworkProblem:
+      type: object
+      required: [category, field, code]
+      properties:
+        category:
+          type: string
+          enum: [SHOP, USER, DEVICE, GENERAL]
+        identifier:
+          type:
+            - string
+            - 'null'
+        field:
+          type: string
+        code:
+          type: string
 
     TradingDay:
       type: object
