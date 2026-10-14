@@ -1,6 +1,7 @@
 package lk.coopfed.knoweb.till.core
 
 import kotlin.math.abs
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,6 +73,8 @@ data class TillStatus(
     val banners: List<String> = emptyList(),
     /** Central revoked this till: it is locked, its facts are kept (doc 32 section 9). */
     val revoked: Boolean = false,
+    /** The till is locked due to inactivity or lock command; operator PIN required to resume (T-09, FR-SEC-070). */
+    val locked: Boolean = false,
 )
 
 /**
@@ -115,6 +118,10 @@ class TillService(
         private set
     var operator: Operator? = null
         private set
+    var isLocked: Boolean = false
+        private set
+    private var lastActivityElapsed: Long = 0L
+    val idleLockDuration: Duration get() = policy.idleLock
     private var snapshotVersion = 0L
     private var operatorsSeen = false
     private var revoked = false
@@ -151,6 +158,7 @@ class TillService(
         revoked = store.setting(Settings.REVOKED) != null
         repairCounters()
         purgeAcknowledged()
+        lastActivityElapsed = currentUptimeMs()
         publishStatus()
     }
 
@@ -312,6 +320,8 @@ class TillService(
                 }
             }
             operator = candidate
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
             publishStatus()
         }
     }
@@ -345,6 +355,8 @@ class TillService(
                 )
             }
             operator = candidate
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
             publishStatus()
             candidate
         }
@@ -453,11 +465,98 @@ class TillService(
         val id = store.setting(Settings.TRIAL_OPERATOR_ID) ?: ids.next().also { id ->
             store.transaction { store.putSetting(Settings.TRIAL_OPERATOR_ID, id) }
         }
-        Operator(id, "Trial cashier", shopLanguage, null, emptyList()).also { operator = it }
+        Operator(id, "Trial cashier", shopLanguage, null, emptyList()).also {
+            operator = it
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
+        }
     }
 
     fun signOut() {
+        isLocked = false
         operator = null
+        publishStatus()
+    }
+
+    /** Records user activity on the till, resetting the inactivity/idle timer. */
+    fun recordActivity() {
+        if (!isLocked) {
+            lastActivityElapsed = currentUptimeMs()
+        }
+    }
+
+    /** Locks the till session; the operator or a colleague must enter their PIN to unlock. */
+    fun lock() {
+        if (operator != null && !isLocked) {
+            isLocked = true
+            publishStatus()
+        }
+    }
+
+    /**
+     * Checks if the till has been idle longer than the configured [idleLockDuration].
+     * If so, locks the till and returns true; otherwise returns false.
+     */
+    fun checkIdleLock(): Boolean {
+        if (operator != null && !isLocked && policy.idleLock.isPositive()) {
+            val elapsed = currentUptimeMs() - lastActivityElapsed
+            if (elapsed >= policy.idleLock.inWholeMilliseconds) {
+                lock()
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Unlocks the currently signed-in operator with their PIN.
+     */
+    suspend fun unlock(pin: String): Operator {
+        val current = lock.withLock {
+            requireDevice()
+            requireNotRevoked()
+            requireNotLockedOut()
+            operator ?: throw TillRefusal("No operator signed in")
+        }
+        if (current.pinHash != null && !checkPin(current, pin)) {
+            throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
+        }
+        return lock.withLock {
+            store.transaction {
+                store.removeSetting(Settings.pinFailures(current.userId))
+            }
+            isLocked = false
+            lastActivityElapsed = currentUptimeMs()
+            publishStatus()
+            current
+        }
+    }
+
+    /**
+     * Unlocks the till with [candidate] operator and their PIN.
+     * If [candidate] is the current operator, unlocks with PIN.
+     * If [candidate] is a colleague, switches operators and audits the switch fact.
+     */
+    suspend fun unlock(candidate: Operator, pin: String, reason: String? = null): Operator {
+        val current = operator
+        return if (current == null || current.userId == candidate.userId) {
+            unlock(pin)
+        } else {
+            val switched = switchOperator(candidate, pin, reason ?: "Unlocked by colleague")
+            lock.withLock {
+                isLocked = false
+                lastActivityElapsed = currentUptimeMs()
+                publishStatus()
+            }
+            switched
+        }
+    }
+
+    private fun requireNotLocked() {
+        if (isLocked) {
+            throw TillRefusal("The till is locked: enter PIN to unlock")
+        }
+        recordActivity()
     }
 
     // ================================================================= the session (doc 26 section 3.5)
@@ -465,6 +564,7 @@ class TillService(
     suspend fun openSession(floatAmount: Money): SessionRecord = lock.withLock {
         val identity = requireDevice()
         requireNotRevoked()
+        requireNotLocked()
         val cashier = operator ?: throw TillRefusal("Sign in first")
         if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
             TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
@@ -511,6 +611,7 @@ class TillService(
         val actingSupervisor = lock.withLock {
             requireDevice()
             requireNotRevoked()
+            requireNotLocked()
             if (store.openSession() != null) throw TillRefusal("Close the session first: the business date changes only between sessions")
             val current = store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) }
             if (current == null || date >= current) {
@@ -556,6 +657,7 @@ class TillService(
     suspend fun sellForCash(basket: Basket, tendered: Money): IssuedReceipt = lock.withLock {
         val identity = requireDevice()
         requireNotRevoked()
+        requireNotLocked()
         val cashier = operator ?: throw TillRefusal("Sign in first")
         if (cashier.userId != store.setting(Settings.TRIAL_OPERATOR_ID) &&
             TillPolicy.RECEIPT_ISSUE_PERMISSION !in cashier.permissions) {
@@ -624,6 +726,7 @@ class TillService(
     /** The cashier's blind count closes the session; the till works out expected cash and the variance. */
     suspend fun closeSession(counted: Money): ZReport = lock.withLock {
         val identity = requireDevice()
+        requireNotLocked()
         val session = store.openSession() ?: throw TillRefusal("No session is open")
         if (counted.cents < 0) throw TillRefusal("The count cannot be negative")
         val receipts = store.receiptsOfSession(session.sessionId)
@@ -1010,6 +1113,8 @@ class TillService(
 
     private fun rawMillis(): Long = clock.now().toEpochMilliseconds()
 
+    private fun currentUptimeMs(): Long = clock.elapsedMillis() ?: rawMillis()
+
     /**
      * The business date a new session opens on: today's date at the shop, never earlier than the
      * date the till already opened (a supervisor moves it back, [correctBusinessDate]). When it moves
@@ -1127,6 +1232,7 @@ class TillService(
             problems = store.unseenAnomalyCount(),
             banners = banners(),
             revoked = revoked,
+            locked = isLocked,
         )
     }
 

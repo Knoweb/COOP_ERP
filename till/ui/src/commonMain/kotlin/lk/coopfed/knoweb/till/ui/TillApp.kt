@@ -64,7 +64,13 @@ import lk.coopfed.knoweb.till.core.time.Times
 fun TillApp(controller: TillController, defaults: EnrolDefaults = EnrolDefaults()) {
     LaunchedEffect(Unit) { controller.start() }
     TillTheme {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            Modifier.fillMaxSize().onPreviewKeyEvent {
+                controller.recordActivity()
+                false
+            },
+            color = MaterialTheme.colorScheme.background,
+        ) {
             Column(Modifier.fillMaxSize()) {
                 TopBar(controller)
                 Banners(controller)
@@ -79,6 +85,7 @@ fun TillApp(controller: TillController, defaults: EnrolDefaults = EnrolDefaults(
                         Screen.SELL -> SellScreen(controller)
                         Screen.CLOSE_SESSION -> CloseSessionScreen(controller)
                         Screen.Z_REPORT -> ZReportScreen(controller)
+                        Screen.LOCKED -> LockScreen(controller)
                     }
                 }
             }
@@ -121,10 +128,11 @@ private fun TopBar(c: TillController) {
                 Text("${s.problems} problem${if (s.problems == 1L) "" else "s"} for the office", color = TillColors.onAccent)
             }
         }
-        if (c.screen != Screen.ENROL && c.screen != Screen.STARTING) {
+        if (c.screen != Screen.ENROL && c.screen != Screen.STARTING && c.screen != Screen.LOCKED) {
             OutlinedButton(onClick = { c.syncNow() }) { Text("Sync now", color = TillColors.onAccent) }
         }
-        if (c.operatorName != null && c.screen != Screen.SIGN_IN) {
+        if (c.operatorName != null && c.screen != Screen.SIGN_IN && c.screen != Screen.LOCKED) {
+            OutlinedButton(onClick = { c.lock() }) { Text("Lock", color = TillColors.onAccent) }
             OutlinedButton(onClick = { c.signOut() }) { Text("Sign out", color = TillColors.onAccent) }
         }
     }
@@ -239,6 +247,80 @@ private fun SignInScreen(c: TillController) {
                     keyboardActions = KeyboardActions(onDone = { c.signIn(op, pin) }),
                 )
                 Button(onClick = { c.signIn(op, pin) }, enabled = !c.busy && pin.length >= 4) { Text(if (c.busy) "Checking…" else "Sign in") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockScreen(c: TillController) {
+    val currentOp = c.operator
+    val trial = currentOp?.pinHash == null && c.trialCashierOffered
+    var switching by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf<Operator?>(null) }
+    var pin by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    Panel("Till locked") {
+        if (!switching) {
+            if (trial) {
+                Text(
+                    "The till locked due to inactivity. Continue as trial cashier to resume.",
+                    color = TillColors.textMuted,
+                )
+            } else {
+                Text(
+                    "The till locked due to inactivity. Enter PIN for ${currentOp?.displayName ?: "operator"} to resume.",
+                    color = TillColors.textMuted,
+                )
+                OutlinedTextField(
+                    pin, { pin = it.filter(Char::isDigit).take(8) },
+                    label = { Text("PIN for ${currentOp?.displayName ?: "operator"}") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (pin.length >= 4) c.unlock(pin) }),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { c.unlock(pin) }, enabled = !c.busy && (trial || pin.length >= 4)) {
+                    Text(if (c.busy) "Checking…" else "Unlock")
+                }
+                if (c.operators.isNotEmpty()) {
+                    OutlinedButton(onClick = { switching = true; pin = "" }) {
+                        Text("Switch operator")
+                    }
+                }
+            }
+        } else {
+            Text("Select colleague and enter PIN to switch operator and unlock:", color = TillColors.textMuted)
+            c.operators.forEach { op ->
+                Text(
+                    op.displayName,
+                    modifier = Modifier.fillMaxWidth().clickable { chosen = op; pin = "" }
+                        .background(if (chosen == op) TillColors.issuedBg else TillColors.surface).padding(10.dp),
+                )
+            }
+            chosen?.let { op ->
+                OutlinedTextField(
+                    pin, { pin = it.filter(Char::isDigit).take(8) },
+                    label = { Text("PIN for ${op.displayName}") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (pin.length >= 4) c.unlockWithOperator(op, pin) }),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { c.unlockWithOperator(op, pin) }, enabled = !c.busy && pin.length >= 4) {
+                        Text(if (c.busy) "Checking…" else "Unlock as ${op.displayName}")
+                    }
+                    OutlinedButton(onClick = { switching = false; pin = "" }) {
+                        Text("Back")
+                    }
+                }
             }
         }
     }
