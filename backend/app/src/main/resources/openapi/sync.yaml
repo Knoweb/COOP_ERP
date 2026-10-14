@@ -549,6 +549,8 @@ components:
         device_seq: { type: integer, format: int64, description: 'Dense per device across all kinds' }
         occurred_at: { type: string, format: date-time, description: 'Device clock plus the offset central returned' }
         occurred_local: { type: [string, 'null'], description: 'The local reading, yyyy-MM-ddTHH:mm:ss' }
+        offline_timed: { type: [boolean, 'null'], description: 'True when recorded without an active clock sync offset' }
+        clock_offset_ms: { type: [integer, 'null'], format: int64, description: 'The clock offset (server - device) applied when occurred_at was created' }
         actor_user_id: { type: [string, 'null'], format: uuid, description: The operator }
         role_snapshot_version: { type: [integer, 'null'], format: int64 }
         correlation_id: { type: [string, 'null'], format: uuid }

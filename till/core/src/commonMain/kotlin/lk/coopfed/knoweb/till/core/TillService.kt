@@ -24,6 +24,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import lk.coopfed.knoweb.till.core.id.IdGenerator
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.ClockReading
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
@@ -298,14 +299,14 @@ class TillService(
         }
         if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         lock.withLock {
-            val at = now()
+            val reading = clockReading()
             val identity = device
             store.transaction {
                 store.removeSetting(Settings.pinFailures(candidate.userId))
                 if (previous != null && previous.userId != candidate.userId && identity != null) {
                     record(
                         Facts.OPERATOR_SWITCH_EVENT,
-                        at,
+                        reading,
                         candidate.userId,
                         Facts.operatorSwitched(identity, previous.userId, candidate.userId),
                     )
@@ -334,12 +335,12 @@ class TillService(
         if (!checkPin(candidate, pin)) throw TillRefusal(lock.withLock { lockedOutMessage() } ?: "Wrong PIN")
         return lock.withLock {
             val identity = requireDevice()
-            val at = now()
+            val reading = clockReading()
             store.transaction {
                 store.removeSetting(Settings.pinFailures(candidate.userId))
                 record(
                     Facts.OPERATOR_SWITCH_EVENT,
-                    at,
+                    reading,
                     candidate.userId,
                     Facts.operatorSwitched(identity, previous.userId, candidate.userId, reason),
                 )
@@ -366,7 +367,8 @@ class TillService(
     }
 
     private fun countWrongPin(candidate: Operator) {
-        val at = now()
+        val reading = clockReading()
+        val at = reading.occurredAt
         val limit = policy.pinFailuresBeforeLock
         val key = Settings.pinFailures(candidate.userId)
         var lockedNow = false
@@ -378,7 +380,7 @@ class TillService(
                 store.putSetting(Settings.PIN_LOCK_REMAINING_MS, policy.pinLockFor.inWholeMilliseconds.toString())
                 store.removeSetting(key)
                 lockedNow = true
-                device?.let { record(Facts.PIN_LOCKOUT_EVENT, at, null, Facts.pinLockout(it, failures, until)) }
+                device?.let { record(Facts.PIN_LOCKOUT_EVENT, reading, null, Facts.pinLockout(it, failures, until)) }
             } else {
                 store.putSetting(key, failures.toString())
             }
@@ -472,7 +474,8 @@ class TillService(
         }
         if (store.openSession() != null) throw TillRefusal("A session is already open at this till")
         if (floatAmount.cents < 0) throw TillRefusal("The float cannot be negative")
-        val now = now()
+        val reading = clockReading()
+        val now = reading.occurredAt
         val session = SessionRecord(
             sessionId = ids.next(),
             operatorUserId = cashier.userId,
@@ -482,7 +485,7 @@ class TillService(
             floatAmount = floatAmount,
         )
         val opened = store.transaction {
-            val fact = record("till_session.opened.v1", now, cashier.userId, Facts.sessionOpened(identity, session))
+            val fact = record("till_session.opened.v1", reading, cashier.userId, Facts.sessionOpened(identity, session))
             session.copy(openedSeq = fact.deviceSeq).also { store.saveSession(it) }
         }
         publishStatus()
@@ -538,11 +541,12 @@ class TillService(
             if (from == null || date >= from) {
                 throw TillRefusal("Only a move back needs a supervisor; the business date moves forward by itself when a session opens")
             }
+            val reading = clockReading()
             store.transaction {
                 if (actingSupervisor != null) store.removeSetting(Settings.pinFailures(actingSupervisor.userId))
                 store.putSetting(Settings.BUSINESS_DATE, date.toString())
                 // Central learns who moved the date, from what to what (TILLM6-05).
-                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, now(), actingSupervisor?.userId, Facts.businessDateCorrected(identity, from, date))
+                record(Facts.BUSINESS_DATE_CORRECTED_EVENT, reading, actingSupervisor?.userId, Facts.businessDateCorrected(identity, from, date))
             }
             publishStatus()
         }
@@ -565,7 +569,8 @@ class TillService(
         if (basket.isEmpty) throw TillRefusal("The basket is empty")
         val gross = basket.total
         if (tendered < gross) throw TenderTooSmall(gross, tendered)
-        val now = now()
+        val reading = clockReading()
+        val now = reading.occurredAt
         val language = shopLanguage
         val receipt = store.transaction {
             val number = next(Settings.NEXT_RECEIPT_NUMBER)
@@ -608,10 +613,19 @@ class TillService(
             store.saveReceipt(receipt)
             store.appendOutbox(
                 Facts.event(
-                    eventId = ids.next(), eventType = "receipt.issued.v1", deviceSeq = seq, occurredAt = now,
-                    zone = clock.zone, actorUserId = cashier.userId,
+                    eventId = ids.next(),
+                    eventType = "receipt.issued.v1",
+                    deviceSeq = seq,
+                    occurredAt = reading.occurredAt,
+                    zone = clock.zone,
+                    actorUserId = cashier.userId,
                     payload = Facts.receiptPayload(document, lineJson, receipt),
-                    aggregateType = "receipt", aggregateId = documentId, contentHash = hash,
+                    aggregateType = "receipt",
+                    aggregateId = documentId,
+                    contentHash = hash,
+                    rawInstant = reading.rawInstant,
+                    offlineTimed = reading.offlineTimed,
+                    clockOffsetMs = reading.clockOffsetMs,
                 ),
             )
             receipt
@@ -628,14 +642,15 @@ class TillService(
         if (counted.cents < 0) throw TillRefusal("The count cannot be negative")
         val receipts = store.receiptsOfSession(session.sessionId)
         val open = ZReport.of(session, receipts)
-        val now = now()
+        val reading = clockReading()
+        val now = reading.occurredAt
         val closing = session.copy(
             closedAt = Times.wholeSecond(now).epochSeconds,
             countedCash = counted,
             expectedCash = SessionRules.expectedCash(session, open.cashSales),
         )
         val closed = store.transaction {
-            val fact = record("till_session.closed.v1", now, operator?.userId ?: session.operatorUserId, Facts.sessionClosed(identity, closing))
+            val fact = record("till_session.closed.v1", reading, operator?.userId ?: session.operatorUserId, Facts.sessionClosed(identity, closing))
             closing.copy(closedSeq = fact.deviceSeq).also { store.saveSession(it) }
         }
         publishStatus()
@@ -974,15 +989,17 @@ class TillService(
     }
 
     /**
-     * The till's clock corrected by the offset central last measured (TillEvent.occurred_at). The
-     * offset is dropped, with a problem recorded, when the PC's clock was moved since it was measured:
+     * Captures a consistent snapshot of the device wall clock and active offset metadata.
+     * The offset is dropped, with a problem recorded, when the PC's clock was moved since it was measured:
      * it reads earlier than at the measurement, or it moved more than the policy's tolerance beside
      * the monotonic clock. The next heartbeat measures again.
      */
-    private fun now(): Instant {
+    private fun clockReading(): ClockReading {
         val raw = clock.now()
-        val offset = store.setting(Settings.CLOCK_OFFSET_MS)?.toLongOrNull() ?: return raw
-        val at = store.setting(Settings.CLOCK_OFFSET_AT)?.toLongOrNull() ?: return raw + offset.milliseconds
+        val offset = store.setting(Settings.CLOCK_OFFSET_MS)?.toLongOrNull()
+            ?: return ClockReading(occurredAt = raw, rawInstant = raw, clockOffsetMs = null, offlineTimed = true)
+        val at = store.setting(Settings.CLOCK_OFFSET_AT)?.toLongOrNull()
+            ?: return ClockReading(occurredAt = raw + offset.milliseconds, rawInstant = raw, clockOffsetMs = offset, offlineTimed = false)
         val rawMs = raw.toEpochMilliseconds()
         val elapsed = clock.elapsedMillis()
         val elapsedAt = offsetElapsedAt
@@ -1003,10 +1020,15 @@ class TillService(
                 )
             }
             offsetElapsedAt = null
-            return raw
+            return ClockReading(occurredAt = raw, rawInstant = raw, clockOffsetMs = null, offlineTimed = true)
         }
-        return raw + offset.milliseconds
+        return ClockReading(occurredAt = raw + offset.milliseconds, rawInstant = raw, clockOffsetMs = offset, offlineTimed = false)
     }
+
+    /**
+     * The till's clock corrected by the offset central last measured (TillEvent.occurred_at).
+     */
+    private fun now(): Instant = clockReading().occurredAt
 
     private fun rawMillis(): Long = clock.now().toEpochMilliseconds()
 
@@ -1100,8 +1122,19 @@ class TillService(
         store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) } ?: Times.date(clock.now(), clock.zone)
 
     /** Appends a fact with the next device sequence number. Call inside a transaction. */
-    private fun record(eventType: String, at: Instant, actor: String?, payload: JsonObject): OutboxEntry {
-        val entry = Facts.event(ids.next(), eventType, next(Settings.NEXT_DEVICE_SEQ), at, clock.zone, actor, payload)
+    private fun record(eventType: String, reading: ClockReading, actor: String?, payload: JsonObject): OutboxEntry {
+        val entry = Facts.event(
+            eventId = ids.next(),
+            eventType = eventType,
+            deviceSeq = next(Settings.NEXT_DEVICE_SEQ),
+            occurredAt = reading.occurredAt,
+            zone = clock.zone,
+            actorUserId = actor,
+            payload = payload,
+            rawInstant = reading.rawInstant,
+            offlineTimed = reading.offlineTimed,
+            clockOffsetMs = reading.clockOffsetMs,
+        )
         store.appendOutbox(entry)
         return entry
     }
