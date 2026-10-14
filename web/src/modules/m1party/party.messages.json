@@ -1,5 +1,6 @@
 {
   "en": {
+    "party.filter.toggle": "Filters",
     "party.nav": "Society register",
     "party.register.title": "Society register",
     "party.register.actions": "Register societies",
@@ -206,6 +207,7 @@
     "party.relationship.reason.OTHER": "Other"
   },
   "si": {
+    "party.filter.toggle": "පෙරහන්",
     "party.nav": "සමිති ලේඛනය",
     "party.register.title": "සමිති ලේඛනය",
     "party.register.actions": "සමිති ලියාපදිංචි කිරීම",
@@ -412,6 +414,7 @@
     "party.relationship.reason.OTHER": "වෙනත්"
   },
   "ta": {
+    "party.filter.toggle": "வடிகட்டிகள்",
     "party.nav": "சங்கப் பதிவேடு",
     "party.register.title": "சங்கப் பதிவேடு",
     "party.register.actions": "சங்கங்களைப் பதிவு செய்தல்",

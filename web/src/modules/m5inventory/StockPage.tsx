@@ -101,7 +101,7 @@ export function StockPage() {
   >
     <path d="M4 7h16M7 12h10M10 17h4" />
   </svg>
-  Filters
+  {t("inventory.filter.toggle").text}
   <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
 </button>
 

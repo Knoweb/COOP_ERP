@@ -100,7 +100,7 @@ export function CataloguePage() {
   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16M7 12h10M10 17h4" />
   </svg>
-  Filters
+  {t("catalogue.filter.toggle").text}
   <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
 </button>
 

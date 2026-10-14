@@ -26,15 +26,15 @@
 
 .reporting-data-table th,
 .reporting-data-table td {
-  min-width: 110px;
+  min-width: var(--reporting-cell-min);
 }
 
 .reporting-data-table th:nth-child(1),
 .reporting-data-table th:nth-child(2),
 .reporting-data-table td:nth-child(1),
 .reporting-data-table td:nth-child(2) {
-  min-width: 200px;
-  max-width: 260px;
+  min-width: var(--reporting-key-column-min);
+  max-width: var(--reporting-key-column-max);
   white-space: normal;
   overflow-wrap: break-word;
 }

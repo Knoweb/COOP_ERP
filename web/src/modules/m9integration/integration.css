@@ -60,19 +60,19 @@
 }
 
 .notification-log-table {
-  min-width: 950px;
+  min-width: var(--integration-log-table-min);
 }
 
 .notification-log-table td:nth-child(1) {
-  min-width: 145px;
+  min-width: var(--integration-log-date-min);
   white-space: nowrap;
 }
 
 .notification-log-table td:nth-child(2),
 .notification-log-table td:nth-child(4),
 .notification-log-table td:nth-child(8) {
-  min-width: 120px;
-  max-width: 240px;
+  min-width: var(--integration-log-detail-min);
+  max-width: var(--integration-log-detail-max);
   overflow-wrap: anywhere;
 }
 
