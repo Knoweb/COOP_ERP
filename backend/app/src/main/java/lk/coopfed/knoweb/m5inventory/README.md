@@ -116,7 +116,20 @@ Decided on the architect's delegation in `docs/progress/deviations/2026-10-06-wa
 - **Repack yield (M5-18).** `inventory.repack_yield_tolerance_pct` (2 %): more packs than expected beyond it are refused (`m5.repack.yield_out_of_range`), fewer need a reason (`varianceReason`, `m5.repack.yield_reason_required`) and are `REPACK_YIELD_EXCEPTION` (REVIEW). A till's repack bundle, when it comes, flags and never refuses.
 - **Requests, dispatch, receipts, sales (M5-02, M5-03, M5-05, M5-16).** An approved transfer request is filled once: each item sent short is `TRANSFER_REQUEST_SHORT` (REVIEW, wanted and sent) and counted in `transfer.issued.v1`'s additive `shortLines`; the shop raises a new request for the rest. A pick row short at the reservation is picked again at dispatch from the in-date stock there is then; what is still missing is `PICK_SHORT_DISPATCHED` (REVIEW), never posted negative. A transfer received by the person who issued it is `TRANSFER_SELF_RECEIVED` (REVIEW). A sale of an item the shop never held posts against the item's newest batch M2 knows (the lot goes negative, `SALE_WITHOUT_LOT`); only an item M2 lacks is `SALE_LINE_UNRESOLVED`.
 - **Till facts without a hook (M5-04).** `TillFactNotAppliedConsumer` flags a till's `count.recorded`, `writeoff.requested`, `repack.executed` and `transfer.issued` bundles as `TILL_FACT_NOT_APPLIED` (REVIEW; `till_fact.not_applied.v1`) until each has its hook; central's own events of those types carry no device and are ignored.
-- **Deferred, with the reason** (`2026-10-06-wave2-stock-movements.md` (7)): the `SaleReversalConsumer` (M5-04) ships with the till's voids and refunds, with M6-07 and M8's negative fact; M5-08 (one cost row per entity and item) waits for the 25A performance test; M5-15 (a short receipt and cancel of a transfer) before shops receive transfers at pilot; M5-19 (an opening balance's batch registered at countersign, the Federation countersigning) before the cutover exercise; the cost of oversold units at zero waits for M8's margin work. The half-rounding of a repack's output cost is accepted (the cost rules' section above).
+## Till snapshot and change log (TILL-DATA-05, M5-11)
+
+M5 provides four snapshot contributors under `internal/snapshot/` and an event-driven change-log fan-out consumer (`M5ChangeLogFanOut`, listener group `m5.snapshot`) for enrolled offline tills:
+
+| Contributor | Table | Row ID | Content |
+|---|---|---|---|
+| `LotSnapshotContributor` | `lot` | `stock_lot_id` | Nonzero lots at the requesting shop location; GOOD, available, in-date lots receive authoritative FEFO rank; DAMAGED, expired, and negative lots have null FEFO rank; zero-quantity lots are excluded (and produce tombstones on depletion); `unit_cost` and margins are strictly excluded. |
+| `CountTaskSnapshotContributor` | `count_task` | `task_id` | SCHEDULED and COUNTING tasks at the requesting shop; SCHEDULED tasks have empty expectations array; COUNTING tasks include frozen expectations; VARIANCE_REVIEW and CLOSED tasks are excluded (and produce tombstones on completion). |
+| `PolicySnapshotContributor` | `inventory_policy` | Requesting shop `location_id` | Location's effective inventory policy across 11 verified configuration keys resolved via `ConfigRegistry` under location > entity > Federation > default precedence. |
+| `ExpectedTransferContributor` | `expected_transfer` | `transfer_id` | In-transit transfers expected at the requesting shop (`to_location_id`); includes transfer lines without `unit_cost`; excluded once received (producing tombstones). |
+
+**Change-log fan-out (`M5ChangeLogFanOut`):**
+- Listens to `StockMoved` (updates lot or produces tombstone if depleted to zero), `CountScheduled` and `CountStarted` (upserts open count tasks), `CountSubmitted`, `AdjustmentApproved`, and `AdjustmentRejected` (produces count task tombstones), `TransferIssued` (upserts expected transfer for destination shop), `TransferReceived` (produces expected transfer tombstone for destination shop), and `ConfigChanged` (upserts `inventory_policy` across the 11 verified inventory policy keys for affected enrolled shops).
+- **Non-shop safeguard (`M5Shops`):** M5 stock movements and counts occurring at warehouses or other non-shop locations are safely filtered out, preventing till change-log noise or invalid location errors.
 
 ## Tests
 
