@@ -115,6 +115,13 @@ class TillScreensTest {
         waitForText("LKR 2,440.00")
         shot("3-basket")
 
+        // Lock screen: operator locks the till; basket and session are preserved upon unlock
+        onNode(hasText("Lock")).performClick()
+        waitForText("Till locked")
+        shot("3b-locked")
+        onNode(hasText("Unlock")).performClick()
+        waitForText("LKR 2,440.00")
+
         scan.performKeyInput { pressKey(Key.F2) }
         waitForText("Cash: LKR 2,440.00")
         onNode(hasSetTextAction() and hasText("Cash given (LKR)")).performTextReplacement("5000")
