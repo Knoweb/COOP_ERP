@@ -34,6 +34,7 @@ test("a registered society lands on its card, is found in the register, and its 
 
   // The register: the new row is there, and the search box narrows to it.
   await page.getByRole("link", { name: textOf(FED_OFFICER, "party.back_to_register") }).click();
+  await page.getByRole("button", { name: textOf(FED_OFFICER, "party.filter.toggle") }).click();
   await page.getByLabel(textOf(FED_OFFICER, "party.filter.search")).fill(code);
   await expect(page.getByRole("link", { name: code })).toBeVisible();
 
