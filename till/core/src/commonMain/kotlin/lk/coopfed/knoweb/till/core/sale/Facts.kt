@@ -177,13 +177,18 @@ object Facts {
         aggregateType: String? = null,
         aggregateId: String? = null,
         contentHash: String? = null,
+        rawInstant: Instant = occurredAt,
+        offlineTimed: Boolean = false,
+        clockOffsetMs: Long? = null,
     ): OutboxEntry {
         val json = buildJsonObject {
             put("event_id", eventId)
             put("event_type", eventType)
             put("device_seq", deviceSeq)
             put("occurred_at", Times.iso(occurredAt))
-            put("occurred_local", Times.local(occurredAt, zone))
+            put("occurred_local", Times.local(rawInstant, zone))
+            if (offlineTimed) put("offline_timed", true)
+            if (clockOffsetMs != null) put("clock_offset_ms", clockOffsetMs)
             put("actor_user_id", actorUserId?.let { JsonPrimitive(it) } ?: JsonPrimitive(null as String?))
             if (aggregateType != null) put("aggregate_type", aggregateType)
             if (aggregateId != null) put("aggregate_id", aggregateId)

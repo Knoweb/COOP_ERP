@@ -1,5 +1,6 @@
 package lk.coopfed.knoweb.till.core.model
 
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 import lk.coopfed.knoweb.till.core.money.Money
@@ -117,4 +118,18 @@ data class Anomaly(
         const val CLOCK = "CLOCK"
     }
 }
+
+/**
+ * A clock snapshot captured consistently at event creation time.
+ */
+data class ClockReading(
+    /** The till's clock with active central offset applied, if any. */
+    val occurredAt: Instant,
+    /** The raw device wall-clock reading at capture time. */
+    val rawInstant: Instant,
+    /** The offset (server - device) in ms actually applied to occurredAt, or null if no offset was active. */
+    val clockOffsetMs: Long?,
+    /** True when recorded without an active clock sync offset. */
+    val offlineTimed: Boolean,
+)
 
