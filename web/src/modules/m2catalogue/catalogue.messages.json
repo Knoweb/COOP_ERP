@@ -107,7 +107,11 @@
     "catalogue.import.score": "Similarity score",
     "catalogue.import.reasons": "Match reasons",
     "catalogue.import.upload_prompt": "Drag and drop a CSV file here, or click to browse",
-    "catalogue.import.reupload": "Upload another file"
+    "catalogue.import.reupload": "Upload another file",
+    "catalogue.import.file_hint": "Supports comma, tab, and semicolon delimited CSV files",
+    "catalogue.import.no_suspects": "No duplicate candidates detected.",
+    "catalogue.import.no_errors": "No row validation errors found.",
+    "catalogue.import.col_message": "Message"
   },
   "si": {
     "catalogue.filter.toggle": "පෙරහන්",
@@ -217,7 +221,11 @@
     "catalogue.import.score": "සමානතා ලකුණු",
     "catalogue.import.reasons": "ගැළපීමට හේතු",
     "catalogue.import.upload_prompt": "CSV ගොනුව මෙතැනට අදින්න හෝ තේරීමට ක්ලික් කරන්න",
-    "catalogue.import.reupload": "වෙනත් ගොනුවක් උඩුගත කරන්න"
+    "catalogue.import.reupload": "වෙනත් ගොනුවක් උඩුගත කරන්න",
+    "catalogue.import.file_hint": "කොමා, ටැබ් සහ අර්ධ කොමා මඟින් වෙන් කරන ලද CSV ගොනු සඳහා සහය දක්වයි",
+    "catalogue.import.no_suspects": "අනුපිටපත් අපේක්ෂකයින් කිසිවක් හඳුනාගෙන නොමැත.",
+    "catalogue.import.no_errors": "පේළි වලංගු කිරීමේ දෝෂ කිසිවක් හමු නොවීය.",
+    "catalogue.import.col_message": "පණිවිඩය"
   },
   "ta": {
     "catalogue.filter.toggle": "வடிகட்டிகள்",
@@ -327,6 +335,10 @@
     "catalogue.import.score": "ஒற்றுமை மதிப்பீடு",
     "catalogue.import.reasons": "பொருந்தியதற்கான காரணங்கள்",
     "catalogue.import.upload_prompt": "CSV கோப்பை இங்கே இழுத்துப் போடவும் அல்லது உலாவ கிளிக் செய்யவும்",
-    "catalogue.import.reupload": "மற்றொரு கோப்பைப் பதிவேற்றவும்"
+    "catalogue.import.reupload": "மற்றொரு கோப்பைப் பதிவேற்றவும்",
+    "catalogue.import.file_hint": "காற்புள்ளி, தாவல் மற்றும் அரைப்புள்ளி பிரிக்கப்பட்ட CSV கோப்புகளை ஆதரிக்கிறது",
+    "catalogue.import.no_suspects": "நகல் உத்தேசங்கள் எதுவும் கண்டறியப்படவில்லை.",
+    "catalogue.import.no_errors": "வரிசை சரிபார்ப்புப் பிழைகள் எதுவும் காணப்படவில்லை.",
+    "catalogue.import.col_message": "செய்தி"
   }
 }

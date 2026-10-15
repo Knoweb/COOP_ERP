@@ -82,7 +82,7 @@ export function CataloguePage() {
         icon="catalogue"
         title={t("catalogue.title").text}
         actions={
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div className="catalogue-actions">
             {canImport && (
               <Link className="action-link" to="/catalogue/import">
                 <span>{t("catalogue.import.nav").text}</span>

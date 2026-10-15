@@ -151,7 +151,7 @@ export function CatalogueImportPage() {
             <path d="m8 16 4-4 4 4" />
           </svg>
           <p className="catalogue-dropzone__prompt">{t("catalogue.import.upload_prompt").text}</p>
-          <span className="catalogue-dropzone__hint">Supports comma, tab, and semicolon delimited CSV files</span>
+          <span className="catalogue-dropzone__hint">{t("catalogue.import.file_hint").text}</span>
           <input
             type="file"
             ref={fileInputRef}
@@ -290,7 +290,7 @@ export function CatalogueImportPage() {
           {activeTab === "suspects" && (
             <div className="import-tab-panel" role="tabpanel">
               {report.suspects.length === 0 ? (
-                <p className="import-empty-state">No duplicate candidates detected.</p>
+                <p className="import-empty-state">{t("catalogue.import.no_suspects").text}</p>
               ) : (
                 <div className="table-container">
                   <table className="import-table">
@@ -353,7 +353,7 @@ export function CatalogueImportPage() {
           {activeTab === "errors" && (
             <div className="import-tab-panel" role="tabpanel">
               {report.errors.length === 0 ? (
-                <p className="import-empty-state">No row validation errors found.</p>
+                <p className="import-empty-state">{t("catalogue.import.no_errors").text}</p>
               ) : (
                 <div className="table-container">
                   <table className="import-table">
@@ -362,7 +362,7 @@ export function CatalogueImportPage() {
                         <th>{t("catalogue.import.row").text}</th>
                         <th>{t("catalogue.import.field").text}</th>
                         <th>{t("catalogue.column.code").text}</th>
-                        <th>Message</th>
+                        <th>{t("catalogue.import.col_message").text}</th>
                       </tr>
                     </thead>
                     <tbody>
