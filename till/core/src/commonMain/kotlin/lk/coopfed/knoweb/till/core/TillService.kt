@@ -31,6 +31,7 @@ import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.port.Central
 import lk.coopfed.knoweb.till.core.port.CentralRefused
@@ -60,6 +61,15 @@ import lk.coopfed.knoweb.till.core.time.Times
 
 /** The till cannot do this now; [message] says why in words for the cashier. */
 class TillRefusal(message: String) : Exception(message)
+
+/** A tender specified by the operator at checkout (doc 26 section 3.3). */
+data class TenderInput(
+    val kind: String,
+    val amount: Money,
+    val reference: String? = null,
+    val tendered: Money = amount,
+    val customerAccountId: String? = null,
+)
 
 /** What the status bar shows: online or not, what waits for central, the snapshot in use, what the office must know. */
 data class TillStatus(
@@ -255,7 +265,12 @@ class TillService(
     suspend fun refreshSnapshot(): Long {
         val identity = requireDevice()
         val held = lock.withLock { snapshotVersion }
-        var delta = SnapshotDelta.fromJson(central.snapshot(held))
+        var delta = try {
+            SnapshotDelta.fromJson(central.snapshot(held))
+        } catch (e: CentralUnreachable) {
+            lock.withLock { publishStatus(online = false, message = "Offline: selling continues; ${e.message}") }
+            throw e
+        }
         var manifest = verifier.verify(delta, identity.locationId, identity.signingPublicKey, identity.signingKeyId)
         try {
             verifier.continuity(manifest, held)
@@ -271,7 +286,7 @@ class TillService(
             val confirmedAt = clock.now().toEpochMilliseconds().toString()
             if (delta.version == current.version && !delta.fullSnapshotRequired) {
                 store.transaction { store.putSetting(Settings.LAST_SNAPSHOT_AT, confirmedAt) }
-                publishStatus()
+                publishStatus(online = true, message = null)
                 return current.version
             }
             val next = current.apply(delta, businessDate())
@@ -283,7 +298,7 @@ class TillService(
             snapshotVersion = next.version
             catalogue = Catalogue(next, localPrices, businessDate())
             if (catalogue.operators.isNotEmpty()) operatorsSeen = true
-            publishStatus()
+            publishStatus(online = true, message = null)
             return next.version
         }
     }
@@ -654,11 +669,14 @@ class TillService(
     }
 
     /**
-     * Sells the basket for cash: numbers the receipt from the till position's series, writes it and
-     * its bundle to the outbox in one transaction, and returns it for printing. The basket is
-     * emptied only when the receipt is safely written.
+     * Completes a sale with one or more tenders: numbers the receipt from the till position's
+     * series, writes it, its tender rows and its bundle to the outbox in one atomic transaction,
+     * and returns it for printing. The basket is emptied only when the receipt is safely written.
+     *
+     * Refuses digital tenders (CARD, WALLET, QR) when offline (FR-POS-040) or when the approval
+     * reference is missing.
      */
-    suspend fun sellForCash(basket: Basket, tendered: Money): IssuedReceipt = lock.withLock {
+    suspend fun sell(basket: Basket, tenders: List<TenderInput>): IssuedReceipt = lock.withLock {
         val identity = requireDevice()
         requireNotRevoked()
         requireNotLocked()
@@ -669,11 +687,68 @@ class TillService(
         }
         val session = store.openSession() ?: throw TillRefusal("Open a session first")
         if (basket.isEmpty) throw TillRefusal("The basket is empty")
+        if (tenders.isEmpty()) throw TillRefusal("At least one tender is required")
+
         val gross = basket.total
-        if (tendered < gross) throw TenderTooSmall(gross, tendered)
+        val isOnline = _status.value.online == true
+
+        for (tender in tenders) {
+            val upperKind = tender.kind.uppercase()
+            val isDigital = upperKind in setOf("CARD", "CARD_REF", "WALLET", "QR")
+            if (isDigital) {
+                val label = when (upperKind) {
+                    "CARD", "CARD_REF" -> "Card"
+                    "WALLET" -> "Wallet"
+                    "QR" -> "QR"
+                    else -> tender.kind
+                }
+                if (!isOnline) {
+                    throw TillRefusal("$label payment is refused while offline")
+                }
+                if (tender.reference.isNullOrBlank()) {
+                    throw TillRefusal("Payment reference is required for $label")
+                }
+            }
+            if (tender.amount <= Money.ZERO) {
+                throw TillRefusal("Tender amount must be positive")
+            }
+        }
+
+        val appliedTotal = tenders.fold(Money.ZERO) { acc, t -> acc + t.amount }
+        if (appliedTotal != gross) {
+            if (appliedTotal < gross) {
+                throw TillRefusal("Total tenders LKR ${appliedTotal.display()} is less than total LKR ${gross.display()}")
+            } else {
+                throw TillRefusal("Total tenders LKR ${appliedTotal.display()} exceeds total LKR ${gross.display()}")
+            }
+        }
+
+        val totalTendered = tenders.fold(Money.ZERO) { acc, t -> acc + t.tendered }
+        if (totalTendered < gross) {
+            throw TenderTooSmall(gross, totalTendered)
+        }
+
         val reading = clockReading()
         val now = reading.occurredAt
         val language = shopLanguage
+
+        val tenderRecords = tenders.mapIndexed { index, t ->
+            val changeGiven = if (t.kind.uppercase() == "CASH" && t.tendered > t.amount) {
+                t.tendered - t.amount
+            } else {
+                Money.ZERO
+            }
+            TenderRecord(
+                seq = index + 1,
+                kind = t.kind.uppercase(),
+                amount = t.amount,
+                reference = t.reference?.trim(),
+                customerAccountId = t.customerAccountId,
+                changeGiven = changeGiven,
+                offline = !isOnline,
+            )
+        }
+
         val receipt = store.transaction {
             val number = next(Settings.NEXT_RECEIPT_NUMBER)
             val seq = next(Settings.NEXT_DEVICE_SEQ)
@@ -707,10 +782,11 @@ class TillService(
                 operatorName = cashier.displayName,
                 lines = lines,
                 gross = gross,
-                tendered = tendered,
-                change = tendered - gross,
+                tendered = totalTendered,
+                change = totalTendered - gross,
                 contentHash = hash,
                 deviceSeq = seq,
+                tenders = tenderRecords,
             )
             store.saveReceipt(receipt)
             store.appendOutbox(
@@ -735,6 +811,47 @@ class TillService(
         basket.clear()
         publishStatus()
         receipt
+    }
+
+    /**
+     * Sells the basket for cash: numbers the receipt from the till position's series, writes it and
+     * its bundle to the outbox in one transaction, and returns it for printing. The basket is
+     * emptied only when the receipt is safely written.
+     */
+    suspend fun sellForCash(basket: Basket, tendered: Money): IssuedReceipt {
+        val gross = basket.total
+        if (tendered < gross) throw TenderTooSmall(gross, tendered)
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "CASH", amount = gross, reference = null, tendered = tendered)),
+        )
+    }
+
+    /** Sells the basket using an external standalone card terminal, recording its approval reference. */
+    suspend fun sellForCard(basket: Basket, reference: String): IssuedReceipt {
+        val gross = basket.total
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "CARD", amount = gross, reference = reference)),
+        )
+    }
+
+    /** Sells the basket using an external mobile wallet, recording its approval reference. */
+    suspend fun sellForWallet(basket: Basket, reference: String): IssuedReceipt {
+        val gross = basket.total
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "WALLET", amount = gross, reference = reference)),
+        )
+    }
+
+    /** Sells the basket using a dynamic/merchant QR payment, recording its transaction reference. */
+    suspend fun sellForQr(basket: Basket, reference: String): IssuedReceipt {
+        val gross = basket.total
+        return sell(
+            basket,
+            listOf(TenderInput(kind = "QR", amount = gross, reference = reference)),
+        )
     }
 
     /** The cashier's blind count closes the session; the till works out expected cash and the variance. */

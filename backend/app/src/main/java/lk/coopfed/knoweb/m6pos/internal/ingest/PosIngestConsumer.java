@@ -67,7 +67,10 @@ class PosIngestConsumer {
         List<RecordReceipt.Tender> tenders = new ArrayList<>();
         for (JsonNode tender : payload.path("tenders")) {
             tenders.add(new RecordReceipt.Tender(
-                    tender.path("seq").asInt(), text(tender, "kind"), decimal(tender, "amount")));
+                    tender.path("seq").asInt(),
+                    text(tender, "kind"),
+                    decimal(tender, "amount"),
+                    tender.hasNonNull("reference") ? text(tender, "reference") : null));
         }
         receipts.handle(
                 new RecordReceipt(

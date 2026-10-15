@@ -52,14 +52,20 @@ data class ZReport(
                     )
                 }
                 .sortedBy { it.nameEn }
+            val cash = ordered.fold(Money.ZERO) { s, r ->
+                if (r.tenders.isNotEmpty()) {
+                    s + r.tenders.filter { it.kind.uppercase() == "CASH" }.fold(Money.ZERO) { cs, t -> cs + t.amount }
+                } else {
+                    s + r.gross
+                }
+            }
             return ZReport(
                 session = session,
                 receiptCount = ordered.size,
                 firstReceipt = ordered.firstOrNull()?.numberDisplay,
                 lastReceipt = ordered.lastOrNull()?.numberDisplay,
                 grossSales = gross,
-                // Cash is the only tender of the trial: every receipt was paid in cash.
-                cashSales = gross,
+                cashSales = cash,
                 items = items,
                 refusedFacts = refusedFacts,
             )

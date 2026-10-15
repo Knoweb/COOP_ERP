@@ -373,6 +373,42 @@ class TillController(
         syncSoon()
     }
 
+    /** Card tendered on standalone terminal; receipt printed, drawer does NOT open. */
+    fun payCard(reference: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val receipt = service.sellForCard(basket, reference)
+        refreshBasket()
+        lastReceipt = receipt
+        onDone()
+        say("${receipt.numberDisplay}: Card LKR ${receipt.gross.display()} (Ref: $reference)")
+        print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = false)
+        syncSoon()
+    }
+
+    /** Mobile wallet payment on standalone terminal / app; receipt printed, drawer does NOT open. */
+    fun payWallet(reference: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val receipt = service.sellForWallet(basket, reference)
+        refreshBasket()
+        lastReceipt = receipt
+        onDone()
+        say("${receipt.numberDisplay}: Wallet LKR ${receipt.gross.display()} (Ref: $reference)")
+        print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = false)
+        syncSoon()
+    }
+
+    /** QR payment on terminal / dynamic QR; receipt printed, drawer does NOT open. */
+    fun payQr(reference: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val receipt = service.sellForQr(basket, reference)
+        refreshBasket()
+        lastReceipt = receipt
+        onDone()
+        say("${receipt.numberDisplay}: QR LKR ${receipt.gross.display()} (Ref: $reference)")
+        print(receipt.numberDisplay, ReceiptLayouts.receipt(receipt, header(), service.shopLanguage, zone), kickDrawer = false)
+        syncSoon()
+    }
+
     fun reprintLast() = act {
         lastReceipt?.let { r -> print("${r.numberDisplay}-reprint", ReceiptLayouts.receipt(r, header(), service.shopLanguage, zone, reprint = true), false) }
     }

@@ -211,7 +211,7 @@ class PosQueriesImpl implements PosQueries {
         Map<UUID, List<ReceiptView.Tender>> tenders = new LinkedHashMap<>();
         jdbc.query(
                 """
-                select document_id, seq, kind, amount
+                select document_id, seq, kind, amount, reference
                   from pos.receipt_tender
                  where document_id = any(?)
                  order by document_id, seq
@@ -219,7 +219,10 @@ class PosQueriesImpl implements PosQueries {
                 rs -> {
                     tenders.computeIfAbsent(rs.getObject("document_id", UUID.class), id -> new ArrayList<>())
                             .add(new ReceiptView.Tender(
-                                    rs.getInt("seq"), rs.getString("kind"), rs.getBigDecimal("amount")));
+                                    rs.getInt("seq"),
+                                    rs.getString("kind"),
+                                    rs.getBigDecimal("amount"),
+                                    rs.getString("reference")));
                 },
                 ids);
         return headers.stream()

@@ -399,15 +399,18 @@ private fun BusinessDateDialog(c: TillController, close: () -> Unit) {
 private fun SellScreen(c: TillController) {
     var scan by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Item>>(emptyList()) }
-    var paying by remember { mutableStateOf(false) }
+    var payingMode by remember { mutableStateOf<String?>(null) }
     val scanFocus = remember { FocusRequester() }
-    LaunchedEffect(paying, c.needsPrice) { if (!paying && c.needsPrice == null) scanFocus.requestFocus() }
+    LaunchedEffect(payingMode, c.needsPrice) { if (payingMode == null && c.needsPrice == null) scanFocus.requestFocus() }
 
     Row(
         Modifier.fillMaxSize().onPreviewKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when (e.key) {
-                Key.F2 -> { if (c.lines.isNotEmpty()) paying = true; true }
+                Key.F2 -> { if (c.lines.isNotEmpty()) payingMode = "CASH"; true }
+                Key.F3 -> { if (c.lines.isNotEmpty()) payingMode = "CARD"; true }
+                Key.F4 -> { if (c.lines.isNotEmpty()) payingMode = "WALLET"; true }
+                Key.F5 -> { if (c.lines.isNotEmpty()) payingMode = "QR"; true }
                 Key.F10 -> { c.toCloseSession(); true }
                 else -> false
             }
@@ -451,8 +454,19 @@ private fun SellScreen(c: TillController) {
                     Text("${c.lines.size} lines", color = TillColors.textMuted)
                 }
             }
-            Button(onClick = { paying = true }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                Text("Cash  (F2)", fontSize = 20.sp)
+            Button(onClick = { payingMode = "CASH" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Text("Cash  (F2)", fontSize = 18.sp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { payingMode = "CARD" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.weight(1f).height(46.dp)) {
+                    Text("Card (F3)", fontSize = 13.sp)
+                }
+                Button(onClick = { payingMode = "WALLET" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.weight(1f).height(46.dp)) {
+                    Text("Wallet (F4)", fontSize = 13.sp)
+                }
+                Button(onClick = { payingMode = "QR" }, enabled = c.lines.isNotEmpty() && !c.busy, modifier = Modifier.weight(1f).height(46.dp)) {
+                    Text("QR (F5)", fontSize = 13.sp)
+                }
             }
             OutlinedButton(onClick = { c.clearSale() }, enabled = c.lines.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Clear the sale") }
             OutlinedButton(onClick = { c.reprintLast() }, enabled = c.lastReceipt != null, modifier = Modifier.fillMaxWidth()) {
@@ -465,7 +479,10 @@ private fun SellScreen(c: TillController) {
             Text("Printer: ${c.printerDescription}", color = TillColors.textMuted, fontSize = 12.sp)
         }
     }
-    if (paying) CashDialog(c) { paying = false }
+    when (payingMode) {
+        "CASH" -> CashDialog(c) { payingMode = null }
+        "CARD", "WALLET", "QR" -> DigitalPayDialog(c, payingMode!!) { payingMode = null }
+    }
     c.needsPrice?.let { PriceDialog(c, it) }
 }
 
@@ -516,6 +533,72 @@ private fun CashDialog(c: TillController, close: () -> Unit) {
             }
         },
         confirmButton = { Button(onClick = { c.payCash(given, close) }, enabled = !c.busy) { Text("Complete (Enter)") } },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel (Esc)") } },
+    )
+}
+
+@Composable
+private fun DigitalPayDialog(c: TillController, kind: String, close: () -> Unit) {
+    var reference by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    val isOnline = c.status.online == true
+    val titleKind = when (kind.uppercase()) {
+        "CARD" -> "Card"
+        "WALLET" -> "Wallet"
+        "QR" -> "QR"
+        else -> kind
+    }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    val onComplete = {
+        if (reference.isNotBlank() && isOnline) {
+            when (kind.uppercase()) {
+                "CARD" -> c.payCard(reference.trim(), close)
+                "WALLET" -> c.payWallet(reference.trim(), close)
+                "QR" -> c.payQr(reference.trim(), close)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("$titleKind Payment: LKR ${c.total.display()}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!isOnline) {
+                    Text(
+                        "Offline: $titleKind payments are refused while offline (Cash only per FR-POS-040)",
+                        color = TillColors.disputedText,
+                        modifier = Modifier.background(TillColors.disputedBg).padding(8.dp),
+                    )
+                } else {
+                    Text(
+                        "Authorize $titleKind on standalone terminal/app, then key the approval reference. Never enter card numbers, PINs or CVV.",
+                        color = TillColors.textMuted,
+                        fontSize = 13.sp,
+                    )
+                }
+                OutlinedTextField(
+                    reference, { reference = it },
+                    label = { Text("Terminal Approval Reference") },
+                    singleLine = true,
+                    enabled = isOnline,
+                    modifier = Modifier.focusRequester(focus).onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) { close(); true } else false
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onComplete() }),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onComplete,
+                enabled = !c.busy && isOnline && reference.isNotBlank(),
+            ) {
+                Text("Complete (Enter)")
+            }
+        },
         dismissButton = { TextButton(onClick = close) { Text("Cancel (Esc)") } },
     )
 }

@@ -78,7 +78,11 @@ public interface PosQueries {
                 int lineNo, UUID skuId, UUID batchId, BigDecimal qty, BigDecimal unitPrice, BigDecimal lineTotal) {}
 
         /** How the customer paid: CASH, CARD ... as the till reported it, in the till's order. */
-        public record Tender(int seq, String kind, BigDecimal amount) {}
+        public record Tender(int seq, String kind, BigDecimal amount, String reference) {
+            public Tender(int seq, String kind, BigDecimal amount) {
+                this(seq, kind, amount, null);
+            }
+        }
     }
 
     /** A session; the open's fields (position, business date, opened at, float) are null for an orphan close. */

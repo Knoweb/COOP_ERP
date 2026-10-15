@@ -249,6 +249,175 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void successfulDigitalTendersWithReferencePersistToPostgresAndQueriesReturnReference() {
+        UUID session = openSession();
+        UUID id = Ids.next();
+        BigDecimal gross = new BigDecimal("1750.00");
+        RecordReceipt r = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                nextNumber++,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                null,
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(
+                        new RecordReceipt.Tender(1, "CARD", new BigDecimal("1000.00"), "AUTH-CARD-1001"),
+                        new RecordReceipt.Tender(2, "WALLET", new BigDecimal("500.00"), "AUTH-WAL-2002"),
+                        new RecordReceipt.Tender(3, "QR", new BigDecimal("250.00"), "AUTH-QR-3003")));
+
+        receipts.handle(r, device());
+
+        assertThat(pos.receipt(id, device())).hasValueSatisfying(receipt -> {
+            assertThat(receipt.grossAmount()).isEqualByComparingTo("1750.00");
+            assertThat(receipt.flags()).isEmpty();
+            assertThat(receipt.tenders()).hasSize(3);
+
+            PosQueries.ReceiptView.Tender t1 = receipt.tenders().get(0);
+            assertThat(t1.seq()).isEqualTo(1);
+            assertThat(t1.kind()).isEqualTo("CARD");
+            assertThat(t1.amount()).isEqualByComparingTo("1000.00");
+            assertThat(t1.reference()).isEqualTo("AUTH-CARD-1001");
+
+            PosQueries.ReceiptView.Tender t2 = receipt.tenders().get(1);
+            assertThat(t2.seq()).isEqualTo(2);
+            assertThat(t2.kind()).isEqualTo("WALLET");
+            assertThat(t2.amount()).isEqualByComparingTo("500.00");
+            assertThat(t2.reference()).isEqualTo("AUTH-WAL-2002");
+
+            PosQueries.ReceiptView.Tender t3 = receipt.tenders().get(2);
+            assertThat(t3.seq()).isEqualTo(3);
+            assertThat(t3.kind()).isEqualTo("QR");
+            assertThat(t3.amount()).isEqualByComparingTo("250.00");
+            assertThat(t3.reference()).isEqualTo("AUTH-QR-3003");
+        });
+
+        List<String> refs = superuserJdbc()
+                .queryForList(
+                        "select reference from pos.receipt_tender where document_id = ? order by seq",
+                        String.class,
+                        id);
+        assertThat(refs).containsExactly("AUTH-CARD-1001", "AUTH-WAL-2002", "AUTH-QR-3003");
+    }
+
+    @Test
+    void missingReferenceOnDigitalTenderIsFlaggedAsTenderReferenceMissing() {
+        UUID session = openSession();
+        UUID id = Ids.next();
+        BigDecimal gross = new BigDecimal("100.00");
+        RecordReceipt r = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                nextNumber++,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                null,
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(new RecordReceipt.Tender(1, "CARD", gross, null)));
+
+        receipts.handle(r, device());
+
+        assertThat(pos.receipt(id, device())).hasValueSatisfying(receipt -> {
+            assertThat(receipt.flags()).containsExactly("TENDER_REFERENCE_MISSING");
+        });
+        assertThat(kernel.committedAudit())
+                .filteredOn(a -> a.eventType().equals("RECEIPT_FLAGGED"))
+                .singleElement()
+                .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TENDER_REFERENCE_MISSING"));
+    }
+
+    @Test
+    void replayWithDifferentTenderDataKeepsFirstAndAuditsReceiptReplayDiffers() {
+        UUID session = openSession();
+        UUID id = Ids.next();
+        BigDecimal gross = new BigDecimal("100.00");
+        RecordReceipt first = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                1L,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                "same-hash",
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(new RecordReceipt.Tender(1, "CARD", gross, "AUTH-ORIGINAL")));
+
+        receipts.handle(first, device());
+        kernel.reset();
+
+        // Exact redelivery: no audit
+        receipts.handle(first, device());
+        assertThat(kernel.committedAudit()).isEmpty();
+
+        // Replay with altered tender reference:
+        RecordReceipt altered = new RecordReceipt(
+                id,
+                SHOP,
+                null,
+                DEVICE,
+                session,
+                OWN_SERIES,
+                1L,
+                "T-1",
+                MORNING,
+                null,
+                null,
+                "LKR",
+                gross,
+                BigDecimal.ZERO,
+                gross,
+                "same-hash",
+                1L,
+                List.of(new RecordReceipt.Line(1, Ids.next(), null, "EA", BigDecimal.ONE, gross, gross)),
+                List.of(new RecordReceipt.Tender(1, "CARD", gross, "AUTH-TAMPERED")));
+
+        receipts.handle(altered, device());
+
+        // First copy is preserved in DB!
+        assertThat(pos.receipt(id, device())).hasValueSatisfying(receipt -> {
+            assertThat(receipt.tenders().get(0).reference()).isEqualTo("AUTH-ORIGINAL");
+        });
+
+        // Replay differs is recorded
+        assertThat(kernel.committedAudit()).singleElement().satisfies(a -> {
+            assertThat(a.eventType()).isEqualTo("RECEIPT_REPLAY_DIFFERS");
+            assertThat(String.valueOf(a.after())).contains("tendersDiffer=true");
+        });
+    }
+
+    @Test
     void receiptsArePagedNewestFirstByDayWithACursorAndAFlaggedFilter() {
         UUID session = openSession();
         List<UUID> today = new ArrayList<>();

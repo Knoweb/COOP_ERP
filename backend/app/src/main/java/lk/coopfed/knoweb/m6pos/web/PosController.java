@@ -98,7 +98,8 @@ class PosController implements PosApi {
                                         .lineTotal(l.lineTotal()))
                                 .toList(),
                         r.tenders().stream()
-                                .map(x -> new ReceiptTenderResponse(x.seq(), x.kind(), x.amount()))
+                                .map(x -> new ReceiptTenderResponse(x.seq(), x.kind(), x.amount())
+                                        .reference(x.reference()))
                                 .toList())
                 .tillPositionId(r.tillPositionId())
                 .netAmount(r.netAmount())

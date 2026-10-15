@@ -534,6 +534,50 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 .satisfies(a -> assertThat(String.valueOf(a.after())).contains("TOTAL_MISMATCH"));
     }
 
+    @Test
+    void endToEndTillCardSaleSyncsAndPosReceiptQueryReturnsReference() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        till.openSession(BigDecimal.ZERO);
+        UUID cardSaleId =
+                till.sell(List.of(new Sale("4790001000011", BigDecimal.ONE, new BigDecimal("1450.00"))), payload -> {
+                    payload.put(
+                            "tenders",
+                            List.of(Map.of(
+                                    "seq", 1,
+                                    "kind", "CARD",
+                                    "amount", "1450.00",
+                                    "reference", "AUTH-E2E-CARD-8899")));
+                });
+        till.closeSession(BigDecimal.ZERO);
+        till.drain(50, Instant.now().plusSeconds(30));
+        deliverTheTillsEvents();
+
+        // Check PosQueries returns reference
+        assertThat(pos.receipt(cardSaleId, own(MPCS))).hasValueSatisfying(r -> {
+            assertThat(r.grossAmount()).isEqualByComparingTo("1450.00");
+            assertThat(r.flags()).isEmpty();
+            assertThat(r.tenders()).singleElement().satisfies(t -> {
+                assertThat(t.kind()).isEqualTo("CARD");
+                assertThat(t.amount()).isEqualByComparingTo("1450.00");
+                assertThat(t.reference()).isEqualTo("AUTH-E2E-CARD-8899");
+            });
+        });
+
+        // Check HTTP endpoint returns reference
+        JsonNode response = http.exchange(
+                        "/v1/pos/receipts/" + cardSaleId,
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(response.get("tenders")).singleElement().satisfies(t -> {
+            assertThat(t.get("kind").asText()).isEqualTo("CARD");
+            assertThat(t.get("amount").asDouble()).isEqualTo(1450.00);
+            assertThat(t.get("reference").asText()).isEqualTo("AUTH-E2E-CARD-8899");
+        });
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private TillSimulator till() {

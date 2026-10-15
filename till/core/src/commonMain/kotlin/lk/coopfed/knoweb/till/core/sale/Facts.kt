@@ -14,6 +14,7 @@ import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.time.Times
 
@@ -92,16 +93,29 @@ object Facts {
         }
     }
 
-    /** The whole receipt.issued.v1 payload: document, lines, the cash tender, the session and the hash. */
+    /** The whole receipt.issued.v1 payload: document, lines, the tenders, the session and the hash. */
     fun receiptPayload(document: JsonObject, lines: JsonArray, receipt: IssuedReceipt): JsonObject = buildJsonObject {
         put("document", document)
         put("lines", lines)
         put("tenders", buildJsonArray {
-            add(buildJsonObject {
-                put("seq", 1)
-                put("kind", "CASH")
-                put("amount", receipt.gross.plain())
-            })
+            val list = receipt.tenders.ifEmpty {
+                listOf(TenderRecord(seq = 1, kind = "CASH", amount = receipt.gross))
+            }
+            for (tender in list) {
+                add(buildJsonObject {
+                    put("seq", tender.seq)
+                    put("kind", tender.kind)
+                    put("amount", tender.amount.plain())
+                    tender.reference?.let { put("reference", it) }
+                    tender.customerAccountId?.let { put("customer_account_id", it) }
+                    if (tender.changeGiven > Money.ZERO) {
+                        put("change_given", tender.changeGiven.plain())
+                    }
+                    if (tender.offline) {
+                        put("offline", true)
+                    }
+                })
+            }
         })
         put("session_id", receipt.sessionId)
         put("content_hash", receipt.contentHash)
