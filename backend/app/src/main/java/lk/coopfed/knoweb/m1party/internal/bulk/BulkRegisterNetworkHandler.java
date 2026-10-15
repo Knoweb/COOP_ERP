@@ -17,7 +17,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -48,8 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>All-or-none: every row is validated first. If any rule fails, nothing is committed and a
  * detailed {@link BulkNetworkReport} is returned. When all items pass, batch inserts minimize
- * database roundtrips and Argon2id PIN hashing runs in parallel to ensure rapid execution well
- * under 60 seconds for at least 40 shops, 120 users, and 60 devices.
+ * database roundtrips and Argon2id PIN hashing runs sequentially with bounded heap usage to
+ * ensure rapid execution well under 60 seconds for at least 40 shops, 120 users, and 60 devices.
  */
 @Service
 @CommandHandler(permission = "prt.location.register")
@@ -173,15 +172,15 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
             }
         }
 
-        // Prepare users and parallel Argon2id PIN hashing
-        Map<String, String> hashedPins = new ConcurrentHashMap<>();
-        users.parallelStream().forEach(u -> {
+        // Prepare users and sequential Argon2id PIN hashing (one at a time to keep heap within 64 MB)
+        Map<String, String> hashedPins = new HashMap<>();
+        for (BulkRegisterNetwork.User u : users) {
             if (u.pin() != null && !u.pin().isBlank()) {
                 hashedPins.put(
                         u.username().strip().toLowerCase(Locale.ROOT),
                         pinHasher.hash(u.pin().strip()));
             }
-        });
+        }
 
         List<PreparedUser> preparedUsers = new ArrayList<>();
         for (BulkRegisterNetwork.User user : users) {
@@ -242,11 +241,23 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         batchInsertDevices(preparedDevices, now);
 
         // 5. Update primary till positions on shops
-        for (Map.Entry<UUID, UUID> entry : primaryTillMap.entrySet()) {
-            jdbc.update(
+        if (!primaryTillMap.isEmpty()) {
+            List<Map.Entry<UUID, UUID>> primaryTillEntries = new ArrayList<>(primaryTillMap.entrySet());
+            jdbc.batchUpdate(
                     "UPDATE party.location SET primary_till_position_id = ? WHERE location_id = ?",
-                    entry.getValue(),
-                    entry.getKey());
+                    new BatchPreparedStatementSetter() {
+                        @Override
+                        public void setValues(PreparedStatement ps, int i) throws SQLException {
+                            Map.Entry<UUID, UUID> entry = primaryTillEntries.get(i);
+                            ps.setObject(1, entry.getValue());
+                            ps.setObject(2, entry.getKey());
+                        }
+
+                        @Override
+                        public int getBatchSize() {
+                            return primaryTillEntries.size();
+                        }
+                    });
         }
 
         // 6. Register Numbering Series for locations and till positions
