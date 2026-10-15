@@ -33,6 +33,10 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A numbering series is not dense
+  - code: DEVICE_SEQUENCE_GAP
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A device source sequence is not dense
   # K-12 and K-13: scheduled jobs and the business day.
   - code: JOB_TIMED_OUT
     severity: ALERT
