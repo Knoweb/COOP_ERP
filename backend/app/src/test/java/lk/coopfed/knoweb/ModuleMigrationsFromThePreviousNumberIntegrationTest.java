@@ -40,7 +40,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 4 (K4-01, K4-03): kernel V0092 (floor_alerted, config_value own_write) from V0091.
         // Wave 4, M3R-09: kernel V0093 (the audit review reader role) from V0091 (#339 takes V0092).
         // Wave 4, TILL-PLAT-07: kernel V0094 (release registry and central update) from V0093.
-        streams.put("kernel", "93");
+        // TILL-DATA-11: kernel V0095 (device sequence gaps) from V0094.
+        streams.put("kernel", "94");
         streams.put("hello", null);
         // Wave 4, TD-03: m1party V0017 (party.change_log_shops) from V0014 as well.
         streams.put("m1party", "14");
@@ -141,7 +142,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         }
 
         assertThat(after)
-                .containsEntry("kernel", 94)
+                .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 8)
