@@ -535,6 +535,16 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  - key: catalogue.duplicate_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0.0, maximum: 1.0 }
+    description_en: Threshold above which two SKUs are considered a duplicate suspect for the data steward
+    description_si: දත්ත භාරකරු සඳහා අයිතම දෙකක් අනුපිටපත් සැකයක් ලෙස සලකනු ලබන සීමාව
+    description_ta: தரவு பொறுப்பாளருக்கு இரண்டு உருப்படிகள் நகல் சந்தேகமாகக் கருதப்படும் வரம்பு
+    default: "0.85"
+    scope_kind: FEDERATION
+    change_permission: sys.config.manage
+    module: m2catalogue
   # M4 Trading Documents (24A section 3.1, "seed/m4/config.yaml"; doc 24 section 7): the defaults
   # of doc 24 DR-1 to DR-6 as doc 10 F-09 and A-03 assume them. Configuration, so a different
   # answer from the Federation admins is a value, not a code change.
