@@ -50,6 +50,7 @@ object ReceiptLayouts {
             blocks += Block.Text(line.nameLocal + tag)
             blocks += Block.Row("  ${line.qty.display()} x ${line.unitPrice.display()}", line.lineTotal.display(), TextSize.SMALL)
         }
+        blocks += Block.Rule
         blocks += Block.Row(m.total, "LKR ${r.gross.display()}", TextSize.LARGE, bold = true)
         if (r.tenders.isNotEmpty()) {
             for (tender in r.tenders) {
