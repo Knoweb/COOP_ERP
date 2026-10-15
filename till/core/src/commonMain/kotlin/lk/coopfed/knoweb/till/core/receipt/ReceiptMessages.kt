@@ -29,6 +29,9 @@ data class ReceiptMessages(
     val variance: String,
     /** "{n}" stands for the count. */
     val refusedFacts: String,
+    val card: String = "Card",
+    val wallet: String = "Wallet",
+    val qr: String = "QR",
 ) {
     companion object {
         private val EN = ReceiptMessages(
@@ -37,6 +40,7 @@ data class ReceiptMessages(
             businessDate = "Business date", opened = "Opened", closed = "Closed", receipts = "Receipts",
             sales = "Sales", float = "Float", expected = "Expected cash", counted = "Counted cash",
             variance = "Variance", refusedFacts = "{n} facts refused by central, see the office",
+            card = "Card", wallet = "Wallet", qr = "QR",
         )
         private val SI = ReceiptMessages(
             receipt = "රිසිට්පත", date = "දිනය", cashier = "මුදල් අයකැමි", counter = "කවුන්ටරය",
@@ -45,6 +49,7 @@ data class ReceiptMessages(
             opened = "ආරම්භය", closed = "අවසානය", receipts = "රිසිට්පත්", sales = "විකුණුම්",
             float = "ආරම්භක මුදල", expected = "අපේක්ෂිත මුදල", counted = "ගණන් කළ මුදල",
             variance = "වෙනස", refusedFacts = "මධ්‍යස්ථානය ප්‍රතික්ෂේප කළ වාර්තා {n}ක්, කාර්යාලය අමතන්න",
+            card = "කාඩ්පත", wallet = "පසුම්බිය", qr = "QR",
         )
         private val TA = ReceiptMessages(
             receipt = "ரசீது", date = "தேதி", cashier = "காசாளர்", counter = "கவுண்டர்",
@@ -53,6 +58,7 @@ data class ReceiptMessages(
             opened = "தொடக்கம்", closed = "முடிவு", receipts = "ரசீதுகள்", sales = "விற்பனை",
             float = "தொடக்கப் பணம்", expected = "எதிர்பார்க்கும் பணம்", counted = "எண்ணிய பணம்",
             variance = "வேறுபாடு", refusedFacts = "மையம் நிராகரித்த {n} பதிவுகள், அலுவலகத்தை அணுகவும்",
+            card = "அட்டை", wallet = "பணப்பை", qr = "QR",
         )
 
         fun of(language: Language): ReceiptMessages = when (language) {

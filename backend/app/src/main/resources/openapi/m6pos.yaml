@@ -185,6 +185,7 @@ components:
         seq: { type: integer }
         kind: { type: string, description: 'CASH, CARD ... as the till reported it' }
         amount: { type: number }
+        reference: { type: string, nullable: true, description: 'Approval reference from the terminal' }
     ReceiptLineResponse:
       type: object
       required: [lineNo, qty]

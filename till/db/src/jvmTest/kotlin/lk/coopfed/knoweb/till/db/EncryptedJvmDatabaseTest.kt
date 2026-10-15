@@ -21,6 +21,7 @@ import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.ReceiptLine
 import lk.coopfed.knoweb.till.core.model.SessionRecord
+import lk.coopfed.knoweb.till.core.model.TenderRecord
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.money.Qty
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRow
@@ -69,6 +70,36 @@ class EncryptedJvmDatabaseTest {
             val store = SqlTillStore(driver)
             store.saveReceipt(receipt)
             assertFailsWith<Exception> { store.saveReceipt(receipt.copy(documentId = "another")) }
+        }
+    }
+
+    @Test
+    fun tendersArePersistedAtomicallyWithReceiptAndCanBeQueried() {
+        EncryptedJvmDatabase.open(file, key).use { driver ->
+            val store = SqlTillStore(driver)
+            val cardTender = TenderRecord(seq = 1, kind = "CARD", amount = Money.parse("1000.00"), reference = "AUTH-123456")
+            val cashTender = TenderRecord(seq = 2, kind = "CASH", amount = Money.parse("250.00"), changeGiven = Money.parse("250.00"))
+            val splitReceipt = receipt.copy(
+                documentId = "d-split",
+                number = 2,
+                numberDisplay = "S01-T2-2",
+                gross = Money.parse("1250.00"),
+                tendered = Money.parse("1500.00"),
+                change = Money.parse("250.00"),
+                tenders = listOf(cardTender, cashTender),
+            )
+            store.saveReceipt(splitReceipt)
+
+            val rows = store.tillQueries.selectTendersByDocument("d-split").executeAsList()
+            assertEquals(2, rows.size)
+            assertEquals("CARD", rows[0].kind)
+            assertEquals("1000.00", rows[0].amount)
+            assertEquals("AUTH-123456", rows[0].reference)
+            assertEquals(0L, rows[0].offline)
+
+            assertEquals("CASH", rows[1].kind)
+            assertEquals("250.00", rows[1].amount)
+            assertEquals("250.00", rows[1].change_given)
         }
     }
 

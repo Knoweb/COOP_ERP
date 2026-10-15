@@ -121,6 +121,8 @@ export interface components {
             /** @description CASH, CARD ... as the till reported it */
             kind: string;
             amount: number;
+            /** @description Approval reference from the terminal */
+            reference?: string | null;
         };
         ReceiptLineResponse: {
             lineNo: number;

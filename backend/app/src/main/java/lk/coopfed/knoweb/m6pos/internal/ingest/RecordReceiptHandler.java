@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -202,14 +203,15 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
         }
         for (RecordReceipt.Tender tender : command.tenders()) {
             jdbc.update(
-                    "insert into pos.receipt_tender (document_id, seq, owner_entity_id, location_id, kind, amount)"
-                            + " values (?, ?, ?, ?, ?, ?)",
+                    "insert into pos.receipt_tender (document_id, seq, owner_entity_id, location_id, kind, amount, reference)"
+                            + " values (?, ?, ?, ?, ?, ?, ?)",
                     command.documentId(),
                     tender.seq(),
                     scope.entityId(),
                     shop,
                     tender.kind(),
-                    tender.amount());
+                    tender.amount(),
+                    tender.reference());
         }
 
         Map<String, Object> after = new LinkedHashMap<>();
@@ -290,13 +292,38 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
      * section 7).
      */
     private void replayed(RecordReceipt command, String firstHash, ScopeContext scope) {
-        if (command.contentHash() == null || Objects.equals(firstHash, command.contentHash())) {
+        boolean hashDiffers = command.contentHash() != null && !Objects.equals(firstHash, command.contentHash());
+        boolean tendersDiffer = false;
+        List<RecordReceipt.Tender> existingTenders = jdbc.query(
+                "select seq, kind, amount, reference from pos.receipt_tender where document_id = ? order by seq",
+                (rs, rowNum) -> new RecordReceipt.Tender(
+                        rs.getInt("seq"), rs.getString("kind"), rs.getBigDecimal("amount"), rs.getString("reference")),
+                command.documentId());
+        if (existingTenders.size() != command.tenders().size()) {
+            tendersDiffer = true;
+        } else {
+            for (int i = 0; i < existingTenders.size(); i++) {
+                RecordReceipt.Tender existing = existingTenders.get(i);
+                RecordReceipt.Tender incoming = command.tenders().get(i);
+                if (existing.seq() != incoming.seq()
+                        || !Objects.equals(existing.kind(), incoming.kind())
+                        || (existing.amount() != null
+                                && incoming.amount() != null
+                                && existing.amount().compareTo(incoming.amount()) != 0)
+                        || !Objects.equals(existing.reference(), incoming.reference())) {
+                    tendersDiffer = true;
+                    break;
+                }
+            }
+        }
+        if (!hashDiffers && !tendersDiffer) {
             return;
         }
         Map<String, Object> differs = new LinkedHashMap<>();
         differs.put("messageId", MESSAGE_REPLAY_DIFFERS);
         differs.put("firstContentHash", firstHash);
         differs.put("laterContentHash", command.contentHash());
+        differs.put("tendersDiffer", tendersDiffer);
         differs.put("docNumber", command.docNumberDisplay());
         differs.put("deviceId", scope.deviceId() != null ? scope.deviceId() : command.deviceId());
         audit.record(
@@ -342,7 +369,21 @@ class RecordReceiptHandler implements Handles<RecordReceipt, UUID> {
                 found.add("TENDER_MISMATCH");
             }
         }
+        for (RecordReceipt.Tender tender : command.tenders()) {
+            if (isDigital(tender.kind())
+                    && (tender.reference() == null || tender.reference().isBlank())) {
+                if (!found.contains("TENDER_REFERENCE_MISSING")) {
+                    found.add("TENDER_REFERENCE_MISSING");
+                }
+            }
+        }
         return found;
+    }
+
+    private static boolean isDigital(String kind) {
+        if (kind == null) return false;
+        String upper = kind.toUpperCase(Locale.ROOT);
+        return upper.equals("CARD") || upper.equals("CARD_REF") || upper.equals("WALLET") || upper.equals("QR");
     }
 
     private static boolean beyond(BigDecimal a, BigDecimal b, BigDecimal tolerance) {

@@ -3,6 +3,7 @@ package lk.coopfed.knoweb.till.core.receipt
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
+import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.snapshot.Language
 import lk.coopfed.knoweb.till.core.session.ZReport
 import lk.coopfed.knoweb.till.core.time.Times
@@ -51,8 +52,29 @@ object ReceiptLayouts {
         }
         blocks += Block.Rule
         blocks += Block.Row(m.total, "LKR ${r.gross.display()}", TextSize.LARGE, bold = true)
-        blocks += Block.Row(m.cash, r.tendered.display())
-        blocks += Block.Row(m.change, r.change.display())
+        if (r.tenders.isNotEmpty()) {
+            for (tender in r.tenders) {
+                val label = when (tender.kind.uppercase()) {
+                    "CASH" -> m.cash
+                    "CARD", "CARD_REF" -> m.card
+                    "WALLET" -> m.wallet
+                    "QR" -> m.qr
+                    else -> tender.kind
+                }
+                val value = if (!tender.reference.isNullOrBlank()) {
+                    "${tender.amount.display()} (${tender.reference})"
+                } else {
+                    tender.amount.display()
+                }
+                blocks += Block.Row(label, value)
+                if (tender.changeGiven > Money.ZERO) {
+                    blocks += Block.Row(m.change, tender.changeGiven.display())
+                }
+            }
+        } else {
+            blocks += Block.Row(m.cash, r.tendered.display())
+            blocks += Block.Row(m.change, r.change.display())
+        }
         blocks += Block.Rule
         blocks += Block.Text(m.thanks, Align.CENTER, bold = true)
         blocks += Block.Gap(24)

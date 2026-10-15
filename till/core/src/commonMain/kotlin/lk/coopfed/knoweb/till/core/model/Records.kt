@@ -64,6 +64,18 @@ data class ReceiptLine(
     val lineTotal: Money,
 )
 
+/** A tender applied to a receipt (doc 26 section 3.3). */
+@Serializable
+data class TenderRecord(
+    val seq: Int,
+    val kind: String,
+    val amount: Money,
+    val reference: String? = null,
+    val customerAccountId: String? = null,
+    val changeGiven: Money = Money.ZERO,
+    val offline: Boolean = false,
+)
+
 /** A receipt the till issued: a fact, never changed afterwards (doc 26; AGENTS.md rule 3). */
 @Serializable
 data class IssuedReceipt(
@@ -81,6 +93,7 @@ data class IssuedReceipt(
     val change: Money,
     val contentHash: String,
     val deviceSeq: Long,
+    val tenders: List<TenderRecord> = emptyList(),
 )
 
 /** A fact waiting in the outbox for central (doc 32 section 3). */
