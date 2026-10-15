@@ -60,6 +60,29 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
     private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9._-]{2,63}$");
     private static final Pattern PIN_PATTERN = Pattern.compile("^[0-9]{4,6}$");
 
+    private record PreparedPosition(UUID id, UUID locationId, int positionNo, UUID ownerEntityId) {}
+
+    private record PreparedUser(
+            UUID id,
+            UUID homeEntityId,
+            String username,
+            String displayName,
+            String language,
+            String userKind,
+            String pinHash,
+            Instant pinChangedAt,
+            String status) {}
+
+    private record PreparedDevice(
+            UUID id,
+            String hardwareSerial,
+            String deviceKind,
+            UUID ownerEntityId,
+            UUID locationId,
+            UUID positionId,
+            String appVersion,
+            String status) {}
+
     private final JdbcTemplate jdbc;
     private final PinHasher pinHasher;
     private final NumberingService numbering;
@@ -133,7 +156,6 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         }
 
         // Prepare till positions
-        record PreparedPosition(UUID id, UUID locationId, int positionNo, UUID ownerEntityId) {}
         List<PreparedPosition> preparedPositions = new ArrayList<>();
         Map<String, UUID> positionMap = new HashMap<>(); // key: "locationCode#positionNo" -> id
         Map<UUID, UUID> primaryTillMap = new HashMap<>(); // locationId -> primary till positionId
@@ -161,17 +183,6 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
             }
         });
 
-        record PreparedUser(
-                UUID id,
-                UUID homeEntityId,
-                String username,
-                String displayName,
-                String language,
-                String userKind,
-                String pinHash,
-                Instant pinChangedAt,
-                String status) {}
-
         List<PreparedUser> preparedUsers = new ArrayList<>();
         for (BulkRegisterNetwork.User user : users) {
             UUID userId = Ids.next();
@@ -197,16 +208,6 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         }
 
         // Prepare devices
-        record PreparedDevice(
-                UUID id,
-                String hardwareSerial,
-                String deviceKind,
-                UUID ownerEntityId,
-                UUID locationId,
-                UUID positionId,
-                String appVersion,
-                String status) {}
-
         List<PreparedDevice> preparedDevices = new ArrayList<>();
         for (BulkRegisterNetwork.Device dev : devices) {
             UUID devId = Ids.next();
@@ -259,28 +260,21 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                 .sorted((a, b) -> a.code().compareTo(b.code()))
                 .toList();
 
+        Map<UUID, String> locationCodeById = new HashMap<>();
         for (BulkRegisterNetwork.Shop shop : shops) {
-            UUID locId = locationIds.get(shop.locationCode().strip());
+            String code = shop.locationCode().strip();
+            UUID locId = locationIds.get(code);
+            locationCodeById.put(locId, code);
             for (DocumentType type : locationTypes) {
                 numbering.registerSeries(
-                        SeriesRegistration.forLocation(
-                                type.code(),
-                                ownerEntityId,
-                                locId,
-                                ownerEntityCode,
-                                shop.locationCode().strip(),
-                                null),
+                        SeriesRegistration.forLocation(type.code(), ownerEntityId, locId, ownerEntityCode, code, null),
                         scope);
             }
         }
 
         Map<UUID, List<UUID>> positionSeriesMap = new HashMap<>();
         for (PreparedPosition pos : preparedPositions) {
-            String shopCode = shops.stream()
-                    .filter(s -> locationIds.get(s.locationCode().strip()).equals(pos.locationId()))
-                    .findFirst()
-                    .map(BulkRegisterNetwork.Shop::locationCode)
-                    .orElse("");
+            String shopCode = locationCodeById.getOrDefault(pos.locationId(), "");
 
             List<UUID> posSeries = new ArrayList<>();
             for (DocumentType type : positionTypes) {
@@ -545,7 +539,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         });
     }
 
-    private void batchInsertPositions(List<?> positions) {
+    private void batchInsertPositions(List<PreparedPosition> positions) {
         if (positions.isEmpty()) return;
         String sql =
                 """
@@ -557,19 +551,11 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         jdbc.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
             public void setValues(PreparedStatement ps, int i) throws SQLException {
-                Object p = positions.get(i);
-                try {
-                    var id = p.getClass().getMethod("id").invoke(p);
-                    var locId = p.getClass().getMethod("locationId").invoke(p);
-                    var posNo = (int) p.getClass().getMethod("positionNo").invoke(p);
-                    var ownerId = p.getClass().getMethod("ownerEntityId").invoke(p);
-                    ps.setObject(1, id);
-                    ps.setObject(2, locId);
-                    ps.setInt(3, posNo);
-                    ps.setObject(4, ownerId);
-                } catch (ReflectiveOperationException e) {
-                    throw new RuntimeException(e);
-                }
+                PreparedPosition p = positions.get(i);
+                ps.setObject(1, p.id());
+                ps.setObject(2, p.locationId());
+                ps.setInt(3, p.positionNo());
+                ps.setObject(4, p.ownerEntityId());
             }
 
             @Override
@@ -579,7 +565,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         });
     }
 
-    private void batchInsertUsers(List<?> users) {
+    private void batchInsertUsers(List<PreparedUser> users) {
         if (users.isEmpty()) return;
         String sql =
                 """
@@ -592,41 +578,25 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         jdbc.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
             public void setValues(PreparedStatement ps, int i) throws SQLException {
-                Object u = users.get(i);
-                try {
-                    var id = u.getClass().getMethod("id").invoke(u);
-                    var homeEntityId = u.getClass().getMethod("homeEntityId").invoke(u);
-                    var username = (String) u.getClass().getMethod("username").invoke(u);
-                    var displayName =
-                            (String) u.getClass().getMethod("displayName").invoke(u);
-                    var language = (String) u.getClass().getMethod("language").invoke(u);
-                    var userKind = (String) u.getClass().getMethod("userKind").invoke(u);
-                    var pinHash = (String) u.getClass().getMethod("pinHash").invoke(u);
-                    var pinChangedAt =
-                            (Instant) u.getClass().getMethod("pinChangedAt").invoke(u);
-                    var status = (String) u.getClass().getMethod("status").invoke(u);
-
-                    ps.setObject(1, id);
-                    ps.setObject(2, homeEntityId);
-                    ps.setString(3, username);
-                    ps.setString(4, displayName);
-                    ps.setString(5, language);
-                    ps.setString(6, userKind);
-                    ps.setString(7, pinHash);
-                    if (pinChangedAt != null) {
-                        ps.setTimestamp(8, Timestamp.from(pinChangedAt));
-                    } else {
-                        ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE);
-                    }
-                    if (pinHash != null) {
-                        ps.setString(9, "[\"" + pinHash + "\"]");
-                    } else {
-                        ps.setString(9, "[]");
-                    }
-                    ps.setString(10, status);
-                } catch (ReflectiveOperationException e) {
-                    throw new RuntimeException(e);
+                PreparedUser u = users.get(i);
+                ps.setObject(1, u.id());
+                ps.setObject(2, u.homeEntityId());
+                ps.setString(3, u.username());
+                ps.setString(4, u.displayName());
+                ps.setString(5, u.language());
+                ps.setString(6, u.userKind());
+                ps.setString(7, u.pinHash());
+                if (u.pinChangedAt() != null) {
+                    ps.setTimestamp(8, Timestamp.from(u.pinChangedAt()));
+                } else {
+                    ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE);
                 }
+                if (u.pinHash() != null) {
+                    ps.setString(9, "[\"" + u.pinHash() + "\"]");
+                } else {
+                    ps.setString(9, "[]");
+                }
+                ps.setString(10, u.status());
             }
 
             @Override
@@ -636,7 +606,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         });
     }
 
-    private void batchInsertDevices(List<?> devices, Instant now) {
+    private void batchInsertDevices(List<PreparedDevice> devices, Instant now) {
         if (devices.isEmpty()) return;
         String sql =
                 """
@@ -649,34 +619,20 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         jdbc.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
             public void setValues(PreparedStatement ps, int i) throws SQLException {
-                Object d = devices.get(i);
-                try {
-                    var id = d.getClass().getMethod("id").invoke(d);
-                    var serial =
-                            (String) d.getClass().getMethod("hardwareSerial").invoke(d);
-                    var kind = (String) d.getClass().getMethod("deviceKind").invoke(d);
-                    var ownerId = d.getClass().getMethod("ownerEntityId").invoke(d);
-                    var locId = d.getClass().getMethod("locationId").invoke(d);
-                    var posId = d.getClass().getMethod("positionId").invoke(d);
-                    var appVer = (String) d.getClass().getMethod("appVersion").invoke(d);
-                    var status = (String) d.getClass().getMethod("status").invoke(d);
-
-                    ps.setObject(1, id);
-                    ps.setString(2, serial);
-                    ps.setString(3, kind);
-                    ps.setObject(4, ownerId);
-                    ps.setObject(5, locId);
-                    if (posId != null) {
-                        ps.setObject(6, posId);
-                    } else {
-                        ps.setNull(6, Types.OTHER);
-                    }
-                    ps.setTimestamp(7, Timestamp.from(now));
-                    ps.setString(8, appVer);
-                    ps.setString(9, status);
-                } catch (ReflectiveOperationException e) {
-                    throw new RuntimeException(e);
+                PreparedDevice d = devices.get(i);
+                ps.setObject(1, d.id());
+                ps.setString(2, d.hardwareSerial());
+                ps.setString(3, d.deviceKind());
+                ps.setObject(4, d.ownerEntityId());
+                ps.setObject(5, d.locationId());
+                if (d.positionId() != null) {
+                    ps.setObject(6, d.positionId());
+                } else {
+                    ps.setNull(6, Types.OTHER);
                 }
+                ps.setTimestamp(7, Timestamp.from(now));
+                ps.setString(8, d.appVersion());
+                ps.setString(9, d.status());
             }
 
             @Override

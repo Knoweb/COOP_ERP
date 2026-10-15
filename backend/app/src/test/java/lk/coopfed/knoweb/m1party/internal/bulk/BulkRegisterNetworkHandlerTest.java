@@ -144,7 +144,14 @@ class BulkRegisterNetworkHandlerTest {
         // No duplicates in DB
         when(jdbc.queryForList(anyString(), eq(String.class), any())).thenReturn(List.of());
         when(jdbc.batchUpdate(anyString(), any(BatchPreparedStatementSetter.class)))
-                .thenReturn(new int[] {1});
+                .thenAnswer(inv -> {
+                    BatchPreparedStatementSetter setter = inv.getArgument(1);
+                    java.sql.PreparedStatement ps = mock(java.sql.PreparedStatement.class);
+                    for (int i = 0; i < setter.getBatchSize(); i++) {
+                        setter.setValues(ps, i);
+                    }
+                    return new int[setter.getBatchSize()];
+                });
 
         when(documentTypes.all())
                 .thenReturn(List.of(new DocumentType(

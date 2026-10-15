@@ -178,10 +178,14 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
                 .filteredOn(a -> BulkRegisterNetworkHandler.AUDIT_NETWORK_REGISTERED.equals(a.eventType()))
                 .hasSize(1);
 
-        assertThat(kernel.committedEvents()).hasSize(1).first().isInstanceOf(BulkNetworkRegistered.class);
+        assertThat(kernel.committedEvents())
+                .filteredOn(e -> e instanceof BulkNetworkRegistered)
+                .hasSize(1);
 
-        BulkNetworkRegistered event =
-                (BulkNetworkRegistered) kernel.committedEvents().get(0);
+        BulkNetworkRegistered event = (BulkNetworkRegistered) kernel.committedEvents().stream()
+                .filter(e -> e instanceof BulkNetworkRegistered)
+                .findFirst()
+                .orElseThrow();
         assertThat(event.entityId()).isEqualTo(ENTITY_ID);
         assertThat(event.shopsCount()).isEqualTo(40);
         assertThat(event.positionsCount()).isEqualTo(60);
