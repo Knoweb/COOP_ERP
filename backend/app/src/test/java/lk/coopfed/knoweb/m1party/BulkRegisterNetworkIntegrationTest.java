@@ -69,6 +69,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
         List<Map<String, Object>> shops = new ArrayList<>();
         for (int i = 1; i <= 40; i++) {
             String shopCode = String.format("SH%03d", i);
+            List<Integer> positions = (i <= 20) ? List.of(1, 2) : List.of(1);
             shops.add(Map.of(
                     "locationCode",
                     shopCode,
@@ -81,7 +82,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
                     "sizeBand",
                     "M",
                     "tillPositions",
-                    List.of(1)));
+                    positions));
         }
 
         List<Map<String, Object>> users = new ArrayList<>();
@@ -105,7 +106,8 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
 
         List<Map<String, Object>> devices = new ArrayList<>();
         for (int i = 1; i <= 60; i++) {
-            int shopIndex = ((i - 1) % 40) + 1;
+            int shopIndex = (i <= 40) ? i : (i - 40);
+            int posNo = (i <= 40) ? 1 : 2;
             String shopCode = String.format("SH%03d", shopIndex);
             devices.add(Map.of(
                     "hardwareSerial",
@@ -115,7 +117,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
                     "locationCode",
                     shopCode,
                     "positionNo",
-                    1,
+                    posNo,
                     "appVersion",
                     "1.0.0"));
         }
@@ -137,7 +139,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
         assertThat(report).isNotNull();
         assertThat(report.get("status").asText()).isEqualTo("REGISTERED");
         assertThat(report.get("shopsRegistered").asInt()).isEqualTo(40);
-        assertThat(report.get("positionsRegistered").asInt()).isEqualTo(40);
+        assertThat(report.get("positionsRegistered").asInt()).isEqualTo(60);
         assertThat(report.get("usersRegistered").asInt()).isEqualTo(120);
         assertThat(report.get("devicesRegistered").asInt()).isEqualTo(60);
         assertThat(report.get("problems")).isEmpty();
@@ -155,7 +157,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
 
         int posCount = admin.queryForObject(
                 "select count(*) from party.till_position where owner_entity_id = ?", Integer.class, ENTITY_ID);
-        assertThat(posCount).isEqualTo(40);
+        assertThat(posCount).isEqualTo(60);
 
         int userCount = admin.queryForObject(
                 "select count(*) from security.app_user where owner_entity_id = ?", Integer.class, ENTITY_ID);
@@ -182,7 +184,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
                 (BulkNetworkRegistered) kernel.committedEvents().get(0);
         assertThat(event.entityId()).isEqualTo(ENTITY_ID);
         assertThat(event.shopsCount()).isEqualTo(40);
-        assertThat(event.positionsCount()).isEqualTo(40);
+        assertThat(event.positionsCount()).isEqualTo(60);
         assertThat(event.usersCount()).isEqualTo(120);
         assertThat(event.devicesCount()).isEqualTo(60);
     }
