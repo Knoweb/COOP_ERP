@@ -8,6 +8,7 @@ import { DEMO, DEMO_LOCATIONS, openSignedIn, textOf } from "./support/stack";
 test("an item of the stock position opens its stock card with the movements in ledger order", async ({ page }) => {
   const user = DEMO.m101Manager;
   await openSignedIn(page, user, "/inventory");
+  await page.getByRole("button", { name: textOf(user, "inventory.filter.toggle") }).click();
   await page.getByLabel(textOf(user, "inventory.field.location")).selectOption(DEMO_LOCATIONS.m101Stores);
   await expect(page.getByRole("columnheader", { name: textOf(user, "inventory.column.on_hand") })).toBeVisible();
 

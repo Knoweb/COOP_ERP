@@ -611,6 +611,12 @@ textarea {
   background: var(--color-surface);
 }
 
+input,
+select,
+textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
 input:hover,
 select:hover,
 textarea:hover {
@@ -1456,10 +1462,12 @@ textarea {
   font-weight: var(--font-weight-strong);
   text-decoration: none;
   white-space: nowrap;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .action-link:hover {
   background: var(--color-training-bg);
+  box-shadow: 0 3px 10px var(--color-polish-6);
 }
 
 .action-link--primary {
@@ -1676,6 +1684,12 @@ textarea {
   stroke-linejoin: round;
 }
 
+.action-link:focus-visible,
+.modern-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 /* ---------- Filter card --------------------------------------------------------------- */
 
 .modern-filter-panel {
@@ -1691,6 +1705,31 @@ textarea {
 
 .modern-filter-panel--stock {
   grid-template-columns: minmax(0, calc(var(--space-8) * 7));
+}
+
+.modern-filter-panel.stock-positions-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.stock-positions-filters[hidden] {
+  display: none;
+}
+
+.stock-positions-filters .modern-location-picker {
+  width: 100%;
+  min-width: 0;
+}
+
+.stock-positions-filters .inventory-control-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--target-gap);
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .modern-field {
@@ -1824,6 +1863,19 @@ textarea {
 
 .stock-table {
   min-width: calc(var(--space-8) * 16);
+}
+
+
+.stock-positions-table .numeric-cell {
+  text-align: right !important;
+}
+
+.stock-positions-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.stock-positions-table td:first-child {
+  min-width: 180px;
 }
 
 /* ---------- Entity link --------------------------------------------------------------- */
@@ -2091,7 +2143,7 @@ textarea {
   background: var(--color-polish-24);
   font-size: 14px;
   color: var(--color-text);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   outline: none;
   appearance: none;
 }
@@ -2127,6 +2179,11 @@ textarea {
   border: 1px solid var(--color-polish-14);
   overflow: hidden;
   margin-bottom: 24px;
+  transition: box-shadow 0.2s ease;
+}
+
+.modern-table-card:hover {
+  box-shadow: 0 10px 32px var(--color-polish-23);
 }
 
 .modern-table-scroll {
@@ -2371,4 +2428,205 @@ textarea {
 
 .user-menu__chip--access svg {
   color: var(--color-accent);
+}
+
+
+
+/* ----------- Collapsible sidebar ---------------- */
+
+.shell-sidebar {
+  transition: width 0.22s ease;
+}
+
+/* Icon-only toggle, aligned with the logo and name */
+.shell-sidebar-brand {
+  gap: 8px;
+}
+
+.shell-sidebar-brand .brand-logo {
+  flex-shrink: 0;
+}
+
+.shell-sidebar-brand .brand-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.shell-sidebar-brand .shell-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-polish-9);
+  border-radius: 6px;
+  background: var(--color-polish-10);
+  color: var(--color-surface);
+  cursor: pointer;
+}
+
+.shell-sidebar-toggle:hover {
+  background: var(--color-polish-11);
+}
+
+.shell-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--color-surface);
+  outline-offset: 2px;
+}
+
+@media (min-width: 769px) {
+  /* Expanded: logo, text and button in one row */
+  .shell-layout:not(.shell-layout--collapsed) .shell-sidebar-brand {
+    padding: 0 12px;
+  }
+
+  /* Collapsed: icon-only navigation */
+  .shell-layout--collapsed .shell-sidebar {
+    width: 72px;
+  }
+
+  .shell-layout--collapsed .shell-sidebar-brand {
+    height: 100px;
+    padding: 8px 0;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .shell-layout--collapsed .brand-text,
+  .shell-layout--collapsed .nav-label,
+  .shell-layout--collapsed .signout-label {
+    display: none;
+  }
+
+  .shell-layout--collapsed .shell-sidebar-toggle {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+  }
+
+  .shell-layout--collapsed .shell-sidebar .shell-nav a {
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .shell-layout--collapsed .shell-sidebar-footer {
+    padding: 12px;
+  }
+
+  .shell-layout--collapsed .btn-signout {
+    min-height: 44px;
+    padding: 8px;
+  }
+}
+
+/* Maintain original mobile navigation */
+@media (max-width: 768px) {
+  .shell-sidebar-brand .shell-sidebar-toggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-sidebar,
+  .action-link,
+  .modern-btn,
+  .modern-table-card {
+    input,
+    select,
+    textarea {
+      transition: none;
+    }
+  }
+
+  .modern-btn:hover,
+  .modern-btn:active {
+    transform: none;
+  }
+}
+
+/* Collapsible filters */
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: fit-content;
+  min-height: 40px;
+  margin-bottom: var(--space-3);
+  padding: 8px 16px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-surface);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter-toggle:hover {
+  background: var(--color-accent-dark, var(--color-accent));
+}
+
+.filter-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.filter-toggle svg {
+  flex-shrink: 0;
+}
+
+.filter-toggle[aria-expanded="true"] {
+  margin-bottom: var(--space-3);
+}
+
+.stock-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.stock-table th,
+.stock-table td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+.stock-table th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stock-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.stock-table tbody tr:hover {
+  background-color: var(--color-surface-subtle);
+}
+
+.stock-table .numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-table td:first-child {
+  min-width: 180px;
+}
+
+.stock-table td:nth-child(3) {
+  white-space: nowrap;
 }

@@ -1,5 +1,6 @@
 {
   "en": {
+    "inventory.filter.toggle": "Filters",
     "inventory.nav": "Stock",
     "inventory.title": "Stock position",
     "inventory.loading": "Loading …",
@@ -235,6 +236,7 @@
     "inventory.repack.variance_reason": "Reason, when fewer packs were made than expected"
   },
   "si": {
+    "inventory.filter.toggle": "පෙරහන්",
     "inventory.nav": "තොගය",
     "inventory.title": "තොග තත්ත්වය",
     "inventory.loading": "පූරණය වෙමින් …",
@@ -470,6 +472,7 @@
     "inventory.repack.variance_reason": "අපේක්ෂිත ප්‍රමාණයට වඩා අඩු පැකට් සෑදූ විට, හේතුව"
   },
   "ta": {
+    "inventory.filter.toggle": "வடிகட்டிகள்",
     "inventory.nav": "இருப்பு",
     "inventory.title": "இருப்பு நிலை",
     "inventory.loading": "ஏற்றுகிறது …",

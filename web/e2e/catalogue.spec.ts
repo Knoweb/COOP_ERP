@@ -35,6 +35,7 @@ test("a new item is created as a draft, shared, and found by its Sinhala name", 
 
   // The browser finds it by the Sinhala name.
   await page.getByRole("link", { name: textOf(FED_OFFICER, "catalogue.back") }).click();
+  await page.getByRole("button", { name: textOf(FED_OFFICER, "catalogue.filter.toggle") }).click();
   await page.getByLabel(textOf(FED_OFFICER, "catalogue.filter.search")).fill(nameSi);
   const row = page.getByRole("row", { name: new RegExp(nameEn) });
   await expect(row).toBeVisible();

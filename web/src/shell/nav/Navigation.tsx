@@ -63,16 +63,20 @@ export function Navigation({ modules }: { modules: ModuleDefinition[] }) {
             } else {
               Icon = <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
             }
-
             return (
               <li key={item.to}>
-                {/* NavLink marks the entry of the current page with aria-current="page". */}
-                <NavLink to={item.to}>
+                {/* NavLink marks the current page with aria-current="page". */}
+                <NavLink
+                  to={item.to}
+                  title={t(item.labelId).text}
+                  aria-label={t(item.labelId).text}
+                >
                   <span className="nav-icon">{Icon}</span>
                   <span className="nav-label">{t(item.labelId).text}</span>
                 </NavLink>
               </li>
             );
+
           })}
         </ul>
       )}

@@ -1,5 +1,6 @@
 {
   "en": {
+    "catalogue.filter.toggle": "Filters",
     "catalogue.nav": "Catalogue",
     "catalogue.title": "Catalogue",
     "catalogue.filter.search": "Search by code or name",
@@ -84,6 +85,7 @@
     "catalogue.column.image": "Image"
   },
   "si": {
+    "catalogue.filter.toggle": "පෙරහන්",
     "catalogue.nav": "භාණ්ඩ නාමාවලිය",
     "catalogue.title": "භාණ්ඩ නාමාවලිය",
     "catalogue.filter.search": "කේතය හෝ නම අනුව සොයන්න",
@@ -168,6 +170,7 @@
     "catalogue.column.image": "පින්තූරය"
   },
   "ta": {
+    "catalogue.filter.toggle": "வடிகட்டிகள்",
     "catalogue.nav": "பொருள் பட்டியல்",
     "catalogue.title": "பொருள் பட்டியல்",
     "catalogue.filter.search": "குறியீடு அல்லது பெயரால் தேடுக",

@@ -12,6 +12,35 @@ import { usePartyApi } from "./partyApi";
 import type { Society, SocietyStatus } from "./partyApi";
 import { STATUSES, STATUS_LOOK, legalNameIn, statusMessageId } from "./societyView";
 
+const DISTRICTS = [
+  "Ampara",
+  "Anuradhapura",
+  "Badulla",
+  "Batticaloa",
+  "Colombo",
+  "Galle",
+  "Gampaha",
+  "Hambantota",
+  "Jaffna",
+  "Kalutara",
+  "Kandy",
+  "Kegalle",
+  "Kilinochchi",
+  "Kurunegala",
+  "Mannar",
+  "Matale",
+  "Matara",
+  "Monaragala",
+  "Mullaitivu",
+  "Nuwara Eliya",
+  "Polonnaruwa",
+  "Puttalam",
+  "Ratnapura",
+  "Trincomalee",
+  "Vavuniya"
+];
+
+
 /**
  * The society register (21A section 8, "Society register"): every entity the Federation
  * governs, as a list a clerk can narrow. Status, district and the search box all go to the
@@ -31,7 +60,9 @@ export function SocietyRegisterPage() {
 
   const [status, setStatus] = useState<SocietyStatus | "">("");
   const [district, setDistrict] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
   const [search, setSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filter = {
@@ -70,7 +101,27 @@ export function SocietyRegisterPage() {
         )}
       </div>
 
-      <form role="search" onSubmit={(event) => event.preventDefault()} className="modern-filter-panel">
+      <button
+  type="button"
+  className="filter-toggle"
+  onClick={() => setFiltersOpen(!filtersOpen)}
+  aria-expanded={filtersOpen}
+  aria-controls="society-filters"
+>
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16M7 12h10M10 17h4" />
+  </svg>
+  {t("party.filter.toggle").text}
+  <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
+</button>
+
+{filtersOpen && (
+  <form
+    id="society-filters"
+    role="search"
+    onSubmit={(event) => event.preventDefault()}
+    className="modern-filter-panel"
+  >
         <label className="modern-field">
           <span className="modern-field__label party-filter-label">{t("party.filter.search").text}</span>
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={200} className="party-filter-input" />
@@ -90,10 +141,35 @@ export function SocietyRegisterPage() {
           </div>
         </label>
         <label className="modern-field">
-          <span className="modern-field__label party-filter-label">{t("party.filter.district").text}</span>
-          <input type="text" value={district} onChange={(event) => setDistrict(event.target.value)} className="party-filter-input" />
+          <span className="modern-field__label party-filter-label">
+            {t("party.filter.district").text}
+          </span>
+          <input
+            type="text"
+            list="society-district-options"
+            value={districtSearch}
+            onChange={(event) => {
+              const value = event.target.value;
+              setDistrictSearch(value);
+
+              const match = DISTRICTS.find(
+                (name) => name.toLowerCase() === value.trim().toLowerCase()
+              );
+
+              setDistrict(match ?? "");
+            }}
+            className="party-filter-input"
+            autoComplete="off"
+          />
+          <datalist id="society-district-options">
+            {DISTRICTS.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </label>
+
       </form>
+)}
 
       {societies.isLoading && <p>{t("party.list.loading").text}</p>}
       {societies.isError && <p role="alert">{errorText(societies.error, t("party.error.generic").text)}</p>}

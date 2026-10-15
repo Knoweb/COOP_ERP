@@ -50,6 +50,7 @@ test("the opening stock of a location is prepared from the screen, and the stock
   // The stock position of the warehouse answers (empty until an opening balance is posted).
   await page.goto("/inventory");
   await expect(page.getByRole("heading", { level: 1, name: textOf(MPCS_ADMIN, "inventory.title") })).toBeVisible();
+  await page.getByRole("button", { name: textOf(MPCS_ADMIN, "inventory.filter.toggle") }).click();
   await page.getByLabel(textOf(MPCS_ADMIN, "inventory.field.location")).selectOption(WAREHOUSE);
   await expect(
     page.getByText(textOf(MPCS_ADMIN, "inventory.balances.empty"), { exact: true }).or(page.getByRole("columnheader", { name: textOf(MPCS_ADMIN, "inventory.column.on_hand") }))
