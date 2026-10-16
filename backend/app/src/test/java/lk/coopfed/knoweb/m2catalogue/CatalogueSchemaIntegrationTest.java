@@ -49,7 +49,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0007: a supplier is read beyond its owner once a batch cites it.
             Map.entry("supplier", with("cited_read")),
             // V0005 (M2-06): the images; own_write follows the SKU, shared_read the SKU owner's rows.
-            Map.entry("sku_image", with("own_update", "shared_read")));
+            Map.entry("sku_image", with("own_update", "shared_read")),
+            // V0009 (CAT-01): the duplicate suspects.
+            Map.entry("duplicate_suspect", with("own_update")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
@@ -185,6 +187,13 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(mayUpdateColumn(db, "sku_image", "object_key_thumb")).isTrue();
         assertThat(mayUpdateColumn(db, "sku_image", "object_key_full")).isFalse();
         assertThat(mayUpdateColumn(db, "sku_image", "content_hash")).isFalse();
+        // V0009: duplicate suspects can update status, decided_by, decided_at.
+        assertThat(may(db, "duplicate_suspect", "INSERT")).isTrue();
+        assertThat(may(db, "duplicate_suspect", "UPDATE")).isFalse();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "status")).isTrue();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "decided_by")).isTrue();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "decided_at")).isTrue();
+        assertThat(mayUpdateColumn(db, "duplicate_suspect", "score")).isFalse();
     }
 
     @Test

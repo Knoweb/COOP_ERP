@@ -154,6 +154,7 @@ public class RowValidator {
 
         // 8. Barcodes
         if (row.barcodes() != null) {
+            Set<String> seenBarcodesInRow = new HashSet<>();
             for (String rawBarcode : row.barcodes()) {
                 if (rawBarcode == null || rawBarcode.isBlank()) continue;
                 String barcode = rawBarcode.strip();
@@ -172,20 +173,12 @@ public class RowValidator {
                             "bulk.sku.barcode_check_digit_invalid",
                             "GTIN check digit invalid",
                             "barcode=" + barcode));
-                } else if (seenBarcodesInSheet != null && !seenBarcodesInSheet.add(barcode)) {
+                } else if (!seenBarcodesInRow.add(barcode)) {
                     errors.add(new ValidationError(
                             rowNum,
                             "barcodes",
-                            "bulk.sku.barcode_duplicate_in_sheet",
-                            "Duplicate barcode in payload",
-                            "barcode=" + barcode));
-                } else if (ctx.existingBarcodes() != null
-                        && ctx.existingBarcodes().contains(barcode)) {
-                    errors.add(new ValidationError(
-                            rowNum,
-                            "barcodes",
-                            "bulk.sku.barcode_already_registered",
-                            "Barcode already registered in catalogue",
+                            "bulk.sku.barcode_duplicate_in_row",
+                            "Duplicate barcode in item",
                             "barcode=" + barcode));
                 }
             }

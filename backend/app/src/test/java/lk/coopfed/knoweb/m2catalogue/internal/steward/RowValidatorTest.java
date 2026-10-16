@@ -152,8 +152,8 @@ class RowValidatorTest {
     }
 
     @Test
-    void rejectsDuplicateBarcodesWithinBatch() {
-        ImportSkuRow row1 = new ImportSkuRow(
+    void rejectsDuplicateBarcodesWithinRow() {
+        ImportSkuRow row = new ImportSkuRow(
                 1,
                 "SKU-001",
                 "Item A",
@@ -170,35 +170,13 @@ class RowValidatorTest {
                 null,
                 "STD",
                 null,
-                List.of("4791000000003"),
+                List.of("4791000000003", "4791000000003"),
                 null,
                 null,
                 null);
 
-        ImportSkuRow row2 = new ImportSkuRow(
-                2,
-                "SKU-002",
-                "Item B",
-                null,
-                null,
-                null,
-                null,
-                null,
-                "EA",
-                false,
-                false,
-                false,
-                false,
-                null,
-                "STD",
-                null,
-                List.of("4791000000003"),
-                null,
-                null,
-                null);
-
-        List<ValidationError> errors = validator.validateBatch(List.of(row1, row2), ctx);
-        assertThat(errors).anyMatch(e -> "bulk.sku.barcode_duplicate_in_sheet".equals(e.code()));
+        List<ValidationError> errors = validator.validateBatch(List.of(row), ctx);
+        assertThat(errors).anyMatch(e -> "bulk.sku.barcode_duplicate_in_row".equals(e.code()));
     }
 
     @Test

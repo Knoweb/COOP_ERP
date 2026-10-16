@@ -158,13 +158,57 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     r.attributes()));
         }
 
-        // 4. Duplicate scoring
+        // 4. Prepare candidate profiles and batch data
+        Set<String> generatedCodes = new HashSet<>(valCtx.existingSkuCodes());
+        List<PreparedSku> preparedSkus = new ArrayList<>(enrichedRows.size());
+        List<PreparedBarcode> preparedBarcodes = new ArrayList<>();
         List<ItemProfile> candidateProfiles = new ArrayList<>(enrichedRows.size());
+
         for (ImportSkuRow r : enrichedRows) {
-            candidateProfiles.add(new ItemProfile(
-                    null, r.skuCode(), r.nameEn(), r.nameSi(), r.nameTa(), r.baseUomCode(), r.brand(), r.barcodes()));
+            UUID skuId = Ids.next();
+            String code = r.skuCode();
+            if (code == null || code.isBlank()) {
+                code = generateUniqueSkuCode(generatedCodes);
+            }
+            generatedCodes.add(code.toLowerCase(Locale.ROOT));
+
+            String uom = r.baseUomCode() != null ? r.baseUomCode().strip().toUpperCase(Locale.ROOT) : "EA";
+            String taxCode =
+                    r.taxCategoryCode() != null ? r.taxCategoryCode().strip().toUpperCase(Locale.ROOT) : "STD";
+            UUID taxId = valCtx.taxCategoriesByCode().get(taxCode);
+
+            preparedSkus.add(new PreparedSku(
+                    skuId,
+                    code,
+                    ownerEntityId,
+                    r.nameEn() != null ? r.nameEn().strip() : "",
+                    r.nameSi(),
+                    r.nameTa(),
+                    r.descriptionEn(),
+                    r.descriptionSi(),
+                    r.descriptionTa(),
+                    uom,
+                    Boolean.TRUE.equals(r.soldByWeight()),
+                    Boolean.TRUE.equals(r.batchTracked()),
+                    Boolean.TRUE.equals(r.expiryTracked()),
+                    Boolean.TRUE.equals(r.hasPrintedMrp()),
+                    r.expiryWarningDays(),
+                    taxId,
+                    r.barcodes()));
+
+            candidateProfiles.add(
+                    new ItemProfile(skuId, code, r.nameEn(), r.nameSi(), r.nameTa(), uom, r.brand(), r.barcodes()));
+
+            if (r.barcodes() != null) {
+                for (String b : r.barcodes()) {
+                    if (b != null && !b.isBlank()) {
+                        preparedBarcodes.add(new PreparedBarcode(b.strip(), skuId, uom, ownerEntityId));
+                    }
+                }
+            }
         }
 
+        // 5. Duplicate scoring
         List<SuspectMatch> sheetSuspects =
                 scorer.scoreWithinBatch(candidateProfiles, DuplicateScorer.DEFAULT_THRESHOLD);
         List<ItemProfile> existingDbProfiles = loadExistingProfiles(ownerEntityId);
@@ -176,7 +220,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
             reportSuspects.add(new DuplicateSuspectItem(
                     0,
                     m.candidate().nameEn(),
-                    null,
+                    m.matched().skuId(),
                     m.matched().skuCode(),
                     m.matched().nameEn(),
                     m.score(),
@@ -195,73 +239,44 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
 
         // If in VALIDATE mode, return report without saving
         if (BulkImportSkus.MODE_VALIDATE.equals(mode)) {
-            int accepted = errors.isEmpty() ? enrichedRows.size() : 0;
-            String status = errors.isEmpty() ? ImportReport.STATUS_VALIDATED : ImportReport.STATUS_REJECTED;
-            return new ImportReport(status, enrichedRows.size(), accepted, errors.size(), errors, reportSuspects);
+            Set<Integer> errorRows = new HashSet<>();
+            for (ValidationError e : errors) {
+                errorRows.add(e.rowNumber());
+            }
+            int rejected = errorRows.size();
+            int accepted = Math.max(0, enrichedRows.size() - rejected);
+            return new ImportReport(
+                    ImportReport.STATUS_VALIDATED, enrichedRows.size(), accepted, rejected, errors, reportSuspects);
         }
 
         // If there are validation errors, reject commit
         if (!errors.isEmpty()) {
+            Set<Integer> errorRows = new HashSet<>();
+            for (ValidationError e : errors) {
+                errorRows.add(e.rowNumber());
+            }
             return new ImportReport(
                     ImportReport.STATUS_REJECTED, enrichedRows.size(), 0, enrichedRows.size(), errors, reportSuspects);
         }
 
-        // 5. COMMIT Mode: Prepare batch data and execute optimized JDBC batch inserts
-        Set<String> generatedCodes = new HashSet<>(valCtx.existingSkuCodes());
-        List<PreparedSku> preparedSkus = new ArrayList<>(enrichedRows.size());
-        List<PreparedBarcode> preparedBarcodes = new ArrayList<>();
-        Map<String, UUID> skuIdByCode = new HashMap<>();
-
-        for (ImportSkuRow r : enrichedRows) {
-            UUID skuId = Ids.next();
-            String code = r.skuCode();
-            if (code == null || code.isBlank()) {
-                code = generateUniqueSkuCode(generatedCodes);
-            }
-            generatedCodes.add(code.toLowerCase(Locale.ROOT));
-            skuIdByCode.put(code, skuId);
-
-            String uom = r.baseUomCode().strip().toUpperCase(Locale.ROOT);
-            String taxCode = r.taxCategoryCode().strip().toUpperCase(Locale.ROOT);
-            UUID taxId = valCtx.taxCategoriesByCode().get(taxCode);
-
-            preparedSkus.add(new PreparedSku(
-                    skuId,
-                    code,
-                    ownerEntityId,
-                    r.nameEn().strip(),
-                    r.nameSi(),
-                    r.nameTa(),
-                    r.descriptionEn(),
-                    r.descriptionSi(),
-                    r.descriptionTa(),
-                    uom,
-                    Boolean.TRUE.equals(r.soldByWeight()),
-                    Boolean.TRUE.equals(r.batchTracked()),
-                    Boolean.TRUE.equals(r.expiryTracked()),
-                    Boolean.TRUE.equals(r.hasPrintedMrp()),
-                    r.expiryWarningDays(),
-                    taxId,
-                    r.barcodes()));
-
-            if (r.barcodes() != null) {
-                for (String b : r.barcodes()) {
-                    if (b != null && !b.isBlank()) {
-                        preparedBarcodes.add(new PreparedBarcode(b.strip(), skuId, uom, ownerEntityId));
-                    }
-                }
-            }
-        }
-
-        // Prepare suspects against existing SKUs for database registration
+        // 6. COMMIT Mode: Prepare suspect records and execute batch inserts
         List<PreparedSuspect> preparedSuspects = new ArrayList<>();
-        for (SuspectMatch m : dbSuspects) {
-            UUID candId = skuIdByCode.get(m.candidate().skuCode());
+        Set<String> seenSuspectPairs = new HashSet<>();
+
+        List<SuspectMatch> allSuspects = new ArrayList<>(sheetSuspects.size() + dbSuspects.size());
+        allSuspects.addAll(sheetSuspects);
+        allSuspects.addAll(dbSuspects);
+
+        for (SuspectMatch m : allSuspects) {
+            UUID candId = m.candidate().skuId();
             UUID existId = m.matched().skuId();
-            if (candId != null && existId != null) {
+            if (candId != null && existId != null && !candId.equals(existId)) {
                 UUID a = candId.compareTo(existId) < 0 ? candId : existId;
                 UUID b = candId.compareTo(existId) < 0 ? existId : candId;
-                preparedSuspects.add(new PreparedSuspect(Ids.next(), a, b, m.score(), m.reasons(), ownerEntityId));
+                String pairKey = a + ":" + b;
+                if (seenSuspectPairs.add(pairKey)) {
+                    preparedSuspects.add(new PreparedSuspect(Ids.next(), a, b, m.score(), m.reasons(), ownerEntityId));
+                }
             }
         }
 
@@ -270,7 +285,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
         batchInsertBarcodes(preparedBarcodes);
         batchInsertSuspects(preparedSuspects);
 
-        // 6. Audit & Domain Events
+        // 7. Audit & Domain Events
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("entityId", ownerEntityId);
         summary.put("skusCount", preparedSkus.size());
@@ -305,7 +320,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     base_uom_code, sold_by_weight, batch_tracked, expiry_tracked,
                     has_printed_mrp, expiry_warning_days, tax_category_id,
                     multi_mrp_policy, origin_kind, attributes
-                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
+                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
                 """;
 
         for (int i = 0; i < skus.size(); i += BATCH_SIZE) {
