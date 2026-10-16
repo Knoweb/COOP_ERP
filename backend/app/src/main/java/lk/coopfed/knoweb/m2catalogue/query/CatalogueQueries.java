@@ -43,4 +43,7 @@ public interface CatalogueQueries {
 
     /** The images of a SKU visible in the scope. */
     List<ImageView> images(UUID skuId, ScopeContext scope);
+
+    /** The duplicate suspects visible in the scope (catalogue RLS) (CAT-01, 22A section 6.1). */
+    List<DuplicateSuspectView> listDuplicateSuspects(String status, int limit, ScopeContext scope);
 }

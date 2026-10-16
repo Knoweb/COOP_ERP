@@ -1030,6 +1030,122 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/import:
+
+    post:
+      tags: [Steward]
+      operationId: importSkus
+      summary: Bulk import catalogue SKUs from payload rows or raw CSV
+      description: >
+        Validates or commits a bulk batch of catalogue SKUs (~20,000 items).
+        Translates missing names, scores duplicates, and executes batch inserts.
+      x-permission: cat.import.run
+      x-scope: ENTITY
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportSkusRequest'
+
+      responses:
+        '200':
+          description: Import report with validation errors and duplicate suspects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReportResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/steward/suspects:
+
+    get:
+      tags: [Steward]
+      operationId: listDuplicateSuspects
+      summary: List duplicate suspect pairs
+      description: >
+        Returns duplicate suspects flagged during catalogue import or creation.
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, MERGED, DISMISSED]
+            default: OPEN
+
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+
+      responses:
+        '200':
+          description: List of duplicate suspect pairs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DuplicateSuspectResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+
+  /v1/catalogue/steward/suspects/{suspectId}/resolve:
+
+    post:
+      tags: [Steward]
+      operationId: resolveDuplicateSuspect
+      summary: Resolve a duplicate suspect pair as MERGED or DISMISSED
+      x-permission: cat.sku.create_local
+      x-scope: ENTITY
+
+      parameters:
+        - in: path
+          name: suspectId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveDuplicateSuspectRequest'
+
+      responses:
+        '204':
+          description: Suspect resolved
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -1703,3 +1819,206 @@ components:
           enum:
             - ACTIVE
             - INACTIVE
+
+
+    BulkImportSkusRequest:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum: [VALIDATE, COMMIT]
+        csvContent:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportSkuRowItem'
+
+
+    ImportSkuRowItem:
+      type: object
+      required:
+        - rowNumber
+        - nameEn
+      properties:
+        rowNumber:
+          type: integer
+        skuCode:
+          type: string
+        nameEn:
+          type: string
+        nameSi:
+          type: string
+        nameTa:
+          type: string
+        descriptionEn:
+          type: string
+        descriptionSi:
+          type: string
+        descriptionTa:
+          type: string
+        baseUomCode:
+          type: string
+        soldByWeight:
+          type: boolean
+        batchTracked:
+          type: boolean
+        expiryTracked:
+          type: boolean
+        hasPrintedMrp:
+          type: boolean
+        expiryWarningDays:
+          type: integer
+        taxCategoryCode:
+          type: string
+        price:
+          type: number
+        barcodes:
+          type: array
+          items:
+            type: string
+        brand:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+
+    ImportReportResponse:
+      type: object
+      required:
+        - status
+        - rows
+        - accepted
+        - rejected
+        - errors
+        - suspects
+      properties:
+        status:
+          type: string
+          enum: [VALIDATED, ACCEPTED, REJECTED]
+        rows:
+          type: integer
+        accepted:
+          type: integer
+        rejected:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportValidationError'
+        suspects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportDuplicateSuspectItem'
+
+
+    ImportValidationError:
+      type: object
+      required:
+        - rowNumber
+        - field
+        - code
+        - message
+      properties:
+        rowNumber:
+          type: integer
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        params:
+          type: string
+
+
+    ImportDuplicateSuspectItem:
+      type: object
+      required:
+        - rowNumber
+        - candidateName
+        - score
+        - reasons
+      properties:
+        rowNumber:
+          type: integer
+        candidateName:
+          type: string
+        matchedSkuId:
+          type: string
+          format: uuid
+        matchedSkuCode:
+          type: string
+        matchedSkuName:
+          type: string
+        score:
+          type: number
+        reasons:
+          type: array
+          items:
+            type: string
+
+
+    DuplicateSuspectResponse:
+      type: object
+      required:
+        - suspectId
+        - skuA
+        - skuB
+        - score
+        - reasons
+        - status
+        - createdAt
+      properties:
+        suspectId:
+          type: string
+          format: uuid
+        skuA:
+          type: string
+          format: uuid
+        skuB:
+          type: string
+          format: uuid
+        skuACode:
+          type: string
+        skuAName:
+          type: string
+        skuBCode:
+          type: string
+        skuBName:
+          type: string
+        score:
+          type: number
+        reasons:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [OPEN, MERGED, DISMISSED]
+        decidedBy:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+
+    ResolveDuplicateSuspectRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum: [MERGED, DISMISSED]
+        canonicalSkuId:
+          type: string
+          format: uuid
+
