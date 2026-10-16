@@ -104,6 +104,14 @@ public class DuplicateScorer {
      * Scores a candidate against an existing item profile.
      */
     public ScoreResult score(ItemProfile candidate, ItemProfile existing, double threshold) {
+        return score(candidate, existing, threshold, null);
+    }
+
+    /**
+     * Scores a candidate against an existing item profile with optional key cache.
+     */
+    public ScoreResult score(
+            ItemProfile candidate, ItemProfile existing, double threshold, Map<UUID, String> keyCache) {
         if (candidate == null || existing == null) {
             return new ScoreResult(BigDecimal.ZERO, false, List.of());
         }
@@ -112,8 +120,8 @@ public class DuplicateScorer {
         double totalScore = 0.0;
 
         // 1. Normalized Latin Name Key & Jaro-Winkler similarity (weight: 0.55)
-        String candKey = toKey(candidate.nameEn(), candidate.nameSi(), candidate.nameTa());
-        String existKey = toKey(existing.nameEn(), existing.nameSi(), existing.nameTa());
+        String candKey = resolveKey(candidate, keyCache);
+        String existKey = resolveKey(existing, keyCache);
 
         double jw = jaroWinkler(candKey, existKey);
         if (jw > 0.0) {
@@ -164,6 +172,14 @@ public class DuplicateScorer {
         return new ScoreResult(rounded, suspect, reasons);
     }
 
+    private String resolveKey(ItemProfile item, Map<UUID, String> keyCache) {
+        if (item == null) return "";
+        if (keyCache != null && item.skuId() != null) {
+            return keyCache.computeIfAbsent(item.skuId(), id -> toKey(item.nameEn(), item.nameSi(), item.nameTa()));
+        }
+        return toKey(item.nameEn(), item.nameSi(), item.nameTa());
+    }
+
     /**
      * Finds duplicates within a batch of incoming candidate items (e.g. from an import sheet).
      * Uses blocking by barcode, brand, and prefix for high throughput on large batches.
@@ -175,6 +191,7 @@ public class DuplicateScorer {
 
         List<SuspectMatch> suspects = new ArrayList<>();
         Set<String> evaluatedPairs = new HashSet<>();
+        Map<UUID, String> keyCache = new HashMap<>();
 
         // 1. Barcode blocking
         Map<String, List<ItemProfile>> barcodeIndex = new HashMap<>();
@@ -194,7 +211,7 @@ public class DuplicateScorer {
             if (group.size() > 1) {
                 for (int i = 0; i < group.size(); i++) {
                     for (int j = i + 1; j < group.size(); j++) {
-                        checkPair(group.get(i), group.get(j), threshold, evaluatedPairs, suspects);
+                        checkPair(group.get(i), group.get(j), threshold, evaluatedPairs, suspects, keyCache);
                     }
                 }
             }
@@ -203,7 +220,7 @@ public class DuplicateScorer {
         // 2. Prefix & Brand blocking
         Map<String, List<ItemProfile>> blockIndex = new HashMap<>();
         for (ItemProfile item : items) {
-            String key = toKey(item.nameEn(), item.nameSi(), item.nameTa());
+            String key = resolveKey(item, keyCache);
             String prefix = key.length() >= 4 ? key.substring(0, 4) : key;
             blockIndex.computeIfAbsent(prefix, k -> new ArrayList<>()).add(item);
 
@@ -219,7 +236,7 @@ public class DuplicateScorer {
             if (block.size() > 1) {
                 for (int i = 0; i < block.size(); i++) {
                     for (int j = i + 1; j < block.size(); j++) {
-                        checkPair(block.get(i), block.get(j), threshold, evaluatedPairs, suspects);
+                        checkPair(block.get(i), block.get(j), threshold, evaluatedPairs, suspects, keyCache);
                     }
                 }
             }
@@ -239,6 +256,7 @@ public class DuplicateScorer {
 
         List<SuspectMatch> suspects = new ArrayList<>();
         Set<String> evaluatedPairs = new HashSet<>();
+        Map<UUID, String> keyCache = new HashMap<>();
 
         // Index existing by barcode and prefix
         Map<String, List<ItemProfile>> existBarcode = new HashMap<>();
@@ -254,7 +272,7 @@ public class DuplicateScorer {
                     }
                 }
             }
-            String key = toKey(ex.nameEn(), ex.nameSi(), ex.nameTa());
+            String key = resolveKey(ex, keyCache);
             String pfx = key.length() >= 4 ? key.substring(0, 4) : key;
             existPrefix.computeIfAbsent(pfx, k -> new ArrayList<>()).add(ex);
 
@@ -279,7 +297,7 @@ public class DuplicateScorer {
             }
 
             // Check prefix & brand
-            String candKey = toKey(cand.nameEn(), cand.nameSi(), cand.nameTa());
+            String candKey = resolveKey(cand, keyCache);
             String pfx = candKey.length() >= 4 ? candKey.substring(0, 4) : candKey;
             if (existPrefix.containsKey(pfx)) {
                 pool.addAll(existPrefix.get(pfx));
@@ -291,7 +309,7 @@ public class DuplicateScorer {
             }
 
             for (ItemProfile ex : pool) {
-                checkPair(cand, ex, threshold, evaluatedPairs, suspects);
+                checkPair(cand, ex, threshold, evaluatedPairs, suspects, keyCache);
             }
         }
 
@@ -299,14 +317,19 @@ public class DuplicateScorer {
     }
 
     private void checkPair(
-            ItemProfile a, ItemProfile b, double threshold, Set<String> evaluatedPairs, List<SuspectMatch> suspects) {
+            ItemProfile a,
+            ItemProfile b,
+            double threshold,
+            Set<String> evaluatedPairs,
+            List<SuspectMatch> suspects,
+            Map<UUID, String> keyCache) {
         String pairKey =
                 a.hashCode() < b.hashCode() ? a.hashCode() + ":" + b.hashCode() : b.hashCode() + ":" + a.hashCode();
         if (!evaluatedPairs.add(pairKey)) {
             return;
         }
 
-        ScoreResult result = score(a, b, threshold);
+        ScoreResult result = score(a, b, threshold, keyCache);
         if (result.isSuspect()) {
             suspects.add(new SuspectMatch(a, b, result.score(), result.reasons()));
         }

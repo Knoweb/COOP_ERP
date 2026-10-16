@@ -160,6 +160,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
 
         // 4. Prepare candidate profiles and batch data
         Set<String> generatedCodes = new HashSet<>(valCtx.existingSkuCodes());
+        Set<String> registeredBarcodes = new HashSet<>(valCtx.existingBarcodes());
         List<PreparedSku> preparedSkus = new ArrayList<>(enrichedRows.size());
         List<PreparedBarcode> preparedBarcodes = new ArrayList<>();
         List<ItemProfile> candidateProfiles = new ArrayList<>(enrichedRows.size());
@@ -202,7 +203,10 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
             if (r.barcodes() != null) {
                 for (String b : r.barcodes()) {
                     if (b != null && !b.isBlank()) {
-                        preparedBarcodes.add(new PreparedBarcode(b.strip(), skuId, uom, ownerEntityId));
+                        String clean = b.strip();
+                        if (registeredBarcodes.add(clean)) {
+                            preparedBarcodes.add(new PreparedBarcode(clean, skuId, uom, ownerEntityId));
+                        }
                     }
                 }
             }
@@ -271,8 +275,8 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
             UUID candId = m.candidate().skuId();
             UUID existId = m.matched().skuId();
             if (candId != null && existId != null && !candId.equals(existId)) {
-                UUID a = candId.compareTo(existId) < 0 ? candId : existId;
-                UUID b = candId.compareTo(existId) < 0 ? existId : candId;
+                UUID a = candId.toString().compareTo(existId.toString()) < 0 ? candId : existId;
+                UUID b = candId.toString().compareTo(existId.toString()) < 0 ? existId : candId;
                 String pairKey = a + ":" + b;
                 if (seenSuspectPairs.add(pairKey)) {
                     preparedSuspects.add(new PreparedSuspect(Ids.next(), a, b, m.score(), m.reasons(), ownerEntityId));
@@ -320,7 +324,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     base_uom_code, sold_by_weight, batch_tracked, expiry_tracked,
                     has_printed_mrp, expiry_warning_days, tax_category_id,
                     multi_mrp_policy, origin_kind, attributes
-                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
+                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
                 """;
 
         for (int i = 0; i < skus.size(); i += BATCH_SIZE) {
@@ -485,10 +489,16 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     String ta = rs.getString("short_name_ta");
                     String uom = rs.getString("base_uom_code");
                     Array bArr = rs.getArray("barcodes");
-                    List<String> bList = List.of();
+                    List<String> bList = new ArrayList<>();
                     if (bArr != null) {
-                        String[] arr = (String[]) bArr.getArray();
-                        bList = List.of(arr);
+                        Object arrayObj = bArr.getArray();
+                        if (arrayObj instanceof Object[] arr) {
+                            for (Object o : arr) {
+                                if (o != null) {
+                                    bList.add(o.toString());
+                                }
+                            }
+                        }
                     }
                     return new ItemProfile(id, code, en, si, ta, uom, null, bList);
                 });
