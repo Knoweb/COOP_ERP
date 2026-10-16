@@ -70,9 +70,7 @@ class BulkImportSkusIntegrationTest extends PostgresIntegrationTest {
                     (tax_category_id, code, name_en, owner_entity_id)
                 values
                     (?, 'STD', 'Standard Tax', ?)
-                on conflict (code) do update set
-                    tax_category_id = excluded.tax_category_id,
-                    owner_entity_id = excluded.owner_entity_id
+                on conflict (code) do nothing
                 """,
                 TAX_CATEGORY,
                 MPCS);
@@ -82,10 +80,9 @@ class BulkImportSkusIntegrationTest extends PostgresIntegrationTest {
                 insert into catalogue.tax_rate
                     (tax_category_id, rate_percent, effective_from, owner_entity_id)
                 values
-                    (?, 18.00, '2024-01-01', ?)
+                    ((select tax_category_id from catalogue.tax_category where code = 'STD' limit 1), 18.00, '2024-01-01', ?)
                 on conflict do nothing
                 """,
-                TAX_CATEGORY,
                 MPCS);
 
         kernel.reset();
@@ -96,8 +93,6 @@ class BulkImportSkusIntegrationTest extends PostgresIntegrationTest {
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table catalogue.sku, catalogue.supplier, catalogue.duplicate_suspect cascade");
         admin.update("delete from catalogue.uom where uom_code = 'PACK'");
-        admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
-        admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
 
     @Test
