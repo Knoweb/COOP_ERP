@@ -205,14 +205,34 @@ class BulkImportSkusHandlerTest {
         assertThat(report.accepted()).isEqualTo(1);
 
         // Verify batch updates were executed (for SKUs and Barcodes)
-        verify(jdbc, org.mockito.Mockito.atLeastOnce())
-                .batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<BatchPreparedStatementSetter> bpssCaptor =
+                ArgumentCaptor.forClass(BatchPreparedStatementSetter.class);
+        verify(jdbc, org.mockito.Mockito.atLeastOnce()).batchUpdate(sqlCaptor.capture(), bpssCaptor.capture());
+
+        boolean foundSkuInsert = false;
+        for (int i = 0; i < sqlCaptor.getAllValues().size(); i++) {
+            String sql = sqlCaptor.getAllValues().get(i);
+            BatchPreparedStatementSetter bpss = bpssCaptor.getAllValues().get(i);
+            if (sql.contains("catalogue.sku (")) {
+                foundSkuInsert = true;
+                long qmarks = sql.chars().filter(ch -> ch == '?').count();
+                assertThat(qmarks).isEqualTo(17);
+                java.sql.PreparedStatement ps = mock(java.sql.PreparedStatement.class);
+                try {
+                    bpss.setValues(ps, 0);
+                    verify(ps).setString(eq(17), eq("{}"));
+                } catch (java.sql.SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        assertThat(foundSkuInsert).isTrue();
 
         // Verify audit recorded
         verify(audit).record(eq(BulkImportSkusHandler.AUDIT_BULK_IMPORTED), any(), any(), any(), eq(SCOPE));
 
         // Verify domain events published
-        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
         verify(events, org.mockito.Mockito.atLeastOnce()).publish(any());
     }
 }

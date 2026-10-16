@@ -324,7 +324,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     base_uom_code, sold_by_weight, batch_tracked, expiry_tracked,
                     has_printed_mrp, expiry_warning_days, tax_category_id,
                     multi_mrp_policy, origin_kind, attributes
-                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
+                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
                 """;
 
         for (int i = 0; i < skus.size(); i += BATCH_SIZE) {
