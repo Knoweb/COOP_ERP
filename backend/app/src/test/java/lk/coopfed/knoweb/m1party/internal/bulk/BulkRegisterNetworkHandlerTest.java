@@ -187,4 +187,80 @@ class BulkRegisterNetworkHandlerTest {
         verify(audit).record(eq(BulkRegisterNetworkHandler.AUDIT_NETWORK_REGISTERED), any(), any(), any(), eq(SCOPE));
         verify(events).publish(any(BulkNetworkRegistered.class));
     }
+
+    @Test
+    void hashingFailureRollsBackWithoutDatabaseWritesOrAudit() {
+        when(jdbc.query(anyString(), any(PreparedStatementSetter.class), any(RowMapper.class)))
+                .thenAnswer(inv -> {
+                    String sql = inv.getArgument(0);
+                    if (sql.contains("party.entity")) {
+                        return List.of("MPCS01");
+                    }
+                    return List.of();
+                });
+
+        when(pinHasher.hash(anyString())).thenThrow(new IllegalStateException("Crypto failure"));
+
+        BulkRegisterNetwork cmd = new BulkRegisterNetwork(
+                List.of(new BulkRegisterNetwork.Shop(
+                        "SH01", "Shop 1", null, null, null, "Colombo", null, null, "en", "M", List.of(1))),
+                List.of(new BulkRegisterNetwork.User("cashier1", "Cashier One", "en", "TILL", "1234", "SH01")),
+                List.of());
+
+        assertThatThrownBy(() -> handler.handle(cmd, SCOPE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Crypto failure");
+
+        // Verify no batch inserts, audit, or events
+        org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never())
+                .batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
+        org.mockito.Mockito.verify(audit, org.mockito.Mockito.never()).record(any(), any(), any(), any(), any());
+        org.mockito.Mockito.verify(events, org.mockito.Mockito.never()).publish(any());
+    }
+
+    @Test
+    void tillPositionSeriesRegistersWithAssignedHolderDeviceIdDirectly() {
+        when(jdbc.query(anyString(), any(PreparedStatementSetter.class), any(RowMapper.class)))
+                .thenAnswer(inv -> {
+                    String sql = inv.getArgument(0);
+                    if (sql.contains("party.entity")) {
+                        return List.of("MPCS01");
+                    }
+                    return List.of();
+                });
+
+        when(documentTypes.all())
+                .thenReturn(List.of(new DocumentType(
+                        "RCT",
+                        "Receipt",
+                        "ලදුපත",
+                        "பற்றுச்சීட்டு",
+                        SeriesScope.TILL_POSITION,
+                        "pos",
+                        false,
+                        true,
+                        true,
+                        "m6pos")));
+
+        when(pinHasher.hash(anyString())).thenReturn("$argon2id$mockedhash");
+
+        BulkRegisterNetwork cmd = new BulkRegisterNetwork(
+                List.of(new BulkRegisterNetwork.Shop(
+                        "SH01", "Shop 1", null, null, null, "Colombo", null, null, "en", "M", List.of(1))),
+                List.of(),
+                List.of(new BulkRegisterNetwork.Device("POS-100", "POS_TERMINAL", "SH01", 1, "1.0.0")));
+
+        BulkNetworkReport report = handler.handle(cmd, SCOPE);
+
+        assertThat(report.status()).isEqualTo(BulkNetworkReport.REGISTERED);
+
+        org.mockito.ArgumentCaptor<lk.coopfed.knoweb.kernel.api.SeriesRegistration> captor =
+                org.mockito.ArgumentCaptor.forClass(lk.coopfed.knoweb.kernel.api.SeriesRegistration.class);
+        verify(numbering).registerSeries(captor.capture(), eq(SCOPE));
+
+        lk.coopfed.knoweb.kernel.api.SeriesRegistration reg = captor.getValue();
+        assertThat(reg.docTypeCode()).isEqualTo("RCT");
+        assertThat(reg.scope()).isEqualTo(SeriesScope.TILL_POSITION);
+        assertThat(reg.holderDeviceId()).isNotNull();
+    }
 }
