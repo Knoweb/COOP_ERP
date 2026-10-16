@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m6pos.api.CashMovementRecorded;
 import lk.coopfed.knoweb.m6pos.api.ReceiptRecorded;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptFilter;
@@ -56,6 +57,9 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     RecordSessionHandler sessions;
 
     @Autowired
+    RecordCashMovementHandler cashMovements;
+
+    @Autowired
     PosQueries pos;
 
     private long nextNumber = 1;
@@ -63,8 +67,9 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void clean() {
         superuserJdbc()
-                .execute("truncate table pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
-                        + " pos.till_session");
+                .execute(
+                        "truncate table pos.cash_movement, pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
+                                + " pos.till_session");
         superuserJdbc().update("delete from kernel.numbering_series where owner_entity_id = ?", MPCS);
         series(OWN_SERIES, Ids.next(), DEVICE);
         series(FOREIGN_SERIES, Ids.next(), ANOTHER_DEVICE);
@@ -688,5 +693,171 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     private static void assertProblem(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String id) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
                 .isEqualTo(id));
+    }
+
+    // ---- cash movement tests (TILL-SELL-10) ------------------------------------------------
+
+    @Test
+    void aCashMovementRecordedAndAudited() {
+        UUID session = openSession();
+        kernel.reset();
+
+        UUID movementId = Ids.next();
+        UUID id = cashMovements.handle(
+                cashMovement(movementId, session, "DROP", new BigDecimal("500.00"), "midday sweep"), device());
+
+        assertThat(id).isEqualTo(movementId);
+        List<PosQueries.CashMovementView> list = pos.cashMovements(session, device());
+        assertThat(list).singleElement().satisfies(m -> {
+            assertThat(m.movementId()).isEqualTo(movementId);
+            assertThat(m.sessionId()).isEqualTo(session);
+            assertThat(m.locationId()).isEqualTo(SHOP);
+            assertThat(m.kind()).isEqualTo("DROP");
+            assertThat(m.amount()).isEqualByComparingTo("500.00");
+            assertThat(m.reason()).isEqualTo("midday sweep");
+            assertThat(m.flags()).isEmpty();
+        });
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("CASH_MOVEMENT_RECORDED");
+        assertThat(kernel.committedEvents())
+                .filteredOn(CashMovementRecorded.class::isInstance)
+                .singleElement()
+                .satisfies(e -> {
+                    CashMovementRecorded ev = (CashMovementRecorded) e;
+                    assertThat(ev.movementId()).isEqualTo(movementId);
+                    assertThat(ev.kind()).isEqualTo("DROP");
+                    assertThat(ev.amount()).isEqualByComparingTo("500.00");
+                });
+    }
+
+    @Test
+    void aCashMovementCentralFindsOddIsKeptAndFlagged() {
+        UUID unknownSession = Ids.next();
+        UUID movementId = Ids.next();
+        UUID elsewhere = Ids.next();
+
+        RecordCashMovement strange = new RecordCashMovement(
+                movementId,
+                unknownSession,
+                elsewhere,
+                null,
+                DEVICE,
+                "PAYOUT",
+                new BigDecimal("120.00"),
+                MORNING,
+                Ids.next(),
+                "emergency milk",
+                1L);
+
+        UUID id = cashMovements.handle(strange, device());
+        assertThat(id).isEqualTo(movementId);
+
+        List<PosQueries.CashMovementView> list = pos.cashMovements(unknownSession, device());
+        assertThat(list).singleElement().satisfies(m -> {
+            assertThat(m.movementId()).isEqualTo(movementId);
+            assertThat(m.flags()).containsExactly("LOCATION_MISMATCH", "SESSION_UNKNOWN");
+        });
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("CASH_MOVEMENT_FLAGGED");
+    }
+
+    @Test
+    void aCashMovementReplayedWithSameDetailsIsNoOp() {
+        UUID session = openSession();
+        kernel.reset();
+
+        UUID movementId = Ids.next();
+        RecordCashMovement command =
+                cashMovement(movementId, session, "DROP", new BigDecimal("300.00"), "routine drop");
+
+        cashMovements.handle(command, device());
+        assertThat(kernel.committedAudit()).hasSize(1);
+        kernel.reset();
+
+        // Exact replay
+        UUID replayed = cashMovements.handle(command, device());
+        assertThat(replayed).isEqualTo(movementId);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void aCashMovementReplayedWithDifferentDetailsAuditsReplayDiffersWithoutModifyingFirst() {
+        UUID session = openSession();
+        kernel.reset();
+
+        UUID movementId = Ids.next();
+        RecordCashMovement first = cashMovement(movementId, session, "DROP", new BigDecimal("300.00"), "routine drop");
+        cashMovements.handle(first, device());
+        kernel.reset();
+
+        // Arrives again with different amount
+        RecordCashMovement altered =
+                cashMovement(movementId, session, "DROP", new BigDecimal("600.00"), "routine drop");
+        cashMovements.handle(altered, device());
+
+        // First copy is kept
+        List<PosQueries.CashMovementView> list = pos.cashMovements(session, device());
+        assertThat(list).singleElement().satisfies(m -> {
+            assertThat(m.amount()).isEqualByComparingTo("300.00");
+        });
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("CASH_MOVEMENT_REPLAY_DIFFERS");
+    }
+
+    @Test
+    void aCashMovementGuardsInvalidAmountAndEmptyReason() {
+        UUID session = openSession();
+        UUID movementId = Ids.next();
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", BigDecimal.ZERO, "zero amount"), device()),
+                "m6.cash_movement.invalid_amount");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", new BigDecimal("-10.00"), "negative amount"),
+                        device()),
+                "m6.cash_movement.invalid_amount");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", new BigDecimal("100.00"), "   "), device()),
+                "m6.cash_movement.reason_required");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        new RecordCashMovement(
+                                null,
+                                session,
+                                SHOP,
+                                null,
+                                DEVICE,
+                                "DROP",
+                                new BigDecimal("100.00"),
+                                MORNING,
+                                Ids.next(),
+                                "reason",
+                                1L),
+                        device()),
+                "m6.cash_movement.malformed");
+
+        assertProblem(
+                () -> cashMovements.handle(
+                        cashMovement(movementId, session, "DROP", new BigDecimal("100.00"), "reason"), entityWide()),
+                "m6.scope.device_required");
+    }
+
+    private RecordCashMovement cashMovement(
+            UUID movementId, UUID session, String kind, BigDecimal amount, String reason) {
+        return new RecordCashMovement(
+                movementId, session, SHOP, null, DEVICE, kind, amount, MORNING, Ids.next(), reason, 1L);
     }
 }

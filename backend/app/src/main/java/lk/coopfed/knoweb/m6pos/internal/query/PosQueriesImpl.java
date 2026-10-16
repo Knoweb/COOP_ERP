@@ -155,6 +155,31 @@ class PosQueriesImpl implements PosQueries {
                 .findFirst();
     }
 
+    @Override
+    public List<CashMovementView> cashMovements(UUID sessionId, ScopeContext scope) {
+        return jdbc.query(
+                """
+                select movement_id, session_id, location_id, till_position_id, device_id, kind, amount, occurred_at, operator_user_id, reason, device_seq, flags
+                  from pos.cash_movement
+                 where session_id = ?
+                 order by occurred_at asc
+                """,
+                (rs, rowNum) -> new CashMovementView(
+                        rs.getObject("movement_id", UUID.class),
+                        rs.getObject("session_id", UUID.class),
+                        rs.getObject("location_id", UUID.class),
+                        rs.getObject("till_position_id", UUID.class),
+                        rs.getObject("device_id", UUID.class),
+                        rs.getString("kind"),
+                        rs.getBigDecimal("amount"),
+                        instant(rs, "occurred_at"),
+                        rs.getObject("operator_user_id", UUID.class),
+                        rs.getString("reason"),
+                        rs.getObject("device_seq") != null ? rs.getLong("device_seq") : null,
+                        texts(rs.getArray("flags"))),
+                sessionId);
+    }
+
     private int pageSize(Integer requested, ScopeContext scope) {
         int max = Math.max(1, config.getInt(CONFIG_MAX_PAGE, scope, 200));
         int wanted = requested == null || requested < 1 ? DEFAULT_PAGE : requested;

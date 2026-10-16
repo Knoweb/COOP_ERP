@@ -294,6 +294,71 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void theTillPerformsCashDropAndPayoutAndAfterSyncMovementsAndExpectedCashReconcile() throws Exception {
+        TillSimulator till = till();
+        till.refreshSnapshot();
+        UUID session = till.openSession(new BigDecimal("1000.00"));
+        UUID receipt = till.sell(List.of(new Sale("4790001000011", new BigDecimal("1"), new BigDecimal("1450.00"))));
+
+        UUID drop = till.cashDrop(new BigDecimal("500.00"), "Midday safe sweep");
+        UUID payout = till.cashPayout(new BigDecimal("150.00"), "Cleaning supplies");
+
+        // Expected cash: 1000 + 1450 - 500 - 150 = 1800.00
+        till.closeSession(new BigDecimal("1800.00"));
+
+        till.drain(50, Instant.now().plusSeconds(30));
+        assertThat(till.pending()).isZero();
+        deliverTheTillsEvents();
+
+        ScopeContext office = own(MPCS);
+        List<PosQueries.CashMovementView> movements = pos.cashMovements(session, office);
+        assertThat(movements).hasSize(2);
+        assertThat(movements)
+                .extracting(PosQueries.CashMovementView::movementId)
+                .containsExactlyInAnyOrder(drop, payout);
+
+        assertThat(movements)
+                .filteredOn(m -> m.kind().equals("DROP"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.amount()).isEqualByComparingTo("500.00");
+                    assertThat(m.reason()).isEqualTo("Midday safe sweep");
+                    assertThat(m.flags()).isEmpty();
+                });
+
+        assertThat(movements)
+                .filteredOn(m -> m.kind().equals("PAYOUT"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.amount()).isEqualByComparingTo("150.00");
+                    assertThat(m.reason()).isEqualTo("Cleaning supplies");
+                    assertThat(m.flags()).isEmpty();
+                });
+
+        // The session's blind close worked out zero variance
+        assertThat(sessionsAt(office)).singleElement().satisfies(s -> {
+            assertThat(s.sessionId()).isEqualTo(session);
+            assertThat(s.countedCash()).isEqualByComparingTo("1800.00");
+            assertThat(s.expectedCash()).isEqualByComparingTo("1800.00");
+            assertThat(s.variance()).isEqualByComparingTo("0.00");
+        });
+
+        // Query over HTTP
+        JsonNode cashMovementsJson = http.exchange(
+                        "/v1/pos/sessions/" + session + "/cash-movements",
+                        HttpMethod.GET,
+                        new HttpEntity<>(TestIdentityProvider.entityWideHeaders(InventoryFixture.USER, MPCS)),
+                        JsonNode.class)
+                .getBody();
+        assertThat(cashMovementsJson).hasSize(2);
+
+        // Committed audit contains movement recorded events
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("CASH_MOVEMENT_RECORDED", "TILL_SESSION_OPENED", "TILL_SESSION_CLOSED");
+    }
+
+    @Test
     void anOversellIsAppliedAndFlaggedNeverRefused() throws Exception {
         TillSimulator till = till();
         till.refreshSnapshot();
@@ -783,8 +848,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static void forget(JdbcTemplate db) {
-        db.execute("truncate table pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
-                + " pos.till_session");
+        db.execute(
+                "truncate table pos.cash_movement, pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
+                        + " pos.till_session");
         db.update("delete from kernel.event_outbox where owner_entity_id = ?", MPCS);
         for (String table : List.of(
                 "kernel.sync_event",

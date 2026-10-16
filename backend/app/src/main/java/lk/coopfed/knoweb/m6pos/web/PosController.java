@@ -3,13 +3,16 @@ package lk.coopfed.knoweb.m6pos.web;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
+import lk.coopfed.knoweb.m6pos.query.PosQueries.CashMovementView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptFilter;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.ReceiptView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.SessionFilter;
 import lk.coopfed.knoweb.m6pos.query.PosQueries.SessionView;
+import lk.coopfed.knoweb.m6pos.web.generated.CashMovementResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.PosApi;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptLineResponse;
 import lk.coopfed.knoweb.m6pos.web.generated.ReceiptPage;
@@ -80,6 +83,17 @@ class PosController implements PosApi {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @Override
+    public ResponseEntity<List<CashMovementResponse>> listSessionCashMovements(UUID sessionId) {
+        return queries.session(sessionId, currentScope.get())
+                .map(s -> {
+                    List<CashMovementView> movements = queries.cashMovements(sessionId, currentScope.get());
+                    return ResponseEntity.ok(
+                            movements.stream().map(PosController::toResponse).toList());
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     private LocalDate dayOrToday(LocalDate businessDate) {
         return businessDate != null ? businessDate : LocalDate.now(clock.withZone(businessZone));
     }
@@ -124,5 +138,21 @@ class PosController implements PosApi {
                 .countedCash(s.countedCash())
                 .expectedCash(s.expectedCash())
                 .variance(s.variance());
+    }
+
+    private static CashMovementResponse toResponse(CashMovementView m) {
+        return new CashMovementResponse(
+                        m.movementId(),
+                        m.sessionId(),
+                        m.locationId(),
+                        CashMovementResponse.KindEnum.fromValue(m.kind()),
+                        m.amount(),
+                        m.occurredAt(),
+                        m.reason())
+                .tillPositionId(m.tillPositionId())
+                .deviceId(m.deviceId())
+                .operatorUserId(m.operatorUserId())
+                .deviceSeq(m.deviceSeq())
+                .flags(m.flags());
     }
 }

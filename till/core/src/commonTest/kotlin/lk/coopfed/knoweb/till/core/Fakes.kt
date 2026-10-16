@@ -20,6 +20,7 @@ import lk.coopfed.knoweb.till.core.crypto.Base64
 import lk.coopfed.knoweb.till.core.crypto.Sha256
 import lk.coopfed.knoweb.till.core.id.IdGenerator
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
@@ -49,10 +50,11 @@ class InMemoryStore : TillStore {
         val sessions: MutableMap<String, SessionRecord> = linkedMapOf(),
         val receipts: MutableList<IssuedReceipt> = mutableListOf(),
         val anomalies: MutableList<Anomaly> = mutableListOf(),
+        val cashMovements: MutableList<CashMovementRecord> = mutableListOf(),
     ) {
         fun copy() = Data(
             settings.toMutableMap(), snapshot, outbox.toMutableMap(), acked.toMutableMap(), sessions.toMutableMap(),
-            receipts.toMutableList(), anomalies.toMutableList(),
+            receipts.toMutableList(), anomalies.toMutableList(), cashMovements.toMutableList(),
         )
     }
 
@@ -104,6 +106,8 @@ class InMemoryStore : TillStore {
     override fun saveSession(session: SessionRecord) { data.sessions[session.sessionId] = session }
     override fun openSession() = data.sessions.values.firstOrNull { it.isOpen }
     override fun session(sessionId: String) = data.sessions[sessionId]
+    override fun saveCashMovement(movement: CashMovementRecord) { data.cashMovements += movement }
+    override fun cashMovementsOfSession(sessionId: String) = data.cashMovements.filter { it.sessionId == sessionId }
     override fun saveReceipt(receipt: IssuedReceipt) {
         check(data.receipts.none { it.number == receipt.number }) { "receipt number ${receipt.number} used twice" }
         data.receipts += receipt

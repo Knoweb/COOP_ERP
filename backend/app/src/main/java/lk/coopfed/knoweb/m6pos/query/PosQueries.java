@@ -41,6 +41,9 @@ public interface PosQueries {
     /** One session, or empty when there is none or the caller's scope may not see it. */
     Optional<SessionView> session(UUID sessionId, ScopeContext scope);
 
+    /** All cash drops and pay-outs recorded during one till session, oldest first. */
+    List<CashMovementView> cashMovements(UUID sessionId, ScopeContext scope);
+
     /**
      * @param locationId   the shop; required
      * @param businessDate the business day (issued within its bounds in the business time zone);
@@ -97,4 +100,18 @@ public interface PosQueries {
             BigDecimal countedCash,
             BigDecimal expectedCash,
             BigDecimal variance) {}
+
+    record CashMovementView(
+            UUID movementId,
+            UUID sessionId,
+            UUID locationId,
+            UUID tillPositionId,
+            UUID deviceId,
+            String kind,
+            BigDecimal amount,
+            Instant occurredAt,
+            UUID operatorUserId,
+            String reason,
+            Long deviceSeq,
+            List<String> flags) {}
 }

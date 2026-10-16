@@ -5,6 +5,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
 import lk.coopfed.knoweb.till.core.model.SessionRecord
@@ -85,6 +86,31 @@ class SqlTillStore(driver: SqlDriver) : TillStore {
 
     override fun session(sessionId: String): SessionRecord? =
         q.selectSession(sessionId).executeAsOneOrNull()?.let { json.decodeFromString(SessionRecord.serializer(), it) }
+
+    override fun saveCashMovement(movement: CashMovementRecord) {
+        q.insertCashMovement(
+            id = movement.movementId,
+            session_id = movement.sessionId,
+            kind = movement.kind,
+            amount = movement.amount.plain(),
+            at = movement.occurredAt,
+            operator_user_id = movement.operatorUserId,
+            reason = movement.reason,
+        )
+    }
+
+    override fun cashMovementsOfSession(sessionId: String): List<CashMovementRecord> =
+        q.selectCashMovementsBySession(sessionId).executeAsList().map {
+            CashMovementRecord(
+                movementId = it.id,
+                sessionId = it.session_id,
+                kind = it.kind,
+                amount = Money.parse(it.amount),
+                occurredAt = it.at,
+                operatorUserId = it.operator_user_id,
+                reason = it.reason ?: "",
+            )
+        }
 
     override fun saveReceipt(receipt: IssuedReceipt) {
         q.insertReceipt(receipt.documentId, receipt.sessionId, receipt.number, json.encodeToString(IssuedReceipt.serializer(), receipt))

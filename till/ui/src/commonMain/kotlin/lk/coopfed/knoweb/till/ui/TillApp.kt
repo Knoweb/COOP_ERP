@@ -400,8 +400,11 @@ private fun SellScreen(c: TillController) {
     var scan by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Item>>(emptyList()) }
     var payingMode by remember { mutableStateOf<String?>(null) }
+    var cashMovementMode by remember { mutableStateOf<String?>(null) }
     val scanFocus = remember { FocusRequester() }
-    LaunchedEffect(payingMode, c.needsPrice) { if (payingMode == null && c.needsPrice == null) scanFocus.requestFocus() }
+    LaunchedEffect(payingMode, cashMovementMode, c.needsPrice) {
+        if (payingMode == null && cashMovementMode == null && c.needsPrice == null) scanFocus.requestFocus()
+    }
 
     Row(
         Modifier.fillMaxSize().onPreviewKeyEvent { e ->
@@ -411,6 +414,8 @@ private fun SellScreen(c: TillController) {
                 Key.F3 -> { if (c.lines.isNotEmpty()) payingMode = "CARD"; true }
                 Key.F4 -> { if (c.lines.isNotEmpty()) payingMode = "WALLET"; true }
                 Key.F5 -> { if (c.lines.isNotEmpty()) payingMode = "QR"; true }
+                Key.F7 -> { cashMovementMode = "DROP"; true }
+                Key.F8 -> { cashMovementMode = "PAYOUT"; true }
                 Key.F10 -> { c.toCloseSession(); true }
                 else -> false
             }
@@ -468,6 +473,14 @@ private fun SellScreen(c: TillController) {
                     Text("QR (F5)", fontSize = 13.sp)
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { cashMovementMode = "DROP" }, enabled = !c.busy, modifier = Modifier.weight(1f)) {
+                    Text("Drop (F7)", fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = { cashMovementMode = "PAYOUT" }, enabled = !c.busy, modifier = Modifier.weight(1f)) {
+                    Text("Pay-out (F8)", fontSize = 12.sp)
+                }
+            }
             OutlinedButton(onClick = { c.clearSale() }, enabled = c.lines.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Clear the sale") }
             OutlinedButton(onClick = { c.reprintLast() }, enabled = c.lastReceipt != null, modifier = Modifier.fillMaxWidth()) {
                 Text("Reprint ${c.lastReceipt?.numberDisplay ?: "last receipt"}")
@@ -483,7 +496,58 @@ private fun SellScreen(c: TillController) {
         "CASH" -> CashDialog(c) { payingMode = null }
         "CARD", "WALLET", "QR" -> DigitalPayDialog(c, payingMode!!) { payingMode = null }
     }
+    cashMovementMode?.let { mode ->
+        CashMovementDialog(c, mode) { cashMovementMode = null }
+    }
     c.needsPrice?.let { PriceDialog(c, it) }
+}
+
+@Composable
+private fun CashMovementDialog(c: TillController, mode: String, close: () -> Unit) {
+    var amount by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    val isDrop = mode == "DROP"
+    val title = if (isDrop) "Cash Drop (Safe)" else "Cash Pay-out"
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (isDrop) "Record cash dropped from drawer into safe. Drawer will open and slip will print."
+                    else "Record pay-out from drawer. Drawer will open and slip will print.",
+                    color = TillColors.textMuted,
+                )
+                OutlinedTextField(
+                    amount,
+                    { amount = it },
+                    label = { Text("Amount (LKR)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                OutlinedTextField(
+                    reason,
+                    { reason = it },
+                    label = { Text("Reason (mandatory)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isDrop) c.recordCashDrop(amount, reason, close)
+                    else c.recordPayout(amount, reason, close)
+                },
+                enabled = !c.busy && amount.isNotBlank() && reason.isNotBlank(),
+            ) { Text("Confirm & Print") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable
