@@ -37,7 +37,7 @@ object Facts {
     }
 
     /** till_session.closed.v1: the blind count and the till's expected figure. */
-    fun sessionClosed(device: DeviceIdentity, s: SessionRecord): JsonObject = buildJsonObject {
+    fun sessionClosed(device: DeviceIdentity, s: SessionRecord, openSessionsRemaining: Int = 0): JsonObject = buildJsonObject {
         put("session_id", s.sessionId)
         put("till_position_id", device.tillPositionId)
         put("operator_user_id", s.operatorUserId)
@@ -46,6 +46,7 @@ object Facts {
         put("counted_cash", s.countedCash!!.plain())
         put("expected_cash", s.expectedCash!!.plain())
         put("variance", s.variance!!.plain())
+        put("open_sessions_remaining", openSessionsRemaining)
     }
 
     /** cash_movement.recorded.v1: cash drop or pay-out at the till drawer. */

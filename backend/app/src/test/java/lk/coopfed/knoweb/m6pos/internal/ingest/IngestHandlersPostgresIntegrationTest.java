@@ -12,8 +12,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.Ids;
+import lk.coopfed.knoweb.kernel.api.LocationSessionsClosed;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
@@ -554,21 +561,42 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UUID openSession() {
+        return openSession(DEVICE, null);
+    }
+
+    private UUID openSession(UUID deviceId) {
+        return openSession(deviceId, null);
+    }
+
+    private UUID openSession(UUID deviceId, LocalDate businessDate) {
         UUID session = Ids.next();
         sessions.handle(
                 new RecordSession(
-                        session, false, null, null, null, MORNING.minusSeconds(600), BigDecimal.ZERO, null, null, null),
-                device());
+                        session,
+                        false,
+                        null,
+                        null,
+                        businessDate,
+                        MORNING.minusSeconds(600),
+                        BigDecimal.ZERO,
+                        null,
+                        null,
+                        null),
+                device(deviceId));
         return session;
     }
 
     private static RecordSession close(UUID session, Instant at, String counted) {
+        return close(session, null, at, counted);
+    }
+
+    private static RecordSession close(UUID session, LocalDate businessDate, Instant at, String counted) {
         return new RecordSession(
                 session,
                 true,
                 null,
                 null,
-                null,
+                businessDate,
                 at,
                 null,
                 new BigDecimal(counted),
@@ -691,9 +719,13 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     /** The scope the consumer framework gives a till's fact: the device's entity at its shop. */
     private static ScopeContext device() {
+        return device(DEVICE);
+    }
+
+    private static ScopeContext device(UUID deviceId) {
         Scope scope = new Scope(MPCS, SHOP);
         return new ScopeContext(
-                null, DEVICE, MPCS, List.of(scope), scope, PolicyClass.OWN, Set.of(), null, Locale.ENGLISH, null);
+                null, deviceId, MPCS, List.of(scope), scope, PolicyClass.OWN, Set.of(), null, Locale.ENGLISH, null);
     }
 
     private static ScopeContext entityWide() {
@@ -1043,6 +1075,118 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedAudit())
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    // ---- automatic day close tests (TILL-SELL-12) -------------------------------------------
+
+    @Test
+    void singleTillClosingLastSessionPublishesLocationSessionsClosed() {
+        UUID session = openSession();
+        kernel.reset();
+
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "1000.00"), device());
+
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .singleElement()
+                .satisfies(e -> {
+                    LocationSessionsClosed closed = (LocationSessionsClosed) e;
+                    assertThat(closed.closedLocationId()).isEqualTo(SHOP);
+                    assertThat(closed.ownerEntityId()).isEqualTo(MPCS);
+                    assertThat(closed.businessDate()).isNotNull();
+                });
+    }
+
+    @Test
+    void multiTillClosingInSequenceOnlyPublishesLocationSessionsClosedWhenAllClosed() {
+        UUID session1 = openSession(DEVICE);
+        UUID session2 = openSession(ANOTHER_DEVICE);
+        kernel.reset();
+
+        // First till closes: session2 is still open -> no LocationSessionsClosed
+        sessions.handle(close(session1, MORNING.plusSeconds(3600), "1000.00"), device(DEVICE));
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .isEmpty();
+
+        // Second till closes: 0 sessions remaining -> LocationSessionsClosed published
+        kernel.reset();
+        sessions.handle(close(session2, MORNING.plusSeconds(3700), "1000.00"), device(ANOTHER_DEVICE));
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .singleElement()
+                .satisfies(e -> {
+                    LocationSessionsClosed closed = (LocationSessionsClosed) e;
+                    assertThat(closed.closedLocationId()).isEqualTo(SHOP);
+                    assertThat(closed.ownerEntityId()).isEqualTo(MPCS);
+                });
+    }
+
+    @Test
+    void delayedPreviousDaySessionCloseDoesNotPublishLocationSessionsClosed() {
+        LocalDate currentTradingDate = LocalDate.now();
+        LocalDate yesterday = currentTradingDate.minusDays(1);
+        UUID session = openSession(DEVICE, yesterday);
+        kernel.reset();
+
+        // Till syncs delayed close from yesterday
+        sessions.handle(close(session, yesterday, MORNING.plusSeconds(3600), "1000.00"), device());
+
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .isEmpty();
+    }
+
+    @Test
+    void duplicateSessionCloseReplayDoesNotPublishDuplicateLocationSessionsClosed() {
+        UUID session = openSession();
+        kernel.reset();
+
+        RecordSession closeCommand = close(session, MORNING.plusSeconds(3600), "1000.00");
+        sessions.handle(closeCommand, device());
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
+
+        kernel.reset();
+        // Duplicate delivery / replay
+        sessions.handle(closeCommand, device());
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .isEmpty();
+    }
+
+    @Test
+    void concurrentSessionClosesSerializeSafelyAndPublishExactlyOneLocationSessionsClosed() throws Exception {
+        UUID session1 = openSession(DEVICE);
+        UUID session2 = openSession(ANOTHER_DEVICE);
+        kernel.reset();
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+
+        Callable<Void> task1 = () -> {
+            barrier.await();
+            sessions.handle(close(session1, MORNING.plusSeconds(3600), "1000.00"), device(DEVICE));
+            return null;
+        };
+        Callable<Void> task2 = () -> {
+            barrier.await();
+            sessions.handle(close(session2, MORNING.plusSeconds(3600), "1000.00"), device(ANOTHER_DEVICE));
+            return null;
+        };
+
+        Future<Void> f1 = pool.submit(task1);
+        Future<Void> f2 = pool.submit(task2);
+
+        f1.get(10, TimeUnit.SECONDS);
+        f2.get(10, TimeUnit.SECONDS);
+        pool.shutdown();
+
+        // Exactly one LocationSessionsClosed event must be published across both concurrent closes
+        assertThat(kernel.committedEvents())
+                .filteredOn(LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
     }
 
     private RecordCashMovement cashMovement(

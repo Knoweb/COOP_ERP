@@ -3,14 +3,18 @@ package lk.coopfed.knoweb.m6pos.internal.ingest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
+import lk.coopfed.knoweb.kernel.api.BusinessDate;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.LocationSessionsClosed;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
@@ -31,7 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code TILL_SESSION_CLOSE_REPLAY_DIFFERS} (wave 2, M6-03). Audit
  * {@code TILL_SESSION_OPENED} or {@code TILL_SESSION_CLOSED}, and {@code TILL_SESSION_SHORTAGE_REVIEW}
  * (REVIEW) when a close's cash shortage strictly exceeds {@code pos.session_variance_review_threshold}
- * (TILL-SELL-11, C-02c, doc 26 section 7); event {@code till_session.recorded.v1}.
+ * (TILL-SELL-11, C-02c, doc 26 section 7); events {@code till_session.recorded.v1} and, when
+ * every open session at the location has closed, {@code location.sessions_closed.v1}
+ * (TILL-SELL-12, C-02d, wave 2 TWK-23).
  */
 @Service
 @CommandHandler(permission = "pos.receipt.view")
@@ -51,12 +57,19 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
     private final AuditFacade audit;
     private final EventPublisher events;
     private final ConfigRegistry config;
+    private final BusinessDate businessDate;
 
-    RecordSessionHandler(JdbcTemplate jdbc, AuditFacade audit, EventPublisher events, ConfigRegistry config) {
+    RecordSessionHandler(
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events,
+            ConfigRegistry config,
+            BusinessDate businessDate) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
         this.config = config;
+        this.businessDate = businessDate;
     }
 
     @Override
@@ -65,6 +78,12 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
         IngestGuards.requireDeviceScope(scope);
         if (command.sessionId() == null || command.at() == null) {
             throw new ProblemException("m6.session.malformed");
+        }
+        if (command.closing()) {
+            jdbc.query(
+                    "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                    rs -> null,
+                    "pos:location-sessions:" + scope.locationId());
         }
         String table = command.closing() ? "pos.till_session_close" : "pos.till_session";
         if (Boolean.TRUE.equals(jdbc.queryForObject(
@@ -94,6 +113,8 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
                     command.expectedCash(),
                     command.variance());
         } else {
+            LocalDate sessionDate =
+                    command.businessDate() != null ? command.businessDate() : businessDate.current(scope.locationId());
             jdbc.update(
                     """
                     insert into pos.till_session (session_id, owner_entity_id, location_id, till_position_id, device_id,
@@ -106,7 +127,7 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
                     command.tillPositionId(),
                     scope.deviceId(),
                     command.operatorUserId(),
-                    command.businessDate(),
+                    sessionDate,
                     Timestamp.from(command.at()),
                     command.floatAmount());
         }
@@ -149,7 +170,51 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
         }
 
         events.publish(new TillSessionRecorded(command.sessionId(), scope.entityId(), scope.locationId(), status));
+        if (command.closing()) {
+            checkLocationSessionsClosed(command, scope);
+        }
         return command.sessionId();
+    }
+
+    /**
+     * When all sessions recorded for this location and business date have closed, publishes
+     * {@link LocationSessionsClosed} so DayCloseTrigger can advance the location's business date
+     * (C-02d, wave 2 TWK-23). A session for a past business date that has already closed is ignored.
+     */
+    private void checkLocationSessionsClosed(RecordSession command, ScopeContext scope) {
+        LocalDate date = command.businessDate();
+        if (date == null) {
+            List<LocalDate> found = jdbc.query(
+                    "select business_date from pos.till_session where session_id = ?",
+                    (rs, i) -> rs.getObject("business_date", LocalDate.class),
+                    command.sessionId());
+            if (!found.isEmpty() && found.getFirst() != null) {
+                date = found.getFirst();
+            } else {
+                date = businessDate.current(scope.locationId());
+            }
+        }
+        LocalDate currentTradingDate = businessDate.current(scope.locationId());
+        if (date.isBefore(currentTradingDate)) {
+            return;
+        }
+        Long remaining = jdbc.queryForObject(
+                """
+                select count(*)
+                  from pos.till_session s
+                 where s.location_id = ?
+                   and coalesce(s.business_date, ?) = ?
+                   and not exists (
+                       select 1 from pos.till_session_close c where c.session_id = s.session_id
+                   )
+                """,
+                Long.class,
+                scope.locationId(),
+                date,
+                date);
+        if (remaining != null && remaining == 0L) {
+            events.publish(new LocationSessionsClosed(scope.locationId(), date, scope.entityId()));
+        }
     }
 
     /**

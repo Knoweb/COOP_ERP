@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
  *   till_position_id, operator_user_id                  when present, a UUID
  *   business_date                                       when present, a date
  *   float_amount, counted_cash, expected_cash, variance when present, a decimal written as text
+ *   open_sessions_remaining                             when present, a non-negative integer
  * </pre>
  *
  * Exactly what the till writes (till/core Facts.sessionOpened, sessionClosed) and what the
@@ -53,6 +54,12 @@ class SessionPayloadCheck implements DevicePayloadCheck {
         }
         if (wrong == null) {
             wrong = firstNot(payload, DECIMALS, DevicePayloadCheck::isDecimalText, "a decimal written as text");
+        }
+        if (wrong == null) {
+            JsonNode remaining = present(payload, "open_sessions_remaining");
+            if (remaining != null && (!remaining.isIntegralNumber() || remaining.asLong() < 0)) {
+                wrong = "open_sessions_remaining is not a non-negative integer";
+            }
         }
         return wrong;
     }

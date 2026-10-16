@@ -367,6 +367,11 @@ public final class TillSimulator {
 
     /** Blind close (doc 26 section 4.2): the cashier counts, the till works out the variance. */
     public void closeSession(java.math.BigDecimal counted) {
+        closeSession(counted, 0);
+    }
+
+    /** Blind close with open_sessions_remaining recorded in the till fact. */
+    public void closeSession(java.math.BigDecimal counted, int openSessionsRemaining) {
         java.math.BigDecimal expected =
                 sessionFloat.add(cashTaken).subtract(cashDrops).subtract(cashPayouts);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -378,6 +383,7 @@ public final class TillSimulator {
         payload.put("counted_cash", counted.toPlainString());
         payload.put("expected_cash", expected.toPlainString());
         payload.put("variance", counted.subtract(expected).toPlainString());
+        payload.put("open_sessions_remaining", openSessionsRemaining);
         record("till_session.closed.v1", payload);
         sessionId = null;
     }

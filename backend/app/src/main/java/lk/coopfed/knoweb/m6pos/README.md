@@ -21,7 +21,7 @@ M5 deducts from the till's own bundle, as 25A section 7.4 says ("m5.sales consum
 
 | Path | What it holds |
 |---|---|
-| `api/` | `ReceiptRecorded` (`receipt.recorded.v1`), `TillSessionRecorded` (`till_session.recorded.v1`). |
+| `api/` | `ReceiptRecorded` (`receipt.recorded.v1`), `TillSessionRecorded` (`till_session.recorded.v1`), and publishes kernel's `LocationSessionsClosed` (`location.sessions_closed.v1`). |
 | `query/` | `PosQueries`: a location's receipts (with lines, tenders, till position, net, tax and flags) and its sessions, one business day a page at a time, and one receipt or one session. The web screens are `web/src/modules/m6pos` (receipts with a day and a "flagged only" filter, one receipt, till sessions; the flags in words, `pos.flag.<CODE>`). |
 | `internal/ingest/` | `PosIngestConsumer` (reads the bundles), `RecordReceiptHandler`, `RecordSessionHandler`, `IngestGuards`, `SessionPayloadCheck` (the gateway's shape check of session events). |
 | `web/` | `PosController`: `GET /v1/pos/receipts?locationId=&businessDate=&flagged=&cursor=&limit=`, `GET /v1/pos/receipts/{documentId}`, `GET /v1/pos/sessions?locationId=&businessDate=&cursor=&limit=`, `GET /v1/pos/sessions/{sessionId}` (`pos.receipt.view`). |
@@ -36,7 +36,17 @@ M5 deducts from the till's own bundle, as 25A section 7.4 says ("m5.sales consum
 - `lines[]`: `line_no`, `sku_id`, `batch_id` (the batch the till resolved; may be absent), `uom_code`, `qty`, `unit_price`, `tax_amount`, `line_total`;
 - `tenders[]`: `seq`, `kind`, `amount`; `session_id`.
 
-Sessions: `till_session.opened.v1` {`session_id`, `till_position_id`, `operator_user_id`, `business_date`, `opened_at`, `float_amount`}; `till_session.closed.v1` {`session_id`, ..., `closed_at`, `counted_cash`, `expected_cash`, `variance`}.
+Sessions: `till_session.opened.v1` {`session_id`, `till_position_id`, `operator_user_id`, `business_date`, `opened_at`, `float_amount`}; `till_session.closed.v1` {`session_id`, ..., `closed_at`, `counted_cash`, `expected_cash`, `variance`, `open_sessions_remaining`}.
+
+## Automatic day closing and offline session safety (TILL-SELL-12, C-02d, TWK-23)
+
+A till records `open_sessions_remaining: 0` in its own fact representing its device-local state. Central M6 POS determines the authoritative location-wide count by checking `pos.till_session` and `pos.till_session_close` for that location and business date, serialized under a PostgreSQL transaction-scoped advisory lock per location (`pos:location-sessions:<locationId>`). When the count reaches zero on the active trading date, M6 publishes `location.sessions_closed.v1`, triggering `DayCloseTrigger` in the kernel to advance `kernel.location_business_date` and audit `DAY_CLOSED`.
+
+**Offline till limitation and safety strategy**: Central cannot know of an offline till session that has never synced. The platform protects data integrity through:
+1. **Past-date guard**: Late-arriving session closes for a business date already superseded by the nightly cut-off cannot trigger day close.
+2. **Immutable document business dates**: Receipts retain the business date stamped at issue time on the till regardless of when central sync occurs.
+3. **Monotonic sequence ordering**: Outbox relay preserves dense `device_seq` order within each device's queue (`m6.till`).
+4. **Nightly cut-off backstop**: The 02:30 `DayCloseCutoffJob` advances any location that remained offline at close.
 
 ## Apply and flag, never refuse (AGENTS.md)
 
