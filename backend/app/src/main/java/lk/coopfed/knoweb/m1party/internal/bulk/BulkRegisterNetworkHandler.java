@@ -17,6 +17,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.regex.Pattern;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -47,7 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>All-or-none: every row is validated first. If any rule fails, nothing is committed and a
  * detailed {@link BulkNetworkReport} is returned. When all items pass, batch inserts minimize
- * database roundtrips and Argon2id PIN hashing runs sequentially with bounded heap usage to
+ * database roundtrips and Argon2id PIN hashing runs with bounded concurrency and heap usage to
  * ensure rapid execution well under 60 seconds for at least 40 shops, 120 users, and 60 devices.
  */
 @Service
@@ -172,13 +178,43 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
             }
         }
 
-        // Prepare users and sequential Argon2id PIN hashing (one at a time to keep heap within 64 MB)
-        Map<String, String> hashedPins = new HashMap<>();
-        for (BulkRegisterNetwork.User u : users) {
-            if (u.pin() != null && !u.pin().isBlank()) {
-                hashedPins.put(
-                        u.username().strip().toLowerCase(Locale.ROOT),
-                        pinHasher.hash(u.pin().strip()));
+        // Prepare users with bounded parallel Argon2id PIN hashing.
+        // Concurrency is bounded to at most 4 (and available CPU cores) to keep peak Argon2 memory
+        // bounded to concurrency * 64 MB (<= 256 MB), well within heap limits, while utilizing
+        // multiple cores to finish 120 users comfortably well within the 60-second requirement.
+        Map<String, String> hashedPins = new ConcurrentHashMap<>();
+        List<BulkRegisterNetwork.User> usersWithPin = users.stream()
+                .filter(u -> u.pin() != null && !u.pin().isBlank())
+                .toList();
+
+        if (!usersWithPin.isEmpty()) {
+            int concurrency = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), 4));
+            ThreadFactory threadFactory = r -> {
+                Thread t = new Thread(r, "bulk-pin-hasher");
+                t.setDaemon(true);
+                return t;
+            };
+
+            try (ExecutorService pool = Executors.newFixedThreadPool(concurrency, threadFactory)) {
+                List<CompletableFuture<Void>> futures = usersWithPin.stream()
+                        .map(u -> CompletableFuture.runAsync(
+                                () -> {
+                                    String norm = u.username().strip().toLowerCase(Locale.ROOT);
+                                    String hash = pinHasher.hash(u.pin().strip());
+                                    hashedPins.put(norm, hash);
+                                },
+                                pool))
+                        .toList();
+
+                try {
+                    CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                            .join();
+                } catch (CompletionException e) {
+                    if (e.getCause() instanceof RuntimeException re) {
+                        throw re;
+                    }
+                    throw new RuntimeException("Bulk PIN hashing failed", e.getCause());
+                }
             }
         }
 
@@ -208,6 +244,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
 
         // Prepare devices
         List<PreparedDevice> preparedDevices = new ArrayList<>();
+        Map<UUID, UUID> positionDeviceMap = new HashMap<>();
         for (BulkRegisterNetwork.Device dev : devices) {
             UUID devId = Ids.next();
             String serial = dev.hardwareSerial().strip();
@@ -228,6 +265,10 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                 posId = positionMap.containsKey(posKey)
                         ? positionMap.get(posKey)
                         : lookupPositionId(locId, dev.positionNo());
+            }
+
+            if (posId != null) {
+                positionDeviceMap.put(posId, devId);
             }
 
             String status = posId != null ? "ACTIVE" : "ENROLLED";
@@ -283,13 +324,12 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
             }
         }
 
-        Map<UUID, List<UUID>> positionSeriesMap = new HashMap<>();
         for (PreparedPosition pos : preparedPositions) {
             String shopCode = locationCodeById.getOrDefault(pos.locationId(), "");
+            UUID holderDeviceId = positionDeviceMap.get(pos.id());
 
-            List<UUID> posSeries = new ArrayList<>();
             for (DocumentType type : positionTypes) {
-                UUID sId = numbering.registerSeries(
+                numbering.registerSeries(
                         SeriesRegistration.forTillPosition(
                                 type.code(),
                                 ownerEntityId,
@@ -298,20 +338,8 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                                 ownerEntityCode,
                                 shopCode,
                                 pos.positionNo(),
-                                null),
+                                holderDeviceId),
                         scope);
-                posSeries.add(sId);
-            }
-            positionSeriesMap.put(pos.id(), posSeries);
-        }
-
-        // Assign holder device for assigned positions
-        for (PreparedDevice dev : preparedDevices) {
-            if (dev.positionId() != null && positionSeriesMap.containsKey(dev.positionId())) {
-                List<UUID> series = positionSeriesMap.get(dev.positionId());
-                if (!series.isEmpty()) {
-                    numbering.holderChange(series, dev.id(), scope);
-                }
             }
         }
 
