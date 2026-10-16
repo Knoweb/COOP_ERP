@@ -55,3 +55,9 @@ audit_event_types:
     severity: ALERT
     offline_capturable: false
     description_en: A cash movement arrived again under the same id with other details; the first copy is kept
+
+  # TILL-SELL-11 (C-02c, doc 26 section 3.5, 26A section 10): shortage exceeds threshold -> REVIEW
+  - code: TILL_SESSION_SHORTAGE_REVIEW
+    severity: REVIEW
+    offline_capturable: false
+    description_en: A till session closed with a cash shortage exceeding the configured threshold
