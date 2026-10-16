@@ -937,7 +937,12 @@ class TillService(
             expectedCash = SessionRules.expectedCash(session, open.cashSales, open.drops, open.payouts),
         )
         val closed = store.transaction {
-            val fact = record("till_session.closed.v1", reading, operator?.userId ?: session.operatorUserId, Facts.sessionClosed(identity, closing))
+            val fact = record(
+                "till_session.closed.v1",
+                reading,
+                operator?.userId ?: session.operatorUserId,
+                Facts.sessionClosed(identity, closing, openSessionsRemaining = 0),
+            )
             closing.copy(closedSeq = fact.deviceSeq).also { store.saveSession(it) }
         }
         publishStatus()
