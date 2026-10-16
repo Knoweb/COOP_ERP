@@ -409,6 +409,42 @@ class TillController(
         syncSoon()
     }
 
+    /** Cash drop from drawer to safe; recorded, slip printed, and drawer kicks. */
+    fun recordCashDrop(amount: String, reason: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val parsed = parseMoney(amount)
+        val movement = service.recordCashDrop(parsed, reason)
+        onDone()
+        say("Cash drop recorded: LKR ${movement.amount.display()}")
+        val layout = ReceiptLayouts.cashMovement(
+            movement = movement,
+            header = header(),
+            operatorName = operatorName ?: "",
+            language = service.shopLanguage,
+            zone = zone,
+        )
+        print("DROP-${movement.movementId.takeLast(8)}", layout, kickDrawer = true)
+        syncSoon()
+    }
+
+    /** Pay-out from drawer; recorded, slip printed, and drawer kicks. */
+    fun recordPayout(amount: String, reason: String, onDone: () -> Unit = {}) = act {
+        recordActivity()
+        val parsed = parseMoney(amount)
+        val movement = service.recordPayout(parsed, reason)
+        onDone()
+        say("Pay-out recorded: LKR ${movement.amount.display()}")
+        val layout = ReceiptLayouts.cashMovement(
+            movement = movement,
+            header = header(),
+            operatorName = operatorName ?: "",
+            language = service.shopLanguage,
+            zone = zone,
+        )
+        print("PAYOUT-${movement.movementId.takeLast(8)}", layout, kickDrawer = true)
+        syncSoon()
+    }
+
     fun reprintLast() = act {
         lastReceipt?.let { r -> print("${r.numberDisplay}-reprint", ReceiptLayouts.receipt(r, header(), service.shopLanguage, zone, reprint = true), false) }
     }

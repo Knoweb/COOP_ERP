@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.OutboxEntry
@@ -45,6 +46,19 @@ object Facts {
         put("counted_cash", s.countedCash!!.plain())
         put("expected_cash", s.expectedCash!!.plain())
         put("variance", s.variance!!.plain())
+    }
+
+    /** cash_movement.recorded.v1: cash drop or pay-out at the till drawer. */
+    fun cashMovement(device: DeviceIdentity, m: CashMovementRecord, occurredAt: Instant): JsonObject = buildJsonObject {
+        put("movement_id", m.movementId)
+        put("session_id", m.sessionId)
+        put("till_position_id", device.tillPositionId)
+        put("kind", m.kind)
+        put("amount", m.amount.plain())
+        put("occurred_at", Times.iso(occurredAt))
+        put("operator_user_id", m.operatorUserId)
+        put("reason", m.reason)
+        m.deviceSeq?.let { put("device_seq", it) }
     }
 
     /** The document and lines of a receipt bundle (receipt.issued.v1), with doc 18's column names. */

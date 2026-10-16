@@ -25,6 +25,8 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import lk.coopfed.knoweb.till.core.id.IdGenerator
 import lk.coopfed.knoweb.till.core.model.Anomaly
+import lk.coopfed.knoweb.till.core.model.CashMovementKind
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.ClockReading
 import lk.coopfed.knoweb.till.core.model.DeviceIdentity
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
@@ -854,6 +856,70 @@ class TillService(
         )
     }
 
+    /**
+     * Records a cash movement (drop or pay-out) at the drawer (doc 26 section 3.5).
+     * Validates that a session is open, amount is positive, reason is non-blank,
+     * and atomically writes the movement and the outbox event in the device sequence.
+     */
+    suspend fun recordCashMovement(
+        kind: String,
+        amount: Money,
+        reason: String,
+    ): CashMovementRecord = lock.withLock {
+        val identity = requireDevice()
+        requireNotRevoked()
+        requireNotLocked()
+        val cashier = operator ?: throw TillRefusal("Sign in first")
+        val session = store.openSession() ?: throw TillRefusal("No session is open")
+        if (amount <= Money.ZERO) {
+            throw TillRefusal("Cash movement amount must be positive")
+        }
+        val trimmedReason = reason.trim()
+        if (trimmedReason.isEmpty()) {
+            throw TillRefusal("Reason is mandatory for cash movement")
+        }
+        val upperKind = kind.uppercase()
+        if (upperKind != CashMovementKind.DROP && upperKind != CashMovementKind.PAYOUT) {
+            throw TillRefusal("Unknown cash movement kind: $kind")
+        }
+
+        val reading = clockReading()
+        val now = reading.occurredAt
+        val movementId = ids.next()
+        val occurredAtSec = Times.wholeSecond(now).epochSeconds
+
+        val movement = CashMovementRecord(
+            movementId = movementId,
+            sessionId = session.sessionId,
+            kind = upperKind,
+            amount = amount,
+            occurredAt = occurredAtSec,
+            operatorUserId = cashier.userId,
+            reason = trimmedReason,
+        )
+
+        val recorded = store.transaction {
+            val fact = record(
+                "cash_movement.recorded.v1",
+                reading,
+                cashier.userId,
+                Facts.cashMovement(identity, movement, now),
+                aggregateType = "cash_movement",
+                aggregateId = movementId,
+            )
+            val withSeq = movement.copy(deviceSeq = fact.deviceSeq)
+            store.saveCashMovement(withSeq)
+            withSeq
+        }
+        recorded
+    }
+
+    suspend fun recordCashDrop(amount: Money, reason: String): CashMovementRecord =
+        recordCashMovement(CashMovementKind.DROP, amount, reason)
+
+    suspend fun recordPayout(amount: Money, reason: String): CashMovementRecord =
+        recordCashMovement(CashMovementKind.PAYOUT, amount, reason)
+
     /** The cashier's blind count closes the session; the till works out expected cash and the variance. */
     suspend fun closeSession(counted: Money): ZReport = lock.withLock {
         val identity = requireDevice()
@@ -861,28 +927,40 @@ class TillService(
         val session = store.openSession() ?: throw TillRefusal("No session is open")
         if (counted.cents < 0) throw TillRefusal("The count cannot be negative")
         val receipts = store.receiptsOfSession(session.sessionId)
-        val open = ZReport.of(session, receipts)
+        val movements = store.cashMovementsOfSession(session.sessionId)
+        val open = ZReport.of(session, receipts, cashMovements = movements)
         val reading = clockReading()
         val now = reading.occurredAt
         val closing = session.copy(
             closedAt = Times.wholeSecond(now).epochSeconds,
             countedCash = counted,
-            expectedCash = SessionRules.expectedCash(session, open.cashSales),
+            expectedCash = SessionRules.expectedCash(session, open.cashSales, open.drops, open.payouts),
         )
         val closed = store.transaction {
             val fact = record("till_session.closed.v1", reading, operator?.userId ?: session.operatorUserId, Facts.sessionClosed(identity, closing))
             closing.copy(closedSeq = fact.deviceSeq).also { store.saveSession(it) }
         }
         publishStatus()
-        zReportOf(closed, receipts)
+        zReportOf(closed, receipts, movements)
     }
 
     suspend fun zReport(sessionId: String): ZReport? = lock.withLock {
-        store.session(sessionId)?.let { zReportOf(it, store.receiptsOfSession(it.sessionId)) }
+        store.session(sessionId)?.let {
+            zReportOf(it, store.receiptsOfSession(it.sessionId), store.cashMovementsOfSession(it.sessionId))
+        }
     }
 
-    private fun zReportOf(session: SessionRecord, receipts: List<IssuedReceipt>): ZReport =
-        ZReport.of(session, receipts, store.quarantinedAmong(ZReport.factsOf(session, receipts)))
+    private fun zReportOf(
+        session: SessionRecord,
+        receipts: List<IssuedReceipt>,
+        cashMovements: List<CashMovementRecord> = emptyList(),
+    ): ZReport =
+        ZReport.of(
+            session,
+            receipts,
+            store.quarantinedAmong(ZReport.factsOf(session, receipts, cashMovements)),
+            cashMovements,
+        )
 
     // ================================================================= problems for the office
 
@@ -1344,7 +1422,14 @@ class TillService(
         store.setting(Settings.BUSINESS_DATE)?.let { LocalDate.parse(it) } ?: Times.date(clock.now(), clock.zone)
 
     /** Appends a fact with the next device sequence number. Call inside a transaction. */
-    private fun record(eventType: String, reading: ClockReading, actor: String?, payload: JsonObject): OutboxEntry {
+    private fun record(
+        eventType: String,
+        reading: ClockReading,
+        actor: String?,
+        payload: JsonObject,
+        aggregateType: String? = null,
+        aggregateId: String? = null,
+    ): OutboxEntry {
         val entry = Facts.event(
             eventId = ids.next(),
             eventType = eventType,
@@ -1353,6 +1438,8 @@ class TillService(
             zone = clock.zone,
             actorUserId = actor,
             payload = payload,
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
             rawInstant = reading.rawInstant,
             offlineTimed = reading.offlineTimed,
             clockOffsetMs = reading.clockOffsetMs,

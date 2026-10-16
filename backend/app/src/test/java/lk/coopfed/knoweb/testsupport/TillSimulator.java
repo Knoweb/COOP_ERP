@@ -238,6 +238,8 @@ public final class TillSimulator {
     private UUID sessionId;
     private java.math.BigDecimal sessionFloat = java.math.BigDecimal.ZERO;
     private java.math.BigDecimal cashTaken = java.math.BigDecimal.ZERO;
+    private java.math.BigDecimal cashDrops = java.math.BigDecimal.ZERO;
+    private java.math.BigDecimal cashPayouts = java.math.BigDecimal.ZERO;
 
     /**
      * Who the till sells as: its entity, its position and the receipt series it holds (the RCT
@@ -263,6 +265,8 @@ public final class TillSimulator {
         sessionId = UUID.randomUUID();
         sessionFloat = floatAmount;
         cashTaken = java.math.BigDecimal.ZERO;
+        cashDrops = java.math.BigDecimal.ZERO;
+        cashPayouts = java.math.BigDecimal.ZERO;
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("session_id", sessionId.toString());
         payload.put("till_position_id", String.valueOf(tillPositionId));
@@ -363,7 +367,8 @@ public final class TillSimulator {
 
     /** Blind close (doc 26 section 4.2): the cashier counts, the till works out the variance. */
     public void closeSession(java.math.BigDecimal counted) {
-        java.math.BigDecimal expected = sessionFloat.add(cashTaken);
+        java.math.BigDecimal expected =
+                sessionFloat.add(cashTaken).subtract(cashDrops).subtract(cashPayouts);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("session_id", sessionId.toString());
         payload.put("till_position_id", String.valueOf(tillPositionId));
@@ -375,6 +380,44 @@ public final class TillSimulator {
         payload.put("variance", counted.subtract(expected).toPlainString());
         record("till_session.closed.v1", payload);
         sessionId = null;
+    }
+
+    /**
+     * Records a cash drop or pay-out at the till drawer (doc 26 section 3.5; TILL-SELL-10).
+     *
+     * @return the movement's id
+     */
+    public UUID cashMovement(String kind, java.math.BigDecimal amount, String reason) {
+        if (sessionId == null) {
+            throw new IllegalStateException("No open till session");
+        }
+        UUID movementId = UUID.randomUUID();
+        long seq = nextSeq;
+        if ("DROP".equalsIgnoreCase(kind)) {
+            cashDrops = cashDrops.add(amount);
+        } else if ("PAYOUT".equalsIgnoreCase(kind)) {
+            cashPayouts = cashPayouts.add(amount);
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("movement_id", movementId.toString());
+        payload.put("session_id", sessionId.toString());
+        payload.put("till_position_id", String.valueOf(tillPositionId));
+        payload.put("kind", kind.toUpperCase());
+        payload.put("amount", amount.toPlainString());
+        payload.put("occurred_at", now().toString());
+        payload.put("operator_user_id", operator.toString());
+        payload.put("reason", reason);
+        payload.put("device_seq", seq);
+        record("cash_movement.recorded.v1", payload);
+        return movementId;
+    }
+
+    public UUID cashDrop(java.math.BigDecimal amount, String reason) {
+        return cashMovement("DROP", amount, reason);
+    }
+
+    public UUID cashPayout(java.math.BigDecimal amount, String reason) {
+        return cashMovement("PAYOUT", amount, reason);
     }
 
     /** The SKU of a barcode in the live snapshot, as the till's scan layer finds it. */

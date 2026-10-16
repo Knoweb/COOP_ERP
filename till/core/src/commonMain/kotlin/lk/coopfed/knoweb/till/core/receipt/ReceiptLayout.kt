@@ -2,6 +2,7 @@ package lk.coopfed.knoweb.till.core.receipt
 
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
+import lk.coopfed.knoweb.till.core.model.CashMovementRecord
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.money.Money
 import lk.coopfed.knoweb.till.core.snapshot.Language
@@ -81,6 +82,35 @@ object ReceiptLayouts {
         return ReceiptLayout(language, blocks)
     }
 
+    fun cashMovement(
+        movement: CashMovementRecord,
+        header: SlipHeader,
+        operatorName: String,
+        language: Language,
+        zone: TimeZone,
+    ): ReceiptLayout {
+        val m = ReceiptMessages.of(language)
+        val title = if (movement.kind.uppercase() == "DROP") m.cashDrop else m.payout
+        val blocks = mutableListOf<Block>()
+        blocks += Block.Text(title.uppercase(), Align.CENTER, TextSize.LARGE, bold = true)
+        blocks += Block.Text(header.shopName, Align.CENTER, bold = true)
+        blocks += Block.Text(header.shopCode, Align.CENTER, TextSize.SMALL)
+        blocks += Block.Gap(8)
+        blocks += Block.Row(m.date, Times.printed(Instant.fromEpochSeconds(movement.occurredAt), zone))
+        blocks += Block.Row(m.counter, header.counter)
+        blocks += Block.Row(m.cashier, operatorName)
+        blocks += Block.Rule
+        blocks += Block.Row(m.amount, "LKR ${movement.amount.display()}", TextSize.LARGE, bold = true)
+        blocks += Block.Row(m.reason, movement.reason)
+        blocks += Block.Rule
+        blocks += Block.Gap(16)
+        blocks += Block.Row("${m.cashierSignature}:", "________________", TextSize.SMALL)
+        blocks += Block.Gap(8)
+        blocks += Block.Row("${m.supervisorSignature}:", "________________", TextSize.SMALL)
+        blocks += Block.Gap(24)
+        return ReceiptLayout(language, blocks)
+    }
+
     fun zReport(z: ZReport, header: SlipHeader, language: Language, zone: TimeZone): ReceiptLayout {
         val m = ReceiptMessages.of(language)
         val s = z.session
@@ -104,6 +134,12 @@ object ReceiptLayouts {
         blocks += Block.Row(m.sales, z.grossSales.display(), bold = true)
         blocks += Block.Row(m.cash, z.cashSales.display())
         blocks += Block.Row(m.float, z.floatAmount.display())
+        if (z.drops > Money.ZERO) {
+            blocks += Block.Row(m.drops, z.drops.display())
+        }
+        if (z.payouts > Money.ZERO) {
+            blocks += Block.Row(m.payouts, z.payouts.display())
+        }
         blocks += Block.Row(m.expected, z.expectedCash.display(), bold = true)
         z.countedCash?.let { blocks += Block.Row(m.counted, it.display()) }
         z.variance?.let { blocks += Block.Row(m.variance, it.display(), bold = true) }

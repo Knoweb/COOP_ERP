@@ -127,6 +127,28 @@ paths:
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '404':
           description: No such session, or the caller's scope may not see it
+  /v1/pos/sessions/{sessionId}/cash-movements:
+    get:
+      tags: [Pos]
+      operationId: listSessionCashMovements
+      summary: The cash drops and pay-outs recorded during a till session
+      x-permission: pos.receipt.view
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Cash movements recorded during the session
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CashMovementResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: No such session, or the caller's scope may not see it
 components:
   schemas:
     ReceiptPage:
@@ -214,3 +236,22 @@ components:
         countedCash: { type: number }
         expectedCash: { type: number }
         variance: { type: number }
+    CashMovementResponse:
+      type: object
+      required: [movementId, sessionId, locationId, kind, amount, occurredAt, reason]
+      properties:
+        movementId: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        tillPositionId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        kind: { type: string, enum: [DROP, PAYOUT] }
+        amount: { type: number }
+        occurredAt: { type: string, format: date-time }
+        operatorUserId: { type: string, format: uuid }
+        reason: { type: string }
+        deviceSeq: { type: integer, format: int64 }
+        flags:
+          type: array
+          description: What central found odd (e.g. LOCATION_MISMATCH, SESSION_UNKNOWN, SESSION_CLOSED)
+          items: { type: string }

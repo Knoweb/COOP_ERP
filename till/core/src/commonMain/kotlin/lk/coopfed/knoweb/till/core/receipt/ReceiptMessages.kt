@@ -32,6 +32,14 @@ data class ReceiptMessages(
     val card: String = "Card",
     val wallet: String = "Wallet",
     val qr: String = "QR",
+    val cashDrop: String = "Cash Drop",
+    val payout: String = "Pay-out",
+    val amount: String = "Amount",
+    val reason: String = "Reason",
+    val drops: String = "Cash drops",
+    val payouts: String = "Pay-outs",
+    val cashierSignature: String = "Cashier signature",
+    val supervisorSignature: String = "Supervisor signature",
 ) {
     companion object {
         private val EN = ReceiptMessages(
@@ -41,6 +49,9 @@ data class ReceiptMessages(
             sales = "Sales", float = "Float", expected = "Expected cash", counted = "Counted cash",
             variance = "Variance", refusedFacts = "{n} facts refused by central, see the office",
             card = "Card", wallet = "Wallet", qr = "QR",
+            cashDrop = "Cash Drop", payout = "Pay-out", amount = "Amount", reason = "Reason",
+            drops = "Cash drops", payouts = "Pay-outs",
+            cashierSignature = "Cashier signature", supervisorSignature = "Supervisor signature",
         )
         private val SI = ReceiptMessages(
             receipt = "රිසිට්පත", date = "දිනය", cashier = "මුදල් අයකැමි", counter = "කවුන්ටරය",
@@ -50,6 +61,9 @@ data class ReceiptMessages(
             float = "ආරම්භක මුදල", expected = "අපේක්ෂිත මුදල", counted = "ගණන් කළ මුදල",
             variance = "වෙනස", refusedFacts = "මධ්‍යස්ථානය ප්‍රතික්ෂේප කළ වාර්තා {n}ක්, කාර්යාලය අමතන්න",
             card = "කාඩ්පත", wallet = "පසුම්බිය", qr = "QR",
+            cashDrop = "මුදල් තැන්පතුව", payout = "මුදල් ගෙවීම", amount = "මුදල", reason = "හේතුව",
+            drops = "මුදල් තැන්පතු", payouts = "මුදල් ගෙවීම්",
+            cashierSignature = "අයකැමි අත්සන", supervisorSignature = "පරීක්ෂක අත්සන",
         )
         private val TA = ReceiptMessages(
             receipt = "ரசீது", date = "தேதி", cashier = "காசாளர்", counter = "கவுண்டர்",
@@ -59,6 +73,9 @@ data class ReceiptMessages(
             float = "தொடக்கப் பணம்", expected = "எதிர்பார்க்கும் பணம்", counted = "எண்ணிய பணம்",
             variance = "வேறுபாடு", refusedFacts = "மையம் நிராகரித்த {n} பதிவுகள், அலுவலகத்தை அணுகவும்",
             card = "அட்டை", wallet = "பணப்பை", qr = "QR",
+            cashDrop = "பண வைப்பு", payout = "பணம் செலுத்துதல்", amount = "தொகை", reason = "காரணம்",
+            drops = "பண வைப்புகள்", payouts = "பணம் செலுத்துதல்கள்",
+            cashierSignature = "காசாளர் கையொப்பம்", supervisorSignature = "மேற்பார்வையாளர் கையொப்பம்",
         )
 
         fun of(language: Language): ReceiptMessages = when (language) {

@@ -78,6 +78,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pos/sessions/{sessionId}/cash-movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cash drops and pay-outs recorded during a till session */
+        get: operations["listSessionCashMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -156,6 +173,30 @@ export interface components {
             countedCash?: number;
             expectedCash?: number;
             variance?: number;
+        };
+        CashMovementResponse: {
+            /** Format: uuid */
+            movementId: string;
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            tillPositionId?: string;
+            /** Format: uuid */
+            deviceId?: string;
+            /** @enum {string} */
+            kind: "DROP" | "PAYOUT";
+            amount: number;
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: uuid */
+            operatorUserId?: string;
+            reason: string;
+            /** Format: int64 */
+            deviceSeq?: number;
+            /** @description What central found odd (e.g. LOCATION_MISMATCH, SESSION_UNKNOWN, SESSION_CLOSED) */
+            flags?: string[];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -301,6 +342,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description No such session, or the caller's scope may not see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listSessionCashMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash movements recorded during the session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashMovementResponse"][];
                 };
             };
             400: components["responses"]["RequestProblem"];

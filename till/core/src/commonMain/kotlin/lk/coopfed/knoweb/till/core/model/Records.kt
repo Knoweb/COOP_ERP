@@ -146,3 +146,21 @@ data class ClockReading(
     val offlineTimed: Boolean,
 )
 
+/** The kind of cash movement at a till drawer (doc 26 section 3.5). */
+object CashMovementKind {
+    const val DROP = "DROP"
+    const val PAYOUT = "PAYOUT"
+}
+
+/** A cash drop or pay-out recorded at a till (doc 26 section 3.5). */
+@Serializable
+data class CashMovementRecord(
+    val movementId: String,
+    val sessionId: String,
+    val kind: String,
+    val amount: Money,
+    val occurredAt: Long,
+    val operatorUserId: String,
+    val reason: String,
+    val deviceSeq: Long? = null,
+)
