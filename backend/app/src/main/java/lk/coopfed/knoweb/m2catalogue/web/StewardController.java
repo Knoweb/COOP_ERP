@@ -99,7 +99,24 @@ class StewardController implements StewardApi {
         }
 
         BulkImportSkus command = new BulkImportSkus(request.getMode().getValue(), rows);
-        ImportReport report = bulkImportHandler.handle(command, scope);
+        ImportReport report;
+        try {
+            report = bulkImportHandler.handle(command, scope);
+        } catch (Throwable t) {
+            org.slf4j.LoggerFactory.getLogger(StewardController.class)
+                    .error("Bulk import failed in handler: {}", t.getMessage(), t);
+            System.err.println("=== BULK IMPORT HANDLER EXCEPTION ===");
+            t.printStackTrace(System.err);
+            Throwable root = t;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            System.err.println("ROOT CAUSE: " + root.getClass().getName() + " -> " + root.getMessage());
+            if (t instanceof ProblemException pe) {
+                throw pe;
+            }
+            throw new RuntimeException("Bulk import failed: " + root.getMessage(), t);
+        }
 
         ImportReportResponse response = new ImportReportResponse();
         response.setStatus(ImportReportResponse.StatusEnum.fromValue(report.status()));
