@@ -1,12 +1,14 @@
 package lk.coopfed.knoweb.m6pos.internal.ingest;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
@@ -27,8 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
  * and a time ({@code m6.session.malformed}). One already recorded is not recorded again; a second
  * close with other amounts keeps the first and writes the ALERT
  * {@code TILL_SESSION_CLOSE_REPLAY_DIFFERS} (wave 2, M6-03). Audit
- * {@code TILL_SESSION_OPENED} or {@code TILL_SESSION_CLOSED}; event
- * {@code till_session.recorded.v1}. The variance threshold and its REVIEW are deferred (README).
+ * {@code TILL_SESSION_OPENED} or {@code TILL_SESSION_CLOSED}, and {@code TILL_SESSION_SHORTAGE_REVIEW}
+ * (REVIEW) when a close's cash shortage strictly exceeds {@code pos.session_variance_review_threshold}
+ * (TILL-SELL-11, C-02c, doc 26 section 7); event {@code till_session.recorded.v1}.
  */
 @Service
 @CommandHandler(permission = "pos.receipt.view")
@@ -38,15 +41,22 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
     static final String AUDIT_CLOSED = "TILL_SESSION_CLOSED";
     static final String AUDIT_CLOSE_REPLAY_DIFFERS = "TILL_SESSION_CLOSE_REPLAY_DIFFERS";
     static final String MESSAGE_CLOSE_REPLAY_DIFFERS = "m6.session.close_replay_differs";
+    static final String AUDIT_SHORTAGE_REVIEW = "TILL_SESSION_SHORTAGE_REVIEW";
+    static final String MESSAGE_SHORTAGE_REVIEW = "m6.session.shortage_review";
+    static final String CONFIG_THRESHOLD = "pos.session_variance_review_threshold";
+    static final String DEFAULT_THRESHOLD_STR = "500.00";
+    static final BigDecimal DEFAULT_THRESHOLD = new BigDecimal("500.00");
 
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
+    private final ConfigRegistry config;
 
-    RecordSessionHandler(JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+    RecordSessionHandler(JdbcTemplate jdbc, AuditFacade audit, EventPublisher events, ConfigRegistry config) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.events = events;
+        this.config = config;
     }
 
     @Override
@@ -112,8 +122,81 @@ class RecordSessionHandler implements Handles<RecordSession, UUID> {
                 null,
                 after,
                 scope);
+
+        if (command.closing()) {
+            BigDecimal threshold = reviewThreshold(scope);
+            BigDecimal variance = resolveVariance(command);
+            if (isShortageExceeded(variance, threshold, command)) {
+                BigDecimal shortage = variance.negate().setScale(2, RoundingMode.HALF_UP);
+                Map<String, Object> review = new LinkedHashMap<>();
+                review.put("messageId", MESSAGE_SHORTAGE_REVIEW);
+                review.put("sessionId", command.sessionId());
+                review.put("countedCash", command.countedCash());
+                review.put("expectedCash", command.expectedCash());
+                review.put("variance", command.variance());
+                review.put("shortage", shortage);
+                review.put("threshold", threshold);
+                review.put("locationId", scope.locationId());
+                review.put("deviceId", scope.deviceId());
+                audit.record(
+                        AUDIT_SHORTAGE_REVIEW,
+                        Subject.of("till_session", command.sessionId()),
+                        null,
+                        review,
+                        scope,
+                        "Cash shortage of " + shortage + " exceeds review threshold " + threshold);
+            }
+        }
+
         events.publish(new TillSessionRecorded(command.sessionId(), scope.entityId(), scope.locationId(), status));
         return command.sessionId();
+    }
+
+    /**
+     * Resolves the threshold from ConfigRegistry without masking negative values with abs().
+     * If unparseable or negative, falls back safely to DEFAULT_THRESHOLD (500.00).
+     */
+    private BigDecimal reviewThreshold(ScopeContext scope) {
+        String raw = config.getOrDefault(CONFIG_THRESHOLD, scope, DEFAULT_THRESHOLD_STR);
+        try {
+            BigDecimal val = new BigDecimal(raw);
+            if (val.compareTo(BigDecimal.ZERO) < 0) {
+                return DEFAULT_THRESHOLD;
+            }
+            return val.setScale(2, RoundingMode.HALF_UP);
+        } catch (Exception e) {
+            return DEFAULT_THRESHOLD;
+        }
+    }
+
+    private static BigDecimal resolveVariance(RecordSession command) {
+        if (command.variance() != null) {
+            return command.variance();
+        }
+        if (command.countedCash() != null && command.expectedCash() != null) {
+            return command.countedCash().subtract(command.expectedCash());
+        }
+        return null;
+    }
+
+    /**
+     * Checks if a shortage strictly exceeds the threshold.
+     * Review only when countedCash < expectedCash and shortage strictly exceeds the applicable threshold.
+     * Exact threshold, zero variance, and surplus must not trigger a shortage review.
+     */
+    private static boolean isShortageExceeded(BigDecimal variance, BigDecimal threshold, RecordSession command) {
+        if (variance == null || threshold == null) {
+            return false;
+        }
+        if (command.countedCash() != null && command.expectedCash() != null) {
+            if (command.countedCash().compareTo(command.expectedCash()) >= 0) {
+                return false;
+            }
+        } else if (variance.compareTo(BigDecimal.ZERO) >= 0) {
+            return false;
+        }
+        BigDecimal shortage = variance.negate();
+        return shortage.compareTo(threshold) > 0;
     }
 
     /**

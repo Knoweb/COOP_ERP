@@ -9,13 +9,16 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.Ids;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.Scope;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry;
 import lk.coopfed.knoweb.m6pos.api.CashMovementRecorded;
 import lk.coopfed.knoweb.m6pos.api.ReceiptRecorded;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
@@ -62,6 +65,9 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     PosQueries pos;
 
+    @Autowired
+    ConfigRegistry config;
+
     private long nextNumber = 1;
 
     @BeforeEach
@@ -71,6 +77,10 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                         "truncate table pos.cash_movement, pos.receipt_tender, pos.receipt_line, pos.receipt, pos.till_session_close,"
                                 + " pos.till_session");
         superuserJdbc().update("delete from kernel.numbering_series where owner_entity_id = ?", MPCS);
+        superuserJdbc().update("delete from kernel.config_value where key = 'pos.session_variance_review_threshold'");
+        if (config instanceof JdbcConfigRegistry jcr) {
+            jcr.invalidate("pos.session_variance_review_threshold");
+        }
         series(OWN_SERIES, Ids.next(), DEVICE);
         series(FOREIGN_SERIES, Ids.next(), ANOTHER_DEVICE);
         kernel.reset();
@@ -853,6 +863,186 @@ class IngestHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 () -> cashMovements.handle(
                         cashMovement(movementId, session, "DROP", new BigDecimal("100.00"), "reason"), entityWide()),
                 "m6.scope.device_required");
+    }
+
+    // ---- session shortage review tests (TILL-SELL-11) ---------------------------------------
+
+    @Test
+    void sessionCloseShortageBelowThresholdAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 600, expected 1000 => variance -400, shortage 400 <= default threshold 500
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "600.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseShortageAtExactThresholdBoundaryAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 500, expected 1000 => variance -500, shortage 500 == default threshold 500 (not strictly exceeded)
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "500.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseZeroVarianceAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 1000, expected 1000 => variance 0, zero shortage
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "1000.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseSurplusAuditsOnlyClosed() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 1250, expected 1000 => variance +250 (surplus, not a shortage)
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "1250.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseShortageExceedingThresholdRaisesReviewAudit() {
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 400, expected 1000 => variance -600, shortage 600 > default threshold 500
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+
+        KernelRecorder.AuditRecord review = kernel.committedAudit().stream()
+                .filter(a -> a.eventType().equals("TILL_SESSION_SHORTAGE_REVIEW"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(review.subject().id()).isEqualTo(session);
+        assertThat(review.subject().type()).isEqualTo("till_session");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> after = (Map<String, Object>) review.after();
+        assertThat(after.get("messageId")).isEqualTo("m6.session.shortage_review");
+        assertThat(after.get("sessionId")).isEqualTo(session);
+        assertThat((BigDecimal) after.get("countedCash")).isEqualByComparingTo("400.00");
+        assertThat((BigDecimal) after.get("expectedCash")).isEqualByComparingTo("1000.00");
+        assertThat((BigDecimal) after.get("variance")).isEqualByComparingTo("-600.00");
+        assertThat((BigDecimal) after.get("shortage")).isEqualByComparingTo("600.00");
+        assertThat((BigDecimal) after.get("threshold")).isEqualByComparingTo("500.00");
+        assertThat(after.get("locationId")).isEqualTo(SHOP);
+        assertThat(after.get("deviceId")).isEqualTo(DEVICE);
+        assertThat(review.reason()).isEqualTo("Cash shortage of 600.00 exceeds review threshold 500.00");
+    }
+
+    @Test
+    void sessionCloseReviewIsIdempotentOnIdenticalReplay() {
+        UUID session = openSession();
+        kernel.reset();
+        // First close with shortage exceeding threshold
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+        kernel.reset();
+
+        // Identical replay: same amounts
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+        assertThat(kernel.committedAudit()).isEmpty();
+    }
+
+    @Test
+    void sessionCloseReviewDivergentReplayRaisesAlertAndNoDuplicateReview() {
+        UUID session = openSession();
+        kernel.reset();
+        // First close with shortage exceeding threshold
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "400.00"), device());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+        kernel.reset();
+
+        // Divergent replay with different amounts
+        sessions.handle(close(session, MORNING.plusSeconds(3700), "350.00"), device());
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSE_REPLAY_DIFFERS");
+    }
+
+    @Test
+    void sessionCloseShortageRespectsEntityConfiguredThresholdOverride() {
+        // Entity configures threshold to 100.00
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, value, reason) values ('pos.session_variance_review_threshold', ?, '100.00'::jsonb, 'test')",
+                        MPCS);
+        if (config instanceof JdbcConfigRegistry jcr) {
+            jcr.invalidate("pos.session_variance_review_threshold");
+        }
+
+        UUID session = openSession();
+        kernel.reset();
+        // Counted 850, expected 1000 => variance -150, shortage 150
+        // 150 <= default 500.00, but 150 > entity override 100.00
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "850.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED", "TILL_SESSION_SHORTAGE_REVIEW");
+        KernelRecorder.AuditRecord review = kernel.committedAudit().stream()
+                .filter(a -> a.eventType().equals("TILL_SESSION_SHORTAGE_REVIEW"))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> after = (Map<String, Object>) review.after();
+        assertThat((BigDecimal) after.get("threshold")).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void sessionCloseHandlesInvalidNegativeThresholdSafelyWithoutAbsMasking() {
+        // Entity configures invalid negative threshold: -100.00
+        // Handler must not use .abs() to mask this as 100.00; it falls back to default 500.00
+        superuserJdbc()
+                .update(
+                        "insert into kernel.config_value (key, scope_entity_id, value, reason) values ('pos.session_variance_review_threshold', ?, '-100.00'::jsonb, 'test')",
+                        MPCS);
+        if (config instanceof JdbcConfigRegistry jcr) {
+            jcr.invalidate("pos.session_variance_review_threshold");
+        }
+
+        UUID session = openSession();
+        kernel.reset();
+        // Shortage 250: would exceed 100 if abs() was used, but within fallback default 500
+        sessions.handle(close(session, MORNING.plusSeconds(3600), "750.00"), device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
+    }
+
+    @Test
+    void sessionCloseWithMissingAmountsDoesNotThrowOrRaiseReview() {
+        UUID session = openSession();
+        kernel.reset();
+        // Close with null amounts
+        RecordSession close =
+                new RecordSession(session, true, null, null, null, MORNING.plusSeconds(3600), null, null, null, null);
+        sessions.handle(close, device());
+
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .containsExactly("TILL_SESSION_CLOSED");
     }
 
     private RecordCashMovement cashMovement(

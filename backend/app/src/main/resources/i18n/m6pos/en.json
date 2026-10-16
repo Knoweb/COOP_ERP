@@ -9,5 +9,6 @@
   "m6.cash_movement.malformed": "The cash movement from the till has no movement id, session id, kind, amount, or time",
   "m6.cash_movement.invalid_amount": "Cash movement amount must be greater than zero",
   "m6.cash_movement.reason_required": "Reason is mandatory for a cash movement",
-  "m6.cash_movement.replay_differs": "The cash movement arrived again under the same id with other details; the first copy is kept"
+  "m6.cash_movement.replay_differs": "The cash movement arrived again under the same id with other details; the first copy is kept",
+  "m6.session.shortage_review": "The till session closed with a cash shortage exceeding the review threshold"
 }

@@ -853,6 +853,18 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m6pos
+  # TILL-SELL-11 (C-02c, doc 26 section 7): how many rupees a closed till session's cash shortage
+  # may reach before central raises a REVIEW audit event (pos.session_variance_review_threshold).
+  - key: pos.session_variance_review_threshold
+    value_type: DECIMAL
+    schema: { minimum: 0, maximum: 1000000 }
+    description_en: How many rupees a closed till session's cash shortage may reach before central raises a review
+    description_si: මධ්‍යස්ථානය සමාලෝචනයක් මතු කිරීමට පෙර වසා දැමූ මුදල් යන්ත්‍ර සැසියක මුදල් හිඟය ළඟා විය හැකි රුපියල් ප්‍රමාණය
+    description_ta: மையம் ஒரு மதிப்பாய்வை எழுப்புவதற்கு முன் மூடப்பட்ட பணப்பெட்டி அமர்வின் பணப் பற்றாக்குறை எட்டக்கூடிய ரூபாய்
+    default: 500.00
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m6pos
   # wave 2, PR 12 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-pricing-rules.md
   # (3), CR-23A-1): how far back a control price may take effect, to the gazette's own date.
   - key: pricing.control_price_backdate_days
