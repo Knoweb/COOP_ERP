@@ -324,7 +324,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     base_uom_code, sold_by_weight, batch_tracked, expiry_tracked,
                     has_printed_mrp, expiry_warning_days, tax_category_id,
                     multi_mrp_policy, origin_kind, attributes
-                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', ?::jsonb)
+                ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO_LOWEST', 'PURCHASED', '{}'::jsonb)
                 """;
 
         for (int i = 0; i < skus.size(); i += BATCH_SIZE) {
@@ -337,11 +337,11 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     ps.setString(2, s.skuCode());
                     ps.setObject(3, s.ownerEntityId());
                     ps.setString(4, s.nameEn());
-                    ps.setString(5, s.nameSi());
-                    ps.setString(6, s.nameTa());
-                    ps.setString(7, s.descEn());
-                    ps.setString(8, s.descSi());
-                    ps.setString(9, s.descTa());
+                    ps.setString(5, (s.nameSi() != null && !s.nameSi().isBlank()) ? s.nameSi() : null);
+                    ps.setString(6, (s.nameTa() != null && !s.nameTa().isBlank()) ? s.nameTa() : null);
+                    ps.setString(7, (s.descEn() != null && !s.descEn().isBlank()) ? s.descEn() : null);
+                    ps.setString(8, (s.descSi() != null && !s.descSi().isBlank()) ? s.descSi() : null);
+                    ps.setString(9, (s.descTa() != null && !s.descTa().isBlank()) ? s.descTa() : null);
                     ps.setString(10, s.baseUom());
                     ps.setBoolean(11, s.soldByWeight());
                     ps.setBoolean(12, s.batchTracked());
@@ -349,8 +349,11 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     ps.setBoolean(14, s.hasPrintedMrp());
                     if (s.expiryWarningDays() != null) ps.setShort(15, s.expiryWarningDays());
                     else ps.setNull(15, Types.SMALLINT);
-                    ps.setObject(16, s.taxCategoryId());
-                    ps.setString(17, "{}");
+                    if (s.taxCategoryId() != null) {
+                        ps.setObject(16, s.taxCategoryId());
+                    } else {
+                        ps.setNull(16, Types.OTHER);
+                    }
                 }
 
                 @Override
@@ -368,7 +371,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                 INSERT INTO catalogue.sku_barcode (
                     barcode, symbology, sku_id, uom_code, owner_entity_id, status
                 ) VALUES (?, ?, ?, ?, ?, 'ACTIVE')
-                ON CONFLICT (barcode, symbology, owner_entity_id) DO NOTHING
+                ON CONFLICT DO NOTHING
                 """;
 
         for (int i = 0; i < barcodes.size(); i += BATCH_SIZE) {
@@ -409,7 +412,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                 INSERT INTO catalogue.duplicate_suspect (
                     suspect_id, sku_a, sku_b, score, reasons, status, owner_entity_id
                 ) VALUES (?, ?, ?, ?, ?, 'OPEN', ?)
-                ON CONFLICT (sku_a, sku_b) DO NOTHING
+                ON CONFLICT DO NOTHING
                 """;
 
         for (int i = 0; i < suspects.size(); i += BATCH_SIZE) {
@@ -423,7 +426,7 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
                     ps.setObject(3, s.skuB());
                     ps.setBigDecimal(4, s.score());
                     Array reasonsArray =
-                            ps.getConnection().createArrayOf("text", s.reasons().toArray());
+                            ps.getConnection().createArrayOf("text", s.reasons().toArray(new String[0]));
                     ps.setArray(5, reasonsArray);
                     ps.setObject(6, s.ownerEntityId());
                 }

@@ -217,11 +217,11 @@ class BulkImportSkusHandlerTest {
             if (sql.contains("catalogue.sku (")) {
                 foundSkuInsert = true;
                 long qmarks = sql.chars().filter(ch -> ch == '?').count();
-                assertThat(qmarks).isEqualTo(17);
+                assertThat(qmarks).isEqualTo(16);
                 java.sql.PreparedStatement ps = mock(java.sql.PreparedStatement.class);
                 try {
                     bpss.setValues(ps, 0);
-                    verify(ps).setString(eq(17), eq("{}"));
+                    verify(ps).setObject(eq(16), eq(TAX_CAT_ID));
                 } catch (java.sql.SQLException e) {
                     throw new RuntimeException(e);
                 }

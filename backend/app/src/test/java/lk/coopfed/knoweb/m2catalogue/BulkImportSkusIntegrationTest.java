@@ -59,9 +59,29 @@ class BulkImportSkusIntegrationTest extends PostgresIntegrationTest {
                     (uom_code, name_en, is_weight)
                 values
                     ('EA', 'Each', false),
-                    ('KG', 'Kilogram', true)
-                on conflict do nothing
+                    ('KG', 'Kilogram', true),
+                    ('G', 'Gram', true),
+                    ('L', 'Litre', false),
+                    ('ML', 'Millilitre', false),
+                    ('PACK', 'Pack', false),
+                    ('CASE', 'Case', false),
+                    ('DOZ', 'Dozen', false)
+                on conflict (uom_code) do nothing
                 """);
+
+        admin.update(
+                """
+                delete from catalogue.tax_rate
+                where tax_category_id in (select tax_category_id from catalogue.tax_category where code in ('STD', 'ZERO', 'EXEMPT'))
+                   or tax_category_id = ?
+                """,
+                TAX_CATEGORY);
+        admin.update(
+                """
+                delete from catalogue.tax_category
+                where code in ('STD', 'ZERO', 'EXEMPT') or tax_category_id = ?
+                """,
+                TAX_CATEGORY);
 
         admin.update(
                 """
@@ -69,7 +89,16 @@ class BulkImportSkusIntegrationTest extends PostgresIntegrationTest {
                     (tax_category_id, code, name_en, owner_entity_id)
                 values
                     (?, 'STD', 'Standard Tax', ?)
-                on conflict do nothing
+                """,
+                TAX_CATEGORY,
+                MPCS);
+
+        admin.update(
+                """
+                insert into catalogue.tax_rate
+                    (tax_category_id, rate_percent, effective_from, owner_entity_id)
+                values
+                    (?, 18.00, '2024-01-01', ?)
                 """,
                 TAX_CATEGORY,
                 MPCS);
