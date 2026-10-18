@@ -311,8 +311,10 @@ public class BulkImportSkusHandler implements Handles<BulkImportSkus, ImportRepo
         summary.put("barcodesCount", preparedBarcodes.size());
         summary.put("suspectsCount", preparedSuspects.size());
 
+        UUID importId = Ids.next();
         audit.record(AUDIT_BULK_IMPORTED, Subject.of("entity", ownerEntityId), null, summary, scope);
         events.publish(new SkusBulkImported(
+                importId,
                 ownerEntityId,
                 preparedSkus.size(),
                 preparedSkus.size(),
