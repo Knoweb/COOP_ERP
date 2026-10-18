@@ -52,5 +52,15 @@
   "m2.image.not_pending": "The image is no longer waiting for its upload",
   "m2.image.upload_open": "The image upload link is still valid; the image is processed after it expires",
   "m2.supplier.not_active": "The supplier is not active",
-  "m2.supplier.name_taken": "A supplier with this name is already registered"
+  "m2.supplier.name_taken": "A supplier with this name is already registered",
+  "m2.sku.name_en_required": "The English name is required",
+  "m2.sku.base_uom_required": "The base unit is required",
+  "m2.sku.price_invalid": "The price must be greater than zero",
+  "m2.sku.code_duplicate_in_sheet": "The SKU code is duplicated within the import sheet",
+  "m2.sku.code_already_exists": "The SKU code is already registered in the catalogue",
+  "m2.barcode.duplicate_in_sheet": "The barcode is duplicated within the import sheet",
+  "m2.sku.scope_required": "An active entity scope is required for catalogue import",
+  "m2.sku.csv_parse_failed": "The catalogue import file could not be parsed",
+  "m2.suspect.decision_invalid": "The suspect resolution decision must be MERGED or DISMISSED",
+  "m2.suspect.not_found_or_closed": "The duplicate suspect pair was not found or is already resolved"
 }

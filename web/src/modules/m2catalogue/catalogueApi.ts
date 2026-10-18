@@ -17,6 +17,10 @@ export type Batch = components["schemas"]["BatchResponse"];
 export type AttachImageRequest = components["schemas"]["AttachImageRequest"];
 export type ImageResponse = components["schemas"]["ImageResponse"];
 export type ImageUploadResponse = components["schemas"]["ImageUploadResponse"];
+export type BulkImportSkusRequest = components["schemas"]["BulkImportSkusRequest"];
+export type ImportReportResponse = components["schemas"]["ImportReportResponse"];
+export type DuplicateSuspectResponse = components["schemas"]["DuplicateSuspectResponse"];
+export type ResolveDuplicateSuspectRequest = components["schemas"]["ResolveDuplicateSuspectRequest"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -127,6 +131,32 @@ export function useCatalogueApi() {
       ): Promise<void> {
         await api.DELETE("/v1/catalogue/skus/{skuId}/images/{imageId}", {
           params: { path: { skuId, imageId }, header: { "Idempotency-Key": idempotencyKey } }
+        });
+      },
+
+      async importSkus(body: BulkImportSkusRequest, idempotencyKey: string): Promise<ImportReportResponse> {
+        const { data } = await api.POST("/v1/catalogue/import", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async listDuplicateSuspects(status?: "OPEN" | "MERGED" | "DISMISSED", limit?: number): Promise<DuplicateSuspectResponse[]> {
+        const { data } = await api.GET("/v1/catalogue/steward/suspects", {
+          params: { query: { status, limit } }
+        });
+        return data ?? [];
+      },
+
+      async resolveDuplicateSuspect(
+        suspectId: string,
+        body: ResolveDuplicateSuspectRequest,
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.POST("/v1/catalogue/steward/suspects/{suspectId}/resolve", {
+          params: { path: { suspectId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
         });
       }
     }),

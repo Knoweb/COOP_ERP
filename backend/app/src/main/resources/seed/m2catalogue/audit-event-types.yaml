@@ -114,3 +114,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: Duplicate suspect resolved
+
+  - code: SKUS_BULK_IMPORTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Batch of catalogue SKUs imported by data steward
+
+  - code: DUPLICATE_SUSPECTED
+    severity: INFO
+    offline_capturable: false
+    description_en: Duplicate SKU suspect detected
+

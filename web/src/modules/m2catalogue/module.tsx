@@ -8,6 +8,7 @@
 import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 import { CataloguePage } from "./CataloguePage";
+import { CatalogueImportPage } from "./CatalogueImportPage";
 import { NewSkuPage } from "./NewSkuPage";
 import { SkuPage } from "./SkuPage";
 
@@ -16,6 +17,14 @@ export const catalogueModule: ModuleDefinition = {
 
   routes: [
     { path: "catalogue", element: <CataloguePage /> },
+    {
+      path: "catalogue/import",
+      element: (
+        <RequirePermission anyOf={["cat.import.run"]}>
+          <CatalogueImportPage />
+        </RequirePermission>
+      )
+    },
     {
       path: "catalogue/skus/new",
       element: (
@@ -31,5 +40,11 @@ export const catalogueModule: ModuleDefinition = {
   navItems: [{ labelId: "catalogue.nav", to: "/catalogue" }],
 
   // x-permissions of openapi/m2catalogue.yaml, read from the session's resolved set (PR #144).
-  requiredPermissions: ["cat.sku.view", "cat.sku.create_local", "cat.sku.create", "cat.barcode.manage"]
+  requiredPermissions: [
+    "cat.sku.view",
+    "cat.sku.create_local",
+    "cat.sku.create",
+    "cat.barcode.manage",
+    "cat.import.run"
+  ]
 };
