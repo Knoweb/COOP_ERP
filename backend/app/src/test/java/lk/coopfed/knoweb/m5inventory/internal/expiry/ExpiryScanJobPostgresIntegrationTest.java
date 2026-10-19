@@ -58,10 +58,10 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
     Handles<ScheduleCount, UUID> scheduleCount;
 
     @Autowired
-    Handles<StartCount, Void> startCount;
+    Handles<StartCount, UUID> startCount;
 
     @Autowired
-    Handles<SubmitCount, Void> submitCount;
+    Handles<SubmitCount, UUID> submitCount;
 
     @Autowired
     StockControlQueries controlQueries;

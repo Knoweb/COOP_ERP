@@ -182,7 +182,7 @@ public final class InventoryFixture {
                 + " inventory.entity_sku_cost, inventory.pick_list_line, inventory.pick_list,"
                 + " inventory.opening_balance_line, inventory.opening_balance, inventory.transfer_receipt,"
                 + " inventory.transfer_line, inventory.transfer, inventory.count_line, inventory.count_expectation,"
-                + " inventory.count_task, inventory.write_off_photo, inventory.write_off_line, inventory.write_off,"
+                + " inventory.count_task, inventory.expiry_task, inventory.write_off_photo, inventory.write_off_line, inventory.write_off,"
                 + " inventory.repack_reversal, inventory.repack, inventory.repack_recipe");
         for (UUID batch : batches) {
             admin.update("delete from catalogue.batch_key where batch_id = ?", batch);
