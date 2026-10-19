@@ -71,11 +71,12 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         JdbcTemplate admin = superuserJdbc();
         clean();
 
-        for (String unit : new String[] {"EA", "CASE"}) {
+        for (String unit : new String[] {"EA", "CASE", "KG"}) {
             admin.update(
-                    "insert into catalogue.uom (uom_code, name_en, is_weight) values (?, ?, false) on conflict do nothing",
+                    "insert into catalogue.uom (uom_code, name_en, is_weight) values (?, ?, ?) on conflict do nothing",
                     unit,
-                    unit);
+                    unit,
+                    "KG".equals(unit));
         }
         admin.update(
                 "insert into catalogue.tax_category (tax_category_id, code, name_en, owner_entity_id)"
@@ -453,13 +454,255 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     void aRetiredCodeNoLongerResolves() {
         register.handle(new RegisterBarcode(sharedSku, EAN, "EAN13", "EA", null), own(FEDERATION));
         retire.handle(new RetireBarcode(sharedSku, EAN, "EAN13", "X", null), own(FEDERATION));
-
         assertThat(queries.lookupByBarcode(lookup(EAN, null, null, null, null), own(MPCS_A)))
                 .isEmpty();
     }
 
+    // ---- 20–29 variable-weight and batch label tests (TILL-SELL-16) --------------------------
+
+    @Test
+    void weighedLabelResolvesSharedSkuByExactSkuCode() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID vegSku = Ids.next();
+        insertWeighedSku(admin, vegSku, "123456", FEDERATION, "SHARED", "Fresh Carrots");
+
+        // 2012345608504: prefix 20, code 123456, 850g, check digit 4
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2012345608504", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(vegSku);
+            assertThat(hit.skuCode()).isEqualTo("123456");
+            assertThat(hit.soldByWeight()).isTrue();
+            assertThat(hit.uomCode()).isEqualTo("KG");
+            assertThat(hit.batch()).isNull();
+        });
+    }
+
+    @Test
+    void weighedLabelResolvesLocalSkuForOwnerEntityOnly() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID localVegA = Ids.next();
+        insertWeighedSku(admin, localVegA, "654321", MPCS_A, "LOCAL", "Local Carrots A");
+
+        // 2065432108500: prefix 20, code 654321, 850g, check digit 0
+        // Owner entity MPCS_A resolves it
+        Optional<LookupResult> resultA =
+                queries.lookupByBarcode(lookup("2065432108500", null, null, null, null), own(MPCS_A));
+        assertThat(resultA).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(localVegA);
+            assertThat(hit.nameEn()).isEqualTo("Local Carrots A");
+        });
+
+        // Another entity MPCS_B cannot resolve MPCS_A's local SKU
+        Optional<LookupResult> resultB =
+                queries.lookupByBarcode(lookup("2065432108500", null, null, null, null), own(MPCS_B));
+        assertThat(resultB).isEmpty();
+    }
+
+    @Test
+    void registeredInternalBarcodeTakesPrecedenceOverDirectSkuCode() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID directSku = Ids.next();
+        insertWeighedSku(admin, directSku, "123456", FEDERATION, "SHARED", "Direct Code Match");
+        UUID registeredSku = Ids.next();
+        insertWeighedSku(admin, registeredSku, "OTHER-CODE", MPCS_A, "LOCAL", "Registered Internal Match");
+
+        register.handle(new RegisterBarcode(registeredSku, "123456", "INTERNAL", "KG", null), own(MPCS_A));
+
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2012345608504", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId())
+                    .as("registered INTERNAL code takes precedence")
+                    .isEqualTo(registeredSku);
+            assertThat(hit.nameEn()).isEqualTo("Registered Internal Match");
+        });
+    }
+
+    @Test
+    void anotherEntityInternalBarcodeDoesNotPreemptOwnSku() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID sharedItem = Ids.next();
+        insertWeighedSku(admin, sharedItem, "123456", FEDERATION, "SHARED", "Shared Carrots");
+        UUID localItemB = Ids.next();
+        insertWeighedSku(admin, localItemB, "LOCAL-B", MPCS_B, "LOCAL", "Local B Item");
+
+        // MPCS_B registers internal barcode 123456 for its own local item
+        register.handle(new RegisterBarcode(localItemB, "123456", "INTERNAL", "KG", null), own(MPCS_B));
+
+        // When MPCS_A scans 2012345608504, MPCS_B's internal barcode is not visible; MPCS_A gets the shared item
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2012345608504", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(sharedItem);
+            assertThat(hit.nameEn()).isEqualTo("Shared Carrots");
+        });
+    }
+
+    @Test
+    void leadingZeroSkuCodeResolvesWhenUnambiguous() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID sku = Ids.next();
+        insertWeighedSku(admin, sku, "1234", FEDERATION, "SHARED", "Stripped Match");
+
+        // 2000123405001: prefix 20, code 001234, 500g, check digit 1 -> matches SKU "1234"
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2000123405001", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(sku);
+            assertThat(hit.skuCode()).isEqualTo("1234");
+        });
+    }
+
+    @Test
+    void ambiguousLeadingZeroCollisionsAreRejected() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID sku1 = Ids.next();
+        insertWeighedSku(admin, sku1, "01234", FEDERATION, "SHARED", "First Ambiguous");
+        UUID sku2 = Ids.next();
+        insertWeighedSku(admin, sku2, "1234", FEDERATION, "SHARED", "Second Ambiguous");
+
+        // 2000123405001 has stripped code "1234", which matches both "01234" and "1234"
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2000123405001", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).as("ambiguous leading-zero matches must be rejected").isEmpty();
+    }
+
+    @Test
+    void batchLabelResolvesSkuAndLinksMatchingBatch() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID batchSku = Ids.next();
+        insertSku(admin, batchSku, "123456", FEDERATION, "SHARED", "Batch Item", null, null);
+
+        UUID batchId = Ids.next();
+        admin.update(
+                """
+                insert into catalogue.batch
+                    (batch_id, sku_id, batch_no, expiry_date, printed_mrp, owner_entity_id)
+                values (?, ?, '0042', date '2027-06-30', 950.00, ?)
+                """,
+                batchId,
+                batchSku,
+                FEDERATION);
+
+        // 2512345600428: prefix 25, code 123456, tail 0042, check digit 8
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2512345600428", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(batchSku);
+            assertThat(hit.batch()).isNotNull();
+            assertThat(hit.batch().batchId()).isEqualTo(batchId);
+            assertThat(hit.batch().batchNo()).isEqualTo("0042");
+            assertThat(hit.batch().printedMrp()).isEqualByComparingTo("950.00");
+        });
+    }
+
+    @Test
+    void batchLabelWithUnknownBatchReturnsSkuWithNullBatch() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID batchSku = Ids.next();
+        insertSku(admin, batchSku, "123456", FEDERATION, "SHARED", "Batch Item", null, null);
+
+        // 2512345600428: batch 0042 not registered in catalogue.batch
+        Optional<LookupResult> result =
+                queries.lookupByBarcode(lookup("2512345600428", null, null, null, null), own(MPCS_A));
+
+        assertThat(result).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(batchSku);
+            assertThat(hit.batch()).isNull();
+        });
+    }
+
+    @Test
+    void malformedWeighedLabelsRejectedWithoutFallback() {
+        // 2012345608500: invalid checksum
+        assertThat(queries.lookupByBarcode(lookup("2012345608500", null, null, null, null), own(MPCS_A)))
+                .isEmpty();
+
+        // 2012345600003: valid checksum 3, but zero weight (0000g)
+        assertThat(queries.lookupByBarcode(lookup("2012345600003", null, null, null, null), own(MPCS_A)))
+                .isEmpty();
+
+        // 2099999908501: valid checksum 1 and weight 850g, but SKU 999999 does not exist
+        assertThat(queries.lookupByBarcode(lookup("2099999908501", null, null, null, null), own(MPCS_A)))
+                .isEmpty();
+    }
+
+    @Test
+    void incompatibleSymbologyBypasses20to29Resolution() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID vegSku = Ids.next();
+        insertWeighedSku(admin, vegSku, "123456", FEDERATION, "SHARED", "Fresh Carrots");
+
+        // Incompatible symbology UPCA for 13-digit in-store label
+        assertThat(queries.lookupByBarcode(lookup("2012345608504", null, null, null, "UPCA"), own(MPCS_A)))
+                .isEmpty();
+
+        // Compatible symbologies
+        assertThat(queries.lookupByBarcode(lookup("2012345608504", null, null, null, "INTERNAL"), own(MPCS_A)))
+                .isPresent();
+        assertThat(queries.lookupByBarcode(lookup("2012345608504", null, null, null, "EAN13"), own(MPCS_A)))
+                .isPresent();
+    }
+
+    @Test
+    void exactRegisteredBarcodeWithInvalidChecksumTakesPrecedenceOver20to29Fallback() {
+        JdbcTemplate admin = superuserJdbc();
+        UUID registeredSku = Ids.next();
+        insertSku(admin, registeredSku, "REG-01", MPCS_A, "LOCAL", "Explicit Registered Code", null, null);
+
+        // 2012345608500 has an invalid EAN-13 check digit (0 instead of 4), but was explicitly
+        // registered as an exact INTERNAL barcode row owned by MPCS_A.
+        admin.update(
+                """
+                insert into catalogue.sku_barcode
+                    (barcode, symbology, sku_id, uom_code, owner_entity_id, status)
+                values
+                    ('2012345608500', 'INTERNAL', ?, 'EA', ?, 'ACTIVE')
+                """,
+                registeredSku,
+                MPCS_A);
+
+        // Tier 1 exact match succeeds for the owning entity even though the check digit is invalid
+        Optional<LookupResult> resultA =
+                queries.lookupByBarcode(lookup("2012345608500", null, null, null, null), own(MPCS_A));
+        assertThat(resultA).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(registeredSku);
+            assertThat(hit.nameEn()).isEqualTo("Explicit Registered Code");
+        });
+
+        // Another entity (MPCS_B) does not own the INTERNAL barcode, so exact match misses.
+        // It falls through to 20-29 resolution, which detects the invalid checksum and rejects it.
+        Optional<LookupResult> resultB =
+                queries.lookupByBarcode(lookup("2012345608500", null, null, null, null), own(MPCS_B));
+        assertThat(resultB).isEmpty();
+    }
+
     private static BarcodeLookup lookup(String barcode, String gtin, String lot, LocalDate expiry, String symbology) {
         return new BarcodeLookup(barcode, gtin, lot, expiry, symbology, null);
+    }
+
+    private static void insertWeighedSku(
+            JdbcTemplate admin, UUID skuId, String code, UUID owner, String status, String en) {
+        admin.update(
+                """
+                insert into catalogue.sku
+                    (sku_id, sku_code, owner_entity_id, status, short_name_en,
+                     base_uom_code, sold_by_weight, tax_category_id)
+                values (?, ?, ?, ?, ?, 'KG', true, ?)
+                """,
+                skuId,
+                code,
+                owner,
+                status,
+                en,
+                TAX_CATEGORY);
     }
 
     private static void insertSku(

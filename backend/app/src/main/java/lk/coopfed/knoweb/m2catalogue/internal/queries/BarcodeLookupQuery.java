@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.internal.barcode.GtinParser;
+import lk.coopfed.knoweb.m2catalogue.internal.barcode.WeighedLabelParser;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -106,6 +107,20 @@ class BarcodeLookupQuery {
             return Optional.of(result(hit, batch.orElse(null), scope.entityId()));
         }
 
+        // In-store 20–29 variable-weight and batch label resolution (TILL-SELL-16; doc 22 §3.3; ADR-43):
+        String inStoreCandidate = barcode != null ? barcode : gtin;
+        if (inStoreCandidate != null && WeighedLabelParser.isPotentialInStoreLabel(inStoreCandidate)) {
+            if (!isCompatibleInStoreSymbology(symbology)) {
+                return Optional.empty();
+            }
+            Optional<WeighedLabelParser.ParsedLabel> parsed = WeighedLabelParser.parse(inStoreCandidate);
+            if (parsed.isEmpty()) {
+                // Malformed 20–29 label (invalid check digit or zero weight): reject immediately.
+                return Optional.empty();
+            }
+            return resolveInStoreLabel(parsed.get(), lot, expiry, scope.entityId());
+        }
+
         // 2): the GTIN of a 2D code registered under any factory symbology (a GTIN-14 with
         // leading zeros is the same item as its EAN-13), then the batch by number.
         if (gtin != null && GtinParser.isValidGtin(gtin)) {
@@ -119,6 +134,83 @@ class BarcodeLookupQuery {
         }
 
         return Optional.empty();
+    }
+
+    private static final String SELECT_SKU_HIT =
+            """
+            select s.sku_id, s.sku_code, s.short_name_en, s.short_name_si, s.short_name_ta,
+                   s.base_uom_code, s.has_printed_mrp, s.sold_by_weight,
+                   s.base_uom_code as uom_code, null::uuid as batch_id, null::text as barcode
+            from catalogue.sku s
+            where s.status in ('LOCAL', 'SHARED')
+            """;
+
+    private Optional<LookupResult> resolveInStoreLabel(
+            WeighedLabelParser.ParsedLabel label, String lot, LocalDate expiry, UUID entityId) {
+        String code = label.code();
+        String batchRef = label.kind() == WeighedLabelParser.Kind.BATCH ? label.batchRef() : lot;
+
+        // Tier 2: Registered INTERNAL barcode in caller's scope
+        Optional<Hit> hit = internalBarcodeRow(code, entityId);
+
+        // Tier 3: Direct exact sku_code match (SHARED or caller's LOCAL SKU)
+        if (hit.isEmpty()) {
+            hit = exactSkuCode(code, entityId);
+        }
+
+        // Tier 4: Leading-zero-normalized fallback (only if code starts with '0')
+        if (hit.isEmpty() && code.startsWith("0")) {
+            String stripped = code.replaceFirst("^0+", "");
+            if (!stripped.isEmpty()) {
+                hit = internalBarcodeRow(stripped, entityId);
+                if (hit.isEmpty()) {
+                    hit = unambiguousStrippedSkuCode(stripped, entityId);
+                }
+            }
+        }
+
+        if (hit.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Hit resolvedHit = hit.get();
+        Optional<LookupResult.BatchRef> batch = resolvedHit.batchId() != null
+                ? batchById(resolvedHit.batchId())
+                : (batchRef != null ? batchByLot(resolvedHit.skuId(), batchRef, expiry) : Optional.empty());
+
+        return Optional.of(result(resolvedHit, batch.orElse(null), entityId));
+    }
+
+    private Optional<Hit> internalBarcodeRow(String barcode, UUID entityId) {
+        String sql = SELECT_HIT
+                + " and b.barcode = ? and b.symbology = 'INTERNAL' and b.owner_entity_id = ?"
+                + " and (s.status = 'SHARED' or s.owner_entity_id = ?)";
+        return jdbc.query(sql, BarcodeLookupQuery::mapHit, barcode, entityId, entityId).stream()
+                .findFirst();
+    }
+
+    private Optional<Hit> exactSkuCode(String skuCode, UUID entityId) {
+        String sql = SELECT_SKU_HIT + " and s.sku_code = ? and (s.status = 'SHARED' or s.owner_entity_id = ?)";
+        return jdbc.query(sql, BarcodeLookupQuery::mapHit, skuCode, entityId).stream()
+                .findFirst();
+    }
+
+    private Optional<Hit> unambiguousStrippedSkuCode(String strippedCode, UUID entityId) {
+        String sql =
+                SELECT_SKU_HIT + " and ltrim(s.sku_code, '0') = ? and (s.status = 'SHARED' or s.owner_entity_id = ?)";
+        List<Hit> hits = jdbc.query(sql, BarcodeLookupQuery::mapHit, strippedCode, entityId);
+        if (hits.size() == 1) {
+            return Optional.of(hits.get(0));
+        }
+        return Optional.empty();
+    }
+
+    private static boolean isCompatibleInStoreSymbology(String symbology) {
+        if (symbology == null) {
+            return true;
+        }
+        String s = symbology.strip().toUpperCase();
+        return "INTERNAL".equals(s) || "EAN13".equals(s) || "INTERNAL_20_29".equals(s);
     }
 
     private Optional<Hit> exactRow(String barcode, String symbology, UUID entityId) {
@@ -165,13 +257,16 @@ class BarcodeLookupQuery {
                         """
                         select batch_id, batch_no, expiry_date, printed_mrp
                         from catalogue.batch
-                        where sku_id = ? and batch_no = ?
-                        order by case when expiry_date = ? then 0 else 1 end,
+                        where sku_id = ? and (batch_no = ? or ltrim(batch_no, '0') = ltrim(?, '0'))
+                        order by case when batch_no = ? then 0 else 1 end,
+                                 case when expiry_date = ? then 0 else 1 end,
                                  case when status = 'REGISTERED' then 0 else 1 end,
                                  created_at desc
                         """,
                         BarcodeLookupQuery::mapBatch,
                         skuId,
+                        lot,
+                        lot,
                         lot,
                         expiry)
                 .stream()
