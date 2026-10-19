@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueApi;
 import lk.coopfed.knoweb.m2catalogue.web.generated.CatalogueReferenceResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ConversionResponse;
 import lk.coopfed.knoweb.m2catalogue.web.generated.DefineConversionRequest;
+import lk.coopfed.knoweb.m2catalogue.web.generated.PromoteSkuRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.ReasonRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuDetailsRequest;
 import lk.coopfed.knoweb.m2catalogue.web.generated.SkuPageResponse;
@@ -166,6 +167,20 @@ class CatalogueController implements CatalogueApi {
             commands.activateShared(skuId, scope);
         } else {
             commands.activateLocal(skuId, scope);
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<Void> promoteSku(UUID skuId, String idempotencyKey, PromoteSkuRequest request) {
+
+        ScopeContext scope = currentScope.get();
+
+        if (request.getMode() == PromoteSkuRequest.ModeEnum.NEW) {
+            commands.promoteToShared(skuId, scope);
+        } else {
+            commands.mergeIntoShared(skuId, request.getTargetSkuId(), scope);
         }
 
         return ResponseEntity.noContent().build();
