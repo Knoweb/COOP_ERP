@@ -16,6 +16,7 @@ import lk.coopfed.knoweb.m2catalogue.query.BarcodeLookup;
 import lk.coopfed.knoweb.m2catalogue.query.BarcodeView;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.ConversionView;
+import lk.coopfed.knoweb.m2catalogue.query.DuplicateSuspectView;
 import lk.coopfed.knoweb.m2catalogue.query.ImageView;
 import lk.coopfed.knoweb.m2catalogue.query.LookupResult;
 import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
@@ -347,5 +348,68 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                 rs.getString("multi_mrp_policy"),
                 rs.getString("origin_kind"),
                 attributes);
+    }
+
+    @Override
+    public List<DuplicateSuspectView> listDuplicateSuspects(String status, int limit, ScopeContext scope) {
+        String filterStatus =
+                (status == null || status.isBlank()) ? "OPEN" : status.trim().toUpperCase();
+        int max = (limit <= 0 || limit > 200) ? 50 : limit;
+
+        String sql =
+                """
+            SELECT
+                d.suspect_id,
+                d.sku_a,
+                d.sku_b,
+                sa.sku_code AS sku_a_code,
+                sa.short_name_en AS sku_a_name,
+                sb.sku_code AS sku_b_code,
+                sb.short_name_en AS sku_b_name,
+                d.score,
+                d.reasons,
+                d.status,
+                d.decided_by,
+                d.decided_at,
+                d.created_at
+            FROM catalogue.duplicate_suspect d
+            JOIN catalogue.sku sa ON sa.sku_id = d.sku_a
+            JOIN catalogue.sku sb ON sb.sku_id = d.sku_b
+            WHERE d.status = ?
+            ORDER BY d.score DESC, d.created_at DESC
+            LIMIT ?
+            """;
+
+        return jdbc.query(
+                sql,
+                (rs, rowNum) -> {
+                    java.sql.Array reasonsArr = rs.getArray("reasons");
+                    List<String> reasons = List.of();
+                    if (reasonsArr != null) {
+                        String[] items = (String[]) reasonsArr.getArray();
+                        if (items != null) {
+                            reasons = List.of(items);
+                        }
+                    }
+                    java.sql.Timestamp decidedAtTs = rs.getTimestamp("decided_at");
+                    java.sql.Timestamp createdAtTs = rs.getTimestamp("created_at");
+                    java.util.UUID decidedByUuid = rs.getObject("decided_by", java.util.UUID.class);
+                    return new DuplicateSuspectView(
+                            rs.getObject("suspect_id", UUID.class),
+                            rs.getObject("sku_a", UUID.class),
+                            rs.getObject("sku_b", UUID.class),
+                            rs.getString("sku_a_code"),
+                            rs.getString("sku_a_name"),
+                            rs.getString("sku_b_code"),
+                            rs.getString("sku_b_name"),
+                            rs.getBigDecimal("score"),
+                            reasons,
+                            rs.getString("status"),
+                            decidedByUuid != null ? decidedByUuid.toString() : null,
+                            decidedAtTs != null ? decidedAtTs.toInstant() : null,
+                            createdAtTs != null ? createdAtTs.toInstant() : null);
+                },
+                filterStatus,
+                max);
     }
 }

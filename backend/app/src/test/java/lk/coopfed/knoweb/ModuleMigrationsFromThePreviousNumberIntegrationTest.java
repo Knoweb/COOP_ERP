@@ -20,7 +20,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * migration"): a database whose every stream stands at the number before this pull request's
  * migrations (kernel {@code V0086} since PR 17, m1security {@code V0020} since M1M2M3M5-26,
  * m1party {@code V0014} (V0016 since M1M2M3M5-26, V0017 since wave 4 TD-03), m2catalogue
- * {@code V0007}, m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09,
+ * {@code V0008} (since CAT-01), m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09,
  * m8reporting {@code V0006} since PR 08) migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
  * FlywayConfig} runs the streams. The streams depend on each other at run time only (a policy
@@ -49,7 +49,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // where the demo server stands after PR 11.
         // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
         streams.put("m1security", "20");
-        streams.put("m2catalogue", "7");
+        // CAT-01: m2catalogue V0009 (duplicate_suspect) from V0008.
+        streams.put("m2catalogue", "8");
         // Wave 4, M3R-08: m3pricing V0007 (pricing.review_trigger) from V0006.
         streams.put("m3pricing", "6");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
@@ -145,7 +146,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
-                .containsEntry("m2catalogue", 8)
+                .containsEntry("m2catalogue", 9)
                 .containsEntry("m3pricing", 7)
                 .containsEntry("m5inventory", 8)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.

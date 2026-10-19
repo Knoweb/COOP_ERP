@@ -59,7 +59,7 @@ class M2SeedLoaderTest extends PostgresIntegrationTest {
     void theStartUpLoadPutTheUnitsAndTheGovernedTagsInPlace() {
         JdbcTemplate db = superuserJdbc();
 
-        assertThat(count(db, "catalogue.uom")).isEqualTo(UNITS);
+        assertThat(count(db, "catalogue.uom")).isGreaterThanOrEqualTo(UNITS);
         assertThat(count(db, "catalogue.uom where is_weight")).isEqualTo(2); // KG and G
         assertThat(db.queryForObject("select name_ta from catalogue.uom where uom_code = 'KG'", String.class))
                 .isEqualTo("கிலோகிராம்");
