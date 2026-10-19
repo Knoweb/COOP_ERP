@@ -14,11 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m3pricing.api.RuleBenefit;
 import lk.coopfed.knoweb.m3pricing.api.RulePredicate;
 import lk.coopfed.knoweb.m3pricing.query.RuleView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Reads of pricing.discount_rule, and the JSON form of a predicate and a benefit. The JSON keys
@@ -29,9 +31,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class RuleStore {
 
-    static final String DRAFT = "DRAFT";
-    static final String ACTIVE = "ACTIVE";
-    static final String WITHDRAWN = "WITHDRAWN";
+    public static final String DRAFT = "DRAFT";
+    public static final String ACTIVE = "ACTIVE";
+    public static final String EXPIRED = "EXPIRED";
+    public static final String WITHDRAWN = "WITHDRAWN";
+
+    public record DueRule(UUID ruleId, UUID ownerEntityId, LocalDate validTo) {}
 
     private static final String COLUMNS = "rule_id, owner_entity_id, name, kind, predicate::text as predicate,"
             + " benefit::text as benefit, priority, valid_from, valid_to, status, created_at";
@@ -74,6 +79,23 @@ public class RuleStore {
                         + " order by rule_id",
                 this::rule,
                 Date.valueOf(date));
+    }
+
+    /**
+     * The ACTIVE rules across all entities whose validity has ended before {@code today},
+     * read in the scope it passes (the Federation-wide view).
+     */
+    @Transactional(readOnly = true)
+    public List<DueRule> dueForExpiry(LocalDate today, ScopeContext scope) {
+        return jdbc.query(
+                "select rule_id, owner_entity_id, valid_to from pricing.discount_rule"
+                        + " where status = 'ACTIVE' and valid_to is not null and valid_to < ?"
+                        + " order by valid_to, rule_id",
+                (rs, row) -> new DueRule(
+                        rs.getObject("rule_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getDate("valid_to").toLocalDate()),
+                Date.valueOf(today));
     }
 
     String predicateJson(RulePredicate p) {
