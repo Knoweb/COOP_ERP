@@ -48,6 +48,8 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static final UUID MPCS = UUID.fromString("0190e600-0000-7000-8000-000000000002");
 
+    private static final UUID BARCODE_TEST_ENTITY = UUID.fromString("0190e600-0000-7000-8000-000000000099");
+
     private static final UUID USER = UUID.fromString("0190e600-0000-7000-8000-000000000010");
 
     private static final UUID TAX_CATEGORY = UUID.fromString("0190e600-0000-7000-8000-000000000100");
@@ -76,6 +78,9 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     UpdateSharedSkuHandler updateShared;
 
+    @Autowired
+    lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
+
     // Forces a code another entity holds, to prove the retry on the unique index.
     @MockitoSpyBean
     SkuCodeGenerator codes;
@@ -92,6 +97,9 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanCatalogue() {
+        if (config != null) {
+            config.invalidate("catalogue.local_sku_requires_barcode");
+        }
         JdbcTemplate admin = superuserJdbc();
 
         admin.execute("truncate table catalogue.sku cascade");
@@ -136,6 +144,9 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tag where tag_code = 'local-promo'");
         admin.update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
+        if (config != null) {
+            config.invalidate("catalogue.local_sku_requires_barcode");
+        }
     }
 
     @Test
@@ -538,8 +549,9 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void activateLocalRefusesWhenBarcodeRequiredAndMissing() {
+        UUID entity = BARCODE_TEST_ENTITY;
         UUID skuId = createLocal.handle(
-                new CreateSku(details("Local Veg", null, null, "EA", false, false, false)), own(MPCS));
+                new CreateSku(details("Local Veg", null, null, "EA", false, false, false)), own(entity));
 
         superuserJdbc()
                 .update(
@@ -555,12 +567,13 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                         insert into kernel.config_value (key, scope_entity_id, value, reason)
                         values ('catalogue.local_sku_requires_barcode', ?, 'true'::jsonb, 'test')
                         """,
-                        MPCS);
+                        entity);
+        config.invalidate("catalogue.local_sku_requires_barcode");
 
         kernel.reset();
 
         try {
-            refused(() -> activateLocal.handle(new ActivateLocalSku(skuId), own(MPCS)), "m2.sku.barcode_required");
+            refused(() -> activateLocal.handle(new ActivateLocalSku(skuId), own(entity)), "m2.sku.barcode_required");
 
             assertThat(status(skuId)).isEqualTo("DRAFT");
             assertThat(kernel.committedAudit()).isEmpty();
@@ -573,13 +586,14 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                     values ('4791234560028', 'EAN13', ?, 'EA', ?, 'ACTIVE')
                     """,
                             skuId,
-                            MPCS);
+                            entity);
 
-            activateLocal.handle(new ActivateLocalSku(skuId), own(MPCS));
+            activateLocal.handle(new ActivateLocalSku(skuId), own(entity));
             assertThat(status(skuId)).isEqualTo("LOCAL");
         } finally {
             superuserJdbc()
                     .update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
+            config.invalidate("catalogue.local_sku_requires_barcode");
         }
     }
 
