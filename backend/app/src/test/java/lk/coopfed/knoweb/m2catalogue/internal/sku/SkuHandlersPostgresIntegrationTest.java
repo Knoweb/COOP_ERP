@@ -134,6 +134,8 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_CATEGORY);
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
+        admin.update("delete from catalogue.tag where tag_code = 'local-promo'");
+        admin.update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
     }
 
     @Test
@@ -542,9 +544,17 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
         superuserJdbc()
                 .update(
                         """
-                insert into kernel.config_value (key, scope_entity_id, value, reason)
-                values ('catalogue.local_sku_requires_barcode', ?, 'true'::jsonb, 'test')
-                """,
+                        insert into kernel.config_item (key, value_type, description_en, default_value, scope_kind, change_permission, module)
+                        values ('catalogue.local_sku_requires_barcode', 'BOOLEAN', 'Barcode required for local SKU', 'false'::jsonb, 'ENTITY', 'sys.config.manage', 'm2catalogue')
+                        on conflict (key) do nothing
+                        """);
+
+        superuserJdbc()
+                .update(
+                        """
+                        insert into kernel.config_value (key, scope_entity_id, value, reason)
+                        values ('catalogue.local_sku_requires_barcode', ?, 'true'::jsonb, 'test')
+                        """,
                         MPCS);
 
         kernel.reset();
