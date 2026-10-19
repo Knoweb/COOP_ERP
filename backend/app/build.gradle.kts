@@ -282,6 +282,10 @@ tasks.withType<Test>().configureEach {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
+    System.getenv("COOP_ERP_BULK_DIAGNOSTICS")?.let { systemProperty("coop-erp.bulk-register.diagnostics", it) }
+    System.getProperty("coop-erp.bulk-register.diagnostics")?.let { systemProperty("coop-erp.bulk-register.diagnostics", it) }
+    System.getenv("COOP_ERP_BULK_CONCURRENCY")?.let { systemProperty("coop-erp.bulk-register.argon2-concurrency", it) }
+    System.getProperty("coop-erp.bulk-register.argon2-concurrency")?.let { systemProperty("coop-erp.bulk-register.argon2-concurrency", it) }
 }
 
 // `make test-int`: the tests tagged "integration" (Testcontainers). Same source folder as the

@@ -1,5 +1,10 @@
 package lk.coopfed.knoweb.m1party.internal.bulk;
 
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -23,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -42,6 +48,8 @@ import lk.coopfed.knoweb.m1party.api.BulkNetworkRegistered;
 import lk.coopfed.knoweb.m1party.api.BulkNetworkReport;
 import lk.coopfed.knoweb.m1party.api.BulkNetworkReport.Problem;
 import lk.coopfed.knoweb.m1party.api.BulkRegisterNetwork;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -60,7 +68,169 @@ import org.springframework.transaction.annotation.Transactional;
 @CommandHandler(permission = "prt.location.register")
 public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, BulkNetworkReport> {
 
+    private static final Logger log = LoggerFactory.getLogger(BulkRegisterNetworkHandler.class);
+
     public static final String AUDIT_NETWORK_REGISTERED = "NETWORK_BULK_REGISTERED";
+
+    static final int MIN_CONCURRENCY = 1;
+    static final int MAX_CONCURRENCY = 4;
+
+    /**
+     * Diagnostic telemetry captured during bulk network registration (CAT-08) execution.
+     * Captured ONLY when diagnostic mode is explicitly enabled.
+     */
+    public record DiagnosticTelemetry(
+            UUID ownerEntityId,
+            Instant recordedAt,
+            int availableProcessors,
+            String cpuQuota,
+            String cpuStat,
+            int activeConcurrency,
+            long totalHandlerDurationMs,
+            long hashingDurationMs,
+            long databaseInsertsDurationMs,
+            long seriesRegistrationDurationMs,
+            long gcCollectionsDelta,
+            long gcTimeDeltaMs,
+            String gcDetails,
+            long heapUsedBeforeMb,
+            long heapUsedAfterMb,
+            long heapCommittedAfterMb,
+            long heapMaxMb) {
+
+        public String formattedReport(long endpointDurationMs) {
+            return String.format(
+                    """
+                    === CAT-08 DIAGNOSTIC TELEMETRY ===
+                    Timestamp: %s | Entity: %s
+                    Processors Available: %d | Linux Cgroup CPU Quota: %s
+                    Linux Cgroup CPU Stat (Throttling Counters): %s
+                    Active Hashing Concurrency: %d [Safe Diagnostic Range: %d..%d]
+                    Durations:
+                      - Endpoint Elapsed (Client HTTP Round-Trip): %d ms (%.2f s)
+                      - Handler Execution (Transactional Boundary): %d ms (%.2f s)
+                          * Argon2id Hashing (Wall-Clock): %d ms (%.2f s) [%.1f%% of handler]
+                          * Database Batch Inserts (Wall-Clock): %d ms (%.2f s) [%.1f%% of handler]
+                          * Series Registrations (Wall-Clock): %d ms (%.2f s) [%.1f%% of handler]
+                          * Validation & Preparation: %d ms
+                    JVM GC Activity (Cumulative during Handler):
+                      - Collections Delta: %d
+                      - Cumulative Collection Time Delta: %d ms (reported by GarbageCollectorMXBean; includes concurrent and pause time, NOT solely stop-the-world pause)
+                      - Collector Breakdown: %s
+                    JVM Heap Memory:
+                      - Used: %d MB -> %d MB
+                      - Committed: %d MB | Max: %d MB
+                    ===================================""",
+                    recordedAt,
+                    ownerEntityId,
+                    availableProcessors,
+                    cpuQuota,
+                    cpuStat,
+                    activeConcurrency,
+                    MIN_CONCURRENCY,
+                    MAX_CONCURRENCY,
+                    endpointDurationMs,
+                    endpointDurationMs / 1000.0,
+                    totalHandlerDurationMs,
+                    totalHandlerDurationMs / 1000.0,
+                    hashingDurationMs,
+                    hashingDurationMs / 1000.0,
+                    (hashingDurationMs * 100.0 / Math.max(1, totalHandlerDurationMs)),
+                    databaseInsertsDurationMs,
+                    databaseInsertsDurationMs / 1000.0,
+                    (databaseInsertsDurationMs * 100.0 / Math.max(1, totalHandlerDurationMs)),
+                    seriesRegistrationDurationMs,
+                    seriesRegistrationDurationMs / 1000.0,
+                    (seriesRegistrationDurationMs * 100.0 / Math.max(1, totalHandlerDurationMs)),
+                    Math.max(
+                            0,
+                            totalHandlerDurationMs
+                                    - hashingDurationMs
+                                    - databaseInsertsDurationMs
+                                    - seriesRegistrationDurationMs),
+                    gcCollectionsDelta,
+                    gcTimeDeltaMs,
+                    gcDetails,
+                    heapUsedBeforeMb,
+                    heapUsedAfterMb,
+                    heapCommittedAfterMb,
+                    heapMaxMb);
+        }
+
+        public String formattedReport() {
+            return formattedReport(totalHandlerDurationMs);
+        }
+    }
+
+    private static final AtomicReference<DiagnosticTelemetry> telemetryRef = new AtomicReference<>();
+
+    /**
+     * Reads the most recent diagnostic telemetry, if any.
+     * Retained for inspectability; tests should prefer {@link #consumeTelemetry()}.
+     */
+    public static DiagnosticTelemetry lastTelemetry() {
+        return telemetryRef.get();
+    }
+
+    /**
+     * Consumes and atomically clears the most recent diagnostic telemetry, guaranteeing test isolation.
+     * Prevents cross-test or stale telemetry leakage.
+     */
+    public static DiagnosticTelemetry consumeTelemetry() {
+        return telemetryRef.getAndSet(null);
+    }
+
+    /**
+     * Explicitly clears any captured diagnostic telemetry.
+     */
+    public static void clearTelemetry() {
+        telemetryRef.set(null);
+    }
+
+    static boolean isDiagnosticsEnabled() {
+        String prop = System.getProperty("coop-erp.bulk-register.diagnostics");
+        if (prop != null) {
+            return Boolean.parseBoolean(prop.trim());
+        }
+        String env = System.getenv("COOP_ERP_BULK_DIAGNOSTICS");
+        if (env != null) {
+            return "true".equalsIgnoreCase(env.trim());
+        }
+        return false;
+    }
+
+    static int resolveConcurrency() {
+        int defaultConcurrency =
+                Math.max(MIN_CONCURRENCY, Math.min(Runtime.getRuntime().availableProcessors(), MAX_CONCURRENCY));
+        if (!isDiagnosticsEnabled()) {
+            return defaultConcurrency;
+        }
+
+        String raw = System.getProperty("coop-erp.bulk-register.argon2-concurrency");
+        if (raw == null || raw.isBlank()) {
+            raw = System.getenv("COOP_ERP_BULK_CONCURRENCY");
+        }
+        if (raw != null && !raw.isBlank()) {
+            try {
+                int parsed = Integer.parseInt(raw.trim());
+                if (parsed >= MIN_CONCURRENCY && parsed <= MAX_CONCURRENCY) {
+                    return parsed;
+                }
+                log.warn(
+                        "Ignoring out-of-range diagnostic concurrency override: {}. Allowed range is [{}..{}]; defaulting to {}.",
+                        parsed,
+                        MIN_CONCURRENCY,
+                        MAX_CONCURRENCY,
+                        defaultConcurrency);
+            } catch (NumberFormatException e) {
+                log.warn(
+                        "Ignoring unparseable diagnostic concurrency override: '{}'; defaulting to {}.",
+                        raw.trim(),
+                        defaultConcurrency);
+            }
+        }
+        return defaultConcurrency;
+    }
 
     private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9._-]{2,63}$");
     private static final Pattern PIN_PATTERN = Pattern.compile("^[0-9]{4,6}$");
@@ -116,6 +286,13 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
     @Override
     @Transactional
     public BulkNetworkReport handle(BulkRegisterNetwork command, ScopeContext scope) {
+        boolean diag = isDiagnosticsEnabled();
+        long handlerStart = diag ? System.nanoTime() : 0L;
+        Map<String, Long> gcCountsBefore = diag ? currentGcCounts() : Map.of();
+        Map<String, Long> gcTimesBefore = diag ? currentGcTimes() : Map.of();
+        long heapUsedBeforeMb =
+                diag ? ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() / (1024 * 1024) : 0L;
+
         if (scope == null || scope.entityId() == null) {
             throw new ProblemException("m1.location.scope_required");
         }
@@ -179,23 +356,25 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         }
 
         // Prepare users with bounded parallel Argon2id PIN hashing.
-        // Concurrency is bounded to at most 4 (and available CPU cores) to keep peak Argon2 memory
-        // bounded to concurrency * 64 MB (<= 256 MB), well within heap limits, while utilizing
-        // multiple cores to finish 120 users comfortably well within the 60-second requirement.
+        // Concurrency is configurable via coop-erp.bulk-register.argon2-concurrency / COOP_ERP_BULK_CONCURRENCY,
+        // defaulting to at most 4 (and available CPU cores) to keep peak Argon2 memory bounded.
         Map<String, String> hashedPins = new ConcurrentHashMap<>();
         List<BulkRegisterNetwork.User> usersWithPin = users.stream()
                 .filter(u -> u.pin() != null && !u.pin().isBlank())
                 .toList();
 
+        long hashingStart = diag ? System.nanoTime() : 0L;
+        int concurrencyUsed = 0;
         if (!usersWithPin.isEmpty()) {
-            int concurrency = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), 4));
+            concurrencyUsed = resolveConcurrency();
+            final int activeConcurrency = concurrencyUsed;
             ThreadFactory threadFactory = r -> {
                 Thread t = new Thread(r, "bulk-pin-hasher");
                 t.setDaemon(true);
                 return t;
             };
 
-            try (ExecutorService pool = Executors.newFixedThreadPool(concurrency, threadFactory)) {
+            try (ExecutorService pool = Executors.newFixedThreadPool(activeConcurrency, threadFactory)) {
                 List<CompletableFuture<Void>> futures = usersWithPin.stream()
                         .map(u -> CompletableFuture.runAsync(
                                 () -> {
@@ -217,6 +396,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                 }
             }
         }
+        long hashingDurationMs = diag ? (System.nanoTime() - hashingStart) / 1_000_000 : 0L;
 
         List<PreparedUser> preparedUsers = new ArrayList<>();
         for (BulkRegisterNetwork.User user : users) {
@@ -276,6 +456,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         }
 
         // 4. Batch Inserts to Database
+        long dbStart = diag ? System.nanoTime() : 0L;
         batchInsertLocations(shops, locationIds, ownerEntityId);
         batchInsertPositions(preparedPositions);
         batchInsertUsers(preparedUsers);
@@ -300,8 +481,10 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                         }
                     });
         }
+        long databaseInsertsDurationMs = diag ? (System.nanoTime() - dbStart) / 1_000_000 : 0L;
 
         // 6. Register Numbering Series for locations and till positions
+        long seriesStart = diag ? System.nanoTime() : 0L;
         List<DocumentType> locationTypes = documentTypes.all().stream()
                 .filter(t -> t.seriesScope() == SeriesScope.LOCATION)
                 .sorted((a, b) -> a.code().compareTo(b.code()))
@@ -342,6 +525,7 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
                         scope);
             }
         }
+        long seriesRegistrationDurationMs = diag ? (System.nanoTime() - seriesStart) / 1_000_000 : 0L;
 
         // 7. Audit & Domain Event
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -354,6 +538,44 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
         audit.record(AUDIT_NETWORK_REGISTERED, Subject.of("entity", ownerEntityId), null, summary, scope);
         events.publish(new BulkNetworkRegistered(
                 ownerEntityId, shops.size(), preparedPositions.size(), preparedUsers.size(), preparedDevices.size()));
+
+        if (diag) {
+            long totalHandlerDurationMs = (System.nanoTime() - handlerStart) / 1_000_000;
+            Map<String, Long> gcCountsAfter = currentGcCounts();
+            Map<String, Long> gcTimesAfter = currentGcTimes();
+            MemoryUsage heapUsageAfter = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+            long heapUsedAfterMb = heapUsageAfter.getUsed() / (1024 * 1024);
+            long heapCommittedAfterMb = heapUsageAfter.getCommitted() / (1024 * 1024);
+            long heapMaxMb = heapUsageAfter.getMax() / (1024 * 1024);
+
+            long gcCollectionsDelta = sumDeltas(gcCountsBefore, gcCountsAfter);
+            long gcTimeDeltaMs = sumDeltas(gcTimesBefore, gcTimesAfter);
+            String gcDetails =
+                    formatGcDetails(diffMaps(gcCountsBefore, gcCountsAfter), diffMaps(gcTimesBefore, gcTimesAfter));
+
+            DiagnosticTelemetry telemetry = new DiagnosticTelemetry(
+                    ownerEntityId,
+                    clock.instant(),
+                    Runtime.getRuntime().availableProcessors(),
+                    readCpuQuota(),
+                    readCpuStat(),
+                    concurrencyUsed,
+                    totalHandlerDurationMs,
+                    hashingDurationMs,
+                    databaseInsertsDurationMs,
+                    seriesRegistrationDurationMs,
+                    gcCollectionsDelta,
+                    gcTimeDeltaMs,
+                    gcDetails,
+                    heapUsedBeforeMb,
+                    heapUsedAfterMb,
+                    heapCommittedAfterMb,
+                    heapMaxMb);
+            telemetryRef.set(telemetry);
+            if (log.isInfoEnabled()) {
+                log.info("Bulk network registration diagnostic telemetry:\n{}", telemetry.formattedReport());
+            }
+        }
 
         return new BulkNetworkReport(
                 BulkNetworkReport.REGISTERED,
@@ -723,5 +945,93 @@ public class BulkRegisterNetworkHandler implements Handles<BulkRegisterNetwork, 
 
     private static String inSql(int count) {
         return String.join(",", Collections.nCopies(count, "?"));
+    }
+
+    private static Map<String, Long> currentGcCounts() {
+        Map<String, Long> map = new HashMap<>();
+        for (GarbageCollectorMXBean b : ManagementFactory.getGarbageCollectorMXBeans()) {
+            map.put(b.getName(), b.getCollectionCount());
+        }
+        return map;
+    }
+
+    private static Map<String, Long> currentGcTimes() {
+        Map<String, Long> map = new HashMap<>();
+        for (GarbageCollectorMXBean b : ManagementFactory.getGarbageCollectorMXBeans()) {
+            map.put(b.getName(), b.getCollectionTime());
+        }
+        return map;
+    }
+
+    private static Map<String, Long> diffMaps(Map<String, Long> before, Map<String, Long> after) {
+        Map<String, Long> diff = new LinkedHashMap<>();
+        for (Map.Entry<String, Long> entry : after.entrySet()) {
+            long prev = before.getOrDefault(entry.getKey(), 0L);
+            diff.put(entry.getKey(), Math.max(0L, entry.getValue() - prev));
+        }
+        return diff;
+    }
+
+    private static long sumDeltas(Map<String, Long> before, Map<String, Long> after) {
+        long sum = 0;
+        for (Map.Entry<String, Long> entry : after.entrySet()) {
+            long prev = before.getOrDefault(entry.getKey(), 0L);
+            sum += Math.max(0L, entry.getValue() - prev);
+        }
+        return sum;
+    }
+
+    private static String formatGcDetails(Map<String, Long> countDeltas, Map<String, Long> timeDeltas) {
+        StringBuilder sb = new StringBuilder();
+        for (String name : countDeltas.keySet()) {
+            if (sb.length() > 0) {
+                sb.append("; ");
+            }
+            sb.append(name)
+                    .append("=")
+                    .append(countDeltas.getOrDefault(name, 0L))
+                    .append(" collections (")
+                    .append(timeDeltas.getOrDefault(name, 0L))
+                    .append(" ms)");
+        }
+        return sb.toString();
+    }
+
+    private static String readCpuQuota() {
+        try {
+            Path cgroupV2 = Path.of("/sys/fs/cgroup/cpu.max");
+            if (Files.exists(cgroupV2)) {
+                return Files.readString(cgroupV2).trim();
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            Path quota = Path.of("/sys/fs/cgroup/cpu/cpu.cfs_quota_us");
+            Path period = Path.of("/sys/fs/cgroup/cpu/cpu.cfs_period_us");
+            if (Files.exists(quota) && Files.exists(period)) {
+                return Files.readString(quota).trim() + " / "
+                        + Files.readString(period).trim();
+            }
+        } catch (Exception ignored) {
+        }
+        return "unrestricted/unknown";
+    }
+
+    private static String readCpuStat() {
+        try {
+            Path cgroupV2 = Path.of("/sys/fs/cgroup/cpu.stat");
+            if (Files.exists(cgroupV2)) {
+                return Files.readString(cgroupV2).trim().replace("\n", ", ");
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            Path cgroupV1 = Path.of("/sys/fs/cgroup/cpu/cpu.stat");
+            if (Files.exists(cgroupV1)) {
+                return Files.readString(cgroupV1).trim().replace("\n", ", ");
+            }
+        } catch (Exception ignored) {
+        }
+        return "unrestricted/unknown";
     }
 }

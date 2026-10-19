@@ -52,6 +52,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanAndSeedEntity() {
+        BulkRegisterNetworkHandler.clearTelemetry();
         JdbcTemplate admin = superuserJdbc();
         admin.execute("truncate table party.device, security.app_user, party.till_position, party.location cascade");
         admin.update(
@@ -131,6 +132,14 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
         ResponseEntity<JsonNode> response = post(request);
         Duration elapsed = Duration.between(before, Instant.now());
 
+        BulkRegisterNetworkHandler.DiagnosticTelemetry telemetry = BulkRegisterNetworkHandler.consumeTelemetry();
+        if (telemetry != null) {
+            assertThat(telemetry.ownerEntityId())
+                    .as("Captured diagnostic telemetry must correlate with the target registration entity")
+                    .isEqualTo(ENTITY_ID);
+            System.err.println(telemetry.formattedReport(elapsed.toMillis()));
+        }
+
         assertThat(response.getStatusCode())
                 .as(String.valueOf(response.getBody()))
                 .isEqualTo(HttpStatus.OK);
@@ -146,7 +155,11 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
 
         // CAT-08 Performance Requirement: Must process within 60 seconds
         assertThat(elapsed)
-                .as("Bulk network registration must finish well within 60 seconds")
+                .as(
+                        "Bulk network registration must finish well within 60 seconds.%n%s",
+                        telemetry != null
+                                ? telemetry.formattedReport(elapsed.toMillis())
+                                : "No telemetry recorded (diagnostics disabled)")
                 .isLessThan(Duration.ofSeconds(60));
 
         // Verify Database Records
