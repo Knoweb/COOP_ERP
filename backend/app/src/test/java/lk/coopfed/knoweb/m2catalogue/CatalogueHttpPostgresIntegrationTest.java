@@ -347,12 +347,12 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 .update(
                         """
                         insert into catalogue.sku
-                            (sku_id, sku_code, owner_entity_id, status, short_name_en,
+                            (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si, short_name_ta,
                              base_uom_code, sold_by_weight, tax_category_id)
-                        values (?, '123456', ?, 'SHARED', 'HTTP Weighed Carrots', 'KG', true, ?)
+                        values (?, '123456', ?, 'SHARED', 'HTTP Weighed Carrots', 'HTTP කැරට්', 'HTTP கேரட்', 'KG', true, ?)
                         """,
                         skuId,
-                        MPCS,
+                        TEST_FEDERATION,
                         TAX_CATEGORY);
 
         UUID batchId = UUID.randomUUID();
@@ -365,7 +365,7 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         """,
                         batchId,
                         skuId,
-                        MPCS);
+                        TEST_FEDERATION);
 
         // GET /v1/catalogue/lookup with 2012345608504 (prefix 20, code 123456, 850g, check digit 4)
         ResponseEntity<JsonNode> weighed = http.exchange(

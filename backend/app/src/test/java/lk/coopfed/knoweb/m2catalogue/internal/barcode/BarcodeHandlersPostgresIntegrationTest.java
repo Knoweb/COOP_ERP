@@ -477,6 +477,16 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
             assertThat(hit.uomCode()).isEqualTo("KG");
             assertThat(hit.batch()).isNull();
         });
+
+        // 2212345615001: prefix 22, code 123456, 1500g, check digit 1
+        Optional<LookupResult> result22 =
+                queries.lookupByBarcode(lookup("2212345615001", null, null, null, null), own(MPCS_A));
+        assertThat(result22).isPresent().get().satisfies(hit -> {
+            assertThat(hit.skuId()).isEqualTo(vegSku);
+            assertThat(hit.skuCode()).isEqualTo("123456");
+            assertThat(hit.soldByWeight()).isTrue();
+            assertThat(hit.uomCode()).isEqualTo("KG");
+        });
     }
 
     @Test
@@ -690,23 +700,29 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     private static void insertWeighedSku(
             JdbcTemplate admin, UUID skuId, String code, UUID owner, String status, String en) {
+        String si = "SHARED".equals(status) ? en + " si" : null;
+        String ta = "SHARED".equals(status) ? en + " ta" : null;
         admin.update(
                 """
                 insert into catalogue.sku
-                    (sku_id, sku_code, owner_entity_id, status, short_name_en,
+                    (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si, short_name_ta,
                      base_uom_code, sold_by_weight, tax_category_id)
-                values (?, ?, ?, ?, ?, 'KG', true, ?)
+                values (?, ?, ?, ?, ?, ?, ?, 'KG', true, ?)
                 """,
                 skuId,
                 code,
                 owner,
                 status,
                 en,
+                si,
+                ta,
                 TAX_CATEGORY);
     }
 
     private static void insertSku(
             JdbcTemplate admin, UUID skuId, String code, UUID owner, String status, String en, String si, String ta) {
+        String actualSi = ("SHARED".equals(status) && si == null) ? en + " si" : si;
+        String actualTa = ("SHARED".equals(status) && ta == null) ? en + " ta" : ta;
         admin.update(
                 """
                 insert into catalogue.sku
@@ -719,8 +735,8 @@ class BarcodeHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 owner,
                 status,
                 en,
-                si,
-                ta,
+                actualSi,
+                actualTa,
                 TAX_CATEGORY);
     }
 
