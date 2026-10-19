@@ -453,6 +453,126 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                 .contains("SKU_CREATED");
     }
 
+    @Test
+    void activateSharedRefusesNonGovernedTags() {
+        UUID skuId = createLocal.handle(
+                new CreateSku(details("Shared Biscuits", "බිස්කට්", "பிஸ்கட்", "EA", false, false, false)),
+                own(FEDERATION));
+
+        UUID tagId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.tag (tag_id, tag_code, name_en, governed, owner_entity_id)
+                values (?, 'local-promo', 'Local Promotion', false, ?)
+                """,
+                        tagId,
+                        FEDERATION);
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_tag (sku_id, tag_id, owner_entity_id)
+                values (?, ?, ?)
+                """,
+                        skuId,
+                        tagId,
+                        FEDERATION);
+
+        kernel.reset();
+
+        refused(
+                () -> activateShared.handle(new ActivateSharedSku(skuId), own(FEDERATION)),
+                "m2.sku.governed_tags_only");
+
+        assertThat(status(skuId)).isEqualTo("DRAFT");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void activateSharedRefusesCaseBarcodeWithoutConversion() {
+        UUID skuId = createLocal.handle(
+                new CreateSku(details("Shared Juice", "යුෂ", "சாறு", "EA", false, false, false)), own(FEDERATION));
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.uom (uom_code, name_en, is_weight)
+                values ('CASE', 'Case', false)
+                on conflict do nothing
+                """);
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id, status)
+                values ('4791234560011', 'EAN13', ?, 'CASE', ?, 'ACTIVE')
+                """,
+                        skuId,
+                        FEDERATION);
+
+        kernel.reset();
+
+        refused(
+                () -> activateShared.handle(new ActivateSharedSku(skuId), own(FEDERATION)),
+                "m2.sku.case_conversion_required");
+
+        assertThat(status(skuId)).isEqualTo("DRAFT");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_uom_conversion (sku_id, uom_code, factor_to_base, effective_from, owner_entity_id)
+                values (?, 'CASE', 12.0, current_date, ?)
+                """,
+                        skuId,
+                        FEDERATION);
+
+        activateShared.handle(new ActivateSharedSku(skuId), own(FEDERATION));
+        assertThat(status(skuId)).isEqualTo("SHARED");
+    }
+
+    @Test
+    void activateLocalRefusesWhenBarcodeRequiredAndMissing() {
+        UUID skuId = createLocal.handle(
+                new CreateSku(details("Local Veg", null, null, "EA", false, false, false)), own(MPCS));
+
+        superuserJdbc()
+                .update(
+                        """
+                insert into kernel.config_value (key, scope_entity_id, value, reason)
+                values ('catalogue.local_sku_requires_barcode', ?, 'true'::jsonb, 'test')
+                """,
+                        MPCS);
+
+        kernel.reset();
+
+        try {
+            refused(() -> activateLocal.handle(new ActivateLocalSku(skuId), own(MPCS)), "m2.sku.barcode_required");
+
+            assertThat(status(skuId)).isEqualTo("DRAFT");
+            assertThat(kernel.committedAudit()).isEmpty();
+            assertThat(kernel.committedEvents()).isEmpty();
+
+            superuserJdbc()
+                    .update(
+                            """
+                    insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id, status)
+                    values ('4791234560028', 'EAN13', ?, 'EA', ?, 'ACTIVE')
+                    """,
+                            skuId,
+                            MPCS);
+
+            activateLocal.handle(new ActivateLocalSku(skuId), own(MPCS));
+            assertThat(status(skuId)).isEqualTo("LOCAL");
+        } finally {
+            superuserJdbc()
+                    .update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
+        }
+    }
+
     private static ScopeContext own(UUID entity) {
         return ScopeContext.dev(USER, entity, null);
     }

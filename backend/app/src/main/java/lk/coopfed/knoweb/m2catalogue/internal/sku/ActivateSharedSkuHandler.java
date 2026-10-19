@@ -6,6 +6,7 @@ import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
 import lk.coopfed.knoweb.kernel.api.EventPublisher;
 import lk.coopfed.knoweb.kernel.api.Handles;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.Subject;
 import lk.coopfed.knoweb.m2catalogue.api.ActivateSharedSku;
@@ -22,13 +23,19 @@ public class ActivateSharedSkuHandler implements Handles<ActivateSharedSku, UUID
     private static final String AUDIT_SHARED = "SKU_SHARED";
 
     private final SkuRepository repository;
+    private final SkuReferenceData references;
     private final FederationCaller federation;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     ActivateSharedSkuHandler(
-            SkuRepository repository, FederationCaller federation, AuditFacade audit, EventPublisher events) {
+            SkuRepository repository,
+            SkuReferenceData references,
+            FederationCaller federation,
+            AuditFacade audit,
+            EventPublisher events) {
         this.repository = repository;
+        this.references = references;
         this.federation = federation;
         this.audit = audit;
         this.events = events;
@@ -40,6 +47,14 @@ public class ActivateSharedSkuHandler implements Handles<ActivateSharedSku, UUID
         federation.require(scope);
 
         Sku sku = SkuGuards.requireOwned(repository, command.skuId(), scope);
+
+        if (references.hasNonGovernedTags(sku.getId())) {
+            throw new ProblemException("m2.sku.governed_tags_only", Map.of("skuId", sku.getId()));
+        }
+
+        if (references.hasCaseBarcodeWithoutConversion(sku.getId())) {
+            throw new ProblemException("m2.sku.case_conversion_required", Map.of("skuId", sku.getId()));
+        }
 
         Map<String, Object> before = sku.auditState();
 

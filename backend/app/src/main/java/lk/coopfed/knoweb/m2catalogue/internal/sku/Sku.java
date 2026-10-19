@@ -120,6 +120,15 @@ class Sku implements Persistable<UUID> {
 
     void activateLocal() {
         requireStatus(DRAFT);
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
+        }
         status = LOCAL;
         priorStatus = null;
     }
@@ -129,6 +138,16 @@ class Sku implements Persistable<UUID> {
 
         if (shortNameSi == null || shortNameTa == null) {
             throw new ProblemException("m2.sku.shared_translations_required");
+        }
+
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
         }
 
         status = SHARED;
@@ -252,6 +271,30 @@ class Sku implements Persistable<UUID> {
 
     UUID taxCategoryId() {
         return taxCategoryId;
+    }
+
+    String shortNameEn() {
+        return shortNameEn;
+    }
+
+    String shortNameSi() {
+        return shortNameSi;
+    }
+
+    String shortNameTa() {
+        return shortNameTa;
+    }
+
+    String multiMrpPolicy() {
+        return multiMrpPolicy;
+    }
+
+    String originKind() {
+        return originKind;
+    }
+
+    Map<String, Object> attributes() {
+        return attributes;
     }
 
     Map<String, Object> auditState() {
