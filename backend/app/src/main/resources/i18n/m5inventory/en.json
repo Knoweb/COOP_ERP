@@ -84,5 +84,6 @@
   "m5.writeoff.approver_is_witness": "The person who witnessed the write-off in person cannot approve it; another approver must act",
   "m5.repack.yield_out_of_range": "More packs ({actual}) than the recipe allows from this quantity ({expected} expected); check the count of packs",
   "m5.repack.yield_reason_required": "Fewer packs ({actual}) than the recipe expects ({expected}); give the reason for the shortfall",
-  "m5.till_fact.type_required": "The till’s fact names no type"
+  "m5.till_fact.type_required": "The till’s fact names no type",
+  "m5.expiry_task.not_found": "The expiry task was not found"
 }
