@@ -333,6 +333,95 @@ class CatalogueHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void inStoreVariableWeightAndBatchLabelsFollowTheGeneratedContract() {
+        HttpHeaders headers = headers();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        superuserJdbc()
+                .update("insert into catalogue.uom (uom_code, name_en, is_weight) values ('KG', 'Kilogram', true)"
+                        + " on conflict do nothing");
+
+        // Create a weighed SKU with 6-digit code "123456"
+        UUID skuId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                        insert into catalogue.sku
+                            (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si, short_name_ta,
+                             base_uom_code, sold_by_weight, tax_category_id)
+                        values (?, '123456', ?, 'SHARED', 'HTTP Weighed Carrots', 'HTTP කැරට්', 'HTTP கேரட்', 'KG', true, ?)
+                        """,
+                        skuId,
+                        TEST_FEDERATION,
+                        TAX_CATEGORY);
+
+        UUID batchId = UUID.randomUUID();
+        superuserJdbc()
+                .update(
+                        """
+                        insert into catalogue.batch
+                            (batch_id, sku_id, batch_no, expiry_date, printed_mrp, owner_entity_id)
+                        values (?, ?, '0042', date '2027-06-30', 950.00, ?)
+                        """,
+                        batchId,
+                        skuId,
+                        TEST_FEDERATION);
+
+        // GET /v1/catalogue/lookup with 2012345608504 (prefix 20, code 123456, 850g, check digit 4)
+        ResponseEntity<JsonNode> weighed = http.exchange(
+                "/v1/catalogue/lookup?barcode=2012345608504",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(weighed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode weighedCard = weighed.getBody();
+        assertThat(weighedCard.get("skuId").asText()).isEqualTo(skuId.toString());
+        assertThat(weighedCard.get("skuCode").asText()).isEqualTo("123456");
+        assertThat(weighedCard.get("soldByWeight").asBoolean()).isTrue();
+        assertThat(weighedCard.get("uomCode").asText()).isEqualTo("KG");
+
+        // GET /v1/catalogue/lookup with 2512345600428 (prefix 25, code 123456, batch 0042, check digit 8)
+        ResponseEntity<JsonNode> batchLookup = http.exchange(
+                "/v1/catalogue/lookup?barcode=2512345600428",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(batchLookup.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode batchCard = batchLookup.getBody();
+        assertThat(batchCard.get("skuId").asText()).isEqualTo(skuId.toString());
+        assertThat(batchCard.get("batch").get("batchId").asText()).isEqualTo(batchId.toString());
+        assertThat(batchCard.get("batch").get("batchNo").asText()).isEqualTo("0042");
+        assertThat(batchCard.get("batch").get("printedMrp").decimalValue()).isEqualByComparingTo("950.00");
+
+        // GET /v1/catalogue/lookup with unknown SKU 2099999908501 -> 404
+        ResponseEntity<JsonNode> unknownSku = http.exchange(
+                "/v1/catalogue/lookup?barcode=2099999908501",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(unknownSku.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(unknownSku.getBody().get("code").asText()).isEqualTo("m2.barcode.not_found");
+
+        // GET /v1/catalogue/lookup with malformed checksum 2012345608500 -> 404
+        ResponseEntity<JsonNode> badChecksum = http.exchange(
+                "/v1/catalogue/lookup?barcode=2012345608500",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(badChecksum.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badChecksum.getBody().get("code").asText()).isEqualTo("m2.barcode.not_found");
+
+        // GET /v1/catalogue/lookup with zero-weight 2012345600003 -> 404
+        ResponseEntity<JsonNode> zeroWeight = http.exchange(
+                "/v1/catalogue/lookup?barcode=2012345600003",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                JsonNode.class);
+        assertThat(zeroWeight.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(zeroWeight.getBody().get("code").asText()).isEqualTo("m2.barcode.not_found");
+    }
+
+    @Test
     void suppliersAndBatchesFollowTheGeneratedContract() {
         HttpHeaders headers = headers();
 
