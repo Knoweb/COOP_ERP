@@ -311,6 +311,19 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "catalogue.sku_alias",
+                    "authenticated_read (22A section 3): alias history every class but NONE reads; only the"
+                            + " Federation updates aliases (fed_update), so an entity's own UPDATE and MOVE are hidden",
+                    check -> {
+                        if (check.op() == Op.SELECT) {
+                            return everyClassButNoneReadsEverything(check);
+                        }
+                        if (check.op() == Op.UPDATE || check.op() == Op.MOVE) {
+                            return HIDDEN;
+                        }
+                        return null;
+                    }),
+            new Departure(
                     "security.app_user",
                     "no ext_view on purpose (m1security V0009): the row carries pin_hash and provider_subject,"
                             + " which RLS cannot hide by column; a regulator's view of staff waits for a masking view",
