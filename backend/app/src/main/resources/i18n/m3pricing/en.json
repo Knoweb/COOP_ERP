@@ -28,6 +28,7 @@
   "m3.rule.not_found": "The discount rule could not be found",
   "m3.rule.not_draft": "Only a draft rule can be activated",
   "m3.rule.not_active": "Only an active rule can be withdrawn",
+  "m3.rule.not_due": "This rule has not reached its end date yet",
   "m3.rule.valid_from_past": "The first valid date of the rule is in the past; author it again from today or later",
   "m3.rule.kind_not_available": "Free-item rules are not available yet",
   "m3.rule.kind_invalid": "This kind of rule is not known",

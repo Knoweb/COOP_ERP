@@ -36,6 +36,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Discount rule withdrawn
 
+  - code: RULE_EXPIRED
+    severity: INFO
+    offline_capturable: false
+    description_en: Discount rule expired by the clock
+
   # M3-06 and M3-07 (23A section 7): control prices and the multi-MRP policy.
   - code: CONTROL_PRICE_ENTERED
     severity: INFO
