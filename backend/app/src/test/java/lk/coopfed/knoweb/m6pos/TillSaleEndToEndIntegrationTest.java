@@ -239,6 +239,9 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
         assertThat(kernel.committedEvents())
                 .filteredOn(TillSessionRecorded.class::isInstance)
                 .hasSize(2);
+        assertThat(kernel.committedEvents())
+                .filteredOn(lk.coopfed.knoweb.kernel.api.LocationSessionsClosed.class::isInstance)
+                .hasSize(1);
 
         // Over HTTP, the office reads the receipt on its business day, and on its own; the shop's
         // own session too. The day is the one the receipt was issued on in the business time zone,

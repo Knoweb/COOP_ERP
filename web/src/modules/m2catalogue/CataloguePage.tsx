@@ -65,6 +65,7 @@ export function CataloguePage() {
   const intl = useIntl();
   const api = useCatalogueApi();
   const canCreate = useHasPermission("cat.sku.create_local");
+  const canImport = useHasPermission("cat.import.run");
   const language = languageOf(intl.locale);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<SkuStatus | "">("");
@@ -81,12 +82,19 @@ export function CataloguePage() {
         icon="catalogue"
         title={t("catalogue.title").text}
         actions={
-          canCreate ? (
-            <Link className="action-link action-link--primary" to="/catalogue/skus/new">
-              <span className="action-link__symbol" aria-hidden="true">+</span>
-              <span>{t("catalogue.new").text}</span>
-            </Link>
-          ) : undefined
+          <div className="catalogue-actions">
+            {canImport && (
+              <Link className="action-link" to="/catalogue/import">
+                <span>{t("catalogue.import.nav").text}</span>
+              </Link>
+            )}
+            {canCreate && (
+              <Link className="action-link action-link--primary" to="/catalogue/skus/new">
+                <span className="action-link__symbol" aria-hidden="true">+</span>
+                <span>{t("catalogue.new").text}</span>
+              </Link>
+            )}
+          </div>
         }
       />
 
