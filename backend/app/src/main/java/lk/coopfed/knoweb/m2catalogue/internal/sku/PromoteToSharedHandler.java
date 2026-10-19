@@ -61,9 +61,15 @@ public class PromoteToSharedHandler implements Handles<PromoteToShared, UUID> {
             throw new ProblemException("request.invalid");
         }
 
-        Sku sku = repository
-                .findById(command.skuId())
-                .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", command.skuId())));
+        // Under OWN scope, another entity's LOCAL SKU is hidden by RLS.
+        // Temporarily switch scope_class to FEDERATION_VIEW to read the local SKU, then restore to OWN.
+        jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
+        Sku sku = repository.findById(command.skuId()).orElse(null);
+        jdbc.execute("SELECT set_config('app.scope_class', 'OWN', true)");
+
+        if (sku == null) {
+            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.skuId()));
+        }
 
         if (!Sku.LOCAL.equals(sku.status())) {
             throw new ProblemException("m2.sku.not_local", Map.of("skuId", sku.getId()));

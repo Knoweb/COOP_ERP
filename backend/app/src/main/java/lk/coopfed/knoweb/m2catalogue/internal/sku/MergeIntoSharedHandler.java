@@ -65,9 +65,24 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
             throw new ProblemException("m2.sku.cannot_merge_with_self");
         }
 
-        Sku source = repository
-                .findById(command.sourceSkuId())
-                .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId())));
+        // Under OWN scope, another entity's LOCAL SKU and barcodes are hidden by RLS.
+        // Temporarily switch scope_class to FEDERATION_VIEW to read source and its barcodes, then restore to OWN.
+        jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
+        Sku source = repository.findById(command.sourceSkuId()).orElse(null);
+        List<Map<String, Object>> barcodes = source == null
+                ? List.of()
+                : jdbc.queryForList(
+                        """
+                        SELECT barcode, symbology, owner_entity_id
+                          FROM catalogue.sku_barcode
+                         WHERE sku_id = ? AND status = 'ACTIVE'
+                        """,
+                        command.sourceSkuId());
+        jdbc.execute("SELECT set_config('app.scope_class', 'OWN', true)");
+
+        if (source == null) {
+            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
+        }
 
         if (!Sku.LOCAL.equals(source.status())) {
             throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
@@ -107,13 +122,6 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
                 sourceOwner);
 
         // Move ACTIVE barcodes from source to target (retiring on collision)
-        List<Map<String, Object>> barcodes = jdbc.queryForList(
-                """
-                SELECT barcode, symbology, owner_entity_id
-                  FROM catalogue.sku_barcode
-                 WHERE sku_id = ? AND status = 'ACTIVE'
-                """,
-                source.getId());
 
         for (Map<String, Object> row : barcodes) {
             String barcode = (String) row.get("barcode");

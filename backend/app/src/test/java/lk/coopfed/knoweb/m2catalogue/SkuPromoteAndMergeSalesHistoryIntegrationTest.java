@@ -32,6 +32,7 @@ import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -115,11 +116,16 @@ class SkuPromoteAndMergeSalesHistoryIntegrationTest extends PostgresIntegrationT
         admin.update(
                 """
                 insert into catalogue.tax_category (tax_category_id, code, name_en, owner_entity_id)
-                values (?, 'STD', 'Standard', ?)
-                on conflict do nothing
+                values (?, 'M2MRG', 'Standard', ?)
+                on conflict (tax_category_id) do nothing
                 """,
                 TAX_CATEGORY,
                 FEDERATION);
+    }
+
+    @AfterEach
+    void cleanTax() {
+        superuserJdbc().update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
 
     @Test
