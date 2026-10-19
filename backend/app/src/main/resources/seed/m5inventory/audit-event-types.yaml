@@ -217,4 +217,3 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: An expiry review task was closed after count, depletion, or write-off
-
