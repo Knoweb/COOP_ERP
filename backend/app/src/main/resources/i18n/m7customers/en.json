@@ -7,6 +7,7 @@
   "m7.customer.attributes_invalid": "The details are too long or have an empty name",
   "m7.customer.not_found": "This customer was not found, or your society may not change them",
   "m7.customer.not_active": "This customer is not active",
+  "m7.customer.already_active": "This customer is already active",
   "m7.customer.via_invalid": "Choose how the customer registered",
   "m7.customer.phone_invalid": "Enter a Sri Lankan phone number, for example 07x xxx xxxx",
   "m7.customer.phone_held": "Another customer of your society has this number now; change their phone first",
