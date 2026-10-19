@@ -7,7 +7,7 @@ compose-material3 = "1.9.0"
 # Skia for the JVM: keep it the version compose-multiplatform brings (render uses it directly).
 skiko = "0.144.6"
 agp = "8.13.2"
-sqldelight = "2.4.0"
+sqldelight = "2.4.1"
 ktor = "3.6.0"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.9.0"
