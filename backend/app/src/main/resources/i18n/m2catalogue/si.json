@@ -62,5 +62,8 @@
   "m2.sku.scope_required": "නාමාවලි ආනයනය සඳහා සක්‍රීය ආයතන විෂය පථයක් අවශ්‍ය වේ",
   "m2.sku.csv_parse_failed": "නාමාවලි ආනයන ගොනුව කියවිය නොහැක",
   "m2.suspect.decision_invalid": "සැක සහිත තීරණය MERGED හෝ DISMISSED විය යුතුය",
-  "m2.suspect.not_found_or_closed": "අනුපිටපත් සැක සහිත යුගලය හමු නොවීය හෝ දැනටමත් විසඳා ඇත"
+  "m2.suspect.not_found_or_closed": "අනුපිටපත් සැක සහිත යුගලය හමු නොවීය හෝ දැනටමත් විසඳා ඇත",
+  "m2.sku.governed_tags_only": "හවුල් SKU සඳහා පාලිත ටැග් පමණක් භාවිතා කළ හැක",
+  "m2.sku.case_conversion_required": "CASE තීරු කේතයක් පවතින විට CASE සඳහා ඒකක පරිවර්තනයක් අවශ්‍ය වේ",
+  "m2.sku.barcode_required": "ආයතන සැකසුම් යටතේ මෙම දේශීය SKU සක්‍රිය කිරීමට තීරු කේතයක් අවශ්‍ය වේ"
 }

@@ -62,5 +62,8 @@
   "m2.sku.scope_required": "An active entity scope is required for catalogue import",
   "m2.sku.csv_parse_failed": "The catalogue import file could not be parsed",
   "m2.suspect.decision_invalid": "The suspect resolution decision must be MERGED or DISMISSED",
-  "m2.suspect.not_found_or_closed": "The duplicate suspect pair was not found or is already resolved"
+  "m2.suspect.not_found_or_closed": "The duplicate suspect pair was not found or is already resolved",
+  "m2.sku.governed_tags_only": "A shared SKU may carry governed tags only",
+  "m2.sku.case_conversion_required": "A unit conversion for CASE is required when a case barcode exists",
+  "m2.sku.barcode_required": "A barcode is required to activate this local SKU under entity configuration"
 }

@@ -545,6 +545,15 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  - key: catalogue.local_sku_requires_barcode
+    value_type: BOOLEAN
+    description_en: Whether local SKU activation requires at least one active barcode
+    description_si: දේශීය SKU සක්‍රිය කිරීම සඳහා අවම වශයෙන් එක් සක්‍රිය තීරු කේතයක් අවශ්‍යද යන්න
+    description_ta: உள்ளூர் SKU செயல்படுத்தலுக்கு குறைந்தது ஒரு செயலில் உள்ள பார்கோடு தேவையா என்பது
+    default: "false"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m2catalogue
   # M4 Trading Documents (24A section 3.1, "seed/m4/config.yaml"; doc 24 section 7): the defaults
   # of doc 24 DR-1 to DR-6 as doc 10 F-09 and A-03 assume them. Configuration, so a different
   # answer from the Federation admins is a value, not a code change.
