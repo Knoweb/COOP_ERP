@@ -22,6 +22,7 @@ import lk.coopfed.knoweb.till.core.model.Anomaly
 import lk.coopfed.knoweb.till.core.model.IssuedReceipt
 import lk.coopfed.knoweb.till.core.model.SessionRecord
 import lk.coopfed.knoweb.till.core.money.Money
+import lk.coopfed.knoweb.till.core.money.Qty
 import lk.coopfed.knoweb.till.core.port.CentralRefused
 import lk.coopfed.knoweb.till.core.port.CentralUnreachable
 import lk.coopfed.knoweb.till.core.receipt.MonoBitmap
@@ -37,6 +38,8 @@ import lk.coopfed.knoweb.till.core.snapshot.Operator
 import lk.coopfed.knoweb.till.core.snapshot.SnapshotRejected
 import lk.coopfed.knoweb.till.peripherals.PrintJob
 import lk.coopfed.knoweb.till.peripherals.PrinterPort
+import lk.coopfed.knoweb.till.peripherals.ScanLayer
+import lk.coopfed.knoweb.till.peripherals.Symbology
 import lk.coopfed.knoweb.till.render.ReceiptRasteriser
 
 /** Where the till is: the screen the cashier sees. */
@@ -55,6 +58,7 @@ class TillController(
     private val zone: TimeZone,
     private val paperDots: Int = MonoBitmap.DOTS_80MM,
     private val syncEveryMillis: Long = 20_000,
+    val scanLayer: ScanLayer = ScanLayer(),
 ) {
     var screen by mutableStateOf(Screen.STARTING)
         private set
@@ -292,16 +296,65 @@ class TillController(
 
     // ---- selling ----
 
-    /** A code from the scan field: a barcode first, else a search the screen shows. */
-    fun scan(code: String): List<Item> {
+    /** A code from the scan field: parsed through the scan layer, then looked up or searched. */
+    fun scan(code: String, atMillis: Long? = null): List<Item> {
         recordActivity()
         val trimmed = code.trim()
         if (trimmed.isEmpty()) return emptyList()
-        val item = service.catalogue.byBarcode(trimmed)
-        if (item != null) {
-            add(item)
+
+        val scanResult = if (atMillis != null) scanLayer.parse(trimmed, atMillis) else scanLayer.parse(trimmed)
+        if (scanResult == null) {
+            // Deduplicated (dual-mark read or scanner bounce within 700 ms)
             return emptyList()
         }
+
+        // 1. Malformed or invalid structured barcodes must fail safely immediately
+        if (scanResult.isMalformed) {
+            say(scanResult.error ?: "Invalid barcode \"$trimmed\"", error = true)
+            return emptyList()
+        }
+
+        // 2. Resolve product by GTIN, SKU code, or raw barcode
+        val gtin = scanResult.gtin
+        val itemCode = scanResult.code
+        val isStructured = gtin != null || itemCode != null || scanResult.symbology != Symbology.UNKNOWN
+
+        val item = when {
+            gtin != null -> service.catalogue.byGtin(gtin) ?: service.catalogue.byBarcode(gtin)
+            itemCode != null -> service.catalogue.bySkuCode(itemCode) ?: service.catalogue.byBarcode(itemCode)
+            scanResult.symbology != Symbology.UNKNOWN -> service.catalogue.byBarcode(scanResult.rawData)
+            else -> service.catalogue.byBarcode(trimmed)
+        }
+
+        if (item != null) {
+            val weightGrams = scanResult.weightGrams
+            if (weightGrams != null) {
+                // Scanned barcode encodes an explicit weight (internal 20..24 label or GS1 AI 3103)
+                if (!item.soldByWeight) {
+                    say("Cannot apply weight to unit product \"${item.name.en}\"", error = true)
+                    return emptyList()
+                }
+                if (weightGrams <= 0L) {
+                    say("Weighed item scanned without valid weight", error = true)
+                    return emptyList()
+                }
+                add(item, Qty(weightGrams))
+            } else {
+                // Standard barcode with no embedded weight:
+                // Preserves existing manual workflow for soldByWeight items (defaults to 1.000 kg, editable)
+                // and 1 unit for sold-by-unit items.
+                add(item, Qty.ONE)
+            }
+            return emptyList()
+        }
+
+        // 3. Structured barcode not found in snapshot
+        if (isStructured) {
+            say("No item with barcode or code \"$trimmed\" in the snapshot", error = true)
+            return emptyList()
+        }
+
+        // 4. Non-structured input falls back to manual search (legacy codes or product names)
         val found = service.catalogue.search(trimmed)
         if (found.isEmpty()) say("No item with barcode or name \"$trimmed\" in the snapshot", error = true)
         return found
@@ -312,14 +365,14 @@ class TillController(
         return service.catalogue.search(query)
     }
 
-    fun add(item: Item) {
+    fun add(item: Item, qty: Qty = Qty.ONE) {
         recordActivity()
         val price = item.price
         if (price == null) {
             needsPrice = item
             return
         }
-        basket.add(item, price)
+        basket.add(item, price, qty)
         refreshBasket()
         message = null
     }

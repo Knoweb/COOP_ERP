@@ -150,7 +150,18 @@ class Catalogue(
                 price = resolvedPrice,
             )
         }.sortedBy { it.name.en }
-        byBarcode = buildMap { items.forEach { item -> item.barcodes.forEach { put(it, item) } } }
+        byBarcode = buildMap {
+            items.forEach { item ->
+                item.barcodes.forEach { bc ->
+                    val trimmed = bc.trim()
+                    put(trimmed, item)
+                    val stripped = trimmed.trimStart('0')
+                    if (stripped.isNotEmpty() && !containsKey(stripped)) {
+                        put(stripped, item)
+                    }
+                }
+            }
+        }
         operators = snapshot.table("operator").mapNotNull { row ->
             val d = row.data ?: return@mapNotNull null
             Operator(
@@ -173,6 +184,20 @@ class Catalogue(
     }
 
     fun byBarcode(code: String): Item? = byBarcode[code.trim()]
+
+    /** Looks up an item by its SKU code, matching exact code or stripped leading zeros. */
+    fun bySkuCode(code: String): Item? {
+        val trimmed = code.trim()
+        val stripped = trimmed.trimStart('0')
+        return items.firstOrNull { it.skuCode == trimmed || (stripped.isNotEmpty() && it.skuCode == stripped) }
+    }
+
+    /** Looks up an item by GTIN (14-digit or stripped leading zeros). */
+    fun byGtin(gtin: String): Item? {
+        val trimmed = gtin.trim()
+        val stripped = trimmed.trimStart('0')
+        return byBarcode[trimmed] ?: (if (stripped.isNotEmpty()) byBarcode[stripped] else null)
+    }
 
     /** Items whose name (any language), code or barcode contains [query]. */
     fun search(query: String, limit: Int = 20): List<Item> {
