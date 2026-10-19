@@ -20,6 +20,7 @@ import lk.coopfed.knoweb.m7customers.api.AccountReopened;
 import lk.coopfed.knoweb.m7customers.api.AccountSuspended;
 import lk.coopfed.knoweb.m7customers.api.CustomerAnonymised;
 import lk.coopfed.knoweb.m7customers.api.CustomerDeactivated;
+import lk.coopfed.knoweb.m7customers.api.CustomerReactivated;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentRecorded;
 import lk.coopfed.knoweb.m7customers.api.CustomerPaymentReversed;
 import lk.coopfed.knoweb.m7customers.api.CustomerPhoneChanged;
@@ -59,6 +60,7 @@ class CustomerChangeLogFanOut {
             AccountClosed.TYPE,
             AccountReopened.TYPE,
             CustomerDeactivated.TYPE,
+            CustomerReactivated.TYPE,
             CustomerAnonymised.TYPE);
 
     private final ChangeLog changeLog;
@@ -75,6 +77,7 @@ class CustomerChangeLogFanOut {
                 AccountClosed.TYPE,
                 AccountReopened.TYPE,
                 CustomerDeactivated.TYPE,
+                CustomerReactivated.TYPE,
                 CustomerAnonymised.TYPE
             },
             consumer = CONSUMER)
