@@ -123,6 +123,7 @@ public final class TradingFixture {
                 """,
                 UUID.class);
         for (String table : new String[] {
+            "doc_order_adjustment",
             "claim_return",
             "claim_decision_line",
             "claim_decision",
@@ -173,6 +174,7 @@ public final class TradingFixture {
 
     public static void clean(JdbcTemplate admin) {
         for (String table : new String[] {
+            "doc_order_adjustment",
             "claim_return",
             "claim_decision_line",
             "claim_decision",

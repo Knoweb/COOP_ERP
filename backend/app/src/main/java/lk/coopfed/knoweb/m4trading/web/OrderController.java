@@ -13,14 +13,17 @@ import lk.coopfed.knoweb.m4trading.api.AmendOrder;
 import lk.coopfed.knoweb.m4trading.api.CancelOrder;
 import lk.coopfed.knoweb.m4trading.api.CreateOrder;
 import lk.coopfed.knoweb.m4trading.api.InventoryAvailability;
+import lk.coopfed.knoweb.m4trading.api.RecordOrderAdjustment;
 import lk.coopfed.knoweb.m4trading.api.RejectOrder;
 import lk.coopfed.knoweb.m4trading.api.SubmitOrder;
 import lk.coopfed.knoweb.m4trading.internal.order.AcceptOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.AmendOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.CancelOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.CreateOrderHandler;
+import lk.coopfed.knoweb.m4trading.internal.order.RecordOrderAdjustmentHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.RejectOrderHandler;
 import lk.coopfed.knoweb.m4trading.internal.order.SubmitOrderHandler;
+import lk.coopfed.knoweb.m4trading.query.OrderAdjustmentView;
 import lk.coopfed.knoweb.m4trading.query.OrderQueries;
 import lk.coopfed.knoweb.m4trading.query.OrderView;
 import lk.coopfed.knoweb.m4trading.web.generated.AcceptOrderRequest;
@@ -28,11 +31,13 @@ import lk.coopfed.knoweb.m4trading.web.generated.AmendOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.AvailabilityResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.CreateOrderRequest;
 import lk.coopfed.knoweb.m4trading.web.generated.DeliveryPointResponse;
+import lk.coopfed.knoweb.m4trading.web.generated.OrderAdjustmentResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderApi;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderLineResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderResponse;
 import lk.coopfed.knoweb.m4trading.web.generated.OrderStatus;
 import lk.coopfed.knoweb.m4trading.web.generated.ReasonRequest;
+import lk.coopfed.knoweb.m4trading.web.generated.RecordOrderAdjustmentRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,6 +51,7 @@ class OrderController implements OrderApi {
     private final AmendOrderHandler amend;
     private final AcceptOrderHandler accept;
     private final RejectOrderHandler reject;
+    private final RecordOrderAdjustmentHandler recordAdjustment;
     private final OrderQueries queries;
     private final InventoryAvailability availability;
     private final CurrentScope currentScope;
@@ -57,6 +63,7 @@ class OrderController implements OrderApi {
             AmendOrderHandler amend,
             AcceptOrderHandler accept,
             RejectOrderHandler reject,
+            RecordOrderAdjustmentHandler recordAdjustment,
             OrderQueries queries,
             InventoryAvailability availability,
             CurrentScope currentScope) {
@@ -66,6 +73,7 @@ class OrderController implements OrderApi {
         this.amend = amend;
         this.accept = accept;
         this.reject = reject;
+        this.recordAdjustment = recordAdjustment;
         this.queries = queries;
         this.availability = availability;
         this.currentScope = currentScope;
@@ -141,6 +149,30 @@ class OrderController implements OrderApi {
     }
 
     @Override
+    public ResponseEntity<OrderAdjustmentResponse> recordOrderAdjustment(
+            String idempotencyKey, UUID orderId, RecordOrderAdjustmentRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID adjustmentId = recordAdjustment.handle(
+                new RecordOrderAdjustment(
+                        orderId, request.getAdjustmentType(), request.getAmount(), request.getDescription()),
+                scope);
+        OrderAdjustmentView adj = queries.listAdjustments(orderId, scope).stream()
+                .filter(a -> a.adjustmentId().equals(adjustmentId))
+                .findFirst()
+                .orElseThrow(() -> new ProblemException("m4.order.not_found"));
+        return ResponseEntity.ok(toAdjustmentResponse(adj));
+    }
+
+    @Override
+    public ResponseEntity<List<OrderAdjustmentResponse>> listOrderAdjustments(UUID orderId) {
+        ScopeContext scope = currentScope.get();
+        queries.getOrder(orderId, scope).orElseThrow(() -> new ProblemException("m4.order.not_found"));
+        return ResponseEntity.ok(queries.listAdjustments(orderId, scope).stream()
+                .map(OrderController::toAdjustmentResponse)
+                .toList());
+    }
+
+    @Override
     public ResponseEntity<List<OrderResponse>> listOrders(String role, OrderStatus status) {
         OrderQueries.Role asked = OrderQueries.Role.valueOf(role);
         return ResponseEntity.ok(
@@ -202,6 +234,22 @@ class OrderController implements OrderApi {
         response.setAllocatedQty(line.allocatedQty());
         response.setFulfilledQty(line.fulfilledQty());
         response.setTierPrice(line.tierPrice());
+        return response;
+    }
+
+    private static OrderAdjustmentResponse toAdjustmentResponse(OrderAdjustmentView adj) {
+        OrderAdjustmentResponse response = new OrderAdjustmentResponse(
+                adj.adjustmentId(),
+                adj.orderId(),
+                adj.ownerEntityId(),
+                adj.counterpartyEntityId(),
+                adj.adjustmentType(),
+                OrderAdjustmentResponse.KindEnum.fromValue(adj.kind()),
+                adj.amount(),
+                adj.recordedBy(),
+                adj.recordedAt());
+        response.setDescription(adj.description());
+        response.setInvoiceDocumentId(adj.invoiceDocumentId());
         return response;
     }
 }

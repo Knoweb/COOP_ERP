@@ -157,6 +157,14 @@ permissions:
     module: "m3pricing"
     description_en: "View pricing reviews"
     scope: "ENTITY"
+  - code: "prc.adjust.special"
+    module: "m3pricing"
+    description_en: "Apply special discounts to orders"
+    scope: "FEDERATION"
+  - code: "prc.adjust.delivery"
+    module: "m3pricing"
+    description_en: "Apply delivery fees to orders"
+    scope: "FEDERATION"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes
@@ -237,6 +245,10 @@ permissions:
   - code: "ord.order.accept"
     module: "m4trading"
     description_en: "Accept, allocate and reject orders received as the seller"
+    scope: "ENTITY"
+  - code: "ord.order.adjust"
+    module: "m4trading"
+    description_en: "Record adjustments on orders"
     scope: "ENTITY"
   - code: "ord.order.lock_override"
     module: "m4trading"
