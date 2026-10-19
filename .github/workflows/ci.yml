@@ -316,6 +316,9 @@ jobs:
       - name: make test-int (this shard only)
         env:
           CHROMIUM_PATH: ${{ github.workspace }}/tools/chromium-in-docker.sh
+          # CAT-08 diagnostic benchmark (Phase 2C): enabled only for kernel+m1party shard
+          COOP_ERP_BULK_DIAGNOSTICS: ${{ matrix.shard.name == 'kernel+m1party' && 'true' || '' }}
+          COOP_ERP_BULK_CONCURRENCY: ${{ matrix.shard.name == 'kernel+m1party' && '2' || '' }}
         run: make test-int
 
       # Each shard's own JaCoCo exec data, renamed so three shards' files never collide when
