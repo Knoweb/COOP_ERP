@@ -94,30 +94,30 @@ public class PromoteToSharedHandler implements Handles<PromoteToShared, UUID> {
             if (references.hasCaseBarcodeWithoutConversion(sku.getId())) {
                 throw new ProblemException("m2.sku.case_conversion_required", Map.of("skuId", sku.getId()));
             }
-
-            originOwner = sku.ownerEntityId();
-            before = sku.auditState();
-
-            sku.promoteToShared(scope.entityId());
-            repository.saveAndFlush(sku);
-            after = sku.auditState();
-
-            LocalDate effectiveDate = LocalDate.now(clock);
-            jdbc.update(
-                    """
-                    INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
-                    """,
-                    sku.getId(),
-                    sku.getId(),
-                    Date.valueOf(effectiveDate),
-                    originOwner);
         } finally {
-            jdbc.update(
+            jdbc.queryForList(
                     "SELECT set_config('app.scope_class', ?, true)",
                     scope.policyClass().name());
         }
+
+        originOwner = sku.ownerEntityId();
+        before = sku.auditState();
+
+        sku.promoteToShared(scope.entityId());
+        repository.saveAndFlush(sku);
+        after = sku.auditState();
+
+        LocalDate effectiveDate = LocalDate.now(clock);
+        jdbc.update(
+                """
+                INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
+                """,
+                sku.getId(),
+                sku.getId(),
+                Date.valueOf(effectiveDate),
+                originOwner);
 
         audit.record(AUDIT_PROMOTED, Subject.of("sku", sku.getId()), before, after, scope);
 
