@@ -629,6 +629,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trading/discrepancies/{discrepancyId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise the upload of one photograph for a discrepancy
+         * @description Answers a URL the client PUTs the bytes to, with the content type given here. Problems: m4.discrepancy.not_found, m4.discrepancy.settled_already, attachment.content_type_not_allowed, attachment.too_large.
+         */
+        post: operations["addDiscrepancyPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trading/discrepancies/{discrepancyId}/settle": {
         parameters: {
             query?: never;
@@ -1509,6 +1531,7 @@ export interface components {
             /** Format: uuid */
             settledByUserId?: string;
             settlementReason?: string;
+            photos?: components["schemas"]["DiscrepancyPhotoStatusResponse"][];
             lines: components["schemas"]["DiscrepancyLineResponse"][];
         };
         DiscrepancyLineResponse: {
@@ -1695,6 +1718,24 @@ export interface components {
             /** Format: uuid */
             grnLineId: string;
             qty: components["schemas"]["Quantity"];
+        };
+        DiscrepancyPhotoRequest: {
+            contentType: string;
+            /** Format: int64 */
+            contentLength?: number;
+        };
+        DiscrepancyPhotoResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DiscrepancyPhotoStatusResponse: {
+            /** Format: uuid */
+            attachmentId: string;
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETE" | "FAILED";
         };
         ClaimPhotoRequest: {
             contentType: string;
@@ -2933,6 +2974,37 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    addDiscrepancyPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                discrepancyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscrepancyPhotoRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorised */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscrepancyPhotoResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
     settleDiscrepancy: {

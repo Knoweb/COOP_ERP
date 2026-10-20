@@ -253,7 +253,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
         // PRC-10: m4trading V0014 (order adjustments).
-        assertThat(after).containsEntry("m4trading", 14);
+        // ORD-10: m4trading V0015 (discrepancy photos).
+        assertThat(after).containsEntry("m4trading", 15);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
