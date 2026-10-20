@@ -207,3 +207,13 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: A till uploaded a stock fact central does not apply yet
+
+  - code: EXPIRY_TASK_OPENED
+    severity: INFO
+    offline_capturable: false
+    description_en: An expiry review task was opened for a batch entering its warning window
+
+  - code: EXPIRY_TASK_CLOSED
+    severity: INFO
+    offline_capturable: false
+    description_en: An expiry review task was closed after count, depletion, or write-off

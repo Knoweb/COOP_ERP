@@ -20,7 +20,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * migration"): a database whose every stream stands at the number before this pull request's
  * migrations (kernel {@code V0086} since PR 17, m1security {@code V0020} since M1M2M3M5-26,
  * m1party {@code V0014} (V0016 since M1M2M3M5-26, V0017 since wave 4 TD-03), m2catalogue
- * {@code V0008} (since CAT-01), m3pricing {@code V0005}, m5inventory {@code V0007} since PR 10, m7customers {@code V0002} since PR 09,
+ * {@code V0008} (since CAT-01), m3pricing {@code V0005}, m5inventory {@code V0008} since INV-01, m7customers {@code V0002} since PR 09,
  * m8reporting {@code V0006} since PR 08) migrates to the new numbers
  * with Flyway strict (out of order false, as application.yml's default), in the order {@code
  * FlywayConfig} runs the streams. The streams depend on each other at run time only (a policy
@@ -55,8 +55,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m3pricing", "6");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        // Wave 2, PR 10: m5inventory V0008 (count_line.counted_at) on a database at V0007.
-        streams.put("m5inventory", "7");
+        // INV-01: m5inventory V0009 (expiry_tasks) on a database at V0008.
+        streams.put("m5inventory", "8");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
         // Wave 2, PR 08: m8reporting V0007 (projections by location, event and line) from V0006.
@@ -148,7 +148,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 9)
                 .containsEntry("m3pricing", 7)
-                .containsEntry("m5inventory", 8)
+                .containsEntry("m5inventory", 9)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
 
@@ -211,6 +211,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         assertThat(admin.queryForObject(
                         "select count(*) from information_schema.columns where table_schema = 'inventory'"
                                 + " and table_name = 'count_line' and column_name = 'counted_at'",
+                        Integer.class))
+                .isEqualTo(1);
+
+        // INV-01: m5inventory V0009 over a database at V0008.
+        assertThat(admin.queryForObject(
+                        "select count(*) from information_schema.tables where table_schema = 'inventory'"
+                                + " and table_name = 'expiry_task'",
                         Integer.class))
                 .isEqualTo(1);
 
