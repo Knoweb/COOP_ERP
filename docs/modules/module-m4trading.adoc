@@ -41,6 +41,7 @@ _Others_
 * `l.c.k.k.api.Formats` (in Platform Kernel)
 * `l.c.k.k.api.Messages` (in Platform Kernel)
 * `l.c.k.k.api.Handles` (in Platform Kernel)
+* `l.c.k.k.api.PermissionResolver` (in Platform Kernel)
 * `l.c.k.k.api.CurrentScope` (in Platform Kernel)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
