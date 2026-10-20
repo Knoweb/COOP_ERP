@@ -128,53 +128,57 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
                 Date.valueOf(effectiveDate),
                 sourceOwner);
 
-        // Move ACTIVE barcodes from source to target (retiring on collision)
+        // Move ACTIVE barcodes from source to target (retiring on collision) and retire source SKU
+        jdbc.execute("SELECT set_config('app.fed_promote', 'true', true)");
+        try {
+            for (Map<String, Object> row : barcodes) {
+                String barcode = (String) row.get("barcode");
+                String symbology = (String) row.get("symbology");
+                UUID barcodeOwner = (UUID) row.get("owner_entity_id");
 
-        for (Map<String, Object> row : barcodes) {
-            String barcode = (String) row.get("barcode");
-            String symbology = (String) row.get("symbology");
-            UUID barcodeOwner = (UUID) row.get("owner_entity_id");
-
-            Integer collisionCount = jdbc.queryForObject(
-                    """
-                    SELECT count(*)
-                      FROM catalogue.sku_barcode
-                     WHERE barcode = ? AND symbology = ? AND sku_id = ? AND status = 'ACTIVE'
-                    """,
-                    Integer.class,
-                    barcode,
-                    symbology,
-                    target.getId());
-
-            if (collisionCount != null && collisionCount > 0) {
-                // Colliding with active barcode on target: retire source barcode
-                jdbc.update(
+                Integer collisionCount = jdbc.queryForObject(
                         """
-                        UPDATE catalogue.sku_barcode
-                           SET status = 'RETIRED'
-                         WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
+                        SELECT count(*)
+                          FROM catalogue.sku_barcode
+                         WHERE barcode = ? AND symbology = ? AND sku_id = ? AND status = 'ACTIVE'
                         """,
+                        Integer.class,
                         barcode,
                         symbology,
-                        barcodeOwner);
-            } else {
-                // Move barcode to target SKU
-                jdbc.update(
-                        """
-                        UPDATE catalogue.sku_barcode
-                           SET sku_id = ?
-                         WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
-                        """,
-                        target.getId(),
-                        barcode,
-                        symbology,
-                        barcodeOwner);
+                        target.getId());
+
+                if (collisionCount != null && collisionCount > 0) {
+                    // Colliding with active barcode on target: retire source barcode
+                    jdbc.update(
+                            """
+                            UPDATE catalogue.sku_barcode
+                               SET status = 'RETIRED'
+                             WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
+                            """,
+                            barcode,
+                            symbology,
+                            barcodeOwner);
+                } else {
+                    // Move barcode to target SKU
+                    jdbc.update(
+                            """
+                            UPDATE catalogue.sku_barcode
+                               SET sku_id = ?
+                             WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
+                            """,
+                            target.getId(),
+                            barcode,
+                            symbology,
+                            barcodeOwner);
+                }
             }
-        }
 
-        // Source SKU becomes INACTIVE with prior_status LOCAL
-        source.mergeIntoShared();
-        repository.saveAndFlush(source);
+            // Source SKU becomes INACTIVE with prior_status LOCAL
+            source.mergeIntoShared();
+            repository.saveAndFlush(source);
+        } finally {
+            jdbc.execute("SELECT set_config('app.fed_promote', '', true)");
+        }
         Map<String, Object> sourceAfter = source.auditState();
 
         // Close any open duplicate suspect pair

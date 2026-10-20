@@ -99,8 +99,13 @@ public class PromoteToSharedHandler implements Handles<PromoteToShared, UUID> {
         UUID originOwner = sku.ownerEntityId();
         Map<String, Object> before = sku.auditState();
 
-        sku.promoteToShared(scope.entityId());
-        repository.saveAndFlush(sku);
+        jdbc.execute("SELECT set_config('app.fed_promote', 'true', true)");
+        try {
+            sku.promoteToShared(scope.entityId());
+            repository.saveAndFlush(sku);
+        } finally {
+            jdbc.execute("SELECT set_config('app.fed_promote', '', true)");
+        }
         Map<String, Object> after = sku.auditState();
 
         LocalDate effectiveDate = LocalDate.now(clock);

@@ -5,10 +5,11 @@
 
 GRANT UPDATE (sku_id) ON inventory.stock_lot TO app_rw;
 
-CREATE POLICY fed_merge_lot ON inventory.stock_lot FOR UPDATE TO app_rw
+CREATE POLICY fed_merge_lot ON inventory.stock_lot FOR ALL TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND kernel.scope_entity() = (SELECT kernel.system_entity())
-           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()))
+           AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location())
+           AND coalesce(current_setting('app.fed_promote', true), '') = 'true')
     WITH CHECK (kernel.scope_class() = 'OWN'
                 AND (kernel.scope_location() IS NULL OR location_id = kernel.scope_location()));
 
