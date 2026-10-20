@@ -157,10 +157,11 @@ class ReportSources {
     private List<Map<String, String>> trade(ReportParameters parameters, Names names, String cap) {
         return jdbc.query(
                 """
-                select business_date, seller_entity_id, buyer_entity_id, sku_id, sum(qty) as qty, sum(value) as value
-                  from reporting.trade_line_fact
+                select business_date, seller_entity_id, buyer_entity_id, coalesce(a.canonical_sku_id, f.sku_id) as sku_id, sum(qty) as qty, sum(value) as value
+                  from reporting.trade_line_fact f
+                  left join catalogue.sku_alias a on a.alias_sku_id = f.sku_id
                  where measure = 'RECEIVED' and business_date between ? and ?
-                 group by business_date, seller_entity_id, buyer_entity_id, sku_id
+                 group by business_date, seller_entity_id, buyer_entity_id, coalesce(a.canonical_sku_id, f.sku_id)
                  order by business_date, seller_entity_id, buyer_entity_id, sku_id
                 """
                         + cap,

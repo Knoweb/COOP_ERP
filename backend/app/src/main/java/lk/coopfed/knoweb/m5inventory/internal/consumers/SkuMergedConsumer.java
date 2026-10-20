@@ -6,6 +6,7 @@ import lk.coopfed.knoweb.kernel.api.EventConsumer;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * On sku.merged.v1, lots of the merged local SKU re-point to the target canonical SKU (doc 25 section 3.1; 22A section 6).
@@ -22,6 +23,7 @@ public class SkuMergedConsumer {
         this.jdbc = jdbc;
     }
 
+    @Transactional
     @EventConsumer(types = SKU_MERGED, consumer = CONSUMER)
     public void onSkuMerged(JsonNode payload, ScopeContext scope) {
         UUID sourceSkuId = Payloads.uuid(payload, "sourceSkuId");

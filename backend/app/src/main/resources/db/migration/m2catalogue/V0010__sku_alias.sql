@@ -54,6 +54,8 @@ CREATE POLICY fed_promote ON catalogue.sku FOR ALL TO app_rw
            AND (status = 'LOCAL' OR (status = 'INACTIVE' AND prior_status = 'LOCAL'))
            AND coalesce(current_setting('app.fed_promote', true), '') = 'true')
     WITH CHECK (kernel.scope_class() = 'OWN'
+                AND kernel.scope_entity() = (SELECT kernel.system_entity())
+                AND coalesce(current_setting('app.fed_promote', true), '') = 'true'
                 AND (
                     (status = 'SHARED' AND owner_entity_id = (SELECT kernel.system_entity()))
                     OR
@@ -68,6 +70,8 @@ CREATE POLICY fed_merge_barcode ON catalogue.sku_barcode FOR ALL TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND kernel.scope_entity() = (SELECT kernel.system_entity())
            AND coalesce(current_setting('app.fed_promote', true), '') = 'true')
-    WITH CHECK (kernel.scope_class() = 'OWN');
+    WITH CHECK (kernel.scope_class() = 'OWN'
+                AND kernel.scope_entity() = (SELECT kernel.system_entity())
+                AND coalesce(current_setting('app.fed_promote', true), '') = 'true');
 
 

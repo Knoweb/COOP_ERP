@@ -117,20 +117,29 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
         Map<String, Object> sourceBefore = source.auditState();
 
         LocalDate effectiveDate = LocalDate.now(clock);
-        jdbc.update(
-                """
-                INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
-                """,
-                source.getId(),
-                target.getId(),
-                Date.valueOf(effectiveDate),
-                sourceOwner);
-
-        // Move ACTIVE barcodes from source to target (retiring on collision) and retire source SKU
+        // Under app.fed_promote, insert alias, re-point existing aliases, move active barcodes and retire source SKU
         jdbc.execute("SELECT set_config('app.fed_promote', 'true', true)");
         try {
+            jdbc.update(
+                    """
+                    INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
+                    """,
+                    source.getId(),
+                    target.getId(),
+                    Date.valueOf(effectiveDate),
+                    sourceOwner);
+
+            jdbc.update(
+                    """
+                    UPDATE catalogue.sku_alias
+                       SET canonical_sku_id = ?
+                     WHERE canonical_sku_id = ?
+                    """,
+                    target.getId(),
+                    source.getId());
+
             for (Map<String, Object> row : barcodes) {
                 String barcode = (String) row.get("barcode");
                 String symbology = (String) row.get("symbology");
