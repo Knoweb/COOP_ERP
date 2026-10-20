@@ -23,6 +23,9 @@ CREATE INDEX doc_order_adjustment_invoice ON trading.doc_order_adjustment (invoi
 ALTER TABLE trading.doc_order_adjustment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trading.doc_order_adjustment FORCE ROW LEVEL SECURITY;
 
+CREATE POLICY own_read ON trading.doc_order_adjustment FOR SELECT TO app_rw
+    USING (kernel.scope_class() = 'OWN' AND owner_entity_id = kernel.scope_entity());
+
 CREATE POLICY party_read ON trading.doc_order_adjustment FOR SELECT TO app_rw
     USING (kernel.scope_class() IN ('OWN', 'PARTY')
            AND (owner_entity_id = kernel.scope_entity() OR counterparty_entity_id = kernel.scope_entity()));

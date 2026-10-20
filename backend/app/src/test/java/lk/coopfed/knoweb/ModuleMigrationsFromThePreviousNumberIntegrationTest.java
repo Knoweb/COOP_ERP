@@ -52,7 +52,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // CAT-01: m2catalogue V0009 (duplicate_suspect) from V0008.
         streams.put("m2catalogue", "8");
         // Wave 4, M3R-08: m3pricing V0007 (pricing.review_trigger) from V0006.
-        streams.put("m3pricing", "6");
+        // PRC-10: m3pricing V0008 (adjustment_types) from V0007.
+        streams.put("m3pricing", "7");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // Wave 2, PR 10: m5inventory V0008 (count_line.counted_at) on a database at V0007.
@@ -147,7 +148,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 9)
-                .containsEntry("m3pricing", 7)
+                .containsEntry("m3pricing", 8)
                 .containsEntry("m5inventory", 8)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
@@ -200,7 +201,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
-        assertThat(after).containsEntry("m4trading", 13);
+        // PRC-10: m4trading V0014 (order adjustments).
+        assertThat(after).containsEntry("m4trading", 14);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",
