@@ -65,42 +65,25 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
             throw new ProblemException("m2.sku.cannot_merge_with_self");
         }
 
-        // Under OWN scope, another entity's LOCAL SKU and barcodes are hidden by RLS.
-        // Switch scope_class to FEDERATION_VIEW to read source, move barcodes, and update the SKU.
-        Sku source;
-        Sku target;
-        UUID sourceOwner;
-        Map<String, Object> sourceBefore;
-        Map<String, Object> sourceAfter;
+        Sku source = repository.findById(command.sourceSkuId()).orElse(null);
 
-        jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
-        List<Map<String, Object>> barcodes;
-        try {
-            source = repository.findById(command.sourceSkuId()).orElse(null);
-            barcodes = source == null
-                    ? List.of()
-                    : jdbc.queryForList(
-                            """
-                            SELECT barcode, symbology, owner_entity_id
-                              FROM catalogue.sku_barcode
-                             WHERE sku_id = ? AND status = 'ACTIVE'
-                            """,
-                            command.sourceSkuId());
-
-            if (source == null) {
-                throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
-            }
-
-            if (!Sku.LOCAL.equals(source.status())) {
-                throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
-            }
-        } finally {
-            jdbc.queryForList(
-                    "SELECT set_config('app.scope_class', ?, true)",
-                    scope.policyClass().name());
+        if (source == null) {
+            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
         }
 
-        target = repository
+        if (!Sku.LOCAL.equals(source.status())) {
+            throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
+        }
+
+        List<Map<String, Object>> barcodes = jdbc.queryForList(
+                """
+                SELECT barcode, symbology, owner_entity_id
+                  FROM catalogue.sku_barcode
+                 WHERE sku_id = ? AND status = 'ACTIVE'
+                """,
+                command.sourceSkuId());
+
+        Sku target = repository
                 .findById(command.targetSkuId())
                 .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", command.targetSkuId())));
 
@@ -118,8 +101,8 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
             throw new ProblemException("m2.sku.unit_conflict");
         }
 
-        sourceOwner = source.ownerEntityId();
-        sourceBefore = source.auditState();
+        UUID sourceOwner = source.ownerEntityId();
+        Map<String, Object> sourceBefore = source.auditState();
 
         LocalDate effectiveDate = LocalDate.now(clock);
         jdbc.update(
@@ -180,7 +163,7 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
         // Source SKU becomes INACTIVE with prior_status LOCAL
         source.mergeIntoShared();
         repository.saveAndFlush(source);
-        sourceAfter = source.auditState();
+        Map<String, Object> sourceAfter = source.auditState();
 
         // Close any open duplicate suspect pair
         Instant now = clock.instant();
