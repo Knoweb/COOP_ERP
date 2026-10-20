@@ -545,6 +545,15 @@ config_items:
     scope_kind: FEDERATION
     change_permission: sys.config.manage
     module: m2catalogue
+  - key: catalogue.local_sku_requires_barcode
+    value_type: BOOLEAN
+    description_en: Whether local SKU activation requires at least one active barcode
+    description_si: දේශීය SKU සක්‍රිය කිරීම සඳහා අවම වශයෙන් එක් සක්‍රිය තීරු කේතයක් අවශ්‍යද යන්න
+    description_ta: உள்ளூர் SKU செயல்படுத்தலுக்கு குறைந்தது ஒரு செயலில் உள்ள பார்கோடு தேவையா என்பது
+    default: "false"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m2catalogue
   # M4 Trading Documents (24A section 3.1, "seed/m4/config.yaml"; doc 24 section 7): the defaults
   # of doc 24 DR-1 to DR-6 as doc 10 F-09 and A-03 assume them. Configuration, so a different
   # answer from the Federation admins is a value, not a code change.
@@ -963,6 +972,16 @@ config_items:
     description_si: ප්‍රතික්ෂේප කිරීමට (වැඩි) හෝ හේතුවක් අවශ්‍ය වීමට (අඩු) පෙර නැවත ඇසුරුම් කිරීමක නිමැවුම වට්ටෝරුවේ අපේක්ෂිත නිමැවුමෙන් වෙනස් විය හැකි ප්‍රතිශතය
     description_ta: மறுபொதியின் வெளியீடு செய்முறையின் எதிர்பார்த்த வெளியீட்டிலிருந்து மறுக்கப்படும் (அதிகம்) அல்லது காரணம் தேவைப்படும் (குறைவு) முன் வேறுபடக்கூடிய சதவீதம்
     default: "2"
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.expiry_warning_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days before batch expiry when an expiry review task and count task are opened
+    description_si: කල් ඉකුත්වීමේ සමාලෝචන කාර්යයක් සහ ගණන් කිරීමේ කාර්යයක් විවෘත වන කාණ්ඩය කල් ඉකුත්වීමට පෙර දින ගණන
+    description_ta: தொகுதி காலாவதியாகும் முன் காலாவதி மதிப்பாய்வு மற்றும் எண்ணிக்கை பணி திறக்கப்படும் நாட்கள்
+    default: 30
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory

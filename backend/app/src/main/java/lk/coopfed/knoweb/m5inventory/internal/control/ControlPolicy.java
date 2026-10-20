@@ -46,6 +46,7 @@ public class ControlPolicy {
     static final String AUTOPOST_VALUE_CAP = "inventory.count_autopost_value_cap";
     static final String DISPATCH_MIN_SHELF_LIFE_DAYS = "inventory.dispatch_min_shelf_life_days";
     static final String REPACK_YIELD_TOLERANCE_PCT = "inventory.repack_yield_tolerance_pct";
+    static final String EXPIRY_WARNING_DAYS = "inventory.expiry_warning_days";
 
     private static final BigDecimal ONE_CENT = new BigDecimal("0.01");
 
@@ -178,6 +179,14 @@ public class ControlPolicy {
      */
     public int dispatchMinShelfLifeDays(ScopeContext scope) {
         return config.getInt(DISPATCH_MIN_SHELF_LIFE_DAYS, scope, 0);
+    }
+
+    /**
+     * The warning window, in days, before a batch expires when an expiry task and count task are
+     * opened ({@code inventory.expiry_warning_days}, 30 by default).
+     */
+    public int expiryWarningDays(ScopeContext scope) {
+        return config.getInt(EXPIRY_WARNING_DAYS, scope, 30);
     }
 
     /** How far, in per cent, a repack's output may stray from the recipe's ({@code inventory.repack_yield_tolerance_pct}, 2). */

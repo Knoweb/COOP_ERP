@@ -68,6 +68,62 @@ class SkuTest {
                 .isInstanceOf(ProblemException.class);
     }
 
+    @Test
+    void activateLocalNormalizesCase() {
+        SkuDetails details = new SkuDetails(
+                "Milk",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ea ",
+                false,
+                false,
+                false,
+                true,
+                null,
+                UUID.randomUUID(),
+                " auto_lowest ",
+                " purchased ",
+                Map.of());
+        Sku sku = sku(details);
+
+        sku.activateLocal();
+
+        assertThat(sku.baseUomCode()).isEqualTo("EA");
+        assertThat(sku.multiMrpPolicy()).isEqualTo("AUTO_LOWEST");
+        assertThat(sku.originKind()).isEqualTo("PURCHASED");
+    }
+
+    @Test
+    void activateSharedNormalizesCase() {
+        SkuDetails details = new SkuDetails(
+                "Milk",
+                "කිරි",
+                "பால்",
+                null,
+                null,
+                null,
+                " ea",
+                false,
+                false,
+                false,
+                true,
+                null,
+                UUID.randomUUID(),
+                "auto_lowest",
+                "purchased",
+                Map.of());
+        Sku sku = sku(details);
+
+        sku.activateShared();
+
+        assertThat(sku.baseUomCode()).isEqualTo("EA");
+        assertThat(sku.multiMrpPolicy()).isEqualTo("AUTO_LOWEST");
+        assertThat(sku.originKind()).isEqualTo("PURCHASED");
+    }
+
     private static Sku sku(SkuDetails details) {
         return Sku.create(UUID.randomUUID(), "SKU-23456789", UUID.randomUUID(), details);
     }
