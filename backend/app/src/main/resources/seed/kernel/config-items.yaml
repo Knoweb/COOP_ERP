@@ -975,6 +975,16 @@ config_items:
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory
+  - key: inventory.expiry_warning_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days before batch expiry when an expiry review task and count task are opened
+    description_si: කල් ඉකුත්වීමේ සමාලෝචන කාර්යයක් සහ ගණන් කිරීමේ කාර්යයක් විවෘත වන කාණ්ඩය කල් ඉකුත්වීමට පෙර දින ගණන
+    description_ta: தொகுதி காலாவதியாகும் முன் காலாவதி மதிப்பாய்வு மற்றும் எண்ணிக்கை பணி திறக்கப்படும் நாட்கள்
+    default: 30
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
   # wave 2, PR 08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-trading-projections.md
   # (7), CR-28A-2): the longest period and the most rows one report answers, the row cap applied in SQL.
   - key: reporting.max_period_days
