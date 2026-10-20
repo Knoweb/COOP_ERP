@@ -28,14 +28,21 @@ public class SkuMergedConsumer {
         UUID canonicalSkuId = Payloads.uuid(payload, "canonicalSkuId");
 
         if (sourceSkuId != null && canonicalSkuId != null) {
-            jdbc.update(
-                    """
-                    UPDATE inventory.stock_lot
-                       SET sku_id = ?
-                     WHERE sku_id = ?
-                    """,
-                    canonicalSkuId,
-                    sourceSkuId);
+            jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
+            try {
+                jdbc.update(
+                        """
+                        UPDATE inventory.stock_lot
+                           SET sku_id = ?
+                         WHERE sku_id = ?
+                        """,
+                        canonicalSkuId,
+                        sourceSkuId);
+            } finally {
+                jdbc.update(
+                        "SELECT set_config('app.scope_class', ?, true)",
+                        scope.policyClass().name());
+            }
         }
     }
 }

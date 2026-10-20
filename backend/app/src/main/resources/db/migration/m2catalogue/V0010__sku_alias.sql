@@ -33,13 +33,13 @@ CREATE POLICY authenticated_read ON catalogue.sku_alias FOR SELECT TO app_rw
     USING (kernel.scope_class() <> 'NONE');
 
 CREATE POLICY fed_write ON catalogue.sku_alias FOR INSERT TO app_rw
-    WITH CHECK (kernel.scope_class() = 'OWN'
+    WITH CHECK (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW')
                 AND kernel.scope_entity() = (SELECT kernel.system_entity()));
 
 CREATE POLICY fed_update ON catalogue.sku_alias FOR UPDATE TO app_rw
-    USING (kernel.scope_class() = 'OWN'
+    USING (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW')
            AND kernel.scope_entity() = (SELECT kernel.system_entity()))
-    WITH CHECK (kernel.scope_class() = 'OWN'
+    WITH CHECK (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW')
                 AND kernel.scope_entity() = (SELECT kernel.system_entity()));
 
 REVOKE ALL PRIVILEGES ON catalogue.sku_alias FROM PUBLIC;
@@ -49,10 +49,10 @@ GRANT SELECT, INSERT, UPDATE ON catalogue.sku_alias TO app_rw;
 -- (PromoteToShared updates status to SHARED and owner to Federation; MergeIntoShared updates
 -- status to INACTIVE with prior_status LOCAL).
 CREATE POLICY fed_promote ON catalogue.sku FOR UPDATE TO app_rw
-    USING (kernel.scope_class() = 'OWN'
+    USING (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW')
            AND kernel.scope_entity() = (SELECT kernel.system_entity())
            AND status = 'LOCAL')
-    WITH CHECK (kernel.scope_class() = 'OWN'
+    WITH CHECK (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW')
                 AND (
                     (status = 'SHARED' AND owner_entity_id = (SELECT kernel.system_entity()))
                     OR
@@ -64,7 +64,8 @@ CREATE POLICY fed_promote ON catalogue.sku FOR UPDATE TO app_rw
 GRANT UPDATE (sku_id) ON catalogue.sku_barcode TO app_rw;
 
 CREATE POLICY fed_merge_barcode ON catalogue.sku_barcode FOR UPDATE TO app_rw
-    USING (kernel.scope_class() = 'OWN'
+    USING (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW')
            AND kernel.scope_entity() = (SELECT kernel.system_entity()))
-    WITH CHECK (kernel.scope_class() = 'OWN');
+    WITH CHECK (kernel.scope_class() IN ('OWN', 'FEDERATION_VIEW'));
+
 

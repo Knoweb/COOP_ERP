@@ -62,53 +62,64 @@ public class PromoteToSharedHandler implements Handles<PromoteToShared, UUID> {
         }
 
         // Under OWN scope, another entity's LOCAL SKU is hidden by RLS.
-        // Temporarily switch scope_class to FEDERATION_VIEW to read the local SKU, then restore to OWN.
+        // Switch scope_class to FEDERATION_VIEW to read the local SKU, update it, and write the alias.
+        Sku sku;
+        UUID originOwner;
+        Map<String, Object> before;
+        Map<String, Object> after;
+
         jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
-        Sku sku = repository.findById(command.skuId()).orElse(null);
-        jdbc.execute("SELECT set_config('app.scope_class', 'OWN', true)");
+        try {
+            sku = repository.findById(command.skuId()).orElse(null);
 
-        if (sku == null) {
-            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.skuId()));
+            if (sku == null) {
+                throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.skuId()));
+            }
+
+            if (!Sku.LOCAL.equals(sku.status())) {
+                throw new ProblemException("m2.sku.not_local", Map.of("skuId", sku.getId()));
+            }
+
+            if (sku.shortNameSi() == null
+                    || sku.shortNameTa() == null
+                    || sku.shortNameSi().isBlank()
+                    || sku.shortNameTa().isBlank()) {
+                throw new ProblemException("m2.sku.shared_translations_required");
+            }
+
+            if (references.hasNonGovernedTags(sku.getId())) {
+                throw new ProblemException("m2.sku.governed_tags_only", Map.of("skuId", sku.getId()));
+            }
+
+            if (references.hasCaseBarcodeWithoutConversion(sku.getId())) {
+                throw new ProblemException("m2.sku.case_conversion_required", Map.of("skuId", sku.getId()));
+            }
+
+            originOwner = sku.ownerEntityId();
+            before = sku.auditState();
+
+            sku.promoteToShared(scope.entityId());
+            repository.saveAndFlush(sku);
+            after = sku.auditState();
+
+            LocalDate effectiveDate = LocalDate.now(clock);
+            jdbc.update(
+                    """
+                    INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
+                    """,
+                    sku.getId(),
+                    sku.getId(),
+                    Date.valueOf(effectiveDate),
+                    originOwner);
+        } finally {
+            jdbc.update(
+                    "SELECT set_config('app.scope_class', ?, true)",
+                    scope.policyClass().name());
         }
 
-        if (!Sku.LOCAL.equals(sku.status())) {
-            throw new ProblemException("m2.sku.not_local", Map.of("skuId", sku.getId()));
-        }
-
-        if (sku.shortNameSi() == null
-                || sku.shortNameTa() == null
-                || sku.shortNameSi().isBlank()
-                || sku.shortNameTa().isBlank()) {
-            throw new ProblemException("m2.sku.shared_translations_required");
-        }
-
-        if (references.hasNonGovernedTags(sku.getId())) {
-            throw new ProblemException("m2.sku.governed_tags_only", Map.of("skuId", sku.getId()));
-        }
-
-        if (references.hasCaseBarcodeWithoutConversion(sku.getId())) {
-            throw new ProblemException("m2.sku.case_conversion_required", Map.of("skuId", sku.getId()));
-        }
-
-        UUID originOwner = sku.ownerEntityId();
-        Map<String, Object> before = sku.auditState();
-
-        sku.promoteToShared(scope.entityId());
-        repository.saveAndFlush(sku);
-
-        LocalDate effectiveDate = LocalDate.now(clock);
-        jdbc.update(
-                """
-                INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
-                """,
-                sku.getId(),
-                sku.getId(),
-                Date.valueOf(effectiveDate),
-                originOwner);
-
-        audit.record(AUDIT_PROMOTED, Subject.of("sku", sku.getId()), before, sku.auditState(), scope);
+        audit.record(AUDIT_PROMOTED, Subject.of("sku", sku.getId()), before, after, scope);
 
         events.publish(new SkuPromoted(sku.getId(), originOwner, sku.skuCode(), sku.status()));
 

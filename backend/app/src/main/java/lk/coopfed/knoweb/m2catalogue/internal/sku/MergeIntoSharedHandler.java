@@ -66,126 +66,139 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
         }
 
         // Under OWN scope, another entity's LOCAL SKU and barcodes are hidden by RLS.
-        // Temporarily switch scope_class to FEDERATION_VIEW to read source and its barcodes, then restore to OWN.
+        // Switch scope_class to FEDERATION_VIEW to read source, move barcodes, and update the SKU.
+        Sku source;
+        Sku target;
+        UUID sourceOwner;
+        Map<String, Object> sourceBefore;
+        Map<String, Object> sourceAfter;
+
         jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
-        Sku source = repository.findById(command.sourceSkuId()).orElse(null);
-        List<Map<String, Object>> barcodes = source == null
-                ? List.of()
-                : jdbc.queryForList(
-                        """
-                        SELECT barcode, symbology, owner_entity_id
-                          FROM catalogue.sku_barcode
-                         WHERE sku_id = ? AND status = 'ACTIVE'
-                        """,
-                        command.sourceSkuId());
-        jdbc.execute("SELECT set_config('app.scope_class', 'OWN', true)");
+        try {
+            source = repository.findById(command.sourceSkuId()).orElse(null);
+            List<Map<String, Object>> barcodes = source == null
+                    ? List.of()
+                    : jdbc.queryForList(
+                            """
+                            SELECT barcode, symbology, owner_entity_id
+                              FROM catalogue.sku_barcode
+                             WHERE sku_id = ? AND status = 'ACTIVE'
+                            """,
+                            command.sourceSkuId());
 
-        if (source == null) {
-            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
-        }
-
-        if (!Sku.LOCAL.equals(source.status())) {
-            throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
-        }
-
-        Sku target = repository
-                .findById(command.targetSkuId())
-                .orElseThrow(() -> new ProblemException("m2.sku.not_found", Map.of("skuId", command.targetSkuId())));
-
-        if (!Sku.SHARED.equals(target.status())) {
-            throw new ProblemException("m2.sku.target_not_shared", Map.of("skuId", target.getId()));
-        }
-
-        if (!source.baseUomCode().equalsIgnoreCase(target.baseUomCode())) {
-            throw new ProblemException("m2.sku.base_uom_mismatch");
-        }
-
-        if (source.soldByWeight() != target.soldByWeight()
-                || source.batchTracked() != target.batchTracked()
-                || source.expiryTracked() != target.expiryTracked()) {
-            throw new ProblemException("m2.sku.unit_conflict");
-        }
-
-        UUID sourceOwner = source.ownerEntityId();
-        Map<String, Object> sourceBefore = source.auditState();
-
-        LocalDate effectiveDate = LocalDate.now(clock);
-        jdbc.update(
-                """
-                INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
-                """,
-                source.getId(),
-                target.getId(),
-                Date.valueOf(effectiveDate),
-                sourceOwner);
-
-        // Move ACTIVE barcodes from source to target (retiring on collision)
-
-        for (Map<String, Object> row : barcodes) {
-            String barcode = (String) row.get("barcode");
-            String symbology = (String) row.get("symbology");
-            UUID barcodeOwner = (UUID) row.get("owner_entity_id");
-
-            Integer collisionCount = jdbc.queryForObject(
-                    """
-                    SELECT count(*)
-                      FROM catalogue.sku_barcode
-                     WHERE barcode = ? AND symbology = ? AND sku_id = ? AND status = 'ACTIVE'
-                    """,
-                    Integer.class,
-                    barcode,
-                    symbology,
-                    target.getId());
-
-            if (collisionCount != null && collisionCount > 0) {
-                // Colliding with active barcode on target: retire source barcode
-                jdbc.update(
-                        """
-                        UPDATE catalogue.sku_barcode
-                           SET status = 'RETIRED'
-                         WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
-                        """,
-                        barcode,
-                        symbology,
-                        barcodeOwner);
-            } else {
-                // Move barcode to target SKU
-                jdbc.update(
-                        """
-                        UPDATE catalogue.sku_barcode
-                           SET sku_id = ?
-                         WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
-                        """,
-                        target.getId(),
-                        barcode,
-                        symbology,
-                        barcodeOwner);
+            if (source == null) {
+                throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
             }
+
+            if (!Sku.LOCAL.equals(source.status())) {
+                throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
+            }
+
+            target = repository
+                    .findById(command.targetSkuId())
+                    .orElseThrow(
+                            () -> new ProblemException("m2.sku.not_found", Map.of("skuId", command.targetSkuId())));
+
+            if (!Sku.SHARED.equals(target.status())) {
+                throw new ProblemException("m2.sku.target_not_shared", Map.of("skuId", target.getId()));
+            }
+
+            if (!source.baseUomCode().equalsIgnoreCase(target.baseUomCode())) {
+                throw new ProblemException("m2.sku.base_uom_mismatch");
+            }
+
+            if (source.soldByWeight() != target.soldByWeight()
+                    || source.batchTracked() != target.batchTracked()
+                    || source.expiryTracked() != target.expiryTracked()) {
+                throw new ProblemException("m2.sku.unit_conflict");
+            }
+
+            sourceOwner = source.ownerEntityId();
+            sourceBefore = source.auditState();
+
+            LocalDate effectiveDate = LocalDate.now(clock);
+            jdbc.update(
+                    """
+                    INSERT INTO catalogue.sku_alias (alias_sku_id, canonical_sku_id, effective_from, owner_entity_id)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (alias_sku_id) DO UPDATE SET canonical_sku_id = EXCLUDED.canonical_sku_id
+                    """,
+                    source.getId(),
+                    target.getId(),
+                    Date.valueOf(effectiveDate),
+                    sourceOwner);
+
+            // Move ACTIVE barcodes from source to target (retiring on collision)
+
+            for (Map<String, Object> row : barcodes) {
+                String barcode = (String) row.get("barcode");
+                String symbology = (String) row.get("symbology");
+                UUID barcodeOwner = (UUID) row.get("owner_entity_id");
+
+                Integer collisionCount = jdbc.queryForObject(
+                        """
+                        SELECT count(*)
+                          FROM catalogue.sku_barcode
+                         WHERE barcode = ? AND symbology = ? AND sku_id = ? AND status = 'ACTIVE'
+                        """,
+                        Integer.class,
+                        barcode,
+                        symbology,
+                        target.getId());
+
+                if (collisionCount != null && collisionCount > 0) {
+                    // Colliding with active barcode on target: retire source barcode
+                    jdbc.update(
+                            """
+                            UPDATE catalogue.sku_barcode
+                               SET status = 'RETIRED'
+                             WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
+                            """,
+                            barcode,
+                            symbology,
+                            barcodeOwner);
+                } else {
+                    // Move barcode to target SKU
+                    jdbc.update(
+                            """
+                            UPDATE catalogue.sku_barcode
+                               SET sku_id = ?
+                             WHERE barcode = ? AND symbology = ? AND owner_entity_id = ?
+                            """,
+                            target.getId(),
+                            barcode,
+                            symbology,
+                            barcodeOwner);
+                }
+            }
+
+            // Source SKU becomes INACTIVE with prior_status LOCAL
+            source.mergeIntoShared();
+            repository.saveAndFlush(source);
+            sourceAfter = source.auditState();
+
+            // Close any open duplicate suspect pair
+            Instant now = clock.instant();
+            jdbc.update(
+                    """
+                    UPDATE catalogue.duplicate_suspect
+                       SET status = 'MERGED', decided_by = ?, decided_at = ?
+                     WHERE ((sku_a = ? AND sku_b = ?) OR (sku_a = ? AND sku_b = ?))
+                       AND status = 'OPEN'
+                    """,
+                    scope.userId(),
+                    Timestamp.from(now),
+                    source.getId(),
+                    target.getId(),
+                    target.getId(),
+                    source.getId());
+        } finally {
+            jdbc.update(
+                    "SELECT set_config('app.scope_class', ?, true)",
+                    scope.policyClass().name());
         }
 
-        // Source SKU becomes INACTIVE with prior_status LOCAL
-        source.mergeIntoShared();
-        repository.saveAndFlush(source);
-
-        // Close any open duplicate suspect pair
-        Instant now = clock.instant();
-        jdbc.update(
-                """
-                UPDATE catalogue.duplicate_suspect
-                   SET status = 'MERGED', decided_by = ?, decided_at = ?
-                 WHERE ((sku_a = ? AND sku_b = ?) OR (sku_a = ? AND sku_b = ?))
-                   AND status = 'OPEN'
-                """,
-                scope.userId(),
-                Timestamp.from(now),
-                source.getId(),
-                target.getId(),
-                target.getId(),
-                source.getId());
-
-        audit.record(AUDIT_MERGED, Subject.of("sku", source.getId()), sourceBefore, source.auditState(), scope);
+        audit.record(AUDIT_MERGED, Subject.of("sku", source.getId()), sourceBefore, sourceAfter, scope);
 
         events.publish(new SkuMerged(
                 source.getId(), target.getId(), sourceOwner, source.skuCode(), target.skuCode(), source.status()));
