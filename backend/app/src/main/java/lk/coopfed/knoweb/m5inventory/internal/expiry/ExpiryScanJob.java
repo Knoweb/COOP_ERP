@@ -127,9 +127,9 @@ public class ExpiryScanJob {
         int count = 0;
 
         // 1. Close any active tasks where the lot is exhausted (qty_on_hand <= 0)
-        List<ExpiryTaskStore.ExpiryTask> activeTasks = store.findActiveTasks(locationId);
+        List<ExpiryTaskStore.ExpiryTask> activeTasks = store.findActiveTasks(locationId, scope);
         for (ExpiryTaskStore.ExpiryTask active : activeTasks) {
-            if (store.currentOnHand(locationId, active.batchId()).signum() <= 0) {
+            if (store.currentOnHand(locationId, active.batchId(), scope).signum() <= 0) {
                 closeHandler.handle(new CloseExpiryTask(active.taskId(), "LOT_EXHAUSTED"), scope);
                 count++;
             }

@@ -109,7 +109,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         int processed = scanJob.scan(execution());
         assertThat(processed).isGreaterThanOrEqualTo(1);
 
-        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1, own(MPCS));
         assertThat(active).hasSize(1);
         ExpiryTaskStore.ExpiryTask task = active.get(0);
         assertThat(task.batchId()).isEqualTo(batch);
@@ -141,8 +141,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         int processed = scanJob.scan(execution());
         assertThat(processed).isEqualTo(0);
 
-        assertThat(store.findActiveTasks(shop1)).isEmpty();
-        assertThat(store.findOpenCountTask(shop1)).isEmpty();
+        assertThat(store.findActiveTasks(shop1, own(MPCS))).isEmpty();
+        assertThat(store.findOpenCountTask(shop1, own(MPCS))).isEmpty();
         assertThat(audits("EXPIRY_TASK_OPENED")).isEmpty();
         assertThat(events(ExpiryTaskOpened.class)).isEmpty();
     }
@@ -160,7 +160,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1, own(MPCS));
         assertThat(active).hasSize(1);
         assertThat(active.get(0).batchId()).isEqualTo(batchIn);
     }
@@ -179,7 +179,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         int processed = scanJob.scan(execution());
         assertThat(processed).isEqualTo(2);
 
-        List<ExpiryTaskStore.ExpiryTask> tasks = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> tasks = store.findActiveTasks(shop1, own(MPCS));
         assertThat(tasks).hasSize(2);
         UUID sharedCountTaskId = tasks.get(0).countTaskId();
         assertThat(sharedCountTaskId).isNotNull();
@@ -202,8 +202,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> tasksShop1 = store.findActiveTasks(shop1);
-        List<ExpiryTaskStore.ExpiryTask> tasksShop2 = store.findActiveTasks(shop2);
+        List<ExpiryTaskStore.ExpiryTask> tasksShop1 = store.findActiveTasks(shop1, own(MPCS));
+        List<ExpiryTaskStore.ExpiryTask> tasksShop2 = store.findActiveTasks(shop2, own(MPCS));
 
         assertThat(tasksShop1).hasSize(1);
         assertThat(tasksShop2).hasSize(1);
@@ -226,7 +226,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         int processed = scanJob.scan(execution());
         assertThat(processed).isEqualTo(0);
-        assertThat(store.findActiveTasks(shop1)).isEmpty();
+        assertThat(store.findActiveTasks(shop1, own(MPCS))).isEmpty();
     }
 
     @Test
@@ -245,7 +245,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(secondRun).isEqualTo(0);
         assertThat(kernel.committedAudit().size()).isEqualTo(auditCountFirst);
         assertThat(kernel.committedEvents().size()).isEqualTo(eventCountFirst);
-        assertThat(store.findActiveTasks(shop1)).hasSize(1);
+        assertThat(store.findActiveTasks(shop1, own(MPCS))).hasSize(1);
     }
 
     @Test
@@ -259,7 +259,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> tasks = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> tasks = store.findActiveTasks(shop1, own(MPCS));
         assertThat(tasks).hasSize(1);
         assertThat(tasks.get(0).countTaskId()).isEqualTo(openCountId);
         // Did not create a second count task
@@ -285,7 +285,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         // 1. First scan: open expiry task is recorded safely, but count scheduling is deferred
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> pending = store.findPendingUnlinkedTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> pending = store.findPendingUnlinkedTasks(shop1, own(MPCS));
         assertThat(pending).hasSize(1);
         assertThat(pending.get(0).countTaskId()).isNull();
         assertThat(pending.get(0).status()).isEqualTo("OPEN");
@@ -307,7 +307,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         // 3. Second scan: now that shop1 has no open count, the pending expiry task is scheduled!
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1, own(MPCS));
         assertThat(active).hasSize(1);
         UUID newlyScheduledCount = active.get(0).countTaskId();
         assertThat(newlyScheduledCount).isNotNull();
@@ -327,7 +327,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         scanJob.scan(execution());
 
-        ExpiryTaskStore.ExpiryTask task = store.findActiveTasks(shop1).get(0);
+        ExpiryTaskStore.ExpiryTask task =
+                store.findActiveTasks(shop1, own(MPCS)).get(0);
         assertThat(task.status()).isEqualTo("OPEN");
         UUID countTaskId = task.countTaskId();
 
@@ -342,7 +343,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
                 at(MPCS, shop1));
 
         // Expiry task transitioned to COUNTED
-        ExpiryTaskStore.ExpiryTask updated = store.findById(task.taskId()).orElseThrow();
+        ExpiryTaskStore.ExpiryTask updated =
+                store.findById(task.taskId(), own(MPCS)).orElseThrow();
         assertThat(updated.status()).isEqualTo("COUNTED");
     }
 
@@ -354,7 +356,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         kernel.reset();
 
         scanJob.scan(execution());
-        ExpiryTaskStore.ExpiryTask task = store.findActiveTasks(shop1).get(0);
+        ExpiryTaskStore.ExpiryTask task =
+                store.findActiveTasks(shop1, own(MPCS)).get(0);
         assertThat(task.status()).isEqualTo("OPEN");
 
         // Deplete the stock to 0
@@ -364,7 +367,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         // Next scan run closes the exhausted expiry task
         scanJob.scan(execution());
 
-        ExpiryTaskStore.ExpiryTask closed = store.findById(task.taskId()).orElseThrow();
+        ExpiryTaskStore.ExpiryTask closed =
+                store.findById(task.taskId(), own(MPCS)).orElseThrow();
         assertThat(closed.status()).isEqualTo("CLOSED");
         assertThat(closed.closedAt()).isNotNull();
 
@@ -380,12 +384,12 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> otherTasks = store.findActiveTasks(otherShop);
+        List<ExpiryTaskStore.ExpiryTask> otherTasks = store.findActiveTasks(otherShop, own(OTHER_ENTITY));
         assertThat(otherTasks).hasSize(1);
         assertThat(otherTasks.get(0).ownerEntityId()).isEqualTo(OTHER_ENTITY);
 
         // Entity MPCS sees nothing of OTHER_ENTITY
-        assertThat(store.findActiveTasks(shop1)).isEmpty();
+        assertThat(store.findActiveTasks(shop1, own(MPCS))).isEmpty();
     }
 
     @Test
@@ -398,8 +402,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         scanJob.scan(execution());
 
         // Does not create a count task for selling expired goods
-        assertThat(store.findActiveTasks(shop1)).isEmpty();
-        assertThat(store.findOpenCountTask(shop1)).isEmpty();
+        assertThat(store.findActiveTasks(shop1, own(MPCS))).isEmpty();
+        assertThat(store.findOpenCountTask(shop1, own(MPCS))).isEmpty();
     }
 
     @Test
@@ -420,7 +424,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         // First scan: expiry task is recorded in OPEN status, but count scheduling is deferred
         scanJob.scan(execution());
-        List<ExpiryTaskStore.ExpiryTask> pending = store.findPendingUnlinkedTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> pending = store.findPendingUnlinkedTasks(shop1, own(MPCS));
         assertThat(pending).hasSize(1);
         assertThat(pending.get(0).countTaskId()).isNull();
         assertThat(pending.get(0).status()).isEqualTo("OPEN");
@@ -448,7 +452,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         // the deferred expiry task is rediscovered and scheduled into a count task!
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> active = store.findActiveTasks(shop1, own(MPCS));
         assertThat(active).hasSize(1);
         UUID newlyScheduledCount = active.get(0).countTaskId();
         assertThat(newlyScheduledCount).isNotNull();
@@ -470,7 +474,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         // 1. Initial scan opens task
         scanJob.scan(execution());
-        ExpiryTaskStore.ExpiryTask task = store.findActiveTasks(shop1).get(0);
+        ExpiryTaskStore.ExpiryTask task =
+                store.findActiveTasks(shop1, own(MPCS)).get(0);
         assertThat(task.status()).isEqualTo("OPEN");
 
         // 2. Date passes expiry date while positive stock (15) remains
@@ -485,7 +490,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         scanJob.scan(execution());
 
         // The task MUST NOT be closed simply because expiry date passed while positive stock remains
-        ExpiryTaskStore.ExpiryTask stillOpen = store.findById(task.taskId()).orElseThrow();
+        ExpiryTaskStore.ExpiryTask stillOpen =
+                store.findById(task.taskId(), own(MPCS)).orElseThrow();
         assertThat(stillOpen.status()).isEqualTo("OPEN");
 
         // 3. Stock is depleted / written off to 0
@@ -495,7 +501,8 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
         // Run scan job again: now that on-hand is 0, the task transitions to CLOSED
         scanJob.scan(execution());
 
-        ExpiryTaskStore.ExpiryTask closed = store.findById(task.taskId()).orElseThrow();
+        ExpiryTaskStore.ExpiryTask closed =
+                store.findById(task.taskId(), own(MPCS)).orElseThrow();
         assertThat(closed.status()).isEqualTo("CLOSED");
         assertThat(closed.closedAt()).isNotNull();
     }
@@ -515,7 +522,7 @@ class ExpiryScanJobPostgresIntegrationTest extends PostgresIntegrationTest {
 
         scanJob.scan(execution());
 
-        List<ExpiryTaskStore.ExpiryTask> tasks = store.findActiveTasks(shop1);
+        List<ExpiryTaskStore.ExpiryTask> tasks = store.findActiveTasks(shop1, own(MPCS));
         assertThat(tasks).hasSize(3);
 
         UUID countTaskId = tasks.get(0).countTaskId();

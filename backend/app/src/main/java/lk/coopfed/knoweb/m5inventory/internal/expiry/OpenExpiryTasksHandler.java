@@ -78,13 +78,13 @@ public class OpenExpiryTasksHandler implements Handles<OpenExpiryTasks, List<UUI
         policy.requireEntityLocation(command.locationId(), scope);
 
         List<OpenExpiryTasks.Batch> incoming = command.batches() == null ? List.of() : command.batches();
-        List<ExpiryTaskStore.ExpiryTask> pendingUnlinked = store.findPendingUnlinkedTasks(command.locationId());
+        List<ExpiryTaskStore.ExpiryTask> pendingUnlinked = store.findPendingUnlinkedTasks(command.locationId(), scope);
 
         if (incoming.isEmpty() && pendingUnlinked.isEmpty()) {
             return List.of();
         }
 
-        Optional<ExpiryTaskStore.OpenCount> openCount = store.findOpenCountTask(command.locationId());
+        Optional<ExpiryTaskStore.OpenCount> openCount = store.findOpenCountTask(command.locationId(), scope);
         UUID targetCountTaskId = null;
 
         if (openCount.isPresent()) {

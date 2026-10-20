@@ -46,7 +46,7 @@ public class CloseExpiryTaskHandler implements Handles<CloseExpiryTask, Void> {
     public Void handle(CloseExpiryTask command, ScopeContext scope) {
         ControlPolicy.requireOwn(scope);
 
-        ExpiryTaskStore.ExpiryTask task = store.findById(command.taskId())
+        ExpiryTaskStore.ExpiryTask task = store.findById(command.taskId(), scope)
                 .orElseThrow(
                         () -> new ProblemException("m5.expiry_task.not_found", Map.of("taskId", command.taskId())));
 

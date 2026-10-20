@@ -12,11 +12,18 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Read-only store for expiry task discovery and queries (ArchitectureTests: only command handlers write).
+ *
+ * <p>Every method is {@code @Transactional(readOnly = true)} so that the kernel's
+ * {@code ScopeConnectionCustomizer} aspect fires and applies the RLS session variables ({@code
+ * app.scope_class}, {@code app.scope_entity_id}, etc.) before any query runs. Without a
+ * transaction the scope variables are never set and all RLS policies deny the read.
  */
 @Component
+@Transactional(readOnly = true)
 public class ExpiryTaskStore {
 
     public record ExpiryTask(
@@ -106,8 +113,11 @@ public class ExpiryTaskStore {
 
     /**
      * Active count task for a location (status <> 'CLOSED').
+     *
+     * @param scope the caller's OWN scope; the {@link ScopeConnectionCustomizer} applies it to the
+     *     connection so RLS admits the row.
      */
-    public Optional<OpenCount> findOpenCountTask(UUID locationId) {
+    public Optional<OpenCount> findOpenCountTask(UUID locationId, ScopeContext scope) {
         return jdbc
                 .query(
                         """
@@ -132,8 +142,10 @@ public class ExpiryTaskStore {
 
     /**
      * Expiry tasks at a location that are OPEN but currently have no linked count task.
+     *
+     * @param scope the caller's OWN scope; applied to the connection so RLS admits the rows.
      */
-    public List<ExpiryTask> findPendingUnlinkedTasks(UUID locationId) {
+    public List<ExpiryTask> findPendingUnlinkedTasks(UUID locationId, ScopeContext scope) {
         return jdbc.query(
                 """
                 select task_id, owner_entity_id, location_id, batch_id, sku_id, days_to_expiry,
@@ -150,8 +162,10 @@ public class ExpiryTaskStore {
 
     /**
      * Active (OPEN or COUNTED) expiry tasks at a location.
+     *
+     * @param scope the caller's OWN scope; applied to the connection so RLS admits the rows.
      */
-    public List<ExpiryTask> findActiveTasks(UUID locationId) {
+    public List<ExpiryTask> findActiveTasks(UUID locationId, ScopeContext scope) {
         return jdbc.query(
                 """
                 select task_id, owner_entity_id, location_id, batch_id, sku_id, days_to_expiry,
@@ -167,8 +181,10 @@ public class ExpiryTaskStore {
 
     /**
      * Find an expiry task by ID.
+     *
+     * @param scope the caller's OWN scope; applied to the connection so RLS admits the row.
      */
-    public Optional<ExpiryTask> findById(UUID taskId) {
+    public Optional<ExpiryTask> findById(UUID taskId, ScopeContext scope) {
         return jdbc
                 .query(
                         """
@@ -185,8 +201,10 @@ public class ExpiryTaskStore {
 
     /**
      * Current on-hand quantity for a GOOD lot of a batch at a location, or zero if missing.
+     *
+     * @param scope the caller's OWN scope; applied to the connection so RLS admits the row.
      */
-    public BigDecimal currentOnHand(UUID locationId, UUID batchId) {
+    public BigDecimal currentOnHand(UUID locationId, UUID batchId, ScopeContext scope) {
         return jdbc
                 .query(
                         """
