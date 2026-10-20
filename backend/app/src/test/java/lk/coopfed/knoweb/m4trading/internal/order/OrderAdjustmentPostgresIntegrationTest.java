@@ -4,15 +4,15 @@ import static lk.coopfed.knoweb.m4trading.TradingFixture.BUYER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.DHAL;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.RICE;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER;
-import static lk.coopfed.knoweb.m4trading.TradingFixture.SELLER_USER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.SHOP;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.STRANGER;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.buyer;
-import static lk.coopfed.knoweb.m4trading.TradingFixture.seller;
 import static lk.coopfed.knoweb.m4trading.TradingFixture.today;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +20,7 @@ import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.kernel.internal.event.PublishedEventListener;
 import lk.coopfed.knoweb.m4trading.TradingFixture;
 import lk.coopfed.knoweb.m4trading.TradingFlow;
 import lk.coopfed.knoweb.m4trading.api.CaptureGrn;
@@ -62,6 +63,23 @@ class OrderAdjustmentPostgresIntegrationTest extends PostgresIntegrationTest {
     private static final UUID SELLER_ROLE = UUID.fromString("0190f400-0000-7000-8000-000000000091");
     private static final UUID LIMITED_USER = UUID.fromString("0190f400-0000-7000-8000-000000000092");
     private static final UUID LIMITED_ROLE = UUID.fromString("0190f400-0000-7000-8000-000000000093");
+    private static final UUID ADJUSTER_USER = UUID.fromString("0190f400-0000-7000-8000-000000000095");
+
+    private static ScopeContext seller() {
+        return ScopeContext.dev(ADJUSTER_USER, SELLER, null);
+    }
+
+    @Autowired(required = false)
+    private List<PublishedEventListener> cacheListeners;
+
+    private void invalidatePermissionCache() {
+        if (cacheListeners != null) {
+            JsonNode emptyPayload = new ObjectMapper().createObjectNode();
+            for (PublishedEventListener listener : cacheListeners) {
+                listener.published("role.changed.v1", emptyPayload);
+            }
+        }
+    }
 
     @Autowired
     TradingFlow flow;
@@ -125,10 +143,10 @@ class OrderAdjustmentPostgresIntegrationTest extends PostgresIntegrationTest {
                 "insert into security.app_user (user_id, home_entity_id, username, display_name, user_kind, status)"
                         + " values (?, ?, ?, 'Seller User', 'BACK_OFFICE', 'ACTIVE')"
                         + " on conflict (user_id) do nothing",
-                SELLER_USER,
+                ADJUSTER_USER,
                 SELLER,
-                "u-seller-" + SELLER_USER);
-        createdUsers.add(SELLER_USER);
+                "u-seller-" + ADJUSTER_USER);
+        createdUsers.add(ADJUSTER_USER);
 
         // Role with ord.order.adjust, prc.adjust.delivery, and prc.adjust.special
         admin.update(
@@ -150,9 +168,10 @@ class OrderAdjustmentPostgresIntegrationTest extends PostgresIntegrationTest {
         admin.update(
                 "insert into security.user_role (user_id, role_id, scope_entity_id, scope_location_id)"
                         + " values (?, ?, ?, null) on conflict do nothing",
-                SELLER_USER,
+                ADJUSTER_USER,
                 SELLER_ROLE,
                 SELLER);
+        invalidatePermissionCache();
     }
 
     private void cleanSecurity() {
@@ -167,6 +186,7 @@ class OrderAdjustmentPostgresIntegrationTest extends PostgresIntegrationTest {
         }
         createdUsers.clear();
         createdRoles.clear();
+        invalidatePermissionCache();
     }
 
     @Test
@@ -208,7 +228,7 @@ class OrderAdjustmentPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(adj.kind()).isEqualTo("DELIVERY_FEE");
         assertThat(adj.amount()).isEqualByComparingTo("500.00");
         assertThat(adj.description()).isEqualTo("Express route delivery fee");
-        assertThat(adj.recordedBy()).isEqualTo(SELLER_USER);
+        assertThat(adj.recordedBy()).isEqualTo(ADJUSTER_USER);
         assertThat(adj.invoiceDocumentId()).isNull();
 
         // 4. Counterparty (buyer) can also view the adjustment through PARTY policy
@@ -427,6 +447,7 @@ class OrderAdjustmentPostgresIntegrationTest extends PostgresIntegrationTest {
                 LIMITED_USER,
                 LIMITED_ROLE,
                 SELLER);
+        invalidatePermissionCache();
 
         ScopeContext limitedCaller = ScopeContext.dev(LIMITED_USER, SELLER, null);
 
