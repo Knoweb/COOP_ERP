@@ -1,15 +1,10 @@
 package lk.coopfed.knoweb.m5inventory.internal.reconcile;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import lk.coopfed.knoweb.kernel.api.AuditFacade;
-import lk.coopfed.knoweb.kernel.api.AuditReviewReader;
 import lk.coopfed.knoweb.kernel.api.JobExecution;
 import lk.coopfed.knoweb.kernel.api.ScheduledJob;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
-import lk.coopfed.knoweb.kernel.api.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -32,13 +27,11 @@ public class StockReconcileJob {
     public static final String AUDIT_STOCK_DRIFT = "STOCK_DRIFT";
 
     private final StockReconcileStore store;
-    private final AuditFacade audit;
-    private final AuditReviewReader reviews;
+    private final StockDriftReporter reporter;
 
-    public StockReconcileJob(StockReconcileStore store, AuditFacade audit, AuditReviewReader reviews) {
+    public StockReconcileJob(StockReconcileStore store, StockDriftReporter reporter) {
         this.store = store;
-        this.audit = audit;
-        this.reviews = reviews;
+        this.reporter = reporter;
     }
 
     /**
@@ -57,7 +50,7 @@ public class StockReconcileJob {
         for (StockReconcileStore.DriftingLot drift : drifts) {
             ScopeContext ownScope = execution.ownScopeOf(drift.ownerEntityId());
             try {
-                if (reportDrift(drift, ownScope)) {
+                if (reporter.reportDrift(drift, ownScope)) {
                     reported++;
                 }
             } catch (RuntimeException e) {
@@ -80,7 +73,7 @@ public class StockReconcileJob {
         List<StockReconcileStore.DriftingLot> drifts = store.findDriftingLots(locationId, scope);
         int reported = 0;
         for (StockReconcileStore.DriftingLot drift : drifts) {
-            if (reportDrift(drift, scope)) {
+            if (reporter.reportDrift(drift, scope)) {
                 reported++;
             }
         }
@@ -88,48 +81,10 @@ public class StockReconcileJob {
     }
 
     /**
-     * Report drift for one stock lot, deduplicated by the lot's current drift amount so that repeated
-     * job runs do not produce duplicate unresolved reviews.
+     * Report drift for one stock lot, delegating to {@link StockDriftReporter} so that each review
+     * runs in an active entity-scoped transaction.
      */
     public boolean reportDrift(StockReconcileStore.DriftingLot drift, ScopeContext scope) {
-        // Prevent duplicate unresolved reviews for the same drift
-        boolean alreadyReported = reviews.reviewExists(
-                AUDIT_STOCK_DRIFT, drift.stockLotId(), "drift", drift.drift().toPlainString(), scope);
-
-        if (alreadyReported) {
-            log.debug(
-                    "Drift of {} on lot {} has already been reported; skipping duplicate review",
-                    drift.drift(),
-                    drift.stockLotId());
-            return false;
-        }
-
-        Map<String, Object> details = new LinkedHashMap<>();
-        details.put("stockLotId", drift.stockLotId().toString());
-        details.put("locationId", drift.locationId().toString());
-        details.put("batchId", drift.batchId().toString());
-        details.put("skuId", drift.skuId().toString());
-        details.put("condition", drift.condition());
-        details.put("qtyOnHand", drift.qtyOnHand().toPlainString());
-        details.put("movementSum", drift.movementSum().toPlainString());
-        details.put("drift", drift.drift().toPlainString());
-
-        audit.record(
-                AUDIT_STOCK_DRIFT,
-                Subject.of("stock_lot", drift.stockLotId()),
-                null,
-                details,
-                scope,
-                "Stock lot quantity on hand drifted from sum of movements");
-
-        log.warn(
-                "STOCK_DRIFT detected for lot {} at location {}: qtyOnHand={}, movementSum={}, drift={}",
-                drift.stockLotId(),
-                drift.locationId(),
-                drift.qtyOnHand(),
-                drift.movementSum(),
-                drift.drift());
-
-        return true;
+        return reporter.reportDrift(drift, scope);
     }
 }
