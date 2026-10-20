@@ -61,29 +61,39 @@ public class PromoteToSharedHandler implements Handles<PromoteToShared, UUID> {
             throw new ProblemException("request.invalid");
         }
 
-        Sku sku = repository.findById(command.skuId()).orElse(null);
+        // Under OWN scope, another entity's LOCAL SKU is hidden by RLS.
+        // Switch scope_class to FEDERATION_VIEW to read the local SKU.
+        Sku sku;
+        jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
+        try {
+            sku = repository.findById(command.skuId()).orElse(null);
 
-        if (sku == null) {
-            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.skuId()));
-        }
+            if (sku == null) {
+                throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.skuId()));
+            }
 
-        if (!Sku.LOCAL.equals(sku.status())) {
-            throw new ProblemException("m2.sku.not_local", Map.of("skuId", sku.getId()));
-        }
+            if (!Sku.LOCAL.equals(sku.status())) {
+                throw new ProblemException("m2.sku.not_local", Map.of("skuId", sku.getId()));
+            }
 
-        if (sku.shortNameSi() == null
-                || sku.shortNameTa() == null
-                || sku.shortNameSi().isBlank()
-                || sku.shortNameTa().isBlank()) {
-            throw new ProblemException("m2.sku.shared_translations_required");
-        }
+            if (sku.shortNameSi() == null
+                    || sku.shortNameTa() == null
+                    || sku.shortNameSi().isBlank()
+                    || sku.shortNameTa().isBlank()) {
+                throw new ProblemException("m2.sku.shared_translations_required");
+            }
 
-        if (references.hasNonGovernedTags(sku.getId())) {
-            throw new ProblemException("m2.sku.governed_tags_only", Map.of("skuId", sku.getId()));
-        }
+            if (references.hasNonGovernedTags(sku.getId())) {
+                throw new ProblemException("m2.sku.governed_tags_only", Map.of("skuId", sku.getId()));
+            }
 
-        if (references.hasCaseBarcodeWithoutConversion(sku.getId())) {
-            throw new ProblemException("m2.sku.case_conversion_required", Map.of("skuId", sku.getId()));
+            if (references.hasCaseBarcodeWithoutConversion(sku.getId())) {
+                throw new ProblemException("m2.sku.case_conversion_required", Map.of("skuId", sku.getId()));
+            }
+        } finally {
+            jdbc.queryForList(
+                    "SELECT set_config('app.scope_class', ?, true)",
+                    scope.policyClass().name());
         }
 
         UUID originOwner = sku.ownerEntityId();

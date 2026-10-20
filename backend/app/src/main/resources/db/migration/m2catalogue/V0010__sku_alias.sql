@@ -48,7 +48,7 @@ GRANT SELECT, INSERT, UPDATE ON catalogue.sku_alias TO app_rw;
 -- Promotion and merge policy on catalogue.sku: the Federation takes over a LOCAL row
 -- (PromoteToShared updates status to SHARED and owner to Federation; MergeIntoShared updates
 -- status to INACTIVE with prior_status LOCAL).
-CREATE POLICY fed_promote ON catalogue.sku FOR ALL TO app_rw
+CREATE POLICY fed_promote ON catalogue.sku FOR UPDATE TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND kernel.scope_entity() = (SELECT kernel.system_entity())
            AND status = 'LOCAL')
@@ -63,7 +63,7 @@ CREATE POLICY fed_promote ON catalogue.sku FOR ALL TO app_rw
 -- updates barcodes of the local SKU (re-pointing to canonical SKU or retiring on collision).
 GRANT UPDATE (sku_id) ON catalogue.sku_barcode TO app_rw;
 
-CREATE POLICY fed_merge_barcode ON catalogue.sku_barcode FOR ALL TO app_rw
+CREATE POLICY fed_merge_barcode ON catalogue.sku_barcode FOR UPDATE TO app_rw
     USING (kernel.scope_class() = 'OWN'
            AND kernel.scope_entity() = (SELECT kernel.system_entity()))
     WITH CHECK (kernel.scope_class() = 'OWN');

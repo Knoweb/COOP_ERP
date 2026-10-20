@@ -65,23 +65,35 @@ public class MergeIntoSharedHandler implements Handles<MergeIntoShared, UUID> {
             throw new ProblemException("m2.sku.cannot_merge_with_self");
         }
 
-        Sku source = repository.findById(command.sourceSkuId()).orElse(null);
+        // Under OWN scope, another entity's LOCAL SKU and barcodes are hidden by RLS.
+        // Switch scope_class to FEDERATION_VIEW to read source and query its active barcodes.
+        Sku source;
+        List<Map<String, Object>> barcodes;
+        jdbc.execute("SELECT set_config('app.scope_class', 'FEDERATION_VIEW', true)");
+        try {
+            source = repository.findById(command.sourceSkuId()).orElse(null);
+            barcodes = source == null
+                    ? List.of()
+                    : jdbc.queryForList(
+                            """
+                            SELECT barcode, symbology, owner_entity_id
+                              FROM catalogue.sku_barcode
+                             WHERE sku_id = ? AND status = 'ACTIVE'
+                            """,
+                            command.sourceSkuId());
 
-        if (source == null) {
-            throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
+            if (source == null) {
+                throw new ProblemException("m2.sku.not_found", Map.of("skuId", command.sourceSkuId()));
+            }
+
+            if (!Sku.LOCAL.equals(source.status())) {
+                throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
+            }
+        } finally {
+            jdbc.queryForList(
+                    "SELECT set_config('app.scope_class', ?, true)",
+                    scope.policyClass().name());
         }
-
-        if (!Sku.LOCAL.equals(source.status())) {
-            throw new ProblemException("m2.sku.not_local", Map.of("skuId", source.getId()));
-        }
-
-        List<Map<String, Object>> barcodes = jdbc.queryForList(
-                """
-                SELECT barcode, symbology, owner_entity_id
-                  FROM catalogue.sku_barcode
-                 WHERE sku_id = ? AND status = 'ACTIVE'
-                """,
-                command.sourceSkuId());
 
         Sku target = repository
                 .findById(command.targetSkuId())
