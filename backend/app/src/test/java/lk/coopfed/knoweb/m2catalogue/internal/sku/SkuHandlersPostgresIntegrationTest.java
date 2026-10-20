@@ -107,6 +107,7 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanCatalogue() {
+        theDatabaseNamesTheFederation(FEDERATION);
         if (config != null) {
             config.invalidate("catalogue.local_sku_requires_barcode");
         }

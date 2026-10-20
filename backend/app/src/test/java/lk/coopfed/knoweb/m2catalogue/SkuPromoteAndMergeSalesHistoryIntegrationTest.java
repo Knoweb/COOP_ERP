@@ -95,6 +95,7 @@ class SkuPromoteAndMergeSalesHistoryIntegrationTest extends PostgresIntegrationT
 
     @BeforeEach
     void setup() {
+        theDatabaseNamesTheFederation(FEDERATION);
         mpcsScope = scopeOf(MPCS);
         fedScope = scopeOf(FEDERATION);
 
@@ -191,12 +192,14 @@ class SkuPromoteAndMergeSalesHistoryIntegrationTest extends PostgresIntegrationT
                 .update(
                         """
                 insert into reporting.shop_sale_line_fact
-                    (business_date, location_id, receipt_id, line_no, sku_id, uom_code, qty, line_total, tax_amount)
-                values (?, ?, ?, 1, ?, 'EA', 10.000, 1500.00, 0.00)
+                    (line_id, receipt_id, line_no, owner_entity_id, location_id, business_date, sku_id, qty, line_total)
+                values (?, ?, 1, ?, ?, ?, ?, 10.000, 1500.00)
                 """,
-                        Date.valueOf(today),
-                        shopLocation,
                         Ids.next(),
+                        Ids.next(),
+                        MPCS,
+                        shopLocation,
+                        Date.valueOf(today),
                         localSkuId);
 
         // Check reports BEFORE merge: attributed to local SKU
