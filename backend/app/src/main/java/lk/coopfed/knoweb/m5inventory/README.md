@@ -15,10 +15,11 @@ Built so far, for the demo (Phase 1: the Federation selling to a distributor): M
 | `api/` | `StockLedger` and its command `PostMovements` (an internal command, CR-19A-6: it runs only inside another command handler); the value types `Movement`, `MovementType`, `LotCondition`, `PostedMovement`; the events `StockMoved` (`stock.moved.v1`), `LotNegative` (`lot.negative.v1`), `ExpiryTaskOpened` (`expiry_task.opened.v1`), and `ExpiryTaskClosed` (`expiry_task.closed.v1`); commands `OpenExpiryTasks` and `CloseExpiryTask`. |
 | `internal/ledger/` | `LedgerService` (the handler), `LedgerGuards` (the guards that need no database), `CostService` (the weighted average, pure arithmetic), `LedgerStore` (the ledger's reads and row locks), `MovementPartitionMaintainer` (the monthly partitions, called by the kernel's partition job). |
 | `internal/expiry/` | `ExpiryScanJob` (nightly scan `@ScheduledJob("inventory-expiry-scan")`), `OpenExpiryTasksHandler` (opens expiry tasks and schedules count tasks under `inv.count.schedule`), `CloseExpiryTaskHandler` (closes expiry tasks on lot exhaustion), `ExpiryTaskStore` (queries for expiring lots and open counts). |
+| `internal/reconcile/` | `StockReconcileJob` (nightly ledger reconciliation `@ScheduledJob("inventory-stock-reconcile")`), `StockReconcileStore` (recomputes movement sums per lot and detects balance drift under RLS), `StockDriftReporter` (records `STOCK_DRIFT` audit reviews in entity-scoped transactions). |
 | `resources/db/migration/m5inventory/V0001__inventory.sql` | `stock_lot`, `stock_movement` (partitioned monthly by `received_at`), `movement_sequence`, `entity_sku_cost`; row-level security from the template; the partition functions. |
 | `resources/db/migration/m5inventory/V0009__expiry_tasks.sql` | `inventory.expiry_task` table, RLS policies, grants to `app_rw`, and unique partial index `expiry_task_open_per_location_batch` on open tasks. |
 | `resources/seed/kernel/config-items.yaml` | `inventory.expiry_warning_days` (ENTITY scope, default 30 days, bounds 1–365, trilingual descriptions). |
-| `resources/seed/m5inventory/audit-event-types.yaml` | The audit codes: `STOCK_POSTED`, `STOCK_LOT_NEGATIVE` (REVIEW), `STOCK_LOT_NEGATIVE_CLEARED`, `EXPIRY_TASK_OPENED`, `EXPIRY_TASK_CLOSED`. |
+| `resources/seed/m5inventory/audit-event-types.yaml` | The audit codes: `STOCK_POSTED`, `STOCK_LOT_NEGATIVE` (REVIEW), `STOCK_LOT_NEGATIVE_CLEARED`, `EXPIRY_TASK_OPENED`, `EXPIRY_TASK_CLOSED`, `STOCK_DRIFT` (REVIEW). |
 | `resources/seed/m1party/permissions.yaml` | M5's 17 permission codes of 25A section 3.1 and `inv.stock.view`, appended to M1's catalogue. |
 
 ## The ledger (25A section 6.1)
@@ -114,6 +115,11 @@ Deferred for the demo (`docs/PLAN_TO_M2.md`): the XFR document and its LOCATION 
 6. When the count task is submitted, `SubmitCountHandler` transitions linked open expiry tasks to `COUNTED`.
 7. When a lot's balance reaches zero, `CloseExpiryTaskHandler` marks the task `CLOSED`, emitting audit `EXPIRY_TASK_CLOSED` and event `expiry_task.closed.v1` (`ExpiryTaskClosed`).
 8. Existing active expiry tasks (`status <> 'CLOSED'`) for the same location and batch are skipped idempotently via the unique partial index `expiry_task_open_per_location_batch`.
+
+**Stock reconciliation (INV-03, M5-11; doc 18 invariant B-I4, doc 25 section 3.2, 25A section 7.2).** `StockReconcileJob` (`@ScheduledJob("inventory-stock-reconcile")`) runs nightly at 03:00 Colombo time. In `federationView()`, `StockReconcileStore` recomputes the sum of all movements (`Σ qty_delta`) per lot joining on the full identity keys (`owner_entity_id`, `location_id`, `batch_id`, `sku_id`, `condition`), and compares with materialized `qty_on_hand`. When drift is detected (`qty_on_hand <> sum(qty_delta)`):
+1. Under the lot owner's OWN scope, an audit review `STOCK_DRIFT` is recorded against `Subject.of("stock_lot", stockLotId)` with both figures (`qtyOnHand`, `movementSum`, and `drift`).
+2. Deduplication via `AuditReviewReader.reviewExists` prevents duplicate unresolved reviews when the drift amount on a lot has not changed.
+3. The job never modifies balances or rewrites movement history (zero database writes).
 
 **Screens** (`web/src/modules/m5inventory`): `/inventory/counts` (schedule and start, the counts, the negative lots), `/inventory/counts/:id` (the stocktake sheet, then the adjustment voucher with Approve and Reject), `/inventory/write-offs` and `/inventory/write-offs/:id` (the damage and expiry register: draft, photographs through the shell's `AttachmentCapture`, submit, witness, approve, reject), `/inventory/repacks` (recipes, the production sheet, reversal).
 
