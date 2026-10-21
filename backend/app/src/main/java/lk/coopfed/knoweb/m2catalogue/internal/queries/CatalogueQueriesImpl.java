@@ -23,6 +23,7 @@ import lk.coopfed.knoweb.m2catalogue.query.SkuFilter;
 import lk.coopfed.knoweb.m2catalogue.query.SkuPage;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m2catalogue.query.TaxCategoryView;
+import lk.coopfed.knoweb.m2catalogue.query.TaxRateHistoryView;
 import lk.coopfed.knoweb.m2catalogue.query.TaxRateView;
 import lk.coopfed.knoweb.m2catalogue.query.UomView;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -127,6 +128,40 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                         onDate)
                 .stream()
                 .findFirst();
+    }
+
+    @Override
+    public List<TaxRateHistoryView> taxRates(UUID taxCategoryId, LocalDate onDate, ScopeContext scope) {
+        if (scope == null || !scope.hasActiveScope()) {
+            return List.of();
+        }
+        StringBuilder sql = new StringBuilder(
+                """
+                select r.tax_category_id, c.code, r.rate_percent, r.effective_from, r.effective_to
+                from catalogue.tax_rate r
+                join catalogue.tax_category c on c.tax_category_id = r.tax_category_id
+                where 1 = 1
+                """);
+        List<Object> params = new ArrayList<>();
+        if (taxCategoryId != null) {
+            sql.append(" and r.tax_category_id = ?");
+            params.add(taxCategoryId);
+        }
+        if (onDate != null) {
+            sql.append(" and r.effective_from <= ? and (r.effective_to is null or r.effective_to >= ?)");
+            params.add(onDate);
+            params.add(onDate);
+        }
+        sql.append(" order by c.code, r.effective_from desc");
+        return jdbc.query(
+                sql.toString(),
+                (rs, row) -> new TaxRateHistoryView(
+                        rs.getObject("tax_category_id", UUID.class),
+                        rs.getString("code"),
+                        rs.getBigDecimal("rate_percent"),
+                        rs.getObject("effective_from", LocalDate.class),
+                        rs.getObject("effective_to", LocalDate.class)),
+                params.toArray());
     }
 
     @Override

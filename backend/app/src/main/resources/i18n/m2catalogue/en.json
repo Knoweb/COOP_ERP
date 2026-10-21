@@ -70,5 +70,10 @@
   "m2.sku.target_not_shared": "The target SKU must be a shared SKU",
   "m2.sku.base_uom_mismatch": "Cannot merge SKUs with different base units of measure",
   "m2.sku.unit_conflict": "Cannot merge SKUs with conflicting weight, batch, or expiry tracking attributes",
-  "m2.sku.cannot_merge_with_self": "Cannot merge a SKU with itself"
+  "m2.sku.cannot_merge_with_self": "Cannot merge a SKU with itself",
+  "m2.tax.category_code_exists": "A tax category with this code already exists",
+  "m2.tax.category_not_found": "The tax category was not found",
+  "m2.tax.rate_invalid": "The tax rate percent must be between 0 and 100",
+  "m2.tax.apply_from_in_past": "The tax rate effective date cannot be in the past",
+  "m2.tax.rate_conflict": "A tax rate is already scheduled for or after this effective date"
 }

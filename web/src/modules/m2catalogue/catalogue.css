@@ -511,5 +511,76 @@
   gap: var(--space-1);
 }
 
+/* Tax Rates Management */
+.tax-success-banner {
+  padding: var(--space-2);
+  background-color: var(--color-issued-bg);
+  color: var(--color-issued-text);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  font-weight: var(--font-weight-strong);
+}
+
+.tax-forms-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.tax-card {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3);
+}
+
+.tax-card-title {
+  font-size: var(--font-size-md);
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+}
+
+.tax-error-text {
+  color: var(--color-alert-text);
+  margin: 0;
+}
+
+.tax-muted-text {
+  color: var(--color-text-muted);
+  margin-top: 0;
+}
+
+.tax-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tax-category-row {
+  cursor: pointer;
+}
+
+.tax-category-row--selected {
+  background-color: var(--color-surface-subtle);
+}
+
+.tax-button-container {
+  margin-top: var(--space-2);
+}
+
+.tax-field-required {
+  font-weight: var(--font-weight-strong);
+}
+
+.tax-code-cell {
+  font-weight: var(--font-weight-strong);
+}
+
+.tax-rate-cell {
+  font-weight: var(--font-weight-strong);
+}
+
 
 

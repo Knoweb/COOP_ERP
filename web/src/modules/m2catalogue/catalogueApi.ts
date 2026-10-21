@@ -21,6 +21,10 @@ export type BulkImportSkusRequest = components["schemas"]["BulkImportSkusRequest
 export type ImportReportResponse = components["schemas"]["ImportReportResponse"];
 export type DuplicateSuspectResponse = components["schemas"]["DuplicateSuspectResponse"];
 export type ResolveDuplicateSuspectRequest = components["schemas"]["ResolveDuplicateSuspectRequest"];
+export type TaxCategory = components["schemas"]["TaxCategoryResponse"];
+export type TaxRate = components["schemas"]["TaxRateResponse"];
+export type DefineTaxCategoryRequest = components["schemas"]["DefineTaxCategoryRequest"];
+export type PublishTaxRateRequest = components["schemas"]["PublishTaxRateRequest"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -158,6 +162,40 @@ export function useCatalogueApi() {
           params: { path: { suspectId }, header: { "Idempotency-Key": idempotencyKey } },
           body
         });
+      },
+
+      async listTaxCategories(): Promise<TaxCategory[]> {
+        const { data } = await api.GET("/v1/catalogue/tax/categories");
+        return data ?? [];
+      },
+
+      async defineTaxCategory(
+        body: DefineTaxCategoryRequest,
+        idempotencyKey: string
+      ): Promise<TaxCategory> {
+        const { data } = await api.POST("/v1/catalogue/tax/categories", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async listTaxRates(categoryId?: string, date?: string): Promise<TaxRate[]> {
+        const { data } = await api.GET("/v1/catalogue/tax/rates", {
+          params: { query: { categoryId, date } }
+        });
+        return data ?? [];
+      },
+
+      async publishTaxRate(
+        body: PublishTaxRateRequest,
+        idempotencyKey: string
+      ): Promise<TaxRate> {
+        const { data } = await api.POST("/v1/catalogue/tax/rates", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
       }
     }),
     [api]
