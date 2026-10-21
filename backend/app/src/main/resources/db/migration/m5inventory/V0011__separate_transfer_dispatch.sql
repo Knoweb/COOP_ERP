@@ -19,10 +19,16 @@ CREATE TABLE inventory.transfer_dispatch (
         REFERENCES inventory.transfer (transfer_id, owner_entity_id, location_id, to_location_id)
 );
 
+-- The migrator owns inventory.transfer, but FORCE RLS also binds the owner and migrations do not
+-- carry a tenant scope. Lift FORCE only for this backfill, then restore it in the same transaction.
+ALTER TABLE inventory.transfer NO FORCE ROW LEVEL SECURITY;
+
 INSERT INTO inventory.transfer_dispatch
     (transfer_id, owner_entity_id, location_id, to_location_id, dispatched_by, dispatched_at)
 SELECT transfer_id, owner_entity_id, location_id, to_location_id, issued_by, issued_at
   FROM inventory.transfer;
+
+ALTER TABLE inventory.transfer FORCE ROW LEVEL SECURITY;
 
 CREATE INDEX transfer_dispatch_by_destination
     ON inventory.transfer_dispatch (to_location_id, dispatched_at);

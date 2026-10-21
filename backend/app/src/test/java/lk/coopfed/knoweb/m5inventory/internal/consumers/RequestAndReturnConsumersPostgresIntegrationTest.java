@@ -84,6 +84,7 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
     void arrange() {
         fixture = new InventoryFixture(superuserJdbc());
         fixture.clean();
+        fixture.entity(SOCIETY, "M5CR", "MPCS");
         stores = fixture.location(SOCIETY, "WAREHOUSE");
         shop = fixture.location(SOCIETY, "SHOP");
         sku = fixture.sku(SOCIETY, "SUGAR1");
