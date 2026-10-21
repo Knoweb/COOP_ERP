@@ -518,6 +518,7 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
     // ---- helpers ------------------------------------------------------------------------------
 
     private void postGood(UUID location, UUID batch, String qty, String cost, UUID entity) {
+        ScopeContext scope = own(entity);
         Movement m = new Movement(
                 location,
                 batch,
@@ -526,13 +527,14 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
                 new BigDecimal(qty),
                 new BigDecimal(cost),
                 null);
-        ledger.post(new PostMovements(Ids.next(), null, null, List.of(m)), own(entity));
+        outer.run(scope, () -> ledger.post(new PostMovements(Ids.next(), null, null, List.of(m)), scope));
     }
 
     private void postSale(UUID location, UUID batch, String qty, UUID entity) {
+        ScopeContext scope = at(entity, location);
         Movement m =
                 new Movement(location, batch, LotCondition.GOOD, MovementType.SALE, new BigDecimal(qty), null, null);
-        ledger.post(new PostMovements(Ids.next(), null, null, List.of(m)), at(entity, location));
+        outer.run(scope, () -> ledger.post(new PostMovements(Ids.next(), null, null, List.of(m)), scope));
     }
 
     private UUID getLotId(UUID location, UUID batch, String condition) {
