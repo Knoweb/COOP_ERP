@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditReviewReader;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
+import lk.coopfed.knoweb.kernel.api.ConfigRegistry.ConfigScope;
 import lk.coopfed.knoweb.kernel.api.DomainEvent;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Ids;
@@ -48,6 +50,7 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
     private static final UUID MPCS = UUID.fromString("0190e67c-0000-7000-8000-000000000002");
     private static final UUID OTHER_ENTITY = UUID.fromString("0190e67c-0000-7000-8000-000000000003");
     private static final LocalDate EXPIRY = LocalDate.of(2027, 12, 31);
+    private static final String NEGATIVE_LOT_ESCALATION_DAYS = "inventory.negative_lot_escalation_days";
 
     @Autowired
     JdbcTemplate jdbc;
@@ -71,6 +74,9 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
     AuditReviewReader auditReviews;
 
     @Autowired
+    ConfigRegistry config;
+
+    @Autowired
     OuterCommand outer;
 
     @Autowired
@@ -87,6 +93,7 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
     private UUID shop1;
     private UUID shop2;
     private UUID otherShop;
+    private boolean thresholdOverrideSet;
 
     @BeforeEach
     void arrange() {
@@ -103,6 +110,24 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
 
     @AfterEach
     void clean() {
+        if (thresholdOverrideSet) {
+            ScopeContext otherEntityScope = own(OTHER_ENTITY);
+            outer.run(otherEntityScope, () -> {
+                config.set(
+                        NEGATIVE_LOT_ESCALATION_DAYS,
+                        ConfigScope.entity(OTHER_ENTITY),
+                        "7",
+                        otherEntityScope,
+                        "test cleanup");
+                return null;
+            });
+            // The supported write invalidates the resolver cache before the test rows are removed.
+            superuserJdbc()
+                    .update(
+                            "delete from kernel.config_value where key = ? and scope_entity_id = ?",
+                            NEGATIVE_LOT_ESCALATION_DAYS,
+                            OTHER_ENTITY);
+        }
         fixture.clean();
     }
 
@@ -437,32 +462,58 @@ class NegativeLotReviewJobPostgresIntegrationTest extends PostgresIntegrationTes
 
     @Test
     void entitySpecificThresholdOverride() {
-        UUID sku = fixture.sku(OTHER_ENTITY, "SKU_CUSTOM_DAYS");
-        UUID batch = fixture.batch(sku, OTHER_ENTITY, "B-CUST", EXPIRY);
-        postSale(otherShop, batch, "-5", OTHER_ENTITY);
-        UUID lotId = getLotId(otherShop, batch, "GOOD");
+        UUID overriddenSku = fixture.sku(OTHER_ENTITY, "SKU_CUSTOM_DAYS");
+        UUID overriddenBatch = fixture.batch(overriddenSku, OTHER_ENTITY, "B-CUST", EXPIRY);
+        postSale(otherShop, overriddenBatch, "-5", OTHER_ENTITY);
+        UUID overriddenLotId = getLotId(otherShop, overriddenBatch, "GOOD");
 
-        // Override escalation threshold to 3 days for OTHER_ENTITY
-        superuserJdbc()
-                .update(
-                        """
-                insert into kernel.entity_config (entity_id, key, value, updated_at)
-                values (?, 'inventory.negative_lot_escalation_days', '3', now())
-                on conflict (entity_id, key) do update set value = '3'
-                """,
-                        OTHER_ENTITY);
+        UUID defaultedSku = fixture.sku(MPCS, "SKU_DEFAULT_DAYS");
+        UUID defaultedBatch = fixture.batch(defaultedSku, MPCS, "B-DEFAULT", EXPIRY);
+        postSale(shop1, defaultedBatch, "-5", MPCS);
+        UUID defaultedLotId = getLotId(shop1, defaultedBatch, "GOOD");
+
+        ScopeContext otherEntityScope = own(OTHER_ENTITY);
+        outer.run(otherEntityScope, () -> {
+            config.set(
+                    NEGATIVE_LOT_ESCALATION_DAYS,
+                    ConfigScope.entity(OTHER_ENTITY),
+                    "3",
+                    otherEntityScope,
+                    "test override");
+            return null;
+        });
+        thresholdOverrideSet = true;
+
+        assertThat(outer.run(otherEntityScope, () -> config.getInt(NEGATIVE_LOT_ESCALATION_DAYS, otherEntityScope, -1)))
+                .isEqualTo(3);
+        assertThat(outer.run(own(MPCS), () -> config.getInt(NEGATIVE_LOT_ESCALATION_DAYS, own(MPCS), -1)))
+                .isEqualTo(7);
 
         LocalDate today = businessDay.today();
         Instant threeDaysAgo =
                 today.minusDays(3).atTime(12, 0).atZone(businessZone).toInstant();
-        setNegativeSince(lotId, threeDaysAgo, OTHER_ENTITY);
+        setNegativeSince(overriddenLotId, threeDaysAgo, OTHER_ENTITY);
+        setNegativeSince(defaultedLotId, threeDaysAgo, MPCS);
         kernel.reset();
 
-        // OTHER_ENTITY escalates on day 3 because its threshold is 3
         int escalated = job.review(execution());
         assertThat(escalated).isEqualTo(1);
         assertThat(audits(NegativeLotReviewJob.AUDIT_STOCK_LOT_NEGATIVE_ESCALATED))
-                .hasSize(1);
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.subject().id()).isEqualTo(overriddenLotId);
+                    assertThat(a.scope().entityId()).isEqualTo(OTHER_ENTITY);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> after = (Map<String, Object>) a.after();
+                    assertThat(after.get("thresholdDays")).isEqualTo(3);
+                });
+        assertThat(auditReviews.reviewExists(
+                        NegativeLotReviewJob.AUDIT_STOCK_LOT_NEGATIVE_ESCALATED,
+                        defaultedLotId,
+                        "negativeSince",
+                        threeDaysAgo.toString(),
+                        own(MPCS)))
+                .isFalse();
     }
 
     @Test
