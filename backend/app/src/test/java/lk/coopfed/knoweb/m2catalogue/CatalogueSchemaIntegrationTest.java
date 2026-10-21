@@ -53,7 +53,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0009 (CAT-01): the duplicate suspects.
             Map.entry("duplicate_suspect", with("own_update")),
             // V0010 (CAT-03): sku_alias.
-            Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")));
+            Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")),
+            // V0011 (CAT-06): location_assortment.
+            Map.entry("location_assortment", with("own_update", "own_delete")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
@@ -144,7 +146,11 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         JdbcTemplate db = superuserJdbc();
 
         for (String table : POLICIES.keySet()) {
-            assertThat(may(db, table, "DELETE")).as(table + " DELETE").isFalse();
+            if (POLICIES.get(table).contains("own_delete")) {
+                assertThat(may(db, table, "DELETE")).as(table + " DELETE").isTrue();
+            } else {
+                assertThat(may(db, table, "DELETE")).as(table + " DELETE").isFalse();
+            }
             assertThat(may(db, table, "TRUNCATE")).as(table + " TRUNCATE").isFalse();
             assertThat(may(db, table, "SELECT")).as(table + " SELECT").isTrue();
         }
