@@ -90,6 +90,11 @@ audit_event_types:
     offline_capturable: false
     description_en: Tag defined
 
+  - code: TAX_CATEGORY_DEFINED
+    severity: INFO
+    offline_capturable: false
+    description_en: Tax category defined
+
   - code: TAX_RATE_PUBLISHED
     severity: INFO
     offline_capturable: false

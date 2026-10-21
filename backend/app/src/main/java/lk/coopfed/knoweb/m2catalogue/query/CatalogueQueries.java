@@ -35,6 +35,12 @@ public interface CatalogueQueries {
      */
     Optional<TaxRateView> taxRateInForce(UUID skuId, LocalDate onDate, ScopeContext scope);
 
+    /**
+     * Lists tax rates, optionally filtered by tax category and/or effective date.
+     * Accessible by every authenticated scope (catalogue.tax_rate authenticated_read policy).
+     */
+    List<TaxRateHistoryView> taxRates(UUID taxCategoryId, LocalDate onDate, ScopeContext scope);
+
     /** The conversions of a SKU visible in the scope (catalogue RLS); empty otherwise. */
     List<ConversionView> conversions(UUID skuId, ScopeContext scope);
 

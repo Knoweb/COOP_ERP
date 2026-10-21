@@ -405,6 +405,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/tax/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all tax categories */
+        get: operations["listTaxCategories"];
+        put?: never;
+        /** Define a new tax category */
+        post: operations["defineTaxCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/tax/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List rates of a category or the rate in force */
+        get: operations["listTaxRates"];
+        put?: never;
+        /** Publish a tax rate for a category */
+        post: operations["publishTaxRate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -733,6 +769,29 @@ export interface components {
             decision: "MERGED" | "DISMISSED";
             /** Format: uuid */
             canonicalSkuId?: string;
+        };
+        DefineTaxCategoryRequest: {
+            code: string;
+            nameEn: string;
+            nameSi?: string;
+            nameTa?: string;
+        };
+        PublishTaxRateRequest: {
+            /** Format: uuid */
+            taxCategoryId: string;
+            ratePercent: number;
+            /** Format: date */
+            applyFrom: string;
+        };
+        TaxRateResponse: {
+            /** Format: uuid */
+            taxCategoryId: string;
+            taxCategoryCode?: string;
+            ratePercent: number;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -1609,6 +1668,109 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTaxCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of tax categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCategoryResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    defineTaxCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineTaxCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Tax category defined */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCategoryResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    listTaxRates: {
+        parameters: {
+            query?: {
+                categoryId?: string;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tax rates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateResponse"][];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+        };
+    };
+    publishTaxRate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishTaxRateRequest"];
+            };
+        };
+        responses: {
+            /** @description Tax rate published */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRateResponse"];
+                };
             };
             400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
