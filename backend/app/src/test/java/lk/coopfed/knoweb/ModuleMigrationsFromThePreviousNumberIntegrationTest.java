@@ -49,15 +49,15 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // where the demo server stands after PR 11.
         // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
         streams.put("m1security", "20");
-        // CAT-01: m2catalogue V0009 (duplicate_suspect) from V0008.
-        streams.put("m2catalogue", "8");
+        // CAT-03: m2catalogue V0010 (sku_alias) from V0009.
+        streams.put("m2catalogue", "9");
         // Wave 4, M3R-08: m3pricing V0007 (pricing.review_trigger) from V0006.
         // PRC-10: m3pricing V0008 (adjustment_types) from V0007.
         streams.put("m3pricing", "7");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        // INV-01: m5inventory V0009 (expiry_tasks) on a database at V0008.
-        streams.put("m5inventory", "8");
+        // CAT-03: m5inventory V0010 (repoint_lots_on_sku_merge) from V0009 (INV-01 expiry_tasks).
+        streams.put("m5inventory", "9");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
         // Wave 2, PR 08: m8reporting V0007 (projections by location, event and line) from V0006.
@@ -147,9 +147,9 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
-                .containsEntry("m2catalogue", 9)
-                .containsEntry("m3pricing", 8)
-                .containsEntry("m5inventory", 9)
+                .containsEntry("m2catalogue", 10)
+                .containsEntry("m3pricing", 7)
+                .containsEntry("m5inventory", 10)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
 

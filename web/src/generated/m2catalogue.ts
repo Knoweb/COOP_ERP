@@ -79,6 +79,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalogue/skus/{skuId}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote a LOCAL SKU to SHARED, or merge it into an existing SHARED SKU */
+        post: operations["promoteSku"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/skus/{skuId}/deactivate": {
         parameters: {
             query?: never;
@@ -418,6 +435,12 @@ export interface components {
         ActivateSkuRequest: {
             /** @enum {string} */
             target: "LOCAL" | "SHARED";
+        };
+        PromoteSkuRequest: {
+            /** @enum {string} */
+            mode: "NEW" | "MERGE";
+            /** Format: uuid */
+            targetSkuId?: string;
         };
         ReasonRequest: {
             reasonCode?: string;
@@ -926,6 +949,35 @@ export interface operations {
         };
         responses: {
             /** @description SKU activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    promoteSku: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                skuId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteSkuRequest"];
+            };
+        };
+        responses: {
+            /** @description SKU promoted or merged */
             204: {
                 headers: {
                     [name: string]: unknown;

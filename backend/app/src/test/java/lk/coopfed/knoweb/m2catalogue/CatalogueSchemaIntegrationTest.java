@@ -36,9 +36,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             Map.entry("uom", Set.of("authenticated_read", "seed_reference")),
             Map.entry("tax_category", with("own_update", "authenticated_read", "seed_reference")),
             Map.entry("tax_rate", with("own_update", "authenticated_read", "seed_reference")),
-            Map.entry("sku", with("own_update", "shared_read")),
+            Map.entry("sku", with("own_update", "shared_read", "fed_promote")),
             Map.entry("sku_uom_conversion", with("own_update", "shared_read")),
-            Map.entry("sku_barcode", with("own_update", "shared_read")),
+            Map.entry("sku_barcode", with("own_update", "shared_read", "fed_merge_barcode")),
             // V0007 (CR-22A-1): the Federation writes the governed tags.
             Map.entry(
                     "tag", with("own_update", "governed_read", "seed_reference", "governed_write", "governed_update")),
@@ -51,7 +51,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0005 (M2-06): the images; own_write follows the SKU, shared_read the SKU owner's rows.
             Map.entry("sku_image", with("own_update", "shared_read")),
             // V0009 (CAT-01): the duplicate suspects.
-            Map.entry("duplicate_suspect", with("own_update")));
+            Map.entry("duplicate_suspect", with("own_update")),
+            // V0010 (CAT-03): sku_alias.
+            Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
@@ -174,7 +176,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         assertThat(may(db, "sku_barcode", "UPDATE")).isFalse();
         assertThat(mayUpdateColumn(db, "sku_barcode", "status")).isTrue();
         assertThat(mayUpdateColumn(db, "sku_barcode", "batch_id")).isTrue();
-        assertThat(mayUpdateColumn(db, "sku_barcode", "sku_id")).isFalse();
+        assertThat(mayUpdateColumn(db, "sku_barcode", "sku_id")).isTrue();
         assertThat(may(db, "batch_key", "UPDATE")).isFalse();
         assertThat(mayUpdateColumn(db, "batch_key", "batch_id")).isTrue();
         assertThat(mayUpdateColumn(db, "batch_key", "batch_no")).isFalse();

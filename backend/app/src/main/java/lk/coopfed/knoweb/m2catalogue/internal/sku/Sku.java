@@ -174,6 +174,35 @@ class Sku implements Persistable<UUID> {
         priorStatus = null;
     }
 
+    void promoteToShared(UUID federationEntityId) {
+        if (!LOCAL.equals(status)) {
+            throw new ProblemException("m2.sku.not_local");
+        }
+        if (shortNameSi == null || shortNameTa == null || shortNameSi.isBlank() || shortNameTa.isBlank()) {
+            throw new ProblemException("m2.sku.shared_translations_required");
+        }
+        if (baseUomCode != null) {
+            baseUomCode = baseUomCode.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (multiMrpPolicy != null) {
+            multiMrpPolicy = multiMrpPolicy.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        if (originKind != null) {
+            originKind = originKind.strip().toUpperCase(java.util.Locale.ROOT);
+        }
+        this.ownerEntityId = federationEntityId;
+        this.status = SHARED;
+        this.priorStatus = null;
+    }
+
+    void mergeIntoShared() {
+        if (!LOCAL.equals(status)) {
+            throw new ProblemException("m2.sku.not_local");
+        }
+        this.priorStatus = LOCAL;
+        this.status = INACTIVE;
+    }
+
     private void apply(SkuDetails details) {
         if (details == null) {
             throw new ProblemException("request.invalid");

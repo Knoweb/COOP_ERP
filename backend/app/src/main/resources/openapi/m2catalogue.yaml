@@ -259,6 +259,43 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/skus/{skuId}/promote:
+
+    post:
+      tags: [Catalogue]
+      operationId: promoteSku
+      summary: Promote a LOCAL SKU to SHARED, or merge it into an existing SHARED SKU
+      x-permission: cat.sku.promote
+      x-scope: FEDERATION
+
+      parameters:
+        - in: path
+          name: skuId
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromoteSkuRequest'
+
+      responses:
+        '204':
+          description: SKU promoted or merged
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
   /v1/catalogue/skus/{skuId}/deactivate:
 
     post:
@@ -1241,6 +1278,20 @@ components:
           enum:
             - LOCAL
             - SHARED
+
+
+    PromoteSkuRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum:
+            - NEW
+            - MERGE
+        targetSkuId:
+          type: string
+          format: uuid
 
 
     ReasonRequest:

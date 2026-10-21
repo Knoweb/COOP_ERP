@@ -65,5 +65,10 @@
   "m2.suspect.not_found_or_closed": "The duplicate suspect pair was not found or is already resolved",
   "m2.sku.governed_tags_only": "A shared SKU may carry governed tags only",
   "m2.sku.case_conversion_required": "A unit conversion for CASE is required when a case barcode exists",
-  "m2.sku.barcode_required": "A barcode is required to activate this local SKU under entity configuration"
+  "m2.sku.barcode_required": "A barcode is required to activate this local SKU under entity configuration",
+  "m2.sku.not_local": "Only a local SKU may be promoted or merged into shared",
+  "m2.sku.target_not_shared": "The target SKU must be a shared SKU",
+  "m2.sku.base_uom_mismatch": "Cannot merge SKUs with different base units of measure",
+  "m2.sku.unit_conflict": "Cannot merge SKUs with conflicting weight, batch, or expiry tracking attributes",
+  "m2.sku.cannot_merge_with_self": "Cannot merge a SKU with itself"
 }

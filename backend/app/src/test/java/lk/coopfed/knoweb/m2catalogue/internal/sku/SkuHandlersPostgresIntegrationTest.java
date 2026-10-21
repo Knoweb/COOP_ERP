@@ -20,11 +20,15 @@ import lk.coopfed.knoweb.m2catalogue.api.ActivateSharedSku;
 import lk.coopfed.knoweb.m2catalogue.api.CreateSku;
 import lk.coopfed.knoweb.m2catalogue.api.DeactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.InventoryLotQuery;
+import lk.coopfed.knoweb.m2catalogue.api.MergeIntoShared;
+import lk.coopfed.knoweb.m2catalogue.api.PromoteToShared;
 import lk.coopfed.knoweb.m2catalogue.api.ReactivateSku;
 import lk.coopfed.knoweb.m2catalogue.api.SkuActivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuCreated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDeactivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDetails;
+import lk.coopfed.knoweb.m2catalogue.api.SkuMerged;
+import lk.coopfed.knoweb.m2catalogue.api.SkuPromoted;
 import lk.coopfed.knoweb.m2catalogue.api.SkuReactivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuShared;
 import lk.coopfed.knoweb.m2catalogue.api.SkuUpdated;
@@ -79,6 +83,12 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
     UpdateSharedSkuHandler updateShared;
 
     @Autowired
+    PromoteToSharedHandler promoteHandler;
+
+    @Autowired
+    MergeIntoSharedHandler mergeHandler;
+
+    @Autowired
     lk.coopfed.knoweb.kernel.internal.config.JdbcConfigRegistry config;
 
     // Forces a code another entity holds, to prove the retry on the unique index.
@@ -97,6 +107,7 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanCatalogue() {
+        theDatabaseNamesTheFederation(FEDERATION);
         if (config != null) {
             config.invalidate("catalogue.local_sku_requires_barcode");
         }
@@ -595,6 +606,89 @@ class SkuHandlersPostgresIntegrationTest extends PostgresIntegrationTest {
                     .update("delete from kernel.config_value where key = 'catalogue.local_sku_requires_barcode'");
             config.invalidate("catalogue.local_sku_requires_barcode");
         }
+    }
+
+    @Test
+    void promoteToSharedUpdatesStatusAndOwnerInsertsAliasAuditsAndPublishes() {
+        UUID local = createLocal.handle(
+                new CreateSku(details("Local Jam", "ජෑම්", "ஜாம்", "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+        assertThat(status(local)).isEqualTo("LOCAL");
+
+        kernel.reset();
+
+        UUID promoted = promoteHandler.handle(new PromoteToShared(local), own(FEDERATION));
+        assertThat(promoted).isEqualTo(local);
+
+        assertThat(status(local)).isEqualTo("SHARED");
+        UUID currentOwner = superuserJdbc()
+                .queryForObject("select owner_entity_id from catalogue.sku where sku_id = ?", UUID.class, local);
+        assertThat(currentOwner).isEqualTo(FEDERATION);
+
+        // Verify sku_alias self-reference for origin entity
+        UUID canonical = superuserJdbc()
+                .queryForObject(
+                        "select canonical_sku_id from catalogue.sku_alias where alias_sku_id = ?", UUID.class, local);
+        assertThat(canonical).isEqualTo(local);
+        UUID aliasOwner = superuserJdbc()
+                .queryForObject(
+                        "select owner_entity_id from catalogue.sku_alias where alias_sku_id = ?", UUID.class, local);
+        assertThat(aliasOwner).isEqualTo(MPCS);
+
+        assertThat(audit("SKU_PROMOTED")).hasSize(1);
+        List<SkuPromoted> events = events(SkuPromoted.class);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).skuId()).isEqualTo(local);
+        assertThat(events.get(0).originEntityId()).isEqualTo(MPCS);
+        assertThat(events.get(0).status()).isEqualTo("SHARED");
+    }
+
+    @Test
+    void mergeIntoSharedRetiresSourceMovesBarcodesInsertsAliasAuditsAndPublishes() {
+        UUID local = createLocal.handle(
+                new CreateSku(details("Local Biscuit", "බිස්කට්", "பிஸ்கட்", "EA", false, false, false)), own(MPCS));
+        activateLocal.handle(new ActivateLocalSku(local), own(MPCS));
+
+        UUID shared = router.create(
+                new CreateSku(details("Shared Biscuit", "බිස්කට්", "பிஸ்கட்", "EA", false, false, false)),
+                own(FEDERATION));
+        activateShared.handle(new ActivateSharedSku(shared), own(FEDERATION));
+
+        // Add a barcode to local SKU
+        superuserJdbc()
+                .update(
+                        """
+                insert into catalogue.sku_barcode (barcode, symbology, sku_id, uom_code, owner_entity_id)
+                values ('4791000999001', 'EAN13', ?, 'EA', ?)
+                """,
+                        local,
+                        MPCS);
+
+        kernel.reset();
+
+        UUID result = mergeHandler.handle(new MergeIntoShared(local, shared), own(FEDERATION));
+        assertThat(result).isEqualTo(shared);
+
+        assertThat(status(local)).isEqualTo("INACTIVE");
+        assertThat(priorStatus(local)).isEqualTo("LOCAL");
+
+        // Verify barcode moved to shared SKU
+        UUID barcodeSku = superuserJdbc()
+                .queryForObject("select sku_id from catalogue.sku_barcode where barcode = '4791000999001'", UUID.class);
+        assertThat(barcodeSku).isEqualTo(shared);
+
+        // Verify sku_alias points local -> shared
+        UUID canonical = superuserJdbc()
+                .queryForObject(
+                        "select canonical_sku_id from catalogue.sku_alias where alias_sku_id = ?", UUID.class, local);
+        assertThat(canonical).isEqualTo(shared);
+
+        assertThat(audit("SKU_MERGED")).hasSize(1);
+        List<SkuMerged> events = events(SkuMerged.class);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).sourceSkuId()).isEqualTo(local);
+        assertThat(events.get(0).canonicalSkuId()).isEqualTo(shared);
+        assertThat(events.get(0).originEntityId()).isEqualTo(MPCS);
     }
 
     private static ScopeContext own(UUID entity) {

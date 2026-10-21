@@ -412,4 +412,27 @@ class CatalogueQueriesImpl implements CatalogueQueries {
                 filterStatus,
                 max);
     }
+
+    @Override
+    public UUID resolveAlias(UUID skuId, ScopeContext scope) {
+        if (skuId == null) {
+            return null;
+        }
+        UUID current = skuId;
+        for (int depth = 0; depth < 3; depth++) {
+            List<UUID> next = jdbc.query(
+                    "select canonical_sku_id from catalogue.sku_alias where alias_sku_id = ?",
+                    (rs, row) -> rs.getObject("canonical_sku_id", UUID.class),
+                    current);
+            if (next.isEmpty()) {
+                break;
+            }
+            UUID canonical = next.get(0);
+            if (canonical == null || canonical.equals(current)) {
+                break;
+            }
+            current = canonical;
+        }
+        return current;
+    }
 }

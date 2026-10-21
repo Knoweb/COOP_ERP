@@ -46,4 +46,10 @@ public interface CatalogueQueries {
 
     /** The duplicate suspects visible in the scope (catalogue RLS) (CAT-01, 22A section 6.1). */
     List<DuplicateSuspectView> listDuplicateSuspects(String status, int limit, ScopeContext scope);
+
+    /**
+     * Resolves the canonical SKU id of a SKU by following the alias chain in catalogue.sku_alias
+     * (max depth 3, 22A section 7; doc 22 section 6.3). Returns the SKU itself if not aliased.
+     */
+    UUID resolveAlias(UUID skuId, ScopeContext scope);
 }
