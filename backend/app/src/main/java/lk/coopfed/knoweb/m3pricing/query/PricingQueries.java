@@ -104,4 +104,12 @@ public interface PricingQueries {
      * listReviews(kind, status) of doc 23 section 5.2.
      */
     List<ReviewItem> listReviews(String kind, String status, ScopeContext scope);
+
+    // ---- M3-07 / PRC-10: adjustment types ----------------------------------------------------
+
+    /** GetAdjustmentType: one adjustment type by code; empty when it does not exist. */
+    Optional<AdjustmentTypeView> getAdjustmentType(String code, ScopeContext scope);
+
+    /** ListAdjustmentTypes: all registered adjustment types. */
+    List<AdjustmentTypeView> listAdjustmentTypes(ScopeContext scope);
 }

@@ -52,7 +52,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // CAT-03: m2catalogue V0010 (sku_alias) from V0009.
         streams.put("m2catalogue", "9");
         // Wave 4, M3R-08: m3pricing V0007 (pricing.review_trigger) from V0006.
-        streams.put("m3pricing", "6");
+        // PRC-10: m3pricing V0008 (adjustment_types) from V0007.
+        streams.put("m3pricing", "7");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // CAT-03: m5inventory V0010 (repoint_lots_on_sku_merge) from V0009 (INV-01 expiry_tasks).
@@ -200,7 +201,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
 
         // Wave 2, PR 07: m4trading V0010 over a database at V0009.
         // Wave 3, M4-09: m4trading V0013 (the invoice line view of a PARTY session joins doc_invoice).
-        assertThat(after).containsEntry("m4trading", 13);
+        // PRC-10: m4trading V0014 (order adjustments).
+        assertThat(after).containsEntry("m4trading", 14);
         assertThat(admin.queryForObject(
                         "select with_check from pg_policies where schemaname = 'trading'"
                                 + " and tablename = 'doc_grn_line' and policyname = 'document_write'",

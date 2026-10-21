@@ -167,5 +167,12 @@
   "m4.transfer.decided": "The transfer request is already decided",
   "m4.transfer.location_invalid": "Both places must be locations of this society",
   "m4.transfer.insufficient_stock": "The stores do not hold that much of an item now",
-  "m4.transfer.source_required": "Choose the society’s location that gives the stock"
+  "m4.transfer.source_required": "Choose the society’s location that gives the stock",
+  "m4.order.not_adjustable": "The order is not in a status that permits adjustments",
+  "m4.adjustment.type_unknown": "The adjustment type was not found or is inactive",
+  "m4.adjustment.amount_invalid": "The adjustment amount must be greater than zero",
+  "m4.adjustment.exceeds_max_amount": "The adjustment amount exceeds the allowed maximum",
+  "m4.adjustment.exceeds_max_percent": "The adjustment discount exceeds the allowed maximum percentage",
+  "m4.adjustment.already_recorded": "An adjustment of this type has already been recorded for this order",
+  "m4.adjustment.permission_denied": "You do not hold permission to record this adjustment type"
 }

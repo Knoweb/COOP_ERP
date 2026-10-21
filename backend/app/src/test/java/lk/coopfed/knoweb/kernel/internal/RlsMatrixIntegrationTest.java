@@ -303,6 +303,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                             + " Federation's row for the item (EffectivePolicy)",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
             new Departure(
+                    "pricing.adjustment_type",
+                    "everyone_reads (m3pricing V0008): adjustment types are read by all authenticated scopes",
+                    RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),
+            new Departure(
                     "catalogue.tax_category",
                     "authenticated_read (M2-01): reference data every class but NONE reads",
                     RlsMatrixIntegrationTest::everyClassButNoneReadsEverything),

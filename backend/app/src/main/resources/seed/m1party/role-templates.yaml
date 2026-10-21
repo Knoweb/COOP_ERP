@@ -57,6 +57,9 @@ templates:
       - "prc.rule.author"
       - "prc.rule.activate"
       - "prc.mrp_policy.set"
+      - "ord.order.adjust"
+      - "prc.adjust.special"
+      - "prc.adjust.delivery"
       # wave 3, fix-till-small-review-findings (TILLM6-03, decided on the architect's delegation:
       # docs/progress/deviations/2026-10-09-wave3-till-small-review-findings.md): AssignRole's grantor
       # guard needs every code of a role, so the society's administrator holds the codes of the
@@ -114,6 +117,9 @@ templates:
       - "cat.sku.view"
       - "prt.relationship.view"
       - "ord.order.accept"
+      - "ord.order.adjust"
+      - "prc.adjust.special"
+      - "prc.adjust.delivery"
       - "del.note.draft"
       - "del.note.issue"
       - "del.note.dispatch"
