@@ -148,7 +148,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 10)
-                .containsEntry("m3pricing", 7)
+                .containsEntry("m3pricing", 8)
                 .containsEntry("m5inventory", 10)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
