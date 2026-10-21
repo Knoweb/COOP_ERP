@@ -995,6 +995,16 @@ config_items:
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory
+  - key: inventory.transfer_receipt_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Calendar days a dispatched transfer may remain unreceived before a review is raised
+    description_si: යැවූ මාරු කිරීමක් සමාලෝචනයක් මතු කිරීමට පෙර නොලැබී පැවතිය හැකි දින දර්ශන දින ගණන
+    description_ta: அனுப்பப்பட்ட இடமாற்றம் மதிப்பாய்வு எழுப்பப்படுவதற்கு முன் பெறப்படாமல் இருக்கக்கூடிய நாட்காட்டி நாட்கள்
+    default: 3
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
   # wave 2, PR 08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-trading-projections.md
   # (7), CR-28A-2): the longest period and the most rows one report answers, the row cap applied in SQL.
   - key: reporting.max_period_days

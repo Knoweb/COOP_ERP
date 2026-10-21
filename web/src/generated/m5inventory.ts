@@ -187,13 +187,13 @@ export interface paths {
         };
         /**
          * The transfers leaving or arriving at a location, newest first
-         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status IN_TRANSIT until the destination receives, then RECEIVED.
+         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until the destination receives, then RECEIVED.
          */
         get: operations["listTransfers"];
         put?: never;
         /**
-         * Send stock from one location of the entity to another (issue and dispatch)
-         * @description The stock leaves the source as TRANSFER_OUT and is in transit until the destination receives it. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid, m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found, m5.transfer.insufficient_stock.
+         * Issue stock from one location of the entity to another
+         * @description The stock leaves the source as TRANSFER_OUT and remains ISSUED until separately dispatched. Codes this operation can answer with 422: m5.scope.own_required, m5.location.not_in_scope, m5.transfer.same_location, m5.transfer.destination_invalid, m5.transfer.lines_required, m5.transfer.line_invalid, m5.batch.not_found, m5.transfer.insufficient_stock.
          */
         post: operations["issueTransfer"];
         delete?: never;
@@ -219,6 +219,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inventory/transfers/{transferId}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dispatch an issued transfer from its source
+         * @description Records the insert-only dispatch fact and moves the derived lifecycle from ISSUED to IN_TRANSIT. Dispatch posts no stock movements. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_source, m5.transfer.already_dispatched, m5.transfer.already_received.
+         */
+        post: operations["dispatchTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inventory/transfers/{transferId}/receive": {
         parameters: {
             query?: never;
@@ -230,7 +250,7 @@ export interface paths {
         put?: never;
         /**
          * The destination receives the transfer in full
-         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.already_received.
+         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received.
          */
         post: operations["receiveTransfer"];
         delete?: never;
@@ -655,11 +675,16 @@ export interface components {
             /** Format: uuid */
             toLocationId: string;
             /** @enum {string} */
-            status: "IN_TRANSIT" | "RECEIVED";
+            status: "ISSUED" | "IN_TRANSIT" | "RECEIVED";
+            documentNo?: string;
             /** Format: uuid */
             issuedBy?: string;
             /** Format: date-time */
             issuedAt?: string;
+            /** Format: uuid */
+            dispatchedBy?: string;
+            /** Format: date-time */
+            dispatchedAt?: string;
             /** Format: uuid */
             receivedBy?: string;
             /** Format: date-time */
@@ -1400,7 +1425,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Issued, in status IN_TRANSIT */
+            /** @description Issued, in status ISSUED */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1440,6 +1465,32 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    dispatchTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dispatched, in status IN_TRANSIT */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            422: components["responses"]["RuleBroken"];
         };
     };
     receiveTransfer: {

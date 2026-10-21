@@ -3379,7 +3379,7 @@ components:
           description: The M5 transfer that fulfils the approved request, once the stores issued it
         transferStatus:
           type: string
-          enum: [IN_TRANSIT, RECEIVED]
+          enum: [ISSUED, IN_TRANSIT, RECEIVED]
         lines:
           type: array
           items:

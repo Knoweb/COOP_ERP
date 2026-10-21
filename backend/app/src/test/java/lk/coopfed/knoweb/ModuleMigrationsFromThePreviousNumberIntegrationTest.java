@@ -56,8 +56,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m3pricing", "7");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        // CAT-03: m5inventory V0010 (repoint_lots_on_sku_merge) from V0009 (INV-01 expiry_tasks).
-        streams.put("m5inventory", "9");
+        // INV-06: m5inventory V0011 (separate transfer dispatch) from V0010.
+        streams.put("m5inventory", "10");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
         // Wave 2, PR 08: m8reporting V0007 (projections by location, event and line) from V0006.
@@ -115,6 +115,21 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 new JdbcTemplate(new DriverManagerDataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword()));
         admin.update(
                 "insert into kernel.system_identity (singleton, entity_id) values (true, ?::uuid)", TEST_FEDERATION_ID);
+        String legacyTransfer = "0190e8ab-0000-7000-8000-000000000001";
+        String legacySource = "0190e8ab-0000-7000-8000-000000000002";
+        String legacyDestination = "0190e8ab-0000-7000-8000-000000000003";
+        String legacyIssuer = "0190e8ab-0000-7000-8000-000000000004";
+        admin.update(
+                """
+                insert into inventory.transfer
+                    (transfer_id, owner_entity_id, location_id, to_location_id, issued_by, issued_at)
+                values (?::uuid, ?::uuid, ?::uuid, ?::uuid, ?::uuid, '2026-10-20T04:30:00Z')
+                """,
+                legacyTransfer,
+                TEST_FEDERATION_ID,
+                legacySource,
+                legacyDestination,
+                legacyIssuer);
         // An M9 posting and an export over it, as the demo server holds them before V0006.
         if (!ScaffoldProof.active()) {
             insertTheDemoServersPostingAndExport(admin);
@@ -149,7 +164,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 10)
                 .containsEntry("m3pricing", 8)
-                .containsEntry("m5inventory", 10)
+                .containsEntry("m5inventory", 11)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
 
@@ -222,6 +237,20 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                                 + " and table_name = 'expiry_task'",
                         Integer.class))
                 .isEqualTo(1);
+
+        // INV-06: transfers already in transit under the old combined issue/dispatch operation are
+        // backfilled as dispatched without changing their original actor or time.
+        assertThat(admin.queryForMap(
+                        "select owner_entity_id::text, location_id::text, to_location_id::text,"
+                                + " dispatched_by::text,"
+                                + " dispatched_at = '2026-10-20T04:30:00Z'::timestamptz as issue_time_preserved"
+                                + " from inventory.transfer_dispatch where transfer_id = ?::uuid",
+                        legacyTransfer))
+                .containsEntry("owner_entity_id", TEST_FEDERATION_ID.toString())
+                .containsEntry("location_id", legacySource)
+                .containsEntry("to_location_id", legacyDestination)
+                .containsEntry("dispatched_by", legacyIssuer)
+                .containsEntry("issue_time_preserved", true);
 
         // Wave 2, PR 08: m8reporting V0007 over a database at V0006 with rows in it. The old lines
         // are numbered in their line_id order under the new key, as the migrator (not a superuser)

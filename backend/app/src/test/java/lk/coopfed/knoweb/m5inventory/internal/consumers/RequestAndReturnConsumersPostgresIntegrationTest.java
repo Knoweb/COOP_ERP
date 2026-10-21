@@ -116,7 +116,7 @@ class RequestAndReturnConsumersPostgresIntegrationTest extends PostgresIntegrati
                 queries.transferOfRequest(requestId, own(SOCIETY)).orElseThrow();
         assertThat(transfer.fromLocationId()).isEqualTo(stores);
         assertThat(transfer.toLocationId()).isEqualTo(shop);
-        assertThat(transfer.status()).isEqualTo("IN_TRANSIT");
+        assertThat(transfer.status()).isEqualTo("ISSUED");
         assertThat(transfer.lines())
                 .extracting(TransferView.Line::batchId, line -> line.qty().intValue())
                 .containsExactly(

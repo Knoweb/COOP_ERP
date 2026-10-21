@@ -303,6 +303,12 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 SHOP_A,
                 BATCH_1,
                 SKU_1);
+        db.update(
+                "insert into inventory.transfer_dispatch (transfer_id, owner_entity_id, location_id, to_location_id, dispatched_at) values (?, ?, ?, ?, now())",
+                TRANSFER_EXPECTED,
+                SOCIETY_A,
+                WAREHOUSE_A,
+                SHOP_A);
 
         // Already received transfer:
         db.update(
@@ -321,6 +327,12 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 BATCH_2,
                 SKU_1);
         db.update(
+                "insert into inventory.transfer_dispatch (transfer_id, owner_entity_id, location_id, to_location_id, dispatched_at) values (?, ?, ?, ?, now() - interval '30 minutes')",
+                TRANSFER_RECEIVED,
+                SOCIETY_A,
+                WAREHOUSE_A,
+                SHOP_A);
+        db.update(
                 "insert into inventory.transfer_receipt (transfer_id, owner_entity_id, location_id, from_location_id, received_at) values (?, ?, ?, ?, now())",
                 TRANSFER_RECEIVED,
                 SOCIETY_A,
@@ -336,6 +348,10 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
     private void clean(JdbcTemplate db) {
         db.update(
                 "delete from inventory.transfer_receipt where transfer_id in (?, ?)",
+                TRANSFER_EXPECTED,
+                TRANSFER_RECEIVED);
+        db.update(
+                "delete from inventory.transfer_dispatch where transfer_id in (?, ?)",
                 TRANSFER_EXPECTED,
                 TRANSFER_RECEIVED);
         db.update(
@@ -547,6 +563,16 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
     }
 
     @Test
+    void issuedTransferIsExcludedUntilItHasADispatchFact() {
+        superuserJdbc().update("delete from inventory.transfer_dispatch where transfer_id = ?", TRANSFER_EXPECTED);
+
+        Map<UUID, Map<String, Object>> transfers =
+                transactions.inScope(tillScopeA, () -> transferContributor.allRows("expected_transfer", shopA));
+
+        assertThat(transfers).doesNotContainKeys(TRANSFER_EXPECTED, TRANSFER_RECEIVED);
+    }
+
+    @Test
     void receivedTransferIsTombstonedInDelta() {
         Map<UUID, Map<String, Object>> rows = transactions.inScope(
                 tillScopeA,
@@ -678,14 +704,14 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
     }
 
     @Test
-    void transferIssuedAndReceivedFanOutToDestinationShop() {
+    void transferDispatchedAndReceivedFanOutToDestinationShop() {
         UUID transferId = UUID.randomUUID();
         transactions.inScope(tillScopeA, () -> {
             ObjectNode payload = json.createObjectNode()
                     .put("ownerEntityId", SOCIETY_A.toString())
                     .put("toLocationId", SHOP_A.toString())
                     .put("transferId", transferId.toString());
-            fanOut.onTransferIssued(payload, tillScopeA);
+            fanOut.onTransferDispatched(payload, tillScopeA);
             return null;
         });
 

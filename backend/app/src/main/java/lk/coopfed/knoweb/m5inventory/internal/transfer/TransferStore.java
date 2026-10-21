@@ -71,6 +71,14 @@ class TransferStore {
                 transferId));
     }
 
+    /** The source has dispatched the transfer; its primary key permits this fact only once. */
+    boolean dispatched(UUID transferId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from inventory.transfer_dispatch where transfer_id = ?)",
+                Boolean.class,
+                transferId));
+    }
+
     /** What the open pick lists of delivery notes hold of the GOOD lot of the batch at the location. */
     BigDecimal reserved(UUID locationId, UUID batchId) {
         BigDecimal held = jdbc.queryForObject(
