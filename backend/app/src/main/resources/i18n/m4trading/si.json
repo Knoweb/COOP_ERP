@@ -167,5 +167,12 @@
   "m4.transfer.decided": "මාරු ඉල්ලීම දැනටමත් තීරණය කර ඇත",
   "m4.transfer.location_invalid": "ස්ථාන දෙකම මෙම සමිතියේ ස්ථාන විය යුතුය",
   "m4.transfer.insufficient_stock": "ගබඩාවේ දැන් අයිතමයක එතරම් ප්‍රමාණයක් නැත",
-  "m4.transfer.source_required": "තොග දෙන සමිතියේ ස්ථානය තෝරන්න"
+  "m4.transfer.source_required": "තොග දෙන සමිතියේ ස්ථානය තෝරන්න",
+  "m4.order.not_adjustable": "ඇණවුම ගැලපීම් කළ හැකි තත්ත්වයක නැත",
+  "m4.adjustment.type_unknown": "ගැලපුම් වර්ගය හමු නොවීය හෝ අක්‍රියයි",
+  "m4.adjustment.amount_invalid": "ගැලපුම් මුදල බිංදුවට වඩා වැඩි විය යුතුය",
+  "m4.adjustment.exceeds_max_amount": "ගැලපුම් මුදල අවසර ලත් උපරිමය ඉක්මවයි",
+  "m4.adjustment.exceeds_max_percent": "ගැලපුම් වට්ටම අවසර ලත් උපරිම ප්‍රතිශතය ඉක්මවයි",
+  "m4.adjustment.already_recorded": "මෙම වර්ගයේ ගැලපීමක් මෙම ඇණවුම සඳහා දැනටමත් වාර්තා කර ඇත",
+  "m4.adjustment.permission_denied": "මෙම ගැලපුම් වර්ගය වාර්තා කිරීමට ඔබට අවසර නැත"
 }
