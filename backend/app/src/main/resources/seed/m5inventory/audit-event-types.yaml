@@ -222,3 +222,8 @@ audit_event_types:
     severity: REVIEW
     offline_capturable: false
     description_en: Stock lot quantity on hand drifted from the sum of its movements
+
+  - code: STOCK_LOT_NEGATIVE_ESCALATED
+    severity: REVIEW
+    offline_capturable: false
+    description_en: An oversold negative stock lot was escalated after remaining unacknowledged
