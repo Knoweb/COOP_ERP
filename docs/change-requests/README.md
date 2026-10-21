@@ -58,6 +58,7 @@ Every change request below is **accepted** (or **accepted as revised**) and alre
 ### 23A (M3 Pricing Implementation Guide)
 
 - `CR-23A-1` — §3, §6, §7: `FIXED_PRICE > 0`, `PERCENT_OFF < 100`, a RETAIL line price `> 0`; a control price backdated by at most `pricing.control_price_backdate_days` with a REVIEW audit; the expiry markdown on the identified or FEFO-first in-date batch, never at days < 0, zero-benefit rules dropped, engine 0.2.0; `control_price` written by the Federation only in SQL, `advisory_read` the Federation's lists only, `buyer_read` ACTIVE relationships only. Wave 2, 6 Oct 2026.
+- `CR-23A-2` — §6–§7: a queued shelf-label job publishes `label_job.requested.v1`; successful rendering alone publishes `label_job.rendered.v1`; terminal failure publishes `label_job.failed.v1`, so each lifecycle handler obeys the audit/event rule without announcing a render before a PDF exists. PRC-03, 21 Oct 2026.
 
 ### 24A (M4 Trading Documents Implementation Guide)
 

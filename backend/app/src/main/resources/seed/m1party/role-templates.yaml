@@ -57,6 +57,7 @@ templates:
       - "prc.rule.author"
       - "prc.rule.activate"
       - "prc.mrp_policy.set"
+      - "prc.label.print"
       - "ord.order.adjust"
       - "prc.adjust.special"
       - "prc.adjust.delivery"

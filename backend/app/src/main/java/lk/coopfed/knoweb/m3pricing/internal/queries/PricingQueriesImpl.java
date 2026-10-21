@@ -27,12 +27,14 @@ import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m2catalogue.query.SkuView;
 import lk.coopfed.knoweb.m3pricing.internal.adjustment.AdjustmentTypeStore;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.ControlPriceStore;
+import lk.coopfed.knoweb.m3pricing.internal.label.LabelJobStore;
 import lk.coopfed.knoweb.m3pricing.internal.list.PriceListStore;
 import lk.coopfed.knoweb.m3pricing.internal.policy.EffectivePolicy;
 import lk.coopfed.knoweb.m3pricing.internal.review.PricingReviews;
 import lk.coopfed.knoweb.m3pricing.internal.rule.RuleStore;
 import lk.coopfed.knoweb.m3pricing.query.AdjustmentTypeView;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
@@ -70,6 +72,7 @@ class PricingQueriesImpl implements PricingQueries {
     private final AuditReviewReader auditReviews;
     private final CatalogueQueries catalogue;
     private final AdjustmentTypeStore adjustmentTypes;
+    private final LabelJobStore labelJobs;
 
     @SuppressWarnings("java:S107") // the inputs of the central resolution; a query service only reads
     PricingQueriesImpl(
@@ -82,7 +85,8 @@ class PricingQueriesImpl implements PricingQueries {
             ObjectMapper mapper,
             AuditReviewReader auditReviews,
             CatalogueQueries catalogue,
-            AdjustmentTypeStore adjustmentTypes) {
+            AdjustmentTypeStore adjustmentTypes,
+            LabelJobStore labelJobs) {
         this.catalogue = catalogue;
         this.store = store;
         this.relationships = relationships;
@@ -93,6 +97,12 @@ class PricingQueriesImpl implements PricingQueries {
         this.mapper = mapper;
         this.auditReviews = auditReviews;
         this.adjustmentTypes = adjustmentTypes;
+        this.labelJobs = labelJobs;
+    }
+
+    @Override
+    public Optional<LabelJobView> labelJob(UUID jobId, ScopeContext scope) {
+        return labelJobs.find(jobId).map(labelJobs::view);
     }
 
     @Override

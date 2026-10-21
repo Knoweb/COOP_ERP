@@ -105,6 +105,9 @@ public interface PricingQueries {
      */
     List<ReviewItem> listReviews(String kind, String status, ScopeContext scope);
 
+    /** One shelf-label print job, empty when RLS does not expose it to the caller. */
+    Optional<LabelJobView> labelJob(UUID jobId, ScopeContext scope);
+
     // ---- M3-07 / PRC-10: adjustment types ----------------------------------------------------
 
     /** GetAdjustmentType: one adjustment type by code; empty when it does not exist. */

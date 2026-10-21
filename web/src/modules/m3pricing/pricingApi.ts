@@ -25,6 +25,7 @@ export type Rule = components["schemas"]["RuleResponse"];
 export type AuthorRuleRequest = components["schemas"]["AuthorRuleRequest"];
 export type WithdrawRuleRequest = components["schemas"]["WithdrawRuleRequest"];
 export type ReviewItem = components["schemas"]["ReviewItem"];
+export type LabelJob = components["schemas"]["LabelJobResponse"];
 export type LotBalance = inventoryComponents["schemas"]["LotBalanceResponse"];
 export type Sku = catalogueComponents["schemas"]["SkuResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
@@ -107,6 +108,21 @@ export function usePricingApi() {
           params: { path: { listId }, header: { "Idempotency-Key": idempotencyKey } },
           body: { applyFrom }
         });
+        return data!;
+      },
+
+      /** Queue all requested lines of the RETAIL list in force today for one shop. */
+      async printLabels(locationId: string, skuIds: string[], idempotencyKey: string): Promise<LabelJob> {
+        const { data } = await api.POST("/v1/pricing/labels", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body: { locationId, skuIds }
+        });
+        return data!;
+      },
+
+      /** Re-read a label job so a rendered result always carries a fresh download link. */
+      async labelJob(jobId: string): Promise<LabelJob> {
+        const { data } = await api.GET("/v1/pricing/labels/{jobId}", { params: { path: { jobId } } });
         return data!;
       },
 

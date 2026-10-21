@@ -13,6 +13,22 @@ import { DEMO, DEMO_LOCATIONS, FED_OFFICER, openSignedIn, textOf } from "./suppo
 
 const RICE = /නාඩු සහල් 5 kg/;
 
+function colomboToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo" }).format(new Date());
+}
+
+function toIsoDate(text: string): string | null {
+  const parts = text.split("/");
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+  return null;
+}
+
 function colomboTomorrow(): string {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo" }).format(new Date());
   const next = new Date(`${today}T00:00:00Z`);
@@ -64,6 +80,131 @@ test("a shelf price above the control price is refused, and the published price 
   const answer = page.getByRole("definition");
   await expect(answer.first()).toContainText("1,100.00");
   await expect(answer.filter({ hasText: "1,100.00" })).toHaveCount(3); // price, list price, control price
+});
+
+test("the effective shelf list prints eligible labels and reports a label above the control price", async ({ page }) => {
+  test.setTimeout(120_000);
+  const manager = DEMO.m101Manager;
+  const text = (id: string) => textOf(manager, id);
+  let requested: { locationId: string; skuIds: string[] } | null = null;
+  const jobId = "0190e903-2000-7000-8000-000000000001";
+
+  // Chromium and the worker are covered by the backend print integration test. Here the browser
+  // contract is deterministic: queue, poll to RENDERED, then show the control-price refusal.
+  await page.route(/\/v1\/pricing\/labels/, async (route) => {
+    const request = route.request();
+    const cors = {
+      "access-control-allow-origin": request.headers()["origin"] ?? "*",
+      "access-control-allow-credentials": "true"
+    };
+    if (request.method() === "POST") {
+      requested = request.postDataJSON() as { locationId: string; skuIds: string[] };
+      return route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        headers: cors,
+        json: {
+          jobId,
+          locationId: requested.locationId,
+          status: "QUEUED",
+          requestedCount: requested.skuIds.length,
+          renderedCount: 0,
+          refused: [],
+          createdAt: "2026-10-21T06:00:00Z"
+        }
+      });
+    }
+    if (request.method() === "GET" && requested) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: cors,
+        json: {
+          jobId,
+          locationId: requested.locationId,
+          status: "RENDERED",
+          requestedCount: requested.skuIds.length,
+          renderedCount: Math.max(0, requested.skuIds.length - 1),
+          refused: [{
+            skuId: requested.skuIds[0],
+            skuCode: "SKU-NADU-5KG",
+            reason: "ABOVE_CONTROL_PRICE",
+            listPrice: 1200,
+            ceilingPrice: 1100,
+            ceilingReference: "2492/29"
+          }],
+          downloadUrl: `${new URL(request.url()).origin}/reports/labels.pdf`,
+          createdAt: "2026-10-21T06:00:00Z"
+        }
+      });
+    }
+    return route.continue();
+  });
+
+  await openSignedIn(page, manager, "/pricing/shelf");
+  await expect(page.getByRole("table")).toBeVisible();
+
+  // Find the effective retail list in force today (apply_from <= today, highest version).
+  // This is independent of test execution order and whether another test drafted/published
+  // a new version applying from tomorrow.
+  const today = colomboToday();
+  const tableRows = page.getByRole("table").getByRole("row");
+  const rowCount = await tableRows.count();
+  let effectiveLink = null;
+  let highestVersion = -1;
+
+  for (let i = 1; i < rowCount; i++) {
+    const row = tableRows.nth(i);
+    const cells = row.getByRole("cell");
+    const cellCount = await cells.count();
+    if (cellCount < 5) continue;
+    const versionText = (await cells.nth(2).innerText()).trim();
+    const version = parseInt(versionText, 10);
+    const applyFromText = (await cells.nth(4).innerText()).trim();
+    const isoDate = toIsoDate(applyFromText);
+    if (isoDate && isoDate <= today && version > highestVersion) {
+      highestVersion = version;
+      effectiveLink = cells.nth(0).getByRole("link");
+    }
+  }
+
+  if (!effectiveLink) {
+    const v1Row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: "1", exact: true }) });
+    if ((await v1Row.count()) > 0) {
+      effectiveLink = v1Row.first().getByRole("link");
+    } else {
+      effectiveLink = page.getByRole("row").nth(1).getByRole("link");
+    }
+  }
+
+  await expect(effectiveLink).toBeVisible();
+  await effectiveLink.click();
+
+  await expect(page.getByRole("button", { name: text("pricing.labels.print"), exact: true })).toBeVisible();
+
+  await page.getByLabel(text("pricing.labels.shop"), { exact: true }).selectOption(DEMO_LOCATIONS.m101TownShop);
+  await page.getByRole("button", { name: text("pricing.labels.print"), exact: true }).click();
+
+  await expect(page.getByText("SKU-NADU-5KG", { exact: true })).toBeVisible();
+  await expect(page.getByText(text("pricing.labels.reason.above_control_price"), { exact: true })).toBeVisible();
+  await expect(page.getByText(/2492\/29/)).toBeVisible();
+  await expect(page.getByRole("button", { name: text("pricing.labels.open"), exact: true })).toBeVisible();
+  expect(requested?.locationId).toBe(DEMO_LOCATIONS.m101TownShop);
+  expect(requested?.skuIds.length).toBeGreaterThan(1);
+
+  await page.context().route("**/reports/labels.pdf*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      headers: { "content-disposition": 'attachment; filename="labels.pdf"' },
+      body: "%PDF-1.4"
+    })
+  );
+  const [download] = await Promise.all([
+    page.context().waitForEvent("download"),
+    page.getByRole("button", { name: text("pricing.labels.open"), exact: true }).click()
+  ]);
+  expect(download.url()).toContain("/reports/labels.pdf");
 });
 
 test("an MPCS user authors and activates a promotion rule on screen", async ({ page }) => {
