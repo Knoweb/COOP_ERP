@@ -996,6 +996,16 @@ config_items:
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory
+  - key: inventory.negative_lot_escalation_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Days an oversold stock lot may remain unacknowledged before escalating
+    description_si: අධික ලෙස විකිණූ තොග කාණ්ඩයක් ඉහළට යොමු කිරීමට පෙර පිළිගැනීමකින් තොරව පැවතිය හැකි දින ගණන
+    description_ta: அதிகப்படியாக விற்கப்பட்ட இருப்புத் தொகுதி தீவிரப்படுத்தப்படுவதற்கு முன் ஒப்புக்கொள்ளப்படாமல் இருக்கக்கூடிய நாட்கள்
+    default: 7
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
   # wave 2, PR 08 (decided 6 October 2026: docs/progress/deviations/2026-10-06-wave2-trading-projections.md
   # (7), CR-28A-2): the longest period and the most rows one report answers, the row cap applied in SQL.
   - key: reporting.max_period_days

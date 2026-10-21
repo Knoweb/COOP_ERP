@@ -1183,6 +1183,127 @@ paths:
           $ref: 'common.yaml#/components/responses/RuleBroken'
 
 
+  /v1/catalogue/tax/categories:
+
+    get:
+      tags: [Tax]
+      operationId: listTaxCategories
+      summary: List all tax categories
+      x-permission: cat.sku.view
+
+      responses:
+        '200':
+          description: List of tax categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaxCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Tax]
+      operationId: defineTaxCategory
+      summary: Define a new tax category
+      x-permission: cat.tax.publish
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefineTaxCategoryRequest'
+
+      responses:
+        '201':
+          description: Tax category defined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxCategoryResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
+  /v1/catalogue/tax/rates:
+
+    get:
+      tags: [Tax]
+      operationId: listTaxRates
+      summary: List rates of a category or the rate in force
+      x-permission: cat.sku.view
+
+      parameters:
+        - in: query
+          name: categoryId
+          required: false
+          schema:
+            type: string
+            format: uuid
+
+        - in: query
+          name: date
+          required: false
+          schema:
+            type: string
+            format: date
+
+      responses:
+        '200':
+          description: Tax rates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaxRateResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+    post:
+      tags: [Tax]
+      operationId: publishTaxRate
+      summary: Publish a tax rate for a category
+      x-permission: cat.tax.publish
+      x-scope: FEDERATION
+
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishTaxRateRequest'
+
+      responses:
+        '201':
+          description: Tax rate published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRateResponse'
+
+        '400':
+          $ref: 'common.yaml#/components/responses/RequestProblem'
+
+        '422':
+          $ref: 'common.yaml#/components/responses/RuleBroken'
+
+
 components:
 
   schemas:
@@ -2072,4 +2193,68 @@ components:
         canonicalSkuId:
           type: string
           format: uuid
+
+
+    DefineTaxCategoryRequest:
+      type: object
+      required:
+        - code
+        - nameEn
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 12
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 80
+        nameSi:
+          type: string
+          maxLength: 80
+        nameTa:
+          type: string
+          maxLength: 80
+
+
+    PublishTaxRateRequest:
+      type: object
+      required:
+        - taxCategoryId
+        - ratePercent
+        - applyFrom
+      properties:
+        taxCategoryId:
+          type: string
+          format: uuid
+        ratePercent:
+          type: number
+          minimum: 0
+          maximum: 100
+        applyFrom:
+          type: string
+          format: date
+
+
+    TaxRateResponse:
+      type: object
+      required:
+        - taxCategoryId
+        - ratePercent
+        - effectiveFrom
+      properties:
+        taxCategoryId:
+          type: string
+          format: uuid
+        taxCategoryCode:
+          type: string
+        ratePercent:
+          type: number
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type: string
+          format: date
+
 

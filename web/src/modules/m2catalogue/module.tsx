@@ -11,12 +11,21 @@ import { CataloguePage } from "./CataloguePage";
 import { CatalogueImportPage } from "./CatalogueImportPage";
 import { NewSkuPage } from "./NewSkuPage";
 import { SkuPage } from "./SkuPage";
+import { TaxRatesPage } from "./TaxRatesPage";
 
 export const catalogueModule: ModuleDefinition = {
   id: "catalogue",
 
   routes: [
     { path: "catalogue", element: <CataloguePage /> },
+    {
+      path: "catalogue/tax-rates",
+      element: (
+        <RequirePermission anyOf={["cat.tax.publish", "cat.sku.view"]}>
+          <TaxRatesPage />
+        </RequirePermission>
+      )
+    },
     {
       path: "catalogue/import",
       element: (
@@ -37,7 +46,10 @@ export const catalogueModule: ModuleDefinition = {
   ],
 
   // The label is a message id of catalogue.messages.json, never literal text.
-  navItems: [{ labelId: "catalogue.nav", to: "/catalogue" }],
+  navItems: [
+    { labelId: "catalogue.nav", to: "/catalogue" },
+    { labelId: "catalogue.tax.nav", to: "/catalogue/tax-rates" }
+  ],
 
   // x-permissions of openapi/m2catalogue.yaml, read from the session's resolved set (PR #144).
   requiredPermissions: [
@@ -45,6 +57,7 @@ export const catalogueModule: ModuleDefinition = {
     "cat.sku.create_local",
     "cat.sku.create",
     "cat.barcode.manage",
-    "cat.import.run"
+    "cat.import.run",
+    "cat.tax.publish"
   ]
 };
