@@ -127,7 +127,7 @@ test("a mis-keyed MRP on a batch can be successfully corrected via the screen", 
   // On Batch Details Page
   await expect(page).toHaveURL(/\/catalogue\/batches\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 2, name: textOf(FED_OFFICER, "catalogue.batch.title") })).toBeVisible();
-  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.batch.status.REGISTERED"), { exact: true })).toBeVisible();
+  await expect(page.locator(".state-chip").getByText(textOf(FED_OFFICER, "catalogue.batch.status.REGISTERED"), { exact: true })).toBeVisible();
 
   // Initiate correction
   const correctBtn = page.getByRole("button", { name: textOf(FED_OFFICER, "catalogue.batch.correct") });
@@ -151,14 +151,14 @@ test("a mis-keyed MRP on a batch can be successfully corrected via the screen", 
   // Assert successful correction notice and superseded state
   await expect(page.getByText(textOf(FED_OFFICER, "catalogue.batch.success.corrected"))).toBeVisible();
   await expect(page.getByText(textOf(FED_OFFICER, "catalogue.batch.superseded_notice"))).toBeVisible();
-  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.batch.status.SUPERSEDED"), { exact: true })).toBeVisible();
+  await expect(page.locator(".state-chip").getByText(textOf(FED_OFFICER, "catalogue.batch.status.SUPERSEDED"), { exact: true })).toBeVisible();
 
   // Click the link to the replacement batch
   await page.locator(".import-alert--success a").click();
 
   // Assert replacement batch is now the active registered batch with the corrected MRP
   await expect(page).toHaveURL(/\/catalogue\/batches\/[0-9a-f-]{36}$/);
-  await expect(page.getByText(textOf(FED_OFFICER, "catalogue.batch.status.REGISTERED"), { exact: true })).toBeVisible();
+  await expect(page.locator(".state-chip").getByText(textOf(FED_OFFICER, "catalogue.batch.status.REGISTERED"), { exact: true })).toBeVisible();
   await expect(page.locator(".batch-detail-value--mrp")).toContainText(targetMrp.replace(".00", ""));
   await expect(page.locator(".batch-chain-notice")).toBeVisible();
 });
