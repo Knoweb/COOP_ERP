@@ -135,6 +135,12 @@ class M3ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
         db.update("delete from party.location where location_id in (?, ?)", SHOP_A, SHOP_B);
         db.update("delete from party.entity_party_directory where entity_id in (?, ?)", SOCIETY_A, SOCIETY_B);
         db.update("delete from party.entity where entity_id in (?, ?)", SOCIETY_A, SOCIETY_B);
+        db.update(
+                "delete from catalogue.location_assortment where owner_entity_id in (?, ?, ?)",
+                SOCIETY_A,
+                SOCIETY_B,
+                TEST_FEDERATION);
+        db.update("delete from catalogue.location_assortment where sku_id in (?, ?)", SKU_1, SKU_2);
         db.update("delete from catalogue.sku where sku_id in (?, ?)", SKU_1, SKU_2);
         db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }

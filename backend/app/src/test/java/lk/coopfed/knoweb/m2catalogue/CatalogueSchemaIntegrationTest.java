@@ -288,6 +288,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         } finally {
             db.update("delete from catalogue.batch where batch_id = ?", batch);
             db.update("delete from catalogue.batch_key where batch_id = ?", batch);
+            db.update("delete from catalogue.location_assortment where sku_id = ?", sku);
             db.update("delete from catalogue.sku where sku_id = ?", sku);
             dropTheMonthsBeyondTheMigration(db);
         }

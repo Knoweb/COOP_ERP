@@ -24,6 +24,7 @@ import lk.coopfed.knoweb.m2catalogue.api.ImageAttached;
 import lk.coopfed.knoweb.m2catalogue.api.SkuDeactivated;
 import lk.coopfed.knoweb.m2catalogue.api.SkuUpdated;
 import lk.coopfed.knoweb.testsupport.PostgresIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,33 +77,8 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setupFixtures() {
+        clean(superuserJdbc());
         JdbcTemplate db = superuserJdbc();
-
-        // Clean up in reverse FK order
-        db.update("delete from catalogue.batch_key where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.sku_barcode where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.sku_image where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.sku_uom_conversion where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.sku_tag where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.batch where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.sku where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
-        db.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_ID);
-        db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_ID);
-
-        db.update(
-                "delete from kernel.change_log where location_id in (?, ?, ?, ?)",
-                SHOP_A,
-                SHOP_B,
-                SHOP_A_ONBOARDING,
-                SHOP_B_DORMANT);
-        db.update(
-                "delete from party.location where location_id in (?, ?, ?, ?)",
-                SHOP_A,
-                SHOP_B,
-                SHOP_A_ONBOARDING,
-                SHOP_B_DORMANT);
-        db.update("delete from party.entity_party_directory where entity_id in (?, ?)", ENTITY_A, ENTITY_B);
-        db.update("delete from party.entity where entity_id in (?, ?)", ENTITY_A, ENTITY_B);
 
         // Entities
         db.update(
@@ -155,7 +131,7 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
                 """
                 insert into catalogue.sku (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si,
                                            short_name_ta, base_uom_code, tax_category_id)
-                values (?, 'SKU-SHR', ?, 'SHARED', 'Shared Rice 5kg', 'සහල් 5kg', 'அரிசி 5kg', 'EA', ?)
+                values (?, 'SKU-SHR', ?, 'SHARED', 'Shared Rice 5kg', 'සහල් 5kg', 'அரிසි 5kg', 'EA', ?)
                 """,
                 SKU_SHARED,
                 TEST_FEDERATION,
@@ -164,11 +140,81 @@ public class M2ChangeLogFanOutIntegrationTest extends PostgresIntegrationTest {
                 """
                 insert into catalogue.sku (sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si,
                                            short_name_ta, base_uom_code, tax_category_id)
-                values (?, 'SKU-LOC-A', ?, 'LOCAL', 'Local Bread', 'පාන්', 'ரொட்டி', 'EA', ?)
+                values (?, 'SKU-LOC-A', ?, 'LOCAL', 'Local Bread', 'පාන්', 'රොටි', 'EA', ?)
                 """,
                 SKU_LOCAL_A,
                 ENTITY_A,
                 TAX_ID);
+
+        // Location assortment for designated shops
+        db.update(
+                """
+                insert into catalogue.location_assortment (location_id, sku_id, reasons, sell_through, owner_entity_id)
+                values (?, ?, ARRAY['CORE_RANGE']::text[], false, ?),
+                       (?, ?, ARRAY['LOCAL']::text[], false, ?),
+                       (?, ?, ARRAY['CORE_RANGE']::text[], false, ?),
+                       (?, ?, ARRAY['CORE_RANGE']::text[], false, ?),
+                       (?, ?, ARRAY['LOCAL']::text[], false, ?),
+                       (?, ?, ARRAY['CORE_RANGE']::text[], false, ?)
+                on conflict (location_id, sku_id) do nothing
+                """,
+                SHOP_A,
+                SKU_SHARED,
+                ENTITY_A,
+                SHOP_A,
+                SKU_LOCAL_A,
+                ENTITY_A,
+                SHOP_B,
+                SKU_SHARED,
+                ENTITY_B,
+                SHOP_A_ONBOARDING,
+                SKU_SHARED,
+                ENTITY_A,
+                SHOP_A_ONBOARDING,
+                SKU_LOCAL_A,
+                ENTITY_A,
+                SHOP_B_DORMANT,
+                SKU_SHARED,
+                ENTITY_B);
+    }
+
+    @AfterEach
+    void cleanAfterwards() {
+        clean(superuserJdbc());
+    }
+
+    private static void clean(JdbcTemplate db) {
+        db.update(
+                "delete from catalogue.location_assortment where location_id in (?, ?, ?, ?)",
+                SHOP_A,
+                SHOP_B,
+                SHOP_A_ONBOARDING,
+                SHOP_B_DORMANT);
+        db.update("delete from catalogue.location_assortment where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.batch_key where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.sku_barcode where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.sku_image where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.sku_uom_conversion where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.sku_tag where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.batch where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.sku where sku_id in (?, ?)", SKU_LOCAL_A, SKU_SHARED);
+        db.update("delete from catalogue.tax_rate where tax_category_id = ?", TAX_ID);
+        db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_ID);
+
+        db.update(
+                "delete from kernel.change_log where location_id in (?, ?, ?, ?)",
+                SHOP_A,
+                SHOP_B,
+                SHOP_A_ONBOARDING,
+                SHOP_B_DORMANT);
+        db.update(
+                "delete from party.location where location_id in (?, ?, ?, ?)",
+                SHOP_A,
+                SHOP_B,
+                SHOP_A_ONBOARDING,
+                SHOP_B_DORMANT);
+        db.update("delete from party.entity_party_directory where entity_id in (?, ?)", ENTITY_A, ENTITY_B);
+        db.update("delete from party.entity where entity_id in (?, ?)", ENTITY_A, ENTITY_B);
     }
 
     @Test
