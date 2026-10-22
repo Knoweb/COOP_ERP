@@ -159,6 +159,7 @@ test("a mis-keyed MRP on a batch can be successfully corrected via the screen", 
   // Assert replacement batch is now the active registered batch with the corrected MRP
   await expect(page).toHaveURL(/\/catalogue\/batches\/[0-9a-f-]{36}$/);
   await expect(page.locator(".state-chip").getByText(textOf(FED_OFFICER, "catalogue.batch.status.REGISTERED"), { exact: true })).toBeVisible();
-  await expect(page.locator(".batch-detail-value--mrp")).toContainText(targetMrp.replace(".00", ""));
+  const expectedFormattedMrp = Number(targetMrp).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  await expect(page.locator(".batch-detail-value--mrp")).toContainText(expectedFormattedMrp);
   await expect(page.locator(".batch-chain-notice")).toBeVisible();
 });
