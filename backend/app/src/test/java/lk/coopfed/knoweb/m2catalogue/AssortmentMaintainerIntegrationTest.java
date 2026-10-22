@@ -330,10 +330,11 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         assertThat(drifts).isGreaterThanOrEqualTo(2);
 
         // Extraneous SKU removed
-        assertThat(store.get(LOC_A, SKU_UNASSIGNED)).isEmpty();
+        assertThat(transactions.inScope(scopeA, () -> store.get(LOC_A, SKU_UNASSIGNED)))
+                .isEmpty();
 
         // Missing SKU restored with LOT and LOCAL reasons
-        Optional<AssortmentRecord> restored = store.get(LOC_A, SKU_LOCAL_A);
+        Optional<AssortmentRecord> restored = transactions.inScope(scopeA, () -> store.get(LOC_A, SKU_LOCAL_A));
         assertThat(restored).isPresent();
         assertThat(restored.get().reasons()).contains("LOT", "LOCAL");
 

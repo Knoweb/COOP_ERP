@@ -99,6 +99,7 @@ public class AssortmentMaintainer {
         }
     }
 
+    @Transactional
     public void upsert(
             UUID locationId,
             UUID skuId,
@@ -112,6 +113,7 @@ public class AssortmentMaintainer {
                 scope);
     }
 
+    @Transactional
     public void delete(UUID locationId, UUID skuId, ScopeContext scope) {
         onAssortmentDrift(
                 new AssortmentDriftDetected(
