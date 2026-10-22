@@ -193,8 +193,8 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         db.update(
                 """
                 insert into inventory.stock_lot (
-                    stock_lot_id, owner_entity_id, location_id, sku_id, batch_id, condition, qty_on_hand, unit_cost
-                ) values (gen_random_uuid(), ?, ?, ?, ?, 'GOOD', 15.000, 100.00)
+                    stock_lot_id, owner_entity_id, location_id, sku_id, batch_id, condition, qty_on_hand, unit_cost, received_at
+                ) values (gen_random_uuid(), ?, ?, ?, ?, 'GOOD', 15.000, 100.00, now())
                 """,
                 MPCS_A,
                 LOC_A,
@@ -313,8 +313,8 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
                 .update(
                         """
                 insert into inventory.stock_lot (
-                    stock_lot_id, owner_entity_id, location_id, sku_id, batch_id, condition, qty_on_hand, unit_cost
-                ) values (gen_random_uuid(), ?, ?, ?, ?, 'GOOD', 5.000, 100.00)
+                    stock_lot_id, owner_entity_id, location_id, sku_id, batch_id, condition, qty_on_hand, unit_cost, received_at
+                ) values (gen_random_uuid(), ?, ?, ?, ?, 'GOOD', 5.000, 100.00, now())
                 """,
                         MPCS_A,
                         LOC_A,
