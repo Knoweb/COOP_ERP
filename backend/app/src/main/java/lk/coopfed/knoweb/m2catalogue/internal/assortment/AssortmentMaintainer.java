@@ -74,7 +74,7 @@ public class AssortmentMaintainer {
     public void onAssortmentDrift(AssortmentDriftDetected event, ScopeContext scope) {
         if (event.action() == AssortmentDriftDetected.Action.DELETE) {
             jdbc.update(
-                    "DELETE FROM catalogue.location_assortment WHERE location_id = ? AND sku_id = ?",
+                    "UPDATE catalogue.location_assortment SET reasons = '{}', sell_through = false WHERE location_id = ? AND sku_id = ?",
                     event.locationId(),
                     event.skuId());
         } else {

@@ -146,11 +146,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         JdbcTemplate db = superuserJdbc();
 
         for (String table : POLICIES.keySet()) {
-            if (POLICIES.get(table).contains("own_delete")) {
-                assertThat(may(db, table, "DELETE")).as(table + " DELETE").isTrue();
-            } else {
-                assertThat(may(db, table, "DELETE")).as(table + " DELETE").isFalse();
-            }
+            assertThat(may(db, table, "DELETE")).as(table + " DELETE").isFalse();
             assertThat(may(db, table, "TRUNCATE")).as(table + " TRUNCATE").isFalse();
             assertThat(may(db, table, "SELECT")).as(table + " SELECT").isTrue();
         }

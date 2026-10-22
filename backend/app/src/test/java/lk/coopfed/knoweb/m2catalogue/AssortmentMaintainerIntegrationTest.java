@@ -89,7 +89,7 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         // 1. Entities & Locations
         db.update(
                 """
-                insert into party.entity (entity_id, entity_type, code, name_en, status)
+                insert into party.entity (entity_id, entity_type, entity_code, legal_name_en, status)
                 values (?, 'MPCS', 'MPCS-A', 'MPCS A', 'ACTIVE'),
                        (?, 'MPCS', 'MPCS-B', 'MPCS B', 'ACTIVE')
                 on conflict (entity_id) do nothing

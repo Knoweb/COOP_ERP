@@ -825,6 +825,15 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 barcode,
                 sku,
                 MPCS);
+        db.update(
+                """
+                insert into catalogue.location_assortment (location_id, sku_id, reasons, sell_through, since, owner_entity_id)
+                values (?, ?, ARRAY['LOCAL']::text[], false, now(), ?)
+                on conflict (location_id, sku_id) do nothing
+                """,
+                SHOP,
+                sku,
+                MPCS);
         outer.run(
                 own(MPCS),
                 () -> ledger.post(
@@ -864,6 +873,7 @@ class TillSaleEndToEndIntegrationTest extends PostgresIntegrationTest {
                 "kernel.location_snapshot_version")) {
             db.update("delete from " + table + " where owner_entity_id = ?", MPCS);
         }
+        db.update("delete from catalogue.location_assortment where owner_entity_id = ?", MPCS);
         db.update("delete from catalogue.sku_barcode where owner_entity_id = ?", MPCS);
         db.update("delete from kernel.numbering_series where series_id = ?", SERIES);
         db.update("delete from party.device where owner_entity_id = ?", MPCS);

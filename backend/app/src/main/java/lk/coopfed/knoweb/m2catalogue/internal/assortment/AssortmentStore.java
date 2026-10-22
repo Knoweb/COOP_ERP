@@ -30,6 +30,7 @@ public class AssortmentStore {
                 SELECT location_id, sku_id, reasons, sell_through, since, owner_entity_id
                   FROM catalogue.location_assortment
                  WHERE location_id = ? AND sku_id = ?
+                   AND (cardinality(reasons) > 0 OR sell_through = true)
                 """,
                 AssortmentStore::mapRow,
                 locationId,
@@ -43,6 +44,7 @@ public class AssortmentStore {
                 SELECT location_id, sku_id, reasons, sell_through, since, owner_entity_id
                   FROM catalogue.location_assortment
                  WHERE location_id = ?
+                   AND (cardinality(reasons) > 0 OR sell_through = true)
                  ORDER BY sku_id
                 """,
                 AssortmentStore::mapRow,
@@ -55,6 +57,7 @@ public class AssortmentStore {
                 SELECT location_id, sku_id, reasons, sell_through, since, owner_entity_id
                   FROM catalogue.location_assortment
                  WHERE sku_id = ?
+                   AND (cardinality(reasons) > 0 OR sell_through = true)
                  ORDER BY location_id
                 """,
                 AssortmentStore::mapRow,
@@ -67,6 +70,7 @@ public class AssortmentStore {
                 SELECT location_id, sku_id, reasons, sell_through, since, owner_entity_id
                   FROM catalogue.location_assortment
                  WHERE sku_id = ? AND ? = ANY(reasons)
+                   AND (cardinality(reasons) > 0 OR sell_through = true)
                  ORDER BY location_id
                 """,
                 AssortmentStore::mapRow,

@@ -99,7 +99,8 @@ public class CatalogueSnapshotContributor implements SnapshotContributor {
                            a.sell_through
                       from catalogue.sku s
                       join catalogue.location_assortment a on a.sku_id = s.sku_id and a.location_id = :locationId
-                     where (s.status in ('LOCAL', 'SHARED') or (s.status = 'INACTIVE' and a.sell_through = true))"""
+                     where ((s.status in ('LOCAL', 'SHARED') and (cardinality(a.reasons) > 0 or a.sell_through = true))
+                            or (s.status = 'INACTIVE' and a.sell_through = true))"""
                             + onlyIds
                             + " order by s.sku_id",
                     params,

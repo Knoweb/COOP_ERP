@@ -345,7 +345,7 @@ class BarcodeLookupQuery {
 
     private Optional<Boolean> checkSellThrough(UUID locationId, UUID skuId) {
         List<Boolean> list = jdbc.queryForList(
-                "select sell_through from catalogue.location_assortment where location_id = ? and sku_id = ?",
+                "select sell_through from catalogue.location_assortment where location_id = ? and sku_id = ? and (cardinality(reasons) > 0 or sell_through = true)",
                 Boolean.class,
                 locationId,
                 skuId);
