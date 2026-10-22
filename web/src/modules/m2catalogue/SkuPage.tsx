@@ -10,6 +10,7 @@ import { ApiProblem } from "../../shell/api/client";
 import { useIdempotencyKey } from "../../shell/api/idempotency";
 import { useHasPermission } from "../../shell/auth/permissions";
 import { StateChip } from "../../shell/components/StateChip";
+import { ReasonCapture } from "../../shell/components/ReasonCapture";
 import "./catalogue.css";
 import { useCatalogueApi, type Symbology } from "./catalogueApi";
 import { SkuFields } from "./SkuFields";
@@ -40,13 +41,19 @@ export function SkuPage() {
   const language = languageOf(intl.locale);
   const canEditLocal = useHasPermission("cat.sku.create_local");
   const canShare = useHasPermission("cat.sku.create");
+  const canDeactivate = useHasPermission("cat.sku.deactivate");
   const canBarcode = useHasPermission("cat.barcode.manage");
   const canImage = useHasPermission("cat.image.manage");
   const saveKey = useIdempotencyKey();
   const activateKey = useIdempotencyKey();
+  const deactivateKey = useIdempotencyKey();
+  const reactivateKey = useIdempotencyKey();
 
   const sku = useQuery({ queryKey: ["catalogue", "sku", skuId], queryFn: () => api.getSku(skuId) });
   const [form, setForm] = useState<SkuForm>(EMPTY_FORM);
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
+  const [confirmingReactivate, setConfirmingReactivate] = useState(false);
+
   useEffect(() => {
     if (sku.data) {
       setForm(formOf(sku.data));
@@ -71,6 +78,28 @@ export function SkuPage() {
       refresh();
     },
     onError: forgetKeyOnProblem(activateKey)
+  });
+
+  const deactivate = useMutation({
+    mutationFn: (reason: { reasonCode: string; reasonText?: string }) =>
+      api.deactivateSku(skuId, reason, deactivateKey.current()),
+    onSuccess: () => {
+      deactivateKey.next();
+      setConfirmingDeactivate(false);
+      refresh();
+    },
+    onError: forgetKeyOnProblem(deactivateKey)
+  });
+
+  const reactivate = useMutation({
+    mutationFn: (reason: { reasonCode: string; reasonText?: string }) =>
+      api.reactivateSku(skuId, reason, reactivateKey.current()),
+    onSuccess: () => {
+      reactivateKey.next();
+      setConfirmingReactivate(false);
+      refresh();
+    },
+    onError: forgetKeyOnProblem(reactivateKey)
   });
 
   if (sku.isLoading) {
@@ -133,6 +162,69 @@ export function SkuPage() {
             </button>
           )}
           {activate.isError && <p role="alert">{errorText(activate.error, t("catalogue.error.generic").text)}</p>}
+        </section>
+      )}
+
+      {(item.status === "LOCAL" || item.status === "SHARED") && canDeactivate && (
+        <section className="catalogue-action-bar">
+          {!confirmingDeactivate ? (
+            <button
+              type="button"
+              className="action-button action-button--secondary"
+              onClick={() => setConfirmingDeactivate(true)}
+            >
+              {t("catalogue.deactivate").text}
+            </button>
+          ) : (
+            <ReasonCapture
+              title={t("catalogue.deactivate.title").text}
+              codes={[
+                { code: "DISCONTINUED", label: t("catalogue.reason.discontinued").text },
+                { code: "SUPPLIER_DEFECT", label: t("catalogue.reason.supplier_defect").text },
+                { code: "SEASONAL_END", label: t("catalogue.reason.seasonal_end").text },
+                { code: "OTHER", label: t("catalogue.reason.other").text }
+              ]}
+              onConfirm={(code, text) =>
+                deactivate.mutate({ reasonCode: code, reasonText: text ?? undefined })
+              }
+              onCancel={() => setConfirmingDeactivate(false)}
+              pending={deactivate.isPending}
+            />
+          )}
+          {deactivate.isError && (
+            <p role="alert">{errorText(deactivate.error, t("catalogue.error.generic").text)}</p>
+          )}
+        </section>
+      )}
+
+      {item.status === "INACTIVE" && canDeactivate && (
+        <section className="catalogue-action-bar">
+          {!confirmingReactivate ? (
+            <button
+              type="button"
+              className="action-button action-button--primary"
+              onClick={() => setConfirmingReactivate(true)}
+            >
+              {t("catalogue.reactivate").text}
+            </button>
+          ) : (
+            <ReasonCapture
+              title={t("catalogue.reactivate.title").text}
+              codes={[
+                { code: "RESTORED", label: t("catalogue.reason.restored").text },
+                { code: "STOCK_RESUMED", label: t("catalogue.reason.stock_resumed").text },
+                { code: "OTHER", label: t("catalogue.reason.other").text }
+              ]}
+              onConfirm={(code, text) =>
+                reactivate.mutate({ reasonCode: code, reasonText: text ?? undefined })
+              }
+              onCancel={() => setConfirmingReactivate(false)}
+              pending={reactivate.isPending}
+            />
+          )}
+          {reactivate.isError && (
+            <p role="alert">{errorText(reactivate.error, t("catalogue.error.generic").text)}</p>
+          )}
         </section>
       )}
 
@@ -234,28 +326,62 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
   const t = useT();
   const api = useCatalogueApi();
   const queryClient = useQueryClient();
-  const key = useIdempotencyKey();
+  const registerKey = useIdempotencyKey();
+  const retireKey = useIdempotencyKey();
+  const linkKey = useIdempotencyKey();
+
   const [barcode, setBarcode] = useState("");
   const [symbology, setSymbology] = useState<Symbology>("EAN13");
   const [uomCode, setUomCode] = useState(baseUom);
+
+  const [retiringBarcode, setRetiringBarcode] = useState<{ barcode: string; symbology: Symbology } | null>(null);
+  const [linkingBarcode, setLinkingBarcode] = useState<{ barcode: string; symbology: Symbology } | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState("");
+
   const barcodes = useQuery({ queryKey: ["catalogue", "barcodes", skuId], queryFn: () => api.barcodes(skuId) });
+  const batches = useQuery({ queryKey: ["catalogue", "batches", skuId], queryFn: () => api.batches(skuId) });
   const conversions = useQuery({ queryKey: ["catalogue", "conversions", skuId], queryFn: () => api.conversions(skuId) });
   const units = [baseUom, ...new Set((conversions.data ?? []).map((row) => row.uomCode))];
 
   const register = useMutation({
-    mutationFn: () => api.registerBarcode(skuId, { barcode: barcode.trim(), symbology, uomCode }, key.current()),
+    mutationFn: () => api.registerBarcode(skuId, { barcode: barcode.trim(), symbology, uomCode }, registerKey.current()),
     onSuccess: () => {
-      key.next();
+      registerKey.next();
       setBarcode("");
       queryClient.invalidateQueries({ queryKey: ["catalogue", "barcodes", skuId] });
     },
-    onError: forgetKeyOnProblem(key)
+    onError: forgetKeyOnProblem(registerKey)
+  });
+
+  const retire = useMutation({
+    mutationFn: ({ code, reasonCode, reasonText }: { code: string; symbology: Symbology; reasonCode: string; reasonText?: string }) =>
+      api.retireBarcode(skuId, code, symbology, { reasonCode, reasonText }, retireKey.current()),
+    onSuccess: () => {
+      retireKey.next();
+      setRetiringBarcode(null);
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "barcodes", skuId] });
+    },
+    onError: forgetKeyOnProblem(retireKey)
+  });
+
+  const link = useMutation({
+    mutationFn: ({ code, symbology, batchId }: { code: string; symbology: Symbology; batchId: string }) =>
+      api.linkBarcodeToBatch(skuId, code, { symbology, batchId }, linkKey.current()),
+    onSuccess: () => {
+      linkKey.next();
+      setLinkingBarcode(null);
+      setSelectedBatchId("");
+      queryClient.invalidateQueries({ queryKey: ["catalogue", "barcodes", skuId] });
+    },
+    onError: forgetKeyOnProblem(linkKey)
   });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     register.mutate();
   };
+
+  const batchMap = new Map((batches.data ?? []).map((b) => [b.batchId, b.batchNo]));
 
   return (
     <section className="catalogue-section">
@@ -268,7 +394,9 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
               <th>{t("catalogue.column.barcode").text}</th>
               <th>{t("catalogue.column.symbology").text}</th>
               <th>{t("catalogue.column.unit").text}</th>
+              <th>{t("catalogue.column.linked_batch").text}</th>
               <th>{t("catalogue.column.status").text}</th>
+              {canEdit && <th>{t("catalogue.column.actions").text}</th>}
             </tr>
           </thead>
           <tbody>
@@ -277,12 +405,120 @@ function Barcodes({ skuId, canEdit, baseUom }: { skuId: string; canEdit: boolean
                 <td>{row.barcode}</td>
                 <td>{row.symbology}</td>
                 <td>{row.uomCode}</td>
+                <td>
+                  {row.batchId ? (
+                    <Link to={`/catalogue/batches/${row.batchId}`}>
+                      {batchMap.get(row.batchId) ?? row.batchId.slice(0, 8)}
+                    </Link>
+                  ) : (
+                    <span>{t("catalogue.barcode.unlinked").text}</span>
+                  )}
+                </td>
                 <td>{t(`catalogue.barcode.status.${row.status}`).text}</td>
+                {canEdit && (
+                  <td>
+                    {row.status === "ACTIVE" && (
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="action-button action-button--secondary"
+                          onClick={() => {
+                            setLinkingBarcode({ barcode: row.barcode, symbology: row.symbology });
+                            setSelectedBatchId(row.batchId ?? "");
+                          }}
+                        >
+                          {t("catalogue.barcode.link").text}
+                        </button>
+                        <button
+                          type="button"
+                          className="action-button action-button--secondary"
+                          onClick={() => setRetiringBarcode({ barcode: row.barcode, symbology: row.symbology })}
+                        >
+                          {t("catalogue.barcode.retire").text}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
+      {retiringBarcode && (
+        <ReasonCapture
+          title={`${t("catalogue.barcode.retire.title").text}: ${retiringBarcode.barcode}`}
+          codes={[
+            { code: "DAMAGED", label: t("catalogue.reason.damaged").text },
+            { code: "SUPERSEDED", label: t("catalogue.reason.superseded").text },
+            { code: "MISPRINT", label: t("catalogue.reason.misprint").text },
+            { code: "OTHER", label: t("catalogue.reason.other").text }
+          ]}
+          onConfirm={(code, text) =>
+            retire.mutate({
+              code: retiringBarcode.barcode,
+              symbology: retiringBarcode.symbology,
+              reasonCode: code,
+              reasonText: text ?? undefined
+            })
+          }
+          onCancel={() => setRetiringBarcode(null)}
+          pending={retire.isPending}
+        />
+      )}
+      {retire.isError && <p role="alert">{errorText(retire.error, t("catalogue.error.generic").text)}</p>}
+
+      {linkingBarcode && (
+        <form
+          className="catalogue-filter-bar catalogue-inline-form"
+          role="dialog"
+          aria-labelledby="link-batch-title"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (selectedBatchId) {
+              link.mutate({
+                code: linkingBarcode.barcode,
+                symbology: linkingBarcode.symbology,
+                batchId: selectedBatchId
+              });
+            }
+          }}
+        >
+          <h4 id="link-batch-title">{t("catalogue.barcode.link.title").text}: {linkingBarcode.barcode}</h4>
+          <label className="catalogue-form-field">
+            {t("catalogue.barcode.link.select").text}
+            <select
+              required
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+            >
+              <option value="">{t("catalogue.field.choose").text}</option>
+              {(batches.data ?? []).map((b) => (
+                <option key={b.batchId} value={b.batchId}>
+                  {b.batchNo} {b.printedMrp != null ? `(MRP ${b.printedMrp})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="action-button action-button--primary"
+            disabled={link.isPending || !selectedBatchId}
+          >
+            {t("catalogue.barcode.link.submit").text}
+          </button>
+          <button
+            type="button"
+            className="action-button action-button--secondary"
+            onClick={() => setLinkingBarcode(null)}
+          >
+            {t("shell.reason.cancel").text}
+          </button>
+          {link.isError && <p role="alert">{errorText(link.error, t("catalogue.error.generic").text)}</p>}
+        </form>
+      )}
+
       {canEdit && (
         <form onSubmit={submit} className="catalogue-filter-bar">
           <label className="catalogue-form-field">
@@ -337,15 +573,25 @@ function Batches({ skuId }: { skuId: string }) {
               <th>{t("catalogue.column.expiry").text}</th>
               <th>{t("catalogue.column.mrp").text}</th>
               <th>{t("catalogue.column.status").text}</th>
+              <th>{t("catalogue.column.actions").text}</th>
             </tr>
           </thead>
           <tbody>
             {batches.data.map((batch) => (
               <tr key={batch.batchId}>
-                <td>{batch.batchNo}</td>
+                <td>
+                  <Link to={`/catalogue/batches/${batch.batchId}`}>{batch.batchNo}</Link>
+                </td>
                 <td>{batch.expiryDate ? formatDate(batch.expiryDate) : ""}</td>
                 <td>{batch.printedMrp != null && <MoneyDisplay amount={batch.printedMrp} />}</td>
                 <td>{t(`catalogue.batch.status.${batch.status}`).text}</td>
+                <td>
+                  <div className="table-actions">
+                    <Link className="action-link" to={`/catalogue/batches/${batch.batchId}`}>
+                      {t("catalogue.batches.view_batch").text}
+                    </Link>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

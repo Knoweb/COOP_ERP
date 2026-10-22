@@ -25,6 +25,11 @@ export type TaxCategory = components["schemas"]["TaxCategoryResponse"];
 export type TaxRate = components["schemas"]["TaxRateResponse"];
 export type DefineTaxCategoryRequest = components["schemas"]["DefineTaxCategoryRequest"];
 export type PublishTaxRateRequest = components["schemas"]["PublishTaxRateRequest"];
+export type ReasonRequest = components["schemas"]["ReasonRequest"];
+export type CorrectBatchRequest = components["schemas"]["CorrectBatchRequest"];
+export type LinkBarcodeToBatchRequest = components["schemas"]["LinkBarcodeToBatchRequest"];
+export type SupplierResponse = components["schemas"]["SupplierResponse"];
+export type RegisterSupplierRequest = components["schemas"]["RegisterSupplierRequest"];
 export type Language = "en" | "si" | "ta";
 
 export function useCatalogueApi() {
@@ -65,6 +70,19 @@ export function useCatalogueApi() {
         return data ?? [];
       },
 
+      async getBatch(batchId: string): Promise<Batch> {
+        const { data } = await api.GET("/v1/catalogue/batches/{batchId}", { params: { path: { batchId } } });
+        return data!;
+      },
+
+      async correctBatch(batchId: string, body: CorrectBatchRequest, idempotencyKey: string): Promise<Batch> {
+        const { data } = await api.POST("/v1/catalogue/batches/{batchId}/correct", {
+          params: { path: { batchId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
       async images(skuId: string): Promise<ImageResponse[]> {
         const { data } = await api.GET("/v1/catalogue/skus/{skuId}/images", { params: { path: { skuId } } });
         return data ?? [];
@@ -94,6 +112,20 @@ export function useCatalogueApi() {
         });
       },
 
+      async deactivateSku(skuId: string, body: ReasonRequest, idempotencyKey: string): Promise<void> {
+        await api.POST("/v1/catalogue/skus/{skuId}/deactivate", {
+          params: { path: { skuId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+      },
+
+      async reactivateSku(skuId: string, body: ReasonRequest, idempotencyKey: string): Promise<void> {
+        await api.POST("/v1/catalogue/skus/{skuId}/reactivate", {
+          params: { path: { skuId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+      },
+
       async defineConversion(
         skuId: string,
         body: { uomCode: string; factorToBase: number; effectiveFrom: string },
@@ -112,6 +144,34 @@ export function useCatalogueApi() {
       ): Promise<void> {
         await api.POST("/v1/catalogue/skus/{skuId}/barcodes", {
           params: { path: { skuId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+      },
+
+      async retireBarcode(
+        skuId: string,
+        barcode: string,
+        symbology: Symbology,
+        reason: { reasonCode?: string; reasonText?: string },
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.DELETE("/v1/catalogue/skus/{skuId}/barcodes/{barcode}", {
+          params: {
+            path: { skuId, barcode },
+            query: { symbology, reasonCode: reason.reasonCode, reasonText: reason.reasonText },
+            header: { "Idempotency-Key": idempotencyKey }
+          }
+        });
+      },
+
+      async linkBarcodeToBatch(
+        skuId: string,
+        barcode: string,
+        body: LinkBarcodeToBatchRequest,
+        idempotencyKey: string
+      ): Promise<void> {
+        await api.POST("/v1/catalogue/skus/{skuId}/barcodes/{barcode}/link", {
+          params: { path: { skuId, barcode }, header: { "Idempotency-Key": idempotencyKey } },
           body
         });
       },
@@ -162,6 +222,19 @@ export function useCatalogueApi() {
           params: { path: { suspectId }, header: { "Idempotency-Key": idempotencyKey } },
           body
         });
+      },
+
+      async listSuppliers(): Promise<SupplierResponse[]> {
+        const { data } = await api.GET("/v1/catalogue/suppliers");
+        return data ?? [];
+      },
+
+      async registerSupplier(body: RegisterSupplierRequest, idempotencyKey: string): Promise<SupplierResponse> {
+        const { data } = await api.POST("/v1/catalogue/suppliers", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
       },
 
       async listTaxCategories(): Promise<TaxCategory[]> {
