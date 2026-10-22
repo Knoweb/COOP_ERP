@@ -86,7 +86,8 @@ test("the effective shelf list prints eligible labels and reports a label above 
   test.setTimeout(120_000);
   const manager = DEMO.m101Manager;
   const text = (id: string) => textOf(manager, id);
-  let requested: { locationId: string; skuIds: string[] } | null = null;
+  type RequestedJob = { locationId: string; skuIds: string[] };
+  const requested: RequestedJob[] = [];
   const jobId = "0190e903-2000-7000-8000-000000000001";
 
   // Chromium and the worker are covered by the backend print integration test. Here the browser
@@ -98,35 +99,37 @@ test("the effective shelf list prints eligible labels and reports a label above 
       "access-control-allow-credentials": "true"
     };
     if (request.method() === "POST") {
-      requested = request.postDataJSON() as { locationId: string; skuIds: string[] };
+      const payload = request.postDataJSON() as RequestedJob;
+      requested.push(payload);
       return route.fulfill({
         status: 202,
         contentType: "application/json",
         headers: cors,
         json: {
           jobId,
-          locationId: requested.locationId,
+          locationId: payload.locationId,
           status: "QUEUED",
-          requestedCount: requested.skuIds.length,
+          requestedCount: payload.skuIds.length,
           renderedCount: 0,
           refused: [],
           createdAt: "2026-10-21T06:00:00Z"
         }
       });
     }
-    if (request.method() === "GET" && requested) {
+    if (request.method() === "GET" && requested.length > 0) {
+      const payload = requested[0]!;
       return route.fulfill({
         status: 200,
         contentType: "application/json",
         headers: cors,
         json: {
           jobId,
-          locationId: requested.locationId,
+          locationId: payload.locationId,
           status: "RENDERED",
-          requestedCount: requested.skuIds.length,
-          renderedCount: Math.max(0, requested.skuIds.length - 1),
+          requestedCount: payload.skuIds.length,
+          renderedCount: Math.max(0, payload.skuIds.length - 1),
           refused: [{
-            skuId: requested.skuIds[0],
+            skuId: payload.skuIds[0],
             skuCode: "SKU-NADU-5KG",
             reason: "ABOVE_CONTROL_PRICE",
             listPrice: 1200,
@@ -189,8 +192,8 @@ test("the effective shelf list prints eligible labels and reports a label above 
   await expect(page.getByText(text("pricing.labels.reason.above_control_price"), { exact: true })).toBeVisible();
   await expect(page.getByText(/2492\/29/)).toBeVisible();
   await expect(page.getByRole("button", { name: text("pricing.labels.open"), exact: true })).toBeVisible();
-  expect(requested?.locationId).toBe(DEMO_LOCATIONS.m101TownShop);
-  expect(requested?.skuIds.length).toBeGreaterThan(1);
+  expect(requested[0]?.locationId).toBe(DEMO_LOCATIONS.m101TownShop);
+  expect(requested[0]?.skuIds.length).toBeGreaterThan(1);
 
   await page.context().route("**/reports/labels.pdf*", (route) =>
     route.fulfill({
