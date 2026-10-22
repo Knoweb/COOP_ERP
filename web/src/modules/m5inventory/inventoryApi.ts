@@ -16,6 +16,7 @@ export type OpeningBalanceLineRequest = components["schemas"]["OpeningBalanceLin
 export type StockCardLine = components["schemas"]["StockCardLineResponse"];
 export type Transfer =components["schemas"]["TransferResponse"];
 export type IssueTransferRequest = components["schemas"]["IssueTransferRequest"];
+export type ReceiveTransferRequest = components["schemas"]["ReceiveTransferRequest"];
 export type Count = components["schemas"]["CountResponse"];
 export type ScheduleCountRequest = components["schemas"]["ScheduleCountRequest"];
 export type CountLineRequest = components["schemas"]["CountLineRequest"];
@@ -114,9 +115,14 @@ export function useInventoryApi() {
         return data!;
       },
 
-      async receiveTransfer(transferId: string, idempotencyKey: string): Promise<Transfer> {
+      async receiveTransfer(
+        transferId: string,
+        idempotencyKey: string,
+        request?: ReceiveTransferRequest
+      ): Promise<Transfer> {
         const { data } = await api.POST("/v1/inventory/transfers/{transferId}/receive", {
-          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } }
+          params: { path: { transferId }, header: { "Idempotency-Key": idempotencyKey } },
+          body: request
         });
         return data!;
       },

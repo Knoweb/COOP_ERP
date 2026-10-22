@@ -408,12 +408,13 @@ class InventoryQueriesImpl implements InventoryQueries {
     private List<TransferView.Line> transferLines(UUID transferId) {
         return jdbc.query(
                 """
-                select line_no, batch_id, sku_id, qty, unit_cost
+                select line_id, line_no, batch_id, sku_id, qty, unit_cost
                   from inventory.transfer_line
                  where transfer_id = ?
                  order by line_no
                 """,
                 (rs, n) -> new TransferView.Line(
+                        rs.getObject("line_id", UUID.class),
                         rs.getInt("line_no"),
                         rs.getObject("batch_id", UUID.class),
                         rs.getObject("sku_id", UUID.class),

@@ -23,5 +23,6 @@ public record TransferView(
         Instant receivedAt,
         List<Line> lines) {
 
-    public record Line(int lineNo, UUID batchId, UUID skuId, BigDecimal qty, BigDecimal unitCost) {}
+    public record Line(
+            UUID transferLineId, int lineNo, UUID batchId, UUID skuId, BigDecimal qty, BigDecimal unitCost) {}
 }

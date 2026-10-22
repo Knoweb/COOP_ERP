@@ -655,6 +655,127 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void explicitFullReceiptPersistsEveryLineAndInvalidQuantitiesRollBackAtomically() {
+        UUID secondSku = fixture.sku(MPCS, "TEA1");
+        UUID secondBatch = fixture.batch(secondSku, MPCS, "T1", LocalDate.of(2027, 8, 31));
+        ScopeContext source = own(MPCS);
+        outer.run(
+                source,
+                () -> ledger.post(
+                        new PostMovements(
+                                Ids.next(),
+                                null,
+                                null,
+                                List.of(new Movement(
+                                        warehouse,
+                                        secondBatch,
+                                        LotCondition.GOOD,
+                                        MovementType.RECEIPT,
+                                        new BigDecimal("10"),
+                                        new BigDecimal("725.2500"),
+                                        null))),
+                        source));
+        UUID id = issue.handle(
+                new IssueTransfer(
+                        warehouse,
+                        shop,
+                        List.of(
+                                new IssueTransfer.Line(batch, new BigDecimal("5.000")),
+                                new IssueTransfer.Line(secondBatch, new BigDecimal("7.000")))),
+                source);
+        dispatch.handle(new DispatchTransfer(id), source);
+
+        List<Map<String, Object>> sent = superuserJdbc()
+                .queryForList(
+                        "select line_id, qty from inventory.transfer_line where transfer_id = ? order by line_no", id);
+        UUID first = (UUID) sent.get(0).get("line_id");
+        UUID second = (UUID) sent.get(1).get("line_id");
+        BigDecimal firstQty = (BigDecimal) sent.get(0).get("qty");
+        BigDecimal secondQty = (BigDecimal) sent.get(1).get("qty");
+
+        assertReceiptRejected(id, List.of(), "m5.transfer.receipt_lines_required");
+        assertReceiptRejected(
+                id,
+                List.of(new ReceiveTransfer.Line(null, firstQty), new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_line_invalid");
+        assertReceiptRejected(
+                id,
+                List.of(
+                        new ReceiveTransfer.Line(first, firstQty),
+                        new ReceiveTransfer.Line(first, firstQty),
+                        new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_line_duplicate");
+        assertReceiptRejected(
+                id,
+                List.of(new ReceiveTransfer.Line(Ids.next(), firstQty), new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_line_unknown");
+        assertReceiptRejected(
+                id, List.of(new ReceiveTransfer.Line(first, firstQty)), "m5.transfer.receipt_line_missing");
+        assertReceiptRejected(
+                id,
+                List.of(
+                        new ReceiveTransfer.Line(first, new BigDecimal("-1")),
+                        new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_qty_invalid");
+        assertReceiptRejected(
+                id,
+                List.of(
+                        new ReceiveTransfer.Line(first, firstQty.setScale(4)),
+                        new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_qty_invalid");
+        assertReceiptRejected(
+                id,
+                List.of(
+                        new ReceiveTransfer.Line(first, firstQty.add(BigDecimal.ONE)),
+                        new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_qty_exceeds_sent");
+        assertReceiptRejected(
+                id,
+                List.of(
+                        new ReceiveTransfer.Line(first, firstQty.subtract(BigDecimal.ONE)),
+                        new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.short_receipt_not_supported");
+
+        kernel.reset();
+        receive.handle(
+                new ReceiveTransfer(
+                        id,
+                        List.of(
+                                new ReceiveTransfer.Line(first, firstQty),
+                                new ReceiveTransfer.Line(second, secondQty))),
+                at(MPCS, shop));
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_receipt_line where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(2);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                """
+                                select count(*)
+                                  from inventory.transfer_receipt_line rl
+                                  join inventory.transfer_line tl
+                                    on tl.transfer_id = rl.transfer_id and tl.line_id = rl.transfer_line_id
+                                  join inventory.stock_movement sm
+                                    on sm.document_id = rl.transfer_id
+                                   and sm.document_line_id = rl.transfer_line_id
+                                   and sm.movement_type = 'TRANSFER_IN'
+                                 where rl.transfer_id = ?
+                                   and rl.received_qty = sm.qty_delta
+                                   and tl.unit_cost = sm.unit_cost_at_movement
+                                """,
+                                Integer.class,
+                                id))
+                .isEqualTo(2);
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("STOCK_POSTED", "TRANSFER_RECEIVED");
+        assertThat(events(TransferReceived.class)).hasSize(1);
+    }
+
+    @Test
     void receiptLineAndCancellationCompositeIdentityIsEnforcedByTheDatabase() {
         UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
         UUID lineId = superuserJdbc()
@@ -746,6 +867,32 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
     private static void assertProblem(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String id) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
                 .isEqualTo(id));
+    }
+
+    private void assertReceiptRejected(UUID transferId, List<ReceiveTransfer.Line> lines, String problemId) {
+        kernel.reset();
+        assertProblem(() -> receive.handle(new ReceiveTransfer(transferId, lines), at(MPCS, shop)), problemId);
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_receipt where transfer_id = ?",
+                                Integer.class,
+                                transferId))
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_receipt_line where transfer_id = ?",
+                                Integer.class,
+                                transferId))
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                Integer.class,
+                                transferId))
+                .isZero();
     }
 
     private static List<String> race(Runnable first, Runnable second) throws Exception {

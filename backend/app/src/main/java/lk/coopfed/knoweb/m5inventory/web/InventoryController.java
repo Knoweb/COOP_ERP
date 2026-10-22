@@ -35,6 +35,7 @@ import lk.coopfed.knoweb.m5inventory.web.generated.OpeningBalanceResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickListResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PickResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.PrepareOpeningBalanceRequest;
+import lk.coopfed.knoweb.m5inventory.web.generated.ReceiveTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.StockCardLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferLineResponse;
 import lk.coopfed.knoweb.m5inventory.web.generated.TransferResponse;
@@ -123,9 +124,19 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
-    public ResponseEntity<TransferResponse> receiveTransfer(String idempotencyKey, UUID transferId) {
+    public ResponseEntity<TransferResponse> receiveTransfer(
+            String idempotencyKey, UUID transferId, ReceiveTransferRequest request) {
         ScopeContext scope = currentScope.get();
-        receiveTransfer.handle(new ReceiveTransfer(transferId), scope);
+        ReceiveTransfer command = request == null
+                ? new ReceiveTransfer(transferId)
+                : new ReceiveTransfer(
+                        transferId,
+                        request.getLines().stream()
+                                .map(line -> line == null
+                                        ? null
+                                        : new ReceiveTransfer.Line(line.getTransferLineId(), line.getReceivedQty()))
+                                .toList());
+        receiveTransfer.handle(command, scope);
         return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
     }
 
@@ -136,7 +147,8 @@ class InventoryController implements InventoryApi {
                         t.toLocationId(),
                         TransferResponse.StatusEnum.fromValue(t.status()),
                         t.lines().stream()
-                                .map(l -> new TransferLineResponse(l.lineNo(), l.batchId(), l.skuId(), l.qty()))
+                                .map(l -> new TransferLineResponse(
+                                        l.transferLineId(), l.lineNo(), l.batchId(), l.skuId(), l.qty()))
                                 .toList())
                 .issuedBy(t.issuedBy())
                 .issuedAt(t.issuedAt())

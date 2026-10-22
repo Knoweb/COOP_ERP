@@ -249,8 +249,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * The destination receives the transfer in full
-         * @description Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received.
+         * The destination receives the transfer
+         * @description An absent body preserves the original full-receipt operation. When a body is supplied it must name every immutable transfer line exactly once; Phase 2A accepts only quantities equal to those sent. Short quantities remain unavailable until the adjustment workflow is approved. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received, m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid, m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown, m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid, m5.transfer.receipt_qty_exceeds_sent, m5.transfer.short_receipt_not_supported.
          */
         post: operations["receiveTransfer"];
         delete?: never;
@@ -667,6 +667,14 @@ export interface components {
             batchId: string;
             qty: number;
         };
+        ReceiveTransferRequest: {
+            lines: components["schemas"]["ReceiveTransferLineRequest"][];
+        };
+        ReceiveTransferLineRequest: {
+            /** Format: uuid */
+            transferLineId: string;
+            receivedQty: number;
+        };
         TransferResponse: {
             /** Format: uuid */
             transferId: string;
@@ -692,6 +700,8 @@ export interface components {
             lines: components["schemas"]["TransferLineResponse"][];
         };
         TransferLineResponse: {
+            /** Format: uuid */
+            transferLineId: string;
             lineNo: number;
             /** Format: uuid */
             batchId: string;
@@ -1505,7 +1515,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReceiveTransferRequest"];
+            };
+        };
         responses: {
             /** @description Received */
             200: {
@@ -1516,6 +1530,7 @@ export interface operations {
                     "application/json": components["schemas"]["TransferResponse"];
                 };
             };
+            400: components["responses"]["RequestProblem"];
             422: components["responses"]["RuleBroken"];
         };
     };

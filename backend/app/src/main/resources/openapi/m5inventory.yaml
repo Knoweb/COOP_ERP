@@ -342,10 +342,17 @@ paths:
     post:
       tags: [Inventory]
       operationId: receiveTransfer
-      summary: The destination receives the transfer in full
+      summary: The destination receives the transfer
       description: >
+        An absent body preserves the original full-receipt operation. When a body is supplied it
+        must name every immutable transfer line exactly once; Phase 2A accepts only quantities equal
+        to those sent. Short quantities remain unavailable until the adjustment workflow is approved.
         Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found,
-        m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received.
+        m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received,
+        m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid,
+        m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown,
+        m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid,
+        m5.transfer.receipt_qty_exceeds_sent, m5.transfer.short_receipt_not_supported.
       x-permission: shop.transfer.receive
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -353,12 +360,18 @@ paths:
           name: transferId
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceiveTransferRequest' }
       responses:
         '200':
           description: Received
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
   # ---- stock control (M5-11, M5-13, repack): counts, write-offs, recipes, repacks ----------
   /v1/inventory/counts:
@@ -915,6 +928,26 @@ components:
       properties:
         batchId: { type: string, format: uuid }
         qty: { type: number, exclusiveMinimum: 0 }
+    ReceiveTransferRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/ReceiveTransferLineRequest' }
+    ReceiveTransferLineRequest:
+      type: object
+      required: [transferLineId, receivedQty]
+      properties:
+        transferLineId: { type: string, format: uuid }
+        receivedQty:
+          type: number
+          minimum: 0
+          maximum: 99999999999.999
+          multipleOf: 0.001
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 11, fraction = 3)'
     TransferResponse:
       type: object
       required: [transferId, fromLocationId, toLocationId, status, lines]
@@ -935,8 +968,9 @@ components:
           items: { $ref: '#/components/schemas/TransferLineResponse' }
     TransferLineResponse:
       type: object
-      required: [lineNo, batchId, skuId, qty]
+      required: [transferLineId, lineNo, batchId, skuId, qty]
       properties:
+        transferLineId: { type: string, format: uuid }
         lineNo: { type: integer }
         batchId: { type: string, format: uuid }
         skuId: { type: string, format: uuid }

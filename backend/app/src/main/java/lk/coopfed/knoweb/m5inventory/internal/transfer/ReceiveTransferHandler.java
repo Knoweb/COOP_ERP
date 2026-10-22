@@ -1,8 +1,12 @@
 package lk.coopfed.knoweb.m5inventory.internal.transfer;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.AuditFacade;
 import lk.coopfed.knoweb.kernel.api.CommandHandler;
@@ -37,7 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
  * scope ({@code m5.transfer.not_found}); the scope at the destination or entity-wide
  * ({@code m5.transfer.not_destination}: a session at the source reads the transfer but does not
  * receive it); dispatched ({@code m5.transfer.not_dispatched}); not received before ({@code
- * m5.transfer.already_received}).
+ * m5.transfer.already_received}); and, when quantities are supplied, exactly one valid quantity
+ * for every immutable transfer line. A short quantity is refused until its adjustment workflow is
+ * approved ({@code m5.transfer.short_receipt_not_supported}).
  *
  * <p>Mutation: the receipt and its full-quantity line facts; TRANSFER_IN per line at the cost the
  * TRANSFER_OUT carried, so the value that left comes back. Audit {@code TRANSFER_RECEIVED}, and
@@ -94,6 +100,7 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
         }
 
         List<TransferStore.Line> lines = store.lines(transfer.transferId());
+        Map<UUID, BigDecimal> receivedQuantities = receivedQuantities(command.lines(), lines);
         jdbc.update(
                 "insert into inventory.transfer_receipt (transfer_id, owner_entity_id, location_id, from_location_id,"
                         + " received_by) values (?, ?, ?, ?, ?)",
@@ -112,7 +119,7 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
                     transfer.ownerEntityId(),
                     transfer.toLocationId(),
                     transfer.fromLocationId(),
-                    line.qty());
+                    receivedQuantities.get(line.lineId()));
         }
         List<Movement> movements = new ArrayList<>();
         for (TransferStore.Line line : lines) {
@@ -121,7 +128,7 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
                     line.batchId(),
                     LotCondition.GOOD,
                     MovementType.TRANSFER_IN,
-                    line.qty(),
+                    receivedQuantities.get(line.lineId()),
                     line.unitCost(),
                     line.lineId()));
         }
@@ -151,5 +158,49 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
                 transfer.toLocationId(),
                 lines.size()));
         return transfer.transferId();
+    }
+
+    private static Map<UUID, BigDecimal> receivedQuantities(
+            List<ReceiveTransfer.Line> requested, List<TransferStore.Line> issued) {
+        Map<UUID, BigDecimal> issuedQuantities = new HashMap<>();
+        for (TransferStore.Line line : issued) {
+            issuedQuantities.put(line.lineId(), line.qty());
+        }
+        if (requested == null) {
+            return issuedQuantities;
+        }
+        if (requested.isEmpty()) {
+            throw new ProblemException("m5.transfer.receipt_lines_required");
+        }
+
+        Map<UUID, BigDecimal> actual = new HashMap<>();
+        Set<UUID> seen = new HashSet<>();
+        for (ReceiveTransfer.Line line : requested) {
+            if (line == null || line.transferLineId() == null || line.receivedQty() == null) {
+                throw new ProblemException("m5.transfer.receipt_line_invalid");
+            }
+            if (!seen.add(line.transferLineId())) {
+                throw new ProblemException("m5.transfer.receipt_line_duplicate");
+            }
+            BigDecimal sent = issuedQuantities.get(line.transferLineId());
+            if (sent == null) {
+                throw new ProblemException("m5.transfer.receipt_line_unknown");
+            }
+            BigDecimal received = line.receivedQty();
+            if (received.signum() < 0 || received.scale() > 3) {
+                throw new ProblemException("m5.transfer.receipt_qty_invalid");
+            }
+            if (received.compareTo(sent) > 0) {
+                throw new ProblemException("m5.transfer.receipt_qty_exceeds_sent");
+            }
+            actual.put(line.transferLineId(), received);
+        }
+        if (actual.size() != issued.size()) {
+            throw new ProblemException("m5.transfer.receipt_line_missing");
+        }
+        if (issued.stream().anyMatch(line -> actual.get(line.lineId()).compareTo(line.qty()) < 0)) {
+            throw new ProblemException("m5.transfer.short_receipt_not_supported");
+        }
+        return actual;
     }
 }
