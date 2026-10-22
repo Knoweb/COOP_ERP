@@ -21,8 +21,18 @@ public record TransferView(
         Instant dispatchedAt,
         UUID receivedBy,
         Instant receivedAt,
+        UUID shortfallId,
+        String shortfallStatus,
+        String shortfallCategory,
         List<Line> lines) {
 
     public record Line(
-            UUID transferLineId, int lineNo, UUID batchId, UUID skuId, BigDecimal qty, BigDecimal unitCost) {}
+            UUID transferLineId,
+            int lineNo,
+            UUID batchId,
+            UUID skuId,
+            BigDecimal qty,
+            BigDecimal unitCost,
+            BigDecimal receivedQty,
+            BigDecimal shortfallQty) {}
 }

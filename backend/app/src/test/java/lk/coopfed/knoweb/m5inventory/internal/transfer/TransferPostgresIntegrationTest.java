@@ -41,6 +41,7 @@ import lk.coopfed.knoweb.m5inventory.api.StockLedger;
 import lk.coopfed.knoweb.m5inventory.api.TransferDispatched;
 import lk.coopfed.knoweb.m5inventory.api.TransferIssued;
 import lk.coopfed.knoweb.m5inventory.api.TransferReceived;
+import lk.coopfed.knoweb.m5inventory.api.TransferShortfallDrafted;
 import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
 import lk.coopfed.knoweb.m5inventory.query.LotBalance;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
@@ -77,7 +78,7 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     InventoryQueries queries;
 
-    @Autowired
+    @MockitoSpyBean
     StockLedger ledger;
 
     @Autowired
@@ -130,7 +131,7 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void clean() {
-        reset(transferDocumentType);
+        reset(transferDocumentType, ledger);
         fixture.clean();
     }
 
@@ -629,13 +630,29 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                                 id))
                 .isEqualTo(1);
 
+        UUID lineId = superuserJdbc()
+                .queryForObject("select line_id from inventory.transfer_line where transfer_id = ?", UUID.class, id);
+        ReceiveTransfer shortReceipt =
+                new ReceiveTransfer(id, List.of(new ReceiveTransfer.Line(lineId, new BigDecimal("4.000"))));
         assertThat(race(
-                        () -> receive.handle(new ReceiveTransfer(id), at(MPCS, shop)),
-                        () -> receive.handle(new ReceiveTransfer(id), at(MPCS, shop))))
+                        () -> receive.handle(shortReceipt, at(MPCS, shop)),
+                        () -> receive.handle(shortReceipt, at(MPCS, shop))))
                 .containsExactlyInAnyOrder("OK", "m5.transfer.already_received");
         assertThat(superuserJdbc()
                         .queryForObject(
                                 "select count(*) from inventory.transfer_receipt where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_shortfall where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_shortfall_line where transfer_id = ?",
                                 Integer.class,
                                 id))
                 .isEqualTo(1);
@@ -731,10 +748,8 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                 "m5.transfer.receipt_qty_exceeds_sent");
         assertReceiptRejected(
                 id,
-                List.of(
-                        new ReceiveTransfer.Line(first, firstQty.subtract(BigDecimal.ONE)),
-                        new ReceiveTransfer.Line(second, secondQty)),
-                "m5.transfer.short_receipt_not_supported");
+                List.of(new ReceiveTransfer.Line(first, BigDecimal.ZERO), new ReceiveTransfer.Line(second, secondQty)),
+                "m5.transfer.receipt_qty_invalid");
 
         kernel.reset();
         receive.handle(
@@ -773,6 +788,203 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                 .extracting(KernelRecorder.AuditRecord::eventType)
                 .contains("STOCK_POSTED", "TRANSFER_RECEIVED");
         assertThat(events(TransferReceived.class)).hasSize(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_shortfall where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isZero();
+    }
+
+    @Test
+    void shortReceiptPostsOnlyActualsAndCreatesOneUnpostedDestinationDraft() {
+        UUID secondSku = fixture.sku(MPCS, "TEA2");
+        UUID secondBatch = fixture.batch(secondSku, MPCS, "T2", LocalDate.of(2027, 9, 30));
+        UUID thirdSku = fixture.sku(MPCS, "TEA3");
+        UUID thirdBatch = fixture.batch(thirdSku, MPCS, "T3", LocalDate.of(2027, 10, 31));
+        ScopeContext source = own(MPCS);
+        outer.run(
+                source,
+                () -> ledger.post(
+                        new PostMovements(
+                                Ids.next(),
+                                null,
+                                null,
+                                List.of(
+                                        new Movement(
+                                                warehouse,
+                                                batch,
+                                                LotCondition.GOOD,
+                                                MovementType.RECEIPT,
+                                                new BigDecimal("100"),
+                                                new BigDecimal("1200.0000"),
+                                                null),
+                                        new Movement(
+                                                warehouse,
+                                                secondBatch,
+                                                LotCondition.GOOD,
+                                                MovementType.RECEIPT,
+                                                new BigDecimal("10"),
+                                                new BigDecimal("725.2500"),
+                                                null),
+                                        new Movement(
+                                                warehouse,
+                                                thirdBatch,
+                                                LotCondition.GOOD,
+                                                MovementType.RECEIPT,
+                                                new BigDecimal("10"),
+                                                new BigDecimal("500.1250"),
+                                                null))),
+                        source));
+        UUID id = issue.handle(
+                new IssueTransfer(
+                        warehouse,
+                        shop,
+                        List.of(
+                                new IssueTransfer.Line(batch, new BigDecimal("100.000")),
+                                new IssueTransfer.Line(secondBatch, new BigDecimal("7.000")),
+                                new IssueTransfer.Line(thirdBatch, new BigDecimal("6.000")))),
+                source);
+        dispatch.handle(new DispatchTransfer(id), source);
+        List<Map<String, Object>> sent = superuserJdbc()
+                .queryForList(
+                        "select line_id, qty, unit_cost from inventory.transfer_line"
+                                + " where transfer_id = ? order by line_no",
+                        id);
+        UUID first = (UUID) sent.get(0).get("line_id");
+        UUID second = (UUID) sent.get(1).get("line_id");
+        UUID third = (UUID) sent.get(2).get("line_id");
+
+        kernel.reset();
+        receive.handle(
+                new ReceiveTransfer(
+                        id,
+                        List.of(
+                                new ReceiveTransfer.Line(first, new BigDecimal("95.000")),
+                                new ReceiveTransfer.Line(second, new BigDecimal("7.000")),
+                                new ReceiveTransfer.Line(third, new BigDecimal("4.500")))),
+                at(MPCS, shop));
+
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select transfer_line_id, received_qty from inventory.transfer_receipt_line"
+                                        + " where transfer_id = ? order by transfer_line_id",
+                                id))
+                .extracting(row -> row.get("received_qty"))
+                .containsExactlyInAnyOrder(new BigDecimal("95.000"), new BigDecimal("7.000"), new BigDecimal("4.500"));
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select document_line_id, qty_delta, unit_cost_at_movement"
+                                        + " from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                id))
+                .allSatisfy(row -> {
+                    UUID lineId = (UUID) row.get("document_line_id");
+                    Map<String, Object> issued = sent.stream()
+                            .filter(candidate -> candidate.get("line_id").equals(lineId))
+                            .findFirst()
+                            .orElseThrow();
+                    BigDecimal expectedQty = lineId.equals(first)
+                            ? new BigDecimal("95.000")
+                            : lineId.equals(second) ? new BigDecimal("7.000") : new BigDecimal("4.500");
+                    assertThat((BigDecimal) row.get("qty_delta")).isEqualByComparingTo(expectedQty);
+                    assertThat((BigDecimal) row.get("unit_cost_at_movement"))
+                            .isEqualByComparingTo((BigDecimal) issued.get("unit_cost"));
+                })
+                .hasSize(3);
+        Map<String, Object> draft = superuserJdbc()
+                .queryForMap(
+                        "select shortfall_id, owner_entity_id, location_id, from_location_id, category, status"
+                                + " from inventory.transfer_shortfall where transfer_id = ?",
+                        id);
+        assertThat(draft)
+                .containsEntry("owner_entity_id", MPCS)
+                .containsEntry("location_id", shop)
+                .containsEntry("from_location_id", warehouse)
+                .containsEntry("category", "DAMAGED_IN_TRANSIT")
+                .containsEntry("status", "DRAFT");
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select transfer_line_id, shortfall_qty, unit_cost"
+                                        + " from inventory.transfer_shortfall_line where transfer_id = ?",
+                                id))
+                .allSatisfy(row -> {
+                    UUID lineId = (UUID) row.get("transfer_line_id");
+                    BigDecimal expected = lineId.equals(first) ? new BigDecimal("5.000") : new BigDecimal("1.500");
+                    assertThat((BigDecimal) row.get("shortfall_qty")).isEqualByComparingTo(expected);
+                    BigDecimal issuedCost = (BigDecimal) sent.stream()
+                            .filter(candidate -> candidate.get("line_id").equals(lineId))
+                            .findFirst()
+                            .orElseThrow()
+                            .get("unit_cost");
+                    assertThat((BigDecimal) row.get("unit_cost")).isEqualByComparingTo(issuedCost);
+                })
+                .hasSize(2);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?"
+                                        + " and movement_type in ('COUNT_ADJUST', 'WRITE_OFF')",
+                                Integer.class,
+                                id))
+                .isZero();
+        TransferView view = queries.transfer(id, at(MPCS, shop)).orElseThrow();
+        assertThat(view.shortfallId()).isEqualTo(draft.get("shortfall_id"));
+        assertThat(view.shortfallStatus()).isEqualTo("DRAFT");
+        assertThat(view.shortfallCategory()).isEqualTo("DAMAGED_IN_TRANSIT");
+        assertThat(view.lines())
+                .extracting(TransferView.Line::shortfallQty)
+                .containsExactly(new BigDecimal("5.000"), null, new BigDecimal("1.500"));
+        assertThat(queries.transfer(id, at(MPCS, warehouse)))
+                .get()
+                .extracting(TransferView::shortfallId)
+                .isEqualTo(draft.get("shortfall_id"));
+        assertThat(queries.transfer(id, at(MPCS, otherShop))).isEmpty();
+        assertThat(queries.transfer(id, own(OTHER))).isEmpty();
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("STOCK_POSTED", "TRANSFER_RECEIVED", "TRANSFER_SHORTFALL_DRAFTED");
+        assertThat(events(TransferReceived.class)).hasSize(1);
+        assertThat(events(TransferShortfallDrafted.class)).singleElement().satisfies(event -> {
+            assertThat(event.shortfallId()).isEqualTo(draft.get("shortfall_id"));
+            assertThat(event.shortfallQty()).isEqualByComparingTo("6.500");
+            assertThat(event.shortfallValue()).isEqualByComparingTo("6750.1875");
+        });
+    }
+
+    @Test
+    void shortReceiptRollsBackReceiptDraftAndAuditWhenMovementPostingFails() {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        dispatch.handle(new DispatchTransfer(id), own(MPCS));
+        UUID lineId = superuserJdbc()
+                .queryForObject("select line_id from inventory.transfer_line where transfer_id = ?", UUID.class, id);
+        kernel.reset();
+        doThrow(new IllegalStateException("TRANSFER_IN failure")).when(ledger).post(any(), any());
+
+        assertThatThrownBy(() -> receive.handle(
+                        new ReceiveTransfer(id, List.of(new ReceiveTransfer.Line(lineId, new BigDecimal("4.000")))),
+                        at(MPCS, shop)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TRANSFER_IN failure");
+
+        for (String table :
+                List.of("transfer_receipt", "transfer_receipt_line", "transfer_shortfall", "transfer_shortfall_line")) {
+            assertThat(superuserJdbc()
+                            .queryForObject(
+                                    "select count(*) from inventory." + table + " where transfer_id = ?",
+                                    Integer.class,
+                                    id))
+                    .as(table)
+                    .isZero();
+        }
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                Integer.class,
+                                id))
+                .isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test

@@ -148,7 +148,9 @@ class InventoryController implements InventoryApi {
                         TransferResponse.StatusEnum.fromValue(t.status()),
                         t.lines().stream()
                                 .map(l -> new TransferLineResponse(
-                                        l.transferLineId(), l.lineNo(), l.batchId(), l.skuId(), l.qty()))
+                                                l.transferLineId(), l.lineNo(), l.batchId(), l.skuId(), l.qty())
+                                        .receivedQty(l.receivedQty())
+                                        .shortfallQty(l.shortfallQty()))
                                 .toList())
                 .issuedBy(t.issuedBy())
                 .issuedAt(t.issuedAt())
@@ -156,7 +158,16 @@ class InventoryController implements InventoryApi {
                 .dispatchedBy(t.dispatchedBy())
                 .dispatchedAt(t.dispatchedAt())
                 .receivedBy(t.receivedBy())
-                .receivedAt(t.receivedAt());
+                .receivedAt(t.receivedAt())
+                .shortfallId(t.shortfallId())
+                .shortfallStatus(
+                        t.shortfallStatus() == null
+                                ? null
+                                : TransferResponse.ShortfallStatusEnum.fromValue(t.shortfallStatus()))
+                .shortfallCategory(
+                        t.shortfallCategory() == null
+                                ? null
+                                : TransferResponse.ShortfallCategoryEnum.fromValue(t.shortfallCategory()));
     }
 
     // ---- reads ----------------------------------------------------------------------------

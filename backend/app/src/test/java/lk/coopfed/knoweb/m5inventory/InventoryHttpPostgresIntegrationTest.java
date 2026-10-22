@@ -379,13 +379,12 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
         assertThat(nullLine.getBody().get("code").asText()).isEqualTo("m5.transfer.receipt_line_invalid");
         assertNoReceiptSideEffects(id);
 
-        ResponseEntity<JsonNode> shortReceipt = post(
+        ResponseEntity<JsonNode> zeroReceipt = post(
                 receiveUrl,
                 java.util.Map.of(
-                        "lines", List.of(java.util.Map.of("transferLineId", lineId, "receivedQty", 4), secondLine)),
+                        "lines", List.of(java.util.Map.of("transferLineId", lineId, "receivedQty", 0), secondLine)),
                 USER);
-        assertThat(shortReceipt.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(shortReceipt.getBody().get("code").asText()).isEqualTo("m5.transfer.short_receipt_not_supported");
+        assertThat(zeroReceipt.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertNoReceiptSideEffects(id);
 
         ResponseEntity<JsonNode> received =
@@ -410,6 +409,85 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                                 id,
                                 secondLineId))
                 .isEqualByComparingTo("3.000");
+    }
+
+    @Test
+    void aPositiveShortReceiptReturnsItsUnpostedDraftAndPostsOnlyTheActualQuantity() {
+        UUID shop = fixture.location(MPCS, "SHORT");
+        ResponseEntity<JsonNode> issued = post(
+                "/v1/inventory/transfers",
+                java.util.Map.of(
+                        "fromLocationId",
+                        warehouse.toString(),
+                        "toLocationId",
+                        shop.toString(),
+                        "lines",
+                        List.of(java.util.Map.of("batchId", batch.toString(), "qty", 5))),
+                USER);
+        assertThat(issued.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String id = issued.getBody().get("transferId").asText();
+        String lineId =
+                issued.getBody().get("lines").get(0).get("transferLineId").asText();
+        assertThat(post("/v1/inventory/transfers/" + id + "/dispatch", null, USER)
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        kernel.reset();
+        UUID receiptKey = UUID.randomUUID();
+        ResponseEntity<JsonNode> received = post(
+                "/v1/inventory/transfers/" + id + "/receive",
+                java.util.Map.of("lines", List.of(java.util.Map.of("transferLineId", lineId, "receivedQty", 3.5))),
+                USER,
+                receiptKey);
+
+        assertThat(received.getStatusCode())
+                .as(String.valueOf(received.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(received.getBody().get("status").asText()).isEqualTo("RECEIVED");
+        assertThat(received.getBody().get("shortfallId").asText()).isNotBlank();
+        assertThat(received.getBody().get("shortfallStatus").asText()).isEqualTo("DRAFT");
+        assertThat(received.getBody().get("shortfallCategory").asText()).isEqualTo("DAMAGED_IN_TRANSIT");
+        assertThat(received.getBody().get("lines").get(0).get("receivedQty").decimalValue())
+                .isEqualByComparingTo("3.500");
+        assertThat(received.getBody().get("lines").get(0).get("shortfallQty").decimalValue())
+                .isEqualByComparingTo("1.500");
+        ResponseEntity<JsonNode> retried = post(
+                "/v1/inventory/transfers/" + id + "/receive",
+                java.util.Map.of("lines", List.of(java.util.Map.of("transferLineId", lineId, "receivedQty", 3.5))),
+                USER,
+                receiptKey);
+        assertThat(retried.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(retried.getBody().get("shortfallId").asText())
+                .isEqualTo(received.getBody().get("shortfallId").asText());
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select qty_delta from inventory.stock_movement"
+                                        + " where document_id = ?::uuid and movement_type = 'TRANSFER_IN'",
+                                BigDecimal.class,
+                                id))
+                .isEqualByComparingTo("3.500");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?::uuid"
+                                        + " and movement_type in ('COUNT_ADJUST', 'WRITE_OFF')",
+                                Integer.class,
+                                id))
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_shortfall where transfer_id = ?::uuid",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_shortfall_line where transfer_id = ?::uuid",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(kernel.committedAudit())
+                .extracting(lk.coopfed.knoweb.testsupport.KernelRecorder.AuditRecord::eventType)
+                .contains("STOCK_POSTED", "TRANSFER_RECEIVED", "TRANSFER_SHORTFALL_DRAFTED");
     }
 
     @Test
@@ -481,8 +559,12 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     private ResponseEntity<JsonNode> post(String url, Object body, UUID user) {
+        return post(url, body, user, UUID.randomUUID());
+    }
+
+    private ResponseEntity<JsonNode> post(String url, Object body, UUID user, UUID idempotencyKey) {
         HttpHeaders headers = TestIdentityProvider.entityWideHeaders(user, MPCS);
-        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        headers.set("Idempotency-Key", idempotencyKey.toString());
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
         return http.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), JsonNode.class);
     }

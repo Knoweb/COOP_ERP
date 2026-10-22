@@ -47,7 +47,8 @@ class InventorySchemaIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void transferLifecycleFactsAreInsertOnlyAndForceRowLevelSecurity() {
-        for (String table : List.of("transfer_receipt_line", "transfer_cancellation")) {
+        for (String table : List.of(
+                "transfer_receipt_line", "transfer_cancellation", "transfer_shortfall", "transfer_shortfall_line")) {
             assertRefused("update inventory." + table + " set owner_entity_id = owner_entity_id");
             assertRefused("delete from inventory." + table);
             assertThat(superuserJdbc()
@@ -90,6 +91,24 @@ class InventorySchemaIntegrationTest extends PostgresIntegrationTest {
                 .contains(
                         "(transfer_id, owner_entity_id, location_id, to_location_id)",
                         "inventory.transfer(transfer_id, owner_entity_id, location_id, to_location_id)");
+
+        List<String> shortfallLineForeignKeys = superuserJdbc()
+                .queryForList(
+                        "select pg_get_constraintdef(oid) from pg_constraint"
+                                + " where conrelid = 'inventory.transfer_shortfall_line'::regclass"
+                                + " and contype = 'f'",
+                        String.class);
+        assertThat(shortfallLineForeignKeys)
+                .anySatisfy(
+                        definition -> assertThat(definition)
+                                .contains(
+                                        "(shortfall_id, transfer_id, owner_entity_id, location_id, from_location_id)",
+                                        "inventory.transfer_shortfall(shortfall_id, transfer_id, owner_entity_id, location_id, from_location_id)"))
+                .anySatisfy(
+                        definition -> assertThat(definition)
+                                .contains(
+                                        "(transfer_id, transfer_line_id, owner_entity_id, location_id, from_location_id)",
+                                        "inventory.transfer_receipt_line(transfer_id, transfer_line_id, owner_entity_id, location_id, from_location_id)"));
     }
 
     @Test

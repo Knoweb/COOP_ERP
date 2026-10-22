@@ -55,7 +55,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         streams.put("m3pricing", "8");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
-        // INV-07: m5inventory V0012 (receipt lines and cancellation facts) from V0011.
+        // INV-07: m5inventory V0012-V0013 (receipt facts and shortfall drafts) from V0011.
         streams.put("m5inventory", "11");
         streams.put("m6pos", null);
         streams.put("m7customers", "2");
@@ -199,7 +199,7 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("m1security", 21)
                 .containsEntry("m2catalogue", 10)
                 .containsEntry("m3pricing", 9)
-                .containsEntry("m5inventory", 12)
+                .containsEntry("m5inventory", 13)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
 
@@ -296,8 +296,13 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("location_id", legacyDestination)
                 .containsEntry("from_location_id", legacySource)
                 .containsEntry("received_qty", new java.math.BigDecimal("7.000"));
-        for (String table :
-                List.of("transfer_line", "transfer_receipt", "transfer_receipt_line", "transfer_cancellation")) {
+        for (String table : List.of(
+                "transfer_line",
+                "transfer_receipt",
+                "transfer_receipt_line",
+                "transfer_cancellation",
+                "transfer_shortfall",
+                "transfer_shortfall_line")) {
             assertThat(admin.queryForObject(
                             "select relrowsecurity and relforcerowsecurity"
                                     + " from pg_class where oid = ('inventory.' || ?)::regclass",

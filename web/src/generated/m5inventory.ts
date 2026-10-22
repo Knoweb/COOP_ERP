@@ -250,7 +250,7 @@ export interface paths {
         put?: never;
         /**
          * The destination receives the transfer
-         * @description An absent body preserves the original full-receipt operation. When a body is supplied it must name every immutable transfer line exactly once; Phase 2A accepts only quantities equal to those sent. Short quantities remain unavailable until the adjustment workflow is approved. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received, m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid, m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown, m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid, m5.transfer.receipt_qty_exceeds_sent, m5.transfer.short_receipt_not_supported.
+         * @description An absent body preserves the original full-receipt operation. When a body is supplied it must name every immutable transfer line exactly once. A positive quantity below the issued quantity receives only that amount and creates an unposted DAMAGED_IN_TRANSIT shortfall draft. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received, m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid, m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown, m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid, m5.transfer.receipt_qty_exceeds_sent.
          */
         post: operations["receiveTransfer"];
         delete?: never;
@@ -697,6 +697,15 @@ export interface components {
             receivedBy?: string;
             /** Format: date-time */
             receivedAt?: string;
+            /**
+             * Format: uuid
+             * @description The destination-owned unposted discrepancy draft, when the receipt was short
+             */
+            shortfallId?: string;
+            /** @enum {string} */
+            shortfallStatus?: "DRAFT";
+            /** @enum {string} */
+            shortfallCategory?: "DAMAGED_IN_TRANSIT";
             lines: components["schemas"]["TransferLineResponse"][];
         };
         TransferLineResponse: {
@@ -708,6 +717,10 @@ export interface components {
             /** Format: uuid */
             skuId: string;
             qty: number;
+            /** @description The accepted receipt quantity; absent before receipt */
+            receivedQty?: number;
+            /** @description The positive missing quantity recorded on the shortfall draft, when any */
+            shortfallQty?: number;
         };
         MovementResponse: {
             /** Format: uuid */
