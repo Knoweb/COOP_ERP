@@ -21,11 +21,7 @@ class TransferStore {
         this.jdbc = jdbc;
     }
 
-    /**
-     * The transfer as the scope sees it: its source (own_read) or its destination (dest_read).
-     * Not locked (the table grants no UPDATE, which FOR SHARE needs): two receipts at once meet
-     * at the receipt's primary key, and the second rolls back whole.
-     */
+    /** The transfer as the scope sees it: its source (own_read) or its destination (dest_read). */
     Optional<Header> find(UUID transferId) {
         return jdbc
                 .query(

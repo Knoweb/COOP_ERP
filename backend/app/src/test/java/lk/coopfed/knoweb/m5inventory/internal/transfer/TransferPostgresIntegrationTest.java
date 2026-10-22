@@ -14,6 +14,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lk.coopfed.knoweb.kernel.api.DocumentBaseRepository;
 import lk.coopfed.knoweb.kernel.api.DocumentIssued;
 import lk.coopfed.knoweb.kernel.api.DocumentLineRecord;
@@ -243,6 +248,16 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                                 UUID.class,
                                 id))
                 .isEqualTo(shop);
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select transfer_line_id, owner_entity_id, location_id, from_location_id,"
+                                        + " received_qty from inventory.transfer_receipt_line where transfer_id = ?",
+                                id))
+                .containsEntry("transfer_line_id", documentLines.get(0).id())
+                .containsEntry("owner_entity_id", MPCS)
+                .containsEntry("location_id", shop)
+                .containsEntry("from_location_id", warehouse)
+                .containsEntry("received_qty", new BigDecimal("20.000"));
         assertThat(superuserJdbc()
                         .queryForList(
                                 "select distinct location_id from inventory.stock_movement where document_id = ?"
@@ -599,6 +614,97 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void concurrentDispatchAndReceiptAttemptsCommitEachLifecycleFactOnlyOnce() throws Exception {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+
+        assertThat(race(
+                        () -> dispatch.handle(new DispatchTransfer(id), own(MPCS)),
+                        () -> dispatch.handle(new DispatchTransfer(id), own(MPCS))))
+                .containsExactlyInAnyOrder("OK", "m5.transfer.already_dispatched");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_dispatch where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+
+        assertThat(race(
+                        () -> receive.handle(new ReceiveTransfer(id), at(MPCS, shop)),
+                        () -> receive.handle(new ReceiveTransfer(id), at(MPCS, shop))))
+                .containsExactlyInAnyOrder("OK", "m5.transfer.already_received");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_receipt where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_receipt_line where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void receiptLineAndCancellationCompositeIdentityIsEnforcedByTheDatabase() {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        UUID lineId = superuserJdbc()
+                .queryForObject("select line_id from inventory.transfer_line where transfer_id = ?", UUID.class, id);
+        superuserJdbc()
+                .update(
+                        "insert into inventory.transfer_receipt"
+                                + " (transfer_id, owner_entity_id, location_id, from_location_id, received_by)"
+                                + " values (?, ?, ?, ?, ?)",
+                        id,
+                        MPCS,
+                        shop,
+                        warehouse,
+                        InventoryFixture.USER);
+
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update(
+                                "insert into inventory.transfer_receipt_line"
+                                        + " (transfer_id, transfer_line_id, owner_entity_id, location_id,"
+                                        + " from_location_id, received_qty) values (?, ?, ?, ?, ?, 5)",
+                                id,
+                                lineId,
+                                MPCS,
+                                shop,
+                                otherShop))
+                .hasMessageContaining("violates foreign key constraint");
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update(
+                                "insert into inventory.transfer_receipt_line"
+                                        + " (transfer_id, transfer_line_id, owner_entity_id, location_id,"
+                                        + " from_location_id, received_qty) values (?, ?, ?, ?, ?, -1)",
+                                id,
+                                lineId,
+                                MPCS,
+                                shop,
+                                warehouse))
+                .hasMessageContaining("violates check constraint");
+        assertThatThrownBy(() -> superuserJdbc()
+                        .update(
+                                "insert into inventory.transfer_cancellation"
+                                        + " (transfer_id, owner_entity_id, location_id, to_location_id,"
+                                        + " cancelled_by, reason) values (?, ?, ?, ?, ?, 'test')",
+                                id,
+                                MPCS,
+                                warehouse,
+                                otherShop,
+                                InventoryFixture.USER))
+                .hasMessageContaining("violates foreign key constraint");
+    }
+
     // ---- helpers --------------------------------------------------------------------------
 
     private UUID heldSku() {
@@ -640,5 +746,28 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
     private static void assertProblem(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String id) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ProblemException.class, e -> assertThat(e.messageId())
                 .isEqualTo(id));
+    }
+
+    private static List<String> race(Runnable first, Runnable second) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<String> firstResult = pool.submit(() -> outcome(start, first));
+            Future<String> secondResult = pool.submit(() -> outcome(start, second));
+            start.countDown();
+            return List.of(firstResult.get(30, TimeUnit.SECONDS), secondResult.get(30, TimeUnit.SECONDS));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static String outcome(CountDownLatch start, Runnable action) throws InterruptedException {
+        start.await();
+        try {
+            action.run();
+            return "OK";
+        } catch (ProblemException problem) {
+            return problem.messageId();
+        }
     }
 }

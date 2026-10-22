@@ -28,9 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
  * flow 6.6), at demo scope: the destination receives everything that was dispatched.
  *
  * <p><b>Own-location writes (PR #148).</b> The destination's session receives, and writes only
- * the destination's rows: one {@code transfer_receipt} row at the destination and the TRANSFER_IN
- * movements there. The source's transfer and lines are read (the {@code dest_read} policy),
- * never changed; the status is RECEIVED because the receipt row exists.
+ * the destination's rows: one {@code transfer_receipt} row and one full-quantity {@code
+ * transfer_receipt_line} per issued line at the destination, plus the TRANSFER_IN movements there.
+ * The source's transfer and lines are read (the {@code dest_read} policy), never changed; the
+ * status is RECEIVED because the receipt row exists.
  *
  * <p>Guards, in order: an OWN scope ({@code m5.scope.own_required}); the transfer visible to the
  * scope ({@code m5.transfer.not_found}); the scope at the destination or entity-wide
@@ -38,10 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
  * receive it); dispatched ({@code m5.transfer.not_dispatched}); not received before ({@code
  * m5.transfer.already_received}).
  *
- * <p>Mutation: the receipt row; TRANSFER_IN per line at the cost the TRANSFER_OUT carried, so the
- * value that left comes back. Audit {@code TRANSFER_RECEIVED}, and {@code TRANSFER_SELF_RECEIVED}
- * (REVIEW) when the receiver issued it too (wave 2, M5-16: allowed, flagged); event
- * {@code transfer.received.v1}.
+ * <p>Mutation: the receipt and its full-quantity line facts; TRANSFER_IN per line at the cost the
+ * TRANSFER_OUT carried, so the value that left comes back. Audit {@code TRANSFER_RECEIVED}, and
+ * {@code TRANSFER_SELF_RECEIVED} (REVIEW) when the receiver issued it too (wave 2, M5-16: allowed,
+ * flagged); event {@code transfer.received.v1}.
  */
 @Service
 @CommandHandler(permission = "shop.transfer.receive")
@@ -51,14 +52,21 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
     static final String AUDIT_SELF_RECEIVED = "TRANSFER_SELF_RECEIVED";
 
     private final TransferStore store;
+    private final TransferLifecycleLock lifecycleLock;
     private final StockLedger ledger;
     private final JdbcTemplate jdbc;
     private final AuditFacade audit;
     private final EventPublisher events;
 
     ReceiveTransferHandler(
-            TransferStore store, StockLedger ledger, JdbcTemplate jdbc, AuditFacade audit, EventPublisher events) {
+            TransferStore store,
+            TransferLifecycleLock lifecycleLock,
+            StockLedger ledger,
+            JdbcTemplate jdbc,
+            AuditFacade audit,
+            EventPublisher events) {
         this.store = store;
+        this.lifecycleLock = lifecycleLock;
         this.ledger = ledger;
         this.jdbc = jdbc;
         this.audit = audit;
@@ -71,6 +79,7 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
         if (scope == null || scope.policyClass() != PolicyClass.OWN || scope.entityId() == null) {
             throw new ProblemException("m5.scope.own_required");
         }
+        lifecycleLock.acquire(command.transferId());
         TransferStore.Header transfer = store.find(command.transferId())
                 .orElseThrow(() -> new ProblemException(
                         "m5.transfer.not_found", Map.of("transferId", String.valueOf(command.transferId()))));
@@ -84,6 +93,7 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
             throw new ProblemException("m5.transfer.already_received");
         }
 
+        List<TransferStore.Line> lines = store.lines(transfer.transferId());
         jdbc.update(
                 "insert into inventory.transfer_receipt (transfer_id, owner_entity_id, location_id, from_location_id,"
                         + " received_by) values (?, ?, ?, ?, ?)",
@@ -92,7 +102,18 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
                 transfer.toLocationId(),
                 transfer.fromLocationId(),
                 scope.userId());
-        List<TransferStore.Line> lines = store.lines(transfer.transferId());
+        for (TransferStore.Line line : lines) {
+            jdbc.update(
+                    "insert into inventory.transfer_receipt_line"
+                            + " (transfer_id, transfer_line_id, owner_entity_id, location_id, from_location_id,"
+                            + " received_qty) values (?, ?, ?, ?, ?, ?)",
+                    transfer.transferId(),
+                    line.lineId(),
+                    transfer.ownerEntityId(),
+                    transfer.toLocationId(),
+                    transfer.fromLocationId(),
+                    line.qty());
+        }
         List<Movement> movements = new ArrayList<>();
         for (TransferStore.Line line : lines) {
             movements.add(new Movement(
