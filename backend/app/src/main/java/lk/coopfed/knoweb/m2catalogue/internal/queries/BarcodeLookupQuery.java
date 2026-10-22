@@ -49,13 +49,14 @@ class BarcodeLookupQuery {
             boolean soldByWeight,
             String uomCode,
             UUID batchId,
-            String barcode) {}
+            String barcode,
+            String status) {}
 
     private static final String SELECT_HIT =
             """
             select s.sku_id, s.sku_code, s.short_name_en, s.short_name_si, s.short_name_ta,
                    s.base_uom_code, s.has_printed_mrp, s.sold_by_weight,
-                   b.uom_code, b.batch_id, b.barcode
+                   b.uom_code, b.batch_id, b.barcode, s.status
             from catalogue.sku_barcode b
             join catalogue.sku s on s.sku_id = b.sku_id
             where b.status = 'ACTIVE'
@@ -104,7 +105,7 @@ class BarcodeLookupQuery {
             Optional<LookupResult.BatchRef> batch = hit.batchId() != null
                     ? batchById(hit.batchId())
                     : (lot != null ? batchByLot(hit.skuId(), lot, expiry) : Optional.empty());
-            return Optional.of(result(hit, batch.orElse(null), scope.entityId()));
+            return buildResult(hit, batch.orElse(null), scope.entityId(), lookup.locationId());
         }
 
         // In-store 20–29 variable-weight and batch label resolution (TILL-SELL-16; doc 22 §3.3; ADR-43):
@@ -118,7 +119,7 @@ class BarcodeLookupQuery {
                 // Malformed 20–29 label (invalid check digit or zero weight): reject immediately.
                 return Optional.empty();
             }
-            return resolveInStoreLabel(parsed.get(), lot, expiry, scope.entityId());
+            return resolveInStoreLabel(parsed.get(), lot, expiry, scope.entityId(), lookup.locationId());
         }
 
         // 2): the GTIN of a 2D code registered under any factory symbology (a GTIN-14 with
@@ -129,7 +130,7 @@ class BarcodeLookupQuery {
                 Hit hit = byGtin.get();
                 Optional<LookupResult.BatchRef> batch =
                         lot != null ? batchByLot(hit.skuId(), lot, expiry) : Optional.empty();
-                return Optional.of(result(hit, batch.orElse(null), scope.entityId()));
+                return buildResult(hit, batch.orElse(null), scope.entityId(), lookup.locationId());
             }
         }
 
@@ -140,13 +141,13 @@ class BarcodeLookupQuery {
             """
             select s.sku_id, s.sku_code, s.short_name_en, s.short_name_si, s.short_name_ta,
                    s.base_uom_code, s.has_printed_mrp, s.sold_by_weight,
-                   s.base_uom_code as uom_code, null::uuid as batch_id, null::text as barcode
+                   s.base_uom_code as uom_code, null::uuid as batch_id, null::text as barcode, s.status
             from catalogue.sku s
             where s.status in ('LOCAL', 'SHARED')
             """;
 
     private Optional<LookupResult> resolveInStoreLabel(
-            WeighedLabelParser.ParsedLabel label, String lot, LocalDate expiry, UUID entityId) {
+            WeighedLabelParser.ParsedLabel label, String lot, LocalDate expiry, UUID entityId, UUID locationId) {
         String code = label.code();
         String batchRef = label.kind() == WeighedLabelParser.Kind.BATCH ? label.batchRef() : lot;
 
@@ -178,7 +179,7 @@ class BarcodeLookupQuery {
                 ? batchById(resolvedHit.batchId())
                 : (batchRef != null ? batchByLot(resolvedHit.skuId(), batchRef, expiry) : Optional.empty());
 
-        return Optional.of(result(resolvedHit, batch.orElse(null), entityId));
+        return buildResult(resolvedHit, batch.orElse(null), entityId, locationId);
     }
 
     private Optional<Hit> internalBarcodeRow(String barcode, UUID entityId) {
@@ -320,7 +321,38 @@ class BarcodeLookupQuery {
                 .findFirst();
     }
 
-    private LookupResult result(Hit hit, LookupResult.BatchRef batch, UUID entityId) {
+    private Optional<LookupResult> buildResult(Hit hit, LookupResult.BatchRef batch, UUID entityId, UUID locationId) {
+        if ("DRAFT".equalsIgnoreCase(hit.status())) {
+            return Optional.empty();
+        }
+
+        boolean sellThrough = false;
+        if (locationId != null) {
+            Optional<Boolean> st = checkSellThrough(locationId, hit.skuId());
+            if (st.isPresent()) {
+                sellThrough = st.get();
+            } else if ("INACTIVE".equalsIgnoreCase(hit.status())) {
+                return Optional.empty();
+            }
+        }
+
+        if ("INACTIVE".equalsIgnoreCase(hit.status()) && !sellThrough) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result(hit, batch, entityId, sellThrough));
+    }
+
+    private Optional<Boolean> checkSellThrough(UUID locationId, UUID skuId) {
+        List<Boolean> list = jdbc.queryForList(
+                "select sell_through from catalogue.location_assortment where location_id = ? and sku_id = ? and (cardinality(reasons) > 0 or sell_through = true)",
+                Boolean.class,
+                locationId,
+                skuId);
+        return list.stream().findFirst();
+    }
+
+    private LookupResult result(Hit hit, LookupResult.BatchRef batch, UUID entityId, boolean sellThrough) {
         BigDecimal factor = hit.uomCode().equals(hit.baseUomCode())
                 ? BigDecimal.ONE
                 : factorInForce(hit.skuId(), hit.uomCode()).orElse(null);
@@ -340,7 +372,7 @@ class BarcodeLookupQuery {
                 factor,
                 batch,
                 thumbKey(hit.skuId(), hit.barcode(), entityId).orElse(null),
-                false,
+                sellThrough,
                 hit.hasPrintedMrp(),
                 hit.soldByWeight());
     }
@@ -357,7 +389,8 @@ class BarcodeLookupQuery {
                 rs.getBoolean("sold_by_weight"),
                 rs.getString("uom_code"),
                 rs.getObject("batch_id", UUID.class),
-                rs.getString("barcode"));
+                rs.getString("barcode"),
+                rs.getString("status"));
     }
 
     private static LookupResult.BatchRef mapBatch(ResultSet rs, int row) throws SQLException {

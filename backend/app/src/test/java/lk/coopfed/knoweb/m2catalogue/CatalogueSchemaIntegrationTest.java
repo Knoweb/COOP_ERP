@@ -53,7 +53,9 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
             // V0009 (CAT-01): the duplicate suspects.
             Map.entry("duplicate_suspect", with("own_update")),
             // V0010 (CAT-03): sku_alias.
-            Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")));
+            Map.entry("sku_alias", with("authenticated_read", "fed_write", "fed_update")),
+            // V0011 (CAT-06): location_assortment.
+            Map.entry("location_assortment", with("own_update", "own_delete")));
 
     /** The default partition alone admits the migrator, which moves rows out of it (V0003). */
     private static final String DEFAULT_PARTITION = "batch_default";
@@ -286,6 +288,7 @@ class CatalogueSchemaIntegrationTest extends PostgresIntegrationTest {
         } finally {
             db.update("delete from catalogue.batch where batch_id = ?", batch);
             db.update("delete from catalogue.batch_key where batch_id = ?", batch);
+            db.update("delete from catalogue.location_assortment where sku_id = ?", sku);
             db.update("delete from catalogue.sku where sku_id = ?", sku);
             dropTheMonthsBeyondTheMigration(db);
         }

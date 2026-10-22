@@ -42,14 +42,14 @@ import org.springframework.stereotype.Component;
  * the whole federation's batches (wave 4 TD-02 and TD-04).
  */
 @Component
-class CatalogueSnapshotContributor implements SnapshotContributor {
+public class CatalogueSnapshotContributor implements SnapshotContributor {
 
     static final String SKU = "sku";
     static final String TAX_CATEGORY = "tax_category";
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    CatalogueSnapshotContributor(JdbcTemplate jdbc) {
+    public CatalogueSnapshotContributor(JdbcTemplate jdbc) {
         this.jdbc = new NamedParameterJdbcTemplate(jdbc);
     }
 
@@ -82,41 +82,46 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
     // ---- sku ----------------------------------------------------------------------------------
 
     private Map<UUID, Map<String, Object>> skus(Shop shop, Collection<UUID> ids) {
-        MapSqlParameterSource params = new MapSqlParameterSource("ids", ids);
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        if (ids != null) {
+            params.addValue("ids", ids);
+        }
         String onlyIds = ids == null ? "" : " and s.sku_id in (:ids)";
 
         Map<UUID, Map<String, Object>> skus = new LinkedHashMap<>();
-        jdbc.query(
-                """
-                select s.sku_id, s.sku_code, s.status, s.short_name_en, s.short_name_si, s.short_name_ta,
-                       s.base_uom_code, s.sold_by_weight, s.batch_tracked, s.expiry_tracked, s.has_printed_mrp,
-                       s.expiry_warning_days, s.tax_category_id, s.multi_mrp_policy
-                  from catalogue.sku s
-                 where s.status in ('LOCAL', 'SHARED')"""
-                        + onlyIds
-                        + " order by s.sku_id",
-                params,
-                rs -> {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("sku_code", rs.getString("sku_code"));
-                    row.put("status", rs.getString("status"));
-                    row.put("short_name_en", rs.getString("short_name_en"));
-                    row.put("short_name_si", rs.getString("short_name_si"));
-                    row.put("short_name_ta", rs.getString("short_name_ta"));
-                    row.put("base_uom_code", rs.getString("base_uom_code"));
-                    row.put("sold_by_weight", rs.getBoolean("sold_by_weight"));
-                    row.put("batch_tracked", rs.getBoolean("batch_tracked"));
-                    row.put("expiry_tracked", rs.getBoolean("expiry_tracked"));
-                    row.put("has_printed_mrp", rs.getBoolean("has_printed_mrp"));
-                    row.put("expiry_warning_days", (Integer) rs.getObject("expiry_warning_days", Integer.class));
-                    row.put("tax_category_id", rs.getString("tax_category_id"));
-                    row.put("multi_mrp_policy", rs.getString("multi_mrp_policy"));
-                    row.put("conversions", new ArrayList<Map<String, Object>>());
-                    row.put("barcodes", new ArrayList<Map<String, Object>>());
-                    row.put("tags", new ArrayList<String>());
-                    row.put("images", new ArrayList<Map<String, Object>>());
-                    skus.put(rs.getObject("sku_id", UUID.class), row);
-                });
+        if (shop != null && shop.locationId() != null) {
+            params.addValue("locationId", shop.locationId());
+            jdbc.query(
+                    """
+                    select s.sku_id, s.sku_code, s.status, s.short_name_en, s.short_name_si, s.short_name_ta,
+                           s.base_uom_code, s.sold_by_weight, s.batch_tracked, s.expiry_tracked, s.has_printed_mrp,
+                           s.expiry_warning_days, s.tax_category_id, s.multi_mrp_policy,
+                           a.sell_through
+                      from catalogue.sku s
+                      join catalogue.location_assortment a on a.sku_id = s.sku_id and a.location_id = :locationId
+                     where ((s.status in ('LOCAL', 'SHARED') and (cardinality(a.reasons) > 0 or a.sell_through = true))
+                            or (s.status = 'INACTIVE' and a.sell_through = true))"""
+                            + onlyIds
+                            + " order by s.sku_id",
+                    params,
+                    rs -> {
+                        mapSkuRow(rs, skus, true);
+                    });
+        } else {
+            jdbc.query(
+                    """
+                    select s.sku_id, s.sku_code, s.status, s.short_name_en, s.short_name_si, s.short_name_ta,
+                           s.base_uom_code, s.sold_by_weight, s.batch_tracked, s.expiry_tracked, s.has_printed_mrp,
+                           s.expiry_warning_days, s.tax_category_id, s.multi_mrp_policy
+                      from catalogue.sku s
+                     where s.status in ('LOCAL', 'SHARED')"""
+                            + onlyIds
+                            + " order by s.sku_id",
+                    params,
+                    rs -> {
+                        mapSkuRow(rs, skus, false);
+                    });
+        }
         if (skus.isEmpty()) {
             return skus;
         }
@@ -241,6 +246,30 @@ class CatalogueSnapshotContributor implements SnapshotContributor {
                             .add(rate);
                 });
         return categories;
+    }
+
+    private static void mapSkuRow(java.sql.ResultSet rs, Map<UUID, Map<String, Object>> skus, boolean fromAssortment)
+            throws java.sql.SQLException {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("sku_code", rs.getString("sku_code"));
+        row.put("status", rs.getString("status"));
+        row.put("short_name_en", rs.getString("short_name_en"));
+        row.put("short_name_si", rs.getString("short_name_si"));
+        row.put("short_name_ta", rs.getString("short_name_ta"));
+        row.put("base_uom_code", rs.getString("base_uom_code"));
+        row.put("sold_by_weight", rs.getBoolean("sold_by_weight"));
+        row.put("batch_tracked", rs.getBoolean("batch_tracked"));
+        row.put("expiry_tracked", rs.getBoolean("expiry_tracked"));
+        row.put("has_printed_mrp", rs.getBoolean("has_printed_mrp"));
+        row.put("expiry_warning_days", (Integer) rs.getObject("expiry_warning_days", Integer.class));
+        row.put("tax_category_id", rs.getString("tax_category_id"));
+        row.put("multi_mrp_policy", rs.getString("multi_mrp_policy"));
+        row.put("sell_through", fromAssortment ? rs.getBoolean("sell_through") : false);
+        row.put("conversions", new ArrayList<Map<String, Object>>());
+        row.put("barcodes", new ArrayList<Map<String, Object>>());
+        row.put("tags", new ArrayList<String>());
+        row.put("images", new ArrayList<Map<String, Object>>());
+        skus.put(rs.getObject("sku_id", UUID.class), row);
     }
 
     // ---- helpers ------------------------------------------------------------------------------

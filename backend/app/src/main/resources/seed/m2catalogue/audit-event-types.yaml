@@ -130,3 +130,8 @@ audit_event_types:
     offline_capturable: false
     description_en: Duplicate SKU suspect detected
 
+  - code: ASSORTMENT_DRIFT
+    severity: REVIEW
+    offline_capturable: false
+    description_en: Assortment maintainer reconcile detected and repaired drift
+

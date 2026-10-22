@@ -194,6 +194,7 @@ public final class InventoryFixture {
                     "delete from catalogue.batch_key where batch_id in (select batch_id from catalogue.batch where sku_id = ?)",
                     sku);
             admin.update("delete from catalogue.batch where sku_id = ?", sku);
+            admin.update("delete from catalogue.location_assortment where sku_id = ?", sku);
             admin.update("delete from catalogue.sku where sku_id = ?", sku);
         }
         for (UUID location : locations) {
