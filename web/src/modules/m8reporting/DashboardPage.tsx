@@ -6,6 +6,8 @@ import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { useReportingApi, type Tile } from "./reportingApi";
 import { errorText, tileLink, trendHeights } from "./reportView";
 import { ExceptionList } from "./ExceptionList";
+import { ShopTargetsDashboardCard } from "./ShopTargetsDashboardCard";
+import { useHasPermission } from "../../shell/auth/permissions";
 import "./reporting.css";
 
 /**
@@ -18,6 +20,7 @@ export function DashboardPage() {
   const t = useT();
   const api = useReportingApi();
   const formatInstant = useFormatInstant();
+  const canViewTargets = useHasPermission("rpt.target.view");
   const dashboard = useQuery({ queryKey: ["reporting", "dashboard"], queryFn: () => api.dashboard() });
   const definitions = useQuery({
     queryKey: ["reporting", "definitions"],
@@ -44,6 +47,8 @@ export function DashboardPage() {
           </ul>
         </>
       )}
+
+      {canViewTargets && <ShopTargetsDashboardCard />}
 
       <h2>{t("reporting.exceptions.title").text}</h2>
       <ExceptionList />

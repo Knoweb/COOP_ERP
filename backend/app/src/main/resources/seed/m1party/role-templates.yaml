@@ -4,6 +4,7 @@ templates:
     role_class: "FEDERATION_VIEW"
     permissions:
       - "rpt.report.run"
+      - "rpt.target.view"
       - "gov.entity.view"
       - "prt.relationship.view"
       - "prt.location.view"
@@ -26,6 +27,8 @@ templates:
     permissions:
       - "rpt.report.run"
       - "rpt.export.run"
+      - "rpt.target.view"
+      - "rpt.target.manage"
       - "gov.entity.view"
       - "gov.user.manage"
       - "gov.user.view"

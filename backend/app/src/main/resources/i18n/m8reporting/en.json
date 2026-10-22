@@ -82,5 +82,12 @@
   "m8.tile.on_time": "Our deliveries on time (%)",
   "m8.tile.supplier_fill_rate": "Fill rate of deliveries to us (%)",
   "m8.tile.supplier_on_time": "Deliveries to us on time (%)",
-  "m8.tile.exceptions": "Exceptions to look at"
+  "m8.tile.exceptions": "Exceptions to look at",
+  "m8.target.location_unknown": "The shop is unknown or not visible to your organisation",
+  "m8.target.location_scope_mismatch": "You can only set targets for your own shop",
+  "m8.target.period_invalid": "The target start date must be on or before the end date",
+  "m8.target.amount_invalid": "The target amount cannot be negative",
+  "m8.target.duplicate": "A sales target already exists for this shop and period",
+  "m8.target.not_found": "The sales target does not exist",
+  "m8.target.own_required": "Sales targets can only be managed by users acting for their own organisation"
 }

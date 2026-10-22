@@ -254,7 +254,14 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 2, PR 08: m8reporting V0007 over a database at V0006 with rows in it. The old lines
         // are numbered in their line_id order under the new key, as the migrator (not a superuser)
         // could only do with the table's FORCE lifted for that statement, and FORCE is back.
-        assertThat(after).containsEntry("m8reporting", 7);
+        // POL-M1-01: m8reporting V0008 adds reporting.shop_target with 4-class RLS.
+        assertThat(after).containsEntry("m8reporting", 8);
+        assertThat(admin.queryForObject("select to_regclass('reporting.shop_target')::text", String.class))
+                .isEqualTo("reporting.shop_target");
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'reporting.shop_target'::regclass",
+                        Boolean.class))
+                .isTrue();
         assertThat(admin.queryForList(
                         "select line_id::text || ':' || line_no from reporting.shop_sale_line_fact order by line_no",
                         String.class))

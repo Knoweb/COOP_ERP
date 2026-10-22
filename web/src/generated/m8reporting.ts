@@ -142,6 +142,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/shop-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Define a sales target for a shop and period
+         * @description Creates a sales target for an allowed shop and period. Codes this operation can answer with 422: m8.target.location_unknown, m8.target.location_scope_mismatch, m8.target.period_invalid, m8.target.amount_invalid, m8.target.duplicate, m8.target.own_required.
+         */
+        post: operations["createShopTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/shop-targets/{targetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a shop sales target by ID */
+        get: operations["getShopTarget"];
+        /**
+         * Update a sales target for a shop and period
+         * @description Updates an existing sales target. Codes this operation can answer with 422: m8.target.not_found, m8.target.period_invalid, m8.target.amount_invalid, m8.target.duplicate, m8.target.own_required.
+         */
+        put: operations["updateShopTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/shop-targets/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shop target vs actual sales comparison performance
+         * @description Compares defined sales targets against aggregated actual sales from shop_sale_fact for the target period, calculating variance and achievement percentage.
+         */
+        get: operations["getShopTargetPerformance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -265,6 +326,67 @@ export interface components {
             requestedAt: string;
             /** Format: date-time */
             completedAt?: string;
+        };
+        CreateShopTargetRequest: {
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            /** @description A non-negative target amount */
+            targetAmount: string;
+            /** @default LKR */
+            currency: string;
+        };
+        UpdateShopTargetRequest: {
+            /** @description A non-negative target amount */
+            targetAmount: string;
+            /** Format: date */
+            periodStart?: string;
+            /** Format: date */
+            periodEnd?: string;
+        };
+        ShopTargetResponse: {
+            /** Format: uuid */
+            targetId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            targetAmount: string;
+            currency: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ShopTargetPerformanceItem: {
+            /** Format: uuid */
+            targetId: string;
+            /** Format: uuid */
+            locationId: string;
+            locationCode: string;
+            locationName: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            targetAmount: string;
+            actualAmount: string;
+            varianceAmount: string;
+            /** @description Actual divided by target times 100, or null when target is 0 */
+            achievementPercent?: string | null;
+            currency: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ShopTargetPerformanceResponse: {
+            items: components["schemas"]["ShopTargetPerformanceItem"][];
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -532,6 +654,131 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    createShopTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateShopTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopTargetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getShopTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The shop target */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopTargetResponse"];
+                };
+            };
+            /** @description Target not found in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateShopTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShopTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopTargetResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Target not found in the caller's scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getShopTargetPerformance: {
+        parameters: {
+            query?: {
+                /** @description One location (the stock position); all the caller reads when absent */
+                locationId?: components["parameters"]["LocationId"];
+                /** @description The first day of the period (period reports) */
+                from?: components["parameters"]["From"];
+                /** @description The last day of the period (period reports) */
+                to?: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comparison items */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopTargetPerformanceResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
         };
     };
 }
