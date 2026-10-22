@@ -152,7 +152,7 @@ WITH job (role_id, codes) AS (
         -- society's shelf prices: its RETAIL list, its MRP policy and its discount rules (M3-06)
         ('0190f0de-0000-7000-8000-000000000332'::uuid, ARRAY[
             'prc.pricelist.view', 'prc.pricelist.author', 'prc.pricelist.publish', 'prc.mrp_policy.set',
-            'prc.rule.author', 'prc.rule.activate', 'prc.review.view',
+            'prc.rule.author', 'prc.rule.activate', 'prc.review.view', 'prc.label.print',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',

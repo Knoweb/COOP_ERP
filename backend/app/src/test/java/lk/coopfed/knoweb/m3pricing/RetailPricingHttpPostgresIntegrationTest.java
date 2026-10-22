@@ -85,11 +85,46 @@ class RetailPricingHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void clean() {
         JdbcTemplate admin = superuserJdbc();
-        admin.execute("truncate table pricing.price_list_line, pricing.price_list cascade");
+        admin.execute("truncate table pricing.label_job, pricing.price_list_line, pricing.price_list cascade");
         admin.execute("truncate table pricing.control_price, pricing.mrp_policy");
         admin.execute("truncate table catalogue.sku cascade");
         admin.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
         admin.execute("truncate table kernel.audit_event");
+    }
+
+    @Test
+    void aShelfLabelJobIsQueuedAndReadThroughTheGeneratedHttpContract() {
+        ResponseEntity<JsonNode> created =
+                send(HttpMethod.POST, "/v1/pricing/lists", SOCIETY, Map.of("kind", "RETAIL", "name", "Labels"));
+        String listId = created.getBody().get("priceListId").asText();
+        send(
+                HttpMethod.PUT,
+                "/v1/pricing/lists/" + listId + "/lines",
+                SOCIETY,
+                Map.of("lines", List.of(Map.of("skuId", rice, "uomCode", "EA", "tierFromQty", 0, "price", 215))));
+        send(
+                HttpMethod.POST,
+                "/v1/pricing/lists/" + listId + "/publish",
+                SOCIETY,
+                Map.of("applyFrom", today.toString()));
+
+        ResponseEntity<JsonNode> queued = send(
+                HttpMethod.POST, "/v1/pricing/labels", SOCIETY, Map.of("locationId", SHOP, "skuIds", List.of(rice)));
+
+        assertThat(queued.getStatusCode()).as(String.valueOf(queued.getBody())).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(queued.getBody().get("status").asText()).isEqualTo("QUEUED");
+        assertThat(queued.getBody().get("requestedCount").asInt()).isEqualTo(1);
+        assertThat(queued.getBody().get("renderedCount").asInt()).isZero();
+        assertThat(queued.getBody().get("refused")).isEmpty();
+        String jobId = queued.getBody().get("jobId").asText();
+
+        ResponseEntity<JsonNode> same = send(HttpMethod.GET, "/v1/pricing/labels/" + jobId, SOCIETY, null);
+        assertThat(same.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(same.getBody().get("jobId").asText()).isEqualTo(jobId);
+        assertThat(send(HttpMethod.GET, "/v1/pricing/labels/" + jobId, FEDERATION, null)
+                        .getStatusCode())
+                .as("another entity cannot discover the society's job")
+                .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test

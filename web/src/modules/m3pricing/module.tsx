@@ -52,6 +52,7 @@ export const pricingModule: ModuleDefinition = {
     "prc.mrp_policy.set",
     "prc.rule.author",
     "prc.rule.activate",
-    "prc.review.view"
+    "prc.review.view",
+    "prc.label.print"
   ]
 };

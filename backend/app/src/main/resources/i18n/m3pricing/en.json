@@ -69,5 +69,16 @@
   "m3.basket.qty_precision": "A quantity has at most three decimal places",
   "m3.review.already_raised": "This pricing review has already been raised",
   "m3.review.trigger_not_found": "The pricing review check could not be found",
-  "m3.review.trigger_checked": "The pricing review check has already been done"
+  "m3.review.trigger_checked": "The pricing review check has already been done",
+  "m3.label.location_not_owned": "Choose a shop that belongs to this entity",
+  "m3.label.retail_list_not_found": "There is no published shelf price list in force today",
+  "m3.label.sku_not_on_list": "One of the selected items is not on the shelf price list in force",
+  "m3.label.template_invalid": "The configured shelf-label template is not available",
+  "m3.label.job_not_found": "The shelf-label print job could not be found",
+  "m3.label.job_not_queued": "The shelf-label print job has already finished",
+  "m3.label.price": "Price",
+  "m3.label.unit": "Unit",
+  "m3.label.mrp.printed": "Do not charge above the MRP printed on the pack",
+  "m3.label.mrp.none": "This item has no printed MRP on the pack",
+  "m3.label.empty": "No eligible shelf labels to print; see the refused items in the job result"
 }

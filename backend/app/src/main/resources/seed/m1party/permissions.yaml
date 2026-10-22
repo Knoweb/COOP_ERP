@@ -165,6 +165,11 @@ permissions:
     module: "m3pricing"
     description_en: "Apply delivery fees to orders"
     scope: "FEDERATION"
+  # PRC-03 / 23A section 3.1: queue and retrieve shelf-label print jobs for the entity's shops.
+  - code: "prc.label.print"
+    module: "m3pricing"
+    description_en: "Print shelf price labels"
+    scope: "ENTITY"
   # M2 Catalogue & Batch (22A section 3.1: "appended to the M1-owned catalogue file"). M2 has
   # no permission file of its own: security.permission is M1's table and M1SeedLoader reads
   # this one file. "F" in the guide is scope FEDERATION; "mfa" is requires_mfa. The eleven codes
