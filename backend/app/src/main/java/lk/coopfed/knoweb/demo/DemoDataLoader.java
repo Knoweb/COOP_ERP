@@ -49,6 +49,7 @@ import lk.coopfed.knoweb.m3pricing.api.SetLinesResult;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
 import lk.coopfed.knoweb.m3pricing.query.PricingQueries;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
@@ -113,6 +114,7 @@ public class DemoDataLoader {
     private final Handles<SignOpeningBalance, UUID> signOpeningBalance;
     private final Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance;
     private final Handles<IssueTransfer, UUID> issueTransfer;
+    private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
     private final PartyQueries party;
     private final RelationshipQueries relationships;
@@ -154,6 +156,7 @@ public class DemoDataLoader {
             Handles<SignOpeningBalance, UUID> signOpeningBalance,
             Handles<CountersignOpeningBalance, UUID> countersignOpeningBalance,
             Handles<IssueTransfer, UUID> issueTransfer,
+            Handles<DispatchTransfer, UUID> dispatchTransfer,
             Handles<ReceiveTransfer, UUID> receiveTransfer,
             PartyQueries party,
             RelationshipQueries relationships,
@@ -184,6 +187,7 @@ public class DemoDataLoader {
         this.signOpeningBalance = signOpeningBalance;
         this.countersignOpeningBalance = countersignOpeningBalance;
         this.issueTransfer = issueTransfer;
+        this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
         this.party = party;
         this.relationships = relationships;
@@ -618,8 +622,8 @@ public class DemoDataLoader {
     /**
      * The society manager sends the town shop its first stock from the stores (M5-09,
      * DemoShopStock#TOWN_SHOP), and the shop's own staff member receives it at the shop: each
-     * writes only its own location's rows. Skipped when a transfer to the shop exists; one left in
-     * transit is received.
+     * writes only its own location's rows. Skipped when a transfer to the shop exists; one left
+     * issued is dispatched and one left in transit is received.
      */
     private void shopStockByTransfer(Map<String, UUID> skus) {
         ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
@@ -634,6 +638,8 @@ public class DemoDataLoader {
             count("IssueTransfer");
             existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
         }
+        dispatchIssued(existing, DemoCast.M101_TOWN_SHOP, manager);
+        existing = inventory.transfers(DemoCast.M101_TOWN_SHOP, shop);
         for (TransferView transfer : existing) {
             if ("IN_TRANSIT".equals(transfer.status()) && DemoCast.M101_TOWN_SHOP.equals(transfer.toLocationId())) {
                 receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), shop);
@@ -646,7 +652,7 @@ public class DemoDataLoader {
      * The society manager sends the Hettipola shop its first stock a month later
      * (DemoShopStock#HETTIPOLA_SHOP) and receives it there himself: the shop has no staff user of
      * its own in the demo, and the manager works entity-wide. Skipped when a transfer to the shop
-     * exists; one left in transit is received.
+     * exists; one left issued is dispatched and one left in transit is received.
      */
     private void hettipolaStockByTransfer(Map<String, UUID> skus) {
         ScopeContext manager = scopeOf(DemoCast.M101_MANAGER);
@@ -661,11 +667,22 @@ public class DemoDataLoader {
             count("IssueTransfer");
             existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
         }
+        dispatchIssued(existing, DemoCast.M101_HETTIPOLA_SHOP, manager);
+        existing = inventory.transfers(DemoCast.M101_HETTIPOLA_SHOP, manager);
         for (TransferView transfer : existing) {
             if ("IN_TRANSIT".equals(transfer.status())
                     && DemoCast.M101_HETTIPOLA_SHOP.equals(transfer.toLocationId())) {
                 receiveTransfer.handle(new ReceiveTransfer(transfer.transferId()), manager);
                 count("ReceiveTransfer");
+            }
+        }
+    }
+
+    private void dispatchIssued(List<TransferView> transfers, UUID destination, ScopeContext source) {
+        for (TransferView transfer : transfers) {
+            if ("ISSUED".equals(transfer.status()) && destination.equals(transfer.toLocationId())) {
+                dispatchTransfer.handle(new DispatchTransfer(transfer.transferId()), source);
+                count("DispatchTransfer");
             }
         }
     }

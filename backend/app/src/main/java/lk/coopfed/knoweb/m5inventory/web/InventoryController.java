@@ -12,6 +12,7 @@ import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
+import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
 import lk.coopfed.knoweb.m5inventory.api.OpeningBalanceLine;
@@ -58,6 +59,7 @@ class InventoryController implements InventoryApi {
     private final Handles<SignOpeningBalance, UUID> sign;
     private final Handles<CountersignOpeningBalance, UUID> countersign;
     private final Handles<IssueTransfer, UUID> issueTransfer;
+    private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
 
     InventoryController(
@@ -68,6 +70,7 @@ class InventoryController implements InventoryApi {
             Handles<SignOpeningBalance, UUID> sign,
             Handles<CountersignOpeningBalance, UUID> countersign,
             Handles<IssueTransfer, UUID> issueTransfer,
+            Handles<DispatchTransfer, UUID> dispatchTransfer,
             Handles<ReceiveTransfer, UUID> receiveTransfer) {
         this.queries = queries;
         this.batches = batches;
@@ -76,6 +79,7 @@ class InventoryController implements InventoryApi {
         this.sign = sign;
         this.countersign = countersign;
         this.issueTransfer = issueTransfer;
+        this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
     }
 
@@ -112,6 +116,13 @@ class InventoryController implements InventoryApi {
     }
 
     @Override
+    public ResponseEntity<TransferResponse> dispatchTransfer(String idempotencyKey, UUID transferId) {
+        ScopeContext scope = currentScope.get();
+        dispatchTransfer.handle(new DispatchTransfer(transferId), scope);
+        return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
+    }
+
+    @Override
     public ResponseEntity<TransferResponse> receiveTransfer(String idempotencyKey, UUID transferId) {
         ScopeContext scope = currentScope.get();
         receiveTransfer.handle(new ReceiveTransfer(transferId), scope);
@@ -129,6 +140,9 @@ class InventoryController implements InventoryApi {
                                 .toList())
                 .issuedBy(t.issuedBy())
                 .issuedAt(t.issuedAt())
+                .documentNo(t.documentNo())
+                .dispatchedBy(t.dispatchedBy())
+                .dispatchedAt(t.dispatchedAt())
                 .receivedBy(t.receivedBy())
                 .receivedAt(t.receivedAt());
     }

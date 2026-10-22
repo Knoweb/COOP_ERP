@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ReceiveTransfer (25A section 6.3, "destination receive posts TRANSFER_IN with actuals"; doc 25
- * flow 6.6), at demo scope: the destination receives everything that was sent.
+ * flow 6.6), at demo scope: the destination receives everything that was dispatched.
  *
  * <p><b>Own-location writes (PR #148).</b> The destination's session receives, and writes only
  * the destination's rows: one {@code transfer_receipt} row at the destination and the TRANSFER_IN
@@ -35,7 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Guards, in order: an OWN scope ({@code m5.scope.own_required}); the transfer visible to the
  * scope ({@code m5.transfer.not_found}); the scope at the destination or entity-wide
  * ({@code m5.transfer.not_destination}: a session at the source reads the transfer but does not
- * receive it); not received before ({@code m5.transfer.already_received}).
+ * receive it); dispatched ({@code m5.transfer.not_dispatched}); not received before ({@code
+ * m5.transfer.already_received}).
  *
  * <p>Mutation: the receipt row; TRANSFER_IN per line at the cost the TRANSFER_OUT carried, so the
  * value that left comes back. Audit {@code TRANSFER_RECEIVED}, and {@code TRANSFER_SELF_RECEIVED}
@@ -75,6 +76,9 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
                         "m5.transfer.not_found", Map.of("transferId", String.valueOf(command.transferId()))));
         if (scope.locationId() != null && !scope.locationId().equals(transfer.toLocationId())) {
             throw new ProblemException("m5.transfer.not_destination");
+        }
+        if (!store.dispatched(transfer.transferId())) {
+            throw new ProblemException("m5.transfer.not_dispatched");
         }
         if (store.received(transfer.transferId())) {
             throw new ProblemException("m5.transfer.already_received");

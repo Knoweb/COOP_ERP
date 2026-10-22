@@ -48,6 +48,7 @@ public class ControlPolicy {
     static final String REPACK_YIELD_TOLERANCE_PCT = "inventory.repack_yield_tolerance_pct";
     static final String EXPIRY_WARNING_DAYS = "inventory.expiry_warning_days";
     static final String NEGATIVE_LOT_ESCALATION_DAYS = "inventory.negative_lot_escalation_days";
+    static final String TRANSFER_RECEIPT_DAYS = "inventory.transfer_receipt_days";
 
     private static final BigDecimal ONE_CENT = new BigDecimal("0.01");
 
@@ -196,6 +197,11 @@ public class ControlPolicy {
      */
     public int negativeLotEscalationDays(ScopeContext scope) {
         return config.getInt(NEGATIVE_LOT_ESCALATION_DAYS, scope, 7);
+    }
+
+    /** Calendar days a dispatched transfer may remain unreceived before a review is raised. */
+    public int transferReceiptDays(ScopeContext scope) {
+        return config.getInt(TRANSFER_RECEIPT_DAYS, scope, 3);
     }
 
     /** How far, in per cent, a repack's output may stray from the recipe's ({@code inventory.repack_yield_tolerance_pct}, 2). */

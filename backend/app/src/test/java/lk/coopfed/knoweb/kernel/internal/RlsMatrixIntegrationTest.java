@@ -415,6 +415,10 @@ class RlsMatrixIntegrationTest extends PostgresIntegrationTest {
                     "dest_read (m5inventory V0004): the receiving shop reads the lines of a transfer sent to it",
                     RlsMatrixIntegrationTest::addressedToTheShop),
             new Departure(
+                    "inventory.transfer_dispatch",
+                    "dest_read (m5inventory V0011): the receiving shop reads the dispatch fact of a transfer sent to it",
+                    RlsMatrixIntegrationTest::addressedToTheShop),
+            new Departure(
                     "inventory.transfer_receipt",
                     "source_read (m5inventory V0004): the sending shop reads the receipt of its transfer",
                     RlsMatrixIntegrationTest::addressedToTheShop),

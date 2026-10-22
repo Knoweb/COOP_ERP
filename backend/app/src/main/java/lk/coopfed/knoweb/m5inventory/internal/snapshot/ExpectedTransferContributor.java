@@ -23,7 +23,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Serves the {@code expected_transfer} snapshot table:
  * <ul>
- *   <li>Only in-transit incoming transfers addressed to the requesting location ({@code to_location_id}).
+ *   <li>Only dispatched, in-transit transfers addressed to the requesting location ({@code
+ *       to_location_id}).
  *   <li>Transfers already received (a receipt row exists) are excluded, producing tombstones.
  *   <li>Includes line items (line ID, line number, batch ID, SKU ID, quantity).
  *   <li>Unit costs are strictly excluded (data minimization / security rule).
@@ -66,6 +67,7 @@ public class ExpectedTransferContributor implements SnapshotContributor {
                 """
                 select t.transfer_id, t.location_id as from_location_id, t.to_location_id, t.issued_at
                   from inventory.transfer t
+                  join inventory.transfer_dispatch d on d.transfer_id = t.transfer_id
                  where t.to_location_id = ?
                    and not exists (
                        select 1 from inventory.transfer_receipt r
