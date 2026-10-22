@@ -691,6 +691,17 @@ config_items:
     change_permission: prc.mrp_policy.set
     till_visible: true
     module: m3pricing
+  # PRC-03 / doc 23 section 7: the A4Renderer template selected for a society's shelf labels.
+  - key: pricing.label_template
+    value_type: STRING
+    schema: { pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    description_en: The print template used for shelf price labels
+    description_si: රාක්ක මිල ලේබල මුද්‍රණය සඳහා භාවිත කරන ආකෘතිය
+    description_ta: அலமாரி விலைச் சீட்டுகளை அச்சிடப் பயன்படும் வார்ப்புரு
+    default: "default"
+    scope_kind: ENTITY
+    change_permission: prc.label.print
+    module: m3pricing
   # M7 Customers & Payment Recording (27A section 3.1, seed/m7/config.yaml). The limit policy is
   # WARN by construction: the ledger never refuses a till's charge (AGENTS.md), so it is no item.
   - key: customers.phone_reuse_window_months
@@ -992,6 +1003,16 @@ config_items:
     description_si: අධික ලෙස විකිණූ තොග කාණ්ඩයක් ඉහළට යොමු කිරීමට පෙර පිළිගැනීමකින් තොරව පැවතිය හැකි දින ගණන
     description_ta: அதிகப்படியாக விற்கப்பட்ட இருப்புத் தொகுதி தீவிரப்படுத்தப்படுவதற்கு முன் ஒப்புக்கொள்ளப்படாமல் இருக்கக்கூடிய நாட்கள்
     default: 7
+    scope_kind: ENTITY
+    change_permission: sys.config.manage
+    module: m5inventory
+  - key: inventory.transfer_receipt_days
+    value_type: INTEGER
+    schema: { minimum: 1, maximum: 365 }
+    description_en: Calendar days a dispatched transfer may remain unreceived before a review is raised
+    description_si: යැවූ මාරු කිරීමක් සමාලෝචනයක් මතු කිරීමට පෙර නොලැබී පැවතිය හැකි දින දර්ශන දින ගණන
+    description_ta: அனுப்பப்பட்ட இடமாற்றம் மதிப்பாய்வு எழுப்பப்படுவதற்கு முன் பெறப்படாமல் இருக்கக்கூடிய நாட்காட்டி நாட்கள்
+    default: 3
     scope_kind: ENTITY
     change_permission: sys.config.manage
     module: m5inventory

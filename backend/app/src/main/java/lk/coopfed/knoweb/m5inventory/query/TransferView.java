@@ -6,16 +6,19 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A transfer between two locations of one entity (doc 25 flow 6.6): IN_TRANSIT until the
- * destination receives it, then RECEIVED.
+ * A transfer between two locations of one entity (doc 25 flow 6.6): ISSUED until the source
+ * dispatches it, IN_TRANSIT until the destination receives it, then RECEIVED.
  */
 public record TransferView(
         UUID transferId,
         UUID fromLocationId,
         UUID toLocationId,
         String status,
+        String documentNo,
         UUID issuedBy,
         Instant issuedAt,
+        UUID dispatchedBy,
+        Instant dispatchedAt,
         UUID receivedBy,
         Instant receivedAt,
         List<Line> lines) {

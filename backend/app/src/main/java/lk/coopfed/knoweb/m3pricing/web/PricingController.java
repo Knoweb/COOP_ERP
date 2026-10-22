@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import lk.coopfed.knoweb.engine.Basket;
 import lk.coopfed.knoweb.engine.TenderKind;
+import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
@@ -17,6 +18,7 @@ import lk.coopfed.knoweb.m3pricing.api.AuthorRule;
 import lk.coopfed.knoweb.m3pricing.api.CreatePriceList;
 import lk.coopfed.knoweb.m3pricing.api.DraftNewVersion;
 import lk.coopfed.knoweb.m3pricing.api.EnterControlPrice;
+import lk.coopfed.knoweb.m3pricing.api.PrintShelfLabels;
 import lk.coopfed.knoweb.m3pricing.api.PublishPriceList;
 import lk.coopfed.knoweb.m3pricing.api.RescindControlPrice;
 import lk.coopfed.knoweb.m3pricing.api.SetLines;
@@ -25,6 +27,7 @@ import lk.coopfed.knoweb.m3pricing.api.SetMrpPolicy;
 import lk.coopfed.knoweb.m3pricing.api.WithdrawRule;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.EnterControlPriceHandler;
 import lk.coopfed.knoweb.m3pricing.internal.ceiling.RescindControlPriceHandler;
+import lk.coopfed.knoweb.m3pricing.internal.label.PrintShelfLabelsHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.CreatePriceListHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.DraftNewVersionHandler;
 import lk.coopfed.knoweb.m3pricing.internal.list.PublishPriceListHandler;
@@ -34,6 +37,7 @@ import lk.coopfed.knoweb.m3pricing.internal.rule.ActivateRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.AuthorRuleHandler;
 import lk.coopfed.knoweb.m3pricing.internal.rule.WithdrawRuleHandler;
 import lk.coopfed.knoweb.m3pricing.query.ControlPriceView;
+import lk.coopfed.knoweb.m3pricing.query.LabelJobView;
 import lk.coopfed.knoweb.m3pricing.query.MrpPolicyView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListLineView;
 import lk.coopfed.knoweb.m3pricing.query.PriceListView;
@@ -46,6 +50,7 @@ import lk.coopfed.knoweb.m3pricing.web.generated.BatchCandidate;
 import lk.coopfed.knoweb.m3pricing.web.generated.ControlPriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.CreatePriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.EnterControlPriceRequest;
+import lk.coopfed.knoweb.m3pricing.web.generated.LabelJobResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineOutcome;
 import lk.coopfed.knoweb.m3pricing.web.generated.LineResult;
 import lk.coopfed.knoweb.m3pricing.web.generated.MrpPolicyResponse;
@@ -53,6 +58,7 @@ import lk.coopfed.knoweb.m3pricing.web.generated.PriceListDetailResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListLineResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PriceListResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.PricingApi;
+import lk.coopfed.knoweb.m3pricing.web.generated.PrintShelfLabelsRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.PublishPriceListRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.RescindControlPriceRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.ResolveBasketLineRequest;
@@ -67,6 +73,8 @@ import lk.coopfed.knoweb.m3pricing.web.generated.SetLinesResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.SetMrpPolicyRequest;
 import lk.coopfed.knoweb.m3pricing.web.generated.TradePriceResponse;
 import lk.coopfed.knoweb.m3pricing.web.generated.WithdrawRuleRequest;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -88,8 +96,10 @@ class PricingController implements PricingApi {
     private final EnterControlPriceHandler enterControlPrice;
     private final RescindControlPriceHandler rescindControlPrice;
     private final SetMrpPolicyHandler setMrpPolicy;
+    private final PrintShelfLabelsHandler printShelfLabels;
     private final PricingQueries queries;
     private final CurrentScope currentScope;
+    private final ObjectProvider<A4Renderer> renderer;
 
     @SuppressWarnings("java:S107") // one handler per operation of the slice; a controller only translates
     PricingController(
@@ -103,11 +113,14 @@ class PricingController implements PricingApi {
             EnterControlPriceHandler enterControlPrice,
             RescindControlPriceHandler rescindControlPrice,
             SetMrpPolicyHandler setMrpPolicy,
+            PrintShelfLabelsHandler printShelfLabels,
             PricingQueries queries,
-            CurrentScope currentScope) {
+            CurrentScope currentScope,
+            ObjectProvider<A4Renderer> renderer) {
         this.enterControlPrice = enterControlPrice;
         this.rescindControlPrice = rescindControlPrice;
         this.setMrpPolicy = setMrpPolicy;
+        this.printShelfLabels = printShelfLabels;
         this.create = create;
         this.draftNewVersion = draftNewVersion;
         this.setLines = setLines;
@@ -117,6 +130,51 @@ class PricingController implements PricingApi {
         this.withdrawRule = withdrawRule;
         this.queries = queries;
         this.currentScope = currentScope;
+        this.renderer = renderer;
+    }
+
+    // ---- shelf-label printing (M3-09) ----------------------------------------------------------
+
+    @Override
+    public ResponseEntity<LabelJobResponse> printShelfLabels(String idempotencyKey, PrintShelfLabelsRequest request) {
+        ScopeContext scope = currentScope.get();
+        UUID jobId = printShelfLabels.handle(
+                new PrintShelfLabels(request.getLocationId(), List.copyOf(request.getSkuIds())), scope);
+        LabelJobView job = queries.labelJob(jobId, scope).orElseThrow();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(toResponse(job, scope));
+    }
+
+    @Override
+    public ResponseEntity<LabelJobResponse> getLabelJob(UUID jobId) {
+        ScopeContext scope = currentScope.get();
+        return queries.labelJob(jobId, scope)
+                .map(job -> ResponseEntity.ok(toResponse(job, scope)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private LabelJobResponse toResponse(LabelJobView job, ScopeContext scope) {
+        LabelJobResponse response = new LabelJobResponse(
+                job.jobId(),
+                job.locationId(),
+                LabelJobResponse.StatusEnum.fromValue(job.status()),
+                job.requestedCount(),
+                job.renderedCount(),
+                job.refused().stream()
+                        .map(refusal -> new lk.coopfed.knoweb.m3pricing.web.generated.LabelRefusal(
+                                        refusal.skuId(),
+                                        refusal.skuCode(),
+                                        lk.coopfed.knoweb.m3pricing.web.generated.LabelRefusal.ReasonEnum.fromValue(
+                                                refusal.reason()),
+                                        refusal.listPrice(),
+                                        refusal.ceilingPrice())
+                                .ceilingReference(refusal.ceilingReference()))
+                        .toList(),
+                job.createdAt());
+        A4Renderer pdf = renderer.getIfAvailable();
+        if (job.objectKey() != null && pdf != null) {
+            response.setDownloadUrl(pdf.presignGet(job.objectKey(), scope));
+        }
+        return response;
     }
 
     // ---- control prices (M3-06) ----------------------------------------------------------------

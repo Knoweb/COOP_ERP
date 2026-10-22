@@ -149,6 +149,8 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                 // 40 at each of the four stores, 23 at the town shop, 16 at Hettipola, 20 at each of
                 // Pannala and Point Pedro, and the society's own 5 kg packs (the repack).
                 .containsEntry("lots", 240L)
+                .containsEntry("dispatched transfers to the town shop", 1L)
+                .containsEntry("dispatched transfers to the Hettipola shop", 1L)
                 .containsEntry("received transfers to the town shop", 1L)
                 .containsEntry("received transfers to the Hettipola shop", 1L)
                 // Each shop's first stock: DemoShopStock's everyday range, one lot of each item.
@@ -191,7 +193,8 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
                     .containsEntry("RaiseClaim", 1)
                     .containsEntry("ApproveClaim", 1)
                     .containsEntry("RequestTransfer", 1)
-                    .containsEntry("ApproveTransferRequest", 1);
+                    .containsEntry("ApproveTransferRequest", 1)
+                    .containsEntry("DispatchTransfer", 2);
             theHistorySpreadsOverEightWeeks();
         }
         theTownShopSellsTheGazettedRiceAtItsControlPrice();
@@ -606,6 +609,18 @@ class DemoDataLoaderIntegrationTest extends PostgresIntegrationTest {
         counts.put(
                 "lots",
                 count(admin, "select count(*) from inventory.stock_lot where location_id::text like '0190f0de-%'"));
+        counts.put(
+                "dispatched transfers to the town shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.transfer_dispatch where to_location_id = ?::uuid",
+                        DemoCast.M101_TOWN_SHOP.toString()));
+        counts.put(
+                "dispatched transfers to the Hettipola shop",
+                count(
+                        admin,
+                        "select count(*) from inventory.transfer_dispatch where to_location_id = ?::uuid",
+                        DemoCast.M101_HETTIPOLA_SHOP.toString()));
         counts.put(
                 "received transfers to the town shop",
                 count(
