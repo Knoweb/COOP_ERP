@@ -83,6 +83,7 @@ class BulkRegisterNetworkIntegrationTest extends PostgresIntegrationTest {
         admin.update("delete from kernel.numbering_series where owner_entity_id = ?", ENTITY_ID);
         admin.update("delete from catalogue.location_assortment where owner_entity_id = ?", ENTITY_ID);
         admin.update("delete from party.location where owner_entity_id = ?", ENTITY_ID);
+        admin.update("delete from party.entity_party_directory where entity_id = ?", ENTITY_ID);
         admin.update("delete from party.entity where entity_id = ?", ENTITY_ID);
     }
 

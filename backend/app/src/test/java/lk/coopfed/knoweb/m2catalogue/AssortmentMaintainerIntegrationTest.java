@@ -149,6 +149,7 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
                 "truncate catalogue.location_assortment, catalogue.sku_barcode, catalogue.sku_uom_conversion, catalogue.sku cascade");
         db.update("delete from inventory.stock_lot where location_id in (?, ?)", LOC_A, LOC_B);
         db.update("delete from party.location where location_id in (?, ?)", LOC_A, LOC_B);
+        db.update("delete from party.entity_party_directory where entity_id in (?, ?)", MPCS_A, MPCS_B);
         db.update("delete from party.entity where entity_id in (?, ?)", MPCS_A, MPCS_B);
         db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
