@@ -85,3 +85,20 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A batch MRP or control price checked against the price lists in force
+
+  # PRC-03 shelf-label job lifecycle. LABEL_JOB_CREATED is specified by 23A; completion and
+  # failure are separate handler facts because every database mutation is audited.
+  - code: LABEL_JOB_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job created
+
+  - code: LABEL_JOB_RENDERED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job rendered
+
+  - code: LABEL_JOB_FAILED
+    severity: INFO
+    offline_capturable: false
+    description_en: Shelf-label print job failed
