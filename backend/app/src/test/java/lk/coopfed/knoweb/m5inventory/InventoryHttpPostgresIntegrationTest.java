@@ -236,7 +236,8 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                         "lines", List.of(java.util.Map.of("batchId", batch.toString(), "qty", 5))),
                 USER);
         assertThat(issued.getStatusCode()).as(String.valueOf(issued.getBody())).isEqualTo(HttpStatus.CREATED);
-        assertThat(issued.getBody().get("status").asText()).isEqualTo("IN_TRANSIT");
+        assertThat(issued.getBody().get("status").asText()).isEqualTo("ISSUED");
+        assertThat(issued.getBody().get("documentNo").asText()).contains("-XFR-");
         String id = issued.getBody().get("transferId").asText();
 
         HttpHeaders headers = TestIdentityProvider.entityWideHeaders(USER, MPCS);
@@ -244,6 +245,19 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
                 get("/v1/inventory/transfers?locationId=" + shop, headers).getBody();
         assertThat(listed).hasSize(1);
         assertThat(listed.get(0).get("lines").get(0).get("qty").decimalValue()).isEqualByComparingTo("5");
+
+        ResponseEntity<JsonNode> tooSoon = post("/v1/inventory/transfers/" + id + "/receive", null, USER);
+        assertThat(tooSoon.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(tooSoon.getBody().get("code").asText()).isEqualTo("m5.transfer.not_dispatched");
+
+        ResponseEntity<JsonNode> dispatched = post("/v1/inventory/transfers/" + id + "/dispatch", null, USER);
+        assertThat(dispatched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(dispatched.getBody().get("status").asText()).isEqualTo("IN_TRANSIT");
+        assertThat(dispatched.getBody().get("dispatchedAt").asText()).isNotBlank();
+
+        ResponseEntity<JsonNode> dispatchedAgain = post("/v1/inventory/transfers/" + id + "/dispatch", null, USER);
+        assertThat(dispatchedAgain.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(dispatchedAgain.getBody().get("code").asText()).isEqualTo("m5.transfer.already_dispatched");
 
         ResponseEntity<JsonNode> received = post("/v1/inventory/transfers/" + id + "/receive", null, USER);
         assertThat(received.getStatusCode()).isEqualTo(HttpStatus.OK);
