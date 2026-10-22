@@ -175,6 +175,103 @@ paths:
               schema: { $ref: '#/components/schemas/ReportRunResponse' }
         '404':
           description: No such run in the caller's scope
+  /v1/reporting/shop-targets:
+    post:
+      tags: [Reporting]
+      operationId: createShopTarget
+      summary: Define a sales target for a shop and period
+      description: >
+        Creates a sales target for an allowed shop and period.
+        Codes this operation can answer with 422: m8.target.location_unknown,
+        m8.target.location_scope_mismatch, m8.target.period_invalid,
+        m8.target.amount_invalid, m8.target.duplicate, m8.target.own_required.
+      x-permission: rpt.target.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateShopTargetRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopTargetResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/shop-targets/{targetId}:
+    get:
+      tags: [Reporting]
+      operationId: getShopTarget
+      summary: Get a shop sales target by ID
+      x-permission: rpt.target.view
+      parameters:
+        - in: path
+          name: targetId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The shop target
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopTargetResponse' }
+        '404':
+          description: Target not found in the caller's scope
+    put:
+      tags: [Reporting]
+      operationId: updateShopTarget
+      summary: Update a sales target for a shop and period
+      description: >
+        Updates an existing sales target.
+        Codes this operation can answer with 422: m8.target.not_found,
+        m8.target.period_invalid, m8.target.amount_invalid,
+        m8.target.duplicate, m8.target.own_required.
+      x-permission: rpt.target.manage
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - in: path
+          name: targetId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateShopTargetRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopTargetResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: Target not found in the caller's scope
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/shop-targets/performance:
+    get:
+      tags: [Reporting]
+      operationId: getShopTargetPerformance
+      summary: Shop target vs actual sales comparison performance
+      description: >
+        Compares defined sales targets against aggregated actual sales from shop_sale_fact
+        for the target period, calculating variance and achievement percentage.
+      x-permission: rpt.target.view
+      parameters:
+        - $ref: '#/components/parameters/LocationId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Comparison items
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopTargetPerformanceResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     ReportId:
@@ -317,3 +414,66 @@ components:
         downloadUrl: { type: string, format: uri, description: 'A pre-signed link to the PDF, when READY' }
         requestedAt: { type: string, format: date-time }
         completedAt: { type: string, format: date-time }
+    CreateShopTargetRequest:
+      type: object
+      required: [locationId, periodStart, periodEnd, targetAmount]
+      properties:
+        locationId: { type: string, format: uuid }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        targetAmount:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+          description: 'A non-negative target amount'
+        currency:
+          type: string
+          default: 'LKR'
+    UpdateShopTargetRequest:
+      type: object
+      required: [targetAmount]
+      properties:
+        targetAmount:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+          description: 'A non-negative target amount'
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+    ShopTargetResponse:
+      type: object
+      required: [targetId, locationId, periodStart, periodEnd, targetAmount, currency, createdAt, updatedAt]
+      properties:
+        targetId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        targetAmount: { type: string }
+        currency: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ShopTargetPerformanceItem:
+      type: object
+      required: [targetId, locationId, locationCode, locationName, periodStart, periodEnd, targetAmount, actualAmount, varianceAmount, currency, createdAt, updatedAt]
+      properties:
+        targetId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        locationCode: { type: string }
+        locationName: { type: string }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        targetAmount: { type: string }
+        actualAmount: { type: string }
+        varianceAmount: { type: string }
+        achievementPercent:
+          type: string
+          nullable: true
+          description: 'Actual divided by target times 100, or null when target is 0'
+        currency: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ShopTargetPerformanceResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ShopTargetPerformanceItem' }

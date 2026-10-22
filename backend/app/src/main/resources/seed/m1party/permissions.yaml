@@ -459,6 +459,15 @@ permissions:
     module: "m8reporting"
     description_en: "Export a report as CSV or print it to PDF"
     scope: "ENTITY"
+  # Polgolla M1-01: shop sales target management and actual sales comparison
+  - code: "rpt.target.view"
+    module: "m8reporting"
+    description_en: "View shop sales targets and actual performance comparison"
+    scope: "ENTITY"
+  - code: "rpt.target.manage"
+    module: "m8reporting"
+    description_en: "Define and update shop sales targets"
+    scope: "ENTITY"
   # M6 Point of Sale, the central side (26A section 10), minimal for the demo: the reads of the
   # receipts and sessions the tills uploaded. The till's own permissions (sale, refund, session)
   # come with the till track.

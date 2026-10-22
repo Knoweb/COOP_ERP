@@ -1,6 +1,8 @@
 package lk.coopfed.knoweb.m8reporting.internal.report;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,6 +21,7 @@ import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
@@ -32,6 +35,10 @@ import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
+import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
+import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceRow;
+import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -309,5 +316,100 @@ class ReportQueriesImpl implements ReportingQueries {
                         + " limit " + RUN_HISTORY,
                 RUN,
                 reportId);
+    }
+
+    @Override
+    public Optional<ShopTargetView> getShopTarget(UUID targetId, ScopeContext scope) {
+        List<ShopTargetView> targets = jdbc.query(
+                """
+                select target_id, owner_entity_id, location_id, period_start, period_end,
+                       target_amount, currency, created_at, updated_at
+                  from reporting.shop_target
+                 where target_id = ?
+                """,
+                (rs, rowNum) -> new ShopTargetView(
+                        rs.getObject("target_id", UUID.class),
+                        rs.getObject("owner_entity_id", UUID.class),
+                        rs.getObject("location_id", UUID.class),
+                        rs.getDate("period_start").toLocalDate(),
+                        rs.getDate("period_end").toLocalDate(),
+                        rs.getBigDecimal("target_amount"),
+                        rs.getString("currency"),
+                        rs.getTimestamp("created_at").toInstant(),
+                        rs.getTimestamp("updated_at").toInstant()),
+                targetId);
+        return targets.stream().findFirst();
+    }
+
+    @Override
+    public ShopTargetPerformanceReport shopTargetPerformance(ShopTargetFilter filter, ScopeContext scope) {
+        Names names = new Names(party, catalogue, scope);
+        UUID locationId = filter != null ? filter.locationId() : null;
+        Date from = filter != null && filter.from() != null ? Date.valueOf(filter.from()) : null;
+        Date to = filter != null && filter.to() != null ? Date.valueOf(filter.to()) : null;
+
+        List<ShopTargetPerformanceRow> items = jdbc.query(
+                """
+                select t.target_id,
+                       t.location_id,
+                       t.period_start,
+                       t.period_end,
+                       t.target_amount,
+                       t.currency,
+                       t.created_at,
+                       t.updated_at,
+                       coalesce(sum(s.gross), 0) as actual_amount
+                  from reporting.shop_target t
+                  left join reporting.shop_sale_fact s
+                    on s.owner_entity_id = t.owner_entity_id
+                   and s.location_id = t.location_id
+                   and s.business_date between t.period_start and t.period_end
+                 where (?::uuid is null or t.location_id = ?)
+                   and (?::date is null or t.period_start >= ?)
+                   and (?::date is null or t.period_end <= ?)
+                 group by t.target_id, t.location_id, t.period_start, t.period_end, t.target_amount, t.currency, t.created_at, t.updated_at
+                 order by t.period_start desc, t.period_end desc, t.location_id
+                """,
+                (rs, rowNum) -> {
+                    UUID targetId = rs.getObject("target_id", UUID.class);
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    LocalDate periodStart = rs.getDate("period_start").toLocalDate();
+                    LocalDate periodEnd = rs.getDate("period_end").toLocalDate();
+                    BigDecimal targetAmount = rs.getBigDecimal("target_amount").setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal actualAmount = rs.getBigDecimal("actual_amount").setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal varianceAmount =
+                            actualAmount.subtract(targetAmount).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal achievementPercent = targetAmount.signum() > 0
+                            ? actualAmount
+                                    .multiply(BigDecimal.valueOf(100))
+                                    .divide(targetAmount, 1, RoundingMode.HALF_UP)
+                            : null;
+                    String locationName = names.location(locId);
+                    Optional<LocationView> locView = party.getLocation(locId, scope);
+                    String locationCode =
+                            locView.map(LocationView::locationCode).orElse("");
+
+                    return new ShopTargetPerformanceRow(
+                            targetId,
+                            locId,
+                            locationCode,
+                            locationName,
+                            periodStart,
+                            periodEnd,
+                            targetAmount,
+                            actualAmount,
+                            varianceAmount,
+                            achievementPercent,
+                            rs.getString("currency"),
+                            rs.getTimestamp("created_at").toInstant(),
+                            rs.getTimestamp("updated_at").toInstant());
+                },
+                locationId,
+                locationId,
+                from,
+                from,
+                to,
+                to);
+        return new ShopTargetPerformanceReport(items);
     }
 }
