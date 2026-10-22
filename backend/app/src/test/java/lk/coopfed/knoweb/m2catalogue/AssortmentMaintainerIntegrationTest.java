@@ -81,6 +81,8 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
     private final ScopeContext scopeA = SystemScope.own(MPCS_A, LOC_A);
     private final ScopeContext scopeB = SystemScope.own(MPCS_B, LOC_B);
 
+    private static final UUID TAX_CATEGORY = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+
     @BeforeEach
     void arrange() {
         clean();
@@ -90,8 +92,8 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         db.update(
                 """
                 insert into party.entity (entity_id, entity_type, entity_code, legal_name_en, status)
-                values (?, 'MPCS', 'MPCS-A', 'MPCS A', 'ACTIVE'),
-                       (?, 'MPCS', 'MPCS-B', 'MPCS B', 'ACTIVE')
+                values (?, 'MPCS', 'MPCS-ASM-A', 'MPCS A', 'ACTIVE'),
+                       (?, 'MPCS', 'MPCS-ASM-B', 'MPCS B', 'ACTIVE')
                 on conflict (entity_id) do nothing
                 """,
                 MPCS_A,
@@ -100,8 +102,8 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         db.update(
                 """
                 insert into party.location (location_id, owner_entity_id, location_code, location_type, name_en, language, status)
-                values (?, ?, 'SHOP-A', 'SHOP', 'Shop A', 'en', 'ACTIVE'),
-                       (?, ?, 'SHOP-B', 'SHOP', 'Shop B', 'en', 'ACTIVE')
+                values (?, ?, 'SHOP-ASM-A', 'SHOP', 'Shop A', 'en', 'ACTIVE'),
+                       (?, ?, 'SHOP-ASM-B', 'SHOP', 'Shop B', 'en', 'ACTIVE')
                 on conflict (location_id) do nothing
                 """,
                 LOC_A,
@@ -109,9 +111,17 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
                 LOC_B,
                 MPCS_B);
 
-        // 2. Base units
+        // 2. Base units & Tax category
         db.update(
                 "insert into catalogue.uom (uom_code, name_en, is_weight) values ('EA', 'Each', false) on conflict do nothing");
+        db.update(
+                """
+                insert into catalogue.tax_category (tax_category_id, code, name_en, owner_entity_id)
+                values (?, 'TAX-ASRT', 'Assortment Tax', ?)
+                on conflict (tax_category_id) do nothing
+                """,
+                TAX_CATEGORY,
+                TEST_FEDERATION);
 
         // 3. SKUs
         insertSku(db, SKU_LOCAL_A, "SKU-LOC-A", MPCS_A, "LOCAL");
@@ -138,6 +148,9 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         db.execute(
                 "truncate catalogue.location_assortment, catalogue.sku_barcode, catalogue.sku_uom_conversion, catalogue.sku cascade");
         db.update("delete from inventory.stock_lot where location_id in (?, ?)", LOC_A, LOC_B);
+        db.update("delete from party.location where location_id in (?, ?)", LOC_A, LOC_B);
+        db.update("delete from party.entity where entity_id in (?, ?)", MPCS_A, MPCS_B);
+        db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
     }
 
     @Test
@@ -332,13 +345,17 @@ class AssortmentMaintainerIntegrationTest extends PostgresIntegrationTest {
         db.update(
                 """
                 insert into catalogue.sku (
-                    sku_id, sku_code, owner_entity_id, status, short_name_en, base_uom_code
-                ) values (?, ?, ?, ?, ?, 'EA')
+                    sku_id, sku_code, owner_entity_id, status, short_name_en, short_name_si, short_name_ta,
+                    base_uom_code, tax_category_id
+                ) values (?, ?, ?, ?, ?, ?, ?, 'EA', ?)
                 """,
                 id,
                 code,
                 owner,
                 status,
-                code);
+                code,
+                code,
+                code,
+                TAX_CATEGORY);
     }
 }
