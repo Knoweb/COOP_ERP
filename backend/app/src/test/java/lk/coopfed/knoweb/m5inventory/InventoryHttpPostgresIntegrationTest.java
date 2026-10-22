@@ -57,6 +57,7 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     void arrange() {
         fixture = new InventoryFixture(superuserJdbc());
         fixture.clean();
+        fixture.entity(MPCS, "M5HT", "MPCS");
         warehouse = fixture.location(MPCS, "WAREHOUSE");
         sku = fixture.sku(MPCS, "SOAP");
         batch = fixture.batch(sku, MPCS, "SP1", LocalDate.of(2028, 1, 31));
