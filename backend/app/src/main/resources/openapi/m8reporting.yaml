@@ -272,6 +272,60 @@ paths:
               schema: { $ref: '#/components/schemas/ShopTargetPerformanceResponse' }
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/shop-reports/daily:
+    get:
+      tags: [Reporting]
+      operationId: getDailyShopReport
+      summary: Daily operational sales report for shops
+      description: >
+        Returns daily operational sales metrics (gross, net, tax, transactions, average transaction value,
+        items sold) aggregated for permitted shops, with comparison against defined targets.
+      x-permission: rpt.report.run
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '200':
+          description: Daily report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyShopReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Shop is outside caller's permitted scope
+        '404':
+          description: Shop not found in caller's permitted scope
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
+  /v1/reporting/shop-reports/monthly:
+    get:
+      tags: [Reporting]
+      operationId: getMonthlyShopReport
+      summary: Monthly operational sales report for shops
+      description: >
+        Returns monthly operational sales metrics, daily trend breakdown, and cross-shop comparison
+        for management review, including sales target achievement where targets exist.
+      x-permission: rpt.report.run
+      parameters:
+        - name: yearMonth
+          in: query
+          required: false
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+        - $ref: '#/components/parameters/LocationId'
+      responses:
+        '200':
+          description: Monthly report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyShopReportResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '403':
+          description: Shop is outside caller's permitted scope
+        '404':
+          description: Shop not found in caller's permitted scope
+        '422': { $ref: 'common.yaml#/components/responses/RuleBroken' }
 components:
   parameters:
     ReportId:
@@ -477,3 +531,106 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/ShopTargetPerformanceItem' }
+    DailyShopReportResponse:
+      type: object
+      required: [summary, shops]
+      properties:
+        summary: { $ref: '#/components/schemas/DailyShopReportSummary' }
+        shops:
+          type: array
+          items: { $ref: '#/components/schemas/DailyShopReportItem' }
+    DailyShopReportSummary:
+      type: object
+      required: [businessDate, totalGrossSales, totalNetSales, totalTaxAmount, totalTransactions, averageTransactionValue, totalItemsSold, currency]
+      properties:
+        businessDate: { type: string, format: date }
+        totalGrossSales: { type: string }
+        totalNetSales: { type: string }
+        totalTaxAmount: { type: string }
+        totalTransactions: { type: integer, format: int64 }
+        averageTransactionValue: { type: string }
+        totalItemsSold: { type: string }
+        totalTargetAmount: { type: string, nullable: true }
+        totalVarianceAmount: { type: string, nullable: true }
+        overallAchievementPercent: { type: string, nullable: true }
+        currency: { type: string }
+    DailyShopReportItem:
+      type: object
+      required: [locationId, locationCode, locationName, businessDate, grossSales, netSales, taxAmount, transactionCount, averageTransactionValue, itemsSold, performanceState, currency]
+      properties:
+        locationId: { type: string, format: uuid }
+        locationCode: { type: string }
+        locationName: { type: string }
+        businessDate: { type: string, format: date }
+        grossSales: { type: string }
+        netSales: { type: string }
+        taxAmount: { type: string }
+        transactionCount: { type: integer, format: int64 }
+        averageTransactionValue: { type: string }
+        itemsSold: { type: string }
+        targetAmount: { type: string, nullable: true }
+        varianceAmount: { type: string, nullable: true }
+        achievementPercent: { type: string, nullable: true }
+        performanceState:
+          type: string
+          enum: [TARGET_MET, BEHIND_TARGET, NO_TARGET]
+        currency: { type: string }
+    MonthlyShopReportResponse:
+      type: object
+      required: [summary, dailyTrend, shops]
+      properties:
+        summary: { $ref: '#/components/schemas/MonthlyShopReportSummary' }
+        dailyTrend:
+          type: array
+          items: { $ref: '#/components/schemas/MonthlyDailyTrendItem' }
+        shops:
+          type: array
+          items: { $ref: '#/components/schemas/MonthlyShopReportItem' }
+    MonthlyShopReportSummary:
+      type: object
+      required: [yearMonth, periodStart, periodEnd, totalGrossSales, totalNetSales, totalTaxAmount, totalTransactions, averageTransactionValue, totalItemsSold, currency]
+      properties:
+        yearMonth: { type: string }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        totalGrossSales: { type: string }
+        totalNetSales: { type: string }
+        totalTaxAmount: { type: string }
+        totalTransactions: { type: integer, format: int64 }
+        averageTransactionValue: { type: string }
+        totalItemsSold: { type: string }
+        totalTargetAmount: { type: string, nullable: true }
+        totalVarianceAmount: { type: string, nullable: true }
+        overallAchievementPercent: { type: string, nullable: true }
+        currency: { type: string }
+    MonthlyDailyTrendItem:
+      type: object
+      required: [businessDate, grossSales, netSales, taxAmount, transactionCount, averageTransactionValue, itemsSold]
+      properties:
+        businessDate: { type: string, format: date }
+        grossSales: { type: string }
+        netSales: { type: string }
+        taxAmount: { type: string }
+        transactionCount: { type: integer, format: int64 }
+        averageTransactionValue: { type: string }
+        itemsSold: { type: string }
+    MonthlyShopReportItem:
+      type: object
+      required: [locationId, locationCode, locationName, grossSales, netSales, taxAmount, transactionCount, averageTransactionValue, itemsSold, performanceState, currency]
+      properties:
+        locationId: { type: string, format: uuid }
+        locationCode: { type: string }
+        locationName: { type: string }
+        grossSales: { type: string }
+        netSales: { type: string }
+        taxAmount: { type: string }
+        transactionCount: { type: integer, format: int64 }
+        averageTransactionValue: { type: string }
+        itemsSold: { type: string }
+        targetAmount: { type: string, nullable: true }
+        varianceAmount: { type: string, nullable: true }
+        achievementPercent: { type: string, nullable: true }
+        performanceState:
+          type: string
+          enum: [TARGET_MET, BEHIND_TARGET, NO_TARGET]
+        currency: { type: string }

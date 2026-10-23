@@ -19,6 +19,13 @@ export type ShopTargetPerformanceItem = components["schemas"]["ShopTargetPerform
 export type ShopTargetPerformanceReport = components["schemas"]["ShopTargetPerformanceResponse"];
 export type CreateShopTargetRequest = components["schemas"]["CreateShopTargetRequest"];
 export type UpdateShopTargetRequest = components["schemas"]["UpdateShopTargetRequest"];
+export type DailyShopReport = components["schemas"]["DailyShopReportResponse"];
+export type DailyShopReportSummary = components["schemas"]["DailyShopReportSummary"];
+export type DailyShopReportItem = components["schemas"]["DailyShopReportItem"];
+export type MonthlyShopReport = components["schemas"]["MonthlyShopReportResponse"];
+export type MonthlyShopReportSummary = components["schemas"]["MonthlyShopReportSummary"];
+export type MonthlyDailyTrendItem = components["schemas"]["MonthlyDailyTrendItem"];
+export type MonthlyShopReportItem = components["schemas"]["MonthlyShopReportItem"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
 export type ReportQuery = { from?: string; to?: string; locationId?: string };
@@ -130,6 +137,26 @@ export function useReportingApi() {
           params: { query }
         });
         return data ?? { items: [] };
+      },
+
+      async dailyShopReport(query?: {
+        date?: string;
+        locationId?: string;
+      }): Promise<DailyShopReport> {
+        const { data } = await api.GET("/v1/reporting/shop-reports/daily", {
+          params: { query }
+        });
+        return data!;
+      },
+
+      async monthlyShopReport(query?: {
+        yearMonth?: string;
+        locationId?: string;
+      }): Promise<MonthlyShopReport> {
+        const { data } = await api.GET("/v1/reporting/shop-reports/monthly", {
+          params: { query }
+        });
+        return data!;
       }
     }),
     [api, party]

@@ -9,13 +9,16 @@ import lk.coopfed.knoweb.kernel.api.A4Renderer;
 import lk.coopfed.knoweb.kernel.api.CurrentScope;
 import lk.coopfed.knoweb.kernel.api.Handles;
 import lk.coopfed.knoweb.kernel.api.Messages;
+import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m8reporting.api.CreateShopTarget;
 import lk.coopfed.knoweb.m8reporting.api.ExportReportCsv;
 import lk.coopfed.knoweb.m8reporting.api.RequestReportRun;
 import lk.coopfed.knoweb.m8reporting.api.UpdateShopTarget;
+import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
@@ -24,9 +27,16 @@ import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetView;
 import lk.coopfed.knoweb.m8reporting.web.generated.CreateShopTargetRequest;
+import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.DashboardTile;
 import lk.coopfed.knoweb.m8reporting.web.generated.ExceptionItemResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyDailyTrendItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportItem;
+import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportResponse;
+import lk.coopfed.knoweb.m8reporting.web.generated.MonthlyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportColumn;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDataResponse;
 import lk.coopfed.knoweb.m8reporting.web.generated.ReportDefinitionResponse;
@@ -309,5 +319,173 @@ class ReportingController implements ReportingApi {
                 view.currency(),
                 view.createdAt(),
                 view.updatedAt());
+    }
+
+    @Override
+    public ResponseEntity<DailyShopReportResponse> getDailyShopReport(
+            @Nullable LocalDate date, @Nullable UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        if (scope.locationId() != null
+                && locationId != null
+                && !scope.locationId().equals(locationId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : locationId;
+        try {
+            DailyShopReport report = queries.dailyShopReport(date, effectiveLocationId, scope);
+            return ResponseEntity.ok(toDailyShopReportResponse(report));
+        } catch (ProblemException e) {
+            if ("m8.shop_report.location_unknown".equals(e.messageId())) {
+                return ResponseEntity.notFound().build();
+            }
+            if ("m8.shop_report.location_forbidden".equals(e.messageId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public ResponseEntity<MonthlyShopReportResponse> getMonthlyShopReport(
+            @Nullable String yearMonth, @Nullable UUID locationId) {
+        ScopeContext scope = currentScope.get();
+        if (scope.locationId() != null
+                && locationId != null
+                && !scope.locationId().equals(locationId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID effectiveLocationId = scope.locationId() != null ? scope.locationId() : locationId;
+        try {
+            MonthlyShopReport report = queries.monthlyShopReport(yearMonth, effectiveLocationId, scope);
+            return ResponseEntity.ok(toMonthlyShopReportResponse(report));
+        } catch (ProblemException e) {
+            if ("m8.shop_report.location_unknown".equals(e.messageId())) {
+                return ResponseEntity.notFound().build();
+            }
+            if ("m8.shop_report.location_forbidden".equals(e.messageId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            throw e;
+        }
+    }
+
+    private DailyShopReportResponse toDailyShopReportResponse(DailyShopReport report) {
+        var s = report.summary();
+        DailyShopReportSummary summaryDto = new DailyShopReportSummary(
+                s.businessDate(),
+                s.totalGrossSales().toPlainString(),
+                s.totalNetSales().toPlainString(),
+                s.totalTaxAmount().toPlainString(),
+                s.totalTransactions(),
+                s.averageTransactionValue().toPlainString(),
+                s.totalItemsSold().toPlainString(),
+                s.currency());
+        if (s.totalTargetAmount() != null) {
+            summaryDto.setTotalTargetAmount(s.totalTargetAmount().toPlainString());
+        }
+        if (s.totalVarianceAmount() != null) {
+            summaryDto.setTotalVarianceAmount(s.totalVarianceAmount().toPlainString());
+        }
+        if (s.overallAchievementPercent() != null) {
+            summaryDto.setOverallAchievementPercent(
+                    s.overallAchievementPercent().toPlainString());
+        }
+
+        List<DailyShopReportItem> shopsDto = report.shops().stream()
+                .map(item -> {
+                    DailyShopReportItem dto = new DailyShopReportItem(
+                            item.locationId(),
+                            item.locationCode(),
+                            item.locationName(),
+                            item.businessDate(),
+                            item.grossSales().toPlainString(),
+                            item.netSales().toPlainString(),
+                            item.taxAmount().toPlainString(),
+                            item.transactionCount(),
+                            item.averageTransactionValue().toPlainString(),
+                            item.itemsSold().toPlainString(),
+                            DailyShopReportItem.PerformanceStateEnum.fromValue(
+                                    item.performanceState().name()),
+                            item.currency());
+                    if (item.targetAmount() != null) {
+                        dto.setTargetAmount(item.targetAmount().toPlainString());
+                    }
+                    if (item.varianceAmount() != null) {
+                        dto.setVarianceAmount(item.varianceAmount().toPlainString());
+                    }
+                    if (item.achievementPercent() != null) {
+                        dto.setAchievementPercent(item.achievementPercent().toPlainString());
+                    }
+                    return dto;
+                })
+                .toList();
+
+        return new DailyShopReportResponse(summaryDto, shopsDto);
+    }
+
+    private MonthlyShopReportResponse toMonthlyShopReportResponse(MonthlyShopReport report) {
+        var s = report.summary();
+        MonthlyShopReportSummary summaryDto = new MonthlyShopReportSummary(
+                s.yearMonth(),
+                s.periodStart(),
+                s.periodEnd(),
+                s.totalGrossSales().toPlainString(),
+                s.totalNetSales().toPlainString(),
+                s.totalTaxAmount().toPlainString(),
+                s.totalTransactions(),
+                s.averageTransactionValue().toPlainString(),
+                s.totalItemsSold().toPlainString(),
+                s.currency());
+        if (s.totalTargetAmount() != null) {
+            summaryDto.setTotalTargetAmount(s.totalTargetAmount().toPlainString());
+        }
+        if (s.totalVarianceAmount() != null) {
+            summaryDto.setTotalVarianceAmount(s.totalVarianceAmount().toPlainString());
+        }
+        if (s.overallAchievementPercent() != null) {
+            summaryDto.setOverallAchievementPercent(
+                    s.overallAchievementPercent().toPlainString());
+        }
+
+        List<MonthlyDailyTrendItem> trendDto = report.dailyTrend().stream()
+                .map(item -> new MonthlyDailyTrendItem(
+                        item.businessDate(),
+                        item.grossSales().toPlainString(),
+                        item.netSales().toPlainString(),
+                        item.taxAmount().toPlainString(),
+                        item.transactionCount(),
+                        item.averageTransactionValue().toPlainString(),
+                        item.itemsSold().toPlainString()))
+                .toList();
+
+        List<MonthlyShopReportItem> shopsDto = report.shops().stream()
+                .map(item -> {
+                    MonthlyShopReportItem dto = new MonthlyShopReportItem(
+                            item.locationId(),
+                            item.locationCode(),
+                            item.locationName(),
+                            item.grossSales().toPlainString(),
+                            item.netSales().toPlainString(),
+                            item.taxAmount().toPlainString(),
+                            item.transactionCount(),
+                            item.averageTransactionValue().toPlainString(),
+                            item.itemsSold().toPlainString(),
+                            MonthlyShopReportItem.PerformanceStateEnum.fromValue(
+                                    item.performanceState().name()),
+                            item.currency());
+                    if (item.targetAmount() != null) {
+                        dto.setTargetAmount(item.targetAmount().toPlainString());
+                    }
+                    if (item.varianceAmount() != null) {
+                        dto.setVarianceAmount(item.varianceAmount().toPlainString());
+                    }
+                    if (item.achievementPercent() != null) {
+                        dto.setAchievementPercent(item.achievementPercent().toPlainString());
+                    }
+                    return dto;
+                })
+                .toList();
+
+        return new MonthlyShopReportResponse(summaryDto, trendDto, shopsDto);
     }
 }

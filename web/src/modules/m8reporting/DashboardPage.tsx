@@ -7,6 +7,7 @@ import { useReportingApi, type Tile } from "./reportingApi";
 import { errorText, tileLink, trendHeights } from "./reportView";
 import { ExceptionList } from "./ExceptionList";
 import { ShopTargetsDashboardCard } from "./ShopTargetsDashboardCard";
+import { ShopReportsDashboardCard } from "./ShopReportsDashboardCard";
 import { useHasPermission } from "../../shell/auth/permissions";
 import "./reporting.css";
 
@@ -47,6 +48,8 @@ export function DashboardPage() {
           </ul>
         </>
       )}
+
+      <ShopReportsDashboardCard />
 
       {canViewTargets && <ShopTargetsDashboardCard />}
 

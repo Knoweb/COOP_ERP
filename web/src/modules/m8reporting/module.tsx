@@ -11,6 +11,7 @@ import { DashboardPage } from "./DashboardPage";
 import { ReportPage } from "./ReportPage";
 import { ExceptionsPage } from "./ExceptionList";
 import { ShopTargetsPage } from "./ShopTargetsPage";
+import { ShopReportsPage } from "./ShopReportsPage";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 
 // Every M8 screen reads APIs that need rpt.report.run; rpt.export.run alone (a custom role) must
@@ -28,12 +29,14 @@ export const reportingModule: ModuleDefinition = {
     { path: "reporting", element: guard(<DashboardPage />) },
     { path: "reporting/exceptions", element: guard(<ExceptionsPage />) },
     { path: "reporting/targets", element: guardTargets(<ShopTargetsPage />) },
+    { path: "reporting/shop-reports", element: guard(<ShopReportsPage />) },
     { path: "reporting/reports/:reportId", element: guard(<ReportPage />) }
   ],
 
   // The label is a message id of reporting.messages.json, never literal text.
   navItems: [
     { labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT },
+    { labelId: "reporting.shop_reports.nav", to: "/reporting/shop-reports", requiredPermissions: REPORT },
     { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS }
   ],
 

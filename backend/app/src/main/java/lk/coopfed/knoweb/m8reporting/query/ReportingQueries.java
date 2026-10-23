@@ -47,4 +47,10 @@ public interface ReportingQueries {
 
     /** A shop sales target by ID in the caller's scope. */
     Optional<ShopTargetView> getShopTarget(UUID targetId, ScopeContext scope);
+
+    /** Daily operational sales report for permitted shops on a business date. */
+    DailyShopReport dailyShopReport(java.time.LocalDate date, UUID locationId, ScopeContext scope);
+
+    /** Monthly operational sales report, daily trend, and cross-shop comparison for a month. */
+    MonthlyShopReport monthlyShopReport(String yearMonth, UUID locationId, ScopeContext scope);
 }

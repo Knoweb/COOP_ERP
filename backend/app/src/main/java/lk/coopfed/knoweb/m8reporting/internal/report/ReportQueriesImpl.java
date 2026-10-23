@@ -7,10 +7,13 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,20 +24,29 @@ import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m1party.query.LocationFilter;
 import lk.coopfed.knoweb.m1party.query.LocationView;
 import lk.coopfed.knoweb.m1party.query.PartyQueries;
 import lk.coopfed.knoweb.m2catalogue.query.CatalogueQueries;
 import lk.coopfed.knoweb.m8reporting.internal.projection.Projection;
 import lk.coopfed.knoweb.m8reporting.internal.report.ReportCatalogue.Definition;
 import lk.coopfed.knoweb.m8reporting.internal.report.TileCatalogue.TileDefinition;
+import lk.coopfed.knoweb.m8reporting.query.DailyShopReport;
+import lk.coopfed.knoweb.m8reporting.query.DailyShopReportItem;
+import lk.coopfed.knoweb.m8reporting.query.DailyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.query.Dashboard;
 import lk.coopfed.knoweb.m8reporting.query.ExceptionItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyDailyTrendItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReport;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportItem;
+import lk.coopfed.knoweb.m8reporting.query.MonthlyShopReportSummary;
 import lk.coopfed.knoweb.m8reporting.query.ReportDefinitionView;
 import lk.coopfed.knoweb.m8reporting.query.ReportParameters;
 import lk.coopfed.knoweb.m8reporting.query.ReportRunView;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable;
 import lk.coopfed.knoweb.m8reporting.query.ReportTable.Column;
 import lk.coopfed.knoweb.m8reporting.query.ReportingQueries;
+import lk.coopfed.knoweb.m8reporting.query.ShopPerformanceState;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetFilter;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceReport;
 import lk.coopfed.knoweb.m8reporting.query.ShopTargetPerformanceRow;
@@ -411,5 +423,521 @@ class ReportQueriesImpl implements ReportingQueries {
                 to,
                 to);
         return new ShopTargetPerformanceReport(items);
+    }
+
+    @Override
+    public DailyShopReport dailyShopReport(LocalDate date, UUID locationId, ScopeContext scope) {
+        if (scope.locationId() != null) {
+            if (locationId != null && !scope.locationId().equals(locationId)) {
+                throw new ProblemException("m8.shop_report.location_forbidden");
+            }
+            locationId = scope.locationId();
+        }
+
+        if (locationId != null) {
+            Optional<LocationView> loc = party.getLocation(locationId, scope);
+            if (loc.isEmpty()) {
+                throw new ProblemException("m8.shop_report.location_unknown");
+            }
+        }
+
+        LocalDate reportDate = date != null ? date : LocalDate.now(clock);
+        Names names = new Names(party, catalogue, scope);
+
+        // 1. Sales facts for the day
+        record SalesFact(UUID locationId, long txnCount, BigDecimal gross, BigDecimal net, BigDecimal tax) {}
+        Map<UUID, SalesFact> sales = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select s.location_id,
+                       count(s.receipt_id) as txn_count,
+                       coalesce(sum(s.gross), 0) as gross,
+                       coalesce(sum(s.net), 0) as net,
+                       coalesce(sum(s.tax), 0) as tax
+                  from reporting.shop_sale_fact s
+                 where s.business_date = ?
+                   and (?::uuid is null or s.location_id = ?)
+                 group by s.location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    sales.put(
+                            locId,
+                            new SalesFact(
+                                    locId,
+                                    rs.getLong("txn_count"),
+                                    rs.getBigDecimal("gross"),
+                                    rs.getBigDecimal("net"),
+                                    rs.getBigDecimal("tax")));
+                },
+                Date.valueOf(reportDate),
+                locationId,
+                locationId);
+
+        // 2. Line fact items sold for the day
+        Map<UUID, BigDecimal> itemsSoldMap = new HashMap<>();
+        jdbc.query(
+                """
+                select f.location_id,
+                       coalesce(sum(f.qty), 0) as items_sold
+                  from reporting.shop_sale_line_fact f
+                 where f.business_date = ?
+                   and (?::uuid is null or f.location_id = ?)
+                 group by f.location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    itemsSoldMap.put(locId, rs.getBigDecimal("items_sold"));
+                },
+                Date.valueOf(reportDate),
+                locationId,
+                locationId);
+
+        // 3. Targets covering this day: pick the most specific target (smallest date range)
+        record TargetRow(UUID locationId, BigDecimal targetAmount, LocalDate start, LocalDate end, String currency) {}
+        Map<UUID, TargetRow> targetMap = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select t.location_id,
+                       t.target_amount,
+                       t.period_start,
+                       t.period_end,
+                       t.currency
+                  from reporting.shop_target t
+                 where ? between t.period_start and t.period_end
+                   and (?::uuid is null or t.location_id = ?)
+                 order by (t.period_end - t.period_start) asc
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    if (!targetMap.containsKey(locId)) {
+                        targetMap.put(
+                                locId,
+                                new TargetRow(
+                                        locId,
+                                        rs.getBigDecimal("target_amount"),
+                                        rs.getDate("period_start").toLocalDate(),
+                                        rs.getDate("period_end").toLocalDate(),
+                                        rs.getString("currency")));
+                    }
+                },
+                Date.valueOf(reportDate),
+                locationId,
+                locationId);
+
+        // 4. Collect all relevant location IDs
+        Set<UUID> allLocIds = new LinkedHashSet<>();
+        if (locationId != null) {
+            allLocIds.add(locationId);
+        } else {
+            allLocIds.addAll(sales.keySet());
+            allLocIds.addAll(targetMap.keySet());
+            try {
+                party.listLocations(new LocationFilter("ACTIVE", null, null, null, 100), scope)
+                        .items()
+                        .forEach(l -> allLocIds.add(l.locationId()));
+            } catch (Exception ignored) {
+            }
+        }
+
+        List<DailyShopReportItem> items = new ArrayList<>();
+        BigDecimal totalGross = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalNet = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalTax = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        long totalTxns = 0;
+        BigDecimal totalItems = BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP);
+        BigDecimal totalTarget = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        boolean anyTarget = false;
+
+        for (UUID locId : allLocIds) {
+            SalesFact sf = sales.get(locId);
+            BigDecimal gross = sf != null
+                    ? sf.gross().setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal net = sf != null
+                    ? sf.net().setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal tax = sf != null
+                    ? sf.tax().setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            long txnCount = sf != null ? sf.txnCount() : 0;
+            BigDecimal atv = txnCount > 0
+                    ? gross.divide(BigDecimal.valueOf(txnCount), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal itemsSold =
+                    itemsSoldMap.getOrDefault(locId, BigDecimal.ZERO).setScale(3, RoundingMode.HALF_UP);
+
+            TargetRow tr = targetMap.get(locId);
+            BigDecimal dailyTarget = null;
+            BigDecimal variance = null;
+            BigDecimal achievement = null;
+            ShopPerformanceState state = ShopPerformanceState.NO_TARGET;
+            String currency = "LKR";
+
+            if (tr != null) {
+                anyTarget = true;
+                currency = tr.currency();
+                long days = ChronoUnit.DAYS.between(tr.start(), tr.end()) + 1;
+                dailyTarget = tr.targetAmount().divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP);
+                totalTarget = totalTarget.add(dailyTarget);
+                variance = gross.subtract(dailyTarget).setScale(2, RoundingMode.HALF_UP);
+                if (dailyTarget.signum() > 0) {
+                    achievement = gross.multiply(BigDecimal.valueOf(100)).divide(dailyTarget, 1, RoundingMode.HALF_UP);
+                }
+                state = gross.compareTo(dailyTarget) >= 0
+                        ? ShopPerformanceState.TARGET_MET
+                        : ShopPerformanceState.BEHIND_TARGET;
+            }
+
+            Optional<LocationView> locView = party.getLocation(locId, scope);
+            String locationCode = locView.map(LocationView::locationCode).orElse("");
+            String locationName = names.location(locId);
+
+            items.add(new DailyShopReportItem(
+                    locId,
+                    locationCode,
+                    locationName,
+                    reportDate,
+                    gross,
+                    net,
+                    tax,
+                    txnCount,
+                    atv,
+                    itemsSold,
+                    dailyTarget,
+                    variance,
+                    achievement,
+                    state,
+                    currency));
+
+            totalGross = totalGross.add(gross);
+            totalNet = totalNet.add(net);
+            totalTax = totalTax.add(tax);
+            totalTxns += txnCount;
+            totalItems = totalItems.add(itemsSold);
+        }
+
+        BigDecimal avgAtv = totalTxns > 0
+                ? totalGross.divide(BigDecimal.valueOf(totalTxns), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal summaryTarget = anyTarget ? totalTarget : null;
+        BigDecimal summaryVariance =
+                anyTarget ? totalGross.subtract(totalTarget).setScale(2, RoundingMode.HALF_UP) : null;
+        BigDecimal summaryAchievement = anyTarget && totalTarget.signum() > 0
+                ? totalGross.multiply(BigDecimal.valueOf(100)).divide(totalTarget, 1, RoundingMode.HALF_UP)
+                : null;
+
+        DailyShopReportSummary summary = new DailyShopReportSummary(
+                reportDate,
+                totalGross,
+                totalNet,
+                totalTax,
+                totalTxns,
+                avgAtv,
+                totalItems,
+                summaryTarget,
+                summaryVariance,
+                summaryAchievement,
+                "LKR");
+
+        return new DailyShopReport(summary, items);
+    }
+
+    @Override
+    public MonthlyShopReport monthlyShopReport(String yearMonth, UUID locationId, ScopeContext scope) {
+        if (scope.locationId() != null) {
+            if (locationId != null && !scope.locationId().equals(locationId)) {
+                throw new ProblemException("m8.shop_report.location_forbidden");
+            }
+            locationId = scope.locationId();
+        }
+
+        if (locationId != null) {
+            Optional<LocationView> loc = party.getLocation(locationId, scope);
+            if (loc.isEmpty()) {
+                throw new ProblemException("m8.shop_report.location_unknown");
+            }
+        }
+
+        YearMonth ym;
+        if (yearMonth == null || yearMonth.isBlank()) {
+            ym = YearMonth.now(clock);
+        } else {
+            try {
+                ym = YearMonth.parse(yearMonth);
+            } catch (Exception e) {
+                throw new ProblemException("m8.shop_report.month_invalid");
+            }
+        }
+
+        LocalDate periodStart = ym.atDay(1);
+        LocalDate periodEnd = ym.atEndOfMonth();
+        Names names = new Names(party, catalogue, scope);
+
+        // 1. Monthly sales per shop
+        record ShopMonthlySales(UUID locationId, long txnCount, BigDecimal gross, BigDecimal net, BigDecimal tax) {}
+        Map<UUID, ShopMonthlySales> sales = new LinkedHashMap<>();
+        jdbc.query(
+                """
+                select s.location_id,
+                       count(s.receipt_id) as txn_count,
+                       coalesce(sum(s.gross), 0) as gross,
+                       coalesce(sum(s.net), 0) as net,
+                       coalesce(sum(s.tax), 0) as tax
+                  from reporting.shop_sale_fact s
+                 where s.business_date between ? and ?
+                   and (?::uuid is null or s.location_id = ?)
+                 group by s.location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    sales.put(
+                            locId,
+                            new ShopMonthlySales(
+                                    locId,
+                                    rs.getLong("txn_count"),
+                                    rs.getBigDecimal("gross"),
+                                    rs.getBigDecimal("net"),
+                                    rs.getBigDecimal("tax")));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd),
+                locationId,
+                locationId);
+
+        // 2. Line fact items sold per shop
+        Map<UUID, BigDecimal> itemsSoldMap = new HashMap<>();
+        jdbc.query(
+                """
+                select f.location_id,
+                       coalesce(sum(f.qty), 0) as items_sold
+                  from reporting.shop_sale_line_fact f
+                 where f.business_date between ? and ?
+                   and (?::uuid is null or f.location_id = ?)
+                 group by f.location_id
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    itemsSoldMap.put(locId, rs.getBigDecimal("items_sold"));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd),
+                locationId,
+                locationId);
+
+        // 3. Daily trend across the month
+        Map<LocalDate, MonthlyDailyTrendItem> dailyTrendMap = new LinkedHashMap<>();
+        for (LocalDate d = periodStart; !d.isAfter(periodEnd); d = d.plusDays(1)) {
+            dailyTrendMap.put(
+                    d,
+                    new MonthlyDailyTrendItem(
+                            d,
+                            BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                            BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                            BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                            0,
+                            BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                            BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)));
+        }
+
+        Map<LocalDate, BigDecimal> dailyItemsMap = new HashMap<>();
+        jdbc.query(
+                """
+                select f.business_date,
+                       coalesce(sum(f.qty), 0) as items_sold
+                  from reporting.shop_sale_line_fact f
+                 where f.business_date between ? and ?
+                   and (?::uuid is null or f.location_id = ?)
+                 group by f.business_date
+                """,
+                rs -> {
+                    dailyItemsMap.put(rs.getDate("business_date").toLocalDate(), rs.getBigDecimal("items_sold"));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd),
+                locationId,
+                locationId);
+
+        jdbc.query(
+                """
+                select s.business_date,
+                       count(s.receipt_id) as txn_count,
+                       coalesce(sum(s.gross), 0) as gross,
+                       coalesce(sum(s.net), 0) as net,
+                       coalesce(sum(s.tax), 0) as tax
+                  from reporting.shop_sale_fact s
+                 where s.business_date between ? and ?
+                   and (?::uuid is null or s.location_id = ?)
+                 group by s.business_date
+                 order by s.business_date
+                """,
+                rs -> {
+                    LocalDate d = rs.getDate("business_date").toLocalDate();
+                    long txns = rs.getLong("txn_count");
+                    BigDecimal gross = rs.getBigDecimal("gross").setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal net = rs.getBigDecimal("net").setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal tax = rs.getBigDecimal("tax").setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal atv = txns > 0
+                            ? gross.divide(BigDecimal.valueOf(txns), 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal items =
+                            dailyItemsMap.getOrDefault(d, BigDecimal.ZERO).setScale(3, RoundingMode.HALF_UP);
+                    dailyTrendMap.put(d, new MonthlyDailyTrendItem(d, gross, net, tax, txns, atv, items));
+                },
+                Date.valueOf(periodStart),
+                Date.valueOf(periodEnd),
+                locationId,
+                locationId);
+
+        // 4. Targets overlapping the month per location
+        Map<UUID, BigDecimal> shopTargetMap = new HashMap<>();
+        Map<UUID, String> shopCurrencyMap = new HashMap<>();
+        jdbc.query(
+                """
+                select t.location_id,
+                       t.period_start,
+                       t.period_end,
+                       t.target_amount,
+                       t.currency
+                  from reporting.shop_target t
+                 where t.period_start <= ?
+                   and t.period_end >= ?
+                   and (?::uuid is null or t.location_id = ?)
+                """,
+                rs -> {
+                    UUID locId = rs.getObject("location_id", UUID.class);
+                    LocalDate tStart = rs.getDate("period_start").toLocalDate();
+                    LocalDate tEnd = rs.getDate("period_end").toLocalDate();
+                    BigDecimal amt = rs.getBigDecimal("target_amount");
+                    shopCurrencyMap.put(locId, rs.getString("currency"));
+
+                    LocalDate overlapStart = tStart.isAfter(periodStart) ? tStart : periodStart;
+                    LocalDate overlapEnd = tEnd.isBefore(periodEnd) ? tEnd : periodEnd;
+                    long overlapDays = ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
+                    long totalDays = ChronoUnit.DAYS.between(tStart, tEnd) + 1;
+
+                    BigDecimal prorated = amt.multiply(BigDecimal.valueOf(overlapDays))
+                            .divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
+                    shopTargetMap.merge(locId, prorated, BigDecimal::add);
+                },
+                Date.valueOf(periodEnd),
+                Date.valueOf(periodStart),
+                locationId,
+                locationId);
+
+        // 5. Collect shops
+        Set<UUID> allLocIds = new LinkedHashSet<>();
+        if (locationId != null) {
+            allLocIds.add(locationId);
+        } else {
+            allLocIds.addAll(sales.keySet());
+            allLocIds.addAll(shopTargetMap.keySet());
+            try {
+                party.listLocations(new LocationFilter("ACTIVE", null, null, null, 100), scope)
+                        .items()
+                        .forEach(l -> allLocIds.add(l.locationId()));
+            } catch (Exception ignored) {
+            }
+        }
+
+        List<MonthlyShopReportItem> items = new ArrayList<>();
+        BigDecimal totalGross = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalNet = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalTax = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        long totalTxns = 0;
+        BigDecimal totalItems = BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP);
+        BigDecimal totalTarget = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        boolean anyTarget = false;
+
+        for (UUID locId : allLocIds) {
+            ShopMonthlySales sf = sales.get(locId);
+            BigDecimal gross = sf != null
+                    ? sf.gross().setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal net = sf != null
+                    ? sf.net().setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal tax = sf != null
+                    ? sf.tax().setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            long txnCount = sf != null ? sf.txnCount() : 0;
+            BigDecimal atv = txnCount > 0
+                    ? gross.divide(BigDecimal.valueOf(txnCount), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal itemsSold =
+                    itemsSoldMap.getOrDefault(locId, BigDecimal.ZERO).setScale(3, RoundingMode.HALF_UP);
+
+            BigDecimal shopTarget = shopTargetMap.get(locId);
+            BigDecimal variance = null;
+            BigDecimal achievement = null;
+            ShopPerformanceState state = ShopPerformanceState.NO_TARGET;
+            String currency = shopCurrencyMap.getOrDefault(locId, "LKR");
+
+            if (shopTarget != null) {
+                anyTarget = true;
+                shopTarget = shopTarget.setScale(2, RoundingMode.HALF_UP);
+                totalTarget = totalTarget.add(shopTarget);
+                variance = gross.subtract(shopTarget).setScale(2, RoundingMode.HALF_UP);
+                if (shopTarget.signum() > 0) {
+                    achievement = gross.multiply(BigDecimal.valueOf(100)).divide(shopTarget, 1, RoundingMode.HALF_UP);
+                }
+                state = gross.compareTo(shopTarget) >= 0
+                        ? ShopPerformanceState.TARGET_MET
+                        : ShopPerformanceState.BEHIND_TARGET;
+            }
+
+            Optional<LocationView> locView = party.getLocation(locId, scope);
+            String locationCode = locView.map(LocationView::locationCode).orElse("");
+            String locationName = names.location(locId);
+
+            items.add(new MonthlyShopReportItem(
+                    locId,
+                    locationCode,
+                    locationName,
+                    gross,
+                    net,
+                    tax,
+                    txnCount,
+                    atv,
+                    itemsSold,
+                    shopTarget,
+                    variance,
+                    achievement,
+                    state,
+                    currency));
+
+            totalGross = totalGross.add(gross);
+            totalNet = totalNet.add(net);
+            totalTax = totalTax.add(tax);
+            totalTxns += txnCount;
+            totalItems = totalItems.add(itemsSold);
+        }
+
+        BigDecimal avgAtv = totalTxns > 0
+                ? totalGross.divide(BigDecimal.valueOf(totalTxns), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal summaryTarget = anyTarget ? totalTarget : null;
+        BigDecimal summaryVariance =
+                anyTarget ? totalGross.subtract(totalTarget).setScale(2, RoundingMode.HALF_UP) : null;
+        BigDecimal summaryAchievement = anyTarget && totalTarget.signum() > 0
+                ? totalGross.multiply(BigDecimal.valueOf(100)).divide(totalTarget, 1, RoundingMode.HALF_UP)
+                : null;
+
+        MonthlyShopReportSummary summary = new MonthlyShopReportSummary(
+                ym.toString(),
+                periodStart,
+                periodEnd,
+                totalGross,
+                totalNet,
+                totalTax,
+                totalTxns,
+                avgAtv,
+                totalItems,
+                summaryTarget,
+                summaryVariance,
+                summaryAchievement,
+                "LKR");
+
+        return new MonthlyShopReport(summary, new ArrayList<>(dailyTrendMap.values()), items);
     }
 }
