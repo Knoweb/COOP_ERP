@@ -158,7 +158,7 @@ WITH job (role_id, codes) AS (
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
             'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'shop.transfer.receive', 'sys.device.enrol',
-            'pos.receipt.view', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
+            'pos.receipt.view', 'pos.receipt.margin', 'inv.writeoff.witness', 'inv.repack.reverse', 'inv.count.schedule',
             'cat.sku.create_local']),
         -- the society managers of M102 and M103 also order from their distributor and receive
         -- at the shop (DEMO-02: the second tier of the demo history)
@@ -168,14 +168,14 @@ WITH job (role_id, codes) AS (
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view', 'pos.receipt.margin']),
         ('0190f0de-0000-7000-8000-000000000352'::uuid, ARRAY[
             'ord.order.draft', 'ord.order.submit', 'shop.grn.confirm', 'prc.pricelist.view', 'prt.relationship.view',
             'inv.opening.prepare', 'inv.opening.sign', 'inv.opening.countersign', 'inv.adjust.approve',
             'inv.writeoff.approve', 'prt.location.view', 'prt.location.activate', 'prt.location.primary',
             'prt.position.manage', 'sys.device.view', 'gov.user.view', 'trd.document.view', 'inv.stock.view',
             'cat.sku.view', 'gov.entity.view',
-            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view']),
+            'rpt.report.run', 'rpt.export.run', 'rpt.target.view', 'rpt.target.manage', 'inv.transfer.issue', 'sys.device.enrol', 'pos.receipt.view', 'pos.receipt.margin']),
         -- shop staff, at one shop only
         ('0190f0de-0000-7000-8000-000000000333'::uuid, ARRAY[
             'shop.grn.confirm', 'shop.count.record', 'shop.transfer.request', 'shop.transfer.receive',

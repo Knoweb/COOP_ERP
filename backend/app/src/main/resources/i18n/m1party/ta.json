@@ -1,6 +1,7 @@
 {
   "permission.pos.session.manage": "அமர்வு திறக்கப்படாதபோது காசாளர் இயந்திரத்தில் வணிக தேதியை பின்னோக்கி நகர்த்தவும்",
   "permission.pos.receipt.issue": "விற்பனை ரசீதை வழங்கவும்",
+  "permission.pos.receipt.margin": "ரசீது அடக்கவிலை, லாபம் மற்றும் மொத்த வரம்பைக் காண்க",
   "permission.pos.receipt.void": "ரசீதை ரத்து செய்யவும்",
   "permission.pos.refund.same_session": "தற்போதைய அமர்வின் ரசீதுக்கு பணத்தை திரும்ப வழங்கவும்",
   "permission.pos.negative_stock.acknowledge": "எதிர்மறை இருப்பு எச்சரிக்கையை ஏற்கவும்",

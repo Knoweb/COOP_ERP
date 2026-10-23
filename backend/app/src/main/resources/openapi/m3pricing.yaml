@@ -24,7 +24,7 @@ paths:
         - in: query
           name: kind
           required: false
-          schema: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+          schema: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         - in: query
           name: status
           required: false
@@ -279,6 +279,44 @@ paths:
       responses:
         '200':
           description: The price, or why the item is not sellable there
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetailPriceResponse' }
+        '404':
+          description: The location or the SKU is not visible in the caller's scope
+  /v1/pricing/resolve/commercial:
+    get:
+      tags: [Pricing]
+      operationId: resolveCommercialPrice
+      summary: The commercial selling price of a SKU at a shop on a date (tax-inclusive, per unit), under MRP and control ceilings
+      description: >
+        Prioritizes the society's published COMMERCIAL list in force on the date, falling back to
+        RETAIL list when no commercial line exists, bounded by in-stock MRP and the control price.
+      x-permission: prc.pricelist.view
+      parameters:
+        - in: query
+          name: locationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: skuId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: uom
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 10 }
+        - in: query
+          name: qty
+          required: true
+          schema: { type: number, exclusiveMinimum: 0 }
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: The commercial price, or why the item is not sellable there
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RetailPriceResponse' }
@@ -703,7 +741,7 @@ components:
       type: object
       required: [kind, name]
       properties:
-        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        kind: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         name: { type: string, minLength: 1, maxLength: 120 }
     PublishPriceListRequest:
       type: object
@@ -864,7 +902,7 @@ components:
         priceListId: { type: string, format: uuid }
         rootPriceListId: { type: string, format: uuid, description: The id of version 1 that a relationship binds }
         ownerEntityId: { type: string, format: uuid }
-        kind: { type: string, enum: [TRADE, RETAIL, ADVISORY] }
+        kind: { type: string, enum: [TRADE, RETAIL, COMMERCIAL, ADVISORY] }
         name: { type: string }
         version: { type: integer }
         sourceVersionId: { type: [string, 'null'], format: uuid }

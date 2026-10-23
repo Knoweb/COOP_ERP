@@ -15,6 +15,7 @@ The living guide of the module (AGENTS.md): with the tests and the seed files it
 | M3-07 | `pricing.mrp_policy` (every scope reads it); SetMrpPolicy; `EffectivePolicy`: the entity's row for the SKU, else the Federation's, else `pricing.default_mrp_policy`; a PICKER row without gaps takes `pricing.picker_gap_amount` and `pricing.picker_gap_percent` | `internal/policy` |
 | M3-10 (four of seven) | The shelf price list (RETAIL and ADVISORY, advisory column, ceiling per line, price check at a shop), the gazette, the MRP policy | `web/src/modules/m3pricing` |
 | M3-09 | The snapshot contributor (`price_list_line`, `discount_rule`, `control_price`, `mrp_policy`), change-log fan-out for retail prices, rules, ceilings and MRP policies, `PricingShops` | `internal/snapshot/` |
+| M1-03 | Commercial Price lists (`kind = 'COMMERCIAL'`) and resolution with fallback to RETAIL, respecting Control Price ceilings and shelf MRP without modifying stock valuation | `db/migration/m3pricing/V0010__commercial_price_list.sql`, `internal/list/`, `internal/queries/RetailPriceResolution`, `web/PricingController` |
 
 Not built yet: FREE_ITEM rules, AmendDraftRule, advisory rules and their adoption, tag-scoped control prices and policies and the unit conversion of a ceiling (M3-06 and M3-07 rest), adjustment types (M3-07), reviews (M3-08), labels, the other screens (M3-10), the freeze (M3-11).
 
