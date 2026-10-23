@@ -668,6 +668,54 @@ class RetailPricingPostgresIntegrationTest extends PostgresIntegrationTest {
                 .isEmpty();
     }
 
+    @Test
+    void commercialPriceResolvesAndFallsBackToRetail() {
+        // Shelf retail list: sugar at 280.00
+        UUID retailList = create.handle(new CreatePriceList("RETAIL", "Society shelf"), own(SOCIETY));
+        setLines.handle(new SetLines(retailList, List.of(line(sugar, "280.00"))), own(SOCIETY));
+        publish.handle(new PublishPriceList(retailList, tomorrow), own(SOCIETY));
+
+        // In-stock lot for rice with MRP 980
+        UUID riceBatch = batch(rice, "R-COMM", "980.00");
+        lot(riceBatch, rice, "50");
+
+        // Commercial list: rice at 900.00 (sugar is omitted from commercial list)
+        UUID commercialList = create.handle(new CreatePriceList("COMMERCIAL", "Commercial list"), own(SOCIETY));
+        setLines.handle(new SetLines(commercialList, List.of(line(rice, "900.00"))), own(SOCIETY));
+        publish.handle(new PublishPriceList(commercialList, tomorrow), own(SOCIETY));
+
+        // Rice resolves to commercial price 900.00
+        assertThat(queries.resolveCommercialPrice(SHOP, rice, "EA", BigDecimal.ONE, tomorrow, atShop(SOCIETY)))
+                .get()
+                .satisfies(p -> {
+                    assertThat(p.sellable()).isTrue();
+                    assertThat(p.unitPrice()).isEqualByComparingTo("900.00");
+                });
+
+        // Sugar was not in the commercial list, so it falls back to the retail shelf price (280.00)
+        assertThat(queries.resolveCommercialPrice(SHOP, sugar, "EA", BigDecimal.ONE, tomorrow, atShop(SOCIETY)))
+                .get()
+                .satisfies(p -> {
+                    assertThat(p.sellable()).isTrue();
+                    assertThat(p.unitPrice()).isEqualByComparingTo("280.00");
+                });
+
+        // Scope check: distributor cannot resolve society shop's commercial price
+        assertThat(queries.resolveCommercialPrice(SHOP, rice, "EA", BigDecimal.ONE, tomorrow, own(DISTRIBUTOR)))
+                .isEmpty();
+
+        // Control price cap check: if gazetted control price is 850.00, commercial price is capped at 850.00
+        enterControlPrice.handle(
+                new EnterControlPrice(rice, new BigDecimal("850.00"), "EA", tomorrow, null, "2492/30"),
+                own(FEDERATION));
+        assertThat(queries.resolveCommercialPrice(SHOP, rice, "EA", BigDecimal.ONE, tomorrow, atShop(SOCIETY)))
+                .get()
+                .satisfies(p -> {
+                    assertThat(p.unitPrice()).isEqualByComparingTo("850.00");
+                    assertThat(p.capReason()).isEqualTo("CONTROL_PRICE");
+                });
+    }
+
     // ---- helpers ----------------------------------------------------------------------------------
 
     private RetailPrice price(UUID sku) {

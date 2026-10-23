@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../shell/i18n/useT";
@@ -5,6 +6,7 @@ import { useFormatDate, useFormatInstant } from "../../shell/i18n/formats";
 import { DocumentHeader } from "../../shell/components/DocumentHeader";
 import { MoneyDisplay } from "../../shell/components/MoneyDisplay";
 import { usePosApi } from "./posApi";
+import type { ReceiptLineProfit } from "./posApi";
 import { useShop } from "./ShopPicker";
 import { FlagList, SkuLabel, TillLabel, useTenderText } from "./labels";
 import { errorText, receiptLook, tillNumber } from "./posView";
@@ -30,6 +32,23 @@ export function ReceiptPage() {
     enabled: documentId !== "",
     retry: false
   });
+  const profitRead = useQuery({
+    queryKey: ["pos", "receipt", "profit", documentId],
+    queryFn: () => api.receiptProfit(documentId),
+    enabled: documentId !== "",
+    retry: false
+  });
+  const profit = profitRead.data;
+  const lineProfitMap = useMemo(() => {
+    const map = new Map<number, ReceiptLineProfit>();
+    if (profit?.lines) {
+      for (const line of profit.lines) {
+        map.set(line.lineNo, line);
+      }
+    }
+    return map;
+  }, [profit]);
+
   const sessionId = found.data?.sessionId;
   const sessionRead = useQuery({
     queryKey: ["pos", "session", sessionId],
@@ -110,24 +129,57 @@ export function ReceiptPage() {
                 <th className="numeric-cell">{t("pos.column.qty").text}</th>
                 <th className="numeric-cell">{t("pos.column.unit_price").text}</th>
                 <th className="numeric-cell">{t("pos.column.line_total").text}</th>
+                {profit && (
+                  <>
+                    <th className="numeric-cell">{t("pos.column.unit_cost").text}</th>
+                    <th className="numeric-cell">{t("pos.column.line_cost").text}</th>
+                    <th className="numeric-cell">{t("pos.column.line_profit").text}</th>
+                    <th className="numeric-cell">{t("pos.column.margin").text}</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
-              {receipt.lines.map((line) => (
-                <tr key={line.lineNo}>
-                  <td>{line.lineNo}</td>
-                  <td>
-                    <SkuLabel skuId={line.skuId} />
-                  </td>
-                  <td className="numeric-cell">{line.qty}</td>
-                  <td className="numeric-cell">
-                    <MoneyDisplay amount={line.unitPrice} />
-                  </td>
-                  <td className="numeric-cell">
-                    <MoneyDisplay amount={line.lineTotal} />
-                  </td>
-                </tr>
-              ))}
+              {receipt.lines.map((line) => {
+                const lp = lineProfitMap.get(line.lineNo);
+                return (
+                  <tr key={line.lineNo}>
+                    <td>{line.lineNo}</td>
+                    <td>
+                      <SkuLabel skuId={line.skuId} />
+                    </td>
+                    <td className="numeric-cell">{line.qty}</td>
+                    <td className="numeric-cell">
+                      <MoneyDisplay amount={line.unitPrice} />
+                    </td>
+                    <td className="numeric-cell">
+                      <MoneyDisplay amount={line.lineTotal} />
+                    </td>
+                    {profit && (
+                      lp && !lp.costPending && lp.unitCost != null && lp.lineCost != null && lp.lineProfit != null ? (
+                        <>
+                          <td className="numeric-cell">
+                            <MoneyDisplay amount={lp.unitCost} />
+                          </td>
+                          <td className="numeric-cell">
+                            <MoneyDisplay amount={lp.lineCost} />
+                          </td>
+                          <td className="numeric-cell">
+                            <MoneyDisplay amount={lp.lineProfit} />
+                          </td>
+                          <td className="numeric-cell">
+                            {lp.marginPercent != null ? `${lp.marginPercent}%` : "—"}
+                          </td>
+                        </>
+                      ) : (
+                        <td className="numeric-cell pos-profit-pending" colSpan={4}>
+                          {t("pos.profit.cost_pending").text}
+                        </td>
+                      )
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -149,6 +201,49 @@ export function ReceiptPage() {
           </div>
         </dl>
       </section>
+
+      {profit && (
+        <section className="pos-section pos-profit-card">
+          <h2>{t("pos.profit.title").text}</h2>
+          {profit.costPending && (
+            <p className="pos-profit-pending" role="status">
+              {t("pos.profit.pending_notice").text}
+            </p>
+          )}
+          <dl className="pos-totals">
+            <div>
+              <dt>{t("pos.profit.total_cost").text}</dt>
+              <dd>
+                {profit.totalCost != null ? (
+                  <MoneyDisplay amount={profit.totalCost} />
+                ) : (
+                  <span className="pos-profit-pending">{t("pos.profit.cost_pending").text}</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>{t("pos.profit.gross_profit").text}</dt>
+              <dd>
+                {profit.grossProfit != null ? (
+                  <MoneyDisplay amount={profit.grossProfit} />
+                ) : (
+                  <span className="pos-profit-pending">{t("pos.profit.cost_pending").text}</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>{t("pos.profit.margin_pct").text}</dt>
+              <dd>
+                {profit.marginPercent != null ? (
+                  <span>{profit.marginPercent}%</span>
+                ) : (
+                  <span className="pos-profit-pending">{t("pos.profit.cost_pending").text}</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <section className="pos-section">
         <h2>{t("pos.receipt.tenders").text}</h2>

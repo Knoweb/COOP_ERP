@@ -80,7 +80,9 @@ class AuthoringValidator {
         Map<UUID, Optional<SkuView>> skus = new HashMap<>();
         Map<UUID, Optional<BigDecimal>> lowestMrp = new HashMap<>();
         Map<UUID, Optional<ShelfBatches.Shelved>> lowestInStock = new HashMap<>();
-        List<UUID> locations = PriceListStore.RETAIL.equals(kind) ? shelf.locationsOfCaller(scope) : List.of();
+        List<UUID> locations = (PriceListStore.RETAIL.equals(kind) || PriceListStore.COMMERCIAL.equals(kind))
+                ? shelf.locationsOfCaller(scope)
+                : List.of();
         Map<String, String> tierFaults = tierFaults(lines);
         Map<String, Long> occurrences = lines.stream()
                 .filter(line -> line.skuId() != null && line.uomCode() != null && line.tierFromQty() != null)
@@ -88,8 +90,14 @@ class AuthoringValidator {
 
         List<Outcome> outcomes = new ArrayList<>();
         for (SetLines.Line line : lines) {
-            String reason =
-                    refusal(line, shelfList, PriceListStore.RETAIL.equals(kind), skus, tierFaults, occurrences, scope);
+            String reason = refusal(
+                    line,
+                    shelfList,
+                    PriceListStore.RETAIL.equals(kind) || PriceListStore.COMMERCIAL.equals(kind),
+                    skus,
+                    tierFaults,
+                    occurrences,
+                    scope);
             if (reason != null) {
                 outcomes.add(new Outcome(line.skuId(), line.uomCode(), line.tierFromQty(), false, reason, null));
                 continue;
@@ -126,10 +134,11 @@ class AuthoringValidator {
             Map<UUID, Optional<ShelfBatches.Shelved>> lowestInStock,
             ScopeContext scope) {
         Optional<ControlPriceView> control = controlPrices.ceilingFor(line.skuId(), line.uomCode(), onDate);
-        Optional<ShelfBatches.Shelved> mrp = PriceListStore.RETAIL.equals(kind)
-                ? lowestInStock.computeIfAbsent(
-                        line.skuId(), sku -> ShelfBatches.lowestMrp(shelf.inStock(locations, sku, scope)))
-                : Optional.empty();
+        Optional<ShelfBatches.Shelved> mrp =
+                (PriceListStore.RETAIL.equals(kind) || PriceListStore.COMMERCIAL.equals(kind))
+                        ? lowestInStock.computeIfAbsent(
+                                line.skuId(), sku -> ShelfBatches.lowestMrp(shelf.inStock(locations, sku, scope)))
+                        : Optional.empty();
 
         // The binding ceiling is the lower of the two; on a tie the control price is named (the law).
         String kindOfCeiling = null;

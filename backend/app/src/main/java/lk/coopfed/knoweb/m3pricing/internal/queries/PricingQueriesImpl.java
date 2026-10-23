@@ -137,6 +137,12 @@ class PricingQueriesImpl implements PricingQueries {
     }
 
     @Override
+    public Optional<RetailPrice> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uomCode, BigDecimal quantity, LocalDate date, ScopeContext scope) {
+        return retail.resolveCommercial(locationId, skuId, uomCode, quantity, date, scope);
+    }
+
+    @Override
     public List<PriceListLineView> advisoryLines(LocalDate date, ScopeContext scope) {
         return store.advisoryInForce(date).stream()
                 .flatMap(list -> store.lines(list.priceListId()).stream())

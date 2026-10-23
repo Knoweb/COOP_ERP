@@ -33,6 +33,12 @@ public interface PosQueries {
     Optional<ReceiptView> receipt(UUID documentId, ScopeContext scope);
 
     /**
+     * Authoritative cost, gross profit and margin breakdown of one receipt, or empty when there is
+     * none or the caller's scope may not see it.
+     */
+    Optional<ReceiptProfitView> receiptProfit(UUID documentId, ScopeContext scope);
+
+    /**
      * One page of a location's till sessions, newest first, with their close when it arrived; a
      * close whose open never arrived is listed with the open's fields empty.
      */
@@ -114,4 +120,29 @@ public interface PosQueries {
             String reason,
             Long deviceSeq,
             List<String> flags) {}
+
+    record ReceiptProfitView(
+            UUID documentId,
+            UUID locationId,
+            BigDecimal netSales,
+            BigDecimal totalCost,
+            BigDecimal grossProfit,
+            BigDecimal marginPercent,
+            boolean costPending,
+            String currency,
+            List<LineProfitView> lines) {
+
+        public record LineProfitView(
+                int lineNo,
+                UUID skuId,
+                BigDecimal qty,
+                BigDecimal unitPrice,
+                BigDecimal lineTotal,
+                BigDecimal lineNet,
+                BigDecimal unitCost,
+                BigDecimal lineCost,
+                BigDecimal lineProfit,
+                BigDecimal marginPercent,
+                boolean costPending) {}
+    }
 }

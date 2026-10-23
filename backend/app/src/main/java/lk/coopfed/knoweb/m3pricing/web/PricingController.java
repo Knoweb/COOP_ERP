@@ -304,6 +304,29 @@ class PricingController implements PricingApi {
     }
 
     @Override
+    public ResponseEntity<RetailPriceResponse> resolveCommercialPrice(
+            UUID locationId, UUID skuId, String uom, BigDecimal qty, LocalDate date) {
+        return queries.resolveCommercialPrice(locationId, skuId, uom, qty, date, currentScope.get())
+                .map(price -> new RetailPriceResponse(
+                                price.locationId(),
+                                price.skuId(),
+                                price.uomCode(),
+                                price.sellable(),
+                                RetailPriceResponse.CapReasonEnum.fromValue(price.capReason()),
+                                RetailPriceResponse.PolicyEnum.fromValue(price.policy()),
+                                price.engineVersion())
+                        .reason(price.reason())
+                        .priceListId(price.priceListId())
+                        .listPrice(price.listPrice())
+                        .unitPrice(price.unitPrice())
+                        .mrpApplied(price.mrpApplied())
+                        .controlPrice(price.controlPrice())
+                        .batchId(price.batchId()))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Override
     public ResponseEntity<List<PriceListLineResponse>> listAdvisoryLines(LocalDate date) {
         return ResponseEntity.ok(queries.advisoryLines(date, currentScope.get()).stream()
                 .map(PricingController::toResponse)
