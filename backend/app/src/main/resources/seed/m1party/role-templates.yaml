@@ -170,4 +170,3 @@ templates:
       - "shop.grn.confirm"
       - "shop.count.record"
       - "inv.writeoff.request"
-      - "pos.receipt.margin"
