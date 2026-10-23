@@ -78,7 +78,7 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     InventoryQueries queries;
 
-    @MockitoSpyBean
+    @Autowired
     StockLedger ledger;
 
     @Autowired
@@ -131,7 +131,7 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @AfterEach
     void clean() {
-        reset(transferDocumentType, ledger);
+        reset(transferDocumentType);
         fixture.clean();
     }
 
@@ -958,13 +958,18 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
         UUID lineId = superuserJdbc()
                 .queryForObject("select line_id from inventory.transfer_line where transfer_id = ?", UUID.class, id);
         kernel.reset();
-        doThrow(new IllegalStateException("TRANSFER_IN failure")).when(ledger).post(any(), any());
+        superuserJdbc()
+                .update(
+                        "insert into inventory.movement_sequence"
+                                + " (location_id, source, owner_entity_id, last_seq) values (?, 'central', ?, ?)",
+                        shop,
+                        MPCS,
+                        Long.MAX_VALUE);
 
         assertThatThrownBy(() -> receive.handle(
                         new ReceiveTransfer(id, List.of(new ReceiveTransfer.Line(lineId, new BigDecimal("4.000")))),
                         at(MPCS, shop)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("TRANSFER_IN failure");
+                .hasRootCauseMessage("ERROR: bigint out of range");
 
         for (String table :
                 List.of("transfer_receipt", "transfer_receipt_line", "transfer_shortfall", "transfer_shortfall_line")) {

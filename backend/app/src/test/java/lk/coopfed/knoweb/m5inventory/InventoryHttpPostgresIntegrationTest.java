@@ -413,7 +413,7 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aPositiveShortReceiptReturnsItsUnpostedDraftAndPostsOnlyTheActualQuantity() {
-        UUID shop = fixture.location(MPCS, "SHORT");
+        UUID shop = fixture.location(MPCS, "SHOP");
         ResponseEntity<JsonNode> issued = post(
                 "/v1/inventory/transfers",
                 java.util.Map.of(
