@@ -89,5 +89,9 @@
   "m8.target.amount_invalid": "The target amount cannot be negative",
   "m8.target.duplicate": "A sales target already exists for this shop and period",
   "m8.target.not_found": "The sales target does not exist",
-  "m8.target.own_required": "Sales targets can only be managed by users acting for their own organisation"
+  "m8.target.own_required": "Sales targets can only be managed by users acting for their own organisation",
+  "m8.shop_report.location_unknown": "The shop was not found or is outside your organisation",
+  "m8.shop_report.location_forbidden": "You are not permitted to view reports for another shop",
+  "m8.shop_report.date_invalid": "The reporting date is invalid",
+  "m8.shop_report.month_invalid": "The reporting month format is invalid, expected YYYY-MM"
 }

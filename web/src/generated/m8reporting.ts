@@ -203,6 +203,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reporting/shop-reports/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Daily operational sales report for shops
+         * @description Returns daily operational sales metrics (gross, net, tax, transactions, average transaction value, items sold) aggregated for permitted shops, with comparison against defined targets.
+         */
+        get: operations["getDailyShopReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reporting/shop-reports/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly operational sales report for shops
+         * @description Returns monthly operational sales metrics, daily trend breakdown, and cross-shop comparison for management review, including sales target achievement where targets exist.
+         */
+        get: operations["getMonthlyShopReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -387,6 +427,99 @@ export interface components {
         };
         ShopTargetPerformanceResponse: {
             items: components["schemas"]["ShopTargetPerformanceItem"][];
+        };
+        DailyShopReportResponse: {
+            summary: components["schemas"]["DailyShopReportSummary"];
+            shops: components["schemas"]["DailyShopReportItem"][];
+        };
+        DailyShopReportSummary: {
+            /** Format: date */
+            businessDate: string;
+            totalGrossSales: string;
+            totalNetSales: string;
+            totalTaxAmount: string;
+            /** Format: int64 */
+            totalTransactions: number;
+            averageTransactionValue: string;
+            totalItemsSold: string;
+            totalTargetAmount?: string | null;
+            totalVarianceAmount?: string | null;
+            overallAchievementPercent?: string | null;
+            currency: string;
+        };
+        DailyShopReportItem: {
+            /** Format: uuid */
+            locationId: string;
+            locationCode: string;
+            locationName: string;
+            /** Format: date */
+            businessDate: string;
+            grossSales: string;
+            netSales: string;
+            taxAmount: string;
+            /** Format: int64 */
+            transactionCount: number;
+            averageTransactionValue: string;
+            itemsSold: string;
+            targetAmount?: string | null;
+            varianceAmount?: string | null;
+            achievementPercent?: string | null;
+            /** @enum {string} */
+            performanceState: "TARGET_MET" | "BEHIND_TARGET" | "NO_TARGET";
+            currency: string;
+        };
+        MonthlyShopReportResponse: {
+            summary: components["schemas"]["MonthlyShopReportSummary"];
+            dailyTrend: components["schemas"]["MonthlyDailyTrendItem"][];
+            shops: components["schemas"]["MonthlyShopReportItem"][];
+        };
+        MonthlyShopReportSummary: {
+            yearMonth: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            totalGrossSales: string;
+            totalNetSales: string;
+            totalTaxAmount: string;
+            /** Format: int64 */
+            totalTransactions: number;
+            averageTransactionValue: string;
+            totalItemsSold: string;
+            totalTargetAmount?: string | null;
+            totalVarianceAmount?: string | null;
+            overallAchievementPercent?: string | null;
+            currency: string;
+        };
+        MonthlyDailyTrendItem: {
+            /** Format: date */
+            businessDate: string;
+            grossSales: string;
+            netSales: string;
+            taxAmount: string;
+            /** Format: int64 */
+            transactionCount: number;
+            averageTransactionValue: string;
+            itemsSold: string;
+        };
+        MonthlyShopReportItem: {
+            /** Format: uuid */
+            locationId: string;
+            locationCode: string;
+            locationName: string;
+            grossSales: string;
+            netSales: string;
+            taxAmount: string;
+            /** Format: int64 */
+            transactionCount: number;
+            averageTransactionValue: string;
+            itemsSold: string;
+            targetAmount?: string | null;
+            varianceAmount?: string | null;
+            achievementPercent?: string | null;
+            /** @enum {string} */
+            performanceState: "TARGET_MET" | "BEHIND_TARGET" | "NO_TARGET";
+            currency: string;
         };
         FieldProblem: {
             /** @description The property of the body, or the header, query or path parameter */
@@ -778,6 +911,86 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getDailyShopReport: {
+        parameters: {
+            query?: {
+                date?: string;
+                /** @description One location (the stock position); all the caller reads when absent */
+                locationId?: components["parameters"]["LocationId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyShopReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Shop is outside caller's permitted scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Shop not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    getMonthlyShopReport: {
+        parameters: {
+            query?: {
+                yearMonth?: string;
+                /** @description One location (the stock position); all the caller reads when absent */
+                locationId?: components["parameters"]["LocationId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monthly report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyShopReportResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            /** @description Shop is outside caller's permitted scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Shop not found in caller's permitted scope */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             422: components["responses"]["RuleBroken"];
         };
     };
