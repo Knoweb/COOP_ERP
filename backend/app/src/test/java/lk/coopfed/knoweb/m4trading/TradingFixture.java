@@ -231,6 +231,7 @@ public final class TradingFixture {
                 "delete from inventory.stock_movement where owner_entity_id in (?, ?, ?)", SELLER, BUYER, STRANGER);
         admin.update("delete from catalogue.batch_key where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.batch where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
+        admin.update("delete from catalogue.location_assortment where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.sku where sku_id in (?, ?, ?)", RICE, DHAL, DRAFT_SKU);
         admin.update("delete from catalogue.tax_rate where tax_category_id in (?, ?)", TAX_CATEGORY, EXEMPT_CATEGORY);
         admin.update(

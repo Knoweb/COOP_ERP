@@ -582,5 +582,191 @@
   font-weight: var(--font-weight-strong);
 }
 
+/* Batch Card & Correction */
+.batch-chain-notice {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-surface-hover);
+  border-left: var(--border-width-strong) solid var(--color-primary);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.batch-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--target-min) * 4), 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.batch-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.batch-detail-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.batch-detail-value {
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.batch-detail-value--mrp {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.batch-correction-form {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: calc(var(--space-8) * 8);
+}
+
+.table-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.catalogue-inline-form {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* Duplicate Suspects Card Grid */
+.suspects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--target-min) * 6), 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.suspect-card {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.suspect-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.suspect-card__status {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.score-badge {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: var(--border-width) var(--space-1);
+  border-radius: var(--radius);
+}
+
+.score-badge--critical {
+  background-color: var(--color-alert-bg);
+  color: var(--color-alert-text);
+}
+
+.score-badge--high {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.score-badge--moderate {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+.suspect-card__comparison {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius);
+}
+
+.suspect-card__side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.suspect-card__side h4 {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.suspect-card__sku {
+  display: flex;
+  flex-direction: column;
+}
+
+.suspect-card__sku a {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.suspect-card__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.suspect-card__divider {
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+}
+
+.reasons-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.reason-tag {
+  font-size: var(--text-xs);
+  background: var(--color-surface-hover);
+  padding: var(--border-width) var(--space-1);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+}
+
+.suspect-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
 
 

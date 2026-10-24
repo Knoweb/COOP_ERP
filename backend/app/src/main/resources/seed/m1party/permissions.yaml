@@ -459,12 +459,26 @@ permissions:
     module: "m8reporting"
     description_en: "Export a report as CSV or print it to PDF"
     scope: "ENTITY"
+  # Polgolla M1-01: shop sales target management and actual sales comparison
+  - code: "rpt.target.view"
+    module: "m8reporting"
+    description_en: "View shop sales targets and actual performance comparison"
+    scope: "ENTITY"
+  - code: "rpt.target.manage"
+    module: "m8reporting"
+    description_en: "Define and update shop sales targets"
+    scope: "ENTITY"
   # M6 Point of Sale, the central side (26A section 10), minimal for the demo: the reads of the
   # receipts and sessions the tills uploaded. The till's own permissions (sale, refund, session)
   # come with the till track.
   - code: "pos.receipt.view"
     module: "m6pos"
     description_en: "See the receipts and till sessions of the shops"
+    scope: "LOCATION"
+  # Polgolla M1-03: POS profit and margin visibility for authorized staff
+  - code: "pos.receipt.margin"
+    module: "m6pos"
+    description_en: "View cost, profit and margin on sales receipts"
     scope: "LOCATION"
   # M7 Customers & Payment Recording (27A section 3.1, seed/m7/permissions.yaml, appended here as
   # M4 and M6 do: M1SeedLoader reads this one file). cus.customer.view is the read code of the

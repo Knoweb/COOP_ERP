@@ -75,6 +75,11 @@ public class CreatePriceListHandler implements Handles<CreatePriceList, UUID> {
             if (store.rootOfKind(PriceListStore.RETAIL, scope.entityId()).isPresent()) {
                 throw new ProblemException("m3.price_list.retail_exists");
             }
+        } else if (PriceListStore.COMMERCIAL.equals(kind)) {
+            // M1-03: An entity may have at most one commercial price list root (its versions supersede).
+            if (store.rootOfKind(PriceListStore.COMMERCIAL, scope.entityId()).isPresent()) {
+                throw new ProblemException("m3.price_list.commercial_exists");
+            }
         } else if (PriceListStore.ADVISORY.equals(kind)) {
             // 23A section 7: "ADVISORY/TRADE-federation: caller F".
             if (!federation.isCaller(scope)) {

@@ -157,6 +157,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/resolve/commercial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The commercial selling price of a SKU at a shop on a date (tax-inclusive, per unit), under MRP and control ceilings
+         * @description Prioritizes the society's published COMMERCIAL list in force on the date, falling back to RETAIL list when no commercial line exists, bounded by in-stock MRP and the control price.
+         */
+        get: operations["resolveCommercialPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/advisory-lines": {
         parameters: {
             query?: never;
@@ -456,7 +476,7 @@ export interface components {
         };
         CreatePriceListRequest: {
             /** @enum {string} */
-            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            kind: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
             name: string;
         };
         PublishPriceListRequest: {
@@ -639,7 +659,7 @@ export interface components {
             /** Format: uuid */
             ownerEntityId?: string;
             /** @enum {string} */
-            kind: "TRADE" | "RETAIL" | "ADVISORY";
+            kind: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
             name: string;
             version: number;
             /** Format: uuid */
@@ -833,7 +853,7 @@ export interface operations {
     listPriceLists: {
         parameters: {
             query?: {
-                kind?: "TRADE" | "RETAIL" | "ADVISORY";
+                kind?: "TRADE" | "RETAIL" | "COMMERCIAL" | "ADVISORY";
                 status?: "DRAFT" | "PUBLISHED" | "SUPERSEDED" | "WITHDRAWN";
             };
             header?: never;
@@ -1097,6 +1117,39 @@ export interface operations {
             };
             400: components["responses"]["RequestProblem"];
             /** @description The location is not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resolveCommercialPrice: {
+        parameters: {
+            query: {
+                locationId: string;
+                skuId: string;
+                uom: string;
+                qty: number;
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The commercial price, or why the item is not sellable there */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetailPriceResponse"];
+                };
+            };
+            /** @description The location or the SKU is not visible in the caller's scope */
             404: {
                 headers: {
                     [name: string]: unknown;

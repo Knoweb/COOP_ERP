@@ -49,10 +49,10 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // where the demo server stands after PR 11.
         // Wave 3, M1M2M3M5-26 (m1security V0021, security.role_holder_shops): from V0020.
         streams.put("m1security", "20");
-        // CAT-03: m2catalogue V0010 (sku_alias) from V0009.
-        streams.put("m2catalogue", "9");
-        // PRC-03: m3pricing V0009 (label_job) from V0008 (adjustment_types).
-        streams.put("m3pricing", "8");
+        // CAT-06: m2catalogue V0011 (location_assortment) from V0010.
+        streams.put("m2catalogue", "10");
+        // M1-03: m3pricing V0010 (commercial_price_list) from V0009 (label_job).
+        streams.put("m3pricing", "9");
         // Wave 2, PR 07: m4trading V0010 (extension rows until issue) on a database at V0009.
         streams.put("m4trading", "9");
         // INV-07: m5inventory V0012-V0014 (receipt, shortfall and cancellation facts) from V0011.
@@ -197,8 +197,8 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
                 .containsEntry("kernel", 95)
                 .containsEntry("m1party", 17)
                 .containsEntry("m1security", 21)
-                .containsEntry("m2catalogue", 10)
-                .containsEntry("m3pricing", 9)
+                .containsEntry("m2catalogue", 11)
+                .containsEntry("m3pricing", 10)
                 .containsEntry("m5inventory", 14)
                 // Wave 3 (M7M8M9-04): m7customers V0005 replaces the re-key functions in place.
                 .containsEntry("m7customers", 5);
@@ -315,7 +315,14 @@ class ModuleMigrationsFromThePreviousNumberIntegrationTest extends PostgresInteg
         // Wave 2, PR 08: m8reporting V0007 over a database at V0006 with rows in it. The old lines
         // are numbered in their line_id order under the new key, as the migrator (not a superuser)
         // could only do with the table's FORCE lifted for that statement, and FORCE is back.
-        assertThat(after).containsEntry("m8reporting", 7);
+        // POL-M1-01: m8reporting V0008 adds reporting.shop_target with 4-class RLS.
+        assertThat(after).containsEntry("m8reporting", 8);
+        assertThat(admin.queryForObject("select to_regclass('reporting.shop_target')::text", String.class))
+                .isEqualTo("reporting.shop_target");
+        assertThat(admin.queryForObject(
+                        "select relforcerowsecurity from pg_class where oid = 'reporting.shop_target'::regclass",
+                        Boolean.class))
+                .isTrue();
         assertThat(admin.queryForList(
                         "select line_id::text || ':' || line_no from reporting.shop_sale_line_fact order by line_no",
                         String.class))

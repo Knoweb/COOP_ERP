@@ -17,3 +17,14 @@ audit_event_types:
     severity: INFO
     offline_capturable: false
     description_en: A report was exported as CSV (the report, its parameters and the row count)
+
+  # Polgolla M1-01: shop sales target management
+  - code: SHOP_TARGET_CREATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A sales target was defined for a shop and period
+
+  - code: SHOP_TARGET_UPDATED
+    severity: INFO
+    offline_capturable: false
+    description_en: A sales target was updated for a shop and period

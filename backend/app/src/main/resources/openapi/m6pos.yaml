@@ -73,6 +73,32 @@ paths:
         '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
         '404':
           description: No such receipt, or the caller's scope may not see it
+  /v1/pos/receipts/{documentId}/profit:
+    get:
+      tags: [Pos]
+      operationId: getReceiptProfit
+      summary: The authoritative cost, gross profit and margin of one receipt
+      description: >
+        Available only to authorized management and accounting staff (pos.receipt.margin).
+        Computes line-level and receipt-level gross profit based on authoritative net sales revenue
+        and authoritative inventory cost allocated from M5 stock movements at the moment of sale.
+        If any line has pending cost (e.g. oversold before inventory intake), costPending is true
+        and overall profit is not calculated as fake zero cost.
+      x-permission: pos.receipt.margin
+      parameters:
+        - in: path
+          name: documentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The receipt profit breakdown
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReceiptProfitResponse' }
+        '400': { $ref: 'common.yaml#/components/responses/RequestProblem' }
+        '404':
+          description: No such receipt, or the caller's scope may not see it
   /v1/pos/sessions:
     get:
       tags: [Pos]
@@ -255,3 +281,33 @@ components:
           type: array
           description: What central found odd (e.g. LOCATION_MISMATCH, SESSION_UNKNOWN, SESSION_CLOSED)
           items: { type: string }
+    ReceiptProfitResponse:
+      type: object
+      required: [documentId, locationId, netSales, costPending, currency, lines]
+      properties:
+        documentId: { type: string, format: uuid }
+        locationId: { type: string, format: uuid }
+        netSales: { type: number }
+        totalCost: { type: number, nullable: true }
+        grossProfit: { type: number, nullable: true }
+        marginPercent: { type: number, nullable: true }
+        costPending: { type: boolean }
+        currency: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/ReceiptLineProfitResponse' }
+    ReceiptLineProfitResponse:
+      type: object
+      required: [lineNo, skuId, qty, unitPrice, lineTotal, lineNet, costPending]
+      properties:
+        lineNo: { type: integer }
+        skuId: { type: string, format: uuid }
+        qty: { type: number }
+        unitPrice: { type: number }
+        lineTotal: { type: number }
+        lineNet: { type: number }
+        unitCost: { type: number, nullable: true }
+        lineCost: { type: number, nullable: true }
+        lineProfit: { type: number, nullable: true }
+        marginPercent: { type: number, nullable: true }
+        costPending: { type: boolean }

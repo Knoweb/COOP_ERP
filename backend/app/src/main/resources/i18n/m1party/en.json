@@ -1,6 +1,7 @@
 {
   "permission.pos.session.manage": "Move the business date backward on a till while no session is open",
   "permission.pos.receipt.issue": "Issue a sale receipt",
+  "permission.pos.receipt.margin": "View receipt cost, profit and gross margin",
   "permission.pos.receipt.void": "Void an entire receipt",
   "permission.pos.refund.same_session": "Issue a refund for a receipt from the current session",
   "permission.pos.negative_stock.acknowledge": "Acknowledge a negative stock warning",

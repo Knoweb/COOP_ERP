@@ -10,13 +10,17 @@ import type { ModuleDefinition } from "../../shell/modules/ModuleDefinition";
 import { DashboardPage } from "./DashboardPage";
 import { ReportPage } from "./ReportPage";
 import { ExceptionsPage } from "./ExceptionList";
+import { ShopTargetsPage } from "./ShopTargetsPage";
+import { ShopReportsPage } from "./ShopReportsPage";
 import { RequirePermission } from "../../shell/auth/RequirePermission";
 
 // Every M8 screen reads APIs that need rpt.report.run; rpt.export.run alone (a custom role) must
 // not get a page that ends in a 403. The CSV, print and run history inside ReportPage are shown
 // to rpt.export.run only (M1A-07).
 const REPORT = ["rpt.report.run"];
+const TARGETS = ["rpt.target.view"];
 const guard = (page: ReactElement) => <RequirePermission anyOf={REPORT}>{page}</RequirePermission>;
+const guardTargets = (page: ReactElement) => <RequirePermission anyOf={TARGETS}>{page}</RequirePermission>;
 
 export const reportingModule: ModuleDefinition = {
   id: "reporting",
@@ -24,12 +28,18 @@ export const reportingModule: ModuleDefinition = {
   routes: [
     { path: "reporting", element: guard(<DashboardPage />) },
     { path: "reporting/exceptions", element: guard(<ExceptionsPage />) },
+    { path: "reporting/targets", element: guardTargets(<ShopTargetsPage />) },
+    { path: "reporting/shop-reports", element: guard(<ShopReportsPage />) },
     { path: "reporting/reports/:reportId", element: guard(<ReportPage />) }
   ],
 
   // The label is a message id of reporting.messages.json, never literal text.
-  navItems: [{ labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT }],
+  navItems: [
+    { labelId: "reporting.nav", to: "/reporting", requiredPermissions: REPORT },
+    { labelId: "reporting.shop_reports.nav", to: "/reporting/shop-reports", requiredPermissions: REPORT },
+    { labelId: "reporting.targets.nav", to: "/reporting/targets", requiredPermissions: TARGETS }
+  ],
 
   // x-permissions of openapi/m8reporting.yaml, read from the session's resolved set (PR #144).
-  requiredPermissions: ["rpt.report.run", "rpt.export.run"]
+  requiredPermissions: ["rpt.report.run", "rpt.export.run", "rpt.target.view", "rpt.target.manage"]
 };

@@ -66,6 +66,7 @@ export function CataloguePage() {
   const api = useCatalogueApi();
   const canCreate = useHasPermission("cat.sku.create_local");
   const canImport = useHasPermission("cat.import.run");
+  const canSupplier = useHasPermission("cat.supplier.manage");
   const language = languageOf(intl.locale);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<SkuStatus | "">("");
@@ -83,6 +84,16 @@ export function CataloguePage() {
         title={t("catalogue.title").text}
         actions={
           <div className="catalogue-actions">
+            {canSupplier && (
+              <Link className="action-link" to="/catalogue/suppliers">
+                <span>{t("catalogue.suppliers.nav").text}</span>
+              </Link>
+            )}
+            {canCreate && (
+              <Link className="action-link" to="/catalogue/suspects">
+                <span>{t("catalogue.suspects.nav").text}</span>
+              </Link>
+            )}
             {canImport && (
               <Link className="action-link" to="/catalogue/import">
                 <span>{t("catalogue.import.nav").text}</span>

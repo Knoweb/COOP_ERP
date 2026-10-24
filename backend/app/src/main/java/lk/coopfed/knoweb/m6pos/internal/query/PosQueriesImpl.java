@@ -1,5 +1,7 @@
 package lk.coopfed.knoweb.m6pos.internal.query;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.ResultSet;
@@ -17,11 +19,14 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lk.coopfed.knoweb.kernel.api.ConfigRegistry;
 import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
+import lk.coopfed.knoweb.m5inventory.query.InventoryQueries;
+import lk.coopfed.knoweb.m5inventory.query.MovementView;
 import lk.coopfed.knoweb.m6pos.query.PosQueries;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -77,12 +82,17 @@ class PosQueriesImpl implements PosQueries {
     private final JdbcTemplate jdbc;
     private final ConfigRegistry config;
     private final ZoneId businessZone;
+    private final InventoryQueries inventoryQueries;
 
     PosQueriesImpl(
-            JdbcTemplate jdbc, ConfigRegistry config, @Value("${coop-erp.business-timezone}") String businessZone) {
+            JdbcTemplate jdbc,
+            ConfigRegistry config,
+            @Value("${coop-erp.business-timezone}") String businessZone,
+            InventoryQueries inventoryQueries) {
         this.jdbc = jdbc;
         this.config = config;
         this.businessZone = ZoneId.of(businessZone);
+        this.inventoryQueries = inventoryQueries;
     }
 
     @Override
@@ -120,6 +130,117 @@ class PosQueriesImpl implements PosQueries {
         List<ReceiptView> found =
                 jdbc.query(RECEIPT_COLUMNS + " where document_id = ?", PosQueriesImpl::header, documentId);
         return withLinesAndTenders(found).stream().findFirst();
+    }
+
+    @Override
+    public Optional<ReceiptProfitView> receiptProfit(UUID documentId, ScopeContext scope) {
+        Optional<ReceiptView> receiptOpt = receipt(documentId, scope);
+        if (receiptOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        ReceiptView receipt = receiptOpt.get();
+
+        List<MovementView> allMovements = inventoryQueries.movementsOf(documentId, scope);
+        List<MovementView> saleMovements = new ArrayList<>(allMovements.stream()
+                .filter(m -> "SALE".equalsIgnoreCase(m.movementType()))
+                .toList());
+
+        List<ReceiptProfitView.LineProfitView> lineProfits = new ArrayList<>();
+        boolean anyCostPending = false;
+
+        BigDecimal receiptGross = receipt.grossAmount() != null
+                ? receipt.grossAmount().setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal receiptNet = receipt.netAmount() != null
+                ? receipt.netAmount().setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        for (ReceiptView.Line line : receipt.lines()) {
+            MovementView matched = null;
+            for (int i = 0; i < saleMovements.size(); i++) {
+                MovementView candidate = saleMovements.get(i);
+                if (candidate.skuId() != null && candidate.skuId().equals(line.skuId())) {
+                    matched = saleMovements.remove(i);
+                    break;
+                }
+            }
+
+            BigDecimal lineTotal = line.lineTotal() != null ? line.lineTotal() : BigDecimal.ZERO;
+            BigDecimal lineNet;
+            if (receiptGross.compareTo(BigDecimal.ZERO) > 0 && receiptNet.compareTo(BigDecimal.ZERO) > 0) {
+                lineNet = lineTotal.multiply(receiptNet).divide(receiptGross, 2, RoundingMode.HALF_UP);
+            } else {
+                lineNet = lineTotal;
+            }
+
+            boolean lineCostKnown = matched != null
+                    && matched.unitCostAtMovement() != null
+                    && matched.unitCostAtMovement().compareTo(BigDecimal.ZERO) > 0;
+
+            if (lineCostKnown) {
+                BigDecimal unitCost = matched.unitCostAtMovement().setScale(4, RoundingMode.HALF_UP);
+                BigDecimal lineCost = unitCost.multiply(line.qty()).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal lineProfit = lineNet.subtract(lineCost).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal marginPercent = lineNet.compareTo(BigDecimal.ZERO) > 0
+                        ? lineProfit.multiply(BigDecimal.valueOf(100)).divide(lineNet, 2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+                lineProfits.add(new ReceiptProfitView.LineProfitView(
+                        line.lineNo(),
+                        line.skuId(),
+                        line.qty(),
+                        line.unitPrice(),
+                        lineTotal,
+                        lineNet,
+                        unitCost,
+                        lineCost,
+                        lineProfit,
+                        marginPercent,
+                        false));
+            } else {
+                anyCostPending = true;
+                lineProfits.add(new ReceiptProfitView.LineProfitView(
+                        line.lineNo(),
+                        line.skuId(),
+                        line.qty(),
+                        line.unitPrice(),
+                        lineTotal,
+                        lineNet,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true));
+            }
+        }
+
+        boolean receiptCostPending = anyCostPending || receipt.lines().isEmpty();
+        BigDecimal totalCost = null;
+        BigDecimal grossProfit = null;
+        BigDecimal marginPercent = null;
+
+        if (!receiptCostPending) {
+            totalCost = lineProfits.stream()
+                    .map(ReceiptProfitView.LineProfitView::lineCost)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+            grossProfit = receiptNet.subtract(totalCost).setScale(2, RoundingMode.HALF_UP);
+            marginPercent = receiptNet.compareTo(BigDecimal.ZERO) > 0
+                    ? grossProfit.multiply(BigDecimal.valueOf(100)).divide(receiptNet, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return Optional.of(new ReceiptProfitView(
+                receipt.documentId(),
+                receipt.locationId(),
+                receiptNet,
+                totalCost,
+                grossProfit,
+                marginPercent,
+                receiptCostPending,
+                "LKR",
+                lineProfits));
     }
 
     @Override

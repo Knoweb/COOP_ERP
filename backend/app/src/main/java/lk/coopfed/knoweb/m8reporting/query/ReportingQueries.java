@@ -41,4 +41,16 @@ public interface ReportingQueries {
      * @throws lk.coopfed.knoweb.kernel.api.ProblemException {@code m8.report.unknown}
      */
     List<ReportRunView> runs(String reportId, ScopeContext scope);
+
+    /** Target vs actual sales comparison performance for shops in the caller's scope. */
+    ShopTargetPerformanceReport shopTargetPerformance(ShopTargetFilter filter, ScopeContext scope);
+
+    /** A shop sales target by ID in the caller's scope. */
+    Optional<ShopTargetView> getShopTarget(UUID targetId, ScopeContext scope);
+
+    /** Daily operational sales report for permitted shops on a business date. */
+    DailyShopReport dailyShopReport(java.time.LocalDate date, UUID locationId, ScopeContext scope);
+
+    /** Monthly operational sales report, daily trend, and cross-shop comparison for a month. */
+    MonthlyShopReport monthlyShopReport(String yearMonth, UUID locationId, ScopeContext scope);
 }

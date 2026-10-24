@@ -399,6 +399,8 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
                 BATCH_NEGATIVE,
                 BATCH_ZERO);
         db.update("delete from catalogue.batch_key where sku_id in (?, ?)", SKU_1, SKU_2);
+        db.update("delete from catalogue.location_assortment where owner_entity_id in (?, ?)", SOCIETY_A, SOCIETY_B);
+        db.update("delete from catalogue.location_assortment where sku_id in (?, ?)", SKU_1, SKU_2);
         db.update("delete from catalogue.sku where sku_id in (?, ?)", SKU_1, SKU_2);
         db.update("delete from catalogue.tax_category where tax_category_id = ?", TAX_CATEGORY);
 

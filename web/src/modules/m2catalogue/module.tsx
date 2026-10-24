@@ -12,6 +12,9 @@ import { CatalogueImportPage } from "./CatalogueImportPage";
 import { NewSkuPage } from "./NewSkuPage";
 import { SkuPage } from "./SkuPage";
 import { TaxRatesPage } from "./TaxRatesPage";
+import { BatchPage } from "./BatchPage";
+import { SuppliersPage } from "./SuppliersPage";
+import { DuplicateSuspectsPage } from "./DuplicateSuspectsPage";
 
 export const catalogueModule: ModuleDefinition = {
   id: "catalogue",
@@ -35,6 +38,22 @@ export const catalogueModule: ModuleDefinition = {
       )
     },
     {
+      path: "catalogue/suppliers",
+      element: (
+        <RequirePermission anyOf={["cat.supplier.manage", "cat.sku.view"]}>
+          <SuppliersPage />
+        </RequirePermission>
+      )
+    },
+    {
+      path: "catalogue/suspects",
+      element: (
+        <RequirePermission anyOf={["cat.sku.create_local", "cat.sku.view"]}>
+          <DuplicateSuspectsPage />
+        </RequirePermission>
+      )
+    },
+    {
       path: "catalogue/skus/new",
       element: (
         <RequirePermission anyOf={["cat.sku.create_local"]}>
@@ -42,13 +61,16 @@ export const catalogueModule: ModuleDefinition = {
         </RequirePermission>
       )
     },
-    { path: "catalogue/skus/:skuId", element: <SkuPage /> }
+    { path: "catalogue/skus/:skuId", element: <SkuPage /> },
+    { path: "catalogue/batches/:batchId", element: <BatchPage /> }
   ],
 
   // The label is a message id of catalogue.messages.json, never literal text.
   navItems: [
     { labelId: "catalogue.nav", to: "/catalogue" },
-    { labelId: "catalogue.tax.nav", to: "/catalogue/tax-rates" }
+    { labelId: "catalogue.tax.nav", to: "/catalogue/tax-rates" },
+    { labelId: "catalogue.suppliers.nav", to: "/catalogue/suppliers" },
+    { labelId: "catalogue.suspects.nav", to: "/catalogue/suspects" }
   ],
 
   // x-permissions of openapi/m2catalogue.yaml, read from the session's resolved set (PR #144).
@@ -56,7 +78,11 @@ export const catalogueModule: ModuleDefinition = {
     "cat.sku.view",
     "cat.sku.create_local",
     "cat.sku.create",
+    "cat.sku.deactivate",
     "cat.barcode.manage",
+    "cat.batch.correct",
+    "cat.supplier.manage",
+    "cat.image.manage",
     "cat.import.run",
     "cat.tax.publish"
   ]

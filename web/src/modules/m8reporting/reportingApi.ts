@@ -14,6 +14,18 @@ export type ReportData = components["schemas"]["ReportDataResponse"];
 export type ReportRun = components["schemas"]["ReportRunResponse"];
 export type ExceptionItem = components["schemas"]["ExceptionItemResponse"];
 export type Location = partyComponents["schemas"]["LocationResponse"];
+export type ShopTarget = components["schemas"]["ShopTargetResponse"];
+export type ShopTargetPerformanceItem = components["schemas"]["ShopTargetPerformanceItem"];
+export type ShopTargetPerformanceReport = components["schemas"]["ShopTargetPerformanceResponse"];
+export type CreateShopTargetRequest = components["schemas"]["CreateShopTargetRequest"];
+export type UpdateShopTargetRequest = components["schemas"]["UpdateShopTargetRequest"];
+export type DailyShopReport = components["schemas"]["DailyShopReportResponse"];
+export type DailyShopReportSummary = components["schemas"]["DailyShopReportSummary"];
+export type DailyShopReportItem = components["schemas"]["DailyShopReportItem"];
+export type MonthlyShopReport = components["schemas"]["MonthlyShopReportResponse"];
+export type MonthlyShopReportSummary = components["schemas"]["MonthlyShopReportSummary"];
+export type MonthlyDailyTrendItem = components["schemas"]["MonthlyDailyTrendItem"];
+export type MonthlyShopReportItem = components["schemas"]["MonthlyShopReportItem"];
 
 /** The parameters of a report: a period for the period reports, a location for the stock position. */
 export type ReportQuery = { from?: string; to?: string; locationId?: string };
@@ -84,6 +96,67 @@ export function useReportingApi() {
       async locations(): Promise<Location[]> {
         const { data } = await party.GET("/v1/party/locations", { params: { query: { limit: 100 } } });
         return data?.items ?? [];
+      },
+
+      async createShopTarget(
+        body: CreateShopTargetRequest,
+        idempotencyKey: string
+      ): Promise<ShopTarget> {
+        const { data } = await api.POST("/v1/reporting/shop-targets", {
+          params: { header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async updateShopTarget(
+        targetId: string,
+        body: UpdateShopTargetRequest,
+        idempotencyKey: string
+      ): Promise<ShopTarget> {
+        const { data } = await api.PUT("/v1/reporting/shop-targets/{targetId}", {
+          params: { path: { targetId }, header: { "Idempotency-Key": idempotencyKey } },
+          body
+        });
+        return data!;
+      },
+
+      async getShopTarget(targetId: string): Promise<ShopTarget> {
+        const { data } = await api.GET("/v1/reporting/shop-targets/{targetId}", {
+          params: { path: { targetId } }
+        });
+        return data!;
+      },
+
+      async getShopTargetPerformance(query?: {
+        locationId?: string;
+        from?: string;
+        to?: string;
+      }): Promise<ShopTargetPerformanceReport> {
+        const { data } = await api.GET("/v1/reporting/shop-targets/performance", {
+          params: { query }
+        });
+        return data ?? { items: [] };
+      },
+
+      async dailyShopReport(query?: {
+        date?: string;
+        locationId?: string;
+      }): Promise<DailyShopReport> {
+        const { data } = await api.GET("/v1/reporting/shop-reports/daily", {
+          params: { query }
+        });
+        return data!;
+      },
+
+      async monthlyShopReport(query?: {
+        yearMonth?: string;
+        locationId?: string;
+      }): Promise<MonthlyShopReport> {
+        const { data } = await api.GET("/v1/reporting/shop-reports/monthly", {
+          params: { query }
+        });
+        return data!;
       }
     }),
     [api, party]
