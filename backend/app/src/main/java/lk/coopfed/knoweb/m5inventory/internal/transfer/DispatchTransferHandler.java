@@ -61,6 +61,9 @@ class DispatchTransferHandler implements Handles<DispatchTransfer, UUID> {
         if (scope.locationId() != null && !scope.locationId().equals(transfer.fromLocationId())) {
             throw new ProblemException("m5.transfer.not_source");
         }
+        if (store.cancelled(transfer.transferId())) {
+            throw new ProblemException("m5.transfer.already_cancelled");
+        }
         if (store.received(transfer.transferId())) {
             throw new ProblemException("m5.transfer.already_received");
         }

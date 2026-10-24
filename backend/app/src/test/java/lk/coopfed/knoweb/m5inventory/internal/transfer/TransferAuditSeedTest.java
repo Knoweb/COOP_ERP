@@ -25,4 +25,21 @@ class TransferAuditSeedTest {
                     assertThat(event.get("offline_capturable")).isEqualTo(false);
                 });
     }
+
+    @Test
+    void transferCancelledIsRegisteredAsAnOnlineInfoAuditEvent() {
+        YamlMapFactoryBean yaml = new YamlMapFactoryBean();
+        yaml.setResources(new ClassPathResource("seed/m5inventory/audit-event-types.yaml"));
+
+        Map<String, Object> root = yaml.getObject();
+        assertThat(root).isNotNull();
+        assertThat(root.get("audit_event_types"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(Map.class))
+                .filteredOn(event -> "TRANSFER_CANCELLED".equals(event.get("code")))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.get("severity")).isEqualTo("INFO");
+                    assertThat(event.get("offline_capturable")).isEqualTo(false);
+                });
+    }
 }

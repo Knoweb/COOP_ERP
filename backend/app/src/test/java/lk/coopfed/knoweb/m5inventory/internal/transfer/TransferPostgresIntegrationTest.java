@@ -30,6 +30,7 @@ import lk.coopfed.knoweb.kernel.api.ProblemException;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.kernel.api.SeriesRegistration;
 import lk.coopfed.knoweb.m5inventory.InventoryFixture;
+import lk.coopfed.knoweb.m5inventory.api.CancelTransfer;
 import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
 import lk.coopfed.knoweb.m5inventory.api.LotCondition;
@@ -38,6 +39,7 @@ import lk.coopfed.knoweb.m5inventory.api.MovementType;
 import lk.coopfed.knoweb.m5inventory.api.PostMovements;
 import lk.coopfed.knoweb.m5inventory.api.ReceiveTransfer;
 import lk.coopfed.knoweb.m5inventory.api.StockLedger;
+import lk.coopfed.knoweb.m5inventory.api.TransferCancelled;
 import lk.coopfed.knoweb.m5inventory.api.TransferDispatched;
 import lk.coopfed.knoweb.m5inventory.api.TransferIssued;
 import lk.coopfed.knoweb.m5inventory.api.TransferReceived;
@@ -74,6 +76,9 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     ReceiveTransferHandler receive;
+
+    @Autowired
+    CancelTransferHandler cancel;
 
     @Autowired
     InventoryQueries queries;
@@ -669,6 +674,215 @@ class TransferPostgresIntegrationTest extends PostgresIntegrationTest {
                                 Integer.class,
                                 id))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void issuedCancellationRestoresSourceAtFrozenCostAndIsTerminal() {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        UUID lineId = superuserJdbc()
+                .queryForObject("select line_id from inventory.transfer_line where transfer_id = ?", UUID.class, id);
+        kernel.reset();
+
+        cancel.handle(new CancelTransfer(id, "Order withdrawn", false), at(MPCS, warehouse));
+
+        assertThat(qty(warehouse)).isEqualByComparingTo("50");
+        assertThat(qty(shop)).isEqualByComparingTo("0");
+        assertThat(queries.transfer(id, own(MPCS)).orElseThrow().status()).isEqualTo("CANCELLED");
+        assertThat(queries.transfer(id, at(MPCS, shop)).orElseThrow().status()).isEqualTo("CANCELLED");
+        assertThat(queries.transfer(id, at(MPCS, otherShop))).isEmpty();
+        assertThat(queries.transfer(id, own(OTHER))).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select cancelled_from_status, physical_return_verified_by,"
+                                        + " physical_return_verified_at, reason"
+                                        + " from inventory.transfer_cancellation where transfer_id = ?",
+                                id))
+                .containsEntry("cancelled_from_status", "ISSUED")
+                .containsEntry("physical_return_verified_by", null)
+                .containsEntry("physical_return_verified_at", null)
+                .containsEntry("reason", "Order withdrawn");
+        assertThat(superuserJdbc()
+                        .queryForList(
+                                "select movement_type, location_id, document_line_id, qty_delta,"
+                                        + " unit_cost_at_movement from inventory.stock_movement"
+                                        + " where document_id = ? order by movement_seq",
+                                id))
+                .hasSize(2)
+                .anySatisfy(row -> {
+                    assertThat(row.get("movement_type")).isEqualTo("TRANSFER_OUT");
+                    assertThat(row.get("qty_delta")).isEqualTo(new BigDecimal("-5.000"));
+                })
+                .anySatisfy(row -> {
+                    assertThat(row.get("movement_type")).isEqualTo("TRANSFER_IN");
+                    assertThat(row.get("location_id")).isEqualTo(warehouse);
+                    assertThat(row.get("document_line_id")).isEqualTo(lineId);
+                    assertThat(row.get("qty_delta")).isEqualTo(new BigDecimal("5.000"));
+                    assertThat(row.get("unit_cost_at_movement")).isEqualTo(new BigDecimal("1200.0000"));
+                });
+        assertThat(kernel.committedAudit())
+                .extracting(KernelRecorder.AuditRecord::eventType)
+                .contains("STOCK_POSTED", "TRANSFER_CANCELLED");
+        assertThat(events(TransferCancelled.class)).singleElement().satisfies(event -> {
+            assertThat(event.previousStatus()).isEqualTo("ISSUED");
+            assertThat(event.physicalReturnVerified()).isFalse();
+        });
+
+        kernel.reset();
+        assertProblem(
+                () -> cancel.handle(new CancelTransfer(id, "Again", false), own(MPCS)),
+                "m5.transfer.already_cancelled");
+        assertProblem(() -> dispatch.handle(new DispatchTransfer(id), own(MPCS)), "m5.transfer.already_cancelled");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void inTransitCancellationRequiresAndRecordsVerifiedPhysicalReturn() {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        dispatch.handle(new DispatchTransfer(id), own(MPCS));
+        kernel.reset();
+
+        assertProblem(
+                () -> cancel.handle(new CancelTransfer(id, "Returned", false), at(MPCS, warehouse)),
+                "m5.transfer.physical_return_required");
+        assertThat(qty(warehouse)).isEqualByComparingTo("45");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_cancellation where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isZero();
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+
+        cancel.handle(new CancelTransfer(id, "Returned", true), at(MPCS, warehouse));
+
+        assertThat(qty(warehouse)).isEqualByComparingTo("50");
+        assertThat(superuserJdbc()
+                        .queryForMap(
+                                "select cancelled_from_status, physical_return_verified_by is not null as verified_by,"
+                                        + " physical_return_verified_at is not null as verified_at"
+                                        + " from inventory.transfer_cancellation where transfer_id = ?",
+                                id))
+                .containsEntry("cancelled_from_status", "IN_TRANSIT")
+                .containsEntry("verified_by", true)
+                .containsEntry("verified_at", true);
+        assertThat(events(TransferCancelled.class)).singleElement().satisfies(event -> {
+            assertThat(event.previousStatus()).isEqualTo("IN_TRANSIT");
+            assertThat(event.physicalReturnVerified()).isTrue();
+        });
+    }
+
+    @Test
+    void duplicateAndReceiptCancellationRacesCommitOneTerminalDecision() throws Exception {
+        UUID issued = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        assertThat(race(
+                        () -> cancel.handle(new CancelTransfer(issued, "Duplicate race", false), own(MPCS)),
+                        () -> cancel.handle(new CancelTransfer(issued, "Duplicate race", false), own(MPCS))))
+                .containsExactlyInAnyOrder("OK", "m5.transfer.already_cancelled");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_cancellation where transfer_id = ?",
+                                Integer.class,
+                                issued))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                Integer.class,
+                                issued))
+                .isEqualTo(1);
+
+        UUID inTransit = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        dispatch.handle(new DispatchTransfer(inTransit), own(MPCS));
+        List<String> outcomes = race(
+                () -> receive.handle(new ReceiveTransfer(inTransit), at(MPCS, shop)),
+                () -> cancel.handle(new CancelTransfer(inTransit, "Returned during race", true), own(MPCS)));
+        assertThat(outcomes).contains("OK");
+        assertThat(outcomes).anySatisfy(outcome -> assertThat(outcome)
+                .isIn("m5.transfer.already_received", "m5.transfer.already_cancelled"));
+        int receipts = superuserJdbc()
+                .queryForObject(
+                        "select count(*) from inventory.transfer_receipt where transfer_id = ?",
+                        Integer.class,
+                        inTransit);
+        int cancellations = superuserJdbc()
+                .queryForObject(
+                        "select count(*) from inventory.transfer_cancellation where transfer_id = ?",
+                        Integer.class,
+                        inTransit);
+        assertThat(receipts + cancellations).isEqualTo(1);
+        assertThat(qty(warehouse).add(qty(shop))).isEqualByComparingTo("50");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                Integer.class,
+                                inTransit))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void cancellationGuardsScopeReasonAndReceiptWithoutMutatingStock() {
+        UUID issued = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        kernel.reset();
+        assertProblem(
+                () -> cancel.handle(new CancelTransfer(issued, "Reason", false), viewOnly()), "m5.scope.own_required");
+        assertProblem(
+                () -> cancel.handle(new CancelTransfer(issued, "Reason", false), at(MPCS, shop)),
+                "m5.transfer.not_source");
+        assertProblem(
+                () -> cancel.handle(new CancelTransfer(issued, "  ", false), own(MPCS)),
+                "m5.transfer.cancellation_reason_invalid");
+        assertThat(qty(warehouse)).isEqualByComparingTo("45");
+
+        dispatch.handle(new DispatchTransfer(issued), own(MPCS));
+        receive.handle(new ReceiveTransfer(issued), at(MPCS, shop));
+        kernel.reset();
+        assertProblem(
+                () -> cancel.handle(new CancelTransfer(issued, "Too late", true), own(MPCS)),
+                "m5.transfer.already_received");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
+    }
+
+    @Test
+    void cancellationRollsBackItsFactAuditAndEventWhenStockRestorationFails() {
+        UUID id = issue.handle(transfer(warehouse, shop, "5"), own(MPCS));
+        kernel.reset();
+        superuserJdbc()
+                .update(
+                        "update inventory.movement_sequence set last_seq = ?"
+                                + " where location_id = ? and source = 'central'",
+                        Long.MAX_VALUE,
+                        warehouse);
+
+        assertThatThrownBy(() -> cancel.handle(new CancelTransfer(id, "Rollback", false), own(MPCS)))
+                .hasRootCauseMessage("ERROR: bigint out of range");
+
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_cancellation where transfer_id = ?",
+                                Integer.class,
+                                id))
+                .isZero();
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement"
+                                        + " where document_id = ? and movement_type = 'TRANSFER_IN'",
+                                Integer.class,
+                                id))
+                .isZero();
+        assertThat(qty(warehouse)).isEqualByComparingTo("45");
+        assertThat(kernel.committedAudit()).isEmpty();
+        assertThat(kernel.committedEvents()).isEmpty();
     }
 
     @Test

@@ -75,6 +75,14 @@ class TransferStore {
                 transferId));
     }
 
+    /** The source cancelled this transfer; its primary key permits this terminal fact only once. */
+    boolean cancelled(UUID transferId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from inventory.transfer_cancellation where transfer_id = ?)",
+                Boolean.class,
+                transferId));
+    }
+
     /** What the open pick lists of delivery notes hold of the GOOD lot of the batch at the location. */
     BigDecimal reserved(UUID locationId, UUID batchId) {
         BigDecimal held = jdbc.queryForObject(

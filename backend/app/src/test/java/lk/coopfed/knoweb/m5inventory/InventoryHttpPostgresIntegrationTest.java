@@ -284,6 +284,59 @@ class InventoryHttpPostgresIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void anIssuedTransferIsCancelledIdempotentlyOverHttp() {
+        UUID shop = fixture.location(MPCS, "SHOP");
+        ResponseEntity<JsonNode> issued = post(
+                "/v1/inventory/transfers",
+                java.util.Map.of(
+                        "fromLocationId", warehouse.toString(),
+                        "toLocationId", shop.toString(),
+                        "lines", List.of(java.util.Map.of("batchId", batch.toString(), "qty", 5))),
+                USER);
+        assertThat(issued.getStatusCode()).as(String.valueOf(issued.getBody())).isEqualTo(HttpStatus.CREATED);
+        String id = issued.getBody().get("transferId").asText();
+        UUID idempotencyKey = UUID.randomUUID();
+
+        ResponseEntity<JsonNode> cancelled = post(
+                "/v1/inventory/transfers/" + id + "/cancel",
+                java.util.Map.of("reason", "Order withdrawn"),
+                USER,
+                idempotencyKey);
+        ResponseEntity<JsonNode> replay = post(
+                "/v1/inventory/transfers/" + id + "/cancel",
+                java.util.Map.of("reason", "Order withdrawn"),
+                USER,
+                idempotencyKey);
+
+        assertThat(cancelled.getStatusCode())
+                .as(String.valueOf(cancelled.getBody()))
+                .isEqualTo(HttpStatus.OK);
+        assertThat(cancelled.getBody().get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(replay.getBody().get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.transfer_cancellation where transfer_id = ?::uuid",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select count(*) from inventory.stock_movement where document_id = ?::uuid",
+                                Integer.class,
+                                id))
+                .isEqualTo(2);
+        assertThat(get(
+                                "/v1/inventory/locations/" + warehouse + "/balances",
+                                TestIdentityProvider.entityWideHeaders(USER, MPCS))
+                        .getBody()
+                        .get(0)
+                        .get("qtyOnHand")
+                        .decimalValue())
+                .isEqualByComparingTo("12");
+    }
+
+    @Test
     void explicitReceiptQuantitiesAreValidatedAndRemainBackwardCompatible() {
         UUID shop = fixture.location(MPCS, "SHOP");
         UUID secondSku = fixture.sku(MPCS, "TEA1");

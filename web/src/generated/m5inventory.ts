@@ -187,7 +187,7 @@ export interface paths {
         };
         /**
          * The transfers leaving or arriving at a location, newest first
-         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until the destination receives, then RECEIVED.
+         * @description A session at the source sees the transfers it sent, a session at the destination the ones addressed to it; an entity-wide user both. Status ISSUED until dispatch, IN_TRANSIT until the destination receives, then RECEIVED, or CANCELLED when cancelled before receipt.
          */
         get: operations["listTransfers"];
         put?: never;
@@ -253,6 +253,26 @@ export interface paths {
          * @description An absent body preserves the original full-receipt operation. When a body is supplied it must name every immutable transfer line exactly once. A positive quantity below the issued quantity receives only that amount and creates an unposted DAMAGED_IN_TRANSIT shortfall draft. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_destination, m5.transfer.not_dispatched, m5.transfer.already_received, m5.transfer.receipt_lines_required, m5.transfer.receipt_line_invalid, m5.transfer.receipt_line_duplicate, m5.transfer.receipt_line_unknown, m5.transfer.receipt_line_missing, m5.transfer.receipt_qty_invalid, m5.transfer.receipt_qty_exceeds_sent.
          */
         post: operations["receiveTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/transfers/{transferId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an unreceived transfer and restore its stock at the source
+         * @description An ISSUED transfer can be cancelled directly. An IN_TRANSIT transfer can be cancelled only after the source user verifies that the goods physically returned to the original source. Cancellation posts one compensating TRANSFER_IN at that source per issued line. Codes this operation can answer with 422: m5.scope.own_required, m5.transfer.not_found, m5.transfer.not_source, m5.transfer.already_received, m5.transfer.already_cancelled, m5.transfer.physical_return_required, m5.transfer.cancellation_reason_invalid.
+         */
+        post: operations["cancelTransfer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -675,6 +695,11 @@ export interface components {
             transferLineId: string;
             receivedQty: number;
         };
+        CancelTransferRequest: {
+            reason: string;
+            /** @description Must be true when cancelling an IN_TRANSIT transfer after physical return */
+            physicalReturnVerified?: boolean;
+        };
         TransferResponse: {
             /** Format: uuid */
             transferId: string;
@@ -683,7 +708,7 @@ export interface components {
             /** Format: uuid */
             toLocationId: string;
             /** @enum {string} */
-            status: "ISSUED" | "IN_TRANSIT" | "RECEIVED";
+            status: "ISSUED" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
             documentNo?: string;
             /** Format: uuid */
             issuedBy?: string;
@@ -1535,6 +1560,37 @@ export interface operations {
         };
         responses: {
             /** @description Received */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferResponse"];
+                };
+            };
+            400: components["responses"]["RequestProblem"];
+            422: components["responses"]["RuleBroken"];
+        };
+    };
+    cancelTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A fresh UUID per user action; repeat the same value when retrying the same request */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                transferId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Cancelled */
             200: {
                 headers: {
                     [name: string]: unknown;

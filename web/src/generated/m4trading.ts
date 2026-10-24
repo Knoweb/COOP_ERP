@@ -1834,7 +1834,7 @@ export interface components {
              */
             transferId?: string;
             /** @enum {string} */
-            transferStatus?: "ISSUED" | "IN_TRANSIT" | "RECEIVED";
+            transferStatus?: "ISSUED" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
             lines: components["schemas"]["TransferRequestLineResponse"][];
         };
         TransferRequestLineResponse: {

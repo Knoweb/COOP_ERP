@@ -67,6 +67,7 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
     static final UUID TRANSFER_RECEIVED = UUID.fromString("0190a820-0000-7000-8800-000000000702");
     static final UUID TRANSFER_LINE_1 = UUID.fromString("0190a820-0000-7000-8800-000000000711");
     static final UUID TRANSFER_LINE_2 = UUID.fromString("0190a820-0000-7000-8800-000000000712");
+    static final UUID TRANSFER_CANCEL_USER = UUID.fromString("0190a820-0000-7000-8800-000000000713");
 
     @Autowired
     LotSnapshotContributor lotContributor;
@@ -347,6 +348,10 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
 
     private void clean(JdbcTemplate db) {
         db.update(
+                "delete from inventory.transfer_cancellation where transfer_id in (?, ?)",
+                TRANSFER_EXPECTED,
+                TRANSFER_RECEIVED);
+        db.update(
                 "delete from inventory.transfer_receipt where transfer_id in (?, ?)",
                 TRANSFER_EXPECTED,
                 TRANSFER_RECEIVED);
@@ -582,6 +587,29 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
         assertThat(rows).containsKey(TRANSFER_EXPECTED).doesNotContainKey(TRANSFER_RECEIVED);
     }
 
+    @Test
+    void cancelledTransferIsTombstonedInSnapshotAndDelta() {
+        superuserJdbc()
+                .update(
+                        "insert into inventory.transfer_cancellation"
+                                + " (transfer_id, owner_entity_id, location_id, to_location_id, reason,"
+                                + " cancelled_from_status, physical_return_verified_by, physical_return_verified_at)"
+                                + " values (?, ?, ?, ?, 'Returned', 'IN_TRANSIT', ?, now())",
+                        TRANSFER_EXPECTED,
+                        SOCIETY_A,
+                        WAREHOUSE_A,
+                        SHOP_A,
+                        TRANSFER_CANCEL_USER);
+
+        Map<UUID, Map<String, Object>> transfers =
+                transactions.inScope(tillScopeA, () -> transferContributor.allRows("expected_transfer", shopA));
+        Map<UUID, Map<String, Object>> rows = transactions.inScope(
+                tillScopeA, () -> transferContributor.rows("expected_transfer", shopA, List.of(TRANSFER_EXPECTED)));
+
+        assertThat(transfers).doesNotContainKey(TRANSFER_EXPECTED);
+        assertThat(rows).doesNotContainKey(TRANSFER_EXPECTED);
+    }
+
     // ===========================================================================================
     // 5. Inventory Policy Snapshot Contributor
     // ===========================================================================================
@@ -704,7 +732,7 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
     }
 
     @Test
-    void transferDispatchedAndReceivedFanOutToDestinationShop() {
+    void transferDispatchedAndTerminalEventsFanOutToDestinationShop() {
         UUID transferId = UUID.randomUUID();
         transactions.inScope(tillScopeA, () -> {
             ObjectNode payload = json.createObjectNode()
@@ -740,6 +768,26 @@ class InventorySnapshotContributorIntegrationTest extends PostgresIntegrationTes
                         SHOP_A,
                         transferId);
         assertThat(changes.get(0).get("op")).isEqualTo("DELETE");
+
+        UUID cancelledTransferId = UUID.randomUUID();
+        transactions.inScope(tillScopeA, () -> {
+            ObjectNode payload = json.createObjectNode()
+                    .put("ownerEntityId", SOCIETY_A.toString())
+                    .put("toLocationId", SHOP_A.toString())
+                    .put("transferId", cancelledTransferId.toString());
+            fanOut.onTransferCancelled(payload, tillScopeA);
+            return null;
+        });
+        changes = superuserJdbc()
+                .queryForList(
+                        "select table_name, row_id, op from kernel.change_log"
+                                + " where location_id = ? and row_id = ? order by version desc limit 1",
+                        SHOP_A,
+                        cancelledTransferId);
+        assertThat(changes).singleElement().satisfies(change -> {
+            assertThat(change.get("table_name")).isEqualTo("expected_transfer");
+            assertThat(change.get("op")).isEqualTo("DELETE");
+        });
     }
 
     @Test

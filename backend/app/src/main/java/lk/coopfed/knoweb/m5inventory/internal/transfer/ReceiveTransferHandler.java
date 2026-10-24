@@ -96,6 +96,9 @@ class ReceiveTransferHandler implements Handles<ReceiveTransfer, UUID> {
         if (scope.locationId() != null && !scope.locationId().equals(transfer.toLocationId())) {
             throw new ProblemException("m5.transfer.not_destination");
         }
+        if (store.cancelled(transfer.transferId())) {
+            throw new ProblemException("m5.transfer.already_cancelled");
+        }
         if (!store.dispatched(transfer.transferId())) {
             throw new ProblemException("m5.transfer.not_dispatched");
         }

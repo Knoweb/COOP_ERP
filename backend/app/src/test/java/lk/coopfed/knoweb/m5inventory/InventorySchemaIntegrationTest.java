@@ -92,6 +92,18 @@ class InventorySchemaIntegrationTest extends PostgresIntegrationTest {
                         "(transfer_id, owner_entity_id, location_id, to_location_id)",
                         "inventory.transfer(transfer_id, owner_entity_id, location_id, to_location_id)");
 
+        assertThat(superuserJdbc()
+                        .queryForObject(
+                                "select pg_get_constraintdef(oid) from pg_constraint"
+                                        + " where conrelid = 'inventory.transfer_cancellation'::regclass"
+                                        + " and conname = 'transfer_cancellation_return_verification'",
+                                String.class))
+                .contains(
+                        "cancelled_from_status = 'ISSUED'",
+                        "physical_return_verified_by IS NULL",
+                        "cancelled_from_status = 'IN_TRANSIT'",
+                        "physical_return_verified_at IS NOT NULL");
+
         List<String> shortfallLineForeignKeys = superuserJdbc()
                 .queryForList(
                         "select pg_get_constraintdef(oid) from pg_constraint"

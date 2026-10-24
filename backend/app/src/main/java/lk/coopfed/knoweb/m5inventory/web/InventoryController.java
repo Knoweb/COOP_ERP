@@ -11,6 +11,7 @@ import lk.coopfed.knoweb.kernel.api.PolicyClass;
 import lk.coopfed.knoweb.kernel.api.ScopeContext;
 import lk.coopfed.knoweb.m2catalogue.query.BatchQueries;
 import lk.coopfed.knoweb.m2catalogue.query.BatchView;
+import lk.coopfed.knoweb.m5inventory.api.CancelTransfer;
 import lk.coopfed.knoweb.m5inventory.api.CountersignOpeningBalance;
 import lk.coopfed.knoweb.m5inventory.api.DispatchTransfer;
 import lk.coopfed.knoweb.m5inventory.api.IssueTransfer;
@@ -26,6 +27,7 @@ import lk.coopfed.knoweb.m5inventory.query.OpeningBalanceView;
 import lk.coopfed.knoweb.m5inventory.query.PickListView;
 import lk.coopfed.knoweb.m5inventory.query.TransferView;
 import lk.coopfed.knoweb.m5inventory.web.generated.AvailabilityResponse;
+import lk.coopfed.knoweb.m5inventory.web.generated.CancelTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.InventoryApi;
 import lk.coopfed.knoweb.m5inventory.web.generated.IssueTransferRequest;
 import lk.coopfed.knoweb.m5inventory.web.generated.LotBalanceResponse;
@@ -62,6 +64,7 @@ class InventoryController implements InventoryApi {
     private final Handles<IssueTransfer, UUID> issueTransfer;
     private final Handles<DispatchTransfer, UUID> dispatchTransfer;
     private final Handles<ReceiveTransfer, UUID> receiveTransfer;
+    private final Handles<CancelTransfer, UUID> cancelTransfer;
 
     InventoryController(
             InventoryQueries queries,
@@ -72,7 +75,8 @@ class InventoryController implements InventoryApi {
             Handles<CountersignOpeningBalance, UUID> countersign,
             Handles<IssueTransfer, UUID> issueTransfer,
             Handles<DispatchTransfer, UUID> dispatchTransfer,
-            Handles<ReceiveTransfer, UUID> receiveTransfer) {
+            Handles<ReceiveTransfer, UUID> receiveTransfer,
+            Handles<CancelTransfer, UUID> cancelTransfer) {
         this.queries = queries;
         this.batches = batches;
         this.currentScope = currentScope;
@@ -82,6 +86,7 @@ class InventoryController implements InventoryApi {
         this.issueTransfer = issueTransfer;
         this.dispatchTransfer = dispatchTransfer;
         this.receiveTransfer = receiveTransfer;
+        this.cancelTransfer = cancelTransfer;
     }
 
     // ---- transfers (M5-09) ----------------------------------------------------------------
@@ -137,6 +142,17 @@ class InventoryController implements InventoryApi {
                                         : new ReceiveTransfer.Line(line.getTransferLineId(), line.getReceivedQty()))
                                 .toList());
         receiveTransfer.handle(command, scope);
+        return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
+    }
+
+    @Override
+    public ResponseEntity<TransferResponse> cancelTransfer(
+            String idempotencyKey, UUID transferId, CancelTransferRequest request) {
+        ScopeContext scope = currentScope.get();
+        cancelTransfer.handle(
+                new CancelTransfer(
+                        transferId, request.getReason(), Boolean.TRUE.equals(request.getPhysicalReturnVerified())),
+                scope);
         return ResponseEntity.ok(toResponse(queries.transfer(transferId, scope).orElseThrow()));
     }
 

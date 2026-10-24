@@ -373,11 +373,13 @@ class InventoryQueriesImpl implements InventoryQueries {
                        d.doc_number_display,
                        x.dispatched_by, x.dispatched_at, x.transfer_id is not null as dispatched,
                        r.received_by, r.received_at, r.transfer_id is not null as received,
+                       c.transfer_id is not null as cancelled,
                        s.shortfall_id, s.status as shortfall_status, s.category as shortfall_category
                   from inventory.transfer t
                   left join kernel.document d on d.document_id = t.transfer_id
                   left join inventory.transfer_dispatch x on x.transfer_id = t.transfer_id
                   left join inventory.transfer_receipt r on r.transfer_id = t.transfer_id
+                  left join inventory.transfer_cancellation c on c.transfer_id = t.transfer_id
                   left join inventory.transfer_shortfall s on s.transfer_id = t.transfer_id
                  where """
                         + " " + condition
@@ -387,9 +389,11 @@ class InventoryQueriesImpl implements InventoryQueries {
                     OffsetDateTime issued = rs.getObject("issued_at", OffsetDateTime.class);
                     OffsetDateTime dispatched = rs.getObject("dispatched_at", OffsetDateTime.class);
                     OffsetDateTime received = rs.getObject("received_at", OffsetDateTime.class);
-                    String status = rs.getBoolean("received")
-                            ? "RECEIVED"
-                            : rs.getBoolean("dispatched") ? "IN_TRANSIT" : "ISSUED";
+                    String status = rs.getBoolean("cancelled")
+                            ? "CANCELLED"
+                            : rs.getBoolean("received")
+                                    ? "RECEIVED"
+                                    : rs.getBoolean("dispatched") ? "IN_TRANSIT" : "ISSUED";
                     return new TransferView(
                             id,
                             rs.getObject("location_id", UUID.class),

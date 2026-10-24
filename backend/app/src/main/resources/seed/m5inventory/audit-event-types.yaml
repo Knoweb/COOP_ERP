@@ -63,6 +63,11 @@ audit_event_types:
     offline_capturable: false
     description_en: A transfer was received at its destination using the quantities recorded by the receiver
 
+  - code: TRANSFER_CANCELLED
+    severity: INFO
+    offline_capturable: false
+    description_en: An unreceived transfer was cancelled and its issued stock restored at the source
+
   - code: TRANSFER_SHORTFALL_DRAFTED
     severity: REVIEW
     offline_capturable: false
